@@ -514,6 +514,95 @@ function deleteAct(practiceNumber) {
   showToast(`Atto ${practiceNumber} eliminato.`);
 }
 
+function defaultCededItemRow() {
+  return `
+    <article class="ceded-item-row">
+      <strong class="row-number">1</strong>
+      <label>Descrizione oggetto <input value=""></label>
+      <label>Metallo
+        <select>
+          <option>Oro</option>
+          <option>Argento</option>
+          <option>Platino</option>
+        </select>
+      </label>
+      <label>Titolo
+        <select>
+          <option>24 kt</option>
+          <option>22 kt</option>
+          <option>21 kt</option>
+          <option selected>18 kt</option>
+          <option>14 kt</option>
+          <option>12 kt</option>
+          <option>9 kt</option>
+          <option>6 kt</option>
+        </select>
+      </label>
+      <button class="remove-row" type="button" aria-label="Rimuovi riga" disabled>-</button>
+    </article>
+  `;
+}
+
+function resetCurrentPractice() {
+  document.querySelectorAll(".form-panel input").forEach((input) => {
+    if (input.readOnly || input.type === "file") return;
+    if (input.type === "checkbox") {
+      input.checked = false;
+      return;
+    }
+    input.value = "";
+  });
+
+  document.querySelectorAll(".form-panel textarea").forEach((textarea) => {
+    textarea.value = "";
+  });
+
+  document.querySelectorAll(".form-panel select").forEach((select) => {
+    select.selectedIndex = 0;
+  });
+
+  const cededItemsTable = document.getElementById("cededItemsTable");
+  cededItemsTable.querySelectorAll(".ceded-item-row").forEach((row) => row.remove());
+  cededItemsTable.insertAdjacentHTML("beforeend", defaultCededItemRow());
+
+  state.signatures = [false, false, false];
+  document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  });
+
+  state.uploadedCaptures.clear();
+  state.attachments = 0;
+  state.step = 0;
+  state.annualProgressive += 1;
+
+  setPracticeMeta();
+  document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
+  renderStep();
+  updateSignatureState();
+  updateCededItems();
+  updateSaleTotal();
+  updateDocumentCaptureCards();
+  renderPaymentCaptureCard();
+  updateAttachmentState();
+}
+
+function deleteCurrentPractice() {
+  const practiceNumber = fieldValue("#practiceNumber");
+  const confirmed = window.confirm(`Vuoi eliminare l'atto attualmente in compilazione${practiceNumber ? ` ${practiceNumber}` : ""}?`);
+  if (!confirmed) return;
+
+  const existingIndex = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
+  if (existingIndex >= 0) {
+    demoActs.splice(existingIndex, 1);
+    saveActs();
+    renderArchiveGroups();
+    renderFusionGroups();
+  }
+
+  resetCurrentPractice();
+  showToast("Atto in compilazione eliminato.");
+}
+
 function actMaterials(act) {
   if (Array.isArray(act.materials) && act.materials.length) return act.materials;
   return [{ metal: "Oro", weight: act.weight || "0" }];
@@ -1114,6 +1203,8 @@ document.getElementById("previousStep").addEventListener("click", () => {
     renderStep();
   }
 });
+
+document.getElementById("deleteCurrentPractice").addEventListener("click", deleteCurrentPractice);
 
 document.getElementById("saveDraft").addEventListener("click", () => {
   showToast("Bozza salvata automaticamente.");
