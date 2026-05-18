@@ -10,6 +10,7 @@
   --rose: #a74531;
   --blue: #2f5f8f;
   --shadow: 0 16px 46px rgba(17, 12, 8, 0.12);
+  --apple-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
 }
 
 * {
@@ -131,6 +132,7 @@ textarea {
 }
 
 .main-menu-actions button {
+  font-family: var(--apple-font);
   border: 0;
   background: transparent;
   color: var(--gold);
@@ -212,6 +214,7 @@ textarea {
 }
 
 .brand-dropdown button {
+  font-family: var(--apple-font);
   width: 100%;
   min-height: 44px;
   border: 0;
@@ -244,6 +247,7 @@ textarea {
 }
 
 .nav-item {
+  font-family: var(--apple-font);
   min-height: 52px;
   border: 0;
   border-radius: 8px;
