@@ -534,6 +534,9 @@ textarea,
 
 input[type="date"],
 input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
   min-width: 0;
   line-height: 1.2;
   padding-right: 10px;
@@ -580,6 +583,16 @@ textarea {
 .field-grid label,
 .birth-place-row label {
   min-width: 0;
+}
+
+.birth-date-field {
+  width: 100%;
+  max-width: 320px;
+}
+
+.birth-date-field input {
+  max-width: 100%;
+  width: 100%;
 }
 
 .document-expiry-field input {
