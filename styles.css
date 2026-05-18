@@ -553,7 +553,7 @@ textarea {
 
 .practice-meta {
   display: grid;
-  grid-template-columns: minmax(120px, 0.8fr) minmax(190px, 1.35fr) minmax(130px, 0.75fr) minmax(112px, 0.6fr);
+  grid-template-columns: 1fr;
   gap: 10px;
   margin-bottom: 18px;
   padding: 12px;
@@ -562,10 +562,20 @@ textarea {
   background: #fff5ed;
 }
 
+.practice-meta-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .practice-meta label,
 .field-grid label,
 .birth-place-row label {
   min-width: 0;
+}
+
+.document-expiry-field input {
+  max-width: 220px;
 }
 
 .practice-meta input[readonly] {
@@ -637,7 +647,7 @@ textarea {
 .bullion-quote-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
 }
 
@@ -1517,10 +1527,6 @@ canvas {
 
   .ceded-items-head {
     display: none;
-  }
-
-  .practice-meta {
-    grid-template-columns: 1fr 1fr;
   }
 
   .brand-wrap {

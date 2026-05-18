@@ -95,24 +95,28 @@
               </div>
 
               <div class="practice-meta">
-                <label>Negozio
-                  <select id="storeCode">
-                    <option value="BUSTO" selected>Busto Arsizio</option>
-                    <option value="CASSANO">Cassano Magnago</option>
-                    <option value="LEGNANO">Legnano</option>
-                  </select>
-                </label>
-                <label>Atto di vendita n. <input id="practiceNumber" readonly></label>
-                <label>Data compilazione <input id="practiceDate" type="date"></label>
-                <label>Ora compilazione <input id="practiceTime" type="time"></label>
+                <div class="practice-meta-row">
+                  <label>Negozio
+                    <select id="storeCode">
+                      <option value="BUSTO" selected>Busto Arsizio</option>
+                      <option value="CASSANO">Cassano Magnago</option>
+                      <option value="LEGNANO">Legnano</option>
+                    </select>
+                  </label>
+                  <label>Atto di vendita n. <input id="practiceNumber" readonly></label>
+                </div>
+                <div class="practice-meta-row">
+                  <label>Data compilazione <input id="practiceDate" type="date"></label>
+                  <label>Ora compilazione <input id="practiceTime" type="time"></label>
+                </div>
               </div>
 
               <div class="field-grid two">
-                <label>Nome <input name="nome" value="Marco"></label>
-                <label>Cognome <input name="cognome" value="Rossi"></label>
-                <label>Data di nascita <input type="date" name="nascita" value="1982-04-18"></label>
+                <label>Nome <input name="nome"></label>
+                <label>Cognome <input name="cognome"></label>
+                <label>Data di nascita <input type="date" name="nascita"></label>
                 <div class="birth-place-row">
-                  <label>Luogo di nascita <input name="luogo" value="Torino"></label>
+                  <label>Luogo di nascita <input name="luogo"></label>
                   <label>Provincia
                     <select name="provinciaNascita" id="birthProvince">
                       <option value="">Seleziona</option>
@@ -125,18 +129,18 @@
                       <option>NA</option><option>NO</option><option>NU</option><option>OR</option><option>PD</option><option>PA</option><option>PR</option><option>PV</option><option>PG</option><option>PU</option><option>PE</option><option>PC</option><option>PI</option><option>PT</option><option>PN</option><option>PZ</option><option>PO</option>
                       <option>RG</option><option>RA</option><option>RC</option><option>RE</option><option>RI</option><option>RN</option><option>RM</option><option>RO</option>
                       <option>SA</option><option>SS</option><option>SV</option><option>SI</option><option>SR</option><option>SO</option><option>SU</option>
-                      <option>TA</option><option>TE</option><option>TR</option><option selected>TO</option><option>TP</option><option>TN</option><option>TV</option><option>TS</option>
+                      <option>TA</option><option>TE</option><option>TR</option><option>TO</option><option>TP</option><option>TN</option><option>TV</option><option>TS</option>
                       <option>UD</option><option>VA</option><option>VE</option><option>VB</option><option>VC</option><option>VR</option><option>VV</option><option>VI</option><option>VT</option>
                     </select>
                   </label>
                 </div>
-                <label>Codice fiscale <input name="cf" value="RSSMRC82D18L219A"></label>
-                <label>Telefono <input name="telefono" value="+39 333 1234567"></label>
+                <label>Codice fiscale <input name="cf"></label>
+                <label>Telefono <input name="telefono"></label>
               </div>
 
               <div class="field-grid">
                 <div class="birth-place-row">
-                  <label>Indirizzo di residenza <input name="indirizzo" value="Via Roma 24, Milano"></label>
+                  <label>Indirizzo di residenza <input name="indirizzo"></label>
                   <label>Provincia
                     <select name="provinciaResidenza" id="residenceProvince">
                       <option value="">Seleziona</option>
@@ -145,7 +149,7 @@
                       <option>CA</option><option>CL</option><option>CB</option><option>CI</option><option>CE</option><option>CT</option><option>CZ</option><option>CH</option><option>CO</option><option>CS</option><option>CR</option><option>KR</option><option>CN</option>
                       <option>EN</option><option>FM</option><option>FE</option><option>FI</option><option>FG</option><option>FC</option><option>FR</option>
                       <option>GE</option><option>GO</option><option>GR</option><option>IM</option><option>IS</option><option>SP</option><option>AQ</option><option>LT</option><option>LE</option><option>LC</option><option>LI</option><option>LO</option><option>LU</option>
-                      <option>MC</option><option>MN</option><option>MS</option><option>MT</option><option>ME</option><option selected>MI</option><option>MO</option><option>MB</option>
+                      <option>MC</option><option>MN</option><option>MS</option><option>MT</option><option>ME</option><option>MI</option><option>MO</option><option>MB</option>
                       <option>NA</option><option>NO</option><option>NU</option><option>OR</option><option>PD</option><option>PA</option><option>PR</option><option>PV</option><option>PG</option><option>PU</option><option>PE</option><option>PC</option><option>PI</option><option>PT</option><option>PN</option><option>PZ</option><option>PO</option>
                       <option>RG</option><option>RA</option><option>RC</option><option>RE</option><option>RI</option><option>RN</option><option>RM</option><option>RO</option>
                       <option>SA</option><option>SS</option><option>SV</option><option>SI</option><option>SR</option><option>SO</option><option>SU</option>
@@ -164,8 +168,8 @@
                     <option>Passaporto</option>
                   </select>
                 </label>
-                <label>Numero documento <input name="numeroDocumento" value="CA1234567"></label>
-                <label>Scadenza <input type="date" name="scadenzaDocumento" value="2030-11-20"></label>
+                <label>Numero documento <input name="numeroDocumento"></label>
+                <label class="document-expiry-field">Scadenza <input type="date" name="scadenzaDocumento"></label>
                 <label>Professione lavorativa
                   <select name="professione">
                     <option>Autonomo</option>
@@ -196,7 +200,7 @@
                   </div>
                   <article class="ceded-item-row">
                     <strong class="row-number">1</strong>
-                    <label>Descrizione oggetto <input value="Bracciale oro giallo"></label>
+                    <label>Descrizione oggetto <input></label>
                     <label>Metallo
                       <select>
                         <option>Oro</option>
@@ -223,7 +227,6 @@
                 <div class="bullion-quote-panel" id="bullionQuotePanel" aria-live="polite">
                   <div class="bullion-quote-heading">
                     <span class="internal-badge">Quotazione giornaliera</span>
-                    <strong>Valore borsa BullionVault</strong>
                   </div>
                   <label class="bullion-quote-field">
                     <span>Quotazione oro in borsa giornaliera &egrave; di &euro;</span>
@@ -263,11 +266,11 @@
                     <option>Assegno</option>
                   </select>
                 </label>
-                <label>Totale corrisposto <input id="saleTotal" type="number" value="860" min="0" step="0.01"></label>
+                <label>Totale corrisposto <input id="saleTotal" type="number" min="0" step="0.01"></label>
               </div>
 
               <label class="textarea-label">Note operatore
-                <textarea>Cliente identificato, oggetti visionati al banco e valutazione accettata.</textarea>
+                <textarea></textarea>
               </label>
             </div>
 
@@ -381,11 +384,11 @@
               <div class="summary-grid">
                 <div>
                   <span>Cliente</span>
-                  <strong>Marco Rossi</strong>
+                  <strong>Dato non inserito</strong>
                 </div>
                 <div>
                   <span>Codice fiscale</span>
-                  <strong>RSSMRC82D18L219A</strong>
+                  <strong>Dato non inserito</strong>
                 </div>
                 <div>
                   <span>Oggetti</span>
@@ -393,7 +396,7 @@
                 </div>
                 <div>
                   <span>Totale</span>
-                  <strong id="summaryTotal">EUR 860,00</strong>
+                  <strong id="summaryTotal">EUR 0,00</strong>
                 </div>
                 <div>
                   <span>Firme</span>

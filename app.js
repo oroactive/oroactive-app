@@ -1058,7 +1058,6 @@ function renderBullionQuoteFields() {
   container.innerHTML = `
     <div class="bullion-quote-heading">
       <span class="internal-badge">Quotazione giornaliera</span>
-      <strong>Valore borsa BullionVault</strong>
     </div>
     ${(metals.length ? metals : ["Oro"]).map((metal) => `
       <label class="bullion-quote-field">
