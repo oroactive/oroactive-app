@@ -151,7 +151,7 @@ textarea {
   border: 0;
   background: transparent;
   color: var(--gold);
-  font-size: clamp(28px, 5vw, 54px);
+  font-size: 20px;
   font-weight: 900;
   letter-spacing: 0;
   transition: transform 0.18s ease, color 0.18s ease;
@@ -1713,7 +1713,7 @@ canvas {
   }
 
   .main-menu-actions button {
-    font-size: clamp(24px, 9vw, 38px);
+    font-size: 20px;
     min-height: 56px;
   }
 
