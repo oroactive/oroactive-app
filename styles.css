@@ -509,7 +509,7 @@ textarea {
 }
 
 .field-grid.three {
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 label {
@@ -533,6 +533,13 @@ textarea,
   color: var(--ink);
   padding: 14px 13px;
   min-height: 50px;
+}
+
+input[type="date"],
+input[type="time"] {
+  min-width: 0;
+  line-height: 1.2;
+  padding-right: 10px;
 }
 
 textarea {
@@ -1423,9 +1430,24 @@ canvas {
   text-align: justify;
 }
 
+@media (max-width: 1180px) {
+  .practice-meta {
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+  }
+
+  .field-grid.two,
+  .field-grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .birth-place-row {
+    grid-template-columns: minmax(0, 1fr) minmax(112px, 140px);
+  }
+}
+
 @media (max-width: 1100px) {
   .practice-meta {
-    grid-template-columns: repeat(2, minmax(240px, 1fr));
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
   }
 
   .app-shell {
