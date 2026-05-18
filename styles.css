@@ -586,12 +586,15 @@ textarea {
 }
 
 .birth-date-field {
-  width: 100%;
-  max-width: 320px;
+  justify-self: start;
+  width: calc(100% - 24px);
+  max-width: calc(100% - 24px);
+  overflow: hidden;
 }
 
-.birth-date-field input {
-  max-width: 100%;
+.birth-date-field input[type="date"] {
+  inline-size: 100%;
+  max-inline-size: 100%;
   width: 100%;
 }
 
