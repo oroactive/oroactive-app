@@ -34,6 +34,7 @@ const documentLabels = {
   Patente: "patente",
   Passaporto: "passaporto"
 };
+const actsStorageKey = "oroactive-acts-v1";
 const demoActs = [
   {
     name: "Marco",
@@ -108,6 +109,26 @@ const demoActs = [
     status: "Archiviata"
   }
 ];
+
+function saveActs() {
+  localStorage.setItem(actsStorageKey, JSON.stringify(demoActs));
+}
+
+function loadSavedActs() {
+  const saved = localStorage.getItem(actsStorageKey);
+  if (!saved) {
+    saveActs();
+    return;
+  }
+
+  try {
+    const acts = JSON.parse(saved);
+    if (!Array.isArray(acts)) return;
+    demoActs.splice(0, demoActs.length, ...acts);
+  } catch {
+    saveActs();
+  }
+}
 
 function showToast(message) {
   toast.textContent = message;
@@ -476,6 +497,7 @@ function deleteAct(practiceNumber) {
   if (!confirmed) return;
 
   demoActs.splice(index, 1);
+  saveActs();
   state.lastSearchResults = state.lastSearchResults.filter((act) => act.practiceNumber !== practiceNumber);
   renderArchiveGroups();
   renderFusionGroups();
@@ -1121,6 +1143,7 @@ document.getElementById("archivePractice").addEventListener("click", () => {
   } else {
     demoActs.unshift(archivedAct);
   }
+  saveActs();
   renderArchiveGroups();
   renderFusionGroups();
   showToast("Atto di vendita salvato e archiviato.");
@@ -1320,6 +1343,7 @@ document.getElementById("closePreview").addEventListener("click", () => {
   previewModal.hidden = true;
 });
 
+loadSavedActs();
 renderStep();
 setPracticeMeta();
 updateSignatureState();
