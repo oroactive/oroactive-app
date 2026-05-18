@@ -1111,7 +1111,7 @@ canvas {
 }
 
 .search-table .table-row {
-  grid-template-columns: 1.2fr 1fr 0.9fr 0.75fr 0.75fr 1fr;
+  grid-template-columns: 1.2fr 1fr 0.9fr 0.75fr 0.75fr 1fr 0.9fr;
 }
 
 .fusion-table .table-row {
@@ -1168,6 +1168,33 @@ canvas {
   min-height: 38px;
   background: #fff;
   font-weight: 800;
+}
+
+.row-actions,
+.readonly-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.row-actions button {
+  flex: 1 1 90px;
+}
+
+.danger-button {
+  border-color: #f2b4a8 !important;
+  background: #fff1ef !important;
+  color: var(--rose) !important;
+}
+
+.danger-button:hover {
+  background: #ffe1dc !important;
+}
+
+.readonly-actions {
+  max-width: 780px;
+  margin: 0 auto 12px;
+  justify-content: flex-end;
 }
 
 .settings-grid {
@@ -1429,6 +1456,7 @@ canvas {
   .side-panel,
   .settings-grid,
   .table-row,
+  .search-table .table-row,
   .fusion-table .table-row {
     grid-template-columns: 1fr;
   }

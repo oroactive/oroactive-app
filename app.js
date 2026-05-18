@@ -165,7 +165,7 @@ function renderSearchResults(results) {
 
   container.innerHTML = `
     <div class="archive-table search-table">
-      <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Negozio</span><span>Data</span><span>Importo</span><span>Pagamento</span></div>
+      <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Negozio</span><span>Data</span><span>Importo</span><span>Pagamento</span><span>Azioni</span></div>
       ${results.map((act) => `
         <div class="table-row">
           <span>${escapeHtml(act.practiceNumber)}</span>
@@ -174,6 +174,10 @@ function renderSearchResults(results) {
           <span>${escapeHtml(act.date)}</span>
           <em>${escapeHtml(formatEuro(Number(act.amount)))}</em>
           <span>${escapeHtml(act.paymentMethod)}</span>
+          <div class="row-actions">
+            <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+            <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
+          </div>
         </div>
       `).join("")}
     </div>
@@ -256,7 +260,10 @@ function renderArchiveGroups() {
                 <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
                 <span>${escapeHtml(act.date)}</span>
                 <em class="${act.status === "Archiviata" ? "done" : ""}">${escapeHtml(act.status)}</em>
-                <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+                <div class="row-actions">
+                  <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+                  <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
+                </div>
               </div>
             `).join("")}
           </div>
@@ -449,8 +456,40 @@ function openArchivedAct(practiceNumber) {
   }
 
   previewTitle.textContent = `Atto di vendita ${act.practiceNumber}`;
-  previewBody.innerHTML = act.readOnlyHtml || buildArchivedActFallback(act);
+  previewBody.innerHTML = `
+    <div class="readonly-actions">
+      <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
+    </div>
+    ${act.readOnlyHtml || buildArchivedActFallback(act)}
+  `;
   previewModal.hidden = false;
+}
+
+function deleteAct(practiceNumber) {
+  const index = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
+  if (index < 0) {
+    showToast("Atto di vendita non trovato.");
+    return;
+  }
+
+  const confirmed = window.confirm(`Vuoi eliminare definitivamente l'atto ${practiceNumber}?`);
+  if (!confirmed) return;
+
+  demoActs.splice(index, 1);
+  state.lastSearchResults = state.lastSearchResults.filter((act) => act.practiceNumber !== practiceNumber);
+  renderArchiveGroups();
+  renderFusionGroups();
+
+  const searchActive = document.getElementById("searchActs")?.classList.contains("active-screen");
+  const keyword = document.getElementById("searchKeyword")?.value.trim();
+  if (searchActive && keyword) {
+    runActSearch();
+  } else if (searchActive) {
+    renderSearchResults(state.lastSearchResults);
+  }
+
+  if (!previewModal.hidden) previewModal.hidden = true;
+  showToast(`Atto ${practiceNumber} eliminato.`);
 }
 
 function actMaterials(act) {
@@ -524,7 +563,10 @@ function renderFusionGroups() {
                         <span>${escapeHtml(act.date)}</span>
                         <em class="done">${escapeHtml(act.daysElapsed)} giorni</em>
                         <span>${escapeHtml(act.materialWeight)} g</span>
-                        <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+                        <div class="row-actions">
+                          <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+                          <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
+                        </div>
                       </div>
                     `).join("")}
                   </div>
@@ -1145,15 +1187,42 @@ document.getElementById("storeCode").addEventListener("change", updatePracticeNu
 document.getElementById("archiveStoreFilter").addEventListener("change", renderArchiveGroups);
 
 document.getElementById("archiveGroups").addEventListener("click", (event) => {
+  const deleteButton = event.target.closest("[data-delete-act]");
+  if (deleteButton) {
+    deleteAct(deleteButton.dataset.deleteAct);
+    return;
+  }
   const openButton = event.target.closest("[data-open-act]");
   if (!openButton) return;
   openArchivedAct(openButton.dataset.openAct);
 });
 
 document.getElementById("fusionGroups").addEventListener("click", (event) => {
+  const deleteButton = event.target.closest("[data-delete-act]");
+  if (deleteButton) {
+    deleteAct(deleteButton.dataset.deleteAct);
+    return;
+  }
   const openButton = event.target.closest("[data-open-act]");
   if (!openButton) return;
   openArchivedAct(openButton.dataset.openAct);
+});
+
+document.getElementById("searchResults").addEventListener("click", (event) => {
+  const deleteButton = event.target.closest("[data-delete-act]");
+  if (deleteButton) {
+    deleteAct(deleteButton.dataset.deleteAct);
+    return;
+  }
+  const openButton = event.target.closest("[data-open-act]");
+  if (!openButton) return;
+  openArchivedAct(openButton.dataset.openAct);
+});
+
+previewBody.addEventListener("click", (event) => {
+  const deleteButton = event.target.closest("[data-delete-act]");
+  if (!deleteButton) return;
+  deleteAct(deleteButton.dataset.deleteAct);
 });
 
 document.getElementById("exportDailyPdf").addEventListener("click", exportDailySearchPdf);
