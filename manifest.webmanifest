@@ -1,0 +1,18 @@
+{
+  "name": "OroActive Gestionale",
+  "short_name": "OroActive",
+  "description": "Software gestionale OroActive per atti di vendita.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#17130d",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "oroactive-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17130d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="OroActive">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  <title>OroActive Gestionale</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="oroactive-logo.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section class="splash-screen" id="splashScreen" aria-label="Accesso OroActive">
+    <button class="splash-logo-button" id="enterSoftware" type="button" aria-label="Entra nel software OroActive">
+      <img src="oroactive-logo.png" alt="OroActive Compro Oro">
+    </button>
+    <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario progettato da Christian Dinato</footer>
+  </section>
+
+  <section class="main-menu-screen" id="mainMenuScreen" hidden aria-label="Menu principale OroActive">
+    <div class="main-menu-inner">
+      <img class="main-menu-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
+      <nav class="main-menu-actions">
+        <button type="button" data-section="practice">Nuovo Atto di Vendita</button>
+        <button type="button" data-section="archive">Elenco</button>
+        <button type="button" data-section="searchActs">Ricerca</button>
+        <button type="button" data-section="fusion">Fusione</button>
+      </nav>
+    </div>
+    <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario progettato da Christian Dinato</footer>
+  </section>
+
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navigazione principale">
+      <div class="brand-wrap">
+        <button class="brand" id="brandMenuButton" type="button" aria-expanded="false" aria-controls="brandDropdown">
+          <img class="brand-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
+          <div>
+            <strong>OroActive</strong>
+            <span>Compro Oro</span>
+          </div>
+        </button>
+        <div class="brand-dropdown" id="brandDropdown" hidden>
+          <button type="button" data-section="practice">Nuovo Atto di Vendita</button>
+          <button type="button" data-section="archive">Elenco Atti di Vendita</button>
+          <button type="button" data-section="searchActs">Ricerca Atto di Vendita</button>
+          <button type="button" data-section="fusion">Fusione</button>
+        </div>
+      </div>
+
+      <div class="operator">
+        <span>Operatore</span>
+        <strong id="operatorStoreName">Negozio Busto Arsizio</strong>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar" id="practiceTopbar">
+        <div class="title-block">
+          <img class="top-logo" src="oroactive-logo.png" alt="">
+          <div>
+            <p class="eyebrow">Gestionale iPad</p>
+            <h1>Atto di vendita OroActive</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="ghost-button" type="button" id="saveDraft">Salva bozza</button>
+          <button class="primary-button" type="button" id="printPractice">Stampa 2 copie</button>
+        </div>
+      </header>
+
+      <section id="practice" class="screen active-screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <ol class="stepper" aria-label="Stato pratica">
+          <li class="step active" data-step="0"><span>1</span>Cliente</li>
+          <li class="step" data-step="1"><span>2</span>Vendita</li>
+          <li class="step" data-step="2"><span>3</span>Firme</li>
+          <li class="step" data-step="3"><span>4</span>Documenti</li>
+          <li class="step" data-step="4"><span>5</span>Riepilogo</li>
+        </ol>
+
+        <div class="practice-layout">
+          <section class="form-panel">
+            <div class="form-step active-step" data-step-panel="0">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 1</p>
+                  <h2>Scheda cliente</h2>
+                </div>
+                <span class="status-pill">Compilazione manuale</span>
+              </div>
+
+              <div class="practice-meta">
+                <label>Negozio
+                  <select id="storeCode">
+                    <option value="BUSTO" selected>Busto Arsizio</option>
+                    <option value="CASSANO">Cassano Magnago</option>
+                    <option value="LEGNANO">Legnano</option>
+                  </select>
+                </label>
+                <label>Atto di vendita n. <input id="practiceNumber" readonly></label>
+                <label>Data compilazione <input id="practiceDate" readonly></label>
+                <label>Ora compilazione <input id="practiceTime" readonly></label>
+              </div>
+
+              <div class="field-grid two">
+                <label>Nome <input name="nome" value="Marco"></label>
+                <label>Cognome <input name="cognome" value="Rossi"></label>
+                <label>Data di nascita <input type="date" name="nascita" value="1982-04-18"></label>
+                <div class="birth-place-row">
+                  <label>Luogo di nascita <input name="luogo" value="Torino"></label>
+                  <label>Provincia
+                    <select name="provinciaNascita" id="birthProvince">
+                      <option value="">Seleziona</option>
+                      <option>AG</option><option>AL</option><option>AN</option><option>AO</option><option>AR</option><option>AP</option><option>AT</option><option>AV</option>
+                      <option>BA</option><option>BT</option><option>BL</option><option>BN</option><option>BG</option><option>BI</option><option>BO</option><option>BZ</option><option>BS</option><option>BR</option>
+                      <option>CA</option><option>CL</option><option>CB</option><option>CI</option><option>CE</option><option>CT</option><option>CZ</option><option>CH</option><option>CO</option><option>CS</option><option>CR</option><option>KR</option><option>CN</option>
+                      <option>EN</option><option>FM</option><option>FE</option><option>FI</option><option>FG</option><option>FC</option><option>FR</option>
+                      <option>GE</option><option>GO</option><option>GR</option><option>IM</option><option>IS</option><option>SP</option><option>AQ</option><option>LT</option><option>LE</option><option>LC</option><option>LI</option><option>LO</option><option>LU</option>
+                      <option>MC</option><option>MN</option><option>MS</option><option>MT</option><option>ME</option><option>MI</option><option>MO</option><option>MB</option>
+                      <option>NA</option><option>NO</option><option>NU</option><option>OR</option><option>PD</option><option>PA</option><option>PR</option><option>PV</option><option>PG</option><option>PU</option><option>PE</option><option>PC</option><option>PI</option><option>PT</option><option>PN</option><option>PZ</option><option>PO</option>
+                      <option>RG</option><option>RA</option><option>RC</option><option>RE</option><option>RI</option><option>RN</option><option>RM</option><option>RO</option>
+                      <option>SA</option><option>SS</option><option>SV</option><option>SI</option><option>SR</option><option>SO</option><option>SU</option>
+                      <option>TA</option><option>TE</option><option>TR</option><option selected>TO</option><option>TP</option><option>TN</option><option>TV</option><option>TS</option>
+                      <option>UD</option><option>VA</option><option>VE</option><option>VB</option><option>VC</option><option>VR</option><option>VV</option><option>VI</option><option>VT</option>
+                    </select>
+                  </label>
+                </div>
+                <label>Codice fiscale <input name="cf" value="RSSMRC82D18L219A"></label>
+                <label>Telefono <input name="telefono" value="+39 333 1234567"></label>
+              </div>
+
+              <div class="field-grid">
+                <div class="birth-place-row">
+                  <label>Indirizzo di residenza <input name="indirizzo" value="Via Roma 24, Milano"></label>
+                  <label>Provincia
+                    <select name="provinciaResidenza" id="residenceProvince">
+                      <option value="">Seleziona</option>
+                      <option>AG</option><option>AL</option><option>AN</option><option>AO</option><option>AR</option><option>AP</option><option>AT</option><option>AV</option>
+                      <option>BA</option><option>BT</option><option>BL</option><option>BN</option><option>BG</option><option>BI</option><option>BO</option><option>BZ</option><option>BS</option><option>BR</option>
+                      <option>CA</option><option>CL</option><option>CB</option><option>CI</option><option>CE</option><option>CT</option><option>CZ</option><option>CH</option><option>CO</option><option>CS</option><option>CR</option><option>KR</option><option>CN</option>
+                      <option>EN</option><option>FM</option><option>FE</option><option>FI</option><option>FG</option><option>FC</option><option>FR</option>
+                      <option>GE</option><option>GO</option><option>GR</option><option>IM</option><option>IS</option><option>SP</option><option>AQ</option><option>LT</option><option>LE</option><option>LC</option><option>LI</option><option>LO</option><option>LU</option>
+                      <option>MC</option><option>MN</option><option>MS</option><option>MT</option><option>ME</option><option selected>MI</option><option>MO</option><option>MB</option>
+                      <option>NA</option><option>NO</option><option>NU</option><option>OR</option><option>PD</option><option>PA</option><option>PR</option><option>PV</option><option>PG</option><option>PU</option><option>PE</option><option>PC</option><option>PI</option><option>PT</option><option>PN</option><option>PZ</option><option>PO</option>
+                      <option>RG</option><option>RA</option><option>RC</option><option>RE</option><option>RI</option><option>RN</option><option>RM</option><option>RO</option>
+                      <option>SA</option><option>SS</option><option>SV</option><option>SI</option><option>SR</option><option>SO</option><option>SU</option>
+                      <option>TA</option><option>TE</option><option>TR</option><option>TO</option><option>TP</option><option>TN</option><option>TV</option><option>TS</option>
+                      <option>UD</option><option>VA</option><option>VE</option><option>VB</option><option>VC</option><option>VR</option><option>VV</option><option>VI</option><option>VT</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div class="field-grid three">
+                <label>Tipo documento
+                  <select name="tipoDocumento" id="documentType">
+                    <option>Carta identita</option>
+                    <option>Patente</option>
+                    <option>Passaporto</option>
+                  </select>
+                </label>
+                <label>Numero documento <input name="numeroDocumento" value="CA1234567"></label>
+                <label>Scadenza <input type="date" name="scadenzaDocumento" value="2030-11-20"></label>
+                <label>Professione lavorativa
+                  <select name="professione">
+                    <option>Autonomo</option>
+                    <option>Dipendente</option>
+                    <option>Disoccupato</option>
+                    <option>Pensionato</option>
+                    <option>Studente</option>
+                  </select>
+                </label>
+              </div>
+
+              <section class="ceded-items-panel" aria-labelledby="cededItemsTitle">
+                <div class="subsection-heading">
+                  <div>
+                    <p class="eyebrow">Oggetti ceduti</p>
+                    <h3 id="cededItemsTitle">Il cliente cede i seguenti oggetti preziosi</h3>
+                  </div>
+                  <button class="small-button" id="addCededItem" type="button">Aggiungi riga</button>
+                </div>
+
+                <div class="ceded-items-table" id="cededItemsTable">
+                  <div class="ceded-items-head">
+                    <span>N.</span>
+                    <span>Descrizione oggetto</span>
+                    <span>Metallo</span>
+                    <span>Titolo</span>
+                    <span></span>
+                  </div>
+                  <article class="ceded-item-row">
+                    <strong class="row-number">1</strong>
+                    <label>Descrizione oggetto <input value="Bracciale oro giallo"></label>
+                    <label>Metallo
+                      <select>
+                        <option>Oro</option>
+                        <option>Argento</option>
+                        <option>Platino</option>
+                      </select>
+                    </label>
+                    <label>Titolo
+                      <select>
+                        <option>24 kt</option>
+                        <option>22 kt</option>
+                        <option>21 kt</option>
+                        <option selected>18 kt</option>
+                        <option>14 kt</option>
+                        <option>12 kt</option>
+                        <option>9 kt</option>
+                        <option>6 kt</option>
+                      </select>
+                    </label>
+                    <button class="remove-row" type="button" aria-label="Rimuovi riga" disabled>-</button>
+                  </article>
+                </div>
+
+                <div class="internal-weight">
+                  <div>
+                    <span class="internal-badge">Dato interno</span>
+                    <strong>Peso totale oggetti preziosi</strong>
+                    <p>Viene stampato sulla copia cliente solo se autorizzato con la casella dedicata.</p>
+                  </div>
+                  <div class="weight-fields">
+                    <div id="totalWeightFields" class="metal-weight-fields"></div>
+                    <label class="inline-check"><input id="printWeightCustomer" type="checkbox"> Stampa peso totale su copia cliente</label>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="form-step" data-step-panel="1">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 2</p>
+                  <h2>Pagamento e note vendita</h2>
+                </div>
+                <span class="status-pill">Oggetti inseriti nella scheda cliente</span>
+              </div>
+
+              <div class="field-grid two">
+                <label>Metodo pagamento
+                  <select id="paymentMethod">
+                    <option>Bonifico</option>
+                    <option>Contanti nei limiti di legge</option>
+                    <option>Assegno</option>
+                  </select>
+                </label>
+                <label>Totale corrisposto <input id="saleTotal" type="number" value="860" min="0" step="0.01"></label>
+              </div>
+
+              <label class="textarea-label">Note operatore
+                <textarea>Cliente identificato, oggetti visionati al banco e valutazione accettata.</textarea>
+              </label>
+            </div>
+
+            <div class="form-step" data-step-panel="2">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 3</p>
+                  <h2>Firma cliente</h2>
+                </div>
+                <span class="status-pill warning" id="signatureStatus">3 firme richieste</span>
+              </div>
+
+              <section class="legal-text" aria-label="Testo dichiarazioni cliente">
+                <p>Gli oggetti venduti sopra descritti sono usati e/o in cattivo stato di conservazione. Autorizzo la loro ulteriore alterazione per poter eseguire il test di verifica del metallo, determinarne il titolo e calcolarne il prezzo. Dichiaro inoltre che gli stessi sopra indicati oggetti non sono di illecita provenienza, di essere in possesso di tutti i diritti atti alla vendita degli stessi e di accettare e consentire il trattamento dei propri dati personali (Legge 196/03). La presente vale quale ricevuta e saldo per la somma riportata alla voce prezzo complessivo. Il venditore si obbliga fin da ora a restituire il ricavato della vendita qualora, a seguito di controlli di verifica, risulti che gli oggetti consegnati non siano corrispondenti nel valore e nella qualità a quelli dichiarati al momento della vendita e/o risultino di non essere di metallo prezioso. Dichiaro infine di aver letto attentamente quanto sopra riportato e che ai sensi e per gli effetti degli art. 1341 e 1342 del c.c. approvo incondizionatamente.</p>
+              </section>
+
+              <div class="signature-grid">
+                <div class="signature-box">
+                  <div>
+                    <strong>Firma vendita</strong>
+                    <span>Conferma dati e cessione beni</span>
+                  </div>
+                  <canvas width="520" height="160" data-signature="0"></canvas>
+                  <button type="button" class="clear-signature">Cancella</button>
+                </div>
+                <div class="signature-box">
+                  <div>
+                    <strong>Firma dichiarazioni</strong>
+                    <span>Proprieta e provenienza lecita</span>
+                  </div>
+                  <canvas width="520" height="160" data-signature="1"></canvas>
+                  <button type="button" class="clear-signature">Cancella</button>
+                </div>
+                <div class="signature-box">
+                  <div>
+                    <strong>Firma privacy</strong>
+                    <span>Consenso trattamento dati</span>
+                  </div>
+                  <canvas width="520" height="160" data-signature="2"></canvas>
+                  <button type="button" class="clear-signature">Cancella</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-step" data-step-panel="3">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 4</p>
+                  <h2>Documenti e fotografie</h2>
+                </div>
+                <span class="status-pill">Allegati alla pratica</span>
+              </div>
+
+              <div class="capture-grid">
+                <label class="capture-card" data-document-capture="fronte" data-capture-key="documento-fronte-carta-identita">
+                  <input type="file" accept="image/*" capture="environment">
+                  <span>Documento</span>
+                  <strong>Fronte carta identita</strong>
+                  <em>Tocca per fotografare</em>
+                </label>
+                <label class="capture-card" data-document-capture="retro" data-capture-key="documento-retro-carta-identita">
+                  <input type="file" accept="image/*" capture="environment">
+                  <span>Documento</span>
+                  <strong>Retro carta identita</strong>
+                  <em>Tocca per fotografare</em>
+                </label>
+                <label class="capture-card" data-capture-key="codice-fiscale-fronte">
+                  <input type="file" accept="image/*" capture="environment">
+                  <span>Codice fiscale</span>
+                  <strong>Fronte tessera</strong>
+                  <em>Tocca per fotografare</em>
+                </label>
+                <label class="capture-card" data-capture-key="codice-fiscale-retro">
+                  <input type="file" accept="image/*" capture="environment">
+                  <span>Codice fiscale</span>
+                  <strong>Retro tessera</strong>
+                  <em>Tocca per fotografare</em>
+                </label>
+              </div>
+
+              <div class="precious-captures">
+                <div class="subsection-heading">
+                  <div>
+                    <p class="eyebrow">Preziosi</p>
+                    <h3>Foto preziosi divise per metallo</h3>
+                  </div>
+                </div>
+                <div class="capture-grid" id="preciousCaptureGrid"></div>
+              </div>
+
+              <div class="payment-captures" id="paymentCaptureSection" hidden>
+                <div class="subsection-heading">
+                  <div>
+                    <p class="eyebrow">Pagamento</p>
+                    <h3>Contabile pagamento</h3>
+                  </div>
+                </div>
+                <div class="capture-grid" id="paymentCaptureGrid"></div>
+              </div>
+            </div>
+
+            <div class="form-step" data-step-panel="4">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 5</p>
+                  <h2>Riepilogo pratica</h2>
+                </div>
+                <span class="status-pill success">Pronta per archivio</span>
+              </div>
+
+              <div class="summary-grid">
+                <div>
+                  <span>Cliente</span>
+                  <strong>Marco Rossi</strong>
+                </div>
+                <div>
+                  <span>Codice fiscale</span>
+                  <strong>RSSMRC82D18L219A</strong>
+                </div>
+                <div>
+                  <span>Oggetti</span>
+                  <strong id="summaryItems">1 prezioso registrato</strong>
+                </div>
+                <div>
+                  <span>Totale</span>
+                  <strong id="summaryTotal">EUR 860,00</strong>
+                </div>
+                <div>
+                  <span>Firme</span>
+                  <strong id="summarySignatures">Da completare</strong>
+                </div>
+                <div>
+                  <span>Allegati</span>
+                  <strong id="summaryAttachments">0 di 6 caricati</strong>
+                </div>
+              </div>
+
+              <div class="document-preview">
+                <div>
+                  <h3>Anteprima prima della stampa</h3>
+                  <p>Controlla la copia cliente e la copia aziendale interna prima di procedere con la stampa finale.</p>
+                </div>
+                <div class="preview-actions">
+                  <button class="ghost-button" type="button" data-preview-copy="customer">Copia cliente</button>
+                  <button class="ghost-button" type="button" data-preview-copy="company">Copia aziendale</button>
+                  <button class="primary-button" type="button" id="archivePractice">Chiudi e archivia</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="bottom-actions">
+              <button class="ghost-button" type="button" id="previousStep">Indietro</button>
+              <button class="primary-button" type="button" id="nextStep">Avanti</button>
+            </div>
+          </section>
+
+          <aside class="side-panel">
+            <div class="practice-card">
+              <span>Numero pratica</span>
+              <strong id="sidePracticeNumber">OA-BUSTO-2026-000184</strong>
+              <p>Bozza salvata automaticamente</p>
+            </div>
+
+            <div class="checklist">
+              <h3>Controlli obbligatori</h3>
+              <label><input type="checkbox" checked> Dati cliente compilati</label>
+              <label><input type="checkbox" checked> Documento valido</label>
+              <label><input type="checkbox"> Tre firme acquisite</label>
+              <label><input type="checkbox"> Foto documenti allegate</label>
+              <label><input type="checkbox"> Preziosi e pagamento allegati</label>
+            </div>
+
+            <div class="print-box">
+              <h3>Stampa</h3>
+              <p>Il PDF finale viene prodotto in duplice copia: cliente e negozio.</p>
+              <button type="button" class="small-button">Anteprima PDF</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="archive" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Archivio</p>
+            <h2>Elenco Atti di Vendita</h2>
+          </div>
+          <label class="filter-field">Negozio
+            <select id="archiveStoreFilter">
+              <option value="Busto Arsizio">Busto Arsizio</option>
+              <option value="Cassano Magnago">Cassano Magnago</option>
+              <option value="Legnano">Legnano</option>
+            </select>
+          </label>
+        </div>
+        <div class="archive-groups" id="archiveGroups"></div>
+      </section>
+
+      <section id="searchActs" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Ricerca</p>
+            <h2>Ricerca Atto di Vendita</h2>
+            <p class="muted">Seleziona il campo da ricercare e inserisci la parola chiave.</p>
+          </div>
+          <div class="settings-list">
+            <label>Campo da ricercare
+              <select id="searchField">
+                <option value="name">Nome</option>
+                <option value="surname">Cognome</option>
+                <option value="practiceNumber">Numero atto di vendita</option>
+                <option value="date">Data atto di vendita</option>
+                <option value="store">Negozio</option>
+                <option value="amount">Importo</option>
+                <option value="paymentMethod">Metodo di pagamento</option>
+                <option value="weight">Peso totale in grammi</option>
+              </select>
+            </label>
+            <input class="search" id="searchKeyword" placeholder="Inserisci parola chiave">
+            <button type="button" id="runActSearch">Cerca</button>
+            <button class="small-button" type="button" id="exportDailyPdf">ESPORTA PDF giornaliero</button>
+          </div>
+        </div>
+        <div class="search-results" id="searchResults" aria-live="polite"></div>
+      </section>
+
+      <section id="fusion" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Fonderia</p>
+            <h2>Fusione</h2>
+            <p class="muted">Atti di vendita acquistati e da inviare in fusione, suddivisi per negozio.</p>
+          </div>
+        </div>
+        <div class="fusion-groups" id="fusionGroups" aria-live="polite"></div>
+      </section>
+      <footer class="software-footer">© 2026 OroActive Tech - Software gestionale proprietario progettato da Christian Dinato</footer>
+    </main>
+  </div>
+
+  <div id="printPacket" aria-hidden="true"></div>
+  <div class="preview-modal" id="previewModal" hidden>
+    <div class="preview-dialog" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+      <div class="preview-topbar">
+        <h2 id="previewTitle">Anteprima stampa</h2>
+        <button class="ghost-button" id="closePreview" type="button">Chiudi</button>
+      </div>
+      <div class="preview-body" id="previewBody"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
