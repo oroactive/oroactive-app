@@ -5,7 +5,8 @@ const state = {
   cededItems: 1,
   annualProgressive: 184,
   uploadedCaptures: new Set(),
-  lastSearchResults: []
+  lastSearchResults: [],
+  editingPracticeNumber: null
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -156,10 +157,11 @@ async function loadSavedActs() {
   }
 }
 
-async function saveActRecord(act) {
+async function saveActRecord(act, method = "POST") {
   try {
-    const saved = await apiRequest("/acts", {
-      method: "POST",
+    const path = method === "PUT" ? `/acts/${encodeURIComponent(act.practiceNumber)}` : "/acts";
+    const saved = await apiRequest(path, {
+      method,
       body: JSON.stringify(act)
     });
     const index = demoActs.findIndex((item) => item.practiceNumber === saved.practiceNumber);
@@ -223,8 +225,9 @@ function showMainMenuFromSplash() {
   mainMenuScreen.hidden = false;
 }
 
-function enterSectionFromMainMenu(section) {
+async function enterSectionFromMainMenu(section) {
   mainMenuScreen.hidden = true;
+  if (section === "practice") await resetCurrentPractice();
   setScreen(section);
 }
 
@@ -254,6 +257,7 @@ function renderSearchResults(results) {
           <span>${escapeHtml(act.paymentMethod)}</span>
           <div class="row-actions">
             <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+            <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
             <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
           </div>
         </div>
@@ -291,6 +295,8 @@ function daysFromPurchase(date) {
 
 function currentActSnapshot(status = "Archiviata") {
   const storeSelect = document.getElementById("storeCode");
+  const items = collectCededItems();
+  const captures = [...state.uploadedCaptures];
   const materials = weightRows()
     .filter((row) => Number(row.value || 0) > 0)
     .map((row) => ({ metal: row.metal, weight: row.value }));
@@ -298,14 +304,32 @@ function currentActSnapshot(status = "Archiviata") {
   return {
     name: fieldValue('[name="nome"]'),
     surname: fieldValue('[name="cognome"]'),
+    birthDate: fieldValue('[name="nascita"]'),
+    birthPlace: fieldValue('[name="luogo"]'),
+    birthProvince: fieldValue('[name="provinciaNascita"]'),
+    fiscalCode: fieldValue('[name="cf"]'),
+    phone: fieldValue('[name="telefono"]'),
+    address: fieldValue('[name="indirizzo"]'),
+    residenceProvince: fieldValue('[name="provinciaResidenza"]'),
+    documentType: fieldValue('[name="tipoDocumento"]'),
+    documentNumber: fieldValue('[name="numeroDocumento"]'),
+    documentExpiry: fieldValue('[name="scadenzaDocumento"]'),
+    profession: fieldValue('[name="professione"]'),
     practiceNumber: fieldValue("#practiceNumber"),
     date: fieldValue("#practiceDate"),
     time: fieldValue("#practiceTime"),
     store: storeSelect?.selectedOptions[0]?.textContent || "",
+    storeCode: storeSelect?.value || "",
+    items,
+    bullionQuotes: bullionQuoteRows(),
+    printWeightCustomer: shouldPrintWeightOnCustomerCopy(),
     amount: fieldValue("#saleTotal"),
     paymentMethod: fieldValue("#paymentMethod"),
+    operatorNotes: document.querySelector(".textarea-label textarea")?.value || "",
     weight: totalWeight.toFixed(2),
     materials,
+    signatures: [...state.signatures],
+    captures,
     status
   };
 }
@@ -347,6 +371,7 @@ function renderArchiveGroups() {
                 <em class="${act.status === "Archiviata" ? "done" : ""}">${escapeHtml(act.status)}</em>
                 <div class="row-actions">
                   <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+                  <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
                   <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
                 </div>
               </div>
@@ -543,6 +568,7 @@ function openArchivedAct(practiceNumber) {
   previewTitle.textContent = `Atto di vendita ${act.practiceNumber}`;
   previewBody.innerHTML = `
     <div class="readonly-actions">
+      <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica atto</button>
       <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
     </div>
     ${act.readOnlyHtml || buildArchivedActFallback(act)}
@@ -577,28 +603,22 @@ async function deleteAct(practiceNumber) {
   showToast(`Atto ${practiceNumber} eliminato.`);
 }
 
-function defaultCededItemRow() {
+function cededItemRowMarkup(item = {}) {
+  const metal = item.metal || "Oro";
+  const titleOptions = titleOptionsByMetal[metal] || titleOptionsByMetal.Oro;
+  const title = item.title || (metal === "Oro" ? "18 kt" : titleOptions[0]);
   return `
     <article class="ceded-item-row">
       <strong class="row-number">1</strong>
-      <label>Descrizione oggetto <input value=""></label>
+      <label>Descrizione oggetto <input value="${escapeHtml(item.description || "")}"></label>
       <label>Metallo
         <select>
-          <option>Oro</option>
-          <option>Argento</option>
-          <option>Platino</option>
+          ${metalOrder.map((option) => `<option${option === metal ? " selected" : ""}>${option}</option>`).join("")}
         </select>
       </label>
       <label>Titolo
         <select>
-          <option>24 kt</option>
-          <option>22 kt</option>
-          <option>21 kt</option>
-          <option selected>18 kt</option>
-          <option>14 kt</option>
-          <option>12 kt</option>
-          <option>9 kt</option>
-          <option>6 kt</option>
+          ${titleOptions.map((option) => `<option${option === title ? " selected" : ""}>${option}</option>`).join("")}
         </select>
       </label>
       <button class="remove-row" type="button" aria-label="Rimuovi riga" disabled>-</button>
@@ -606,7 +626,114 @@ function defaultCededItemRow() {
   `;
 }
 
-function resetCurrentPractice() {
+function defaultCededItemRow() {
+  return cededItemRowMarkup();
+}
+
+function collectCededItems() {
+  return [...document.querySelectorAll(".ceded-item-row")].map((row) => {
+    const selects = row.querySelectorAll("select");
+    return {
+      description: row.querySelector("input")?.value || "",
+      metal: selects[0]?.value || "Oro",
+      title: selects[1]?.value || ""
+    };
+  });
+}
+
+function setFieldValue(selector, value) {
+  const field = document.querySelector(selector);
+  if (field) field.value = value || "";
+}
+
+function toDateInputValue(value) {
+  const text = String(value || "");
+  if (!text || text.includes("-")) return text;
+  const [day, month, year] = text.split("/");
+  return year && month && day ? `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}` : "";
+}
+
+function storeCodeFromAct(act) {
+  if (act.storeCode) return act.storeCode;
+  return {
+    "Busto Arsizio": "BUSTO",
+    "Cassano Magnago": "CASSANO",
+    Legnano: "LEGNANO"
+  }[act.store] || "BUSTO";
+}
+
+async function loadActForEdit(practiceNumber) {
+  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+  if (!act) {
+    showToast("Atto di vendita non trovato.");
+    return;
+  }
+
+  await resetCurrentPractice();
+  state.editingPracticeNumber = act.practiceNumber;
+
+  setFieldValue("#storeCode", storeCodeFromAct(act));
+  setFieldValue("#practiceNumber", act.practiceNumber);
+  setFieldValue("#practiceDate", toDateInputValue(act.date));
+  setFieldValue("#practiceTime", act.time);
+  setFieldValue('[name="nome"]', act.name);
+  setFieldValue('[name="cognome"]', act.surname);
+  setFieldValue('[name="nascita"]', toDateInputValue(act.birthDate));
+  setFieldValue('[name="luogo"]', act.birthPlace);
+  setFieldValue('[name="provinciaNascita"]', act.birthProvince);
+  setFieldValue('[name="cf"]', act.fiscalCode);
+  setFieldValue('[name="telefono"]', act.phone);
+  setFieldValue('[name="indirizzo"]', act.address);
+  setFieldValue('[name="provinciaResidenza"]', act.residenceProvince);
+  setFieldValue('[name="tipoDocumento"]', act.documentType);
+  setFieldValue('[name="numeroDocumento"]', act.documentNumber);
+  setFieldValue('[name="scadenzaDocumento"]', toDateInputValue(act.documentExpiry));
+  setFieldValue('[name="professione"]', act.profession);
+  setFieldValue("#paymentMethod", act.paymentMethod);
+  setFieldValue("#saleTotal", act.amount);
+  setFieldValue(".textarea-label textarea", act.operatorNotes);
+
+  const cededItemsTable = document.getElementById("cededItemsTable");
+  const items = Array.isArray(act.items) && act.items.length ? act.items : [{ description: "", metal: act.materials?.[0]?.metal || "Oro", title: "18 kt" }];
+  cededItemsTable.querySelectorAll(".ceded-item-row").forEach((row) => row.remove());
+  items.forEach((item) => cededItemsTable.insertAdjacentHTML("beforeend", cededItemRowMarkup(item)));
+
+  document.getElementById("printWeightCustomer").checked = Boolean(act.printWeightCustomer);
+  state.signatures = Array.isArray(act.signatures) ? act.signatures : [true, true, true];
+  state.uploadedCaptures = new Set(Array.isArray(act.captures) ? act.captures : []);
+  state.attachments = state.uploadedCaptures.size;
+  state.step = 0;
+
+  document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
+  updateCededItems();
+  updateSaleTotal();
+  updateSignatureState();
+  updateDocumentCaptureCards();
+  renderPaymentCaptureCard();
+
+  if (Array.isArray(act.bullionQuotes)) {
+    act.bullionQuotes.forEach((quote) => {
+      const input = document.querySelector(`#bullionQuotePanel input[data-bullion-quote="${quote.metal}"]`);
+      if (input) input.value = quote.value === "Dato non inserito" ? "" : quote.value;
+    });
+  }
+
+  if (Array.isArray(act.materials)) {
+    act.materials.forEach((material) => {
+      const input = document.querySelector(`#totalWeightFields input[data-metal-weight="${material.metal}"]`);
+      if (input) input.value = material.weight || "";
+    });
+  }
+
+  document.getElementById("sidePracticeNumber").textContent = act.practiceNumber;
+  document.getElementById("operatorStoreName").textContent = `Negozio ${document.getElementById("storeCode").selectedOptions[0]?.textContent || ""}`;
+  renderStep();
+  setScreen("practice");
+  previewModal.hidden = true;
+  showToast(`Atto ${practiceNumber} aperto in modifica.`);
+}
+
+async function resetCurrentPractice() {
   document.querySelectorAll(".form-panel input").forEach((input) => {
     if (input.readOnly || input.type === "file") return;
     if (input.type === "checkbox") {
@@ -637,8 +764,9 @@ function resetCurrentPractice() {
   state.attachments = 0;
   state.step = 0;
   state.annualProgressive += 1;
+  state.editingPracticeNumber = null;
 
-  setPracticeMeta();
+  await setPracticeMeta();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   renderStep();
   updateSignatureState();
@@ -661,7 +789,7 @@ async function deleteCurrentPractice() {
     renderFusionGroups();
   }
 
-  resetCurrentPractice();
+  await resetCurrentPractice();
   showToast("Atto in compilazione eliminato.");
 }
 
@@ -738,6 +866,7 @@ function renderFusionGroups() {
                         <span>${escapeHtml(act.materialWeight)} g</span>
                         <div class="row-actions">
                           <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+                          <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
                           <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
                         </div>
                       </div>
@@ -884,6 +1013,13 @@ async function updatePracticeNumber() {
   const selectedDate = document.getElementById("practiceDate").value;
   const year = selectedDate ? Number(selectedDate.slice(0, 4)) : new Date().getFullYear();
 
+  if (state.editingPracticeNumber) {
+    document.getElementById("practiceNumber").value = state.editingPracticeNumber;
+    document.getElementById("sidePracticeNumber").textContent = state.editingPracticeNumber;
+    document.getElementById("operatorStoreName").textContent = `Negozio ${storeSelect?.selectedOptions[0]?.textContent || ""}`;
+    return;
+  }
+
   let nextNumber = null;
   try {
     const data = await apiRequest(`/acts/next-number?storeCode=${encodeURIComponent(storeCode)}&year=${year}`);
@@ -933,9 +1069,11 @@ function updateTitleOptions(row) {
   const titleSelect = selects[1];
   if (!metalSelect || !titleSelect) return;
 
+  const currentTitle = titleSelect.value;
   const options = titleOptionsByMetal[metalSelect.value] || titleOptionsByMetal.Oro;
   titleSelect.innerHTML = options.map((option) => `<option>${option}</option>`).join("");
-  if (metalSelect.value === "Oro") titleSelect.value = "18 kt";
+  if (options.includes(currentTitle)) titleSelect.value = currentTitle;
+  else if (metalSelect.value === "Oro") titleSelect.value = "18 kt";
 }
 
 function escapeHtml(value) {
@@ -1298,7 +1436,8 @@ document.querySelectorAll("[data-return-menu]").forEach((button) => {
 });
 
 brandDropdown.querySelectorAll("button").forEach((button) => {
-  button.addEventListener("click", () => {
+  button.addEventListener("click", async () => {
+    if (button.dataset.section === "practice") await resetCurrentPractice();
     setScreen(button.dataset.section);
     closeBrandMenu();
   });
@@ -1359,40 +1498,18 @@ document.getElementById("archivePractice").addEventListener("click", async () =>
   }
   const archivedAct = currentActSnapshot("Archiviata");
   archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
-  await saveActRecord(archivedAct);
+  const wasEditing = Boolean(state.editingPracticeNumber);
+  await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   renderArchiveGroups();
   renderFusionGroups();
-  await updatePracticeNumber();
-  showToast("Atto di vendita salvato e archiviato.");
+  await resetCurrentPractice();
+  showToast(wasEditing ? "Atto di vendita modificato e salvato." : "Atto di vendita salvato e archiviato.");
 });
 
 document.getElementById("addCededItem").addEventListener("click", () => {
   const row = document.createElement("article");
   row.className = "ceded-item-row";
-  row.innerHTML = `
-    <strong class="row-number">1</strong>
-    <label>Descrizione oggetto <input value=""></label>
-    <label>Metallo
-      <select>
-        <option>Oro</option>
-        <option>Argento</option>
-        <option>Platino</option>
-      </select>
-    </label>
-    <label>Titolo
-      <select>
-        <option>24 kt</option>
-        <option>22 kt</option>
-        <option>21 kt</option>
-        <option selected>18 kt</option>
-        <option>14 kt</option>
-        <option>12 kt</option>
-        <option>9 kt</option>
-        <option>6 kt</option>
-      </select>
-    </label>
-    <button class="remove-row" type="button" aria-label="Rimuovi riga">-</button>
-  `;
+  row.innerHTML = cededItemRowMarkup().replace('<article class="ceded-item-row">', "").replace("</article>", "");
   document.getElementById("cededItemsTable").appendChild(row);
   updateTitleOptions(row);
   updateCededItems();
@@ -1434,6 +1551,11 @@ document.getElementById("archiveGroups").addEventListener("click", (event) => {
     deleteAct(deleteButton.dataset.deleteAct);
     return;
   }
+  const editButton = event.target.closest("[data-edit-act]");
+  if (editButton) {
+    loadActForEdit(editButton.dataset.editAct);
+    return;
+  }
   const openButton = event.target.closest("[data-open-act]");
   if (!openButton) return;
   openArchivedAct(openButton.dataset.openAct);
@@ -1443,6 +1565,11 @@ document.getElementById("fusionGroups").addEventListener("click", (event) => {
   const deleteButton = event.target.closest("[data-delete-act]");
   if (deleteButton) {
     deleteAct(deleteButton.dataset.deleteAct);
+    return;
+  }
+  const editButton = event.target.closest("[data-edit-act]");
+  if (editButton) {
+    loadActForEdit(editButton.dataset.editAct);
     return;
   }
   const openButton = event.target.closest("[data-open-act]");
@@ -1456,12 +1583,22 @@ document.getElementById("searchResults").addEventListener("click", (event) => {
     deleteAct(deleteButton.dataset.deleteAct);
     return;
   }
+  const editButton = event.target.closest("[data-edit-act]");
+  if (editButton) {
+    loadActForEdit(editButton.dataset.editAct);
+    return;
+  }
   const openButton = event.target.closest("[data-open-act]");
   if (!openButton) return;
   openArchivedAct(openButton.dataset.openAct);
 });
 
 previewBody.addEventListener("click", (event) => {
+  const editButton = event.target.closest("[data-edit-act]");
+  if (editButton) {
+    loadActForEdit(editButton.dataset.editAct);
+    return;
+  }
   const deleteButton = event.target.closest("[data-delete-act]");
   if (!deleteButton) return;
   deleteAct(deleteButton.dataset.deleteAct);
