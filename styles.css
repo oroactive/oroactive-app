@@ -554,18 +554,26 @@ textarea {
 .practice-meta {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 18px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid #ffc39e;
   border-radius: 8px;
   background: #fff5ed;
+  overflow: hidden;
 }
 
 .practice-meta-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.practice-meta-row > label {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 0;
 }
 
 .practice-meta label,
@@ -582,6 +590,23 @@ textarea {
   background: #fff;
   color: var(--ink);
   font-weight: 900;
+}
+
+.practice-meta input,
+.practice-meta select {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.practice-meta input[type="date"],
+.practice-meta input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: center;
 }
 
 .ceded-items-panel {
@@ -1699,6 +1724,16 @@ canvas {
     bottom: 12px;
     min-width: 0;
     max-width: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .practice-meta-row {
+    flex-direction: column;
+  }
+
+  .practice-meta-row > label {
+    width: 100%;
   }
 }
 
