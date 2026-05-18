@@ -945,6 +945,7 @@ canvas {
 
 .capture-card.loaded {
   border-style: solid;
+  border-color: #2e9f68;
   background: #edf8f1;
 }
 
@@ -958,6 +959,21 @@ canvas {
 
 .capture-card.platinum {
   background: #eef4f8;
+}
+
+.capture-card.loaded,
+.capture-card.gold.loaded,
+.capture-card.silver.loaded,
+.capture-card.platinum.loaded {
+  border-style: solid;
+  border-color: #2e9f68;
+  background: #edf8f1;
+}
+
+.capture-card.loaded span,
+.capture-card.loaded strong,
+.capture-card.loaded em {
+  color: #16784c;
 }
 
 .summary-grid {

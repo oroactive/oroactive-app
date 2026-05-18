@@ -707,6 +707,7 @@ async function loadActForEdit(practiceNumber) {
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   updateCededItems();
   updateSaleTotal();
+  updateCustomerSummary();
   updateSignatureState();
   updateDocumentCaptureCards();
   renderPaymentCaptureCard();
@@ -770,6 +771,7 @@ async function resetCurrentPractice() {
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   renderStep();
   updateSignatureState();
+  updateCustomerSummary();
   updateCededItems();
   updateSaleTotal();
   updateDocumentCaptureCards();
@@ -1046,6 +1048,15 @@ function updateSaleTotal() {
   document.getElementById("summaryTotal").textContent = formatEuro(Number.isFinite(total) ? total : 0);
 }
 
+function updateCustomerSummary() {
+  const name = fieldValue('[name="nome"]').trim();
+  const surname = fieldValue('[name="cognome"]').trim();
+  const fiscalCode = fieldValue('[name="cf"]').trim();
+  const customer = [name, surname].filter(Boolean).join(" ");
+  document.getElementById("summaryClient").textContent = customer || "Dato non inserito";
+  document.getElementById("summaryFiscalCode").textContent = fiscalCode || "Dato non inserito";
+}
+
 function updateCededItems() {
   const rows = document.querySelectorAll(".ceded-item-row");
 
@@ -1233,7 +1244,7 @@ function requiredCaptureKeys() {
   const documentKeys = [`documento-fronte-${documentSlug}`, `documento-retro-${documentSlug}`, "codice-fiscale-fronte", "codice-fiscale-retro"];
   const preciousKeys = activeMetals().flatMap((metal) => [
     `preziosi-${metal.toLowerCase()}-fronte`,
-    `preziosi-${metal.toLowerCase()}-laterale`
+    `preziosi-${metal.toLowerCase()}-retro`
   ]);
   const paymentKeys = paymentRequiresProof() ? [paymentCaptureKey()] : [];
   return [...documentKeys, ...preciousKeys, ...paymentKeys];
@@ -1253,7 +1264,7 @@ function renderPreciousCaptureCards() {
 
   grid.innerHTML = activeMetals().map((metal) => [
     { side: "fronte", label: "Foto frontale" },
-    { side: "laterale", label: "Foto laterale" }
+    { side: "retro", label: "Foto retro" }
   ].map((photo) => {
     const key = `preziosi-${metal.toLowerCase()}-${photo.side}`;
     const loaded = state.uploadedCaptures.has(key);
@@ -1416,6 +1427,23 @@ function showPrintPreview(scope) {
   previewModal.hidden = false;
 }
 
+async function archiveCurrentPractice() {
+  const missing = validatePrintScope("company");
+  if (missing.length) {
+    showToast(validationMessage(missing, "la copia aziendale"));
+    return false;
+  }
+  const archivedAct = currentActSnapshot("Archiviata");
+  archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
+  const wasEditing = Boolean(state.editingPracticeNumber);
+  await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
+  renderArchiveGroups();
+  renderFusionGroups();
+  await resetCurrentPractice();
+  showToast(wasEditing ? "Atto di vendita modificato e salvato." : "Atto di vendita salvato e archiviato.");
+  return true;
+}
+
 navItems.forEach((item) => {
   item.addEventListener("click", () => setScreen(item.dataset.section));
 });
@@ -1454,7 +1482,7 @@ steps.forEach((step) => {
   });
 });
 
-document.getElementById("nextStep").addEventListener("click", () => {
+document.getElementById("nextStep").addEventListener("click", async () => {
   if (state.step === 2 && state.signatures.some((signed) => !signed)) {
     showToast("Prima di procedere servono tutte e tre le firme del cliente.");
     return;
@@ -1463,7 +1491,7 @@ document.getElementById("nextStep").addEventListener("click", () => {
     state.step += 1;
     renderStep();
   } else {
-    showToast("Pratica archiviata nella cartella digitale.");
+    await archiveCurrentPractice();
   }
 });
 
@@ -1490,21 +1518,7 @@ document.getElementById("printPractice").addEventListener("click", () => {
   window.print();
 });
 
-document.getElementById("archivePractice").addEventListener("click", async () => {
-  const missing = validatePrintScope("company");
-  if (missing.length) {
-    showToast(validationMessage(missing, "la copia aziendale"));
-    return;
-  }
-  const archivedAct = currentActSnapshot("Archiviata");
-  archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
-  const wasEditing = Boolean(state.editingPracticeNumber);
-  await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
-  renderArchiveGroups();
-  renderFusionGroups();
-  await resetCurrentPractice();
-  showToast(wasEditing ? "Atto di vendita modificato e salvato." : "Atto di vendita salvato e archiviato.");
-});
+document.getElementById("archivePractice").addEventListener("click", archiveCurrentPractice);
 
 document.getElementById("addCededItem").addEventListener("click", () => {
   const row = document.createElement("article");
@@ -1534,6 +1548,14 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
 });
 
 document.getElementById("saleTotal").addEventListener("input", updateSaleTotal);
+
+document.querySelector(".form-panel").addEventListener("input", (event) => {
+  if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
+});
+
+document.querySelector(".form-panel").addEventListener("change", (event) => {
+  if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
+});
 
 document.getElementById("paymentMethod").addEventListener("change", () => {
   renderPaymentCaptureCard();
@@ -1695,6 +1717,8 @@ document.querySelectorAll("[data-preview-copy]").forEach((button) => {
   button.addEventListener("click", () => showPrintPreview(button.dataset.previewCopy));
 });
 
+document.getElementById("fullPdfPreview").addEventListener("click", () => showPrintPreview("company"));
+
 document.getElementById("closePreview").addEventListener("click", () => {
   previewModal.hidden = true;
 });
@@ -1708,6 +1732,7 @@ async function initializeApp() {
   updateAttachmentState();
   updateCededItems();
   updateSaleTotal();
+  updateCustomerSummary();
   renderPaymentCaptureCard();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   renderArchiveGroups();
