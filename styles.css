@@ -505,11 +505,11 @@ textarea {
 }
 
 .field-grid.two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
 }
 
 .field-grid.three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
 label {
@@ -524,6 +524,8 @@ input,
 select,
 textarea,
 .search {
+  max-width: 100%;
+  min-width: 0;
   width: 100%;
   border: 1px solid #ded2be;
   border-radius: 8px;
@@ -540,19 +542,26 @@ textarea {
 
 .birth-place-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 124px;
+  grid-template-columns: minmax(220px, 1fr) minmax(112px, 132px);
   gap: 14px;
+  min-width: 0;
 }
 
 .practice-meta {
   display: grid;
-  grid-template-columns: 0.95fr 1.15fr 0.8fr 0.7fr;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(250px, 1.2fr) minmax(170px, 0.85fr) minmax(145px, 0.7fr);
   gap: 14px;
   margin-bottom: 18px;
   padding: 14px;
   border: 1px solid #ffc39e;
   border-radius: 8px;
   background: #fff5ed;
+}
+
+.practice-meta label,
+.field-grid label,
+.birth-place-row label {
+  min-width: 0;
 }
 
 .practice-meta input[readonly] {
@@ -1415,6 +1424,10 @@ canvas {
 }
 
 @media (max-width: 1100px) {
+  .practice-meta {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+  }
+
   .app-shell {
     grid-template-columns: 92px 1fr;
   }
