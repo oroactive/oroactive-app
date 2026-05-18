@@ -103,8 +103,8 @@
                   </select>
                 </label>
                 <label>Atto di vendita n. <input id="practiceNumber" readonly></label>
-                <label>Data compilazione <input id="practiceDate" readonly></label>
-                <label>Ora compilazione <input id="practiceTime" readonly></label>
+                <label>Data compilazione <input id="practiceDate" type="date"></label>
+                <label>Ora compilazione <input id="practiceTime" type="time"></label>
               </div>
 
               <div class="field-grid two">
@@ -218,6 +218,18 @@
                     </label>
                     <button class="remove-row" type="button" aria-label="Rimuovi riga" disabled>-</button>
                   </article>
+                </div>
+
+                <div class="bullion-quote-panel" id="bullionQuotePanel" aria-live="polite">
+                  <div class="bullion-quote-heading">
+                    <span class="internal-badge">Quotazione giornaliera</span>
+                    <strong>Valore borsa BullionVault</strong>
+                  </div>
+                  <label class="bullion-quote-field">
+                    <span>Quotazione oro in borsa giornaliera &egrave; di &euro;</span>
+                    <input data-bullion-quote="Oro" type="number" min="0" step="0.01" placeholder="Dato BullionVault">
+                    <em>Dato estrapolato da BullionVault al Kg di oro puro.</em>
+                  </label>
                 </div>
 
                 <div class="internal-weight">

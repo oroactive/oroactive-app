@@ -611,6 +611,49 @@ textarea {
   background: #fff;
 }
 
+.bullion-quote-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #ffc39e;
+  border-radius: 8px;
+  background: #fff9f4;
+}
+
+.bullion-quote-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bullion-quote-heading strong {
+  color: var(--ink);
+}
+
+.bullion-quote-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(180px, 0.45fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #ffc39e;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.bullion-quote-field span {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.bullion-quote-field em {
+  color: var(--soft-ink);
+  font-style: normal;
+  line-height: 1.35;
+}
+
 .row-number {
   min-height: 50px;
   border-radius: 8px;
@@ -1432,6 +1475,7 @@ canvas {
   .topbar,
   .panel-heading,
   .subsection-heading,
+  .bullion-quote-heading,
   .archive-header,
   .document-preview,
   .fusion-store-heading,
@@ -1447,6 +1491,7 @@ canvas {
   .field-grid.three,
   .item-row,
   .ceded-item-row,
+  .bullion-quote-field,
   .internal-weight,
   .weight-fields,
   .metal-weight-fields,

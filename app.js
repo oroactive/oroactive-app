@@ -34,7 +34,7 @@ const documentLabels = {
   Patente: "patente",
   Passaporto: "passaporto"
 };
-const actsStorageKey = "oroactive-acts-v1";
+const actsStorageKey = "oroactive-acts-v2";
 const demoActs = [
   {
     name: "Marco",
@@ -117,15 +117,21 @@ function saveActs() {
 function loadSavedActs() {
   const saved = localStorage.getItem(actsStorageKey);
   if (!saved) {
+    demoActs.splice(0, demoActs.length);
     saveActs();
     return;
   }
 
   try {
     const acts = JSON.parse(saved);
-    if (!Array.isArray(acts)) return;
+    if (!Array.isArray(acts)) {
+      demoActs.splice(0, demoActs.length);
+      saveActs();
+      return;
+    }
     demoActs.splice(0, demoActs.length, ...acts);
   } catch {
+    demoActs.splice(0, demoActs.length);
     saveActs();
   }
 }
@@ -206,17 +212,24 @@ function renderSearchResults(results) {
 }
 
 function dateParts(date) {
-  const [day, month, year] = date.split("/");
-  const dateObject = new Date(Number(year), Number(month) - 1, Number(day));
+  const dateObject = parseActDate(date);
   return {
-    day,
+    day: String(dateObject.getDate()).padStart(2, "0"),
     monthName: dateObject.toLocaleDateString("it-IT", { month: "long", year: "numeric" })
   };
 }
 
-function dateValue(date) {
+function parseActDate(date) {
+  if (date.includes("-")) {
+    const [year, month, day] = date.split("-");
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
   const [day, month, year] = date.split("/");
-  return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+  return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
+function dateValue(date) {
+  return parseActDate(date).getTime();
 }
 
 function daysFromPurchase(date) {
@@ -806,24 +819,24 @@ function formatEuro(value) {
 
 function setPracticeMeta() {
   const now = new Date();
-  document.getElementById("practiceDate").value = now.toLocaleDateString("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
-  document.getElementById("practiceTime").value = now.toLocaleTimeString("it-IT", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+  document.getElementById("practiceDate").value = now.toISOString().slice(0, 10);
+  document.getElementById("practiceTime").value = now.toTimeString().slice(0, 5);
   updatePracticeNumber();
 }
 
 function updatePracticeNumber() {
-  const year = new Date().getFullYear();
   const storeSelect = document.getElementById("storeCode");
   const storeCode = storeSelect?.value || "NEGOZIO";
-  const progressive = String(state.annualProgressive).padStart(6, "0");
-  const practiceNumber = `OA-${storeCode}-${year}-${progressive}`;
+  const selectedDate = document.getElementById("practiceDate").value;
+  const year = selectedDate ? Number(selectedDate.slice(0, 4)) : new Date().getFullYear();
+  const lastNumber = demoActs.reduce((max, act) => {
+    const match = String(act.practiceNumber || "").match(/^OA-([^-]+)-(\d{4})-(\d+)$/);
+    if (!match) return max;
+    const [, actStore, actYear, actNumber] = match;
+    if (actStore !== storeCode || Number(actYear) !== year) return max;
+    return Math.max(max, Number(actNumber));
+  }, 0);
+  const practiceNumber = `OA-${storeCode}-${year}-${lastNumber + 1}`;
   document.getElementById("practiceNumber").value = practiceNumber;
   document.getElementById("sidePracticeNumber").textContent = practiceNumber;
   document.getElementById("operatorStoreName").textContent = `Negozio ${storeSelect?.selectedOptions[0]?.textContent || ""}`;
@@ -845,6 +858,7 @@ function updateCededItems() {
 
   state.cededItems = rows.length;
   document.getElementById("summaryItems").textContent = `${rows.length} ${rows.length === 1 ? "prezioso registrato" : "preziosi registrati"}`;
+  renderBullionQuoteFields();
   renderWeightFields();
   renderPreciousCaptureCards();
   updateAttachmentState();
@@ -956,8 +970,62 @@ function shouldPrintWeightOnCustomerCopy() {
 }
 
 function activeMetals() {
-  const metals = new Set([...document.querySelectorAll(".ceded-item-row select")].map((select) => select.value));
+  const metals = new Set([...document.querySelectorAll(".ceded-item-row")].map((row) => row.querySelector("select")?.value).filter(Boolean));
   return metalOrder.filter((metal) => metals.has(metal));
+}
+
+function pureMaterialLabel(metal) {
+  return {
+    Oro: "oro",
+    Argento: "argento",
+    Platino: "platino"
+  }[metal] || "materiale prezioso";
+}
+
+function renderBullionQuoteFields() {
+  const container = document.getElementById("bullionQuotePanel");
+  if (!container) return;
+
+  const previousValues = {};
+  container.querySelectorAll("input[data-bullion-quote]").forEach((input) => {
+    previousValues[input.dataset.bullionQuote] = input.value;
+  });
+
+  const metals = activeMetals();
+  container.innerHTML = `
+    <div class="bullion-quote-heading">
+      <span class="internal-badge">Quotazione giornaliera</span>
+      <strong>Valore borsa BullionVault</strong>
+    </div>
+    ${(metals.length ? metals : ["Oro"]).map((metal) => `
+      <label class="bullion-quote-field">
+        <span>Quotazione ${metal.toLowerCase()} in borsa giornaliera &egrave; di &euro;</span>
+        <input data-bullion-quote="${metal}" type="number" min="0" step="0.01" value="${escapeHtml(previousValues[metal] || "")}" placeholder="Dato BullionVault">
+        <em>Dato estrapolato da BullionVault al Kg di ${escapeHtml(pureMaterialLabel(metal))} puro.</em>
+      </label>
+    `).join("")}
+  `;
+}
+
+function bullionQuoteRows() {
+  return [...document.querySelectorAll("#bullionQuotePanel input[data-bullion-quote]")].map((input) => ({
+    metal: input.dataset.bullionQuote,
+    value: input.value || "Dato non inserito"
+  }));
+}
+
+function buildBullionQuoteBlock() {
+  const rows = bullionQuoteRows().map((row) => `
+    <div class="print-field">
+      <span>Quotazione ${escapeHtml(row.metal.toLowerCase())} BullionVault</span>
+      EUR ${escapeHtml(row.value)} al Kg di ${escapeHtml(pureMaterialLabel(row.metal))} puro
+    </div>
+  `).join("");
+
+  return `
+    <h2>Quotazioni borsa giornaliera</h2>
+    <div class="print-grid">${rows}</div>
+  `;
 }
 
 function requiredCaptureKeys() {
@@ -1112,6 +1180,7 @@ function buildPrintCopy(title, weightLabel, scope) {
 
       <h2>Oggetti ceduti</h2>
       <div class="print-items">${items}</div>
+      ${buildBullionQuoteBlock()}
       ${internalSections}
       <h2>Dichiarazioni</h2>
       <p class="print-legal">Gli oggetti venduti sopra descritti sono usati e/o in cattivo stato di conservazione. Autorizzo la loro ulteriore alterazione per poter eseguire il test di verifica del metallo, determinarne il titolo e calcolarne il prezzo. Dichiaro inoltre che gli stessi sopra indicati oggetti non sono di illecita provenienza, di essere in possesso di tutti i diritti atti alla vendita degli stessi e di accettare e consentire il trattamento dei propri dati personali (Legge 196/03). La presente vale quale ricevuta e saldo per la somma riportata alla voce prezzo complessivo. Il venditore si obbliga fin da ora a restituire il ricavato della vendita qualora, a seguito di controlli di verifica, risulti che gli oggetti consegnati non siano corrispondenti nel valore e nella qualità a quelli dichiarati al momento della vendita e/o risultino di non essere di metallo prezioso. Dichiaro infine di aver letto attentamente quanto sopra riportato e che ai sensi e per gli effetti degli art. 1341 e 1342 del c.c. approvo incondizionatamente.</p>
@@ -1283,6 +1352,7 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
   const selects = row.querySelectorAll("select");
   if (event.target === selects[0]) {
     updateTitleOptions(row);
+    renderBullionQuoteFields();
     renderWeightFields();
     renderPreciousCaptureCards();
     updateAttachmentState();
@@ -1297,6 +1367,7 @@ document.getElementById("paymentMethod").addEventListener("change", () => {
 });
 
 document.getElementById("storeCode").addEventListener("change", updatePracticeNumber);
+document.getElementById("practiceDate").addEventListener("change", updatePracticeNumber);
 
 document.getElementById("archiveStoreFilter").addEventListener("change", renderArchiveGroups);
 
