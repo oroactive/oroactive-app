@@ -1444,6 +1444,16 @@ async function archiveCurrentPractice() {
   return true;
 }
 
+async function saveCurrentDraft() {
+  const draftAct = currentActSnapshot("Bozza");
+  draftAct.readOnlyHtml = buildPrintCopy("Bozza salvata - Sola lettura", "Dato interno aziendale", "company");
+  const wasEditing = Boolean(state.editingPracticeNumber);
+  await saveActRecord(draftAct, wasEditing ? "PUT" : "POST");
+  renderArchiveGroups();
+  renderFusionGroups();
+  showToast("Bozza salvata e visibile in Elenco e Ricerca.");
+}
+
 navItems.forEach((item) => {
   item.addEventListener("click", () => setScreen(item.dataset.section));
 });
@@ -1504,9 +1514,7 @@ document.getElementById("previousStep").addEventListener("click", () => {
 
 document.getElementById("deleteCurrentPractice").addEventListener("click", deleteCurrentPractice);
 
-document.getElementById("saveDraft").addEventListener("click", () => {
-  showToast("Bozza salvata automaticamente.");
-});
+document.getElementById("saveDraft").addEventListener("click", saveCurrentDraft);
 
 document.getElementById("printPractice").addEventListener("click", () => {
   const missing = validatePrintScope("company");
