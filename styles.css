@@ -84,6 +84,21 @@ textarea {
   display: block;
 }
 
+.splash-motto {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  top: 74%;
+  margin: 0 auto;
+  max-width: 620px;
+  color: #fff;
+  font-family: var(--apple-font);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .main-menu-screen {
   position: fixed;
   inset: 0;
