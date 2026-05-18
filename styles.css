@@ -505,7 +505,7 @@ textarea {
 }
 
 .field-grid.two {
-  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  grid-template-columns: repeat(2, minmax(300px, 1fr));
 }
 
 .field-grid.three {
@@ -549,8 +549,8 @@ textarea {
 
 .birth-place-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(112px, 132px);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 118px);
+  gap: 10px;
   min-width: 0;
 }
 
@@ -1435,13 +1435,12 @@ canvas {
     grid-template-columns: repeat(2, minmax(260px, 1fr));
   }
 
-  .field-grid.two,
   .field-grid.three {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
   }
 
   .birth-place-row {
-    grid-template-columns: minmax(0, 1fr) minmax(112px, 140px);
+    grid-template-columns: minmax(0, 1fr) minmax(96px, 118px);
   }
 }
 
@@ -1520,10 +1519,6 @@ canvas {
   }
 
   .stepper,
-  .practice-meta,
-  .birth-place-row,
-  .field-grid.two,
-  .field-grid.three,
   .item-row,
   .ceded-item-row,
   .bullion-quote-field,
@@ -1539,6 +1534,19 @@ canvas {
   .search-table .table-row,
   .fusion-table .table-row {
     grid-template-columns: 1fr;
+  }
+
+  .practice-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-grid.two,
+  .field-grid.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .birth-place-row {
+    grid-template-columns: minmax(0, 1fr) minmax(92px, 108px);
   }
 
   .ceded-items-head {
@@ -1715,6 +1723,15 @@ canvas {
     bottom: 12px;
     min-width: 0;
     max-width: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .practice-meta,
+  .field-grid.two,
+  .field-grid.three,
+  .birth-place-row {
+    grid-template-columns: 1fr;
   }
 }
 
