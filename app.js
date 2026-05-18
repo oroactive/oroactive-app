@@ -34,6 +34,7 @@ const documentLabels = {
   Patente: "patente",
   Passaporto: "passaporto"
 };
+const apiBase = "/api";
 const actsStorageKey = "oroactive-acts-v2";
 const demoActs = [
   {
@@ -110,30 +111,80 @@ const demoActs = [
   }
 ];
 
-function saveActs() {
+async function apiRequest(path, options = {}) {
+  const response = await fetch(`${apiBase}${path}`, {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || "Errore comunicazione server");
+  }
+  return response.json();
+}
+
+function saveActsLocal() {
   localStorage.setItem(actsStorageKey, JSON.stringify(demoActs));
 }
 
-function loadSavedActs() {
-  const saved = localStorage.getItem(actsStorageKey);
-  if (!saved) {
-    demoActs.splice(0, demoActs.length);
-    saveActs();
-    return;
-  }
-
+async function loadSavedActs() {
   try {
-    const acts = JSON.parse(saved);
-    if (!Array.isArray(acts)) {
+    const acts = await apiRequest("/acts");
+    demoActs.splice(0, demoActs.length, ...acts);
+    saveActsLocal();
+    return;
+  } catch {
+    const saved = localStorage.getItem(actsStorageKey);
+    if (!saved) {
       demoActs.splice(0, demoActs.length);
-      saveActs();
+      saveActsLocal();
       return;
     }
-    demoActs.splice(0, demoActs.length, ...acts);
-  } catch {
-    demoActs.splice(0, demoActs.length);
-    saveActs();
+
+    try {
+      const acts = JSON.parse(saved);
+      if (!Array.isArray(acts)) {
+        demoActs.splice(0, demoActs.length);
+        saveActsLocal();
+        return;
+      }
+      demoActs.splice(0, demoActs.length, ...acts);
+    } catch {
+      demoActs.splice(0, demoActs.length);
+      saveActsLocal();
+    }
   }
+}
+
+async function saveActRecord(act) {
+  try {
+    const saved = await apiRequest("/acts", {
+      method: "POST",
+      body: JSON.stringify(act)
+    });
+    const index = demoActs.findIndex((item) => item.practiceNumber === saved.practiceNumber);
+    if (index >= 0) demoActs[index] = saved;
+    else demoActs.unshift(saved);
+    saveActsLocal();
+    return saved;
+  } catch {
+    const index = demoActs.findIndex((item) => item.practiceNumber === act.practiceNumber);
+    if (index >= 0) demoActs[index] = act;
+    else demoActs.unshift(act);
+    saveActsLocal();
+    return act;
+  }
+}
+
+async function deleteActRecord(practiceNumber) {
+  try {
+    await apiRequest(`/acts/${encodeURIComponent(practiceNumber)}`, { method: "DELETE" });
+  } catch {
+    // Fallback locale per uso offline/prototipo.
+  }
+  const index = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
+  if (index >= 0) demoActs.splice(index, 1);
+  saveActsLocal();
 }
 
 function showToast(message) {
@@ -499,7 +550,7 @@ function openArchivedAct(practiceNumber) {
   previewModal.hidden = false;
 }
 
-function deleteAct(practiceNumber) {
+async function deleteAct(practiceNumber) {
   const index = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
   if (index < 0) {
     showToast("Atto di vendita non trovato.");
@@ -509,8 +560,7 @@ function deleteAct(practiceNumber) {
   const confirmed = window.confirm(`Vuoi eliminare definitivamente l'atto ${practiceNumber}?`);
   if (!confirmed) return;
 
-  demoActs.splice(index, 1);
-  saveActs();
+  await deleteActRecord(practiceNumber);
   state.lastSearchResults = state.lastSearchResults.filter((act) => act.practiceNumber !== practiceNumber);
   renderArchiveGroups();
   renderFusionGroups();
@@ -599,15 +649,14 @@ function resetCurrentPractice() {
   updateAttachmentState();
 }
 
-function deleteCurrentPractice() {
+async function deleteCurrentPractice() {
   const practiceNumber = fieldValue("#practiceNumber");
   const confirmed = window.confirm(`Vuoi eliminare l'atto attualmente in compilazione${practiceNumber ? ` ${practiceNumber}` : ""}?`);
   if (!confirmed) return;
 
   const existingIndex = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
   if (existingIndex >= 0) {
-    demoActs.splice(existingIndex, 1);
-    saveActs();
+    await deleteActRecord(practiceNumber);
     renderArchiveGroups();
     renderFusionGroups();
   }
@@ -711,7 +760,7 @@ function clearActSearch() {
   state.lastSearchResults = [];
 }
 
-function runActSearch() {
+async function runActSearch() {
   const field = document.getElementById("searchField").value;
   const keyword = document.getElementById("searchKeyword").value.trim().toLowerCase();
   if (!keyword) {
@@ -719,7 +768,12 @@ function runActSearch() {
     return;
   }
 
-  const results = demoActs.filter((act) => String(act[field]).toLowerCase().includes(keyword));
+  let results;
+  try {
+    results = await apiRequest(`/acts?field=${encodeURIComponent(field)}&q=${encodeURIComponent(keyword)}`);
+  } catch {
+    results = demoActs.filter((act) => String(act[field]).toLowerCase().includes(keyword));
+  }
   state.lastSearchResults = results;
   renderSearchResults(results);
 }
@@ -817,26 +871,35 @@ function formatEuro(value) {
   }).format(value || 0);
 }
 
-function setPracticeMeta() {
+async function setPracticeMeta() {
   const now = new Date();
   document.getElementById("practiceDate").value = now.toISOString().slice(0, 10);
   document.getElementById("practiceTime").value = now.toTimeString().slice(0, 5);
-  updatePracticeNumber();
+  await updatePracticeNumber();
 }
 
-function updatePracticeNumber() {
+async function updatePracticeNumber() {
   const storeSelect = document.getElementById("storeCode");
   const storeCode = storeSelect?.value || "NEGOZIO";
   const selectedDate = document.getElementById("practiceDate").value;
   const year = selectedDate ? Number(selectedDate.slice(0, 4)) : new Date().getFullYear();
-  const lastNumber = demoActs.reduce((max, act) => {
-    const match = String(act.practiceNumber || "").match(/^OA-([^-]+)-(\d{4})-(\d+)$/);
-    if (!match) return max;
-    const [, actStore, actYear, actNumber] = match;
-    if (actStore !== storeCode || Number(actYear) !== year) return max;
-    return Math.max(max, Number(actNumber));
-  }, 0);
-  const practiceNumber = `OA-${storeCode}-${year}-${lastNumber + 1}`;
+
+  let nextNumber = null;
+  try {
+    const data = await apiRequest(`/acts/next-number?storeCode=${encodeURIComponent(storeCode)}&year=${year}`);
+    nextNumber = data.nextNumber;
+  } catch {
+    const lastNumber = demoActs.reduce((max, act) => {
+      const match = String(act.practiceNumber || "").match(/^OA-([^-]+)-(\d{4})-(\d+)$/);
+      if (!match) return max;
+      const [, actStore, actYear, actNumber] = match;
+      if (actStore !== storeCode || Number(actYear) !== year) return max;
+      return Math.max(max, Number(actNumber));
+    }, 0);
+    nextNumber = lastNumber + 1;
+  }
+
+  const practiceNumber = `OA-${storeCode}-${year}-${nextNumber}`;
   document.getElementById("practiceNumber").value = practiceNumber;
   document.getElementById("sidePracticeNumber").textContent = practiceNumber;
   document.getElementById("operatorStoreName").textContent = `Negozio ${storeSelect?.selectedOptions[0]?.textContent || ""}`;
@@ -1289,7 +1352,7 @@ document.getElementById("printPractice").addEventListener("click", () => {
   window.print();
 });
 
-document.getElementById("archivePractice").addEventListener("click", () => {
+document.getElementById("archivePractice").addEventListener("click", async () => {
   const missing = validatePrintScope("company");
   if (missing.length) {
     showToast(validationMessage(missing, "la copia aziendale"));
@@ -1297,15 +1360,10 @@ document.getElementById("archivePractice").addEventListener("click", () => {
   }
   const archivedAct = currentActSnapshot("Archiviata");
   archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
-  const existingIndex = demoActs.findIndex((act) => act.practiceNumber === archivedAct.practiceNumber);
-  if (existingIndex >= 0) {
-    demoActs[existingIndex] = archivedAct;
-  } else {
-    demoActs.unshift(archivedAct);
-  }
-  saveActs();
+  await saveActRecord(archivedAct);
   renderArchiveGroups();
   renderFusionGroups();
+  await updatePracticeNumber();
   showToast("Atto di vendita salvato e archiviato.");
 });
 
@@ -1505,15 +1563,19 @@ document.getElementById("closePreview").addEventListener("click", () => {
   previewModal.hidden = true;
 });
 
-loadSavedActs();
-renderStep();
-setPracticeMeta();
-updateSignatureState();
-updateDocumentCaptureCards();
-updateAttachmentState();
-updateCededItems();
-updateSaleTotal();
-renderPaymentCaptureCard();
-document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
-renderArchiveGroups();
-renderFusionGroups();
+async function initializeApp() {
+  await loadSavedActs();
+  renderStep();
+  await setPracticeMeta();
+  updateSignatureState();
+  updateDocumentCaptureCards();
+  updateAttachmentState();
+  updateCededItems();
+  updateSaleTotal();
+  renderPaymentCaptureCard();
+  document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
+  renderArchiveGroups();
+  renderFusionGroups();
+}
+
+initializeApp();
