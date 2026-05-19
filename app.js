@@ -267,6 +267,13 @@ function renderSearchResults(results) {
   `;
 }
 
+function statusClass(status = "") {
+  const normalized = String(status).toLowerCase();
+  if (normalized === "completato" || normalized === "completata") return "status-completed";
+  if (normalized === "archiviato" || normalized === "archiviata") return "status-archived";
+  return "";
+}
+
 function dateParts(date) {
   const dateObject = parseActDate(date);
   return {
@@ -369,7 +376,7 @@ function renderArchiveGroups() {
                 <span>${escapeHtml(act.practiceNumber)}</span>
                 <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
                 <span>${escapeHtml(act.date)}</span>
-                <em class="${act.status === "Archiviata" ? "done" : ""}">${escapeHtml(act.status)}</em>
+                <em class="${statusClass(act.status)}">${escapeHtml(act.status)}</em>
                 <div class="row-actions">
                   <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
                   <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
@@ -393,7 +400,7 @@ function buildArchiveDayExport(store, date, acts) {
       <span>${escapeHtml(formatEuro(Number(act.amount)))}</span>
       <span>${escapeHtml(act.paymentMethod)}</span>
       <span>${escapeHtml(act.weight)} g</span>
-      <em>${escapeHtml(act.status)}</em>
+      <em class="${statusClass(act.status)}">${escapeHtml(act.status)}</em>
     </div>
   `).join("");
 
@@ -1542,26 +1549,26 @@ function showPrintPreview(scope) {
   previewModal.hidden = false;
 }
 
-async function archiveCurrentPractice() {
+async function archiveCurrentPractice(status = "Archiviata") {
   const missing = validatePrintScope("company");
   if (missing.length) {
     showToast(validationMessage(missing, "la copia aziendale"));
     return false;
   }
-  const archivedAct = currentActSnapshot("Archiviata");
+  const archivedAct = currentActSnapshot(status);
   archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
   const wasEditing = Boolean(state.editingPracticeNumber);
   await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   renderArchiveGroups();
   renderFusionGroups();
   await resetCurrentPractice();
-  showToast(wasEditing ? "Atto di vendita modificato e salvato." : "Atto di vendita salvato e archiviato.");
+  showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`);
   return true;
 }
 
 async function completeCurrentPractice() {
   const missing = validatePrintScope("company");
-  if (!missing.length) return archiveCurrentPractice();
+  if (!missing.length) return archiveCurrentPractice("Completato");
 
   const preview = missing.slice(0, 8).join(", ");
   const suffix = missing.length > 8 ? ` e altri ${missing.length - 8} elementi` : "";

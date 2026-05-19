@@ -1377,6 +1377,18 @@ canvas {
   font-weight: 800;
 }
 
+.table-row em.status-completed,
+.archive-export-row em.status-completed {
+  background: var(--gold);
+  color: #0b0b0a;
+}
+
+.table-row em.status-archived,
+.archive-export-row em.status-archived {
+  background: #ffd24a;
+  color: #0b0b0a;
+}
+
 .table-row em.done {
   background: #e8f5ed;
   color: var(--green);
