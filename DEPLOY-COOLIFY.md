@@ -15,7 +15,7 @@ ADMIN_EMAIL=elite@oroactive.it
 ADMIN_PASSWORD=Snoopdoggydogg.8
 ADMIN_NOME=Elite
 ADMIN_COGNOME=Admin
-ADMIN_NEGOZIO=Busto Arsizio
+ADMIN_NEGOZIO=Tutti
 ```
 
 Per la configurazione OroActive richiesta:
@@ -69,13 +69,14 @@ Il frontend usa queste API per salvare, leggere, cercare, modificare/eliminare e
 ## Ruoli
 
 ```text
-admin      vede tutti i negozi, crea utenti e cambia negozio assegnato
-operatore  vede solo il proprio negozio e crea/modifica solo gli atti del negozio assegnato
+Founder  vede tutti i negozi, gestisce utenti e amministratori, modifica e revoca ogni accesso
+Admin    vede tutti i negozi, gestisce solo gli Utenti, modifica e revoca solo utenti
+Utente   accede al gestionale senza sezione Utenti
 ```
 
-Dopo il primo accesso admin, crea gli operatori dalla sezione `Utenti` e assegna il negozio corretto.
+Founder e Admin visualizzano `Tutti` nel campo negozio. Dopo il primo accesso Founder, crea gli Admin o gli Utenti dalla sezione `Utenti`.
 
-Accesso admin iniziale:
+Accesso Founder iniziale:
 
 ```text
 Nome utente: Elite

@@ -51,17 +51,33 @@ function publicUser(row) {
     cognome: row.cognome,
     username: row.username,
     email: row.email,
-    ruolo: row.ruolo,
-    negozio: row.negozio,
+    ruolo: normalizeRole(row.ruolo),
+    negozio: roleSeesAllStores(row.ruolo) ? "Tutti" : row.negozio,
     data_creazione: row.data_creazione
   };
+}
+
+function normalizeRole(role = "utente") {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "founder") return "founder";
+  if (normalized === "admin") return "admin";
+  if (normalized === "operatore" || normalized === "utente" || normalized === "user") return "utente";
+  return "utente";
+}
+
+function roleSeesAllStores(role) {
+  return ["founder", "admin"].includes(normalizeRole(role));
+}
+
+function canManageAccess(user) {
+  return ["founder", "admin"].includes(normalizeRole(user?.ruolo));
 }
 
 function signUserToken(user) {
   return jwt.sign(
     {
       sub: String(user.id),
-      ruolo: user.ruolo,
+      ruolo: normalizeRole(user.ruolo),
       negozio: user.negozio
     },
     jwtSecret,
@@ -94,8 +110,8 @@ async function authenticate(request, response, next) {
 }
 
 function requireAdmin(request, response, next) {
-  if (request.user?.ruolo !== "admin") {
-    return response.status(403).json({ error: "Operazione riservata all'amministratore" });
+  if (!canManageAccess(request.user)) {
+    return response.status(403).json({ error: "Operazione riservata a Founder o Admin" });
   }
   next();
 }
@@ -221,7 +237,7 @@ async function bootstrapAdminUser() {
         username = $4,
         email = LOWER($5),
         password_hash = $6,
-        ruolo = 'admin',
+        ruolo = 'founder',
         negozio = $7
        WHERE id = $1`,
       [
@@ -231,7 +247,7 @@ async function bootstrapAdminUser() {
         username,
         email,
         passwordHash,
-        process.env.ADMIN_NEGOZIO || "Busto Arsizio"
+        "Tutti"
       ]
     );
     return;
@@ -239,14 +255,14 @@ async function bootstrapAdminUser() {
 
   await pool.query(
     `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
-     VALUES ($1, $2, $3, LOWER($4), $5, 'admin', $6)`,
+     VALUES ($1, $2, $3, LOWER($4), $5, 'founder', $6)`,
     [
       process.env.ADMIN_NOME || "Elite",
       process.env.ADMIN_COGNOME || "Admin",
       username,
       email,
       passwordHash,
-      process.env.ADMIN_NEGOZIO || "Busto Arsizio"
+      "Tutti"
     ]
   );
 }
@@ -255,7 +271,7 @@ function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
   const where = [];
   const values = [];
 
-  const effectiveStore = user?.ruolo === "operatore" ? user.negozio : store;
+  const effectiveStore = roleSeesAllStores(user?.ruolo) ? store : user?.negozio;
   if (effectiveStore) {
     values.push(effectiveStore);
     where.push(`store = $${values.length}`);
@@ -326,7 +342,7 @@ async function nextActNumber(storeCode, year) {
 }
 
 function enforceActStore(input, user) {
-  if (!user || user.ruolo === "admin") return input;
+  if (!user || roleSeesAllStores(user.ruolo)) return input;
   const storeCode = storeCodeFromName(user.negozio);
   const practiceNumber = String(input.practiceNumber || "").replace(/^OA-[^-]+-/, `OA-${storeCode}-`);
   return {
@@ -350,7 +366,7 @@ async function getAct(identifier) {
 }
 
 function canAccessAct(row, user) {
-  return user?.ruolo === "admin" || row?.store === user?.negozio;
+  return roleSeesAllStores(user?.ruolo) || row?.store === user?.negozio;
 }
 
 async function saveAct(input, user) {
@@ -464,14 +480,18 @@ async function deleteAct(identifier, user) {
   return result.rowCount > 0;
 }
 
-async function createUser(input) {
+async function createUser(input, actor) {
   const password = String(input.password || "");
   if (password.length < 8) {
     const error = new Error("La password deve avere almeno 8 caratteri");
     error.status = 400;
     throw error;
   }
+  const actorRole = normalizeRole(actor?.ruolo);
   const passwordHash = await bcrypt.hash(password, 12);
+  const role = normalizeRole(input.ruolo);
+  const finalRole = actorRole === "admin" && role !== "utente" ? "utente" : role;
+  const finalStore = roleSeesAllStores(finalRole) ? "Tutti" : input.negozio || "Busto Arsizio";
   const result = await pool.query(
     `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
      VALUES ($1, $2, NULLIF($3, ''), LOWER($4), $5, $6, $7)
@@ -482,20 +502,40 @@ async function createUser(input) {
       input.username || "",
       input.email || "",
       passwordHash,
-      input.ruolo === "admin" ? "admin" : "operatore",
-      input.negozio || "Busto Arsizio"
+      finalRole,
+      finalStore
     ]
   );
   return publicUser(result.rows[0]);
 }
 
-async function updateUser(id, input) {
+async function findUserRawById(id) {
+  const result = await pool.query("SELECT * FROM utenti WHERE id = $1", [id]);
+  return result.rows[0] || null;
+}
+
+function assertCanManageTarget(actor, target, requestedRole = target?.ruolo) {
+  const actorRole = normalizeRole(actor?.ruolo);
+  const targetRole = normalizeRole(target?.ruolo);
+  if (actorRole === "founder") return;
+  if (actorRole === "admin" && targetRole === "utente" && normalizeRole(requestedRole) === "utente") return;
+  const error = new Error("Permesso non consentito per questo utente");
+  error.status = 403;
+  throw error;
+}
+
+async function updateUser(id, input, actor) {
+  const target = await findUserRawById(id);
+  if (!target) return null;
+  assertCanManageTarget(actor, target, input.ruolo || target.ruolo);
   const fields = [];
   const values = [];
   const allowed = ["nome", "cognome", "username", "email", "ruolo", "negozio"];
   allowed.forEach((field) => {
     if (input[field] === undefined) return;
-    const value = field === "email" ? String(input[field]).toLowerCase() : input[field];
+    let value = field === "email" ? String(input[field]).toLowerCase() : input[field];
+    if (field === "ruolo") value = normalizeRole(value);
+    if (field === "negozio" && roleSeesAllStores(input.ruolo || target.ruolo)) value = "Tutti";
     values.push(field === "username" && !value ? null : value);
     fields.push(`${field} = $${values.length}`);
   });
@@ -520,6 +560,27 @@ async function listUsers() {
     "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione FROM utenti ORDER BY data_creazione DESC"
   );
   return result.rows.map(publicUser);
+}
+
+async function listUsersForActor(actor) {
+  if (normalizeRole(actor?.ruolo) === "founder") return listUsers();
+  const result = await pool.query(
+    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione FROM utenti WHERE ruolo IN ('utente', 'operatore') ORDER BY data_creazione DESC"
+  );
+  return result.rows.map(publicUser);
+}
+
+async function deleteUser(id, actor) {
+  if (String(actor.id) === String(id)) {
+    const error = new Error("Non puoi eliminare il tuo stesso accesso");
+    error.status = 400;
+    throw error;
+  }
+  const target = await findUserRawById(id);
+  if (!target) return false;
+  assertCanManageTarget(actor, target);
+  const result = await pool.query("DELETE FROM utenti WHERE id = $1 RETURNING id", [id]);
+  return result.rowCount > 0;
 }
 
 async function loginUser(identifier, password) {
@@ -561,7 +622,7 @@ app.use("/api", authenticate);
 
 app.get("/api/utenti", requireAdmin, async (_request, response, next) => {
   try {
-    response.json(await listUsers());
+    response.json(await listUsersForActor(_request.user));
   } catch (error) {
     next(error);
   }
@@ -569,7 +630,7 @@ app.get("/api/utenti", requireAdmin, async (_request, response, next) => {
 
 app.post("/api/utenti", requireAdmin, async (request, response, next) => {
   try {
-    response.status(201).json(await createUser(request.body));
+    response.status(201).json(await createUser(request.body, request.user));
   } catch (error) {
     next(error);
   }
@@ -577,9 +638,19 @@ app.post("/api/utenti", requireAdmin, async (request, response, next) => {
 
 app.put("/api/utenti/:id", requireAdmin, async (request, response, next) => {
   try {
-    const user = await updateUser(request.params.id, request.body);
+    const user = await updateUser(request.params.id, request.body, request.user);
     if (!user) return response.status(404).json({ error: "Utente non trovato" });
     response.json(user);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/utenti/:id", requireAdmin, async (request, response, next) => {
+  try {
+    const deleted = await deleteUser(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Utente non trovato" });
+    response.json({ ok: true, id: request.params.id });
   } catch (error) {
     next(error);
   }
@@ -603,9 +674,9 @@ app.get(["/api/atti/search", "/api/acts/search"], async (request, response, next
 
 app.get(["/api/atti/next-number", "/api/acts/next-number"], async (request, response, next) => {
   try {
-    const storeCode = request.user.ruolo === "operatore"
-      ? storeCodeFromName(request.user.negozio)
-      : String(request.query.storeCode || "");
+    const storeCode = roleSeesAllStores(request.user.ruolo)
+      ? String(request.query.storeCode || "")
+      : storeCodeFromName(request.user.negozio);
     const year = Number(request.query.year || new Date().getFullYear());
     response.json({ nextNumber: await nextActNumber(storeCode, year) });
   } catch (error) {

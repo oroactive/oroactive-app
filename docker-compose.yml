@@ -14,7 +14,7 @@ services:
       ADMIN_PASSWORD: Snoopdoggydogg.8
       ADMIN_NOME: Elite
       ADMIN_COGNOME: Admin
-      ADMIN_NEGOZIO: Busto Arsizio
+      ADMIN_NEGOZIO: Tutti
     depends_on:
       - postgres
 
