@@ -158,6 +158,40 @@ async function loadSavedActs() {
   }
 }
 
+function isPracticeFormEmpty() {
+  const selectors = [
+    '[name="nome"]',
+    '[name="cognome"]',
+    '[name="nascita"]',
+    '[name="luogo"]',
+    '[name="cf"]',
+    '[name="telefono"]',
+    '[name="indirizzo"]',
+    '[name="numeroDocumento"]',
+    '[name="scadenzaDocumento"]',
+    "#saleTotal"
+  ];
+  const hasFilledFields = selectors.some((selector) => hasValue(selector));
+  const hasFilledItems = [...document.querySelectorAll(".ceded-item-row input")].some((input) => input.value.trim());
+  return !hasFilledFields && !hasFilledItems && state.uploadedCaptures.size === 0 && state.signatures.every((signed) => !signed);
+}
+
+async function syncActsFromServer() {
+  await loadSavedActs();
+  renderArchiveGroups();
+  renderFusionGroups();
+
+  const searchActive = document.getElementById("searchActs")?.classList.contains("active-screen");
+  const keyword = document.getElementById("searchKeyword")?.value.trim();
+  if (searchActive && keyword) {
+    await runActSearch();
+  }
+
+  if (!state.editingPracticeNumber && isPracticeFormEmpty()) {
+    await updatePracticeNumber();
+  }
+}
+
 async function saveActRecord(act, method = "POST") {
   try {
     const path = method === "PUT" ? `/atti/${encodeURIComponent(act.practiceNumber)}` : "/atti";
@@ -1550,8 +1584,9 @@ function showPrintPreview(scope) {
 }
 
 async function archiveCurrentPractice(status = "Archiviata") {
-  const missing = validatePrintScope("company");
-  if (missing.length) {
+  const isCompletion = status === "Completato";
+  const missing = isCompletion ? validatePrintScope("company") : [];
+  if (isCompletion && missing.length) {
     showToast(validationMessage(missing, "la copia aziendale"));
     return false;
   }
@@ -1561,6 +1596,7 @@ async function archiveCurrentPractice(status = "Archiviata") {
   await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   renderArchiveGroups();
   renderFusionGroups();
+  await syncActsFromServer();
   await resetCurrentPractice();
   showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`);
   return true;
@@ -1594,6 +1630,7 @@ async function saveCurrentDraft() {
   await saveActRecord(draftAct, wasEditing ? "PUT" : "POST");
   renderArchiveGroups();
   renderFusionGroups();
+  await syncActsFromServer();
   showToast("Bozza salvata e visibile in Elenco e Ricerca.");
 }
 
@@ -1947,6 +1984,11 @@ async function initializeApp() {
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   renderArchiveGroups();
   renderFusionGroups();
+  window.setInterval(syncActsFromServer, 5000);
+  window.addEventListener("focus", syncActsFromServer);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) syncActsFromServer();
+  });
 }
 
 initializeApp();
