@@ -33,6 +33,7 @@ const loginForm = document.getElementById("loginForm");
 const loginMessage = document.getElementById("loginMessage");
 const logoutButton = document.getElementById("logoutButton");
 const loggedUserName = document.getElementById("loggedUserName");
+const sessionUsername = document.getElementById("sessionUsername");
 const appShell = document.querySelector(".app-shell");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
@@ -171,8 +172,33 @@ function showAuthenticatedShell() {
   mainMenuScreen.hidden = true;
 }
 
+function normalizeRole(role = "utente") {
+  const normalized = String(role || "").toLowerCase();
+  if (normalized === "founder") return "founder";
+  if (normalized === "admin") return "admin";
+  return "utente";
+}
+
+function roleLabel(role) {
+  return { founder: "Founder", admin: "Admin", utente: "Utente" }[normalizeRole(role)];
+}
+
+function displayUsername(user = {}) {
+  if (user.username) return user.username;
+  if (normalizeRole(user.ruolo) === "admin") return "Admin";
+  return user.nome || user.email || "";
+}
+
 function isAdmin() {
-  return state.currentUser?.ruolo === "admin";
+  return ["founder", "admin"].includes(normalizeRole(state.currentUser?.ruolo));
+}
+
+function isFounder() {
+  return normalizeRole(state.currentUser?.ruolo) === "founder";
+}
+
+function userSeesAllStores(user = state.currentUser) {
+  return ["founder", "admin"].includes(normalizeRole(user?.ruolo));
 }
 
 function currentUserStoreCode() {
@@ -186,7 +212,7 @@ function applyRolePermissions() {
 
   const storeCode = document.getElementById("storeCode");
   const archiveStore = document.getElementById("archiveStoreFilter");
-  if (!isAdmin()) {
+  if (!userSeesAllStores()) {
     const code = currentUserStoreCode();
     if (storeCode) {
       storeCode.value = code;
@@ -202,8 +228,16 @@ function applyRolePermissions() {
   }
 
   if (loggedUserName && state.currentUser) {
-    loggedUserName.textContent = `${state.currentUser.nome} ${state.currentUser.cognome} - ${state.currentUser.ruolo}`;
+    loggedUserName.textContent = `${displayUsername(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
   }
+  const operatorStoreName = document.getElementById("operatorStoreName");
+  if (operatorStoreName && state.currentUser && userSeesAllStores()) {
+    operatorStoreName.textContent = "Negozio Tutti";
+  }
+  if (sessionUsername && state.currentUser) {
+    sessionUsername.textContent = displayUsername(state.currentUser);
+  }
+  configureUserFormPermissions();
 }
 
 async function startAuthenticatedApp() {
@@ -212,6 +246,7 @@ async function startAuthenticatedApp() {
   await loadSavedActs();
   renderStep();
   await setPracticeMeta();
+  applyRolePermissions();
   updateSignatureState();
   updateDocumentCaptureCards();
   updateAttachmentState();
@@ -353,6 +388,25 @@ function resetUserForm() {
   form.reset();
   document.getElementById("userId").value = "";
   document.getElementById("userPassword").required = true;
+  configureUserFormPermissions();
+}
+
+function configureUserFormPermissions() {
+  const roleSelect = document.getElementById("userRole");
+  const storeSelect = document.getElementById("userStore");
+  if (!roleSelect || !storeSelect) return;
+  [...roleSelect.options].forEach((option) => {
+    option.hidden = !isFounder() && option.value !== "utente";
+  });
+  if (!isFounder()) roleSelect.value = "utente";
+  const role = normalizeRole(roleSelect.value);
+  if (["founder", "admin"].includes(role)) {
+    storeSelect.value = "Tutti";
+    storeSelect.disabled = true;
+  } else {
+    storeSelect.disabled = false;
+    if (storeSelect.value === "Tutti") storeSelect.value = "Busto Arsizio";
+  }
 }
 
 function renderUsers(users) {
@@ -368,11 +422,15 @@ function renderUsers(users) {
     ${users.map((user) => `
       <div class="table-row">
         <strong>${escapeHtml(user.nome)} ${escapeHtml(user.cognome)}</strong>
-        <span>${escapeHtml(user.username || user.email)}<br>${escapeHtml(user.email)}</span>
-        <em>${escapeHtml(user.ruolo)}</em>
-        <span>${escapeHtml(user.negozio)}</span>
+        <span>${escapeHtml(displayUsername(user))}<br>${escapeHtml(user.email)}</span>
+        <em>${escapeHtml(roleLabel(user.ruolo))}</em>
+        <span>${escapeHtml(userSeesAllStores(user) ? "Tutti" : user.negozio)}</span>
         <div class="row-actions">
-          <button type="button" data-edit-user="${escapeHtml(String(user.id))}">Modifica</button>
+          <select data-user-action="${escapeHtml(String(user.id))}" aria-label="Azioni utente">
+            <option value="">Azioni</option>
+            <option value="edit">Modifica</option>
+            <option value="delete">Elimina</option>
+          </select>
         </div>
       </div>
     `).join("")}
@@ -399,7 +457,7 @@ async function saveUser(event) {
     cognome: document.getElementById("userSurname").value.trim(),
     username: document.getElementById("userUsername").value.trim(),
     email: document.getElementById("userEmail").value.trim(),
-    ruolo: document.getElementById("userRole").value,
+    ruolo: normalizeRole(document.getElementById("userRole").value),
     negozio: document.getElementById("userStore").value
   };
   const password = document.getElementById("userPassword").value;
@@ -426,12 +484,27 @@ function editUser(id) {
   document.getElementById("userSurname").value = user.cognome || "";
   document.getElementById("userUsername").value = user.username || "";
   document.getElementById("userEmail").value = user.email || "";
-  document.getElementById("userRole").value = user.ruolo || "operatore";
-  document.getElementById("userStore").value = user.negozio || "Busto Arsizio";
+  document.getElementById("userRole").value = normalizeRole(user.ruolo);
+  document.getElementById("userStore").value = userSeesAllStores(user) ? "Tutti" : user.negozio || "Busto Arsizio";
   const password = document.getElementById("userPassword");
   password.value = "";
   password.required = false;
+  configureUserFormPermissions();
   showToast("Utente caricato in modifica.");
+}
+
+async function deleteUser(id) {
+  const user = (state.users || []).find((item) => String(item.id) === String(id));
+  if (!user) return;
+  const confirmed = window.confirm(`Vuoi eliminare definitivamente l'utente ${displayUsername(user)}?`);
+  if (!confirmed) return;
+  try {
+    await apiRequest(`/utenti/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await loadUsers();
+    showToast("Utente eliminato.");
+  } catch (error) {
+    showToast(error.message || "Utente non eliminato.");
+  }
 }
 
 function normalizeWorkflowStatus(status = "Archiviata") {
@@ -1791,6 +1864,15 @@ document.getElementById("usersList").addEventListener("click", (event) => {
   const button = event.target.closest("[data-edit-user]");
   if (button) editUser(button.dataset.editUser);
 });
+document.getElementById("usersList").addEventListener("change", (event) => {
+  const select = event.target.closest("[data-user-action]");
+  if (!select || !select.value) return;
+  const id = select.dataset.userAction;
+  if (select.value === "edit") editUser(id);
+  if (select.value === "delete") deleteUser(id);
+  select.value = "";
+});
+document.getElementById("userRole").addEventListener("change", configureUserFormPermissions);
 
 brandMenuButton.addEventListener("click", (event) => {
   event.stopPropagation();
