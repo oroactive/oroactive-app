@@ -34,8 +34,6 @@ const loginMessage = document.getElementById("loginMessage");
 const logoutButton = document.getElementById("logoutButton");
 const loggedUserName = document.getElementById("loggedUserName");
 const sessionUsername = document.getElementById("sessionUsername");
-const loginGreeting = document.getElementById("loginGreeting");
-const splashGreeting = document.getElementById("splashGreeting");
 const appShell = document.querySelector(".app-shell");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
@@ -255,12 +253,6 @@ function applyRolePermissions() {
   if (sessionUsername && state.currentUser) {
     sessionUsername.textContent = displayUsername(state.currentUser);
   }
-  if (loginGreeting && state.currentUser) {
-    loginGreeting.textContent = `Ciao ${displayUsername(state.currentUser)}`;
-  }
-  if (splashGreeting && state.currentUser) {
-    splashGreeting.textContent = `Ciao ${displayUsername(state.currentUser)}`;
-  }
   configureUserFormPermissions();
 }
 
@@ -309,7 +301,7 @@ async function handleLogin(event) {
     const data = await apiRequest("/auth/login", {
       method: "POST",
       body: JSON.stringify({
-        email: document.getElementById("loginEmail").value.trim(),
+        username: document.getElementById("loginUsername").value.trim(),
         password: document.getElementById("loginPassword").value
       })
     });

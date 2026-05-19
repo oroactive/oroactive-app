@@ -626,12 +626,12 @@ async function deleteUser(id, actor) {
 
 async function loginUser(identifier, password) {
   const result = await pool.query(
-    "SELECT * FROM utenti WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)",
+    "SELECT * FROM utenti WHERE LOWER(username) = LOWER($1)",
     [identifier || ""]
   );
   const user = result.rows[0];
   if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash))) {
-    const error = new Error("Email o password non corretti");
+    const error = new Error("Nome utente o password non corretti");
     error.status = 401;
     throw error;
   }
@@ -647,7 +647,7 @@ app.get("/api/health", (_request, response) => {
 
 app.post("/api/auth/login", async (request, response, next) => {
   try {
-    response.json(await loginUser(request.body.email, request.body.password));
+    response.json(await loginUser(request.body.username, request.body.password));
   } catch (error) {
     next(error);
   }
