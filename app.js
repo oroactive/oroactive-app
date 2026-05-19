@@ -1067,7 +1067,10 @@ function updateCededItems() {
   });
 
   state.cededItems = rows.length;
-  document.getElementById("summaryItems").textContent = `${rows.length} ${rows.length === 1 ? "prezioso registrato" : "preziosi registrati"}`;
+  const materialTypes = activeMetals().length || 1;
+  document.getElementById("summaryItems").textContent = materialTypes === 1
+    ? "1 tipologia di prezioso registrato"
+    : `${materialTypes} tipologie di preziosi registrati`;
   renderBullionQuoteFields();
   renderWeightFields();
   renderPreciousCaptureCards();
