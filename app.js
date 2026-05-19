@@ -1053,7 +1053,7 @@ function updateCustomerSummary() {
   const surname = fieldValue('[name="cognome"]').trim();
   const fiscalCode = fieldValue('[name="cf"]').trim();
   const customer = [name, surname].filter(Boolean).join(" ");
-  document.getElementById("summaryClient").textContent = customer || "Dato non inserito";
+  document.getElementById("summaryClient").textContent = customer || "Dati non inseriti";
   document.getElementById("summaryFiscalCode").textContent = fiscalCode || "Dato non inserito";
 }
 
