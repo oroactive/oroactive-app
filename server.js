@@ -65,7 +65,7 @@ function publicUser(row) {
 function normalizeRole(role = "commesso") {
   const normalized = String(role || "").trim().toLowerCase();
   if (normalized === "founder") return "founder";
-  if (normalized === "admin") return "admin";
+  if (normalized === "admin") return "responsabile";
   if (normalized === "responsabile") return "responsabile";
   if (normalized === "commessa") return "commessa";
   if (normalized === "commesso" || normalized === "operatore" || normalized === "utente" || normalized === "user") {
@@ -75,17 +75,16 @@ function normalizeRole(role = "commesso") {
 }
 
 function roleSeesAllStores(role) {
-  return ["founder", "admin"].includes(normalizeRole(role));
+  return normalizeRole(role) === "founder";
 }
 
 function canManageAccess(user) {
-  return ["founder", "admin", "responsabile"].includes(normalizeRole(user?.ruolo));
+  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
 
 function managedRolesForActor(actor) {
   const role = normalizeRole(actor?.ruolo);
-  if (role === "founder") return ["admin", "responsabile", "commesso", "commessa"];
-  if (role === "admin") return ["responsabile", "commesso", "commessa"];
+  if (role === "founder") return ["responsabile", "commesso", "commessa"];
   if (role === "responsabile") return ["commesso", "commessa"];
   return [];
 }
@@ -130,7 +129,7 @@ async function authenticate(request, response, next) {
 
 function requireAdmin(request, response, next) {
   if (!canManageAccess(request.user)) {
-    return response.status(403).json({ error: "Operazione riservata a Founder o Admin" });
+    return response.status(403).json({ error: "Operazione riservata a Founder o Responsabile" });
   }
   next();
 }

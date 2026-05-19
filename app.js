@@ -34,6 +34,8 @@ const loginMessage = document.getElementById("loginMessage");
 const logoutButton = document.getElementById("logoutButton");
 const loggedUserName = document.getElementById("loggedUserName");
 const sessionUsername = document.getElementById("sessionUsername");
+const loginGreeting = document.getElementById("loginGreeting");
+const splashGreeting = document.getElementById("splashGreeting");
 const appShell = document.querySelector(".app-shell");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
@@ -178,7 +180,7 @@ function showAuthenticatedShell() {
 function normalizeRole(role = "commesso") {
   const normalized = String(role || "").toLowerCase();
   if (normalized === "founder") return "founder";
-  if (normalized === "admin") return "admin";
+  if (normalized === "admin") return "responsabile";
   if (normalized === "responsabile") return "responsabile";
   if (normalized === "commessa") return "commessa";
   return "commesso";
@@ -187,7 +189,6 @@ function normalizeRole(role = "commesso") {
 function roleLabel(role) {
   return {
     founder: "Founder",
-    admin: "Admin",
     responsabile: "Responsabile",
     commesso: "Commesso",
     commessa: "Commessa"
@@ -196,12 +197,11 @@ function roleLabel(role) {
 
 function displayUsername(user = {}) {
   if (user.username) return user.username;
-  if (normalizeRole(user.ruolo) === "admin") return "Admin";
   return user.nome || user.email || "";
 }
 
 function isAdmin() {
-  return ["founder", "admin", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+  return ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
 function isFounder() {
@@ -209,13 +209,12 @@ function isFounder() {
 }
 
 function userSeesAllStores(user = state.currentUser) {
-  return ["founder", "admin"].includes(normalizeRole(user?.ruolo));
+  return normalizeRole(user?.ruolo) === "founder";
 }
 
 function managedRolesForCurrentUser() {
   const role = normalizeRole(state.currentUser?.ruolo);
-  if (role === "founder") return ["admin", "responsabile", "commesso", "commessa"];
-  if (role === "admin") return ["responsabile", "commesso", "commessa"];
+  if (role === "founder") return ["responsabile", "commesso", "commessa"];
   if (role === "responsabile") return ["commesso", "commessa"];
   return [];
 }
@@ -255,6 +254,12 @@ function applyRolePermissions() {
   }
   if (sessionUsername && state.currentUser) {
     sessionUsername.textContent = displayUsername(state.currentUser);
+  }
+  if (loginGreeting && state.currentUser) {
+    loginGreeting.textContent = `Ciao ${displayUsername(state.currentUser)}`;
+  }
+  if (splashGreeting && state.currentUser) {
+    splashGreeting.textContent = `Ciao ${displayUsername(state.currentUser)}`;
   }
   configureUserFormPermissions();
 }
@@ -329,7 +334,7 @@ async function handleLogout() {
 
 function setScreen(id) {
   if (id === "users" && !isAdmin()) {
-    showToast("Sezione riservata all'amministratore.");
+    showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
   const leavingSearch = document.getElementById("searchActs")?.classList.contains("active-screen") && id !== "searchActs";
@@ -421,7 +426,7 @@ function configureUserFormPermissions() {
   });
   if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles[0] || "commesso";
   const role = normalizeRole(roleSelect.value);
-  if (["founder", "admin"].includes(role)) {
+  if (role === "founder") {
     storeSelect.value = "Tutti";
     storeSelect.disabled = true;
   } else {

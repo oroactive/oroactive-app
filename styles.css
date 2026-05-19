@@ -189,6 +189,19 @@ textarea {
   text-align: center;
 }
 
+.splash-login-greeting {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  top: 68%;
+  margin: 0 auto;
+  color: var(--gold);
+  font-family: var(--apple-font);
+  font-size: 18px;
+  font-weight: 900;
+  text-align: center;
+}
+
 .main-menu-screen {
   position: fixed;
   inset: 0;
@@ -234,6 +247,14 @@ textarea {
   gap: 18px;
   width: 100%;
   justify-items: center;
+}
+
+.login-greeting {
+  margin: 0 0 4px;
+  color: var(--gold);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .main-menu-actions button {
@@ -1480,14 +1501,30 @@ canvas {
 }
 
 .user-form-actions {
-  position: sticky;
-  bottom: 0;
+  position: static;
   z-index: 2;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
-  padding-top: 10px;
+  padding: 12px 0 2px;
   background: var(--panel);
+}
+
+.user-form-actions button,
+.settings-list .user-form-actions button {
+  min-height: 64px;
+  padding: 0 12px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 950;
+  white-space: normal;
+  line-height: 1.15;
+}
+
+#saveUserButton {
+  background: var(--gold);
+  border-color: var(--gold-dark);
+  color: #0b0b0a;
 }
 
 .archive-export-table {
@@ -1954,9 +1991,24 @@ canvas {
     gap: 12px;
   }
 
+  .login-greeting {
+    font-size: 20px;
+  }
+
   .main-menu-actions button {
     font-size: 20px;
     min-height: 56px;
+  }
+
+  .user-form-actions {
+    position: static;
+    grid-template-columns: 1fr;
+  }
+
+  .user-form-actions button,
+  .settings-list .user-form-actions button {
+    min-height: 62px;
+    font-size: 17px;
   }
 
   .splash-screen .dark-footer,

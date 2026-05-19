@@ -9,9 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
   <title>OroActive Gestionale</title>
-  <link rel="manifest" href="manifest.webmanifest?v=20260519-28">
+  <link rel="manifest" href="manifest.webmanifest?v=20260519-29">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260519-28">
+  <link rel="stylesheet" href="styles.css?v=20260519-29">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -30,6 +30,7 @@
     <button class="splash-logo-button" id="enterSoftware" type="button" aria-label="Entra nel software OroActive">
       <img src="oroactive-logo.png" alt="OroActive Compro Oro">
     </button>
+    <p class="login-greeting splash-login-greeting" id="splashGreeting"></p>
     <p class="splash-motto">La differenza non la fanno i preziosi che acquisti, ma il valore che porti ogni giorno.<br>Cresci come persona, evolvi come professionista, brilla come OroActive.</p>
     <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario progettato da Christian Dinato</footer>
   </section>
@@ -38,6 +39,7 @@
     <div class="main-menu-inner">
       <img class="main-menu-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
       <nav class="main-menu-actions">
+        <p class="login-greeting" id="loginGreeting"></p>
         <button type="button" data-section="practice">Atto di Vendita</button>
         <button type="button" data-section="archive">Elenco</button>
         <button type="button" data-section="searchActs">Ricerca</button>
@@ -553,7 +555,6 @@
                 <option value="commesso">Commesso</option>
                 <option value="commessa">Commessa</option>
                 <option value="responsabile">Responsabile</option>
-                <option value="admin">Admin</option>
               </select>
             </label>
             <label>Negozio
@@ -587,6 +588,6 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260519-28"></script>
+  <script src="app.js?v=20260519-29"></script>
 </body>
 </html>

@@ -69,13 +69,12 @@ Il frontend usa queste API per salvare, leggere, cercare, modificare/eliminare e
 ## Ruoli
 
 ```text
-Founder  vede tutti i negozi, gestisce utenti e amministratori, modifica e revoca ogni accesso
-Admin    vede tutti i negozi, visualizza responsabili e commessi, gestisce accessi sotto il proprio ruolo
+Founder  vede tutti i negozi, gestisce responsabili, commessi e commesse
 Responsabile  visualizza e gestisce Commesso/Commessa
 Commesso/Commessa  accede al gestionale senza sezione Utenti
 ```
 
-Founder e Admin visualizzano `Tutti` nel campo negozio. Il Founder non compare nella sezione Utenti e non puo essere eliminato. Dopo il primo accesso Founder, crea Admin, Responsabili, Commessi o Commesse dalla sezione `Utenti`.
+Il Founder visualizza `Tutti` nel campo negozio. Il Founder non compare nella sezione Utenti e non puo essere eliminato. Dopo il primo accesso Founder, crea Responsabili, Commessi o Commesse dalla sezione `Utenti`.
 
 Accesso Founder iniziale:
 
