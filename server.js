@@ -59,6 +59,14 @@ function dateText(value) {
   return String(value).slice(0, 10);
 }
 
+function normalizeWorkflowStatus(status = "Archiviata") {
+  if (typeof status !== "string") return "Archiviata";
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "completato" || normalized === "completata") return "Completato";
+  if (normalized === "archiviato" || normalized === "archiviata") return "Archiviata";
+  return "Archiviata";
+}
+
 function normalizeAct(input = {}, existing = null) {
   const practiceNumber = input.practiceNumber || existing?.practice_number || "";
   const parsed = parsePracticeNumber(practiceNumber);
@@ -88,7 +96,7 @@ function normalizeAct(input = {}, existing = null) {
     quotazione: quoteValue(payload, "Oro") || numberFrom(existing?.quotazione),
     totale: numberFrom(input.amount ?? input.totale ?? existing?.totale),
     paymentMethod: input.paymentMethod || existing?.payment_method || "",
-    status: input.status || existing?.status || "Archiviata",
+    status: normalizeWorkflowStatus(input.status || existing?.status || "Archiviata"),
     payload
   };
 }
@@ -108,7 +116,7 @@ function rowToAct(row) {
     weight: payload.weight ?? row.peso_oro,
     amount: payload.amount ?? row.totale,
     paymentMethod: row.payment_method || payload.paymentMethod || "",
-    status: row.status || payload.status || "Archiviata"
+    status: normalizeWorkflowStatus(row.status || payload.status || "Archiviata")
   };
 }
 

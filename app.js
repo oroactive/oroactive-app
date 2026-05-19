@@ -208,8 +208,16 @@ function renderSearchResults(results) {
   `;
 }
 
+function normalizeWorkflowStatus(status = "Archiviata") {
+  if (typeof status !== "string") return "Archiviata";
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "completato" || normalized === "completata") return "Completato";
+  if (normalized === "archiviato" || normalized === "archiviata") return "Archiviata";
+  return "Archiviata";
+}
+
 function statusClass(status = "") {
-  const normalized = String(status).toLowerCase();
+  const normalized = normalizeWorkflowStatus(status).toLowerCase();
   if (normalized === "completato" || normalized === "completata") return "status-completed";
   if (normalized === "archiviato" || normalized === "archiviata") return "status-archived";
   return "";
@@ -279,7 +287,7 @@ function currentActSnapshot(status = "Archiviata") {
     materials,
     signatures: [...state.signatures],
     captures,
-    status
+    status: normalizeWorkflowStatus(status)
   };
 }
 
@@ -317,7 +325,7 @@ function renderArchiveGroups() {
                 <span>${escapeHtml(act.practiceNumber)}</span>
                 <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
                 <span>${escapeHtml(act.date)}</span>
-                <em class="${statusClass(act.status)}">${escapeHtml(act.status)}</em>
+                <em class="${statusClass(act.status)}">${escapeHtml(normalizeWorkflowStatus(act.status))}</em>
                 <div class="row-actions">
                   <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
                   <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
@@ -341,7 +349,7 @@ function buildArchiveDayExport(store, date, acts) {
       <span>${escapeHtml(formatEuro(Number(act.amount)))}</span>
       <span>${escapeHtml(act.paymentMethod)}</span>
       <span>${escapeHtml(act.weight)} g</span>
-      <em class="${statusClass(act.status)}">${escapeHtml(act.status)}</em>
+      <em class="${statusClass(act.status)}">${escapeHtml(normalizeWorkflowStatus(act.status))}</em>
     </div>
   `).join("");
 
@@ -1530,35 +1538,19 @@ async function completeCurrentPractice() {
 
   const preview = missing.slice(0, 8).join(", ");
   const suffix = missing.length > 8 ? ` e altri ${missing.length - 8} elementi` : "";
-  const shouldSaveDraft = window.confirm(
-    `La pratica non puo essere completata. Mancano: ${preview}${suffix}. Vuoi archiviare la pratica come bozza per completarla successivamente?`
+  const shouldArchive = window.confirm(
+    `La pratica non puo essere completata. Mancano: ${preview}${suffix}. Vuoi archiviare l'atto di vendita per completarlo successivamente?`
   );
 
-  if (shouldSaveDraft) {
-    await saveCurrentDraft();
+  if (shouldArchive) {
+    await archiveCurrentPractice("Archiviata");
     await resetCurrentPractice();
-    showToast("Pratica salvata come bozza. Potrai completarla da Elenco o Ricerca.");
+    showToast("Atto di vendita archiviato. Potrai completarlo da Elenco o Ricerca.");
     return true;
   }
 
   showToast(validationMessage(missing, "la pratica"));
   return false;
-}
-
-async function saveCurrentDraft() {
-  const draftAct = currentActSnapshot("Bozza");
-  draftAct.readOnlyHtml = buildPrintCopy("Bozza salvata - Sola lettura", "Dato interno aziendale", "company");
-  const wasEditing = Boolean(state.editingPracticeNumber);
-  try {
-    await saveActRecord(draftAct, wasEditing ? "PUT" : "POST");
-  } catch {
-    showToast("Bozza non salvata: controlla la connessione al database.");
-    return;
-  }
-  renderArchiveGroups();
-  renderFusionGroups();
-  await syncActsFromServer();
-  showToast("Bozza salvata e visibile in Elenco e Ricerca.");
 }
 
 navItems.forEach((item) => {
@@ -1624,7 +1616,7 @@ document.getElementById("deleteCurrentPractice").addEventListener("click", delet
 document.getElementById("printCustomerCopySummary").addEventListener("click", printCustomerCopy);
 document.getElementById("printCompanyCopySummary").addEventListener("click", printCompanyCopy);
 
-document.getElementById("archivePractice").addEventListener("click", archiveCurrentPractice);
+document.getElementById("archivePractice").addEventListener("click", () => archiveCurrentPractice("Archiviata"));
 
 document.getElementById("addCededItem").addEventListener("click", () => {
   const row = document.createElement("article");
