@@ -973,6 +973,27 @@ canvas {
   font-style: normal;
 }
 
+.capture-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.capture-actions button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.capture-actions button[data-delete-capture] {
+  border-color: #f2b4a8;
+  background: #fff1ef;
+  color: var(--rose);
+}
+
 .capture-card.loaded {
   border-style: solid;
   border-color: #2e9f68;
@@ -1004,6 +1025,21 @@ canvas {
 .capture-card.loaded strong,
 .capture-card.loaded em {
   color: #16784c;
+}
+
+.capture-preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: 72vh;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+.capture-preview-frame {
+  width: min(100%, 860px);
+  height: 72vh;
+  border: 0;
+  background: #fff;
 }
 
 .summary-grid {

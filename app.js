@@ -5,6 +5,7 @@ const state = {
   cededItems: 1,
   annualProgressive: 184,
   uploadedCaptures: new Set(),
+  captureFiles: new Map(),
   lastSearchResults: [],
   editingPracticeNumber: null
 };
@@ -701,6 +702,7 @@ async function loadActForEdit(practiceNumber) {
   document.getElementById("printWeightCustomer").checked = Boolean(act.printWeightCustomer);
   state.signatures = Array.isArray(act.signatures) ? act.signatures : [true, true, true];
   state.uploadedCaptures = new Set(Array.isArray(act.captures) ? act.captures : []);
+  state.captureFiles.clear();
   state.attachments = state.uploadedCaptures.size;
   state.step = 0;
 
@@ -768,6 +770,7 @@ async function resetCurrentPractice(options = {}) {
   });
 
   state.uploadedCaptures.clear();
+  state.captureFiles.clear();
   state.attachments = 0;
   state.step = 0;
   state.editingPracticeNumber = null;
@@ -975,8 +978,10 @@ function renderPaymentCaptureCard() {
       <span>Pagamento</span>
       <strong>Contabile ${method}</strong>
       <em>${loaded ? "Allegato acquisito" : "Tocca per fotografare o allegare"}</em>
+      ${captureActionsMarkup()}
     </label>
   `;
+  ensureCaptureActions();
   updateAttachmentState();
 }
 
@@ -1001,6 +1006,7 @@ function updateDocumentCaptureCards() {
     card.classList.toggle("loaded", loaded);
     card.querySelector("em").textContent = loaded ? "Foto acquisita" : "Tocca per fotografare";
   });
+  ensureCaptureActions();
 }
 
 function formatEuro(value) {
@@ -1312,6 +1318,21 @@ function captureClassForMetal(metal) {
   }[metal] || "gold";
 }
 
+function captureActionsMarkup() {
+  return `
+    <div class="capture-actions">
+      <button type="button" data-view-capture>Visualizza foto</button>
+      <button type="button" data-delete-capture>Elimina foto</button>
+    </div>
+  `;
+}
+
+function ensureCaptureActions() {
+  document.querySelectorAll(".capture-card").forEach((card) => {
+    if (!card.querySelector(".capture-actions")) card.insertAdjacentHTML("beforeend", captureActionsMarkup());
+  });
+}
+
 function renderPreciousCaptureCards() {
   const grid = document.getElementById("preciousCaptureGrid");
   if (!grid) return;
@@ -1328,9 +1349,11 @@ function renderPreciousCaptureCards() {
         <span>Preziosi ${metal}</span>
         <strong>${photo.label} ${metal.toLowerCase()}</strong>
         <em>${loaded ? "Foto acquisita" : "Tocca per fotografare"}</em>
+        ${captureActionsMarkup()}
       </label>
     `;
   }).join("")).join("");
+  ensureCaptureActions();
 }
 
 function renderWeightFields() {
@@ -1360,7 +1383,7 @@ function buildWeightBlock(label) {
   const rows = weightRows().map((row) => `<li>${escapeHtml(row.metal)}: ${escapeHtml(row.value)} g</li>`).join("");
   return `
     <div class="print-internal">
-      <span>${label}</span>
+      ${label ? `<span>${escapeHtml(label)}</span>` : ""}
       <strong>Peso totale oggetti preziosi</strong>
       <ul>${rows}</ul>
     </div>
@@ -1389,7 +1412,7 @@ function attachmentRows() {
   `).join("");
 }
 
-function buildPrintCopy(title, weightLabel, scope) {
+function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
   const items = [...document.querySelectorAll(".ceded-item-row")].map((row, index) => {
     const description = row.querySelector("input")?.value || "";
     const selects = row.querySelectorAll("select");
@@ -1403,7 +1426,7 @@ function buildPrintCopy(title, weightLabel, scope) {
     `;
   }).join("");
 
-  const internalWeight = weightLabel ? buildWeightBlock(weightLabel) : "";
+  const internalWeight = (weightLabel || includeWeight) ? buildWeightBlock(weightLabel) : "";
   const internalSections = scope === "company" ? `
       ${internalWeight}
       <h2>Allegati pratica</h2>
@@ -1458,7 +1481,7 @@ function buildPrintCopy(title, weightLabel, scope) {
 function preparePrintPacket() {
   renderPaymentCaptureCard();
   printPacket.innerHTML = [
-    buildPrintCopy("Copia cliente", shouldPrintWeightOnCustomerCopy() ? "Peso totale autorizzato su copia cliente" : "", "customer"),
+    buildPrintCopy("Copia cliente", "", "customer", shouldPrintWeightOnCustomerCopy()),
     buildPrintCopy("Copia aziendale interna", "Dato interno aziendale", "company")
   ].join("");
 }
@@ -1482,8 +1505,9 @@ function printCustomerCopy() {
   renderPaymentCaptureCard();
   printPacket.innerHTML = buildPrintCopy(
     "Copia cliente",
-    shouldPrintWeightOnCustomerCopy() ? "Peso totale autorizzato su copia cliente" : "",
-    "customer"
+    "",
+    "customer",
+    shouldPrintWeightOnCustomerCopy()
   );
   window.print();
 }
@@ -1509,8 +1533,9 @@ function showPrintPreview(scope) {
   }
   const html = buildPrintCopy(
     isCompany ? "Copia aziendale interna" : "Copia cliente",
-    isCompany ? "Dato interno aziendale" : (shouldPrintWeightOnCustomerCopy() ? "Peso totale autorizzato su copia cliente" : ""),
-    scope
+    isCompany ? "Dato interno aziendale" : "",
+    scope,
+    !isCompany && shouldPrintWeightOnCustomerCopy()
   );
   previewTitle.textContent = `Anteprima ${isCompany ? "copia aziendale interna" : "copia cliente"}`;
   previewBody.innerHTML = html;
@@ -1625,9 +1650,6 @@ document.getElementById("previousStep").addEventListener("click", () => {
 
 document.getElementById("deleteCurrentPractice").addEventListener("click", deleteCurrentPractice);
 
-document.getElementById("saveDraft").addEventListener("click", saveCurrentDraft);
-
-document.getElementById("printPractice").addEventListener("click", printBothCopies);
 document.getElementById("printCustomerCopySummary").addEventListener("click", printCustomerCopy);
 document.getElementById("printCompanyCopySummary").addEventListener("click", printCompanyCopy);
 
@@ -1835,12 +1857,64 @@ document.addEventListener("change", (event) => {
   const card = event.target.closest(".capture-card");
   const key = card?.dataset.captureKey;
   if (!card || !key) return;
+  const file = event.target.files?.[0];
+  if (file) {
+    const previous = state.captureFiles.get(key);
+    if (previous?.url) URL.revokeObjectURL(previous.url);
+    state.captureFiles.set(key, {
+      name: file.name || "Foto allegata",
+      type: file.type || "",
+      url: URL.createObjectURL(file)
+    });
+  }
   state.uploadedCaptures.add(key);
   state.attachments = state.uploadedCaptures.size;
   card.classList.add("loaded");
   card.querySelector("em").textContent = "Foto acquisita";
   updateAttachmentState();
   updateChecklistState();
+});
+
+document.addEventListener("click", (event) => {
+  const viewButton = event.target.closest("[data-view-capture]");
+  const deleteButton = event.target.closest("[data-delete-capture]");
+  if (!viewButton && !deleteButton) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  const card = event.target.closest(".capture-card");
+  const key = card?.dataset.captureKey;
+  if (!card || !key) return;
+
+  if (viewButton) {
+    const file = state.captureFiles.get(key);
+    if (!file) {
+      showToast(state.uploadedCaptures.has(key) ? "Allegato presente, anteprima non disponibile in questa sessione." : "Nessuna foto caricata.");
+      return;
+    }
+    previewTitle.textContent = file.name || "Anteprima foto";
+    previewBody.innerHTML = file.type.includes("pdf")
+      ? `<iframe class="capture-preview-frame" src="${file.url}" title="${escapeHtml(file.name)}"></iframe>`
+      : `<img class="capture-preview-image" src="${file.url}" alt="${escapeHtml(file.name)}">`;
+    previewModal.hidden = false;
+    return;
+  }
+
+  const previous = state.captureFiles.get(key);
+  if (previous?.url) URL.revokeObjectURL(previous.url);
+  state.captureFiles.delete(key);
+  state.uploadedCaptures.delete(key);
+  state.attachments = state.uploadedCaptures.size;
+  card.classList.remove("loaded");
+  card.querySelector("em").textContent = key.startsWith("pagamento-") ? "Tocca per fotografare o allegare" : "Tocca per fotografare";
+  const input = card.querySelector("input");
+  if (input) input.value = "";
+  updateDocumentCaptureCards();
+  renderPaymentCaptureCard();
+  renderPreciousCaptureCards();
+  updateAttachmentState();
+  updateChecklistState();
+  showToast("Foto eliminata.");
 });
 
 document.querySelectorAll("[data-preview-copy]").forEach((button) => {
