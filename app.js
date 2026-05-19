@@ -1527,7 +1527,7 @@ async function archiveCurrentPractice(status = "Archiviata") {
   renderArchiveGroups();
   renderFusionGroups();
   await syncActsFromServer();
-  await resetCurrentPractice();
+  await resetCurrentPractice({ preserveStoreCode: true });
   showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`);
   return true;
 }
@@ -1544,7 +1544,6 @@ async function completeCurrentPractice() {
 
   if (shouldArchive) {
     await archiveCurrentPractice("Archiviata");
-    await resetCurrentPractice();
     showToast("Atto di vendita archiviato. Potrai completarlo da Elenco o Ricerca.");
     return true;
   }
