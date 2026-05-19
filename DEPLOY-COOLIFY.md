@@ -39,12 +39,12 @@ La tabella usa i campi principali richiesti: `id`, `cliente_nome`, `cliente_cogn
 GET    /api/health
 GET    /api/atti
 POST   /api/atti
+GET    /api/atti/:id
 GET    /api/atti/search?q=Rossi
 GET    /api/atti/search?field=surname&q=Rossi
 GET    /api/atti?store=Busto%20Arsizio
 GET    /api/atti?fusionEligible=true
 GET    /api/atti/next-number?storeCode=BUSTO&year=2026
-GET    /api/atti/:id
 PUT    /api/atti/:id
 DELETE /api/atti/:id
 ```

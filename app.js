@@ -117,6 +117,20 @@ async function deleteActRecord(practiceNumber) {
   if (index >= 0) demoActs.splice(index, 1);
 }
 
+async function getActRecord(identifier) {
+  try {
+    const saved = await apiRequest(`/atti/${encodeURIComponent(identifier)}`);
+    const index = demoActs.findIndex(
+      (item) => (saved.id && item.id === saved.id) || item.practiceNumber === saved.practiceNumber
+    );
+    if (index >= 0) demoActs[index] = saved;
+    else demoActs.unshift(saved);
+    return saved;
+  } catch {
+    return demoActs.find((item) => item.id === identifier || item.practiceNumber === identifier) || null;
+  }
+}
+
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add("show");
@@ -493,8 +507,8 @@ function buildArchivedActFallback(act) {
   `;
 }
 
-function openArchivedAct(practiceNumber) {
-  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+async function openArchivedAct(practiceNumber) {
+  const act = await getActRecord(practiceNumber);
   if (!act) {
     showToast("Atto di vendita non trovato.");
     return;
@@ -603,7 +617,7 @@ function storeCodeFromAct(act) {
 }
 
 async function loadActForEdit(practiceNumber) {
-  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+  const act = await getActRecord(practiceNumber);
   if (!act) {
     showToast("Atto di vendita non trovato.");
     return;
