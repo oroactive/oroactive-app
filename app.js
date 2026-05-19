@@ -37,81 +37,7 @@ const documentLabels = {
   Passaporto: "passaporto"
 };
 const apiBase = "/api";
-const actsStorageKey = "oroactive-acts-v2";
-const demoActs = [
-  {
-    name: "Marco",
-    surname: "Rossi",
-    practiceNumber: "OA-BUSTO-2026-000184",
-    date: "15/05/2026",
-    store: "Busto Arsizio",
-    amount: "860",
-    paymentMethod: "Bonifico",
-    weight: "18.45",
-    materials: [{ metal: "Oro", weight: "18.45" }],
-    status: "Bozza"
-  },
-  {
-    name: "Anna",
-    surname: "Neri",
-    practiceNumber: "OA-BUSTO-2026-000181",
-    date: "03/05/2026",
-    store: "Busto Arsizio",
-    amount: "730",
-    paymentMethod: "Bonifico",
-    weight: "15.20",
-    materials: [{ metal: "Oro", weight: "15.20" }],
-    status: "Archiviata"
-  },
-  {
-    name: "Laura",
-    surname: "Bianchi",
-    practiceNumber: "OA-CASSANO-2026-000183",
-    date: "15/05/2026",
-    store: "Cassano Magnago",
-    amount: "1240",
-    paymentMethod: "Assegno",
-    weight: "27.30",
-    materials: [{ metal: "Argento", weight: "27.30" }],
-    status: "Archiviata"
-  },
-  {
-    name: "Paolo",
-    surname: "Gallo",
-    practiceNumber: "OA-CASSANO-2026-000180",
-    date: "28/04/2026",
-    store: "Cassano Magnago",
-    amount: "410",
-    paymentMethod: "Contanti nei limiti di legge",
-    weight: "8.40",
-    materials: [{ metal: "Oro", weight: "8.40" }],
-    status: "Archiviata"
-  },
-  {
-    name: "Gianni",
-    surname: "Verdi",
-    practiceNumber: "OA-LEGNANO-2026-000182",
-    date: "14/05/2026",
-    store: "Legnano",
-    amount: "520",
-    paymentMethod: "Contanti nei limiti di legge",
-    weight: "11.80",
-    materials: [{ metal: "Platino", weight: "11.80" }],
-    status: "Archiviata"
-  },
-  {
-    name: "Sara",
-    surname: "Costa",
-    practiceNumber: "OA-LEGNANO-2026-000179",
-    date: "02/04/2026",
-    store: "Legnano",
-    amount: "980",
-    paymentMethod: "Assegno",
-    weight: "21.10",
-    materials: [{ metal: "Oro", weight: "14.60" }, { metal: "Argento", weight: "6.50" }],
-    status: "Archiviata"
-  }
-];
+const demoActs = [];
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, {
@@ -125,36 +51,12 @@ async function apiRequest(path, options = {}) {
   return response.json();
 }
 
-function saveActsLocal() {
-  localStorage.setItem(actsStorageKey, JSON.stringify(demoActs));
-}
-
 async function loadSavedActs() {
   try {
     const acts = await apiRequest("/atti");
     demoActs.splice(0, demoActs.length, ...acts);
-    saveActsLocal();
-    return;
-  } catch {
-    const saved = localStorage.getItem(actsStorageKey);
-    if (!saved) {
-      demoActs.splice(0, demoActs.length);
-      saveActsLocal();
-      return;
-    }
-
-    try {
-      const acts = JSON.parse(saved);
-      if (!Array.isArray(acts)) {
-        demoActs.splice(0, demoActs.length);
-        saveActsLocal();
-        return;
-      }
-      demoActs.splice(0, demoActs.length, ...acts);
-    } catch {
-      demoActs.splice(0, demoActs.length);
-      saveActsLocal();
-    }
+  } catch (error) {
+    showToast("Database non raggiungibile: controllo connessione server.");
   }
 }
 
@@ -193,35 +95,26 @@ async function syncActsFromServer() {
 }
 
 async function saveActRecord(act, method = "POST") {
-  try {
-    const path = method === "PUT" ? `/atti/${encodeURIComponent(act.practiceNumber)}` : "/atti";
-    const saved = await apiRequest(path, {
-      method,
-      body: JSON.stringify(act)
-    });
-    const index = demoActs.findIndex((item) => item.practiceNumber === saved.practiceNumber);
-    if (index >= 0) demoActs[index] = saved;
-    else demoActs.unshift(saved);
-    saveActsLocal();
-    return saved;
-  } catch {
-    const index = demoActs.findIndex((item) => item.practiceNumber === act.practiceNumber);
-    if (index >= 0) demoActs[index] = act;
-    else demoActs.unshift(act);
-    saveActsLocal();
-    return act;
-  }
+  const identifier = act.id || act.practiceNumber;
+  const path = method === "PUT" ? `/atti/${encodeURIComponent(identifier)}` : "/atti";
+  const saved = await apiRequest(path, {
+    method,
+    body: JSON.stringify(act)
+  });
+  const index = demoActs.findIndex(
+    (item) => (saved.id && item.id === saved.id) || item.practiceNumber === saved.practiceNumber
+  );
+  if (index >= 0) demoActs[index] = saved;
+  else demoActs.unshift(saved);
+  return saved;
 }
 
 async function deleteActRecord(practiceNumber) {
-  try {
-    await apiRequest(`/atti/${encodeURIComponent(practiceNumber)}`, { method: "DELETE" });
-  } catch {
-    // Fallback locale per uso offline/prototipo.
-  }
+  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+  const identifier = act?.id || practiceNumber;
+  await apiRequest(`/atti/${encodeURIComponent(identifier)}`, { method: "DELETE" });
   const index = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
   if (index >= 0) demoActs.splice(index, 1);
-  saveActsLocal();
 }
 
 function showToast(message) {
@@ -628,7 +521,12 @@ async function deleteAct(practiceNumber) {
   const confirmed = window.confirm(`Vuoi eliminare definitivamente l'atto ${practiceNumber}?`);
   if (!confirmed) return;
 
-  await deleteActRecord(practiceNumber);
+  try {
+    await deleteActRecord(practiceNumber);
+  } catch {
+    showToast("Eliminazione non riuscita: controlla la connessione al database.");
+    return;
+  }
   state.lastSearchResults = state.lastSearchResults.filter((act) => act.practiceNumber !== practiceNumber);
   renderArchiveGroups();
   renderFusionGroups();
@@ -836,7 +734,12 @@ async function deleteCurrentPractice() {
 
   const existingIndex = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
   if (existingIndex >= 0) {
-    await deleteActRecord(practiceNumber);
+    try {
+      await deleteActRecord(practiceNumber);
+    } catch {
+      showToast("Eliminazione non riuscita: controlla la connessione al database.");
+      return;
+    }
     renderArchiveGroups();
     renderFusionGroups();
   }
@@ -1593,7 +1496,12 @@ async function archiveCurrentPractice(status = "Archiviata") {
   const archivedAct = currentActSnapshot(status);
   archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
   const wasEditing = Boolean(state.editingPracticeNumber);
-  await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
+  try {
+    await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
+  } catch {
+    showToast("Salvataggio non riuscito: controlla la connessione al database.");
+    return false;
+  }
   renderArchiveGroups();
   renderFusionGroups();
   await syncActsFromServer();
@@ -1627,7 +1535,12 @@ async function saveCurrentDraft() {
   const draftAct = currentActSnapshot("Bozza");
   draftAct.readOnlyHtml = buildPrintCopy("Bozza salvata - Sola lettura", "Dato interno aziendale", "company");
   const wasEditing = Boolean(state.editingPracticeNumber);
-  await saveActRecord(draftAct, wasEditing ? "PUT" : "POST");
+  try {
+    await saveActRecord(draftAct, wasEditing ? "PUT" : "POST");
+  } catch {
+    showToast("Bozza non salvata: controlla la connessione al database.");
+    return;
+  }
   renderArchiveGroups();
   renderFusionGroups();
   await syncActsFromServer();

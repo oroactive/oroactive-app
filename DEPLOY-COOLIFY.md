@@ -31,6 +31,7 @@ DATABASE_SSL=true
 5. Avvia il deploy.
 
 Alla prima partenza il server crea automaticamente la tabella `atti_vendita`.
+La tabella usa i campi principali richiesti: `id`, `cliente_nome`, `cliente_cognome`, `codice_fiscale`, `telefono`, `peso_oro`, `quotazione`, `totale`, `data_atto`. Le informazioni complete del gestionale vengono salvate anche nel campo `payload`.
 
 ## API REST principali
 
@@ -43,9 +44,9 @@ GET    /api/atti/search?field=surname&q=Rossi
 GET    /api/atti?store=Busto%20Arsizio
 GET    /api/atti?fusionEligible=true
 GET    /api/atti/next-number?storeCode=BUSTO&year=2026
-GET    /api/atti/:practiceNumber
-PUT    /api/atti/:practiceNumber
-DELETE /api/atti/:practiceNumber
+GET    /api/atti/:id
+PUT    /api/atti/:id
+DELETE /api/atti/:id
 ```
 
-Il frontend usa queste API per salvare, leggere, cercare, modificare/eliminare e numerare gli atti di vendita.
+Il frontend usa queste API per salvare, leggere, cercare, modificare/eliminare e numerare gli atti di vendita. Per compatibilita, gli endpoint `:id` accettano anche il numero atto `OA-NEGOZIO-ANNO-NUMERO`.

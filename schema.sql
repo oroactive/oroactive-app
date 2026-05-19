@@ -1,21 +1,52 @@
 CREATE TABLE IF NOT EXISTS atti_vendita (
-  id TEXT PRIMARY KEY,
-  practice_number TEXT UNIQUE NOT NULL,
-  store TEXT NOT NULL,
-  store_code TEXT NOT NULL,
-  act_year INTEGER NOT NULL,
-  act_number INTEGER NOT NULL,
-  act_date DATE,
-  customer_name TEXT,
-  customer_surname TEXT,
-  amount NUMERIC(12, 2),
+  id BIGSERIAL PRIMARY KEY,
+  cliente_nome TEXT,
+  cliente_cognome TEXT,
+  codice_fiscale TEXT,
+  telefono TEXT,
+  peso_oro NUMERIC(12, 3) DEFAULT 0,
+  quotazione NUMERIC(14, 2) DEFAULT 0,
+  totale NUMERIC(14, 2) DEFAULT 0,
+  data_atto DATE,
+  practice_number TEXT UNIQUE,
+  store TEXT,
+  store_code TEXT,
+  act_year INTEGER,
+  act_number INTEGER,
   payment_method TEXT,
-  total_weight NUMERIC(12, 2),
   status TEXT DEFAULT 'Archiviata',
-  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  payload JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS atti_vendita_store_year_idx ON atti_vendita (store_code, act_year, act_number);
-CREATE INDEX IF NOT EXISTS atti_vendita_payload_idx ON atti_vendita USING GIN (payload);
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS cliente_nome TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS cliente_cognome TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS codice_fiscale TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS telefono TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS peso_oro NUMERIC(12, 3) DEFAULT 0;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS quotazione NUMERIC(14, 2) DEFAULT 0;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS totale NUMERIC(14, 2) DEFAULT 0;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS data_atto DATE;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS practice_number TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS store TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS store_code TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS act_year INTEGER;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS act_number INTEGER;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS payment_method TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Archiviata';
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE UNIQUE INDEX IF NOT EXISTS atti_vendita_practice_number_unique
+  ON atti_vendita (practice_number);
+
+CREATE INDEX IF NOT EXISTS atti_vendita_store_year_number_idx
+  ON atti_vendita (store_code, act_year, act_number);
+
+CREATE INDEX IF NOT EXISTS atti_vendita_data_atto_idx
+  ON atti_vendita (data_atto);
+
+CREATE INDEX IF NOT EXISTS atti_vendita_payload_idx
+  ON atti_vendita USING GIN (payload);

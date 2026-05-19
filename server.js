@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const port = Number(process.env.PORT || 3000);
 const actsTable = "atti_vendita";
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined
@@ -33,45 +33,82 @@ function parsePracticeNumber(practiceNumber = "") {
   };
 }
 
-function normalizeAct(input) {
-  const parsed = parsePracticeNumber(input.practiceNumber);
+function numberFrom(value) {
+  const normalized = String(value ?? "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function materialWeight(input, metalName) {
+  const row = Array.isArray(input.materials) ? input.materials.find((material) => material.metal === metalName) : null;
+  return numberFrom(row?.weight);
+}
+
+function quoteValue(input, metalName) {
+  const row = Array.isArray(input.bullionQuotes)
+    ? input.bullionQuotes.find((quote) => quote.metal === metalName)
+    : null;
+  if (row) return numberFrom(row.value);
+  const firstQuote = Array.isArray(input.bullionQuotes) ? input.bullionQuotes[0] : null;
+  return numberFrom(firstQuote?.value ?? input.quotazione ?? input.quote);
+}
+
+function dateText(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function normalizeAct(input = {}, existing = null) {
+  const practiceNumber = input.practiceNumber || existing?.practice_number || "";
+  const parsed = parsePracticeNumber(practiceNumber);
   if (!parsed) {
     const error = new Error("Numero atto non valido. Usa formato OA-NEGOZIO-ANNO-NUMERO.");
     error.status = 400;
     throw error;
   }
 
+  const payload = { ...(existing?.payload || {}), ...input, practiceNumber };
+  const actDate = input.date || input.data_atto || existing?.data_atto || null;
+  const oroWeight = materialWeight(payload, "Oro") || numberFrom(input.peso_oro ?? existing?.peso_oro);
+
   return {
-    id: input.id || crypto.randomUUID(),
-    practiceNumber: input.practiceNumber,
-    store: input.store || "",
+    id: input.id || existing?.id || null,
+    practiceNumber,
+    store: input.store || existing?.store || "",
     storeCode: parsed.storeCode,
     actYear: parsed.year,
     actNumber: parsed.number,
-    actDate: input.date || null,
-    customerName: input.name || "",
-    customerSurname: input.surname || "",
-    amount: Number(input.amount || 0),
-    paymentMethod: input.paymentMethod || "",
-    totalWeight: Number(input.weight || 0),
-    status: input.status || "Archiviata",
-    payload: input
+    dataAtto: actDate,
+    clienteNome: input.name ?? input.cliente_nome ?? existing?.cliente_nome ?? "",
+    clienteCognome: input.surname ?? input.cliente_cognome ?? existing?.cliente_cognome ?? "",
+    codiceFiscale: input.fiscalCode ?? input.codice_fiscale ?? existing?.codice_fiscale ?? "",
+    telefono: input.phone ?? input.telefono ?? existing?.telefono ?? "",
+    pesoOro: oroWeight,
+    quotazione: quoteValue(payload, "Oro") || numberFrom(existing?.quotazione),
+    totale: numberFrom(input.amount ?? input.totale ?? existing?.totale),
+    paymentMethod: input.paymentMethod || existing?.payment_method || "",
+    status: input.status || existing?.status || "Archiviata",
+    payload
   };
 }
 
 function rowToAct(row) {
+  const payload = row.payload || {};
   return {
-    ...row.payload,
+    ...payload,
     id: row.id,
-    practiceNumber: row.practice_number,
-    store: row.store,
-    date: row.payload?.date || row.act_date,
-    name: row.customer_name,
-    surname: row.customer_surname,
-    amount: row.payload?.amount ?? row.amount,
-    paymentMethod: row.payment_method,
-    weight: row.payload?.weight ?? row.total_weight,
-    status: row.status
+    practiceNumber: row.practice_number || payload.practiceNumber,
+    store: row.store || payload.store || "",
+    date: payload.date || dateText(row.data_atto),
+    name: row.cliente_nome || payload.name || "",
+    surname: row.cliente_cognome || payload.surname || "",
+    fiscalCode: row.codice_fiscale || payload.fiscalCode || "",
+    phone: row.telefono || payload.phone || "",
+    weight: payload.weight ?? row.peso_oro,
+    amount: payload.amount ?? row.totale,
+    paymentMethod: row.payment_method || payload.paymentMethod || "",
+    status: row.status || payload.status || "Archiviata"
   };
 }
 
@@ -91,14 +128,16 @@ function buildActsQuery({ store, field, q, fusionEligible } = {}) {
 
   if (q && field) {
     const allowedFields = {
-      name: "customer_name",
-      surname: "customer_surname",
+      name: "cliente_nome",
+      surname: "cliente_cognome",
+      fiscalCode: "codice_fiscale",
+      phone: "telefono",
       practiceNumber: "practice_number",
-      date: "act_date::text",
+      date: "data_atto::text",
       store: "store",
-      amount: "amount::text",
+      amount: "totale::text",
       paymentMethod: "payment_method",
-      weight: "total_weight::text"
+      weight: "peso_oro::text"
     };
     const column = allowedFields[field];
     if (column) {
@@ -109,20 +148,22 @@ function buildActsQuery({ store, field, q, fusionEligible } = {}) {
     values.push(`%${String(q).toLowerCase()}%`);
     const parameter = `$${values.length}`;
     where.push(`(
-      LOWER(practice_number) LIKE ${parameter}
-      OR LOWER(customer_name) LIKE ${parameter}
-      OR LOWER(customer_surname) LIKE ${parameter}
-      OR LOWER(store) LIKE ${parameter}
-      OR LOWER(payment_method) LIKE ${parameter}
-      OR LOWER(act_date::text) LIKE ${parameter}
-      OR LOWER(amount::text) LIKE ${parameter}
-      OR LOWER(total_weight::text) LIKE ${parameter}
-      OR LOWER(payload::text) LIKE ${parameter}
+      LOWER(COALESCE(practice_number, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(cliente_nome, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(cliente_cognome, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(codice_fiscale, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(telefono, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(store, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(payment_method, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(data_atto::text, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(totale::text, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(peso_oro::text, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(payload::text, '')) LIKE ${parameter}
     )`);
   }
 
   if (fusionEligible === "true") {
-    where.push("act_date <= CURRENT_DATE - INTERVAL '10 days'");
+    where.push("data_atto <= CURRENT_DATE - INTERVAL '10 days'");
   }
 
   return { where, values };
@@ -133,7 +174,7 @@ async function listActs(query = {}) {
   const result = await pool.query(
     `SELECT * FROM ${actsTable}
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-     ORDER BY act_date DESC NULLS LAST, act_number DESC`,
+     ORDER BY data_atto DESC NULLS LAST, act_number DESC NULLS LAST, updated_at DESC`,
     values
   );
   return result.rows.map(rowToAct);
@@ -141,52 +182,53 @@ async function listActs(query = {}) {
 
 async function nextActNumber(storeCode, year) {
   const result = await pool.query(
-    `SELECT COALESCE(MAX(act_number), 0) + 1 AS next_number FROM ${actsTable} WHERE store_code = $1 AND act_year = $2`,
+    `SELECT COALESCE(MAX(act_number), 0) + 1 AS next_number
+     FROM ${actsTable}
+     WHERE store_code = $1 AND act_year = $2`,
     [storeCode, year]
   );
   return Number(result.rows[0].next_number);
 }
 
-async function getAct(practiceNumber) {
-  const result = await pool.query(`SELECT * FROM ${actsTable} WHERE practice_number = $1`, [practiceNumber]);
-  return result.rowCount ? rowToAct(result.rows[0]) : null;
+async function findExisting(identifier) {
+  const result = await pool.query(`SELECT * FROM ${actsTable} WHERE id::text = $1 OR practice_number = $1 LIMIT 1`, [
+    identifier
+  ]);
+  return result.rowCount ? result.rows[0] : null;
+}
+
+async function getAct(identifier) {
+  const row = await findExisting(identifier);
+  return row ? rowToAct(row) : null;
 }
 
 async function saveAct(input) {
-  const act = normalizeAct(input);
+  const existing = input.id ? await findExisting(input.id) : input.practiceNumber ? await findExisting(input.practiceNumber) : null;
+  if (existing) return updateAct(existing.id, input);
+  const act = normalizeAct(input, existing);
   const result = await pool.query(
     `INSERT INTO ${actsTable} (
-      id, practice_number, store, store_code, act_year, act_number, act_date,
-      customer_name, customer_surname, amount, payment_method, total_weight, status, payload
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-    ON CONFLICT (practice_number) DO UPDATE SET
-      store = EXCLUDED.store,
-      store_code = EXCLUDED.store_code,
-      act_year = EXCLUDED.act_year,
-      act_number = EXCLUDED.act_number,
-      act_date = EXCLUDED.act_date,
-      customer_name = EXCLUDED.customer_name,
-      customer_surname = EXCLUDED.customer_surname,
-      amount = EXCLUDED.amount,
-      payment_method = EXCLUDED.payment_method,
-      total_weight = EXCLUDED.total_weight,
-      status = EXCLUDED.status,
-      payload = EXCLUDED.payload,
-      updated_at = NOW()
+      cliente_nome, cliente_cognome, codice_fiscale, telefono,
+      peso_oro, quotazione, totale, data_atto,
+      practice_number, store, store_code, act_year, act_number,
+      payment_method, status, payload
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
     RETURNING *`,
     [
-      act.id,
+      act.clienteNome,
+      act.clienteCognome,
+      act.codiceFiscale,
+      act.telefono,
+      act.pesoOro,
+      act.quotazione,
+      act.totale,
+      act.dataAtto,
       act.practiceNumber,
       act.store,
       act.storeCode,
       act.actYear,
       act.actNumber,
-      act.actDate,
-      act.customerName,
-      act.customerSurname,
-      act.amount,
       act.paymentMethod,
-      act.totalWeight,
       act.status,
       act.payload
     ]
@@ -194,27 +236,47 @@ async function saveAct(input) {
   return rowToAct(result.rows[0]);
 }
 
-async function updateAct(practiceNumber, input) {
-  const act = normalizeAct({ ...input, practiceNumber });
+async function updateAct(identifier, input) {
+  const existing = await findExisting(identifier);
+  if (!existing) return null;
+  const act = normalizeAct(input, existing);
   const result = await pool.query(
     `UPDATE ${actsTable} SET
-      store = $2, store_code = $3, act_year = $4, act_number = $5, act_date = $6,
-      customer_name = $7, customer_surname = $8, amount = $9, payment_method = $10,
-      total_weight = $11, status = $12, payload = $13, updated_at = NOW()
-     WHERE practice_number = $1
+      cliente_nome = $2,
+      cliente_cognome = $3,
+      codice_fiscale = $4,
+      telefono = $5,
+      peso_oro = $6,
+      quotazione = $7,
+      totale = $8,
+      data_atto = $9,
+      practice_number = $10,
+      store = $11,
+      store_code = $12,
+      act_year = $13,
+      act_number = $14,
+      payment_method = $15,
+      status = $16,
+      payload = $17,
+      updated_at = NOW()
+     WHERE id = $1
      RETURNING *`,
     [
+      existing.id,
+      act.clienteNome,
+      act.clienteCognome,
+      act.codiceFiscale,
+      act.telefono,
+      act.pesoOro,
+      act.quotazione,
+      act.totale,
+      act.dataAtto,
       act.practiceNumber,
       act.store,
       act.storeCode,
       act.actYear,
       act.actNumber,
-      act.actDate,
-      act.customerName,
-      act.customerSurname,
-      act.amount,
       act.paymentMethod,
-      act.totalWeight,
       act.status,
       act.payload
     ]
@@ -222,9 +284,9 @@ async function updateAct(practiceNumber, input) {
   return result.rowCount ? rowToAct(result.rows[0]) : null;
 }
 
-async function deleteActByPracticeNumber(practiceNumber) {
-  const result = await pool.query(`DELETE FROM ${actsTable} WHERE practice_number = $1 RETURNING practice_number`, [
-    practiceNumber
+async function deleteAct(identifier) {
+  const result = await pool.query(`DELETE FROM ${actsTable} WHERE id::text = $1 OR practice_number = $1 RETURNING id`, [
+    identifier
   ]);
   return result.rowCount > 0;
 }
@@ -259,9 +321,9 @@ app.get(["/api/atti/next-number", "/api/acts/next-number"], async (request, resp
   }
 });
 
-app.get(["/api/atti/:practiceNumber", "/api/acts/:practiceNumber"], async (request, response, next) => {
+app.get(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
-    const act = await getAct(request.params.practiceNumber);
+    const act = await getAct(request.params.id);
     if (!act) return response.status(404).json({ error: "Atto non trovato" });
     response.json(act);
   } catch (error) {
@@ -277,9 +339,9 @@ app.post(["/api/atti", "/api/acts"], async (request, response, next) => {
   }
 });
 
-app.put(["/api/atti/:practiceNumber", "/api/acts/:practiceNumber"], async (request, response, next) => {
+app.put(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
-    const act = await updateAct(request.params.practiceNumber, request.body);
+    const act = await updateAct(request.params.id, request.body);
     if (!act) return response.status(404).json({ error: "Atto non trovato" });
     response.json(act);
   } catch (error) {
@@ -287,11 +349,11 @@ app.put(["/api/atti/:practiceNumber", "/api/acts/:practiceNumber"], async (reque
   }
 });
 
-app.delete(["/api/atti/:practiceNumber", "/api/acts/:practiceNumber"], async (request, response, next) => {
+app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
-    const deleted = await deleteActByPracticeNumber(request.params.practiceNumber);
+    const deleted = await deleteAct(request.params.id);
     if (!deleted) return response.status(404).json({ error: "Atto non trovato" });
-    response.json({ ok: true, practiceNumber: request.params.practiceNumber });
+    response.json({ ok: true, id: request.params.id });
   } catch (error) {
     next(error);
   }
