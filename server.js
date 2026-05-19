@@ -1,9 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import bcrypt from "bcrypt";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import jwt from "jsonwebtoken";
 import pg from "pg";
 
 dotenv.config();
@@ -13,6 +15,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const port = Number(process.env.PORT || 3000);
 const actsTable = "atti_vendita";
+const jwtSecret = process.env.JWT_SECRET || "cambia-questa-chiave-jwt-oroactive";
+const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -22,6 +26,78 @@ const pool = new Pool({
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
+
+function storeCodeFromName(storeName) {
+  return {
+    "Busto Arsizio": "BUSTO",
+    "Cassano Magnago": "CASSANO",
+    Legnano: "LEGNANO"
+  }[storeName] || "BUSTO";
+}
+
+function storeNameFromCode(storeCode) {
+  return {
+    BUSTO: "Busto Arsizio",
+    CASSANO: "Cassano Magnago",
+    LEGNANO: "Legnano"
+  }[storeCode] || "Busto Arsizio";
+}
+
+function publicUser(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    nome: row.nome,
+    cognome: row.cognome,
+    email: row.email,
+    ruolo: row.ruolo,
+    negozio: row.negozio,
+    data_creazione: row.data_creazione
+  };
+}
+
+function signUserToken(user) {
+  return jwt.sign(
+    {
+      sub: String(user.id),
+      ruolo: user.ruolo,
+      negozio: user.negozio
+    },
+    jwtSecret,
+    { expiresIn: jwtExpiresIn }
+  );
+}
+
+async function findUserById(id) {
+  const result = await pool.query(
+    "SELECT id, nome, cognome, email, ruolo, negozio, data_creazione FROM utenti WHERE id = $1",
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+async function authenticate(request, response, next) {
+  try {
+    const header = request.headers.authorization || "";
+    const [, token] = header.match(/^Bearer\s+(.+)$/i) || [];
+    if (!token) return response.status(401).json({ error: "Accesso non autenticato" });
+
+    const decoded = jwt.verify(token, jwtSecret);
+    const user = await findUserById(decoded.sub);
+    if (!user) return response.status(401).json({ error: "Utente non trovato" });
+    request.user = user;
+    next();
+  } catch {
+    response.status(401).json({ error: "Sessione scaduta o non valida" });
+  }
+}
+
+function requireAdmin(request, response, next) {
+  if (request.user?.ruolo !== "admin") {
+    return response.status(403).json({ error: "Operazione riservata all'amministratore" });
+  }
+  next();
+}
 
 function parsePracticeNumber(practiceNumber = "") {
   const match = String(practiceNumber).match(/^OA-([^-]+)-(\d{4})-(\d+)$/);
@@ -123,14 +199,35 @@ function rowToAct(row) {
 async function initDatabase() {
   const schema = await fs.readFile(path.join(__dirname, "schema.sql"), "utf8");
   await pool.query(schema);
+  await bootstrapAdminUser();
 }
 
-function buildActsQuery({ store, field, q, fusionEligible } = {}) {
+async function bootstrapAdminUser() {
+  const result = await pool.query("SELECT COUNT(*)::int AS count FROM utenti");
+  if (result.rows[0].count > 0) return;
+
+  const password = process.env.ADMIN_PASSWORD || "OroActive2026!";
+  const passwordHash = await bcrypt.hash(password, 12);
+  await pool.query(
+    `INSERT INTO utenti (nome, cognome, email, password_hash, ruolo, negozio)
+     VALUES ($1, $2, $3, $4, 'admin', $5)`,
+    [
+      process.env.ADMIN_NOME || "Admin",
+      process.env.ADMIN_COGNOME || "OroActive",
+      process.env.ADMIN_EMAIL || "admin@oroactive.it",
+      passwordHash,
+      process.env.ADMIN_NEGOZIO || "Busto Arsizio"
+    ]
+  );
+}
+
+function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
   const where = [];
   const values = [];
 
-  if (store) {
-    values.push(store);
+  const effectiveStore = user?.ruolo === "operatore" ? user.negozio : store;
+  if (effectiveStore) {
+    values.push(effectiveStore);
     where.push(`store = $${values.length}`);
   }
 
@@ -177,8 +274,8 @@ function buildActsQuery({ store, field, q, fusionEligible } = {}) {
   return { where, values };
 }
 
-async function listActs(query = {}) {
-  const { where, values } = buildActsQuery(query);
+async function listActs(query = {}, user = null) {
+  const { where, values } = buildActsQuery(query, user);
   const result = await pool.query(
     `SELECT * FROM ${actsTable}
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
@@ -198,6 +295,18 @@ async function nextActNumber(storeCode, year) {
   return Number(result.rows[0].next_number);
 }
 
+function enforceActStore(input, user) {
+  if (!user || user.ruolo === "admin") return input;
+  const storeCode = storeCodeFromName(user.negozio);
+  const practiceNumber = String(input.practiceNumber || "").replace(/^OA-[^-]+-/, `OA-${storeCode}-`);
+  return {
+    ...input,
+    store: user.negozio,
+    storeCode,
+    practiceNumber
+  };
+}
+
 async function findExisting(identifier) {
   const result = await pool.query(`SELECT * FROM ${actsTable} WHERE id::text = $1 OR practice_number = $1 LIMIT 1`, [
     identifier
@@ -210,10 +319,24 @@ async function getAct(identifier) {
   return row ? rowToAct(row) : null;
 }
 
-async function saveAct(input) {
-  const existing = input.id ? await findExisting(input.id) : input.practiceNumber ? await findExisting(input.practiceNumber) : null;
-  if (existing) return updateAct(existing.id, input);
-  const act = normalizeAct(input, existing);
+function canAccessAct(row, user) {
+  return user?.ruolo === "admin" || row?.store === user?.negozio;
+}
+
+async function saveAct(input, user) {
+  const protectedInput = enforceActStore(input, user);
+  const existing = protectedInput.id
+    ? await findExisting(protectedInput.id)
+    : protectedInput.practiceNumber
+      ? await findExisting(protectedInput.practiceNumber)
+      : null;
+  if (existing && !canAccessAct(existing, user)) {
+    const error = new Error("Atto non accessibile per il negozio assegnato");
+    error.status = 403;
+    throw error;
+  }
+  if (existing) return updateAct(existing.id, protectedInput, user);
+  const act = normalizeAct(protectedInput, existing);
   const result = await pool.query(
     `INSERT INTO ${actsTable} (
       cliente_nome, cliente_cognome, codice_fiscale, telefono,
@@ -244,10 +367,15 @@ async function saveAct(input) {
   return rowToAct(result.rows[0]);
 }
 
-async function updateAct(identifier, input) {
+async function updateAct(identifier, input, user) {
   const existing = await findExisting(identifier);
   if (!existing) return null;
-  const act = normalizeAct(input, existing);
+  if (!canAccessAct(existing, user)) {
+    const error = new Error("Atto non accessibile per il negozio assegnato");
+    error.status = 403;
+    throw error;
+  }
+  const act = normalizeAct(enforceActStore(input, user), existing);
   const result = await pool.query(
     `UPDATE ${actsTable} SET
       cliente_nome = $2,
@@ -292,20 +420,139 @@ async function updateAct(identifier, input) {
   return result.rowCount ? rowToAct(result.rows[0]) : null;
 }
 
-async function deleteAct(identifier) {
-  const result = await pool.query(`DELETE FROM ${actsTable} WHERE id::text = $1 OR practice_number = $1 RETURNING id`, [
-    identifier
+async function deleteAct(identifier, user) {
+  const existing = await findExisting(identifier);
+  if (!existing) return false;
+  if (!canAccessAct(existing, user)) {
+    const error = new Error("Atto non accessibile per il negozio assegnato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(`DELETE FROM ${actsTable} WHERE id = $1 RETURNING id`, [
+    existing.id
   ]);
   return result.rowCount > 0;
+}
+
+async function createUser(input) {
+  const password = String(input.password || "");
+  if (password.length < 8) {
+    const error = new Error("La password deve avere almeno 8 caratteri");
+    error.status = 400;
+    throw error;
+  }
+  const passwordHash = await bcrypt.hash(password, 12);
+  const result = await pool.query(
+    `INSERT INTO utenti (nome, cognome, email, password_hash, ruolo, negozio)
+     VALUES ($1, $2, LOWER($3), $4, $5, $6)
+     RETURNING id, nome, cognome, email, ruolo, negozio, data_creazione`,
+    [
+      input.nome || "",
+      input.cognome || "",
+      input.email || "",
+      passwordHash,
+      input.ruolo === "admin" ? "admin" : "operatore",
+      input.negozio || "Busto Arsizio"
+    ]
+  );
+  return publicUser(result.rows[0]);
+}
+
+async function updateUser(id, input) {
+  const fields = [];
+  const values = [];
+  const allowed = ["nome", "cognome", "email", "ruolo", "negozio"];
+  allowed.forEach((field) => {
+    if (input[field] === undefined) return;
+    values.push(field === "email" ? String(input[field]).toLowerCase() : input[field]);
+    fields.push(`${field} = $${values.length}`);
+  });
+
+  if (input.password) {
+    values.push(await bcrypt.hash(String(input.password), 12));
+    fields.push(`password_hash = $${values.length}`);
+  }
+
+  if (!fields.length) return findUserById(id);
+  values.push(id);
+  const result = await pool.query(
+    `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}
+     RETURNING id, nome, cognome, email, ruolo, negozio, data_creazione`,
+    values
+  );
+  return result.rowCount ? publicUser(result.rows[0]) : null;
+}
+
+async function listUsers() {
+  const result = await pool.query(
+    "SELECT id, nome, cognome, email, ruolo, negozio, data_creazione FROM utenti ORDER BY data_creazione DESC"
+  );
+  return result.rows.map(publicUser);
+}
+
+async function loginUser(email, password) {
+  const result = await pool.query("SELECT * FROM utenti WHERE LOWER(email) = LOWER($1)", [email || ""]);
+  const user = result.rows[0];
+  if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash))) {
+    const error = new Error("Email o password non corretti");
+    error.status = 401;
+    throw error;
+  }
+  const safeUser = publicUser(user);
+  return { token: signUserToken(safeUser), user: safeUser };
 }
 
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true, service: "oroactive-gestionale" });
 });
 
+app.post("/api/auth/login", async (request, response, next) => {
+  try {
+    response.json(await loginUser(request.body.email, request.body.password));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/logout", (_request, response) => {
+  response.json({ ok: true });
+});
+
+app.get("/api/auth/me", authenticate, (request, response) => {
+  response.json({ user: publicUser(request.user) });
+});
+
+app.use("/api", authenticate);
+
+app.get("/api/utenti", requireAdmin, async (_request, response, next) => {
+  try {
+    response.json(await listUsers());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/utenti", requireAdmin, async (request, response, next) => {
+  try {
+    response.status(201).json(await createUser(request.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/utenti/:id", requireAdmin, async (request, response, next) => {
+  try {
+    const user = await updateUser(request.params.id, request.body);
+    if (!user) return response.status(404).json({ error: "Utente non trovato" });
+    response.json(user);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get(["/api/atti", "/api/acts"], async (request, response, next) => {
   try {
-    response.json(await listActs(request.query));
+    response.json(await listActs(request.query, request.user));
   } catch (error) {
     next(error);
   }
@@ -313,7 +560,7 @@ app.get(["/api/atti", "/api/acts"], async (request, response, next) => {
 
 app.get(["/api/atti/search", "/api/acts/search"], async (request, response, next) => {
   try {
-    response.json(await listActs(request.query));
+    response.json(await listActs(request.query, request.user));
   } catch (error) {
     next(error);
   }
@@ -321,7 +568,9 @@ app.get(["/api/atti/search", "/api/acts/search"], async (request, response, next
 
 app.get(["/api/atti/next-number", "/api/acts/next-number"], async (request, response, next) => {
   try {
-    const storeCode = String(request.query.storeCode || "");
+    const storeCode = request.user.ruolo === "operatore"
+      ? storeCodeFromName(request.user.negozio)
+      : String(request.query.storeCode || "");
     const year = Number(request.query.year || new Date().getFullYear());
     response.json({ nextNumber: await nextActNumber(storeCode, year) });
   } catch (error) {
@@ -331,7 +580,9 @@ app.get(["/api/atti/next-number", "/api/acts/next-number"], async (request, resp
 
 app.get(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
-    const act = await getAct(request.params.id);
+    const row = await findExisting(request.params.id);
+    if (row && !canAccessAct(row, request.user)) return response.status(403).json({ error: "Atto non accessibile" });
+    const act = row ? rowToAct(row) : null;
     if (!act) return response.status(404).json({ error: "Atto non trovato" });
     response.json(act);
   } catch (error) {
@@ -341,7 +592,7 @@ app.get(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
 
 app.post(["/api/atti", "/api/acts"], async (request, response, next) => {
   try {
-    response.status(201).json(await saveAct(request.body));
+    response.status(201).json(await saveAct(request.body, request.user));
   } catch (error) {
     next(error);
   }
@@ -349,7 +600,7 @@ app.post(["/api/atti", "/api/acts"], async (request, response, next) => {
 
 app.put(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
-    const act = await updateAct(request.params.id, request.body);
+    const act = await updateAct(request.params.id, request.body, request.user);
     if (!act) return response.status(404).json({ error: "Atto non trovato" });
     response.json(act);
   } catch (error) {
@@ -359,7 +610,7 @@ app.put(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
 
 app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
-    const deleted = await deleteAct(request.params.id);
+    const deleted = await deleteAct(request.params.id, request.user);
     if (!deleted) return response.status(404).json({ error: "Atto non trovato" });
     response.json({ ok: true, id: request.params.id });
   } catch (error) {

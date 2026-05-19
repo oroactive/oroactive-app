@@ -8,6 +8,13 @@ Imposta nella app Coolify:
 NODE_ENV=production
 PORT=3000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
+JWT_SECRET=UNA_CHIAVE_LUNGA_CASUALE
+JWT_EXPIRES_IN=7d
+ADMIN_EMAIL=admin@oroactive.it
+ADMIN_PASSWORD=CAMBIA_SUBITO_QUESTA_PASSWORD
+ADMIN_NOME=Admin
+ADMIN_COGNOME=OroActive
+ADMIN_NEGOZIO=Busto Arsizio
 ```
 
 Per la configurazione OroActive richiesta:
@@ -32,11 +39,18 @@ DATABASE_SSL=true
 
 Alla prima partenza il server crea automaticamente la tabella `atti_vendita`.
 La tabella usa i campi principali richiesti: `id`, `cliente_nome`, `cliente_cognome`, `codice_fiscale`, `telefono`, `peso_oro`, `quotazione`, `totale`, `data_atto`. Le informazioni complete del gestionale vengono salvate anche nel campo `payload`.
+Alla prima partenza viene creato anche il primo utente admin usando le variabili `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
 
 ## API REST principali
 
 ```text
 GET    /api/health
+POST   /api/auth/login
+POST   /api/auth/logout
+GET    /api/auth/me
+GET    /api/utenti
+POST   /api/utenti
+PUT    /api/utenti/:id
 GET    /api/atti
 POST   /api/atti
 GET    /api/atti/:id
@@ -50,3 +64,12 @@ DELETE /api/atti/:id
 ```
 
 Il frontend usa queste API per salvare, leggere, cercare, modificare/eliminare e numerare gli atti di vendita. Per compatibilita, gli endpoint `:id` accettano anche il numero atto `OA-NEGOZIO-ANNO-NUMERO`.
+
+## Ruoli
+
+```text
+admin      vede tutti i negozi, crea utenti e cambia negozio assegnato
+operatore  vede solo il proprio negozio e crea/modifica solo gli atti del negozio assegnato
+```
+
+Dopo il primo accesso admin, crea gli operatori dalla sezione `Utenti` e assegna il negozio corretto.

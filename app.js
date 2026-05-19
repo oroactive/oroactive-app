@@ -7,7 +7,10 @@ const state = {
   uploadedCaptures: new Set(),
   captureFiles: new Map(),
   lastSearchResults: [],
-  editingPracticeNumber: null
+  editingPracticeNumber: null,
+  authToken: localStorage.getItem("oroactive-auth-token") || "",
+  currentUser: null,
+  syncTimer: null
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -25,6 +28,12 @@ const splashScreen = document.getElementById("splashScreen");
 const enterSoftware = document.getElementById("enterSoftware");
 const mainMenuScreen = document.getElementById("mainMenuScreen");
 const practiceTopbar = document.getElementById("practiceTopbar");
+const loginScreen = document.getElementById("loginScreen");
+const loginForm = document.getElementById("loginForm");
+const loginMessage = document.getElementById("loginMessage");
+const logoutButton = document.getElementById("logoutButton");
+const loggedUserName = document.getElementById("loggedUserName");
+const appShell = document.querySelector(".app-shell");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -40,12 +49,17 @@ const apiBase = "/api";
 const demoActs = [];
 
 async function apiRequest(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
   const response = await fetch(`${apiBase}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers,
     ...options
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
+    if (response.status === 401 && !path.startsWith("/auth/login")) {
+      showLogin();
+    }
     throw new Error(body.error || "Errore comunicazione server");
   }
   return response.json();
@@ -138,7 +152,132 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2400);
 }
 
+function showLogin() {
+  state.authToken = "";
+  state.currentUser = null;
+  localStorage.removeItem("oroactive-auth-token");
+  loginScreen.hidden = false;
+  splashScreen.classList.add("hidden");
+  mainMenuScreen.hidden = true;
+  appShell.hidden = true;
+  if (state.syncTimer) window.clearInterval(state.syncTimer);
+  state.syncTimer = null;
+}
+
+function showAuthenticatedShell() {
+  loginScreen.hidden = true;
+  appShell.hidden = false;
+  splashScreen.classList.remove("hidden");
+  mainMenuScreen.hidden = true;
+}
+
+function isAdmin() {
+  return state.currentUser?.ruolo === "admin";
+}
+
+function currentUserStoreCode() {
+  return storeCodeFromName(state.currentUser?.negozio || "Busto Arsizio");
+}
+
+function applyRolePermissions() {
+  document.querySelectorAll(".admin-only").forEach((element) => {
+    element.hidden = !isAdmin();
+  });
+
+  const storeCode = document.getElementById("storeCode");
+  const archiveStore = document.getElementById("archiveStoreFilter");
+  if (!isAdmin()) {
+    const code = currentUserStoreCode();
+    if (storeCode) {
+      storeCode.value = code;
+      storeCode.disabled = true;
+    }
+    if (archiveStore) {
+      archiveStore.value = state.currentUser.negozio;
+      archiveStore.disabled = true;
+    }
+  } else {
+    if (storeCode) storeCode.disabled = false;
+    if (archiveStore) archiveStore.disabled = false;
+  }
+
+  if (loggedUserName && state.currentUser) {
+    loggedUserName.textContent = `${state.currentUser.nome} ${state.currentUser.cognome} - ${state.currentUser.ruolo}`;
+  }
+}
+
+async function startAuthenticatedApp() {
+  showAuthenticatedShell();
+  applyRolePermissions();
+  await loadSavedActs();
+  renderStep();
+  await setPracticeMeta();
+  updateSignatureState();
+  updateDocumentCaptureCards();
+  updateAttachmentState();
+  updateCededItems();
+  updateSaleTotal();
+  updateCustomerSummary();
+  renderPaymentCaptureCard();
+  updateChecklistState();
+  document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
+  renderArchiveGroups();
+  renderFusionGroups();
+  if (isAdmin()) await loadUsers();
+  if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 5000);
+}
+
+async function restoreSession() {
+  if (!state.authToken) {
+    showLogin();
+    return false;
+  }
+  try {
+    const data = await apiRequest("/auth/me");
+    state.currentUser = data.user;
+    await startAuthenticatedApp();
+    return true;
+  } catch {
+    showLogin();
+    return false;
+  }
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  loginMessage.textContent = "";
+  try {
+    const data = await apiRequest("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({
+        email: document.getElementById("loginEmail").value.trim(),
+        password: document.getElementById("loginPassword").value
+      })
+    });
+    state.authToken = data.token;
+    state.currentUser = data.user;
+    localStorage.setItem("oroactive-auth-token", data.token);
+    loginForm.reset();
+    await startAuthenticatedApp();
+  } catch (error) {
+    loginMessage.textContent = error.message || "Accesso non riuscito.";
+  }
+}
+
+async function handleLogout() {
+  try {
+    await apiRequest("/auth/logout", { method: "POST" });
+  } catch {
+    // La sessione viene comunque rimossa dal dispositivo.
+  }
+  showLogin();
+}
+
 function setScreen(id) {
+  if (id === "users" && !isAdmin()) {
+    showToast("Sezione riservata all'amministratore.");
+    return;
+  }
   const leavingSearch = document.getElementById("searchActs")?.classList.contains("active-screen") && id !== "searchActs";
   if (leavingSearch) clearActSearch();
   screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
@@ -206,6 +345,91 @@ function renderSearchResults(results) {
       `).join("")}
     </div>
   `;
+}
+
+function resetUserForm() {
+  const form = document.getElementById("userForm");
+  if (!form) return;
+  form.reset();
+  document.getElementById("userId").value = "";
+  document.getElementById("userPassword").required = true;
+}
+
+function renderUsers(users) {
+  const container = document.getElementById("usersList");
+  if (!container) return;
+  if (!users.length) {
+    container.innerHTML = '<div class="empty-state">Nessun utente registrato.</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="table-row head"><span>Utente</span><span>Email</span><span>Ruolo</span><span>Negozio</span><span>Azioni</span></div>
+    ${users.map((user) => `
+      <div class="table-row">
+        <strong>${escapeHtml(user.nome)} ${escapeHtml(user.cognome)}</strong>
+        <span>${escapeHtml(user.email)}</span>
+        <em>${escapeHtml(user.ruolo)}</em>
+        <span>${escapeHtml(user.negozio)}</span>
+        <div class="row-actions">
+          <button type="button" data-edit-user="${escapeHtml(String(user.id))}">Modifica</button>
+        </div>
+      </div>
+    `).join("")}
+  `;
+}
+
+async function loadUsers() {
+  if (!isAdmin()) return;
+  try {
+    const users = await apiRequest("/utenti");
+    state.users = users;
+    renderUsers(users);
+  } catch (error) {
+    showToast(error.message || "Utenti non caricati.");
+  }
+}
+
+async function saveUser(event) {
+  event.preventDefault();
+  if (!isAdmin()) return;
+  const id = document.getElementById("userId").value;
+  const payload = {
+    nome: document.getElementById("userName").value.trim(),
+    cognome: document.getElementById("userSurname").value.trim(),
+    email: document.getElementById("userEmail").value.trim(),
+    ruolo: document.getElementById("userRole").value,
+    negozio: document.getElementById("userStore").value
+  };
+  const password = document.getElementById("userPassword").value;
+  if (password) payload.password = password;
+
+  try {
+    await apiRequest(id ? `/utenti/${encodeURIComponent(id)}` : "/utenti", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(payload)
+    });
+    resetUserForm();
+    await loadUsers();
+    showToast(id ? "Utente aggiornato." : "Utente creato.");
+  } catch (error) {
+    showToast(error.message || "Utente non salvato.");
+  }
+}
+
+function editUser(id) {
+  const user = (state.users || []).find((item) => String(item.id) === String(id));
+  if (!user) return;
+  document.getElementById("userId").value = user.id;
+  document.getElementById("userName").value = user.nome || "";
+  document.getElementById("userSurname").value = user.cognome || "";
+  document.getElementById("userEmail").value = user.email || "";
+  document.getElementById("userRole").value = user.ruolo || "operatore";
+  document.getElementById("userStore").value = user.negozio || "Busto Arsizio";
+  const password = document.getElementById("userPassword");
+  password.value = "";
+  password.required = false;
+  showToast("Utente caricato in modifica.");
 }
 
 function normalizeWorkflowStatus(status = "Archiviata") {
@@ -737,6 +961,7 @@ async function resetCurrentPractice(options = {}) {
   state.editingPracticeNumber = null;
 
   await setPracticeMeta();
+  applyRolePermissions();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   renderStep();
   updateSignatureState();
@@ -1556,6 +1781,15 @@ navItems.forEach((item) => {
   item.addEventListener("click", () => setScreen(item.dataset.section));
 });
 
+loginForm.addEventListener("submit", handleLogin);
+logoutButton.addEventListener("click", handleLogout);
+document.getElementById("userForm").addEventListener("submit", saveUser);
+document.getElementById("resetUserForm").addEventListener("click", resetUserForm);
+document.getElementById("usersList").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-user]");
+  if (button) editUser(button.dataset.editUser);
+});
+
 brandMenuButton.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleBrandMenu();
@@ -1888,24 +2122,13 @@ document.getElementById("closePreview").addEventListener("click", () => {
 });
 
 async function initializeApp() {
-  await loadSavedActs();
-  renderStep();
-  await setPracticeMeta();
-  updateSignatureState();
-  updateDocumentCaptureCards();
-  updateAttachmentState();
-  updateCededItems();
-  updateSaleTotal();
-  updateCustomerSummary();
-  renderPaymentCaptureCard();
-  updateChecklistState();
-  document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
-  renderArchiveGroups();
-  renderFusionGroups();
-  window.setInterval(syncActsFromServer, 5000);
-  window.addEventListener("focus", syncActsFromServer);
+  appShell.hidden = true;
+  await restoreSession();
+  window.addEventListener("focus", () => {
+    if (state.authToken) syncActsFromServer();
+  });
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) syncActsFromServer();
+    if (!document.hidden && state.authToken) syncActsFromServer();
   });
 }
 
