@@ -45,6 +45,8 @@ function storeNameFromCode(storeCode) {
 
 function publicUser(row) {
   if (!row) return null;
+  const lastSeen = row.last_seen ? new Date(row.last_seen) : null;
+  const online = Boolean(lastSeen && Date.now() - lastSeen.getTime() < 2 * 60 * 1000);
   return {
     id: row.id,
     nome: row.nome,
@@ -53,16 +55,23 @@ function publicUser(row) {
     email: row.email,
     ruolo: normalizeRole(row.ruolo),
     negozio: roleSeesAllStores(row.ruolo) ? "Tutti" : row.negozio,
-    data_creazione: row.data_creazione
+    data_creazione: row.data_creazione,
+    last_seen: row.last_seen,
+    online,
+    stato_connessione: online ? "Online" : "Offline"
   };
 }
 
-function normalizeRole(role = "utente") {
+function normalizeRole(role = "commesso") {
   const normalized = String(role || "").trim().toLowerCase();
   if (normalized === "founder") return "founder";
   if (normalized === "admin") return "admin";
-  if (normalized === "operatore" || normalized === "utente" || normalized === "user") return "utente";
-  return "utente";
+  if (normalized === "responsabile") return "responsabile";
+  if (normalized === "commessa") return "commessa";
+  if (normalized === "commesso" || normalized === "operatore" || normalized === "utente" || normalized === "user") {
+    return "commesso";
+  }
+  return "commesso";
 }
 
 function roleSeesAllStores(role) {
@@ -70,7 +79,15 @@ function roleSeesAllStores(role) {
 }
 
 function canManageAccess(user) {
-  return ["founder", "admin"].includes(normalizeRole(user?.ruolo));
+  return ["founder", "admin", "responsabile"].includes(normalizeRole(user?.ruolo));
+}
+
+function managedRolesForActor(actor) {
+  const role = normalizeRole(actor?.ruolo);
+  if (role === "founder") return ["admin", "responsabile", "commesso", "commessa"];
+  if (role === "admin") return ["responsabile", "commesso", "commessa"];
+  if (role === "responsabile") return ["commesso", "commessa"];
+  return [];
 }
 
 function signUserToken(user) {
@@ -87,7 +104,7 @@ function signUserToken(user) {
 
 async function findUserById(id) {
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione FROM utenti WHERE id = $1",
+    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen FROM utenti WHERE id = $1",
     [id]
   );
   return result.rows[0] || null;
@@ -102,6 +119,8 @@ async function authenticate(request, response, next) {
     const decoded = jwt.verify(token, jwtSecret);
     const user = await findUserById(decoded.sub);
     if (!user) return response.status(401).json({ error: "Utente non trovato" });
+    await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
+    user.last_seen = new Date();
     request.user = user;
     next();
   } catch {
@@ -243,7 +262,7 @@ async function bootstrapAdminUser() {
       [
         existing.rows[0].id,
         process.env.ADMIN_NOME || "Elite",
-        process.env.ADMIN_COGNOME || "Admin",
+        process.env.ADMIN_COGNOME || "Founder",
         username,
         email,
         passwordHash,
@@ -258,7 +277,7 @@ async function bootstrapAdminUser() {
      VALUES ($1, $2, $3, LOWER($4), $5, 'founder', $6)`,
     [
       process.env.ADMIN_NOME || "Elite",
-      process.env.ADMIN_COGNOME || "Admin",
+      process.env.ADMIN_COGNOME || "Founder",
       username,
       email,
       passwordHash,
@@ -490,12 +509,13 @@ async function createUser(input, actor) {
   const actorRole = normalizeRole(actor?.ruolo);
   const passwordHash = await bcrypt.hash(password, 12);
   const role = normalizeRole(input.ruolo);
-  const finalRole = actorRole === "admin" && role !== "utente" ? "utente" : role;
+  const allowedRoles = managedRolesForActor(actor);
+  const finalRole = allowedRoles.includes(role) ? role : allowedRoles.at(-1) || "commesso";
   const finalStore = roleSeesAllStores(finalRole) ? "Tutti" : input.negozio || "Busto Arsizio";
   const result = await pool.query(
     `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
      VALUES ($1, $2, NULLIF($3, ''), LOWER($4), $5, $6, $7)
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, data_creazione`,
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen`,
     [
       input.nome || "",
       input.cognome || "",
@@ -517,8 +537,13 @@ async function findUserRawById(id) {
 function assertCanManageTarget(actor, target, requestedRole = target?.ruolo) {
   const actorRole = normalizeRole(actor?.ruolo);
   const targetRole = normalizeRole(target?.ruolo);
-  if (actorRole === "founder") return;
-  if (actorRole === "admin" && targetRole === "utente" && normalizeRole(requestedRole) === "utente") return;
+  if (targetRole === "founder") {
+    const error = new Error("Il Founder non puo essere modificato o revocato");
+    error.status = 403;
+    throw error;
+  }
+  const allowedRoles = managedRolesForActor(actor);
+  if (allowedRoles.includes(targetRole) && allowedRoles.includes(normalizeRole(requestedRole))) return;
   const error = new Error("Permesso non consentito per questo utente");
   error.status = 403;
   throw error;
@@ -549,7 +574,7 @@ async function updateUser(id, input, actor) {
   values.push(id);
   const result = await pool.query(
     `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, data_creazione`,
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen`,
     values
   );
   return result.rowCount ? publicUser(result.rows[0]) : null;
@@ -557,15 +582,27 @@ async function updateUser(id, input, actor) {
 
 async function listUsers() {
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione FROM utenti ORDER BY data_creazione DESC"
+    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen FROM utenti WHERE ruolo <> 'founder' ORDER BY data_creazione DESC"
   );
   return result.rows.map(publicUser);
 }
 
 async function listUsersForActor(actor) {
-  if (normalizeRole(actor?.ruolo) === "founder") return listUsers();
+  const actorRole = normalizeRole(actor?.ruolo);
+  if (actorRole === "founder") return listUsers();
+  const roles = managedRolesForActor(actor);
+  if (!roles.length) return [];
+  const values = [roles];
+  let where = "WHERE ruolo = ANY($1)";
+  if (actorRole === "responsabile") {
+    values.push(actor.negozio);
+    where += " AND negozio = $2";
+  }
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione FROM utenti WHERE ruolo IN ('utente', 'operatore') ORDER BY data_creazione DESC"
+    `SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen
+     FROM utenti ${where}
+     ORDER BY data_creazione DESC`,
+    values
   );
   return result.rows.map(publicUser);
 }
@@ -578,6 +615,11 @@ async function deleteUser(id, actor) {
   }
   const target = await findUserRawById(id);
   if (!target) return false;
+  if (normalizeRole(target.ruolo) === "founder") {
+    const error = new Error("Il Founder non puo essere eliminato");
+    error.status = 403;
+    throw error;
+  }
   assertCanManageTarget(actor, target);
   const result = await pool.query("DELETE FROM utenti WHERE id = $1 RETURNING id", [id]);
   return result.rowCount > 0;
@@ -594,6 +636,8 @@ async function loginUser(identifier, password) {
     error.status = 401;
     throw error;
   }
+  await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
+  user.last_seen = new Date();
   const safeUser = publicUser(user);
   return { token: signUserToken(safeUser), user: safeUser };
 }

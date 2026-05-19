@@ -14,7 +14,7 @@ ADMIN_USERNAME=Elite
 ADMIN_EMAIL=elite@oroactive.it
 ADMIN_PASSWORD=Snoopdoggydogg.8
 ADMIN_NOME=Elite
-ADMIN_COGNOME=Admin
+ADMIN_COGNOME=Founder
 ADMIN_NEGOZIO=Tutti
 ```
 
@@ -40,7 +40,7 @@ DATABASE_SSL=true
 
 Alla prima partenza il server crea automaticamente la tabella `atti_vendita`.
 La tabella usa i campi principali richiesti: `id`, `cliente_nome`, `cliente_cognome`, `codice_fiscale`, `telefono`, `peso_oro`, `quotazione`, `totale`, `data_atto`. Le informazioni complete del gestionale vengono salvate anche nel campo `payload`.
-Alla prima partenza viene creato anche il primo utente admin usando le variabili `ADMIN_USERNAME`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
+Alla prima partenza viene creato anche il primo accesso Founder usando le variabili `ADMIN_USERNAME`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
 
 ## API REST principali
 
@@ -70,11 +70,12 @@ Il frontend usa queste API per salvare, leggere, cercare, modificare/eliminare e
 
 ```text
 Founder  vede tutti i negozi, gestisce utenti e amministratori, modifica e revoca ogni accesso
-Admin    vede tutti i negozi, gestisce solo gli Utenti, modifica e revoca solo utenti
-Utente   accede al gestionale senza sezione Utenti
+Admin    vede tutti i negozi, visualizza responsabili e commessi, gestisce accessi sotto il proprio ruolo
+Responsabile  visualizza e gestisce Commesso/Commessa
+Commesso/Commessa  accede al gestionale senza sezione Utenti
 ```
 
-Founder e Admin visualizzano `Tutti` nel campo negozio. Dopo il primo accesso Founder, crea gli Admin o gli Utenti dalla sezione `Utenti`.
+Founder e Admin visualizzano `Tutti` nel campo negozio. Il Founder non compare nella sezione Utenti e non puo essere eliminato. Dopo il primo accesso Founder, crea Admin, Responsabili, Commessi o Commesse dalla sezione `Utenti`.
 
 Accesso Founder iniziale:
 

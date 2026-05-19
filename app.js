@@ -97,6 +97,9 @@ async function syncActsFromServer() {
   await loadSavedActs();
   renderArchiveGroups();
   renderFusionGroups();
+  if (isAdmin() && document.getElementById("users")?.classList.contains("active-screen")) {
+    await loadUsers();
+  }
 
   const searchActive = document.getElementById("searchActs")?.classList.contains("active-screen");
   const keyword = document.getElementById("searchKeyword")?.value.trim();
@@ -172,15 +175,23 @@ function showAuthenticatedShell() {
   mainMenuScreen.hidden = true;
 }
 
-function normalizeRole(role = "utente") {
+function normalizeRole(role = "commesso") {
   const normalized = String(role || "").toLowerCase();
   if (normalized === "founder") return "founder";
   if (normalized === "admin") return "admin";
-  return "utente";
+  if (normalized === "responsabile") return "responsabile";
+  if (normalized === "commessa") return "commessa";
+  return "commesso";
 }
 
 function roleLabel(role) {
-  return { founder: "Founder", admin: "Admin", utente: "Utente" }[normalizeRole(role)];
+  return {
+    founder: "Founder",
+    admin: "Admin",
+    responsabile: "Responsabile",
+    commesso: "Commesso",
+    commessa: "Commessa"
+  }[normalizeRole(role)];
 }
 
 function displayUsername(user = {}) {
@@ -190,7 +201,7 @@ function displayUsername(user = {}) {
 }
 
 function isAdmin() {
-  return ["founder", "admin"].includes(normalizeRole(state.currentUser?.ruolo));
+  return ["founder", "admin", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
 function isFounder() {
@@ -199,6 +210,14 @@ function isFounder() {
 
 function userSeesAllStores(user = state.currentUser) {
   return ["founder", "admin"].includes(normalizeRole(user?.ruolo));
+}
+
+function managedRolesForCurrentUser() {
+  const role = normalizeRole(state.currentUser?.ruolo);
+  if (role === "founder") return ["admin", "responsabile", "commesso", "commessa"];
+  if (role === "admin") return ["responsabile", "commesso", "commessa"];
+  if (role === "responsabile") return ["commesso", "commessa"];
+  return [];
 }
 
 function currentUserStoreCode() {
@@ -388,6 +407,7 @@ function resetUserForm() {
   form.reset();
   document.getElementById("userId").value = "";
   document.getElementById("userPassword").required = true;
+  document.getElementById("saveUserButton").textContent = "Salva Utente";
   configureUserFormPermissions();
 }
 
@@ -395,10 +415,11 @@ function configureUserFormPermissions() {
   const roleSelect = document.getElementById("userRole");
   const storeSelect = document.getElementById("userStore");
   if (!roleSelect || !storeSelect) return;
+  const allowedRoles = managedRolesForCurrentUser();
   [...roleSelect.options].forEach((option) => {
-    option.hidden = !isFounder() && option.value !== "utente";
+    option.hidden = !allowedRoles.includes(option.value);
   });
-  if (!isFounder()) roleSelect.value = "utente";
+  if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles[0] || "commesso";
   const role = normalizeRole(roleSelect.value);
   if (["founder", "admin"].includes(role)) {
     storeSelect.value = "Tutti";
@@ -418,13 +439,14 @@ function renderUsers(users) {
   }
 
   container.innerHTML = `
-    <div class="table-row head"><span>Utente</span><span>Accesso</span><span>Ruolo</span><span>Negozio</span><span>Azioni</span></div>
+    <div class="table-row head"><span>Utente</span><span>Accesso</span><span>Ruolo</span><span>Negozio</span><span>Stato</span><span>Azioni</span></div>
     ${users.map((user) => `
       <div class="table-row">
         <strong>${escapeHtml(user.nome)} ${escapeHtml(user.cognome)}</strong>
         <span>${escapeHtml(displayUsername(user))}<br>${escapeHtml(user.email)}</span>
         <em>${escapeHtml(roleLabel(user.ruolo))}</em>
         <span>${escapeHtml(userSeesAllStores(user) ? "Tutti" : user.negozio)}</span>
+        <span class="presence ${user.online ? "online" : "offline"}">${user.online ? "Online" : "Offline"}</span>
         <div class="row-actions">
           <select data-user-action="${escapeHtml(String(user.id))}" aria-label="Azioni utente">
             <option value="">Azioni</option>
@@ -489,6 +511,7 @@ function editUser(id) {
   const password = document.getElementById("userPassword");
   password.value = "";
   password.required = false;
+  document.getElementById("saveUserButton").textContent = "Salva Modifiche";
   configureUserFormPermissions();
   showToast("Utente caricato in modifica.");
 }

@@ -9,9 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
   <title>OroActive Gestionale</title>
-  <link rel="manifest" href="manifest.webmanifest?v=20260519-27">
+  <link rel="manifest" href="manifest.webmanifest?v=20260519-28">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260519-27">
+  <link rel="stylesheet" href="styles.css?v=20260519-28">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -550,9 +550,10 @@
             <label>Password <input id="userPassword" type="password" autocomplete="new-password" placeholder="Minimo 8 caratteri" required></label>
             <label>Ruolo
               <select id="userRole">
-                <option value="utente">Utente</option>
+                <option value="commesso">Commesso</option>
+                <option value="commessa">Commessa</option>
+                <option value="responsabile">Responsabile</option>
                 <option value="admin">Admin</option>
-                <option value="founder">Founder</option>
               </select>
             </label>
             <label>Negozio
@@ -563,8 +564,10 @@
                 <option>Legnano</option>
               </select>
             </label>
-            <button type="submit">Salva utente</button>
-            <button class="ghost-button" type="button" id="resetUserForm">Nuovo utente</button>
+            <div class="user-form-actions">
+              <button type="submit" id="saveUserButton">Salva Utente</button>
+              <button class="ghost-button" type="button" id="resetUserForm">Nuovo utente</button>
+            </div>
           </form>
         </div>
         <div class="archive-table users-table" id="usersList" aria-live="polite"></div>
@@ -584,6 +587,6 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260519-27"></script>
+  <script src="app.js?v=20260519-28"></script>
 </body>
 </html>

@@ -1459,7 +1459,35 @@ canvas {
 }
 
 .users-table .table-row {
-  grid-template-columns: 1fr 1.2fr 0.65fr 0.85fr 0.7fr;
+  grid-template-columns: 1fr 1.2fr 0.75fr 0.85fr 0.62fr 0.7fr;
+}
+
+.presence {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 900;
+}
+
+.presence.online {
+  background: #dff7e8;
+  color: #0c7a3e;
+}
+
+.presence.offline {
+  background: #ffe2df;
+  color: #c62828;
+}
+
+.user-form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-top: 10px;
+  background: var(--panel);
 }
 
 .archive-export-table {
@@ -1888,7 +1916,7 @@ canvas {
   }
 
   .table-row {
-    min-width: 0;
+    min-width: 760px;
   }
 
   .preview-modal {

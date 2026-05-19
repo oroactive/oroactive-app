@@ -58,9 +58,10 @@ CREATE TABLE IF NOT EXISTS utenti (
   username TEXT,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  ruolo TEXT NOT NULL CHECK (ruolo IN ('founder', 'admin', 'utente', 'operatore')),
+  ruolo TEXT NOT NULL CHECK (ruolo IN ('founder', 'admin', 'responsabile', 'commesso', 'commessa', 'utente', 'operatore')),
   negozio TEXT NOT NULL DEFAULT 'Busto Arsizio',
-  data_creazione TIMESTAMPTZ DEFAULT NOW()
+  data_creazione TIMESTAMPTZ DEFAULT NOW(),
+  last_seen TIMESTAMPTZ
 );
 
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS nome TEXT;
@@ -71,10 +72,11 @@ ALTER TABLE utenti ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS ruolo TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS negozio TEXT DEFAULT 'Busto Arsizio';
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS data_creazione TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE utenti ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
 
 ALTER TABLE utenti DROP CONSTRAINT IF EXISTS utenti_ruolo_check;
 ALTER TABLE utenti ADD CONSTRAINT utenti_ruolo_check
-  CHECK (ruolo IN ('founder', 'admin', 'utente', 'operatore'));
+  CHECK (ruolo IN ('founder', 'admin', 'responsabile', 'commesso', 'commessa', 'utente', 'operatore'));
 
 CREATE UNIQUE INDEX IF NOT EXISTS utenti_email_unique
   ON utenti (LOWER(email));
