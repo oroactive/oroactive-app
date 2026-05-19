@@ -777,6 +777,7 @@ async function resetCurrentPractice() {
   updateDocumentCaptureCards();
   renderPaymentCaptureCard();
   updateAttachmentState();
+  updateChecklistState();
 }
 
 async function deleteCurrentPractice() {
@@ -923,15 +924,14 @@ function updateSignatureState() {
   status.classList.toggle("success", signed === 3);
   status.classList.toggle("warning", signed !== 3);
   document.getElementById("summarySignatures").textContent = signed === 3 ? "3 di 3 complete" : `${signed} di 3 complete`;
-  document.querySelectorAll(".checklist input")[2].checked = signed === 3;
+  updateChecklistState();
 }
 
 function updateAttachmentState() {
   const required = requiredCaptureKeys();
   const uploadedRequired = required.filter((key) => state.uploadedCaptures.has(key)).length;
   document.getElementById("summaryAttachments").textContent = `${uploadedRequired} di ${required.length} caricati`;
-  document.querySelectorAll(".checklist input")[3].checked = required.slice(0, 4).every((key) => state.uploadedCaptures.has(key));
-  document.querySelectorAll(".checklist input")[4].checked = required.slice(4).every((key) => state.uploadedCaptures.has(key));
+  updateChecklistState();
 }
 
 function selectedPaymentMethod() {
@@ -1103,6 +1103,49 @@ function fieldValue(selector) {
 
 function hasValue(selector) {
   return fieldValue(selector).trim().length > 0;
+}
+
+function missingClientDataFields() {
+  const checks = [
+    ["Negozio", "#storeCode"],
+    ["Atto di vendita n.", "#practiceNumber"],
+    ["Data compilazione", "#practiceDate"],
+    ["Ora compilazione", "#practiceTime"],
+    ["Nome", '[name="nome"]'],
+    ["Cognome", '[name="cognome"]'],
+    ["Data di nascita", '[name="nascita"]'],
+    ["Luogo di nascita", '[name="luogo"]'],
+    ["Provincia nascita", '[name="provinciaNascita"]'],
+    ["Codice fiscale", '[name="cf"]'],
+    ["Telefono", '[name="telefono"]'],
+    ["Indirizzo di residenza", '[name="indirizzo"]'],
+    ["Provincia residenza", '[name="provinciaResidenza"]'],
+    ["Professione lavorativa", '[name="professione"]']
+  ];
+  return checks.filter(([, selector]) => !hasValue(selector)).map(([label]) => label);
+}
+
+function missingIdentityDocumentFields() {
+  const checks = [
+    ["Tipo documento", '[name="tipoDocumento"]'],
+    ["Numero documento", '[name="numeroDocumento"]'],
+    ["Scadenza documento", '[name="scadenzaDocumento"]']
+  ];
+  return checks.filter(([, selector]) => !hasValue(selector)).map(([label]) => label);
+}
+
+function updateChecklistState() {
+  const checklist = document.querySelectorAll(".checklist input");
+  if (!checklist.length) return;
+
+  const required = requiredCaptureKeys();
+  const documentKeys = required.slice(0, 4);
+  const practiceKeys = required.slice(4);
+  checklist[0].checked = missingClientDataFields().length === 0;
+  checklist[1].checked = missingIdentityDocumentFields().length === 0;
+  checklist[2].checked = state.signatures.every(Boolean);
+  checklist[3].checked = documentKeys.length > 0 && documentKeys.every((key) => state.uploadedCaptures.has(key));
+  checklist[4].checked = missingSaleFields().length === 0 && practiceKeys.every((key) => state.uploadedCaptures.has(key));
 }
 
 function missingCustomerFields() {
@@ -1535,11 +1578,13 @@ document.getElementById("addCededItem").addEventListener("click", () => {
   document.getElementById("cededItemsTable").appendChild(row);
   updateTitleOptions(row);
   updateCededItems();
+  updateChecklistState();
   showToast("Nuova riga oggetto aggiunta alla scheda cliente.");
 });
 
 document.getElementById("cededItemsTable").addEventListener("input", (event) => {
-  if (event.target.matches('input[type="number"]')) updateCededItems();
+  updateCededItems();
+  updateChecklistState();
 });
 
 document.getElementById("cededItemsTable").addEventListener("change", (event) => {
@@ -1552,26 +1597,39 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
     renderWeightFields();
     renderPreciousCaptureCards();
     updateAttachmentState();
+    updateChecklistState();
   }
 });
 
-document.getElementById("saleTotal").addEventListener("input", updateSaleTotal);
+document.getElementById("saleTotal").addEventListener("input", () => {
+  updateSaleTotal();
+  updateChecklistState();
+});
 
 document.querySelector(".form-panel").addEventListener("input", (event) => {
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
+  updateChecklistState();
 });
 
 document.querySelector(".form-panel").addEventListener("change", (event) => {
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
+  updateChecklistState();
 });
 
 document.getElementById("paymentMethod").addEventListener("change", () => {
   renderPaymentCaptureCard();
   updateAttachmentState();
+  updateChecklistState();
 });
 
-document.getElementById("storeCode").addEventListener("change", updatePracticeNumber);
-document.getElementById("practiceDate").addEventListener("change", updatePracticeNumber);
+document.getElementById("storeCode").addEventListener("change", async () => {
+  await updatePracticeNumber();
+  updateChecklistState();
+});
+document.getElementById("practiceDate").addEventListener("change", async () => {
+  await updatePracticeNumber();
+  updateChecklistState();
+});
 
 document.getElementById("archiveStoreFilter").addEventListener("change", renderArchiveGroups);
 
@@ -1651,6 +1709,7 @@ document.getElementById("cededItemsTable").addEventListener("click", (event) => 
   if (!event.target.classList.contains("remove-row") || event.target.disabled) return;
   event.target.closest(".ceded-item-row").remove();
   updateCededItems();
+  updateChecklistState();
 });
 
 document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
@@ -1719,6 +1778,7 @@ document.addEventListener("change", (event) => {
   card.classList.add("loaded");
   card.querySelector("em").textContent = "Foto acquisita";
   updateAttachmentState();
+  updateChecklistState();
 });
 
 document.querySelectorAll("[data-preview-copy]").forEach((button) => {
@@ -1742,6 +1802,7 @@ async function initializeApp() {
   updateSaleTotal();
   updateCustomerSummary();
   renderPaymentCaptureCard();
+  updateChecklistState();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   renderArchiveGroups();
   renderFusionGroups();

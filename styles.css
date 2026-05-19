@@ -1581,7 +1581,7 @@ canvas {
     padding: 12px;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
   }
 
   .workspace {
@@ -1623,11 +1623,15 @@ canvas {
   }
 
   .brand-wrap {
-    width: min(100%, 320px);
+    width: auto;
+    margin: 0 auto;
   }
 
   .brand-dropdown {
+    left: 50%;
+    right: auto;
     width: min(320px, calc(100vw - 24px));
+    transform: translateX(-50%);
   }
 
   .brand-logo {
