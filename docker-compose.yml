@@ -5,7 +5,7 @@ services:
       - "3000:3000"
     environment:
       PORT: 3000
-      DATABASE_URL: postgresql://oroactive:oroactive_password@postgres:5432/oroactive
+      DATABASE_URL: postgresql://oroactive_admin:oroactive_password@postgres:5432/oroactive_db
       NODE_ENV: production
     depends_on:
       - postgres
@@ -13,9 +13,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: oroactive
+      POSTGRES_USER: oroactive_admin
       POSTGRES_PASSWORD: oroactive_password
-      POSTGRES_DB: oroactive
+      POSTGRES_DB: oroactive_db
     volumes:
       - oroactive-postgres:/var/lib/postgresql/data
 

@@ -130,7 +130,7 @@ function saveActsLocal() {
 
 async function loadSavedActs() {
   try {
-    const acts = await apiRequest("/acts");
+    const acts = await apiRequest("/atti");
     demoActs.splice(0, demoActs.length, ...acts);
     saveActsLocal();
     return;
@@ -159,7 +159,7 @@ async function loadSavedActs() {
 
 async function saveActRecord(act, method = "POST") {
   try {
-    const path = method === "PUT" ? `/acts/${encodeURIComponent(act.practiceNumber)}` : "/acts";
+    const path = method === "PUT" ? `/atti/${encodeURIComponent(act.practiceNumber)}` : "/atti";
     const saved = await apiRequest(path, {
       method,
       body: JSON.stringify(act)
@@ -180,7 +180,7 @@ async function saveActRecord(act, method = "POST") {
 
 async function deleteActRecord(practiceNumber) {
   try {
-    await apiRequest(`/acts/${encodeURIComponent(practiceNumber)}`, { method: "DELETE" });
+    await apiRequest(`/atti/${encodeURIComponent(practiceNumber)}`, { method: "DELETE" });
   } catch {
     // Fallback locale per uso offline/prototipo.
   }
@@ -907,7 +907,7 @@ async function runActSearch() {
 
   let results;
   try {
-    results = await apiRequest(`/acts?field=${encodeURIComponent(field)}&q=${encodeURIComponent(keyword)}`);
+    results = await apiRequest(`/atti/search?field=${encodeURIComponent(field)}&q=${encodeURIComponent(keyword)}`);
   } catch {
     results = demoActs.filter((act) => String(act[field]).toLowerCase().includes(keyword));
   }
@@ -1032,7 +1032,7 @@ async function updatePracticeNumber() {
 
   let nextNumber = null;
   try {
-    const data = await apiRequest(`/acts/next-number?storeCode=${encodeURIComponent(storeCode)}&year=${year}`);
+    const data = await apiRequest(`/atti/next-number?storeCode=${encodeURIComponent(storeCode)}&year=${year}`);
     nextNumber = data.nextNumber;
   } catch {
     const lastNumber = demoActs.reduce((max, act) => {

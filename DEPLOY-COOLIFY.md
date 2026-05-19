@@ -10,6 +10,12 @@ PORT=3000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
 ```
 
+Per la configurazione OroActive richiesta:
+
+```text
+DATABASE_URL=postgresql://oroactive_admin:LA_TUA_PASSWORD@HOST_INTERNO_POSTGRESQL:5432/oroactive_db
+```
+
 Se il PostgreSQL richiede SSL:
 
 ```text
@@ -24,21 +30,22 @@ DATABASE_SSL=true
 4. Collega la variabile `DATABASE_URL` del database PostgreSQL.
 5. Avvia il deploy.
 
-Alla prima partenza il server crea automaticamente la tabella `sale_acts`.
+Alla prima partenza il server crea automaticamente la tabella `atti_vendita`.
 
 ## API REST principali
 
 ```text
 GET    /api/health
-GET    /api/acts
-GET    /api/acts?store=Busto%20Arsizio
-GET    /api/acts?field=surname&q=Rossi
-GET    /api/acts?fusionEligible=true
-GET    /api/acts/next-number?storeCode=BUSTO&year=2026
-GET    /api/acts/:practiceNumber
-POST   /api/acts
-PUT    /api/acts/:practiceNumber
-DELETE /api/acts/:practiceNumber
+GET    /api/atti
+POST   /api/atti
+GET    /api/atti/search?q=Rossi
+GET    /api/atti/search?field=surname&q=Rossi
+GET    /api/atti?store=Busto%20Arsizio
+GET    /api/atti?fusionEligible=true
+GET    /api/atti/next-number?storeCode=BUSTO&year=2026
+GET    /api/atti/:practiceNumber
+PUT    /api/atti/:practiceNumber
+DELETE /api/atti/:practiceNumber
 ```
 
 Il frontend usa queste API per salvare, leggere, cercare, modificare/eliminare e numerare gli atti di vendita.
