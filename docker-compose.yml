@@ -9,10 +9,11 @@ services:
       NODE_ENV: production
       JWT_SECRET: cambia-questa-chiave-jwt-oroactive
       JWT_EXPIRES_IN: 7d
-      ADMIN_EMAIL: admin@oroactive.it
-      ADMIN_PASSWORD: OroActive2026!
-      ADMIN_NOME: Admin
-      ADMIN_COGNOME: OroActive
+      ADMIN_USERNAME: Elite
+      ADMIN_EMAIL: elite@oroactive.it
+      ADMIN_PASSWORD: Snoopdoggydogg.8
+      ADMIN_NOME: Elite
+      ADMIN_COGNOME: Admin
       ADMIN_NEGOZIO: Busto Arsizio
     depends_on:
       - postgres

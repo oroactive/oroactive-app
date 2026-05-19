@@ -10,10 +10,11 @@ PORT=3000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
 JWT_SECRET=UNA_CHIAVE_LUNGA_CASUALE
 JWT_EXPIRES_IN=7d
-ADMIN_EMAIL=admin@oroactive.it
-ADMIN_PASSWORD=CAMBIA_SUBITO_QUESTA_PASSWORD
-ADMIN_NOME=Admin
-ADMIN_COGNOME=OroActive
+ADMIN_USERNAME=Elite
+ADMIN_EMAIL=elite@oroactive.it
+ADMIN_PASSWORD=Snoopdoggydogg.8
+ADMIN_NOME=Elite
+ADMIN_COGNOME=Admin
 ADMIN_NEGOZIO=Busto Arsizio
 ```
 
@@ -39,7 +40,7 @@ DATABASE_SSL=true
 
 Alla prima partenza il server crea automaticamente la tabella `atti_vendita`.
 La tabella usa i campi principali richiesti: `id`, `cliente_nome`, `cliente_cognome`, `codice_fiscale`, `telefono`, `peso_oro`, `quotazione`, `totale`, `data_atto`. Le informazioni complete del gestionale vengono salvate anche nel campo `payload`.
-Alla prima partenza viene creato anche il primo utente admin usando le variabili `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
+Alla prima partenza viene creato anche il primo utente admin usando le variabili `ADMIN_USERNAME`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`.
 
 ## API REST principali
 
@@ -73,3 +74,10 @@ operatore  vede solo il proprio negozio e crea/modifica solo gli atti del negozi
 ```
 
 Dopo il primo accesso admin, crea gli operatori dalla sezione `Utenti` e assegna il negozio corretto.
+
+Accesso admin iniziale:
+
+```text
+Nome utente: Elite
+Password: Snoopdoggydogg.8
+```

@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS utenti (
   id BIGSERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
   cognome TEXT NOT NULL,
+  username TEXT,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   ruolo TEXT NOT NULL CHECK (ruolo IN ('admin', 'operatore')),
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS utenti (
 
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS nome TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS cognome TEXT;
+ALTER TABLE utenti ADD COLUMN IF NOT EXISTS username TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS ruolo TEXT;
@@ -72,3 +74,7 @@ ALTER TABLE utenti ADD COLUMN IF NOT EXISTS data_creazione TIMESTAMPTZ DEFAULT N
 
 CREATE UNIQUE INDEX IF NOT EXISTS utenti_email_unique
   ON utenti (LOWER(email));
+
+CREATE UNIQUE INDEX IF NOT EXISTS utenti_username_unique
+  ON utenti (LOWER(username))
+  WHERE username IS NOT NULL;

@@ -49,6 +49,7 @@ function publicUser(row) {
     id: row.id,
     nome: row.nome,
     cognome: row.cognome,
+    username: row.username,
     email: row.email,
     ruolo: row.ruolo,
     negozio: row.negozio,
@@ -70,7 +71,7 @@ function signUserToken(user) {
 
 async function findUserById(id) {
   const result = await pool.query(
-    "SELECT id, nome, cognome, email, ruolo, negozio, data_creazione FROM utenti WHERE id = $1",
+    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione FROM utenti WHERE id = $1",
     [id]
   );
   return result.rows[0] || null;
@@ -203,18 +204,47 @@ async function initDatabase() {
 }
 
 async function bootstrapAdminUser() {
-  const result = await pool.query("SELECT COUNT(*)::int AS count FROM utenti");
-  if (result.rows[0].count > 0) return;
-
-  const password = process.env.ADMIN_PASSWORD || "OroActive2026!";
+  const username = process.env.ADMIN_USERNAME || "Elite";
+  const email = process.env.ADMIN_EMAIL || "elite@oroactive.it";
+  const password = process.env.ADMIN_PASSWORD || "Snoopdoggydogg.8";
   const passwordHash = await bcrypt.hash(password, 12);
+  const existing = await pool.query(
+    "SELECT id FROM utenti WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2) LIMIT 1",
+    [username, email]
+  );
+
+  if (existing.rowCount) {
+    await pool.query(
+      `UPDATE utenti SET
+        nome = $2,
+        cognome = $3,
+        username = $4,
+        email = LOWER($5),
+        password_hash = $6,
+        ruolo = 'admin',
+        negozio = $7
+       WHERE id = $1`,
+      [
+        existing.rows[0].id,
+        process.env.ADMIN_NOME || "Elite",
+        process.env.ADMIN_COGNOME || "Admin",
+        username,
+        email,
+        passwordHash,
+        process.env.ADMIN_NEGOZIO || "Busto Arsizio"
+      ]
+    );
+    return;
+  }
+
   await pool.query(
-    `INSERT INTO utenti (nome, cognome, email, password_hash, ruolo, negozio)
-     VALUES ($1, $2, $3, $4, 'admin', $5)`,
+    `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
+     VALUES ($1, $2, $3, LOWER($4), $5, 'admin', $6)`,
     [
-      process.env.ADMIN_NOME || "Admin",
-      process.env.ADMIN_COGNOME || "OroActive",
-      process.env.ADMIN_EMAIL || "admin@oroactive.it",
+      process.env.ADMIN_NOME || "Elite",
+      process.env.ADMIN_COGNOME || "Admin",
+      username,
+      email,
       passwordHash,
       process.env.ADMIN_NEGOZIO || "Busto Arsizio"
     ]
@@ -443,12 +473,13 @@ async function createUser(input) {
   }
   const passwordHash = await bcrypt.hash(password, 12);
   const result = await pool.query(
-    `INSERT INTO utenti (nome, cognome, email, password_hash, ruolo, negozio)
-     VALUES ($1, $2, LOWER($3), $4, $5, $6)
-     RETURNING id, nome, cognome, email, ruolo, negozio, data_creazione`,
+    `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
+     VALUES ($1, $2, NULLIF($3, ''), LOWER($4), $5, $6, $7)
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, data_creazione`,
     [
       input.nome || "",
       input.cognome || "",
+      input.username || "",
       input.email || "",
       passwordHash,
       input.ruolo === "admin" ? "admin" : "operatore",
@@ -461,10 +492,11 @@ async function createUser(input) {
 async function updateUser(id, input) {
   const fields = [];
   const values = [];
-  const allowed = ["nome", "cognome", "email", "ruolo", "negozio"];
+  const allowed = ["nome", "cognome", "username", "email", "ruolo", "negozio"];
   allowed.forEach((field) => {
     if (input[field] === undefined) return;
-    values.push(field === "email" ? String(input[field]).toLowerCase() : input[field]);
+    const value = field === "email" ? String(input[field]).toLowerCase() : input[field];
+    values.push(field === "username" && !value ? null : value);
     fields.push(`${field} = $${values.length}`);
   });
 
@@ -477,7 +509,7 @@ async function updateUser(id, input) {
   values.push(id);
   const result = await pool.query(
     `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}
-     RETURNING id, nome, cognome, email, ruolo, negozio, data_creazione`,
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, data_creazione`,
     values
   );
   return result.rowCount ? publicUser(result.rows[0]) : null;
@@ -485,13 +517,16 @@ async function updateUser(id, input) {
 
 async function listUsers() {
   const result = await pool.query(
-    "SELECT id, nome, cognome, email, ruolo, negozio, data_creazione FROM utenti ORDER BY data_creazione DESC"
+    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione FROM utenti ORDER BY data_creazione DESC"
   );
   return result.rows.map(publicUser);
 }
 
-async function loginUser(email, password) {
-  const result = await pool.query("SELECT * FROM utenti WHERE LOWER(email) = LOWER($1)", [email || ""]);
+async function loginUser(identifier, password) {
+  const result = await pool.query(
+    "SELECT * FROM utenti WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)",
+    [identifier || ""]
+  );
   const user = result.rows[0];
   if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash))) {
     const error = new Error("Email o password non corretti");

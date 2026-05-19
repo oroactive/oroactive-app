@@ -364,11 +364,11 @@ function renderUsers(users) {
   }
 
   container.innerHTML = `
-    <div class="table-row head"><span>Utente</span><span>Email</span><span>Ruolo</span><span>Negozio</span><span>Azioni</span></div>
+    <div class="table-row head"><span>Utente</span><span>Accesso</span><span>Ruolo</span><span>Negozio</span><span>Azioni</span></div>
     ${users.map((user) => `
       <div class="table-row">
         <strong>${escapeHtml(user.nome)} ${escapeHtml(user.cognome)}</strong>
-        <span>${escapeHtml(user.email)}</span>
+        <span>${escapeHtml(user.username || user.email)}<br>${escapeHtml(user.email)}</span>
         <em>${escapeHtml(user.ruolo)}</em>
         <span>${escapeHtml(user.negozio)}</span>
         <div class="row-actions">
@@ -397,6 +397,7 @@ async function saveUser(event) {
   const payload = {
     nome: document.getElementById("userName").value.trim(),
     cognome: document.getElementById("userSurname").value.trim(),
+    username: document.getElementById("userUsername").value.trim(),
     email: document.getElementById("userEmail").value.trim(),
     ruolo: document.getElementById("userRole").value,
     negozio: document.getElementById("userStore").value
@@ -423,6 +424,7 @@ function editUser(id) {
   document.getElementById("userId").value = user.id;
   document.getElementById("userName").value = user.nome || "";
   document.getElementById("userSurname").value = user.cognome || "";
+  document.getElementById("userUsername").value = user.username || "";
   document.getElementById("userEmail").value = user.email || "";
   document.getElementById("userRole").value = user.ruolo || "operatore";
   document.getElementById("userStore").value = user.negozio || "Busto Arsizio";
