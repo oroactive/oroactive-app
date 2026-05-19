@@ -378,11 +378,14 @@ textarea {
 
 .primary-button,
 .ghost-button,
-.small-button {
+.small-button,
+.warning-button,
+.danger-button {
   min-height: 46px;
   border-radius: 8px;
   border: 1px solid transparent;
   padding: 0 18px;
+  font-family: inherit;
   font-weight: 800;
 }
 
@@ -402,6 +405,12 @@ textarea {
   background: #fff2e8;
   color: var(--gold-dark);
   border-color: #ffc39e;
+}
+
+.warning-button {
+  background: #ffd24a;
+  color: #17130d;
+  border-color: #e0a900;
 }
 
 .screen {
@@ -1090,6 +1099,16 @@ canvas {
   font-weight: 800;
 }
 
+.practice-archive-button,
+.practice-delete-button {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.practice-delete-button {
+  margin-top: 10px;
+}
+
 .checklist {
   display: grid;
   gap: 13px;
@@ -1348,13 +1367,25 @@ canvas {
 }
 
 .danger-button {
-  border-color: #f2b4a8 !important;
-  background: #fff1ef !important;
-  color: var(--rose) !important;
+  border-color: #b91c1c !important;
+  background: #d71920 !important;
+  color: #0b0b0a !important;
 }
 
 .danger-button:hover {
-  background: #ffe1dc !important;
+  background: #b91c1c !important;
+}
+
+#nextStep {
+  background: #16834a;
+  color: #fff;
+  border-color: #0f6f3d;
+}
+
+#nextStep.complete-practice-button {
+  background: var(--gold);
+  color: #0b0b0a;
+  border-color: var(--gold-dark);
 }
 
 .readonly-actions {

@@ -734,7 +734,9 @@ async function loadActForEdit(practiceNumber) {
   showToast(`Atto ${practiceNumber} aperto in modifica.`);
 }
 
-async function resetCurrentPractice() {
+async function resetCurrentPractice(options = {}) {
+  const preservedStoreCode = options.preserveStoreCode ? fieldValue("#storeCode") : "";
+
   document.querySelectorAll(".form-panel input").forEach((input) => {
     if (input.readOnly || input.type === "file") return;
     if (input.type === "checkbox") {
@@ -752,6 +754,10 @@ async function resetCurrentPractice() {
     select.selectedIndex = 0;
   });
 
+  if (preservedStoreCode) {
+    document.getElementById("storeCode").value = preservedStoreCode;
+  }
+
   const cededItemsTable = document.getElementById("cededItemsTable");
   cededItemsTable.querySelectorAll(".ceded-item-row").forEach((row) => row.remove());
   cededItemsTable.insertAdjacentHTML("beforeend", defaultCededItemRow());
@@ -764,7 +770,6 @@ async function resetCurrentPractice() {
   state.uploadedCaptures.clear();
   state.attachments = 0;
   state.step = 0;
-  state.annualProgressive += 1;
   state.editingPracticeNumber = null;
 
   await setPracticeMeta();
@@ -792,7 +797,7 @@ async function deleteCurrentPractice() {
     renderFusionGroups();
   }
 
-  await resetCurrentPractice();
+  await resetCurrentPractice({ preserveStoreCode: true });
   showToast("Atto in compilazione eliminato.");
 }
 
@@ -914,7 +919,10 @@ function renderStep() {
   steps.forEach((step, index) => step.classList.toggle("active", index === state.step));
   panels.forEach((panel, index) => panel.classList.toggle("active-step", index === state.step));
   document.getElementById("previousStep").disabled = state.step === 0;
-  document.getElementById("nextStep").textContent = state.step === 4 ? "Completa pratica" : "Avanti";
+  const nextStepButton = document.getElementById("nextStep");
+  const isFinalStep = state.step === 4;
+  nextStepButton.textContent = isFinalStep ? "Completa pratica" : "Avanti";
+  nextStepButton.classList.toggle("complete-practice-button", isFinalStep);
 }
 
 function updateSignatureState() {
@@ -1465,6 +1473,32 @@ function printBothCopies() {
   window.print();
 }
 
+function printCustomerCopy() {
+  const missing = validatePrintScope("customer");
+  if (missing.length) {
+    showToast(validationMessage(missing, "la copia cliente"));
+    return;
+  }
+  renderPaymentCaptureCard();
+  printPacket.innerHTML = buildPrintCopy(
+    "Copia cliente",
+    shouldPrintWeightOnCustomerCopy() ? "Peso totale autorizzato su copia cliente" : "",
+    "customer"
+  );
+  window.print();
+}
+
+function printCompanyCopy() {
+  const missing = validatePrintScope("company");
+  if (missing.length) {
+    showToast(validationMessage(missing, "la copia aziendale"));
+    return;
+  }
+  renderPaymentCaptureCard();
+  printPacket.innerHTML = buildPrintCopy("Copia aziendale interna", "Dato interno aziendale", "company");
+  window.print();
+}
+
 function showPrintPreview(scope) {
   renderPaymentCaptureCard();
   const isCompany = scope === "company";
@@ -1498,6 +1532,27 @@ async function archiveCurrentPractice() {
   await resetCurrentPractice();
   showToast(wasEditing ? "Atto di vendita modificato e salvato." : "Atto di vendita salvato e archiviato.");
   return true;
+}
+
+async function completeCurrentPractice() {
+  const missing = validatePrintScope("company");
+  if (!missing.length) return archiveCurrentPractice();
+
+  const preview = missing.slice(0, 8).join(", ");
+  const suffix = missing.length > 8 ? ` e altri ${missing.length - 8} elementi` : "";
+  const shouldSaveDraft = window.confirm(
+    `La pratica non puo essere completata. Mancano: ${preview}${suffix}. Vuoi archiviare la pratica come bozza per completarla successivamente?`
+  );
+
+  if (shouldSaveDraft) {
+    await saveCurrentDraft();
+    await resetCurrentPractice();
+    showToast("Pratica salvata come bozza. Potrai completarla da Elenco o Ricerca.");
+    return true;
+  }
+
+  showToast(validationMessage(missing, "la pratica"));
+  return false;
 }
 
 async function saveCurrentDraft() {
@@ -1557,7 +1612,7 @@ document.getElementById("nextStep").addEventListener("click", async () => {
     state.step += 1;
     renderStep();
   } else {
-    await archiveCurrentPractice();
+    await completeCurrentPractice();
   }
 });
 
@@ -1573,7 +1628,8 @@ document.getElementById("deleteCurrentPractice").addEventListener("click", delet
 document.getElementById("saveDraft").addEventListener("click", saveCurrentDraft);
 
 document.getElementById("printPractice").addEventListener("click", printBothCopies);
-document.getElementById("printBothCopiesSummary").addEventListener("click", printBothCopies);
+document.getElementById("printCustomerCopySummary").addEventListener("click", printCustomerCopy);
+document.getElementById("printCompanyCopySummary").addEventListener("click", printCompanyCopy);
 
 document.getElementById("archivePractice").addEventListener("click", archiveCurrentPractice);
 
@@ -1790,8 +1846,6 @@ document.addEventListener("change", (event) => {
 document.querySelectorAll("[data-preview-copy]").forEach((button) => {
   button.addEventListener("click", () => showPrintPreview(button.dataset.previewCopy));
 });
-
-document.getElementById("fullPdfPreview").addEventListener("click", () => showPrintPreview("company"));
 
 document.getElementById("closePreview").addEventListener("click", () => {
   previewModal.hidden = true;

@@ -9,9 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
   <title>OroActive Gestionale</title>
-  <link rel="manifest" href="manifest.webmanifest?v=20260519-5">
+  <link rel="manifest" href="manifest.webmanifest?v=20260519-14">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260519-5">
+  <link rel="stylesheet" href="styles.css?v=20260519-14">
 </head>
 <body>
   <section class="splash-screen" id="splashScreen" aria-label="Accesso OroActive">
@@ -413,22 +413,19 @@
 
               <div class="document-preview">
                 <div>
-                  <h3>Anteprima prima della stampa</h3>
+                  <h3>Anteprima di stampa</h3>
                   <p>Controlla la copia cliente e la copia aziendale interna prima di procedere con la stampa finale.</p>
                 </div>
                 <div class="preview-actions">
                   <div class="preview-action-stack">
                     <button class="ghost-button" type="button" data-preview-copy="customer">Copia cliente</button>
-                    <button class="primary-button" type="button" id="printBothCopiesSummary">Stampa cliente + azienda</button>
+                    <button class="primary-button" type="button" id="printCustomerCopySummary">Stampa Copia cliente</button>
                   </div>
-                  <button class="ghost-button" type="button" data-preview-copy="company">Copia aziendale</button>
-                  <button class="primary-button" type="button" id="archivePractice">Chiudi e archivia</button>
                 </div>
               </div>
             </div>
 
             <div class="bottom-actions">
-              <button class="danger-button" type="button" id="deleteCurrentPractice">Elimina atto</button>
               <button class="ghost-button" type="button" id="previousStep">Indietro</button>
               <button class="primary-button" type="button" id="nextStep">Avanti</button>
             </div>
@@ -439,6 +436,8 @@
               <span>Numero pratica</span>
               <strong id="sidePracticeNumber">OA-BUSTO-2026-000184</strong>
               <p>Bozza salvata automaticamente</p>
+              <button class="warning-button practice-archive-button" type="button" id="archivePractice">Chiudi e archivia</button>
+              <button class="danger-button practice-delete-button" type="button" id="deleteCurrentPractice">Elimina atto</button>
             </div>
 
             <div class="checklist">
@@ -453,7 +452,10 @@
             <div class="print-box">
               <h3>Stampa</h3>
               <p>Il PDF finale viene prodotto in duplice copia: cliente e negozio.</p>
-                  <button type="button" class="small-button" id="fullPdfPreview">Anteprima PDF</button>
+              <div class="preview-action-stack">
+                <button class="ghost-button" type="button" data-preview-copy="company">Copia aziendale</button>
+                <button class="primary-button" type="button" id="printCompanyCopySummary">Stampa Copia aziendale</button>
+              </div>
             </div>
           </aside>
         </div>
@@ -532,6 +534,6 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260519-5"></script>
+  <script src="app.js?v=20260519-14"></script>
 </body>
 </html>
