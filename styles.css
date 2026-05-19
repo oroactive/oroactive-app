@@ -1032,6 +1032,11 @@ canvas {
   justify-content: flex-end;
 }
 
+.preview-action-stack {
+  display: grid;
+  gap: 8px;
+}
+
 .document-preview h3,
 .document-preview p,
 .checklist h3,

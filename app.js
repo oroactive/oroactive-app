@@ -1455,6 +1455,16 @@ function preparePrintPacket() {
   ].join("");
 }
 
+function printBothCopies() {
+  const missing = validatePrintScope("company");
+  if (missing.length) {
+    showToast(validationMessage(missing, "le copie cliente e aziendale"));
+    return;
+  }
+  preparePrintPacket();
+  window.print();
+}
+
 function showPrintPreview(scope) {
   renderPaymentCaptureCard();
   const isCompany = scope === "company";
@@ -1562,15 +1572,8 @@ document.getElementById("deleteCurrentPractice").addEventListener("click", delet
 
 document.getElementById("saveDraft").addEventListener("click", saveCurrentDraft);
 
-document.getElementById("printPractice").addEventListener("click", () => {
-  const missing = validatePrintScope("company");
-  if (missing.length) {
-    showToast(validationMessage(missing, "le copie cliente e aziendale"));
-    return;
-  }
-  preparePrintPacket();
-  window.print();
-});
+document.getElementById("printPractice").addEventListener("click", printBothCopies);
+document.getElementById("printBothCopiesSummary").addEventListener("click", printBothCopies);
 
 document.getElementById("archivePractice").addEventListener("click", archiveCurrentPractice);
 
