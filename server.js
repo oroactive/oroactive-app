@@ -62,6 +62,7 @@ function publicUser(row) {
     email: row.email,
     ruolo: normalizeRole(row.ruolo),
     negozio: roleSeesAllStores(row.ruolo) ? "Tutti" : row.negozio,
+    hasFaceId: Boolean(row.face_id_credential),
     data_creazione: row.data_creazione,
     last_seen: row.last_seen,
     online,
@@ -113,7 +114,7 @@ function signUserToken(user) {
 
 async function findUserById(id) {
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen FROM utenti WHERE id = $1",
+    "SELECT id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen FROM utenti WHERE id = $1",
     [id]
   );
   return result.rows[0] || null;
@@ -603,7 +604,7 @@ async function createUser(input, actor) {
   const result = await pool.query(
     `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
      VALUES ($1, $2, NULLIF($3, ''), LOWER($4), $5, $6, $7)
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen`,
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen`,
     [
       input.nome || "",
       input.cognome || "",
@@ -662,7 +663,7 @@ async function updateUser(id, input, actor) {
   values.push(id);
   const result = await pool.query(
     `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen`,
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen`,
     values
   );
   return result.rowCount ? publicUser(result.rows[0]) : null;
@@ -670,7 +671,7 @@ async function updateUser(id, input, actor) {
 
 async function listUsers() {
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen FROM utenti WHERE ruolo <> 'founder' ORDER BY data_creazione DESC"
+    "SELECT id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen FROM utenti WHERE ruolo <> 'founder' ORDER BY data_creazione DESC"
   );
   return result.rows.map(publicUser);
 }
@@ -687,7 +688,7 @@ async function listUsersForActor(actor) {
     where += " AND negozio = $2";
   }
   const result = await pool.query(
-    `SELECT id, nome, cognome, username, email, ruolo, negozio, data_creazione, last_seen
+    `SELECT id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen
      FROM utenti ${where}
      ORDER BY data_creazione DESC`,
     values
@@ -730,6 +731,38 @@ async function loginUser(identifier, password) {
   return { token: signUserToken(safeUser), user: safeUser };
 }
 
+async function registerFaceId(user, credentialId) {
+  const credential = String(credentialId || "").trim();
+  if (!credential) {
+    const error = new Error("Credenziale Face ID non valida");
+    error.status = 400;
+    throw error;
+  }
+  const result = await pool.query(
+    `UPDATE utenti SET face_id_credential = $2 WHERE id = $1
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen`,
+    [user.id, credential]
+  );
+  return publicUser(result.rows[0]);
+}
+
+async function loginWithFaceId(identifier, credentialId) {
+  const result = await pool.query(
+    "SELECT * FROM utenti WHERE LOWER(username) = LOWER($1) AND face_id_credential = $2",
+    [identifier || "", String(credentialId || "")]
+  );
+  const user = result.rows[0];
+  if (!user) {
+    const error = new Error("Face ID non registrato per questo utente");
+    error.status = 401;
+    throw error;
+  }
+  await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
+  user.last_seen = new Date();
+  const safeUser = publicUser(user);
+  return { token: signUserToken(safeUser), user: safeUser };
+}
+
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true, service: "oroactive-gestionale" });
 });
@@ -737,6 +770,14 @@ app.get("/api/health", (_request, response) => {
 app.post("/api/auth/login", async (request, response, next) => {
   try {
     response.json(await loginUser(request.body.username, request.body.password));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/faceid/login", async (request, response, next) => {
+  try {
+    response.json(await loginWithFaceId(request.body.username, request.body.credentialId));
   } catch (error) {
     next(error);
   }
@@ -751,6 +792,14 @@ app.get("/api/auth/me", authenticate, (request, response) => {
 });
 
 app.use("/api", authenticate);
+
+app.post("/api/auth/faceid/register", async (request, response, next) => {
+  try {
+    response.json({ user: await registerFaceId(request.user, request.body.credentialId) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.get("/api/utenti", requireAdmin, async (_request, response, next) => {
   try {

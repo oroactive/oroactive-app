@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS utenti (
   password_hash TEXT NOT NULL,
   ruolo TEXT NOT NULL CHECK (ruolo IN ('founder', 'responsabile', 'commesso', 'aiuto_commesso')),
   negozio TEXT NOT NULL DEFAULT 'Busto Arsizio',
+  face_id_credential TEXT,
   data_creazione TIMESTAMPTZ DEFAULT NOW(),
   last_seen TIMESTAMPTZ
 );
@@ -71,6 +72,7 @@ ALTER TABLE utenti ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS ruolo TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS negozio TEXT DEFAULT 'Busto Arsizio';
+ALTER TABLE utenti ADD COLUMN IF NOT EXISTS face_id_credential TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS data_creazione TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
 

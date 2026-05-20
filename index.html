@@ -22,6 +22,7 @@
       <label>Nome utente <input id="loginUsername" type="text" autocomplete="username" required></label>
       <label>Password <input id="loginPassword" type="password" autocomplete="current-password" required></label>
       <button class="primary-button" type="submit">Accedi</button>
+      <button class="ghost-button" type="button" id="faceIdLoginButton">Accedi con Face ID</button>
       <p class="login-message" id="loginMessage"></p>
     </form>
   </section>
@@ -70,6 +71,7 @@
         <span>Accesso</span>
         <strong id="operatorStoreName">Negozio Busto Arsizio</strong>
         <small id="loggedUserName"></small>
+        <button class="faceid-button" type="button" id="registerFaceIdButton">Registra Face ID</button>
         <button class="logout-button" type="button" id="logoutButton">Logout</button>
       </div>
     </aside>
@@ -520,6 +522,14 @@
             <h2>Giacenza</h2>
             <p class="muted">Materiale prezioso in giacenza e calendario fusioni, suddiviso per negozio.</p>
           </div>
+          <label>Negozio
+            <select id="fusionStoreFilter">
+              <option>Tutti</option>
+              <option>Busto Arsizio</option>
+              <option>Cassano Magnago</option>
+              <option>Legnano</option>
+            </select>
+          </label>
         </div>
         <div class="fusion-groups" id="fusionGroups" aria-live="polite"></div>
       </section>
@@ -576,6 +586,6 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260520-18"></script>
+  <script src="app.js?v=20260520-19"></script>
 </body>
 </html>

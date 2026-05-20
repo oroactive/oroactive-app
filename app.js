@@ -35,6 +35,8 @@ const loginScreen = document.getElementById("loginScreen");
 const loginForm = document.getElementById("loginForm");
 const loginMessage = document.getElementById("loginMessage");
 const logoutButton = document.getElementById("logoutButton");
+const faceIdLoginButton = document.getElementById("faceIdLoginButton");
+const registerFaceIdButton = document.getElementById("registerFaceIdButton");
 const loggedUserName = document.getElementById("loggedUserName");
 const sessionUsername = document.getElementById("sessionUsername");
 const appShell = document.querySelector(".app-shell");
@@ -344,6 +346,7 @@ function applyRolePermissions() {
 
   const storeCode = document.getElementById("storeCode");
   const archiveStore = document.getElementById("archiveStoreFilter");
+  const fusionStore = document.getElementById("fusionStoreFilter");
   if (!userSeesAllStores()) {
     const code = currentUserStoreCode();
     if (storeCode) {
@@ -354,9 +357,14 @@ function applyRolePermissions() {
       archiveStore.value = state.currentUser.negozio;
       archiveStore.disabled = true;
     }
+    if (fusionStore) {
+      fusionStore.value = state.currentUser.negozio;
+      fusionStore.disabled = true;
+    }
   } else {
     if (storeCode) storeCode.disabled = false;
     if (archiveStore) archiveStore.disabled = false;
+    if (fusionStore) fusionStore.disabled = false;
   }
 
   if (loggedUserName && state.currentUser) {
@@ -432,6 +440,110 @@ async function handleLogin(event) {
     await startAuthenticatedApp();
   } catch (error) {
     loginMessage.textContent = error.message || "Accesso non riuscito.";
+  }
+}
+
+function bytesToBase64Url(bytes) {
+  const binary = String.fromCharCode(...new Uint8Array(bytes));
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlToBytes(value) {
+  const padded = `${value}${"=".repeat((4 - (value.length % 4)) % 4)}`;
+  const binary = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function randomChallenge() {
+  const challenge = new Uint8Array(32);
+  crypto.getRandomValues(challenge);
+  return challenge;
+}
+
+function webAuthnAvailable() {
+  return window.PublicKeyCredential && navigator.credentials && window.isSecureContext;
+}
+
+async function registerFaceId() {
+  if (!state.currentUser) return;
+  if (!webAuthnAvailable()) {
+    showToast("Face ID richiede HTTPS e un dispositivo compatibile.");
+    return;
+  }
+
+  try {
+    const userId = new TextEncoder().encode(String(state.currentUser.id || displayUsername(state.currentUser)));
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge: randomChallenge(),
+        rp: { name: "OroActive Gestionale" },
+        user: {
+          id: userId,
+          name: displayUsername(state.currentUser),
+          displayName: displayUsername(state.currentUser)
+        },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -257 }
+        ],
+        authenticatorSelection: {
+          userVerification: "required",
+          residentKey: "preferred"
+        },
+        timeout: 60000
+      }
+    });
+    const credentialId = bytesToBase64Url(credential.rawId);
+    const data = await apiRequest("/auth/faceid/register", {
+      method: "POST",
+      body: JSON.stringify({ credentialId })
+    });
+    state.currentUser = data.user;
+    localStorage.setItem("oroactive-faceid-username", displayUsername(state.currentUser));
+    localStorage.setItem("oroactive-faceid-credential", credentialId);
+    showToast("Face ID registrato su questo dispositivo.");
+  } catch (error) {
+    showToast(error.message || "Registrazione Face ID non completata.");
+  }
+}
+
+async function loginWithFaceId() {
+  if (!webAuthnAvailable()) {
+    loginMessage.textContent = "Face ID richiede HTTPS e un dispositivo compatibile.";
+    return;
+  }
+  const username = document.getElementById("loginUsername").value.trim() || localStorage.getItem("oroactive-faceid-username") || "";
+  const storedCredential = localStorage.getItem("oroactive-faceid-credential") || "";
+  if (!username || !storedCredential) {
+    loginMessage.textContent = "Prima accedi con password e registra il Face ID su questo dispositivo.";
+    return;
+  }
+
+  try {
+    const credential = await navigator.credentials.get({
+      publicKey: {
+        challenge: randomChallenge(),
+        allowCredentials: [{
+          id: base64UrlToBytes(storedCredential),
+          type: "public-key"
+        }],
+        userVerification: "required",
+        timeout: 60000
+      }
+    });
+    const credentialId = bytesToBase64Url(credential.rawId);
+    const data = await apiRequest("/auth/faceid/login", {
+      method: "POST",
+      body: JSON.stringify({ username, credentialId })
+    });
+    state.authToken = data.token;
+    state.currentUser = data.user;
+    localStorage.setItem("oroactive-auth-token", data.token);
+    localStorage.setItem("oroactive-faceid-username", username);
+    localStorage.setItem("oroactive-faceid-credential", credentialId);
+    await startAuthenticatedApp();
+  } catch (error) {
+    loginMessage.textContent = error.message || "Accesso Face ID non riuscito.";
   }
 }
 
@@ -713,38 +825,62 @@ function scoreBarMarkup(user) {
   const penaltyText = normalizeRole(user?.ruolo) === "responsabile" && score.negative
     ? ` - ${score.negative} flag negativi team`
     : "";
+  const objectiveMarkup = isFounder()
+    ? `<button class="score-goal-button" type="button" data-goal-message="${escapeHtml(String(user.id))}">${escapeHtml(levelText)}</button>`
+    : `<em>${escapeHtml(levelText)}</em>`;
   return `
     <div class="score-wrap">
       <div class="score-bar" aria-label="Punteggio operatore">
         <span style="width:${score.percent.toFixed(1)}%"></span>
       </div>
       <small>${escapeHtml(unlockText)} - ${escapeHtml(score.positive)} flag positivi${escapeHtml(penaltyText)}</small>
-      <em>${escapeHtml(levelText)}</em>
+      ${objectiveMarkup}
     </div>
   `;
 }
 
-function maybeShowLevelUnlockMessage() {
-  if (!state.currentUser || !previewModal || !previewBody || !previewTitle) return;
-  const role = normalizeRole(state.currentUser.ruolo);
+function showLevelMessageForUser(user, options = {}) {
+  if (!user || !previewModal || !previewBody || !previewTitle) return false;
+  const role = normalizeRole(user.ruolo);
   const message = LEVEL_UNLOCK_MESSAGES[role];
-  if (!message) return;
+  if (!message) return false;
 
-  const score = scoreProgress(state.currentUser);
-  if (score.points < score.target.points) return;
+  const score = scoreProgress(user);
+  if (!options.previewOnly && score.points < score.target.points) return false;
 
-  const storageKey = `oroactive-level-unlock-${state.currentUser.id || displayUsername(state.currentUser)}-${role}-${score.target.points}`;
-  if (localStorage.getItem(storageKey)) return;
-  localStorage.setItem(storageKey, "shown");
+  if (!options.previewOnly) {
+    const storageKey = `oroactive-level-unlock-${user.id || displayUsername(user)}-${role}-${score.target.points}`;
+    if (localStorage.getItem(storageKey)) return false;
+    localStorage.setItem(storageKey, "shown");
+  }
 
   previewTitle.textContent = message.title;
   previewBody.innerHTML = `
     <section class="level-unlock-message">
       <h3>${escapeHtml(message.title)}</h3>
+      ${options.previewOnly ? `<p><strong>Anteprima Elite obiettivo ${escapeHtml(score.target.points)} punti.</strong></p>` : ""}
       ${message.body.split("\n\n").map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("")}
     </section>
   `;
   previewModal.hidden = false;
+  return true;
+}
+
+function maybeShowLevelUnlockMessage() {
+  showLevelMessageForUser(state.currentUser);
+}
+
+function previewGoalMessage(userId) {
+  if (!isFounder()) {
+    showToast("Anteprima riservata a Elite.");
+    return;
+  }
+  const user = (state.users || []).find((item) => String(item.id) === String(userId));
+  if (!user) {
+    showToast("Utente non trovato.");
+    return;
+  }
+  showLevelMessageForUser(user, { previewOnly: true });
 }
 
 function actWeightAmount(act) {
@@ -959,33 +1095,91 @@ function printableAttachmentRows(keys, uploadedKeys, attachments = new Map()) {
   return keys.map((key) => {
     const attachment = attachments.get(key);
     const present = uploadedKeys.has(key) || Boolean(attachment);
-    const isImage = attachment?.dataUrl?.startsWith("data:image/");
+    const imageSource = attachment?.dataUrl || attachment?.url || "";
+    const isImage = imageSource.startsWith("data:image/");
     return `
       <div class="print-attachment ${isImage ? "with-image" : ""}">
         <span>${present ? "Allegato presente" : "Allegato mancante"}</span>
         <strong>${escapeHtml(attachmentLabel(key))}</strong>
-        ${isImage ? `<img src="${attachment.dataUrl}" alt="${escapeHtml(attachmentLabel(key))}">` : ""}
+        ${isImage ? `<img src="${imageSource}" alt="${escapeHtml(attachmentLabel(key))}">` : ""}
       </div>
     `;
   }).join("");
 }
 
-function fullActPrintHtml(act, heading = "Atto di vendita - Fascicolo aziendale") {
+function actAttachmentPage(act, heading) {
   const attachments = actAttachmentMap(act);
-  const attachmentPage = attachments.size ? `
-    <section class="print-copy company-copy readonly-copy">
-      <h1>${escapeHtml(heading)} - Allegati fotografici</h1>
-      <div class="print-attachments full-attachments">${printableAttachmentRows([...attachments.keys()], new Set(act.captures || []), attachments)}</div>
-    </section>` : "";
-  if (act.readOnlyHtml) {
-    return attachmentPage && !act.readOnlyHtml.includes("data:image/") ? `${act.readOnlyHtml}${attachmentPage}` : act.readOnlyHtml;
-  }
-  const fallback = buildArchivedActFallback(act).replace(
-    "<h1>Atto di vendita OroActive - Anteprima aziendale sola lettura</h1>",
-    `<h1>${escapeHtml(heading)}</h1>`
-  );
-  if (!attachments.size) return fallback;
-  return `${fallback}${attachmentPage}`;
+  const attachmentKeys = attachments.size ? [...attachments.keys()] : (act.captures || []);
+  return `
+    <section class="print-copy company-copy readonly-copy attachment-copy">
+      <h1>${escapeHtml(heading)} - Foto documenti e allegati</h1>
+      <p class="print-legal">Foto documenti cliente, foto preziosi e contabile pagamento riferite all'atto di vendita.</p>
+      <div class="print-attachments full-attachments">${printableAttachmentRows(attachmentKeys, new Set(act.captures || []), attachments)}</div>
+    </section>
+  `;
+}
+
+function actCompanyMainPage(act, heading) {
+  const missing = "Dato non inserito";
+  const materials = actMaterials(act);
+  const itemRows = (Array.isArray(act.items) && act.items.length ? act.items : materials).map((item, index) => `
+    <div class="print-item">
+      <strong>${index + 1}</strong>
+      <div><span>Descrizione</span>${escapeHtml(item.description || `Oggetto prezioso in ${(item.metal || "").toLowerCase()}`)}</div>
+      <div><span>Metallo</span>${escapeHtml(item.metal || missing)}</div>
+      <div><span>Titolo</span>${escapeHtml(item.title || missing)}</div>
+    </div>
+  `).join("");
+  const weightRows = materials.map((material) => `<li>Peso totale oggetti preziosi in ${escapeHtml(material.metal.toLowerCase())}: ${escapeHtml(material.weight)} gr</li>`).join("");
+
+  return `
+    <section class="print-copy company-copy readonly-copy act-main-page">
+      <h1>${escapeHtml(heading)}</h1>
+      <div class="print-meta">
+        <div class="print-field"><span>Atto n.</span>${escapeHtml(act.practiceNumber || missing)}</div>
+        <div class="print-field"><span>Data</span>${escapeHtml(act.date || missing)}</div>
+        <div class="print-field"><span>Ora</span>${escapeHtml(act.time || missing)}</div>
+        <div class="print-field"><span>Negozio</span>${escapeHtml(act.store || missing)}</div>
+      </div>
+
+      <h2>Sezione cliente</h2>
+      <div class="print-grid">
+        <div class="print-field"><span>Nome</span>${escapeHtml(act.name || missing)}</div>
+        <div class="print-field"><span>Cognome</span>${escapeHtml(act.surname || missing)}</div>
+        <div class="print-field"><span>Codice fiscale</span>${escapeHtml(act.fiscalCode || missing)}</div>
+        <div class="print-field"><span>Telefono</span>${escapeHtml(act.phone || missing)}</div>
+        <div class="print-field"><span>Data nascita</span>${escapeHtml(act.birthDate || missing)}</div>
+        <div class="print-field"><span>Luogo nascita</span>${escapeHtml(act.birthPlace || missing)}</div>
+        <div class="print-field"><span>Provincia nascita</span>${escapeHtml(act.birthProvince || missing)}</div>
+        <div class="print-field"><span>Residenza</span>${escapeHtml(act.address || missing)}</div>
+        <div class="print-field"><span>Provincia residenza</span>${escapeHtml(act.residenceProvince || missing)}</div>
+        <div class="print-field"><span>Documento</span>${escapeHtml(act.documentType || missing)}</div>
+        <div class="print-field"><span>Numero documento</span>${escapeHtml(act.documentNumber || missing)}</div>
+        <div class="print-field"><span>Scadenza documento</span>${escapeHtml(act.documentExpiry || missing)}</div>
+        <div class="print-field"><span>Professione</span>${escapeHtml(act.profession || missing)}</div>
+      </div>
+
+      <h2>Sezione vendita</h2>
+      <div class="print-grid">
+        <div class="print-field"><span>Metodo pagamento</span>${escapeHtml(act.paymentMethod || missing)}</div>
+        <div class="print-field"><span>Totale corrisposto</span>${escapeHtml(formatEuro(Number(act.amount || 0)))}</div>
+        ${materialAmountsBlockFromRows(act.materialAmounts || [])}
+        <div class="print-field"><span>Operatore</span>${escapeHtml(act.operatorUsername || act.operatorName || missing)}</div>
+      </div>
+
+      <h2>Oggetti preziosi</h2>
+      <div class="print-items">${itemRows}</div>
+      <div class="print-internal">
+        <span>Dato interno aziendale</span>
+        <strong>Peso totale oggetti preziosi</strong>
+        <ul>${weightRows}</ul>
+      </div>
+    </section>
+  `;
+}
+
+function fullActPrintHtml(act, heading = "Atto di vendita - Fascicolo aziendale") {
+  return `${actCompanyMainPage(act, heading)}${actAttachmentPage(act, heading)}`;
 }
 
 function buildActsPdfPacket(title, subtitle, acts) {
@@ -2015,6 +2209,7 @@ function fusionActRows(acts, options = {}) {
 function renderFusionGroups() {
   const container = document.getElementById("fusionGroups");
   if (!container) return;
+  const selectedStore = document.getElementById("fusionStoreFilter")?.value || "Tutti";
 
   const acts = demoActs
     .map((act) => ({ ...act, daysElapsed: daysFromPurchase(act.date), fusionDate: addDays(act.date, 10) }))
@@ -2033,6 +2228,7 @@ function renderFusionGroups() {
 
   const stores = ["Busto Arsizio", "Cassano Magnago", "Legnano"];
   container.innerHTML = stores
+    .filter((store) => selectedStore === "Tutti" || store === selectedStore)
     .filter((store) => grouped[store]?.length)
     .map((store) => {
       const storeActs = grouped[store];
@@ -2088,7 +2284,7 @@ function renderFusionGroups() {
           </div>
         </section>
       `;
-    }).join("");
+    }).join("") || '<div class="empty-state">Nessuna giacenza disponibile per il negozio selezionato.</div>';
 }
 
 function clearActSearch() {
@@ -2924,10 +3120,17 @@ navItems.forEach((item) => {
 });
 
 loginForm.addEventListener("submit", handleLogin);
+faceIdLoginButton.addEventListener("click", loginWithFaceId);
 logoutButton.addEventListener("click", handleLogout);
+registerFaceIdButton.addEventListener("click", registerFaceId);
 document.getElementById("userForm").addEventListener("submit", saveUser);
 document.getElementById("resetUserForm").addEventListener("click", resetUserForm);
 document.getElementById("usersList").addEventListener("click", (event) => {
+  const goalButton = event.target.closest("[data-goal-message]");
+  if (goalButton) {
+    previewGoalMessage(goalButton.dataset.goalMessage);
+    return;
+  }
   const button = event.target.closest("[data-edit-user]");
   if (button) editUser(button.dataset.editUser);
 });
@@ -3071,6 +3274,7 @@ document.getElementById("practiceDate").addEventListener("change", async () => {
 });
 
 document.getElementById("archiveStoreFilter").addEventListener("change", renderArchiveGroups);
+document.getElementById("fusionStoreFilter").addEventListener("change", renderFusionGroups);
 
 document.getElementById("archiveGroups").addEventListener("click", (event) => {
   const feedbackButton = event.target.closest("[data-quality-feedback]");
