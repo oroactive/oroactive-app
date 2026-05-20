@@ -843,6 +843,18 @@ function statusClass(status = "") {
   return "";
 }
 
+function qualityReviewLabel(review) {
+  if (review?.status === "positive") return "Flag positivo";
+  if (review?.status === "negative") return "Flag negativo";
+  return "Non flaggato";
+}
+
+function qualityReviewClass(review) {
+  if (review?.status === "positive") return "quality-positive";
+  if (review?.status === "negative") return "quality-negative";
+  return "quality-pending";
+}
+
 function dateParts(date) {
   const dateObject = parseActDate(date);
   return {
@@ -901,7 +913,7 @@ function fullActPrintHtml(act, heading = "Atto di vendita - Fascicolo aziendale"
       <h1>${escapeHtml(heading)} - Allegati fotografici</h1>
       <div class="print-attachments full-attachments">${printableAttachmentRows([...attachments.keys()], new Set(act.captures || []), attachments)}</div>
     </section>` : "";
-  if (act.readOnlyHtml) return `${act.readOnlyHtml}${attachmentPage}`;
+  if (act.readOnlyHtml) return act.readOnlyHtml.includes("full-attachments") ? act.readOnlyHtml : `${act.readOnlyHtml}${attachmentPage}`;
   const fallback = buildArchivedActFallback(act).replace(
     "<h1>Atto di vendita OroActive - Anteprima aziendale sola lettura</h1>",
     `<h1>${escapeHtml(heading)}</h1>`
@@ -1052,15 +1064,16 @@ function renderArchiveGroups() {
         <div class="archive-day">
           <h4>Giorno ${escapeHtml(day)}</h4>
           ${archiveTotalsMarkup(archiveTotals(dayActs), "Giornaliero")}
-          <div class="archive-table">
-            <div class="table-row head"><span>Pratica</span><span>Cliente</span><span>Operatore</span><span>Data</span><span>Stato</span><span>Azioni</span></div>
+          <div class="archive-table acts-table">
+            <div class="table-row head"><span>Pratica</span><span>Cliente</span><span>Operatore</span><span>Data</span><span>Stato</span><span>Controllo</span><span>Azioni</span></div>
             ${dayActs.map((act) => `
-              <div class="table-row">
+              <div class="table-row ${qualityReviewClass(act.qualityReview)}-row">
                 <span>${escapeHtml(act.practiceNumber)}</span>
                 <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
                 <span>${escapeHtml(act.operatorUsername || act.operatorName || "Dato non inserito")}</span>
                 <span>${escapeHtml(act.date)}</span>
                 <em class="${statusClass(act.status)}">${escapeHtml(normalizeWorkflowStatus(act.status))}</em>
+                <em class="quality-review-badge ${qualityReviewClass(act.qualityReview)}">${escapeHtml(qualityReviewLabel(act.qualityReview))}</em>
                 <div class="row-actions">
                   <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
                   <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
@@ -2565,6 +2578,17 @@ function attachmentRows() {
   return printableAttachmentRows(requiredCaptureKeys(), state.uploadedCaptures, state.captureFiles);
 }
 
+function companyAttachmentPrintPage() {
+  const rows = attachmentRows();
+  return `
+    <section class="print-copy company-copy attachment-copy">
+      <h1>Allegati fotografici atto di vendita</h1>
+      <p class="print-legal">Foto documenti cliente, foto preziosi e contabile pagamento allegati alla copia aziendale interna.</p>
+      <div class="print-attachments full-attachments">${rows}</div>
+    </section>
+  `;
+}
+
 function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
   const items = [...document.querySelectorAll(".ceded-item-row")].map((row, index) => {
     const description = row.querySelector("input")?.value || "";
@@ -2582,11 +2606,9 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
   const internalWeight = (weightLabel || includeWeight) ? buildWeightBlock(weightLabel) : "";
   const internalSections = scope === "company" ? `
       ${internalWeight}
-      <h2>Allegati pratica</h2>
-      <div class="print-attachments">${attachmentRows()}</div>
   ` : internalWeight;
 
-  return `
+  const mainCopy = `
     <section class="print-copy ${scope === "company" ? "company-copy" : "customer-copy"}">
       <h1>Atto di vendita OroActive - ${title}</h1>
       <div class="print-meta">
@@ -2630,6 +2652,8 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
       <div class="print-signatures">${signatureRows()}</div>
     </section>
   `;
+
+  return scope === "company" ? `${mainCopy}${companyAttachmentPrintPage()}` : mainCopy;
 }
 
 function preparePrintPacket() {

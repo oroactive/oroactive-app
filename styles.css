@@ -1708,6 +1708,18 @@ canvas {
   grid-template-columns: 1.15fr 1fr 0.85fr 0.7fr 0.65fr 0.6fr;
 }
 
+.acts-table .table-row {
+  grid-template-columns: 1fr 1fr 0.85fr 0.7fr 0.72fr 0.78fr 0.7fr;
+}
+
+.acts-table .quality-positive-row {
+  background: #f0fbf4;
+}
+
+.acts-table .quality-negative-row {
+  background: #fff8dc;
+}
+
 .users-table .table-row {
   grid-template-columns: 1fr 1.05fr 0.75fr 0.75fr 0.62fr 1.15fr 0.7fr;
 }
@@ -1852,6 +1864,10 @@ canvas {
   grid-template-columns: 1fr 1fr 0.7fr;
 }
 
+.ddt-copy {
+  font-size: 12px;
+}
+
 .ddt-header {
   display: grid;
   grid-template-columns: 86px 1fr;
@@ -1904,6 +1920,15 @@ canvas {
   margin-top: 28px;
 }
 
+.ddt-copy .archive-export-table,
+.ddt-copy .print-grid,
+.ddt-copy .print-meta,
+.ddt-recipient,
+.ddt-signatures {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 .table-row.head {
   border-top: 0;
   background: #fff2e8;
@@ -1931,6 +1956,26 @@ canvas {
 .archive-export-row em.status-archived {
   background: #ffd24a;
   color: #0b0b0a;
+}
+
+.table-row em.quality-review-badge {
+  justify-self: start;
+  font-weight: 950;
+}
+
+.table-row em.quality-positive {
+  background: #dff7e8;
+  color: #0b0b0a;
+}
+
+.table-row em.quality-negative {
+  background: #fff1b8;
+  color: #0b0b0a;
+}
+
+.table-row em.quality-pending {
+  background: #f1ede6;
+  color: var(--soft-ink);
 }
 
 .table-row em.done {
@@ -2112,6 +2157,16 @@ canvas {
   gap: 8px;
 }
 
+.preview-body .print-attachments.full-attachments {
+  grid-template-columns: 1fr;
+}
+
+.preview-body .print-attachments.full-attachments .print-attachment img {
+  width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+}
+
 .preview-body .print-field,
 .preview-body .print-item,
 .preview-body .print-internal,
@@ -2249,6 +2304,7 @@ canvas {
   .archive-totals,
   .table-row,
   .search-table .table-row,
+  .acts-table .table-row,
   .fusion-table .table-row,
   .stats-table .table-row {
     grid-template-columns: 1fr;
@@ -2468,6 +2524,11 @@ canvas {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
   body {
     background: #fff;
   }
@@ -2489,6 +2550,12 @@ canvas {
     page-break-after: always;
   }
 
+  .print-copy.ddt-copy {
+    min-height: auto;
+    padding: 0;
+    font-size: 11px;
+  }
+
   .print-copy:last-child {
     page-break-after: auto;
   }
@@ -2501,6 +2568,16 @@ canvas {
   .print-copy h2 {
     margin: 18px 0 8px;
     font-size: 15px;
+  }
+
+  .ddt-copy h1 {
+    font-size: 19px;
+    margin: 0 0 5px;
+  }
+
+  .ddt-copy h2 {
+    margin: 9px 0 5px;
+    font-size: 12px;
   }
 
   .print-meta,
@@ -2554,6 +2631,11 @@ canvas {
     padding-left: 18px;
   }
 
+  .print-copy.attachment-copy {
+    min-height: auto;
+    padding: 10mm;
+  }
+
   .print-signatures,
   .print-attachments {
     display: grid;
@@ -2570,7 +2652,7 @@ canvas {
   }
 
   .print-attachment.with-image {
-    min-height: 90mm;
+    min-height: auto;
   }
 
   .print-attachment img {
@@ -2584,7 +2666,42 @@ canvas {
   }
 
   .print-attachments.full-attachments {
-    grid-template-columns: repeat(2, 1fr);
+    display: block;
+  }
+
+  .print-attachments.full-attachments .print-attachment {
+    display: block;
+    min-height: auto;
+    margin: 0 0 8mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-attachments.full-attachments .print-attachment img {
+    max-height: 210mm;
+    object-fit: contain;
+  }
+
+  .ddt-copy .ddt-header {
+    grid-template-columns: 58px 1fr;
+    gap: 9px;
+    margin-bottom: 9px;
+  }
+
+  .ddt-copy .ddt-header img {
+    width: 52px;
+    height: 52px;
+  }
+
+  .ddt-copy .ddt-recipient,
+  .ddt-copy .archive-export-row,
+  .ddt-copy .print-field {
+    padding: 5px;
+  }
+
+  .ddt-copy .ddt-signatures {
+    margin-top: 12px;
+    gap: 10px;
   }
 
   .print-legal {
