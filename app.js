@@ -13,7 +13,8 @@ const state = {
   syncTimer: null,
   cashLimitWarningShown: false,
   bullionVaultPrices: {},
-  lastActCaptureAttachments: []
+  lastActCaptureAttachments: [],
+  loadedSignatureImages: []
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -1197,6 +1198,29 @@ function buildActsPdfPacket(title, subtitle, acts) {
   `;
 }
 
+async function requestPdf(path, payload, filename) {
+  const headers = { "Content-Type": "application/json" };
+  if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
+  const response = await fetch(`${apiBase}${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || "PDF non generato.");
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
 function parseActDate(date) {
   if (date.includes("-")) {
     const [year, month, day] = date.split("-");
@@ -1264,6 +1288,7 @@ function currentActSnapshot(status = "Archiviata") {
     captureAttachments,
     qualityReview: currentQualityReview(),
     signatures: [...state.signatures],
+    signatureImages: signatureImages(),
     captures,
     status: normalizeWorkflowStatus(status)
   };
@@ -1396,7 +1421,7 @@ function exportArchiveDay(date) {
   window.print();
 }
 
-function exportDailySearchPdf() {
+async function exportDailySearchPdf() {
   const results = archiveVisibleActs();
 
   if (!results.length) {
@@ -1413,15 +1438,18 @@ function exportDailySearchPdf() {
   const stores = [...new Set(results.map((act) => act.store))];
   const storeLabel = stores.length === 1 ? stores[0] : "Tutti i negozi";
   const dayActs = results.sort((first, second) => first.practiceNumber.localeCompare(second.practiceNumber));
-  printPacket.innerHTML = buildActsPdfPacket(
-    "Esportazione PDF giornaliera",
-    `${storeLabel} - ${dates[0]}`,
-    dayActs
-  );
-  window.print();
+  try {
+    await requestPdf("/pdf/acts", {
+      title: "Esportazione PDF giornaliera",
+      subtitle: `${storeLabel} - ${dates[0]}`,
+      acts: dayActs
+    }, `OroActive-PDF-giornaliero-${dates[0]}.pdf`);
+  } catch (error) {
+    showToast(error.message || "PDF giornaliero non generato.");
+  }
 }
 
-function exportMonthlySearchPdf() {
+async function exportMonthlySearchPdf() {
   const results = archiveVisibleActs();
 
   if (!results.length) {
@@ -1438,12 +1466,15 @@ function exportMonthlySearchPdf() {
   const stores = [...new Set(results.map((act) => act.store))];
   const storeLabel = stores.length === 1 ? stores[0] : "Tutti i negozi";
   const monthActs = results.sort((first, second) => first.practiceNumber.localeCompare(second.practiceNumber));
-  printPacket.innerHTML = buildActsPdfPacket(
-    "Esportazione PDF mensile",
-    `${storeLabel} - ${months[0]}`,
-    monthActs
-  );
-  window.print();
+  try {
+    await requestPdf("/pdf/acts", {
+      title: "Esportazione PDF mensile",
+      subtitle: `${storeLabel} - ${months[0]}`,
+      acts: monthActs
+    }, `OroActive-PDF-mensile-${months[0]}.pdf`);
+  } catch (error) {
+    showToast(error.message || "PDF mensile non generato.");
+  }
 }
 
 function storeCodeFromName(storeName) {
@@ -1817,6 +1848,7 @@ async function loadActForEdit(practiceNumber) {
   setFieldValue("#saleTotal", act.amount);
   setFieldValue(".textarea-label textarea", act.operatorNotes);
   setQualityReview(act.qualityReview || null);
+  state.loadedSignatureImages = Array.isArray(act.signatureImages) ? act.signatureImages : [];
 
   const cededItemsTable = document.getElementById("cededItemsTable");
   const items = Array.isArray(act.items) && act.items.length ? act.items : [{ description: "", metal: act.materials?.[0]?.metal || "Oro", title: "18 kt" }];
@@ -1913,6 +1945,7 @@ async function resetCurrentPractice(options = {}) {
   state.attachments = 0;
   state.step = 0;
   state.editingPracticeNumber = null;
+  state.loadedSignatureImages = [];
   setQualityReview(null);
 
   await setPracticeMeta();
@@ -2827,9 +2860,35 @@ function captureActionsMarkup() {
 }
 
 function fileToDataUrl(file) {
+  if (file.type && file.type.startsWith("image/")) return imageFileToOptimizedDataUrl(file);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function imageFileToOptimizedDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const maxSide = 1800;
+        const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.88));
+      };
+      image.onerror = reject;
+      image.src = String(reader.result || "");
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -2913,6 +2972,12 @@ function signatureRows() {
       </div>
     `;
   }).join("");
+}
+
+function signatureImages() {
+  return [...document.querySelectorAll("canvas[data-signature]")].map((canvas, index) => (
+    state.signatures[index] ? (state.loadedSignatureImages[index] || canvas.toDataURL("image/png")) : ""
+  ));
 }
 
 function attachmentRows() {
@@ -3033,7 +3098,7 @@ function printCustomerCopy() {
   window.print();
 }
 
-function printCompanyCopy() {
+async function printCompanyCopy() {
   if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
   const missing = validatePrintScope("company");
   if (missing.length) {
@@ -3041,8 +3106,14 @@ function printCompanyCopy() {
     return;
   }
   renderPaymentCaptureCard();
-  printPacket.innerHTML = buildPrintCopy("Copia aziendale interna", "Dato interno aziendale", "company");
-  window.print();
+  try {
+    await requestPdf("/pdf/act", {
+      title: "Copia aziendale interna",
+      act: currentActSnapshot(state.editingPracticeNumber ? "Archiviata" : "Archiviata")
+    }, `OroActive-${fieldValue("#practiceNumber") || "atto"}-copia-aziendale.pdf`);
+  } catch (error) {
+    showToast(error.message || "PDF copia aziendale non generato.");
+  }
 }
 
 function showPrintPreview(scope) {
@@ -3415,7 +3486,9 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
     ctx.lineTo(next.x, next.y);
     ctx.stroke();
     last = next;
-    state.signatures[Number(canvas.dataset.signature)] = true;
+    const signatureIndex = Number(canvas.dataset.signature);
+    state.signatures[signatureIndex] = true;
+    state.loadedSignatureImages[signatureIndex] = "";
     updateSignatureState();
   }
 
@@ -3433,7 +3506,9 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
 
   canvas.parentElement.querySelector(".clear-signature").addEventListener("click", () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    state.signatures[Number(canvas.dataset.signature)] = false;
+    const signatureIndex = Number(canvas.dataset.signature);
+    state.signatures[signatureIndex] = false;
+    state.loadedSignatureImages[signatureIndex] = "";
     updateSignatureState();
   });
 });

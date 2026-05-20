@@ -6,6 +6,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import jwt from "jsonwebtoken";
+import PDFDocument from "pdfkit";
 import pg from "pg";
 
 dotenv.config();
@@ -32,7 +33,7 @@ const pool = new Pool({
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "100mb" }));
+app.use(express.json({ limit: "250mb" }));
 
 function storeCodeFromName(storeName) {
   return {
@@ -870,6 +871,215 @@ app.get("/api/bullionvault/prices", async (_request, response, next) => {
       provider: "BullionVault",
       note: "Prezzo medio tra miglior acquisto e miglior vendita espresso in EUR al kg.",
       prices
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+function pdfFormatEuro(value) {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(Number(value || 0));
+}
+
+function dataUrlToBuffer(dataUrl = "") {
+  const match = String(dataUrl).match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/i);
+  if (!match) return null;
+  return Buffer.from(match[2], "base64");
+}
+
+function actMaterialsForPdf(act = {}) {
+  if (Array.isArray(act.materials) && act.materials.length) return act.materials;
+  return [{ metal: "Oro", weight: act.weight || "0" }];
+}
+
+function actAttachmentsForPdf(act = {}) {
+  return (act.captureAttachments || [])
+    .map((attachment) => ({
+      label: attachmentLabelForPdf(attachment.key),
+      buffer: dataUrlToBuffer(attachment.dataUrl || attachment.url || "")
+    }))
+    .filter((attachment) => attachment.buffer);
+}
+
+function attachmentLabelForPdf(key = "") {
+  const normalized = String(key).replaceAll("-", " ");
+  if (normalized.includes("documento fronte")) return "Documento fronte";
+  if (normalized.includes("documento retro")) return "Documento retro";
+  if (normalized.includes("codice fiscale fronte")) return "Codice fiscale fronte";
+  if (normalized.includes("codice fiscale retro")) return "Codice fiscale retro";
+  if (normalized.includes("preziosi")) return normalized.replace("preziosi", "Preziosi");
+  if (normalized.includes("pagamento")) return "Contabile pagamento";
+  return "Allegato fotografico";
+}
+
+function drawPdfHeader(doc, act, title) {
+  const logoPath = path.join(__dirname, "oroactive-logo.png");
+  try {
+    doc.image(logoPath, 42, 30, { width: 52, height: 52, fit: [52, 52] });
+  } catch {
+    // Il PDF resta valido anche se il logo non è disponibile.
+  }
+  doc.fillColor("#f47a20").fontSize(9).font("Helvetica-Bold").text("GESTIONALE OROACTIVE", 105, 32);
+  doc.fillColor("#111").fontSize(20).font("Helvetica-Bold").text(title, 105, 45, { width: 360 });
+  doc.fillColor("#555").fontSize(9).font("Helvetica").text(`Atto n. ${act.practiceNumber || "Dato non inserito"} | ${act.date || ""} ${act.time || ""}`, 105, 70);
+  doc.fillColor("#555").text(`Negozio ${act.store || "Dato non inserito"} | Operatore ${act.operatorUsername || act.operatorName || "Dato non inserito"}`, 105, 84);
+  doc.save().opacity(0.045).fillColor("#f47a20").fontSize(54).font("Helvetica-Bold").rotate(-30, { origin: [300, 410] }).text("OROACTIVE", 120, 410);
+  doc.restore();
+  doc.moveTo(42, 104).lineTo(553, 104).strokeColor("#f4c6a6").stroke();
+}
+
+function drawPdfSectionTitle(doc, title, y) {
+  doc.fillColor("#f47a20").font("Helvetica-Bold").fontSize(11).text(title.toUpperCase(), 42, y);
+  return y + 18;
+}
+
+function drawPdfImage(doc, buffer, x, y, options) {
+  try {
+    doc.image(buffer, x, y, options);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function drawPdfFields(doc, fields, y, columns = 2) {
+  const gap = 10;
+  const width = (511 - gap * (columns - 1)) / columns;
+  let currentY = y;
+  fields.forEach((field, index) => {
+    const column = index % columns;
+    if (index && column === 0) currentY += 42;
+    const x = 42 + column * (width + gap);
+    doc.roundedRect(x, currentY, width, 34, 4).strokeColor("#e6d6c8").stroke();
+    doc.fillColor("#777").font("Helvetica-Bold").fontSize(7).text(field.label, x + 7, currentY + 6, { width: width - 14 });
+    doc.fillColor("#111").font("Helvetica").fontSize(9).text(String(field.value || "Dato non inserito"), x + 7, currentY + 18, { width: width - 14 });
+  });
+  return currentY + 46;
+}
+
+function ensurePdfSpace(doc, y, needed = 90) {
+  if (y + needed <= 760) return y;
+  doc.addPage();
+  return 42;
+}
+
+function drawActMainPdfPage(doc, act, title) {
+  doc.addPage();
+  drawPdfHeader(doc, act, title);
+  let y = 122;
+  y = drawPdfSectionTitle(doc, "1. Dati cliente", y);
+  y = drawPdfFields(doc, [
+    { label: "Nome", value: act.name },
+    { label: "Cognome", value: act.surname },
+    { label: "Codice fiscale", value: act.fiscalCode },
+    { label: "Telefono", value: act.phone },
+    { label: "Data nascita", value: act.birthDate },
+    { label: "Luogo nascita", value: act.birthPlace },
+    { label: "Provincia nascita", value: act.birthProvince },
+    { label: "Residenza", value: act.address },
+    { label: "Documento", value: `${act.documentType || ""} ${act.documentNumber || ""}`.trim() },
+    { label: "Scadenza documento", value: act.documentExpiry }
+  ], y, 2);
+
+  y = ensurePdfSpace(doc, y, 150);
+  y = drawPdfSectionTitle(doc, "2. Oggetti ceduti", y);
+  (act.items || []).forEach((item, index) => {
+    y = ensurePdfSpace(doc, y, 34);
+    doc.roundedRect(42, y, 511, 26, 4).strokeColor("#e6d6c8").stroke();
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(9).text(`${index + 1}. ${item.description || "Oggetto prezioso"}`, 50, y + 7, { width: 280 });
+    doc.fillColor("#555").font("Helvetica").text(`${item.metal || ""} - ${item.title || ""}`, 355, y + 7, { width: 185 });
+    y += 32;
+  });
+
+  y = ensurePdfSpace(doc, y, 130);
+  y = drawPdfSectionTitle(doc, "3. Peso totale e pagamento", y);
+  const materialFields = actMaterialsForPdf(act).map((material) => ({
+    label: `Peso totale ${material.metal}`,
+    value: `${material.weight || "0"} gr`
+  }));
+  const amountFields = (act.materialAmounts || []).map((row) => ({
+    label: `Totale corrisposto ${row.metal}`,
+    value: pdfFormatEuro(row.amount)
+  }));
+  y = drawPdfFields(doc, [
+    ...materialFields,
+    { label: "Metodo pagamento", value: act.paymentMethod },
+    { label: "Totale corrisposto", value: pdfFormatEuro(act.amount) },
+    ...amountFields
+  ], y, 2);
+
+  y = ensurePdfSpace(doc, y, 110);
+  y = drawPdfSectionTitle(doc, "6. Firme cliente", y);
+  const signatures = (act.signatureImages || []).filter(Boolean);
+  if (signatures.length) {
+    signatures.forEach((signature, index) => {
+      const x = 42 + index * 172;
+      const buffer = dataUrlToBuffer(signature);
+      doc.roundedRect(x, y, 154, 58, 4).strokeColor("#e6d6c8").stroke();
+      doc.fillColor("#777").font("Helvetica-Bold").fontSize(7).text(`Firma ${index + 1}`, x + 7, y + 6);
+      if (buffer) drawPdfImage(doc, buffer, x + 8, y + 18, { fit: [138, 34], align: "center", valign: "center" });
+    });
+    y += 72;
+  }
+
+  y = ensurePdfSpace(doc, y, 75);
+  y = drawPdfSectionTitle(doc, "7. Riepilogo finale", y);
+  doc.fillColor("#111").font("Helvetica").fontSize(9).text("Atto di vendita generato e archiviato nel gestionale OroActive con allegati fotografici e firme integrate.", 42, y, { width: 511, lineGap: 2 });
+}
+
+function drawActAttachmentPdfPages(doc, act, title) {
+  const attachments = actAttachmentsForPdf(act);
+  doc.addPage();
+  drawPdfHeader(doc, act, `${title} - Allegati`);
+  let y = 124;
+  y = drawPdfSectionTitle(doc, "5. Allegati fotografici", y);
+  if (!attachments.length) {
+    return;
+  }
+  attachments.forEach((attachment) => {
+    y = ensurePdfSpace(doc, y, 270);
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(10).text(attachment.label, 42, y);
+    y += 14;
+    doc.roundedRect(42, y, 511, 245, 6).strokeColor("#e6d6c8").stroke();
+    drawPdfImage(doc, attachment.buffer, 52, y + 10, { fit: [491, 225], align: "center", valign: "center" });
+    y += 265;
+  });
+}
+
+function buildPdfForActs(response, { title = "Atto di vendita OroActive", subtitle = "", acts = [] }) {
+  response.setHeader("Content-Type", "application/pdf");
+  response.setHeader("Content-Disposition", `attachment; filename=\"oroactive-atti.pdf\"`);
+  const doc = new PDFDocument({ size: "A4", autoFirstPage: false, margin: 42, bufferPages: true });
+  doc.pipe(response);
+  if (subtitle) {
+    doc.addPage();
+    drawPdfHeader(doc, { practiceNumber: "", store: "", operatorUsername: "" }, title);
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(16).text(subtitle, 42, 140, { width: 511 });
+    doc.fillColor("#555").font("Helvetica").fontSize(10).text(`Atti inclusi: ${acts.length}`, 42, 170);
+    doc.text(`Data generazione: ${new Date().toLocaleString("it-IT")}`, 42, 188);
+  }
+  acts.forEach((act) => {
+    const heading = act.practiceNumber ? `Atto di vendita ${act.practiceNumber}` : title;
+    drawActMainPdfPage(doc, act, heading);
+    drawActAttachmentPdfPages(doc, act, heading);
+  });
+  doc.end();
+}
+
+app.post("/api/pdf/act", async (request, response, next) => {
+  try {
+    buildPdfForActs(response, { title: request.body.title || "Atto di vendita OroActive", acts: [request.body.act || {}] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/pdf/acts", async (request, response, next) => {
+  try {
+    buildPdfForActs(response, {
+      title: request.body.title || "Esportazione atti OroActive",
+      subtitle: request.body.subtitle || "",
+      acts: Array.isArray(request.body.acts) ? request.body.acts : []
     });
   } catch (error) {
     next(error);
