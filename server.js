@@ -74,15 +74,18 @@ function normalizeRole(role = "commesso") {
   if (normalized === "founder") return "founder";
   if (normalized === "admin") return "responsabile";
   if (normalized === "responsabile") return "responsabile";
-  if (normalized === "commessa") return "commessa";
+  if (normalized === "aiuto_commesso" || normalized === "aiuto commesso" || normalized === "aiuto_commessa" || normalized === "aiuto commessa") {
+    return "aiuto_commesso";
+  }
   if (normalized === "commesso" || normalized === "operatore" || normalized === "utente" || normalized === "user") {
     return "commesso";
   }
+  if (normalized === "commessa") return "commesso";
   return "commesso";
 }
 
 function roleSeesAllStores(role) {
-  return normalizeRole(role) === "founder";
+  return ["founder", "responsabile"].includes(normalizeRole(role));
 }
 
 function canManageAccess(user) {
@@ -91,8 +94,8 @@ function canManageAccess(user) {
 
 function managedRolesForActor(actor) {
   const role = normalizeRole(actor?.ruolo);
-  if (role === "founder") return ["responsabile", "commesso", "commessa"];
-  if (role === "responsabile") return ["commesso", "commessa"];
+  if (role === "founder") return ["responsabile", "commesso", "aiuto_commesso"];
+  if (role === "responsabile") return ["commesso", "aiuto_commesso"];
   return [];
 }
 
@@ -652,7 +655,7 @@ async function listUsersForActor(actor) {
   if (!roles.length) return [];
   const values = [roles];
   let where = "WHERE ruolo = ANY($1)";
-  if (actorRole === "responsabile") {
+  if (actorRole === "responsabile" && !roleSeesAllStores(actor.ruolo)) {
     values.push(actor.negozio);
     where += " AND negozio = $2";
   }

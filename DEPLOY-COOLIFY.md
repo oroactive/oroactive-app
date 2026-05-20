@@ -72,12 +72,13 @@ L'endpoint BullionVault aggiorna le quotazioni oro, argento e platino in EUR al 
 ## Ruoli
 
 ```text
-Founder  vede tutti i negozi, gestisce responsabili, commessi e commesse
-Responsabile  visualizza e gestisce Commesso/Commessa
-Commesso/Commessa  accede al gestionale senza sezione Utenti
+Founder  vede tutti i negozi, gestisce responsabili, commessi e aiuto commessi
+Responsabile  vede tutti i negozi e gestisce Commesso/a e Aiuto Commesso/a
+Commesso/a  accede al gestionale senza sezione Utenti
+Aiuto Commesso/a  accede al gestionale con gli stessi permessi base del Commesso/a
 ```
 
-Il Founder visualizza `Tutti` nel campo negozio. Il Founder non compare nella sezione Utenti e non puo essere eliminato. Dopo il primo accesso Founder, crea Responsabili, Commessi o Commesse dalla sezione `Utenti`.
+Il Founder e il Responsabile visualizzano `Tutti` nel campo negozio. Il Founder non compare nella sezione Utenti e non puo essere eliminato. Dopo il primo accesso Founder, crea Responsabili, Commessi o Aiuto Commessi dalla sezione `Utenti`.
 
 Accesso Founder iniziale:
 

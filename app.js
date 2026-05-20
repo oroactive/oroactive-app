@@ -183,7 +183,9 @@ function normalizeRole(role = "commesso") {
   if (normalized === "founder") return "founder";
   if (normalized === "admin") return "responsabile";
   if (normalized === "responsabile") return "responsabile";
-  if (normalized === "commessa") return "commessa";
+  if (normalized === "aiuto_commesso" || normalized === "aiuto commesso" || normalized === "aiuto commessa" || normalized === "aiuto_commessa") {
+    return "aiuto_commesso";
+  }
   return "commesso";
 }
 
@@ -191,8 +193,8 @@ function roleLabel(role) {
   return {
     founder: "Founder",
     responsabile: "Responsabile",
-    commesso: "Commesso",
-    commessa: "Commessa"
+    commesso: "Commesso/a",
+    aiuto_commesso: "Aiuto Commesso/a"
   }[normalizeRole(role)];
 }
 
@@ -210,13 +212,13 @@ function isFounder() {
 }
 
 function userSeesAllStores(user = state.currentUser) {
-  return normalizeRole(user?.ruolo) === "founder";
+  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
 
 function managedRolesForCurrentUser() {
   const role = normalizeRole(state.currentUser?.ruolo);
-  if (role === "founder") return ["responsabile", "commesso", "commessa"];
-  if (role === "responsabile") return ["commesso", "commessa"];
+  if (role === "founder") return ["responsabile", "commesso", "aiuto_commesso"];
+  if (role === "responsabile") return ["commesso", "aiuto_commesso"];
   return [];
 }
 
@@ -393,10 +395,16 @@ function configureUserFormPermissions() {
   });
   if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles[0] || "commesso";
   const role = normalizeRole(roleSelect.value);
-  if (role === "founder") {
+  if (["founder", "responsabile"].includes(role)) {
     storeSelect.value = "Tutti";
     storeSelect.disabled = true;
+    [...storeSelect.options].forEach((option) => {
+      option.hidden = option.value !== "Tutti" && option.textContent !== "Tutti";
+    });
   } else {
+    [...storeSelect.options].forEach((option) => {
+      option.hidden = option.value === "Tutti" || option.textContent === "Tutti";
+    });
     storeSelect.disabled = false;
     if (storeSelect.value === "Tutti") storeSelect.value = "Busto Arsizio";
   }
