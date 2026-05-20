@@ -9,9 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
   <title>OroActive Gestionale</title>
-  <link rel="manifest" href="manifest.webmanifest?v=20260519-31">
+  <link rel="manifest" href="manifest.webmanifest?v=20260520-02">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260519-31">
+  <link rel="stylesheet" href="styles.css?v=20260520-02">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -40,7 +40,6 @@
       <nav class="main-menu-actions">
         <button type="button" data-section="practice">Atto di Vendita</button>
         <button type="button" data-section="archive">Elenco</button>
-        <button type="button" data-section="searchActs">Ricerca</button>
         <button type="button" data-section="fusion">Fusione</button>
         <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
       </nav>
@@ -62,7 +61,6 @@
         <div class="brand-dropdown" id="brandDropdown" hidden>
           <button type="button" data-section="practice">Atto di Vendita</button>
           <button type="button" data-section="archive">Elenco</button>
-          <button type="button" data-section="searchActs">Ricerca</button>
           <button type="button" data-section="fusion">Fusione</button>
           <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
         </div>
@@ -489,36 +487,27 @@
             </select>
           </label>
         </div>
-        <div class="archive-groups" id="archiveGroups"></div>
-      </section>
-
-      <section id="searchActs" class="screen">
-        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
-        <div class="settings-grid">
-          <div>
-            <p class="eyebrow">Ricerca</p>
-            <h2>Ricerca Atto di Vendita</h2>
-            <p class="muted">Seleziona il campo da ricercare e inserisci la parola chiave.</p>
-          </div>
-          <div class="settings-list">
-            <label>Campo da ricercare
-              <select id="searchField">
-                <option value="name">Nome</option>
-                <option value="surname">Cognome</option>
-                <option value="practiceNumber">Numero atto di vendita</option>
-                <option value="date">Data atto di vendita</option>
-                <option value="store">Negozio</option>
-                <option value="amount">Importo</option>
-                <option value="paymentMethod">Metodo di pagamento</option>
-                <option value="weight">Peso totale in grammi</option>
-              </select>
-            </label>
-            <input class="search" id="searchKeyword" placeholder="Inserisci parola chiave">
+        <div class="settings-list archive-search-panel">
+          <label>Campo da ricercare
+            <select id="searchField">
+              <option value="name">Nome</option>
+              <option value="surname">Cognome</option>
+              <option value="practiceNumber">Numero atto di vendita</option>
+              <option value="date">Data atto di vendita</option>
+              <option value="store">Negozio</option>
+              <option value="amount">Importo</option>
+              <option value="paymentMethod">Metodo di pagamento</option>
+              <option value="weight">Peso totale in grammi</option>
+            </select>
+          </label>
+          <input class="search" id="searchKeyword" placeholder="Inserisci parola chiave">
+          <div class="archive-search-actions">
             <button type="button" id="runActSearch">Cerca</button>
+            <button class="ghost-button" type="button" id="clearActSearch">Cancella ricerca</button>
             <button class="small-button" type="button" id="exportDailyPdf">ESPORTA PDF giornaliero</button>
           </div>
         </div>
-        <div class="search-results" id="searchResults" aria-live="polite"></div>
+        <div class="archive-groups" id="archiveGroups"></div>
       </section>
 
       <section id="fusion" class="screen">
@@ -586,6 +575,6 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260519-31"></script>
+  <script src="app.js?v=20260520-02"></script>
 </body>
 </html>

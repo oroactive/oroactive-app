@@ -49,6 +49,12 @@ const documentLabels = {
 const apiBase = "/api";
 const demoActs = [];
 
+function removeLegacySearchMenu() {
+  document.querySelectorAll('[data-section="searchActs"], #searchActs').forEach((element) => {
+    element.remove();
+  });
+}
+
 async function apiRequest(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
@@ -2185,6 +2191,7 @@ document.getElementById("closePreview").addEventListener("click", () => {
 });
 
 async function initializeApp() {
+  removeLegacySearchMenu();
   appShell.hidden = true;
   await restoreSession();
   window.addEventListener("focus", () => {
