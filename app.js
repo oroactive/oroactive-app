@@ -53,10 +53,109 @@ const apiBase = "/api";
 const CASH_PAYMENT_LIMIT = 499.99;
 const QUALITY_FLAG_POINTS = 1;
 const ROLE_LEVELS = [
-  { role: "aiuto_commesso", label: "Aiuto Commesso/a", points: 0 },
-  { role: "commesso", label: "Commesso/a", points: 500 },
-  { role: "responsabile", label: "Responsabile", points: 2000 }
+  { role: "aiuto_commesso", label: "Commesso OroActive", points: 1000 },
+  { role: "commesso", label: "Responsabile OroActive", points: 2500 },
+  { role: "responsabile", label: "Supervisore dei Responsabili OroActive", points: 5000 }
 ];
+const LEVEL_UNLOCK_MESSAGES = {
+  aiuto_commesso: {
+    title: "Hai sbloccato il livello Commesso OroActive",
+    body: `Hai sbloccato il livello Commesso OroActive.
+
+Da questo momento non stai semplicemente utilizzando un software.
+Stai entrando in una realtà costruita su fiducia, responsabilità e crescita personale.
+
+OroActive ha scelto di affidarti un ruolo importante, perché crediamo nelle tue capacità, nella tua mentalità e nel valore che puoi portare ogni giorno all'interno del negozio.
+
+Ogni cliente che incontrerai, ogni pratica che gestirai e ogni dettaglio a cui presterai attenzione contribuiranno a costruire qualcosa di più grande: la reputazione e il futuro di OroActive.
+
+Qui non cerchiamo persone perfette.
+Cerchiamo persone che vogliono migliorarsi, imparare, crescere e diventare professionisti veri.
+
+Ricorda sempre una cosa:
+la fiducia si conquista con costanza, precisione e atteggiamento.
+
+Questo livello rappresenta l'inizio del tuo percorso.
+Il modo in cui lo affronterai determinerà fino a dove potrai arrivare.
+
+Benvenuto in OroActive.`
+  },
+  commesso: {
+    title: "Hai sbloccato il livello Responsabile OroActive",
+    body: `Hai sbloccato il livello Responsabile OroActive.
+
+Questo traguardo non rappresenta soltanto un nuovo livello operativo.
+Rappresenta la fiducia che OroActive ha deciso di riporre in te.
+
+Diventare Responsabile significa essere un punto di riferimento.
+Per il team.
+Per i clienti.
+Per il futuro del marchio.
+
+Le persone non seguiranno solo ciò che dici, ma soprattutto il modo in cui agirai ogni giorno: con mentalità, presenza, disciplina e rispetto.
+
+OroActive nasce da valori profondi: crescita, umanità, ambizione e professionalità.
+E oggi quei valori li rappresenti anche tu.
+
+Grazie di cuore per essere parte della famiglia OroActive.
+Grazie per l'impegno, per l'energia che metti nel tuo lavoro e per il contributo reale che dai ogni giorno alla costruzione di qualcosa di grande.
+
+Ricorda sempre una cosa:
+i ruoli si assegnano, ma la leadership si conquista.
+
+Questo livello è la dimostrazione che il tuo percorso sta lasciando il segno.
+
+Continua a crescere.
+Continua a credere nelle tue capacità.
+Continua a portare in alto il nome OroActive.
+
+Il futuro si costruisce insieme.`
+  },
+  responsabile: {
+    title: "Supervisore dei Responsabili OroActive",
+    body: `Hai raggiunto lo status riservato di
+Supervisore dei Responsabili OroActive.
+
+Questo livello non viene assegnato semplicemente per i risultati ottenuti.
+Viene conquistato attraverso il carattere, la resilienza, le cadute affrontate e la forza dimostrata nel rialzarsi ogni volta.
+
+Oggi non stai ricevendo soltanto un nuovo ruolo.
+Stai entrando nel cuore operativo di OroActive.
+
+Da questo momento collaborerai direttamente con il fondatore e con i soci nella gestione delle aree aziendali e nel coordinamento operativo dei responsabili.
+Questo significa che il tuo valore, la tua mentalità e la tua visione sono diventati parte integrante della crescita del marchio.
+
+Essere Supervisore significa guidare senza perdere l'umiltà.
+Significa diventare una luce per chi sta ancora costruendo il proprio cammino.
+Significa rappresentare l'essenza più profonda di OroActive: crescita, disciplina, umanità, ambizione e coraggio.
+
+Ma soprattutto... significa aver dimostrato di meritare fiducia.
+
+Voglio dirti personalmente grazie.
+
+Grazie per ogni sacrificio affrontato.
+Grazie per non aver mollato nei momenti difficili.
+Grazie per aver creduto in questo progetto anche nelle salite più dure.
+Perché sono proprio le difficoltà, le cadute e le sfide affrontate nel silenzio a costruire le persone destinate a lasciare il segno.
+
+Che questo traguardo non sia un punto di arrivo, ma una nuova partenza.
+Una luce da seguire.
+Una responsabilità da onorare.
+Un percorso che continui a portarti sempre più in alto, aiutandoti a scoprire il tuo enorme potenziale sia come persona che come professionista.
+
+Ricordati sempre una cosa:
+
+non sarai mai solo in questo cammino.
+
+Io, Christian Dinato, fondatore di OroActive, sarò sempre al tuo fianco durante il tuo percorso lavorativo, pronto a sostenerti, supportarti e credere in te anche nei momenti più complessi.
+
+Perché OroActive non è soltanto un marchio.
+È una famiglia costruita da persone che hanno deciso di crescere insieme.
+
+Grazie ancora di cuore.
+E benvenuto tra coloro che porteranno OroActive verso il futuro.`
+  }
+};
 const demoActs = [];
 
 function removeLegacySearchMenu() {
@@ -116,6 +215,7 @@ async function syncActsFromServer() {
   if (isAdmin() && document.getElementById("users")?.classList.contains("active-screen")) {
     await loadUsers();
   }
+  maybeShowLevelUnlockMessage();
 
   if (!state.editingPracticeNumber && isPracticeFormEmpty()) {
     await updatePracticeNumber();
@@ -294,6 +394,7 @@ async function startAuthenticatedApp() {
   renderFusionGroups();
   if (isAdmin()) await loadUsers();
   await refreshBullionVaultPrices();
+  maybeShowLevelUnlockMessage();
   if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 5000);
 }
 
@@ -538,25 +639,66 @@ function actSpentAmount(act) {
   return materialSum > 0 ? materialSum : Number(act.amount || 0);
 }
 
-function positiveFlagsForUser(user) {
+function directFlagsForUser(user) {
   const key = userOperatorKey(user);
-  return demoActs.filter((act) => actOperatorKey(act) === key && act.qualityReview?.status === "positive").length;
+  const acts = demoActs.filter((act) => actOperatorKey(act) === key);
+  return {
+    positive: acts.filter((act) => act.qualityReview?.status === "positive").length,
+    negative: acts.filter((act) => act.qualityReview?.status === "negative").length
+  };
 }
 
-function scoreForUser(user) {
-  return positiveFlagsForUser(user) * QUALITY_FLAG_POINTS;
+function managedOperatorKeysForResponsible() {
+  return new Set((state.users || [])
+    .filter((user) => ["aiuto_commesso", "commesso"].includes(normalizeRole(user.ruolo)))
+    .map(userOperatorKey)
+    .filter(Boolean));
+}
+
+function teamFlagsForResponsible() {
+  const managedKeys = managedOperatorKeysForResponsible();
+  if (!managedKeys.size) return { positive: 0, negative: 0 };
+  const acts = demoActs.filter((act) => managedKeys.has(actOperatorKey(act)));
+  return {
+    positive: acts.filter((act) => act.qualityReview?.status === "positive").length,
+    negative: acts.filter((act) => act.qualityReview?.status === "negative").length
+  };
+}
+
+function scoreTargetForUser(user) {
+  return ROLE_LEVELS.find((level) => level.role === normalizeRole(user?.ruolo)) || ROLE_LEVELS[0];
+}
+
+function scoreDetailsForUser(user) {
+  const role = normalizeRole(user?.ruolo);
+  const direct = directFlagsForUser(user);
+  if (role === "responsabile") {
+    const team = teamFlagsForResponsible();
+    const points = Math.max(0, ((direct.positive + team.positive) * QUALITY_FLAG_POINTS) - (team.negative * 5));
+    return {
+      points,
+      positive: direct.positive + team.positive,
+      negative: team.negative,
+      directPositive: direct.positive,
+      teamPositive: team.positive
+    };
+  }
+
+  return {
+    points: direct.positive * QUALITY_FLAG_POINTS,
+    positive: direct.positive,
+    negative: direct.negative,
+    directPositive: direct.positive,
+    teamPositive: 0
+  };
 }
 
 function scoreProgress(user) {
-  const points = scoreForUser(user);
-  const role = normalizeRole(user?.ruolo);
-  const target = role === "aiuto_commesso"
-    ? { label: "Commesso/a sbloccato", points: 100 }
-    : ROLE_LEVELS.find((level) => level.role === role) || ROLE_LEVELS[0];
-  const percent = Math.min(100, Math.max(0, (points / Math.max(target.points, 1)) * 100));
+  const score = scoreDetailsForUser(user);
+  const target = scoreTargetForUser(user);
+  const percent = Math.min(100, Math.max(0, (score.points / Math.max(target.points, 1)) * 100));
   return {
-    points,
-    flags: positiveFlagsForUser(user),
+    ...score,
     target,
     percent
   };
@@ -568,15 +710,41 @@ function scoreBarMarkup(user) {
   const levelText = score.points >= score.target.points
     ? `${score.target.label} raggiunto`
     : `Obiettivo: ${score.target.label}`;
+  const penaltyText = normalizeRole(user?.ruolo) === "responsabile" && score.negative
+    ? ` - ${score.negative} flag negativi team`
+    : "";
   return `
     <div class="score-wrap">
       <div class="score-bar" aria-label="Punteggio operatore">
         <span style="width:${score.percent.toFixed(1)}%"></span>
       </div>
-      <small>${escapeHtml(unlockText)} - ${escapeHtml(score.flags)} flag positivi</small>
+      <small>${escapeHtml(unlockText)} - ${escapeHtml(score.positive)} flag positivi${escapeHtml(penaltyText)}</small>
       <em>${escapeHtml(levelText)}</em>
     </div>
   `;
+}
+
+function maybeShowLevelUnlockMessage() {
+  if (!state.currentUser || !previewModal || !previewBody || !previewTitle) return;
+  const role = normalizeRole(state.currentUser.ruolo);
+  const message = LEVEL_UNLOCK_MESSAGES[role];
+  if (!message) return;
+
+  const score = scoreProgress(state.currentUser);
+  if (score.points < score.target.points) return;
+
+  const storageKey = `oroactive-level-unlock-${state.currentUser.id || displayUsername(state.currentUser)}-${role}-${score.target.points}`;
+  if (localStorage.getItem(storageKey)) return;
+  localStorage.setItem(storageKey, "shown");
+
+  previewTitle.textContent = message.title;
+  previewBody.innerHTML = `
+    <section class="level-unlock-message">
+      <h3>${escapeHtml(message.title)}</h3>
+      ${message.body.split("\n\n").map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`).join("")}
+    </section>
+  `;
+  previewModal.hidden = false;
 }
 
 function actWeightAmount(act) {
@@ -1472,6 +1640,7 @@ function materialTotalsMarkup(totals, label = "Totali giacenza") {
 
 function fusionActRows(acts, options = {}) {
   if (!acts.length) return '<div class="empty-state">Nessun atto presente.</div>';
+  const today = localDateKey();
   return `
     <div class="archive-table fusion-table">
       <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Data acquisto</span><span>Fondibile dal</span><span>Materiale</span><span>Azioni</span></div>
@@ -1480,7 +1649,7 @@ function fusionActRows(acts, options = {}) {
           <span>${escapeHtml(act.practiceNumber)}</span>
           <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
           <span>${escapeHtml(act.date)}</span>
-          <em class="${options.ready ? "done" : ""}">${escapeHtml(addDays(act.date, 10))}</em>
+          <em class="${(options.ready || act.fusionDate <= today) ? "done" : ""}">${escapeHtml(act.fusionDate || addDays(act.date, 10))}</em>
           <span>${escapeHtml(material.metal)} ${escapeHtml(material.weight)} gr</span>
           <div class="row-actions">
             <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
@@ -1520,58 +1689,25 @@ function renderFusionGroups() {
       const storeTotals = materialTotalMap(storeActs);
       const readyActs = storeActs.filter((act) => act.daysElapsed >= 10);
       const readyTotals = materialTotalMap(readyActs);
-      const actsByDay = storeActs.reduce((days, act) => {
-        days[act.date] ||= [];
-        days[act.date].push(act);
-        return days;
-      }, {});
-      const upcomingByDate = storeActs.reduce((days, act) => {
-        days[act.fusionDate] ||= [];
-        days[act.fusionDate].push(act);
-        return days;
-      }, {});
+      const orderedStoreActs = [...storeActs].sort((first, second) => {
+        const fusionCompare = String(first.fusionDate || "").localeCompare(String(second.fusionDate || ""));
+        return fusionCompare || String(second.date || "").localeCompare(String(first.date || ""));
+      });
 
       return `
         <section class="fusion-store">
           <div class="fusion-store-heading">
             <div>
               <h3>${escapeHtml(store)}</h3>
-              <p>Giacenza complessiva per negozio, giorno e materiale.</p>
+              <p>Giacenza complessiva per negozio, con atti ordinati per data di fusione.</p>
             </div>
-            ${materialTotalsMarkup(storeTotals)}
-          </div>
-          <div class="fusion-materials">
-            <section class="fusion-material">
-              <div class="fusion-material-heading">
-                <h4>Fondibile oggi</h4>
-                <span>${escapeHtml(readyActs.length)} atti pronti</span>
-              </div>
+            <div class="fusion-store-totals">
+              ${materialTotalsMarkup(storeTotals)}
               ${materialTotalsMarkup(readyTotals, "Totali fondibili oggi")}
-              ${fusionActRows(readyActs, { ready: true })}
-            </section>
-            ${Object.entries(actsByDay).sort(([a], [b]) => b.localeCompare(a)).map(([day, dayActs]) => `
-              <section class="fusion-material">
-                <div class="fusion-material-heading">
-                  <h4>Giacenza giorno ${escapeHtml(day)}</h4>
-                  <span>${escapeHtml(dayActs.length)} atti</span>
-                </div>
-                ${materialTotalsMarkup(materialTotalMap(dayActs), "Totali giorno")}
-                ${fusionActRows(dayActs)}
-              </section>
-            `).join("")}
-            <section class="fusion-material platinum">
-              <div class="fusion-material-heading">
-                <h4>Calendario prossime fusioni</h4>
-                <span>Atti fondibili per data</span>
-              </div>
-              ${Object.entries(upcomingByDate).sort(([a], [b]) => a.localeCompare(b)).map(([date, dateActs]) => `
-                <div class="fusion-calendar-day">
-                  <h5>${escapeHtml(date)}</h5>
-                  ${materialTotalsMarkup(materialTotalMap(dateActs), "Totali fondibili")}
-                  ${fusionActRows(dateActs, { ready: date <= localDateKey() })}
-                </div>
-              `).join("")}
-            </section>
+            </div>
+          </div>
+          <div class="fusion-materials single-fusion-table">
+            ${fusionActRows(orderedStoreActs)}
           </div>
         </section>
       `;
