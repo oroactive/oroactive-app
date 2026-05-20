@@ -1572,7 +1572,7 @@ canvas {
 
 .table-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 0.8fr 0.8fr 0.7fr;
+  grid-template-columns: 1fr 1fr 0.8fr 0.75fr 0.75fr 0.7fr;
   align-items: center;
   gap: 14px;
   padding: 16px 18px;
@@ -2322,6 +2322,24 @@ canvas {
     object-fit: contain;
     border-top: 1px solid #bbb;
     margin-top: 6px;
+  }
+
+  .print-attachment.with-image {
+    min-height: 90mm;
+  }
+
+  .print-attachment img {
+    display: block;
+    width: 100%;
+    max-height: 84mm;
+    object-fit: contain;
+    margin-top: 6px;
+    border: 1px solid #bbb;
+    background: #fff;
+  }
+
+  .print-attachments.full-attachments {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .print-legal {

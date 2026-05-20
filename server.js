@@ -32,7 +32,7 @@ const pool = new Pool({
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "25mb" }));
+app.use(express.json({ limit: "100mb" }));
 
 function storeCodeFromName(storeName) {
   return {

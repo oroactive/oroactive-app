@@ -12,7 +12,8 @@ const state = {
   currentUser: null,
   syncTimer: null,
   cashLimitWarningShown: false,
-  bullionVaultPrices: {}
+  bullionVaultPrices: {},
+  lastActCaptureAttachments: []
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -648,6 +649,59 @@ function archiveTotalsMarkup(totals, labelPrefix) {
   `;
 }
 
+function attachmentLabel(key = "") {
+  return key.replaceAll("-", " ");
+}
+
+function actAttachmentMap(act = {}) {
+  return new Map((act.captureAttachments || []).map((attachment) => [attachment.key, attachment]));
+}
+
+function printableAttachmentRows(keys, uploadedKeys, attachments = new Map()) {
+  return keys.map((key) => {
+    const attachment = attachments.get(key);
+    const present = uploadedKeys.has(key) || Boolean(attachment);
+    const isImage = attachment?.dataUrl?.startsWith("data:image/");
+    return `
+      <div class="print-attachment ${isImage ? "with-image" : ""}">
+        <span>${present ? "Allegato presente" : "Allegato mancante"}</span>
+        <strong>${escapeHtml(attachmentLabel(key))}</strong>
+        ${isImage ? `<img src="${attachment.dataUrl}" alt="${escapeHtml(attachmentLabel(key))}">` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+function fullActPrintHtml(act, heading = "Atto di vendita - Fascicolo aziendale") {
+  if (act.readOnlyHtml) return act.readOnlyHtml;
+  const attachments = actAttachmentMap(act);
+  const fallback = buildArchivedActFallback(act).replace(
+    "<h1>Atto di vendita OroActive - Anteprima aziendale sola lettura</h1>",
+    `<h1>${escapeHtml(heading)}</h1>`
+  );
+  if (!attachments.size) return fallback;
+  return `${fallback}
+    <section class="print-copy company-copy readonly-copy">
+      <h1>${escapeHtml(heading)} - Allegati fotografici</h1>
+      <div class="print-attachments full-attachments">${printableAttachmentRows([...attachments.keys()], new Set(act.captures || []), attachments)}</div>
+    </section>`;
+}
+
+function buildActsPdfPacket(title, subtitle, acts) {
+  return `
+    <section class="print-copy archive-export-cover">
+      <h1>${escapeHtml(title)}</h1>
+      <div class="print-meta">
+        <div class="print-field"><span>Dettaglio</span>${escapeHtml(subtitle)}</div>
+        <div class="print-field"><span>Atti esportati</span>${escapeHtml(acts.length)}</div>
+        <div class="print-field"><span>Data esportazione</span>${escapeHtml(localDateKey())}</div>
+      </div>
+      <p class="print-legal">Fascicolo unico con sezioni cliente, vendita, firme e documenti allegati per ogni atto di vendita.</p>
+    </section>
+    ${acts.map((act) => fullActPrintHtml(act, `Atto di vendita ${act.practiceNumber}`)).join("")}
+  `;
+}
+
 function parseActDate(date) {
   if (date.includes("-")) {
     const [year, month, day] = date.split("-");
@@ -671,6 +725,12 @@ function currentActSnapshot(status = "Archiviata") {
   const storeSelect = document.getElementById("storeCode");
   const items = collectCededItems();
   const captures = [...state.uploadedCaptures];
+  const captureAttachments = [...state.captureFiles.entries()].map(([key, file]) => ({
+    key,
+    name: file.name,
+    type: file.type,
+    dataUrl: file.dataUrl || ""
+  }));
   const materials = weightRows()
     .filter((row) => Number(row.value || 0) > 0)
     .map((row) => ({ metal: row.metal, weight: row.value }));
@@ -706,6 +766,7 @@ function currentActSnapshot(status = "Archiviata") {
     operatorName: [state.currentUser?.nome, state.currentUser?.cognome].filter(Boolean).join(" "),
     weight: totalWeight.toFixed(2),
     materials,
+    captureAttachments,
     signatures: [...state.signatures],
     captures,
     status: normalizeWorkflowStatus(status)
@@ -859,7 +920,36 @@ function exportDailySearchPdf() {
   const stores = [...new Set(results.map((act) => act.store))];
   const storeLabel = stores.length === 1 ? stores[0] : "Tutti i negozi";
   const dayActs = results.sort((first, second) => first.practiceNumber.localeCompare(second.practiceNumber));
-  printPacket.innerHTML = buildArchiveDayExport(storeLabel, dates[0], dayActs);
+  printPacket.innerHTML = buildActsPdfPacket(
+    "Esportazione PDF giornaliera",
+    `${storeLabel} - ${dates[0]}`,
+    dayActs
+  );
+  window.print();
+}
+
+function exportMonthlySearchPdf() {
+  const results = archiveVisibleActs();
+
+  if (!results.length) {
+    showToast("Nessun atto da esportare nell'elenco selezionato.");
+    return;
+  }
+
+  const months = [...new Set(results.map((act) => String(act.date || "").slice(0, 7)))];
+  if (months.length !== 1) {
+    showToast("Per esportare il PDF mensile cerca un solo mese, ad esempio 2026-05.");
+    return;
+  }
+
+  const stores = [...new Set(results.map((act) => act.store))];
+  const storeLabel = stores.length === 1 ? stores[0] : "Tutti i negozi";
+  const monthActs = results.sort((first, second) => first.practiceNumber.localeCompare(second.practiceNumber));
+  printPacket.innerHTML = buildActsPdfPacket(
+    "Esportazione PDF mensile",
+    `${storeLabel} - ${months[0]}`,
+    monthActs
+  );
   window.print();
 }
 
@@ -1103,6 +1193,15 @@ async function loadActForEdit(practiceNumber) {
   state.signatures = Array.isArray(act.signatures) ? act.signatures : [true, true, true];
   state.uploadedCaptures = new Set(Array.isArray(act.captures) ? act.captures : []);
   state.captureFiles.clear();
+  (act.captureAttachments || []).forEach((attachment) => {
+    if (!attachment.key) return;
+    state.captureFiles.set(attachment.key, {
+      name: attachment.name || attachmentLabel(attachment.key),
+      type: attachment.type || "",
+      dataUrl: attachment.dataUrl || "",
+      url: attachment.dataUrl || ""
+    });
+  });
   state.attachments = state.uploadedCaptures.size;
   state.step = 0;
 
@@ -1843,6 +1942,15 @@ function captureActionsMarkup() {
   `;
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function ensureCaptureActions() {
   document.querySelectorAll(".capture-card").forEach((card) => {
     if (!card.querySelector(".capture-actions")) card.insertAdjacentHTML("beforeend", captureActionsMarkup());
@@ -1924,12 +2032,7 @@ function signatureRows() {
 }
 
 function attachmentRows() {
-  return requiredCaptureKeys().map((key) => `
-    <div class="print-attachment">
-      <span>${state.uploadedCaptures.has(key) ? "Allegato presente" : "Allegato mancante"}</span>
-      ${escapeHtml(key.replaceAll("-", " "))}
-    </div>
-  `).join("");
+  return printableAttachmentRows(requiredCaptureKeys(), state.uploadedCaptures, state.captureFiles);
 }
 
 function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
@@ -2308,6 +2411,7 @@ previewBody.addEventListener("click", (event) => {
 });
 
 document.getElementById("exportDailyPdf").addEventListener("click", exportDailySearchPdf);
+document.getElementById("exportMonthlyPdf").addEventListener("click", exportMonthlySearchPdf);
 document.getElementById("clearActSearch").addEventListener("click", clearActSearch);
 
 document.getElementById("documentType").addEventListener("change", () => {
@@ -2385,7 +2489,7 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
   });
 });
 
-document.addEventListener("change", (event) => {
+document.addEventListener("change", async (event) => {
   if (!event.target.matches(".capture-card input")) return;
   const card = event.target.closest(".capture-card");
   const key = card?.dataset.captureKey;
@@ -2394,10 +2498,18 @@ document.addEventListener("change", (event) => {
   if (file) {
     const previous = state.captureFiles.get(key);
     if (previous?.url) URL.revokeObjectURL(previous.url);
+    const objectUrl = URL.createObjectURL(file);
+    let dataUrl = "";
+    try {
+      dataUrl = await fileToDataUrl(file);
+    } catch {
+      showToast("Foto caricata, ma anteprima PDF non disponibile.");
+    }
     state.captureFiles.set(key, {
       name: file.name || "Foto allegata",
       type: file.type || "",
-      url: URL.createObjectURL(file)
+      url: objectUrl,
+      dataUrl
     });
   }
   state.uploadedCaptures.add(key);
@@ -2433,8 +2545,8 @@ document.addEventListener("click", (event) => {
     }
     previewTitle.textContent = file.name || "Anteprima foto";
     previewBody.innerHTML = file.type.includes("pdf")
-      ? `<iframe class="capture-preview-frame" src="${file.url}" title="${escapeHtml(file.name)}"></iframe>`
-      : `<img class="capture-preview-image" src="${file.url}" alt="${escapeHtml(file.name)}">`;
+      ? `<iframe class="capture-preview-frame" src="${file.url || file.dataUrl}" title="${escapeHtml(file.name)}"></iframe>`
+      : `<img class="capture-preview-image" src="${file.url || file.dataUrl}" alt="${escapeHtml(file.name)}">`;
     previewModal.hidden = false;
     return;
   }
