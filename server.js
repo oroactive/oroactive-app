@@ -94,8 +94,8 @@ function canManageAccess(user) {
 
 function managedRolesForActor(actor) {
   const role = normalizeRole(actor?.ruolo);
-  if (role === "founder") return ["responsabile", "commesso", "aiuto_commesso"];
-  if (role === "responsabile") return ["commesso", "aiuto_commesso"];
+  if (role === "founder") return ["aiuto_commesso", "commesso", "responsabile"];
+  if (role === "responsabile") return ["aiuto_commesso", "commesso"];
   return [];
 }
 
