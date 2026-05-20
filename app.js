@@ -11,6 +11,10 @@ const state = {
   authToken: localStorage.getItem("oroactive-auth-token") || "",
   currentUser: null,
   syncTimer: null,
+  actsCache: new Map(),
+  archivePage: 1,
+  archivePageSize: 10,
+  searchActive: false,
   cashLimitWarningShown: false,
   bullionVaultPrices: {},
   lastActCaptureAttachments: [],
@@ -40,6 +44,7 @@ const faceIdLoginButton = document.getElementById("faceIdLoginButton");
 const registerFaceIdButton = document.getElementById("registerFaceIdButton");
 const loggedUserName = document.getElementById("loggedUserName");
 const sessionUsername = document.getElementById("sessionUsername");
+const loadingIndicator = document.getElementById("loadingIndicator");
 const appShell = document.querySelector(".app-shell");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
@@ -54,6 +59,8 @@ const documentLabels = {
 };
 const apiBase = "/api";
 const CASH_PAYMENT_LIMIT = 499.99;
+const ACT_LIST_LIMIT = 50;
+const ACT_CACHE_TTL = 30000;
 const QUALITY_FLAG_POINTS = 1;
 const ROLE_LEVELS = [
   { role: "aiuto_commesso", label: "Commesso OroActive", points: 1000 },
@@ -167,29 +174,96 @@ function removeLegacySearchMenu() {
   });
 }
 
+function showLoading(message = "Caricamento in corso...") {
+  if (!loadingIndicator) return;
+  loadingIndicator.querySelector("span").textContent = message;
+  loadingIndicator.hidden = false;
+}
+
+function hideLoading() {
+  if (loadingIndicator) loadingIndicator.hidden = true;
+}
+
+function queryString(params = {}) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") search.set(key, value);
+  });
+  return search.toString();
+}
+
 async function apiRequest(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
-  const response = await fetch(`${apiBase}${path}`, {
-    headers,
-    ...options
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    if (response.status === 401 && !path.startsWith("/auth/login")) {
-      showLogin();
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs || 18000);
+  try {
+    const response = await fetch(`${apiBase}${path}`, {
+      headers,
+      ...options,
+      signal: options.signal || controller.signal
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      if (response.status === 401 && !path.startsWith("/auth/login")) {
+        showLogin();
+      }
+      throw new Error(body.error || "Errore comunicazione server");
     }
-    throw new Error(body.error || "Errore comunicazione server");
+    return response.json();
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("Connessione lenta: riprova tra qualche secondo.");
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  return response.json();
 }
 
-async function loadSavedActs() {
+function mergeActsIntoCache(acts = []) {
+  acts.forEach((saved) => {
+    const index = demoActs.findIndex(
+      (item) => (saved.id && item.id === saved.id) || item.practiceNumber === saved.practiceNumber
+    );
+    if (index >= 0) demoActs[index] = { ...demoActs[index], ...saved };
+    else demoActs.unshift(saved);
+  });
+}
+
+async function loadSavedActs(options = {}) {
+  const {
+    force = false,
+    store = "",
+    field = "",
+    q = "",
+    limit = ACT_LIST_LIMIT,
+    offset = 0,
+    silent = false
+  } = options;
+  const endpoint = q ? "/atti/search" : "/atti";
+  const params = queryString({ store, field, q, limit, offset });
+  const cacheKey = `${endpoint}?${params}`;
+  const cached = state.actsCache.get(cacheKey);
+  if (!force && cached && Date.now() - cached.time < ACT_CACHE_TTL) {
+    mergeActsIntoCache(cached.acts);
+    return cached.acts;
+  }
+
   try {
-    const acts = await apiRequest("/atti");
-    demoActs.splice(0, demoActs.length, ...acts);
+    if (!silent) showLoading("Caricamento atti...");
+    const acts = await apiRequest(`${endpoint}${params ? `?${params}` : ""}`);
+    state.actsCache.set(cacheKey, { time: Date.now(), acts });
+    if (store && !q) {
+      for (let index = demoActs.length - 1; index >= 0; index -= 1) {
+        if (demoActs[index].store === store) demoActs.splice(index, 1);
+      }
+    }
+    mergeActsIntoCache(acts);
+    return acts;
   } catch (error) {
-    showToast("Database non raggiungibile: controllo connessione server.");
+    if (!silent) showToast(error.message || "Database non raggiungibile: controllo connessione server.");
+    return [];
+  } finally {
+    if (!silent) hideLoading();
   }
 }
 
@@ -212,9 +286,16 @@ function isPracticeFormEmpty() {
 }
 
 async function syncActsFromServer() {
-  await loadSavedActs();
-  renderArchiveGroups();
-  renderFusionGroups();
+  const activeArchive = document.getElementById("archive")?.classList.contains("active-screen");
+  const activeFusion = document.getElementById("fusion")?.classList.contains("active-screen");
+  if (activeArchive) {
+    await loadArchiveScreenData({ force: true, silent: true });
+    renderArchiveGroups();
+  }
+  if (activeFusion) {
+    await loadFusionScreenData({ force: true, silent: true });
+    renderFusionGroups();
+  }
   if (isAdmin() && document.getElementById("users")?.classList.contains("active-screen")) {
     await loadUsers();
   }
@@ -228,10 +309,17 @@ async function syncActsFromServer() {
 async function saveActRecord(act, method = "POST") {
   const identifier = act.id || act.practiceNumber;
   const path = method === "PUT" ? `/atti/${encodeURIComponent(identifier)}` : "/atti";
-  const saved = await apiRequest(path, {
-    method,
-    body: JSON.stringify(act)
-  });
+  showLoading("Salvataggio pratica...");
+  let saved;
+  try {
+    saved = await apiRequest(path, {
+      method,
+      body: JSON.stringify(act)
+    });
+  } finally {
+    hideLoading();
+  }
+  state.actsCache.clear();
   const index = demoActs.findIndex(
     (item) => (saved.id && item.id === saved.id) || item.practiceNumber === saved.practiceNumber
   );
@@ -244,12 +332,14 @@ async function deleteActRecord(practiceNumber) {
   const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
   const identifier = act?.id || practiceNumber;
   await apiRequest(`/atti/${encodeURIComponent(identifier)}`, { method: "DELETE" });
+  state.actsCache.clear();
   const index = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
   if (index >= 0) demoActs.splice(index, 1);
 }
 
 async function getActRecord(identifier) {
   try {
+    showLoading("Apertura pratica...");
     const saved = await apiRequest(`/atti/${encodeURIComponent(identifier)}`);
     const index = demoActs.findIndex(
       (item) => (saved.id && item.id === saved.id) || item.practiceNumber === saved.practiceNumber
@@ -259,6 +349,8 @@ async function getActRecord(identifier) {
     return saved;
   } catch {
     return demoActs.find((item) => item.id === identifier || item.practiceNumber === identifier) || null;
+  } finally {
+    hideLoading();
   }
 }
 
@@ -272,6 +364,8 @@ function showToast(message) {
 function showLogin() {
   state.authToken = "";
   state.currentUser = null;
+  state.actsCache.clear();
+  demoActs.splice(0, demoActs.length);
   localStorage.removeItem("oroactive-auth-token");
   loginScreen.hidden = false;
   splashScreen.classList.add("hidden");
@@ -386,7 +480,6 @@ function applyRolePermissions() {
 async function startAuthenticatedApp() {
   showAuthenticatedShell();
   applyRolePermissions();
-  await loadSavedActs();
   renderStep();
   await setPracticeMeta();
   applyRolePermissions();
@@ -399,12 +492,10 @@ async function startAuthenticatedApp() {
   renderPaymentCaptureCard();
   updateChecklistState();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
-  renderArchiveGroups();
-  renderFusionGroups();
-  if (isAdmin()) await loadUsers();
-  await refreshBullionVaultPrices();
+  if (isAdmin()) loadUsers();
+  refreshBullionVaultPrices();
   maybeShowLevelUnlockMessage();
-  if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 5000);
+  if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 30000);
 }
 
 async function restoreSession() {
@@ -567,6 +658,18 @@ function setScreen(id) {
   screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
   navItems.forEach((item) => item.classList.toggle("active", item.dataset.section === id));
   if (practiceTopbar) practiceTopbar.hidden = id !== "practice";
+  handleScreenDataLoad(id);
+}
+
+async function handleScreenDataLoad(id) {
+  if (id === "archive") {
+    await loadArchiveScreenData();
+    renderArchiveGroups();
+  }
+  if (id === "fusion") {
+    await loadFusionScreenData();
+    renderFusionGroups();
+  }
 }
 
 function closeBrandMenu() {
@@ -1207,24 +1310,30 @@ function buildActsPdfPacket(title, subtitle, acts) {
 async function requestPdf(path, payload, filename) {
   const headers = { "Content-Type": "application/json" };
   if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
-  const response = await fetch(`${apiBase}${path}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload)
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error || "PDF non generato.");
+  showLoading("Preparazione PDF...");
+  let response;
+  try {
+    response = await fetch(`${apiBase}${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || "PDF non generato.");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } finally {
+    hideLoading();
   }
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
 
 function parseActDate(date) {
@@ -1314,10 +1423,37 @@ function archiveSearchValue(act, field) {
   return String(values[field] ?? "").toLowerCase();
 }
 
+function selectedArchiveStore() {
+  return document.getElementById("archiveStoreFilter")?.value || "Busto Arsizio";
+}
+
+function selectedFusionStore() {
+  return document.getElementById("fusionStoreFilter")?.value || "Busto Arsizio";
+}
+
+async function loadArchiveScreenData(options = {}) {
+  await loadSavedActs({
+    force: options.force || false,
+    store: selectedArchiveStore(),
+    limit: ACT_LIST_LIMIT,
+    silent: options.silent || false
+  });
+}
+
+async function loadFusionScreenData(options = {}) {
+  await loadSavedActs({
+    force: options.force || false,
+    store: selectedFusionStore(),
+    limit: ACT_LIST_LIMIT,
+    silent: options.silent || false
+  });
+}
+
 function archiveVisibleActs() {
-  const selectedStore = document.getElementById("archiveStoreFilter")?.value || "Busto Arsizio";
+  const selectedStore = selectedArchiveStore();
   const field = document.getElementById("searchField")?.value || "name";
   const keyword = document.getElementById("searchKeyword")?.value.trim().toLowerCase() || "";
+  if (state.searchActive && keyword) return state.lastSearchResults;
   return demoActs.filter((act) => {
     const storeMatches = act.store === selectedStore;
     const keywordMatches = !keyword || archiveSearchValue(act, field).includes(keyword);
@@ -1339,7 +1475,12 @@ function renderArchiveGroups() {
     return;
   }
 
-  const grouped = acts.reduce((groups, act) => {
+  const totalPages = Math.max(1, Math.ceil(acts.length / state.archivePageSize));
+  state.archivePage = Math.min(Math.max(1, state.archivePage), totalPages);
+  const start = (state.archivePage - 1) * state.archivePageSize;
+  const visiblePageActs = acts.slice(start, start + state.archivePageSize);
+
+  const grouped = visiblePageActs.reduce((groups, act) => {
     const { day, monthName } = dateParts(act.date);
     groups[monthName] ||= {};
     groups[monthName][day] ||= [];
@@ -1372,7 +1513,18 @@ function renderArchiveGroups() {
         </div>
       `).join("")}
     </section>
-  `).join("");
+  `).join("") + archivePaginationMarkup(acts.length, totalPages);
+}
+
+function archivePaginationMarkup(total, totalPages) {
+  if (totalPages <= 1) return "";
+  return `
+    <div class="archive-pagination">
+      <button type="button" data-archive-page="${state.archivePage - 1}" ${state.archivePage <= 1 ? "disabled" : ""}>Indietro</button>
+      <span>Pagina ${state.archivePage} di ${totalPages} - ${total} atti caricati</span>
+      <button type="button" data-archive-page="${state.archivePage + 1}" ${state.archivePage >= totalPages ? "disabled" : ""}>Avanti</button>
+    </div>
+  `;
 }
 
 function buildArchiveDayExport(store, date, acts) {
@@ -1819,6 +1971,26 @@ function storeCodeFromAct(act) {
   }[act.store] || "BUSTO";
 }
 
+function restoreCaptureStateFromAct(act) {
+  const restoredCaptures = new Set(Array.isArray(act.captures) ? act.captures : []);
+  state.captureFiles.clear();
+
+  (act.captureAttachments || []).forEach((attachment) => {
+    if (!attachment?.key) return;
+    const source = attachment.dataUrl || attachment.url || "";
+    restoredCaptures.add(attachment.key);
+    state.captureFiles.set(attachment.key, {
+      name: attachment.name || attachmentLabel(attachment.key),
+      type: attachment.type || (String(source).startsWith("data:application/pdf") ? "application/pdf" : "image/jpeg"),
+      dataUrl: source,
+      url: source
+    });
+  });
+
+  state.uploadedCaptures = restoredCaptures;
+  state.attachments = restoredCaptures.size;
+}
+
 async function loadActForEdit(practiceNumber) {
   const act = await getActRecord(practiceNumber);
   if (!act) {
@@ -1863,18 +2035,7 @@ async function loadActForEdit(practiceNumber) {
 
   document.getElementById("printWeightCustomer").checked = Boolean(act.printWeightCustomer);
   state.signatures = Array.isArray(act.signatures) ? act.signatures : [true, true, true];
-  state.uploadedCaptures = new Set(Array.isArray(act.captures) ? act.captures : []);
-  state.captureFiles.clear();
-  (act.captureAttachments || []).forEach((attachment) => {
-    if (!attachment.key) return;
-    state.captureFiles.set(attachment.key, {
-      name: attachment.name || attachmentLabel(attachment.key),
-      type: attachment.type || "",
-      dataUrl: attachment.dataUrl || "",
-      url: attachment.dataUrl || ""
-    });
-  });
-  state.attachments = state.uploadedCaptures.size;
+  restoreCaptureStateFromAct(act);
   state.step = 0;
 
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
@@ -1884,6 +2045,8 @@ async function loadActForEdit(practiceNumber) {
   updateSignatureState();
   updateDocumentCaptureCards();
   renderPaymentCaptureCard();
+  renderPreciousCaptureCards();
+  updateAttachmentState();
 
   if (Array.isArray(act.bullionQuotes)) {
     act.bullionQuotes.forEach((quote) => {
@@ -2330,18 +2493,28 @@ function clearActSearch() {
   const keyword = document.getElementById("searchKeyword");
   if (keyword) keyword.value = "";
   state.lastSearchResults = [];
+  state.searchActive = false;
+  state.archivePage = 1;
   renderArchiveGroups();
 }
 
-function runActSearch() {
-  const keyword = document.getElementById("searchKeyword").value.trim().toLowerCase();
+async function runActSearch() {
+  const keyword = document.getElementById("searchKeyword").value.trim();
   if (!keyword) {
     showToast("Inserisci una parola chiave da ricercare.");
     return;
   }
 
-  const results = archiveVisibleActs();
+  const results = await loadSavedActs({
+    force: true,
+    store: selectedArchiveStore(),
+    field: document.getElementById("searchField")?.value || "name",
+    q: keyword,
+    limit: ACT_LIST_LIMIT
+  });
   state.lastSearchResults = results;
+  state.searchActive = true;
+  state.archivePage = 1;
   renderArchiveGroups();
   if (!results.length) showToast("Nessun atto trovato nel negozio selezionato.");
 }
@@ -2881,7 +3054,7 @@ function imageFileToOptimizedDataUrl(file) {
     reader.onload = () => {
       const image = new Image();
       image.onload = () => {
-        const maxSide = 1800;
+        const maxSide = 1200;
         const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(image.width * scale));
@@ -2890,7 +3063,7 @@ function imageFileToOptimizedDataUrl(file) {
         ctx.fillStyle = "#fff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.88));
+        resolve(canvas.toDataURL("image/jpeg", 0.74));
       };
       image.onerror = reject;
       image.src = String(reader.result || "");
@@ -2898,6 +3071,29 @@ function imageFileToOptimizedDataUrl(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function revokeCaptureUrl(file) {
+  if (file?.url && String(file.url).startsWith("blob:")) URL.revokeObjectURL(file.url);
+}
+
+function capturePreviewSource(file) {
+  return file?.dataUrl || file?.url || "";
+}
+
+function isCapturePdf(file, source) {
+  return String(file?.type || "").includes("pdf") || String(source || "").startsWith("data:application/pdf");
+}
+
+function canvasToOptimizedDataUrl(canvas) {
+  const output = document.createElement("canvas");
+  output.width = canvas.width;
+  output.height = canvas.height;
+  const ctx = output.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, output.width, output.height);
+  ctx.drawImage(canvas, 0, 0);
+  return output.toDataURL("image/jpeg", 0.72);
 }
 
 function ensureCaptureActions() {
@@ -2970,7 +3166,7 @@ function buildWeightBlock(label) {
 function signatureRows() {
   return [...document.querySelectorAll("canvas[data-signature]")].map((canvas, index) => {
     const labels = ["Firma vendita", "Firma dichiarazioni", "Firma privacy"];
-    const image = state.signatures[index] ? canvas.toDataURL("image/png") : "";
+    const image = state.signatures[index] ? canvasToOptimizedDataUrl(canvas) : "";
     return `
       <div class="print-signature">
         <span>${labels[index]}</span>
@@ -2982,7 +3178,7 @@ function signatureRows() {
 
 function signatureImages() {
   return [...document.querySelectorAll("canvas[data-signature]")].map((canvas, index) => (
-    state.signatures[index] ? (state.loadedSignatureImages[index] || canvas.toDataURL("image/png")) : ""
+    state.signatures[index] ? (state.loadedSignatureImages[index] || canvasToOptimizedDataUrl(canvas)) : ""
   ));
 }
 
@@ -3166,7 +3362,6 @@ async function archiveCurrentPractice(status = "Archiviata") {
   }
   renderArchiveGroups();
   renderFusionGroups();
-  await syncActsFromServer();
   await resetCurrentPractice({ preserveStoreCode: true });
   showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`);
   return true;
@@ -3350,10 +3545,27 @@ document.getElementById("practiceDate").addEventListener("change", async () => {
   updateChecklistState();
 });
 
-document.getElementById("archiveStoreFilter").addEventListener("change", renderArchiveGroups);
-document.getElementById("fusionStoreFilter").addEventListener("change", renderFusionGroups);
+document.getElementById("archiveStoreFilter").addEventListener("change", async () => {
+  state.archivePage = 1;
+  state.searchActive = false;
+  state.lastSearchResults = [];
+  const keyword = document.getElementById("searchKeyword");
+  if (keyword) keyword.value = "";
+  await loadArchiveScreenData({ force: true });
+  renderArchiveGroups();
+});
+document.getElementById("fusionStoreFilter").addEventListener("change", async () => {
+  await loadFusionScreenData({ force: true });
+  renderFusionGroups();
+});
 
 document.getElementById("archiveGroups").addEventListener("click", (event) => {
+  const pageButton = event.target.closest("[data-archive-page]");
+  if (pageButton) {
+    state.archivePage = Number(pageButton.dataset.archivePage) || 1;
+    renderArchiveGroups();
+    return;
+  }
   const feedbackButton = event.target.closest("[data-quality-feedback]");
   if (feedbackButton) {
     showQualityFeedback(feedbackButton.dataset.qualityFeedback);
@@ -3446,10 +3658,21 @@ document.getElementById("documentType").addEventListener("change", () => {
 });
 
 document.getElementById("runActSearch").addEventListener("click", runActSearch);
-document.getElementById("searchField").addEventListener("change", renderArchiveGroups);
+document.getElementById("searchField").addEventListener("change", () => {
+  state.searchActive = false;
+  state.lastSearchResults = [];
+  state.archivePage = 1;
+  renderArchiveGroups();
+});
 
 document.getElementById("searchKeyword").addEventListener("keydown", (event) => {
   if (event.key === "Enter") runActSearch();
+});
+
+document.getElementById("searchKeyword").addEventListener("input", () => {
+  state.searchActive = false;
+  state.lastSearchResults = [];
+  state.archivePage = 1;
 });
 
 document.getElementById("cededItemsTable").addEventListener("click", (event) => {
@@ -3527,8 +3750,7 @@ document.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (file) {
     const previous = state.captureFiles.get(key);
-    if (previous?.url) URL.revokeObjectURL(previous.url);
-    const objectUrl = URL.createObjectURL(file);
+    revokeCaptureUrl(previous);
     let dataUrl = "";
     try {
       dataUrl = await fileToDataUrl(file);
@@ -3538,7 +3760,7 @@ document.addEventListener("change", async (event) => {
     state.captureFiles.set(key, {
       name: file.name || "Foto allegata",
       type: file.type || "",
-      url: objectUrl,
+      url: dataUrl,
       dataUrl
     });
   }
@@ -3569,20 +3791,21 @@ document.addEventListener("click", (event) => {
 
   if (viewButton) {
     const file = state.captureFiles.get(key);
-    if (!file) {
+    const source = capturePreviewSource(file);
+    if (!source) {
       showToast(state.uploadedCaptures.has(key) ? "Allegato presente, anteprima non disponibile in questa sessione." : "Nessuna foto caricata.");
       return;
     }
     previewTitle.textContent = file.name || "Anteprima foto";
-    previewBody.innerHTML = file.type.includes("pdf")
-      ? `<iframe class="capture-preview-frame" src="${file.url || file.dataUrl}" title="${escapeHtml(file.name)}"></iframe>`
-      : `<img class="capture-preview-image" src="${file.url || file.dataUrl}" alt="${escapeHtml(file.name)}">`;
+    previewBody.innerHTML = isCapturePdf(file, source)
+      ? `<iframe class="capture-preview-frame" src="${source}" title="${escapeHtml(file.name)}"></iframe>`
+      : `<img class="capture-preview-image" src="${source}" alt="${escapeHtml(file.name)}">`;
     previewModal.hidden = false;
     return;
   }
 
   const previous = state.captureFiles.get(key);
-  if (previous?.url) URL.revokeObjectURL(previous.url);
+  revokeCaptureUrl(previous);
   state.captureFiles.delete(key);
   state.uploadedCaptures.delete(key);
   state.attachments = state.uploadedCaptures.size;

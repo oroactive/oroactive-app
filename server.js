@@ -17,6 +17,7 @@ const __dirname = path.dirname(__filename);
 const port = Number(process.env.PORT || 3000);
 const actsTable = "atti_vendita";
 const CASH_PAYMENT_LIMIT = 499.99;
+const ACT_LIST_LIMIT = 50;
 const jwtSecret = process.env.JWT_SECRET || "cambia-questa-chiave-jwt-oroactive";
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
@@ -279,8 +280,19 @@ function normalizeAct(input = {}, existing = null) {
   };
 }
 
-function rowToAct(row) {
-  const payload = row.payload || {};
+function compactActPayload(payload = {}) {
+  const {
+    captureAttachments,
+    signatureImages,
+    readOnlyHtml,
+    lastActCaptureAttachments,
+    ...compact
+  } = payload;
+  return compact;
+}
+
+function rowToAct(row, options = {}) {
+  const payload = options.full === false ? compactActPayload(row.payload || {}) : (row.payload || {});
   return {
     ...payload,
     id: row.id,
@@ -405,15 +417,33 @@ function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
   return { where, values };
 }
 
+function queryLimit(value) {
+  const parsed = Number(value || ACT_LIST_LIMIT);
+  if (!Number.isFinite(parsed) || parsed <= 0) return ACT_LIST_LIMIT;
+  return Math.min(parsed, ACT_LIST_LIMIT);
+}
+
+function queryOffset(value) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 async function listActs(query = {}, user = null) {
   const { where, values } = buildActsQuery(query, user);
+  const limit = queryLimit(query.limit);
+  const offset = queryOffset(query.offset);
+  values.push(limit);
+  const limitParameter = `$${values.length}`;
+  values.push(offset);
+  const offsetParameter = `$${values.length}`;
   const result = await pool.query(
     `SELECT * FROM ${actsTable}
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-     ORDER BY data_atto DESC NULLS LAST, act_number DESC NULLS LAST, updated_at DESC`,
+     ORDER BY data_atto DESC NULLS LAST, act_number DESC NULLS LAST, updated_at DESC
+     LIMIT ${limitParameter} OFFSET ${offsetParameter}`,
     values
   );
-  return result.rows.map(rowToAct);
+  return result.rows.map((row) => rowToAct(row, { full: false }));
 }
 
 async function nextActNumber(storeCode, year) {
