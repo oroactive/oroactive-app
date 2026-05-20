@@ -1502,6 +1502,13 @@ canvas {
   font-weight: 800;
 }
 
+.fusion-store-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+  width: min(720px, 100%);
+}
+
 .fusion-totals {
   display: grid;
   justify-items: start;
@@ -1535,6 +1542,48 @@ canvas {
   margin: 0;
   color: var(--gold-dark);
   font-size: 15px;
+}
+
+.fusion-history {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.fusion-day-summary {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #ffc39e;
+  border-radius: 8px;
+  background: #fff8f1;
+}
+
+.fusion-day-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fusion-day-heading h5,
+.fusion-day-heading span,
+.fusion-day-summary p {
+  margin: 0;
+}
+
+.fusion-day-heading h5 {
+  color: var(--gold-dark);
+  font-size: 16px;
+}
+
+.fusion-day-heading span,
+.fusion-day-summary p {
+  color: var(--soft-ink);
+  font-weight: 900;
 }
 
 .fusion-materials {
@@ -1726,6 +1775,31 @@ canvas {
   font-style: normal;
 }
 
+.level-unlock-message {
+  max-width: 760px;
+  margin: 0 auto;
+  border: 1px solid #ffc39e;
+  border-radius: 8px;
+  background: #fff;
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.level-unlock-message h3 {
+  margin: 0 0 18px;
+  color: var(--gold-dark);
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.level-unlock-message p {
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 750;
+}
+
 .user-form-actions {
   position: static;
   z-index: 2;
@@ -1772,6 +1846,62 @@ canvas {
   border-top: 0;
   background: #fff2e8;
   font-weight: 800;
+}
+
+.ddt-copy .archive-export-row {
+  grid-template-columns: 1fr 1fr 0.7fr;
+}
+
+.ddt-header {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.ddt-header img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+}
+
+.ddt-header h1,
+.ddt-header p {
+  margin: 0;
+}
+
+.ddt-header p {
+  color: #555;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ddt-recipient {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #999;
+  padding: 10px;
+}
+
+.ddt-recipient span {
+  display: block;
+  margin-bottom: 3px;
+  color: #555;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.ddt-statement {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.ddt-signatures {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  margin-top: 28px;
 }
 
 .table-row.head {
@@ -2095,7 +2225,8 @@ canvas {
   .archive-header,
   .document-preview,
   .fusion-store-heading,
-  .fusion-material-heading {
+  .fusion-material-heading,
+  .fusion-day-heading {
     align-items: stretch;
     flex-direction: column;
   }
@@ -2181,6 +2312,11 @@ canvas {
 
   .fusion-totals {
     justify-items: start;
+  }
+
+  .fusion-store-totals {
+    grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .archive-table,

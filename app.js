@@ -1638,6 +1638,197 @@ function materialTotalsMarkup(totals, label = "Totali giacenza") {
   `;
 }
 
+function isActFused(act) {
+  return Boolean(act.fusion?.fused);
+}
+
+function actNumberValue(practiceNumber = "") {
+  const match = String(practiceNumber).match(/-(\d+)$/);
+  return match ? Number(match[1]) : 0;
+}
+
+function nextFusionDdtNumber(store) {
+  const numbers = demoActs
+    .filter((act) => act.store === store && act.fusion?.ddtNumber)
+    .map((act) => Number(act.fusion.ddtNumber))
+    .filter(Number.isFinite);
+  return numbers.length ? Math.max(...numbers) + 1 : 1;
+}
+
+function ddtNumberForFusionBatch(store, date) {
+  const existing = demoActs.find((act) => (
+    act.store === store
+    && act.fusion?.fused
+    && act.fusion?.date === date
+    && act.fusion?.ddtNumber
+  ));
+  return existing ? existing.fusion.ddtNumber : nextFusionDdtNumber(store);
+}
+
+function materialLotsForAct(act) {
+  return actMaterials(act).map((material) => {
+    const titles = [...new Set((act.items || [])
+      .filter((item) => item.metal === material.metal)
+      .map((item) => item.title)
+      .filter(Boolean))];
+    return {
+      act,
+      metal: material.metal,
+      title: titles.length ? titles.join(", ") : "Titolo non indicato",
+      weight: Number(material.weight || 0)
+    };
+  });
+}
+
+function fusionLots(acts) {
+  return acts.flatMap(materialLotsForAct);
+}
+
+function fusionLotTotals(acts) {
+  return fusionLots(acts).reduce((totals, lot) => {
+    const key = `${lot.metal}|${lot.title}`;
+    totals[key] ||= { metal: lot.metal, title: lot.title, weight: 0 };
+    totals[key].weight += lot.weight;
+    return totals;
+  }, {});
+}
+
+function fusionSummaryText(acts) {
+  const lots = Object.values(fusionLotTotals(acts));
+  if (!lots.length) return "Nessun materiale registrato.";
+  return lots
+    .map((lot) => `${lot.metal} ${lot.title}: ${lot.weight.toFixed(2)} gr`)
+    .join(" - ");
+}
+
+function fusionDdtCode(store, date, number) {
+  const year = String(date || localDateKey()).slice(0, 4);
+  return `${storeCodeFromName(store)}-${year}-${number}`;
+}
+
+function fusionDdtHtml(store, date, acts) {
+  const orderedActs = [...acts].sort((first, second) => actNumberValue(first.practiceNumber) - actNumberValue(second.practiceNumber));
+  const firstAct = orderedActs[0]?.practiceNumber || "";
+  const lastAct = orderedActs.at(-1)?.practiceNumber || "";
+  const ddtNumber = orderedActs[0]?.fusion?.ddtNumber || ddtNumberForFusionBatch(store, date);
+  const lots = Object.values(fusionLotTotals(orderedActs));
+  const totalsByMetal = materialTotalMap(orderedActs);
+  const overallWeight = lots.reduce((sum, lot) => sum + lot.weight, 0);
+
+  return `
+    <section class="print-copy ddt-copy">
+      <div class="ddt-header">
+        <img src="oroactive-logo.png" alt="OroActive">
+        <div>
+          <h1>Documento di Trasporto - Fusione</h1>
+          <p>OroActive Compro Oro</p>
+          <p>Ragione sociale, sede legale, P.IVA e riferimenti societari futuri</p>
+        </div>
+      </div>
+
+      <div class="print-meta">
+        <div class="print-field"><span>DDT n.</span>${escapeHtml(fusionDdtCode(store, date, ddtNumber))}</div>
+        <div class="print-field"><span>Data DDT</span>${escapeHtml(date)}</div>
+        <div class="print-field"><span>Negozio</span>${escapeHtml(store)}</div>
+      </div>
+
+      <h2>Destinatario</h2>
+      <div class="ddt-recipient">
+        <div><span>Destinatario</span>______________________________________________</div>
+        <div><span>Sede</span>______________________________________________________</div>
+        <div><span>P.IVA / C.F.</span>_______________________________________________</div>
+      </div>
+
+      <h2>Materiale destinato alla fusione</h2>
+      <p class="ddt-statement">
+        Vi consegnamo grammi di materiale prezioso usato destinato alla fusione di ${escapeHtml(store)}
+        da atto n. ${escapeHtml(firstAct)} a atto n. ${escapeHtml(lastAct)}.
+      </p>
+      <div class="archive-export-table ddt-lot-table">
+        <div class="archive-export-row head"><span>Materiale</span><span>Titolo / caratura</span><span>Grammi</span></div>
+        ${lots.map((lot) => `
+          <div class="archive-export-row">
+            <strong>${escapeHtml(lot.metal)}</strong>
+            <span>${escapeHtml(lot.title)}</span>
+            <span>${escapeHtml(lot.weight.toFixed(2))} gr</span>
+          </div>
+        `).join("")}
+      </div>
+
+      <h2>Totale grammi di scarico</h2>
+      <div class="print-grid">
+        ${metalOrder.map((metal) => `
+          <div class="print-field"><span>${escapeHtml(metal)}</span>${escapeHtml((totalsByMetal[metal] || 0).toFixed(2))} gr</div>
+        `).join("")}
+        <div class="print-field"><span>Totale complessivo</span>${escapeHtml(overallWeight.toFixed(2))} gr</div>
+      </div>
+
+      <h2>Atti inclusi nel DDT</h2>
+      <div class="archive-export-table ddt-act-table">
+        <div class="archive-export-row head"><span>Atto</span><span>Cliente</span><span>Data acquisto</span></div>
+        ${orderedActs.map((act) => `
+          <div class="archive-export-row">
+            <strong>${escapeHtml(act.practiceNumber)}</strong>
+            <span>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</span>
+            <span>${escapeHtml(act.date)}</span>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="ddt-signatures">
+        <div>Firma consegnatario ____________________________</div>
+        <div>Firma destinatario _____________________________</div>
+      </div>
+    </section>
+  `;
+}
+
+function printFusionDdt(store, date) {
+  const acts = demoActs.filter((act) => act.store === store && act.fusion?.fused && act.fusion?.date === date);
+  if (!acts.length) {
+    showToast("Nessun atto fuso presente per creare il DDT.");
+    return;
+  }
+  printPacket.innerHTML = fusionDdtHtml(store, date, acts);
+  window.print();
+}
+
+async function confirmActFusion(practiceNumber) {
+  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+  if (!act) {
+    showToast("Atto di vendita non trovato.");
+    return;
+  }
+
+  const today = localDateKey();
+  const legalDate = addDays(act.date, 10);
+  const confirmed = window.confirm(
+    `L'atto ${practiceNumber} risulta fondibile secondo i termini di legge dal ${legalDate}. Puoi decidere se procedere comunque con la fusione oppure attendere i termini di legge. Vuoi confermare lo scarico dalla giacenza e mandarlo in fusione?`
+  );
+  if (!confirmed) return;
+
+  const updatedAct = {
+    ...act,
+    fusion: {
+      ...(act.fusion || {}),
+      fused: true,
+      date: today,
+      time: new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }),
+      legalFusionDate: legalDate,
+      ddtNumber: ddtNumberForFusionBatch(act.store, today),
+      fusedBy: displayUsername(state.currentUser)
+    }
+  };
+
+  try {
+    await saveActRecord(updatedAct, "PUT");
+    await syncActsFromServer();
+    showToast(`Atto ${practiceNumber} scaricato dalla giacenza e inserito nella fusione del giorno.`);
+  } catch {
+    showToast("Fusione non salvata: controlla la connessione al database.");
+  }
+}
+
 function fusionActRows(acts, options = {}) {
   if (!acts.length) return '<div class="empty-state">Nessun atto presente.</div>';
   const today = localDateKey();
@@ -1654,6 +1845,7 @@ function fusionActRows(acts, options = {}) {
           <div class="row-actions">
             <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
             <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
+            ${isActFused(act) ? "" : `<button class="warning-button" type="button" data-fuse-act="${escapeHtml(act.practiceNumber)}">Fondi</button>`}
             <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
           </div>
         </div>
@@ -1686,13 +1878,21 @@ function renderFusionGroups() {
     .filter((store) => grouped[store]?.length)
     .map((store) => {
       const storeActs = grouped[store];
-      const storeTotals = materialTotalMap(storeActs);
-      const readyActs = storeActs.filter((act) => act.daysElapsed >= 10);
+      const stockActs = storeActs.filter((act) => !isActFused(act));
+      const fusedActs = storeActs.filter(isActFused);
+      const storeTotals = materialTotalMap(stockActs);
+      const readyActs = stockActs.filter((act) => act.daysElapsed >= 10);
       const readyTotals = materialTotalMap(readyActs);
-      const orderedStoreActs = [...storeActs].sort((first, second) => {
+      const orderedStoreActs = [...stockActs].sort((first, second) => {
         const fusionCompare = String(first.fusionDate || "").localeCompare(String(second.fusionDate || ""));
         return fusionCompare || String(second.date || "").localeCompare(String(first.date || ""));
       });
+      const fusedByDay = fusedActs.reduce((days, act) => {
+        const date = act.fusion?.date || localDateKey();
+        days[date] ||= [];
+        days[date].push(act);
+        return days;
+      }, {});
 
       return `
         <section class="fusion-store">
@@ -1708,6 +1908,25 @@ function renderFusionGroups() {
           </div>
           <div class="fusion-materials single-fusion-table">
             ${fusionActRows(orderedStoreActs)}
+          </div>
+          <div class="fusion-history">
+            <div class="fusion-material-heading">
+              <h4>Fusioni confermate</h4>
+              <span>${escapeHtml(fusedActs.length)} atti fusi</span>
+            </div>
+            ${Object.entries(fusedByDay).sort(([a], [b]) => b.localeCompare(a)).map(([date, dayActs]) => `
+              <section class="fusion-day-summary">
+                <div class="fusion-day-heading">
+                  <div>
+                    <h5>Fusione del ${escapeHtml(date)}</h5>
+                    <span>DDT ${escapeHtml(fusionDdtCode(store, date, dayActs[0]?.fusion?.ddtNumber || ddtNumberForFusionBatch(store, date)))}</span>
+                  </div>
+                  <button class="primary-button" type="button" data-fusion-ddt-store="${escapeHtml(store)}" data-fusion-ddt-date="${escapeHtml(date)}">Prepara PDF DDT Fusione</button>
+                </div>
+                <p>${escapeHtml(fusionSummaryText(dayActs))}</p>
+                ${fusionActRows(dayActs, { ready: true })}
+              </section>
+            `).join("") || '<div class="empty-state">Nessuna fusione confermata per questo negozio.</div>'}
           </div>
         </section>
       `;
@@ -2701,6 +2920,16 @@ document.getElementById("archiveGroups").addEventListener("click", (event) => {
 });
 
 document.getElementById("fusionGroups").addEventListener("click", (event) => {
+  const ddtButton = event.target.closest("[data-fusion-ddt-store]");
+  if (ddtButton) {
+    printFusionDdt(ddtButton.dataset.fusionDdtStore, ddtButton.dataset.fusionDdtDate);
+    return;
+  }
+  const fuseButton = event.target.closest("[data-fuse-act]");
+  if (fuseButton) {
+    confirmActFusion(fuseButton.dataset.fuseAct);
+    return;
+  }
   const deleteButton = event.target.closest("[data-delete-act]");
   if (deleteButton) {
     deleteAct(deleteButton.dataset.deleteAct);
