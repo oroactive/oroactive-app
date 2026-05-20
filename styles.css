@@ -894,6 +894,41 @@ textarea {
   line-height: 1.35;
 }
 
+.material-amount-panel {
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid #ffc39e;
+  border-radius: 8px;
+  background: #fff9f4;
+}
+
+.material-amount-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.material-amount-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 0.5fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.material-amount-field span {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.material-amount-field input {
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
 .row-number {
   min-height: 50px;
   border-radius: 8px;
@@ -1535,6 +1570,15 @@ canvas {
   grid-template-columns: 1fr 1.2fr 0.75fr 0.85fr 0.62fr 0.7fr;
 }
 
+.stats-table .table-row {
+  grid-template-columns: 0.9fr 0.85fr 0.75fr 0.85fr 0.85fr 0.5fr 0.75fr 0.85fr 0.85fr;
+}
+
+.stats-preview h3,
+.stats-preview p {
+  margin: 0 0 10px;
+}
+
 .presence {
   justify-self: start;
   border-radius: 999px;
@@ -1930,6 +1974,7 @@ canvas {
   .item-row,
   .ceded-item-row,
   .bullion-quote-field,
+  .material-amount-field,
   .internal-weight,
   .weight-fields,
   .metal-weight-fields,
@@ -1942,7 +1987,8 @@ canvas {
   .archive-search-panel,
   .table-row,
   .search-table .table-row,
-  .fusion-table .table-row {
+  .fusion-table .table-row,
+  .stats-table .table-row {
     grid-template-columns: 1fr;
   }
 

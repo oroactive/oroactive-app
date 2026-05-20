@@ -422,6 +422,7 @@ function renderUsers(users) {
         <div class="row-actions">
           <select data-user-action="${escapeHtml(String(user.id))}" aria-label="Azioni utente">
             <option value="">Azioni</option>
+            <option value="stats">Statistiche</option>
             <option value="edit">Modifica</option>
             <option value="delete">Elimina</option>
           </select>
@@ -502,6 +503,102 @@ async function deleteUser(id) {
   }
 }
 
+function actOperatorKey(act) {
+  return String(act.operatorUsername || act.operatorName || "").trim().toLowerCase();
+}
+
+function userOperatorKey(user) {
+  return String(displayUsername(user) || user.nome || "").trim().toLowerCase();
+}
+
+function actSpentAmount(act) {
+  const materialSum = Array.isArray(act.materialAmounts)
+    ? act.materialAmounts.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    : 0;
+  return materialSum > 0 ? materialSum : Number(act.amount || 0);
+}
+
+function actWeightAmount(act) {
+  const materialSum = Array.isArray(act.materials)
+    ? act.materials.reduce((sum, row) => sum + Number(row.weight || 0), 0)
+    : 0;
+  return materialSum > 0 ? materialSum : Number(act.weight || 0);
+}
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function monthKey(date = new Date()) {
+  return localDateKey(date).slice(0, 7);
+}
+
+function computeStatsRows(user) {
+  const operatorKey = userOperatorKey(user);
+  const today = localDateKey();
+  const currentMonth = monthKey();
+  const userActs = demoActs.filter((act) => actOperatorKey(act) === operatorKey);
+  const stores = [...new Set(userActs.map((act) => act.store || user.negozio).filter(Boolean))];
+
+  return stores.map((store) => {
+    const storeActs = userActs.filter((act) => (act.store || user.negozio) === store);
+    const dailyActs = storeActs.filter((act) => String(act.date || "").slice(0, 10) === today);
+    const monthlyActs = storeActs.filter((act) => String(act.date || "").slice(0, 7) === currentMonth);
+    const dailyWeight = dailyActs.reduce((sum, act) => sum + actWeightAmount(act), 0);
+    const dailySpent = dailyActs.reduce((sum, act) => sum + actSpentAmount(act), 0);
+    const monthlyWeight = monthlyActs.reduce((sum, act) => sum + actWeightAmount(act), 0);
+    const monthlySpent = monthlyActs.reduce((sum, act) => sum + actSpentAmount(act), 0);
+
+    return {
+      store,
+      operator: displayUsername(user),
+      dailyWeight,
+      dailySpent,
+      dailyAverage: dailyWeight > 0 ? dailySpent / dailyWeight : 0,
+      dailyClients: dailyActs.length,
+      monthlyWeight,
+      monthlySpent,
+      monthlyAverage: monthlyWeight > 0 ? monthlySpent / monthlyWeight : 0
+    };
+  });
+}
+
+async function showUserStatistics(id) {
+  const user = (state.users || []).find((item) => String(item.id) === String(id));
+  if (!user) return;
+  await loadSavedActs();
+  const rows = computeStatsRows(user);
+  previewTitle.textContent = `Statistiche ${displayUsername(user)}`;
+  previewBody.innerHTML = `
+    <section class="stats-preview">
+      <h3>${escapeHtml(displayUsername(user))}</h3>
+      <p>Statistiche acquisto oggetti preziosi suddivise per negozio e operatore.</p>
+      ${rows.length ? `
+        <div class="archive-table stats-table">
+          <div class="table-row head"><span>Negozio</span><span>Operatore</span><span>Grammi giorno</span><span>Speso giorno</span><span>Media giorno</span><span>Clienti</span><span>Grammi mese</span><span>Speso mese</span><span>Media mese</span></div>
+          ${rows.map((row) => `
+            <div class="table-row">
+              <strong>${escapeHtml(row.store)}</strong>
+              <span>${escapeHtml(row.operator)}</span>
+              <span>${escapeHtml(row.dailyWeight.toFixed(2))} gr</span>
+              <span>${escapeHtml(formatEuro(row.dailySpent))}</span>
+              <span>${escapeHtml(formatEuro(row.dailyAverage))}/gr</span>
+              <span>${escapeHtml(row.dailyClients)}</span>
+              <span>${escapeHtml(row.monthlyWeight.toFixed(2))} gr</span>
+              <span>${escapeHtml(formatEuro(row.monthlySpent))}</span>
+              <span>${escapeHtml(formatEuro(row.monthlyAverage))}/gr</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : '<div class="empty-state">Nessun atto collegato a questo operatore.</div>'}
+    </section>
+  `;
+  previewModal.hidden = false;
+}
+
 function normalizeWorkflowStatus(status = "Archiviata") {
   if (typeof status !== "string") return "Archiviata";
   const normalized = status.trim().toLowerCase();
@@ -573,10 +670,14 @@ function currentActSnapshot(status = "Archiviata") {
     storeCode: storeSelect?.value || "",
     items,
     bullionQuotes: bullionQuoteRows(),
+    materialAmounts: materialAmountRows(),
     printWeightCustomer: shouldPrintWeightOnCustomerCopy(),
     amount: fieldValue("#saleTotal"),
     paymentMethod: fieldValue("#paymentMethod"),
     operatorNotes: document.querySelector(".textarea-label textarea")?.value || "",
+    operatorId: state.currentUser?.id || null,
+    operatorUsername: displayUsername(state.currentUser),
+    operatorName: [state.currentUser?.nome, state.currentUser?.cognome].filter(Boolean).join(" "),
     weight: totalWeight.toFixed(2),
     materials,
     signatures: [...state.signatures],
@@ -808,6 +909,7 @@ function buildArchivedActFallback(act) {
       <div class="print-grid">
         <div class="print-field"><span>Metodo pagamento</span>${escapeHtml(act.paymentMethod)}</div>
         <div class="print-field"><span>Totale corrisposto</span>${escapeHtml(formatEuro(Number(act.amount)))}</div>
+        ${materialAmountsBlockFromRows(act.materialAmounts || [])}
         <div class="print-field"><span>Note operatore</span>${escapeHtml(act.notes || missing)}</div>
       </div>
 
@@ -994,6 +1096,12 @@ async function loadActForEdit(practiceNumber) {
     act.materials.forEach((material) => {
       const input = document.querySelector(`#totalWeightFields input[data-metal-weight="${material.metal}"]`);
       if (input) input.value = material.weight || "";
+    });
+  }
+  if (Array.isArray(act.materialAmounts)) {
+    act.materialAmounts.forEach((material) => {
+      const input = document.querySelector(`#materialAmountFields input[data-material-amount="${material.metal}"]`);
+      if (input) input.value = material.amount || "";
     });
   }
 
@@ -1418,6 +1526,7 @@ function updateCededItems() {
     : `${materialTypes} tipologie di preziosi registrati`;
   renderBullionQuoteFields();
   renderWeightFields();
+  renderMaterialAmountFields();
   renderPreciousCaptureCards();
   updateAttachmentState();
 }
@@ -1524,6 +1633,12 @@ function missingSaleFields() {
   if (!hasValue("#paymentMethod")) missing.push("Metodo pagamento");
   if (saleTotalAmount() <= 0) missing.push("Totale corrisposto");
   if (cashPaymentLimitViolation()) missing.push("Metodo pagamento a norma di legge");
+  materialAmountRows().forEach((row) => {
+    if (Number(row.amount || 0) <= 0) missing.push(`Importo ${row.metal}`);
+  });
+  if (materialAmountRows().length && Math.abs(materialAmountTotal() - saleTotalAmount()) > 0.01) {
+    missing.push("Ripartizione importo uguale al totale corrisposto");
+  }
 
   const itemRows = [...document.querySelectorAll(".ceded-item-row")];
   if (!itemRows.length) {
@@ -1617,6 +1732,44 @@ function bullionQuoteRows() {
     metal: input.dataset.bullionQuote,
     value: input.value || "Dato non inserito"
   }));
+}
+
+function renderMaterialAmountFields() {
+  const container = document.getElementById("materialAmountFields");
+  if (!container) return;
+
+  const previousValues = {};
+  container.querySelectorAll("input[data-material-amount]").forEach((input) => {
+    previousValues[input.dataset.materialAmount] = input.value;
+  });
+
+  container.innerHTML = activeMetals().map((metal) => `
+    <label class="material-amount-field">
+      <span>Di cui ${metal}</span>
+      <input data-material-amount="${metal}" type="number" min="0" step="0.01" value="${escapeHtml(previousValues[metal] || "")}" placeholder="Importo ${metal.toLowerCase()}">
+    </label>
+  `).join("");
+}
+
+function materialAmountRows() {
+  return [...document.querySelectorAll("#materialAmountFields input[data-material-amount]")].map((input) => ({
+    metal: input.dataset.materialAmount,
+    amount: input.value || "0"
+  }));
+}
+
+function materialAmountTotal() {
+  return materialAmountRows().reduce((sum, row) => sum + Number(row.amount || 0), 0);
+}
+
+function materialAmountsBlockFromRows(rows = materialAmountRows()) {
+  if (!rows.length) return "";
+  return `
+    <div class="print-field material-amount-print">
+      <span>Ripartizione importo</span>
+      ${rows.map((row) => `<strong>${escapeHtml(row.metal)}: ${escapeHtml(formatEuro(Number(row.amount || 0)))}</strong>`).join("")}
+    </div>
+  `;
 }
 
 function buildBullionQuoteBlock() {
@@ -1801,6 +1954,7 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
       <div class="print-grid">
         <div class="print-field"><span>Metodo pagamento</span>${escapeHtml(fieldValue("#paymentMethod"))}</div>
         <div class="print-field"><span>Totale corrisposto</span>${escapeHtml(formatEuro(Number(fieldValue("#saleTotal"))))}</div>
+        ${materialAmountsBlockFromRows()}
         <div class="print-field"><span>Note operatore</span>${escapeHtml(document.querySelector(".textarea-label textarea")?.value || "")}</div>
       </div>
 
@@ -1945,6 +2099,7 @@ document.getElementById("usersList").addEventListener("change", (event) => {
   const select = event.target.closest("[data-user-action]");
   if (!select || !select.value) return;
   const id = select.dataset.userAction;
+  if (select.value === "stats") showUserStatistics(id);
   if (select.value === "edit") editUser(id);
   if (select.value === "delete") deleteUser(id);
   select.value = "";
@@ -2049,6 +2204,8 @@ document.getElementById("saleTotal").addEventListener("input", () => {
   notifyCashPaymentLimitIfNeeded();
   updateChecklistState();
 });
+
+document.getElementById("materialAmountFields").addEventListener("input", updateChecklistState);
 
 document.querySelector(".form-panel").addEventListener("input", (event) => {
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
