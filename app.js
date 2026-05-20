@@ -101,12 +101,6 @@ async function syncActsFromServer() {
     await loadUsers();
   }
 
-  const searchActive = document.getElementById("searchActs")?.classList.contains("active-screen");
-  const keyword = document.getElementById("searchKeyword")?.value.trim();
-  if (searchActive && keyword) {
-    await runActSearch();
-  }
-
   if (!state.editingPracticeNumber && isPracticeFormEmpty()) {
     await updatePracticeNumber();
   }
@@ -329,8 +323,8 @@ function setScreen(id) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
-  const leavingSearch = document.getElementById("searchActs")?.classList.contains("active-screen") && id !== "searchActs";
-  if (leavingSearch) clearActSearch();
+  const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
+  if (leavingArchive) clearActSearch();
   screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
   navItems.forEach((item) => item.classList.toggle("active", item.dataset.section === id));
   if (practiceTopbar) practiceTopbar.hidden = id !== "practice";
@@ -367,35 +361,6 @@ function returnToMainMenu() {
   closeBrandMenu();
   clearActSearch();
   mainMenuScreen.hidden = false;
-}
-
-function renderSearchResults(results) {
-  const container = document.getElementById("searchResults");
-  if (!results.length) {
-    container.innerHTML = '<div class="empty-state">Nessun atto di vendita trovato per la ricerca inserita.</div>';
-    return;
-  }
-
-  container.innerHTML = `
-    <div class="archive-table search-table">
-      <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Negozio</span><span>Data</span><span>Importo</span><span>Pagamento</span><span>Azioni</span></div>
-      ${results.map((act) => `
-        <div class="table-row">
-          <span>${escapeHtml(act.practiceNumber)}</span>
-          <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
-          <span>${escapeHtml(act.store)}</span>
-          <span>${escapeHtml(act.date)}</span>
-          <em>${escapeHtml(formatEuro(Number(act.amount)))}</em>
-          <span>${escapeHtml(act.paymentMethod)}</span>
-          <div class="row-actions">
-            <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
-            <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
-            <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
-          </div>
-        </div>
-      `).join("")}
-    </div>
-  `;
 }
 
 function resetUserForm() {
@@ -610,16 +575,42 @@ function currentActSnapshot(status = "Archiviata") {
   };
 }
 
-function renderArchiveGroups() {
+function archiveSearchValue(act, field) {
+  const values = {
+    name: act.name,
+    surname: act.surname,
+    practiceNumber: act.practiceNumber,
+    date: act.date,
+    store: act.store,
+    amount: act.amount,
+    paymentMethod: act.paymentMethod,
+    weight: act.weight
+  };
+  return String(values[field] ?? "").toLowerCase();
+}
+
+function archiveVisibleActs() {
   const selectedStore = document.getElementById("archiveStoreFilter")?.value || "Busto Arsizio";
+  const field = document.getElementById("searchField")?.value || "name";
+  const keyword = document.getElementById("searchKeyword")?.value.trim().toLowerCase() || "";
+  return demoActs.filter((act) => {
+    const storeMatches = act.store === selectedStore;
+    const keywordMatches = !keyword || archiveSearchValue(act, field).includes(keyword);
+    return storeMatches && keywordMatches;
+  });
+}
+
+function renderArchiveGroups() {
   const container = document.getElementById("archiveGroups");
   if (!container) return;
 
-  const acts = demoActs
-    .filter((act) => act.store === selectedStore)
+  const keyword = document.getElementById("searchKeyword")?.value.trim() || "";
+  const acts = archiveVisibleActs()
     .sort((first, second) => dateValue(second.date) - dateValue(first.date));
   if (!acts.length) {
-    container.innerHTML = '<div class="empty-state">Nessun atto registrato per il negozio selezionato.</div>';
+    container.innerHTML = keyword
+      ? '<div class="empty-state">Nessun atto di vendita trovato per la ricerca inserita nel negozio selezionato.</div>'
+      : '<div class="empty-state">Nessun atto registrato per il negozio selezionato.</div>';
     return;
   }
 
@@ -712,14 +703,10 @@ function exportArchiveDay(date) {
 }
 
 function exportDailySearchPdf() {
-  const field = document.getElementById("searchField").value;
-  const keyword = document.getElementById("searchKeyword").value.trim().toLowerCase();
-  const results = keyword
-    ? demoActs.filter((act) => String(act[field]).toLowerCase().includes(keyword))
-    : state.lastSearchResults;
+  const results = archiveVisibleActs();
 
   if (!results.length) {
-    showToast("Cerca prima gli atti del giorno da esportare.");
+    showToast("Nessun atto da esportare nell'elenco selezionato.");
     return;
   }
 
@@ -871,14 +858,6 @@ async function deleteAct(practiceNumber) {
   state.lastSearchResults = state.lastSearchResults.filter((act) => act.practiceNumber !== practiceNumber);
   renderArchiveGroups();
   renderFusionGroups();
-
-  const searchActive = document.getElementById("searchActs")?.classList.contains("active-screen");
-  const keyword = document.getElementById("searchKeyword")?.value.trim();
-  if (searchActive && keyword) {
-    runActSearch();
-  } else if (searchActive) {
-    renderSearchResults(state.lastSearchResults);
-  }
 
   if (!previewModal.hidden) previewModal.hidden = true;
   showToast(`Atto ${practiceNumber} eliminato.`);
@@ -1180,28 +1159,22 @@ function renderFusionGroups() {
 
 function clearActSearch() {
   const keyword = document.getElementById("searchKeyword");
-  const results = document.getElementById("searchResults");
   if (keyword) keyword.value = "";
-  if (results) results.innerHTML = "";
   state.lastSearchResults = [];
+  renderArchiveGroups();
 }
 
-async function runActSearch() {
-  const field = document.getElementById("searchField").value;
+function runActSearch() {
   const keyword = document.getElementById("searchKeyword").value.trim().toLowerCase();
   if (!keyword) {
     showToast("Inserisci una parola chiave da ricercare.");
     return;
   }
 
-  let results;
-  try {
-    results = await apiRequest(`/atti/search?field=${encodeURIComponent(field)}&q=${encodeURIComponent(keyword)}`);
-  } catch {
-    results = demoActs.filter((act) => String(act[field]).toLowerCase().includes(keyword));
-  }
+  const results = archiveVisibleActs();
   state.lastSearchResults = results;
-  renderSearchResults(results);
+  renderArchiveGroups();
+  if (!results.length) showToast("Nessun atto trovato nel negozio selezionato.");
 }
 
 function renderStep() {
@@ -1864,7 +1837,7 @@ async function completeCurrentPractice() {
 
   if (shouldArchive) {
     await archiveCurrentPractice("Archiviata");
-    showToast("Atto di vendita archiviato. Potrai completarlo da Elenco o Ricerca.");
+    showToast("Atto di vendita archiviato. Potrai completarlo da Elenco.");
     return true;
   }
 
@@ -2049,22 +2022,6 @@ document.getElementById("fusionGroups").addEventListener("click", (event) => {
   openArchivedAct(openButton.dataset.openAct);
 });
 
-document.getElementById("searchResults").addEventListener("click", (event) => {
-  const deleteButton = event.target.closest("[data-delete-act]");
-  if (deleteButton) {
-    deleteAct(deleteButton.dataset.deleteAct);
-    return;
-  }
-  const editButton = event.target.closest("[data-edit-act]");
-  if (editButton) {
-    loadActForEdit(editButton.dataset.editAct);
-    return;
-  }
-  const openButton = event.target.closest("[data-open-act]");
-  if (!openButton) return;
-  openArchivedAct(openButton.dataset.openAct);
-});
-
 previewBody.addEventListener("click", (event) => {
   const editButton = event.target.closest("[data-edit-act]");
   if (editButton) {
@@ -2077,6 +2034,7 @@ previewBody.addEventListener("click", (event) => {
 });
 
 document.getElementById("exportDailyPdf").addEventListener("click", exportDailySearchPdf);
+document.getElementById("clearActSearch").addEventListener("click", clearActSearch);
 
 document.getElementById("documentType").addEventListener("change", () => {
   updateDocumentCaptureCards();
@@ -2084,6 +2042,7 @@ document.getElementById("documentType").addEventListener("change", () => {
 });
 
 document.getElementById("runActSearch").addEventListener("click", runActSearch);
+document.getElementById("searchField").addEventListener("change", renderArchiveGroups);
 
 document.getElementById("searchKeyword").addEventListener("keydown", (event) => {
   if (event.key === "Enter") runActSearch();
