@@ -1537,6 +1537,27 @@ canvas {
   font-size: 15px;
 }
 
+.archive-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #ffc39e;
+  border-radius: 8px;
+  background: #fff5ed;
+}
+
+.archive-totals span {
+  color: var(--soft-ink);
+  font-weight: 900;
+}
+
+.archive-totals strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+}
+
 .archive-table,
 .settings-list {
   background: var(--panel);
@@ -1985,6 +2006,7 @@ canvas {
   .side-panel,
   .settings-grid,
   .archive-search-panel,
+  .archive-totals,
   .table-row,
   .search-table .table-row,
   .fusion-table .table-row,

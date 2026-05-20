@@ -198,7 +198,7 @@ function roleLabel(role) {
 
 function displayUsername(user = {}) {
   if (user.username) return user.username;
-  return user.nome || user.email || "";
+  return user.nome || "";
 }
 
 function isAdmin() {
@@ -415,7 +415,7 @@ function renderUsers(users) {
     ${users.map((user) => `
       <div class="table-row">
         <strong>${escapeHtml(user.nome)} ${escapeHtml(user.cognome)}</strong>
-        <span>${escapeHtml(displayUsername(user))}<br>${escapeHtml(user.email)}</span>
+        <span>${escapeHtml(displayUsername(user))}</span>
         <em>${escapeHtml(roleLabel(user.ruolo))}</em>
         <span>${escapeHtml(userSeesAllStores(user) ? "Tutti" : user.negozio)}</span>
         <span class="presence ${user.online ? "online" : "offline"}">${user.online ? "Online" : "Offline"}</span>
@@ -451,7 +451,6 @@ async function saveUser(event) {
     nome: document.getElementById("userName").value.trim(),
     cognome: document.getElementById("userSurname").value.trim(),
     username: document.getElementById("userUsername").value.trim(),
-    email: document.getElementById("userEmail").value.trim(),
     ruolo: normalizeRole(document.getElementById("userRole").value),
     negozio: document.getElementById("userStore").value
   };
@@ -478,7 +477,6 @@ function editUser(id) {
   document.getElementById("userName").value = user.nome || "";
   document.getElementById("userSurname").value = user.cognome || "";
   document.getElementById("userUsername").value = user.username || "";
-  document.getElementById("userEmail").value = user.email || "";
   document.getElementById("userRole").value = normalizeRole(user.ruolo);
   document.getElementById("userStore").value = userSeesAllStores(user) ? "Tutti" : user.negozio || "Busto Arsizio";
   const password = document.getElementById("userPassword");
@@ -622,6 +620,26 @@ function dateParts(date) {
   };
 }
 
+function archiveTotals(acts) {
+  const weight = acts.reduce((sum, act) => sum + actWeightAmount(act), 0);
+  const spent = acts.reduce((sum, act) => sum + actSpentAmount(act), 0);
+  return {
+    weight,
+    spent,
+    average: weight > 0 ? spent / weight : 0
+  };
+}
+
+function archiveTotalsMarkup(totals, labelPrefix) {
+  return `
+    <div class="archive-totals">
+      <span>${escapeHtml(labelPrefix)} grammi: <strong>${escapeHtml(totals.weight.toFixed(2))} gr</strong></span>
+      <span>${escapeHtml(labelPrefix)} speso: <strong>${escapeHtml(formatEuro(totals.spent))}</strong></span>
+      <span>${escapeHtml(labelPrefix)} media: <strong>${escapeHtml(formatEuro(totals.average))}/gr</strong></span>
+    </div>
+  `;
+}
+
 function parseActDate(date) {
   if (date.includes("-")) {
     const [year, month, day] = date.split("-");
@@ -736,9 +754,11 @@ function renderArchiveGroups() {
   container.innerHTML = Object.entries(grouped).map(([month, days]) => `
     <section class="archive-month">
       <h3>${escapeHtml(month)}</h3>
+      ${archiveTotalsMarkup(archiveTotals(Object.values(days).flat()), "Mensile")}
       ${Object.entries(days).map(([day, dayActs]) => `
         <div class="archive-day">
           <h4>Giorno ${escapeHtml(day)}</h4>
+          ${archiveTotalsMarkup(archiveTotals(dayActs), "Giornaliero")}
           <div class="archive-table">
             <div class="table-row head"><span>Pratica</span><span>Cliente</span><span>Data</span><span>Stato</span><span>Azioni</span></div>
             ${dayActs.map((act) => `

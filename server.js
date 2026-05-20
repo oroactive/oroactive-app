@@ -568,6 +568,8 @@ async function createUser(input, actor) {
   const allowedRoles = managedRolesForActor(actor);
   const finalRole = allowedRoles.includes(role) ? role : allowedRoles.at(-1) || "commesso";
   const finalStore = roleSeesAllStores(finalRole) ? "Tutti" : input.negozio || "Busto Arsizio";
+  const username = String(input.username || "").trim();
+  const generatedEmail = `${username || `utente-${Date.now()}`}@oroactive.local`;
   const result = await pool.query(
     `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
      VALUES ($1, $2, NULLIF($3, ''), LOWER($4), $5, $6, $7)
@@ -575,8 +577,8 @@ async function createUser(input, actor) {
     [
       input.nome || "",
       input.cognome || "",
-      input.username || "",
-      input.email || "",
+      username,
+      generatedEmail,
       passwordHash,
       finalRole,
       finalStore
@@ -611,10 +613,10 @@ async function updateUser(id, input, actor) {
   assertCanManageTarget(actor, target, input.ruolo || target.ruolo);
   const fields = [];
   const values = [];
-  const allowed = ["nome", "cognome", "username", "email", "ruolo", "negozio"];
+  const allowed = ["nome", "cognome", "username", "ruolo", "negozio"];
   allowed.forEach((field) => {
     if (input[field] === undefined) return;
-    let value = field === "email" ? String(input[field]).toLowerCase() : input[field];
+    let value = input[field];
     if (field === "ruolo") value = normalizeRole(value);
     if (field === "negozio" && roleSeesAllStores(input.ruolo || target.ruolo)) value = "Tutti";
     values.push(field === "username" && !value ? null : value);
