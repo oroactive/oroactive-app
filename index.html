@@ -440,6 +440,15 @@
               <p>Atto archiviabile per completamento successivo</p>
               <button class="warning-button practice-archive-button" type="button" id="archivePractice">Chiudi e archivia</button>
               <button class="danger-button practice-delete-button" type="button" id="deleteCurrentPractice">Elimina atto</button>
+              <div class="quality-review-panel" id="qualityReviewPanel" hidden>
+                <span>Controllo qualità atto</span>
+                <div class="quality-review-actions">
+                  <label><input type="radio" name="qualityReviewStatus" value="positive"> Positivo</label>
+                  <label><input type="radio" name="qualityReviewStatus" value="negative"> Negativo</label>
+                </div>
+                <textarea id="qualityReviewFeedback" placeholder="Feedback obbligatorio se negativo"></textarea>
+                <button class="primary-button quality-review-save" type="button" id="saveQualityReview">Salva controllo qualità</button>
+              </div>
             </div>
 
             <div class="checklist">
@@ -567,6 +576,6 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260520-13"></script>
+  <script src="app.js?v=20260520-14"></script>
 </body>
 </html>

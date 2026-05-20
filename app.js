@@ -51,6 +51,12 @@ const documentLabels = {
 };
 const apiBase = "/api";
 const CASH_PAYMENT_LIMIT = 499.99;
+const QUALITY_FLAG_POINTS = 1;
+const ROLE_LEVELS = [
+  { role: "aiuto_commesso", label: "Aiuto Commesso/a", points: 0 },
+  { role: "commesso", label: "Commesso/a", points: 500 },
+  { role: "responsabile", label: "Responsabile", points: 2000 }
+];
 const demoActs = [];
 
 function removeLegacySearchMenu() {
@@ -212,6 +218,10 @@ function isFounder() {
   return normalizeRole(state.currentUser?.ruolo) === "founder";
 }
 
+function canReviewActs(user = state.currentUser) {
+  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
+}
+
 function userSeesAllStores(user = state.currentUser) {
   return ["founder", "responsabile", "commesso"].includes(normalizeRole(user?.ruolo));
 }
@@ -259,6 +269,8 @@ function applyRolePermissions() {
   if (sessionUsername && state.currentUser) {
     sessionUsername.textContent = displayUsername(state.currentUser);
   }
+  const qualityPanel = document.getElementById("qualityReviewPanel");
+  if (qualityPanel) qualityPanel.hidden = !canReviewActs();
   configureUserFormPermissions();
 }
 
@@ -420,7 +432,7 @@ function renderUsers(users) {
   }
 
   container.innerHTML = `
-    <div class="table-row head"><span>Utente</span><span>Accesso</span><span>Ruolo</span><span>Negozio</span><span>Stato</span><span>Azioni</span></div>
+    <div class="table-row head"><span>Utente</span><span>Accesso</span><span>Ruolo</span><span>Negozio</span><span>Stato</span><span>Punteggio</span><span>Azioni</span></div>
     ${users.map((user) => `
       <div class="table-row">
         <strong>${escapeHtml(user.nome)} ${escapeHtml(user.cognome)}</strong>
@@ -428,6 +440,7 @@ function renderUsers(users) {
         <em>${escapeHtml(roleLabel(user.ruolo))}</em>
         <span>${escapeHtml(userSeesAllStores(user) ? "Tutti" : user.negozio)}</span>
         <span class="presence ${user.online ? "online" : "offline"}">${user.online ? "Online" : "Offline"}</span>
+        ${scoreBarMarkup(user)}
         <div class="row-actions">
           <select data-user-action="${escapeHtml(String(user.id))}" aria-label="Azioni utente">
             <option value="">Azioni</option>
@@ -523,6 +536,47 @@ function actSpentAmount(act) {
     ? act.materialAmounts.reduce((sum, row) => sum + Number(row.amount || 0), 0)
     : 0;
   return materialSum > 0 ? materialSum : Number(act.amount || 0);
+}
+
+function positiveFlagsForUser(user) {
+  const key = userOperatorKey(user);
+  return demoActs.filter((act) => actOperatorKey(act) === key && act.qualityReview?.status === "positive").length;
+}
+
+function scoreForUser(user) {
+  return positiveFlagsForUser(user) * QUALITY_FLAG_POINTS;
+}
+
+function scoreProgress(user) {
+  const points = scoreForUser(user);
+  const role = normalizeRole(user?.ruolo);
+  const target = role === "aiuto_commesso"
+    ? { label: "Commesso/a sbloccato", points: 100 }
+    : ROLE_LEVELS.find((level) => level.role === role) || ROLE_LEVELS[0];
+  const percent = Math.min(100, Math.max(0, (points / Math.max(target.points, 1)) * 100));
+  return {
+    points,
+    flags: positiveFlagsForUser(user),
+    target,
+    percent
+  };
+}
+
+function scoreBarMarkup(user) {
+  const score = scoreProgress(user);
+  const unlockText = `${score.points}/${score.target.points} punti`;
+  const levelText = score.points >= score.target.points
+    ? `${score.target.label} raggiunto`
+    : `Obiettivo: ${score.target.label}`;
+  return `
+    <div class="score-wrap">
+      <div class="score-bar" aria-label="Punteggio operatore">
+        <span style="width:${score.percent.toFixed(1)}%"></span>
+      </div>
+      <small>${escapeHtml(unlockText)} - ${escapeHtml(score.flags)} flag positivi</small>
+      <em>${escapeHtml(levelText)}</em>
+    </div>
+  `;
 }
 
 function actWeightAmount(act) {
@@ -768,6 +822,7 @@ function currentActSnapshot(status = "Archiviata") {
     weight: totalWeight.toFixed(2),
     materials,
     captureAttachments,
+    qualityReview: currentQualityReview(),
     signatures: [...state.signatures],
     captures,
     status: normalizeWorkflowStatus(status)
@@ -1133,6 +1188,73 @@ function collectCededItems() {
   });
 }
 
+function currentQualityReview() {
+  const selected = document.querySelector('input[name="qualityReviewStatus"]:checked')?.value || "";
+  const feedback = document.getElementById("qualityReviewFeedback")?.value.trim() || "";
+  if (!selected) return null;
+  return {
+    status: selected,
+    feedback
+  };
+}
+
+function setQualityReview(review = null) {
+  document.querySelectorAll('input[name="qualityReviewStatus"]').forEach((input) => {
+    input.checked = review?.status === input.value;
+  });
+  const feedback = document.getElementById("qualityReviewFeedback");
+  if (feedback) feedback.value = review?.feedback || "";
+}
+
+async function saveQualityReview() {
+  if (!canReviewActs()) {
+    showToast("Controllo qualità riservato a Responsabili ed Elite.");
+    return false;
+  }
+
+  const review = currentQualityReview();
+  if (!review) {
+    showToast("Seleziona controllo positivo o negativo.");
+    return false;
+  }
+
+  if (review.status === "negative" && !review.feedback) {
+    showToast("Inserisci il feedback scritto per il controllo qualità negativo.");
+    return false;
+  }
+
+  const practiceNumber = fieldValue("#practiceNumber");
+  const existing = demoActs.find((act) => act.practiceNumber === practiceNumber);
+  if (!existing) {
+    showToast("Archivia l'atto prima di inserire il controllo qualità.");
+    return false;
+  }
+
+  const updatedAct = currentActSnapshot(existing.status || "Archiviata");
+  updatedAct.id = existing.id;
+  updatedAct.status = normalizeWorkflowStatus(existing.status || updatedAct.status);
+  updatedAct.operatorId = existing.operatorId ?? updatedAct.operatorId;
+  updatedAct.operatorUsername = existing.operatorUsername || updatedAct.operatorUsername;
+  updatedAct.operatorName = existing.operatorName || updatedAct.operatorName;
+  updatedAct.qualityReview = {
+    status: review.status,
+    feedback: review.feedback,
+    reviewedAt: new Date().toISOString()
+  };
+  updatedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
+
+  try {
+    await saveActRecord(updatedAct, "PUT");
+    await syncActsFromServer();
+    if (isAdmin()) await loadUsers();
+    showToast(review.status === "positive" ? "Controllo qualità positivo salvato." : "Controllo qualità negativo salvato.");
+    return true;
+  } catch {
+    showToast("Controllo qualità non salvato: controlla la connessione al database.");
+    return false;
+  }
+}
+
 function setFieldValue(selector, value) {
   const field = document.querySelector(selector);
   if (field) field.value = value || "";
@@ -1184,6 +1306,7 @@ async function loadActForEdit(practiceNumber) {
   setFieldValue("#paymentMethod", act.paymentMethod);
   setFieldValue("#saleTotal", act.amount);
   setFieldValue(".textarea-label textarea", act.operatorNotes);
+  setQualityReview(act.qualityReview || null);
 
   const cededItemsTable = document.getElementById("cededItemsTable");
   const items = Array.isArray(act.items) && act.items.length ? act.items : [{ description: "", metal: act.materials?.[0]?.metal || "Oro", title: "18 kt" }];
@@ -1280,6 +1403,7 @@ async function resetCurrentPractice(options = {}) {
   state.attachments = 0;
   state.step = 0;
   state.editingPracticeNumber = null;
+  setQualityReview(null);
 
   await setPracticeMeta();
   applyRolePermissions();
@@ -2223,6 +2347,11 @@ function showPrintPreview(scope) {
 
 async function archiveCurrentPractice(status = "Archiviata") {
   if (notifyCashPaymentLimitIfNeeded({ force: true })) return false;
+  const review = currentQualityReview();
+  if (review?.status === "negative" && !review.feedback) {
+    showToast("Inserisci il feedback scritto per il controllo qualità negativo.");
+    return false;
+  }
   const isCompletion = status === "Completato";
   const missing = isCompletion ? validatePrintScope("company") : [];
   if (isCompletion && missing.length) {
@@ -2344,6 +2473,7 @@ document.getElementById("previousStep").addEventListener("click", () => {
 });
 
 document.getElementById("deleteCurrentPractice").addEventListener("click", deleteCurrentPractice);
+document.getElementById("saveQualityReview").addEventListener("click", saveQualityReview);
 
 document.getElementById("printCustomerCopySummary").addEventListener("click", printCustomerCopy);
 document.getElementById("printCompanyCopySummary").addEventListener("click", printCompanyCopy);
