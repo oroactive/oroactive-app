@@ -855,6 +855,70 @@ function qualityReviewClass(review) {
   return "quality-pending";
 }
 
+function isCurrentUserActOwner(act) {
+  return actOperatorKey(act) === userOperatorKey(state.currentUser || {});
+}
+
+function canViewActQuality(act) {
+  return canReviewActs() || isCurrentUserActOwner(act);
+}
+
+function canModifyAct(act) {
+  return canReviewActs() || isCurrentUserActOwner(act);
+}
+
+function canDeleteActDirectly(act) {
+  return canReviewActs();
+}
+
+function canRequestActDeletion(act) {
+  return ["aiuto_commesso", "commesso"].includes(normalizeRole(state.currentUser?.ruolo)) && isCurrentUserActOwner(act);
+}
+
+function qualityReviewCellMarkup(act) {
+  if (!canViewActQuality(act)) {
+    return '<em class="quality-review-badge quality-hidden">Riservato</em>';
+  }
+  if (act.qualityReview?.status === "negative") {
+    return `<button class="quality-review-badge quality-negative" type="button" data-quality-feedback="${escapeHtml(act.practiceNumber)}">Flag negativo</button>`;
+  }
+  return `<em class="quality-review-badge ${qualityReviewClass(act.qualityReview)}">${escapeHtml(qualityReviewLabel(act.qualityReview))}</em>`;
+}
+
+function deletionRequestLabel(act) {
+  if (act.deletionRequest?.status === "pending") {
+    return `Richiesta eliminazione da ${act.deletionRequest.requestedBy || "operatore"}`;
+  }
+  return "";
+}
+
+function archiveRowActionsMarkup(act) {
+  const actions = [`<button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>`];
+  if (canModifyAct(act)) {
+    actions.push(`<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>`);
+  }
+
+  if (canDeleteActDirectly(act)) {
+    actions.push(`<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>`);
+    if (act.deletionRequest?.status === "pending") {
+      actions.push(`<button class="warning-button" type="button" data-approve-delete-act="${escapeHtml(act.practiceNumber)}">Autorizza elimina</button>`);
+    }
+  } else if (canRequestActDeletion(act)) {
+    if (act.deletionRequest?.status === "pending") {
+      actions.push('<span class="request-pending">Richiesta inviata</span>');
+    } else {
+      actions.push(`<button class="warning-button" type="button" data-request-delete-act="${escapeHtml(act.practiceNumber)}">Richiedi eliminazione</button>`);
+    }
+  }
+
+  return `
+    <div class="row-actions">
+      ${actions.join("")}
+      ${deletionRequestLabel(act) ? `<small>${escapeHtml(deletionRequestLabel(act))}</small>` : ""}
+    </div>
+  `;
+}
+
 function dateParts(date) {
   const dateObject = parseActDate(date);
   return {
@@ -913,7 +977,9 @@ function fullActPrintHtml(act, heading = "Atto di vendita - Fascicolo aziendale"
       <h1>${escapeHtml(heading)} - Allegati fotografici</h1>
       <div class="print-attachments full-attachments">${printableAttachmentRows([...attachments.keys()], new Set(act.captures || []), attachments)}</div>
     </section>` : "";
-  if (act.readOnlyHtml) return act.readOnlyHtml.includes("full-attachments") ? act.readOnlyHtml : `${act.readOnlyHtml}${attachmentPage}`;
+  if (act.readOnlyHtml) {
+    return attachmentPage && !act.readOnlyHtml.includes("data:image/") ? `${act.readOnlyHtml}${attachmentPage}` : act.readOnlyHtml;
+  }
   const fallback = buildArchivedActFallback(act).replace(
     "<h1>Atto di vendita OroActive - Anteprima aziendale sola lettura</h1>",
     `<h1>${escapeHtml(heading)}</h1>`
@@ -1067,18 +1133,14 @@ function renderArchiveGroups() {
           <div class="archive-table acts-table">
             <div class="table-row head"><span>Pratica</span><span>Cliente</span><span>Operatore</span><span>Data</span><span>Stato</span><span>Controllo</span><span>Azioni</span></div>
             ${dayActs.map((act) => `
-              <div class="table-row ${qualityReviewClass(act.qualityReview)}-row">
+              <div class="table-row ${canViewActQuality(act) ? `${qualityReviewClass(act.qualityReview)}-row` : ""}">
                 <span>${escapeHtml(act.practiceNumber)}</span>
                 <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
                 <span>${escapeHtml(act.operatorUsername || act.operatorName || "Dato non inserito")}</span>
                 <span>${escapeHtml(act.date)}</span>
                 <em class="${statusClass(act.status)}">${escapeHtml(normalizeWorkflowStatus(act.status))}</em>
-                <em class="quality-review-badge ${qualityReviewClass(act.qualityReview)}">${escapeHtml(qualityReviewLabel(act.qualityReview))}</em>
-                <div class="row-actions">
-                  <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
-                  <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
-                  <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
-                </div>
+                ${qualityReviewCellMarkup(act)}
+                ${archiveRowActionsMarkup(act)}
               </div>
             `).join("")}
           </div>
@@ -1299,18 +1361,74 @@ async function openArchivedAct(practiceNumber) {
   previewTitle.textContent = `Atto di vendita ${act.practiceNumber}`;
   previewBody.innerHTML = `
     <div class="readonly-actions">
-      <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica atto</button>
-      <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
+      ${canModifyAct(act) ? `<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica atto</button>` : ""}
+      ${canDeleteActDirectly(act) ? `<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>` : ""}
+      ${canRequestActDeletion(act) ? `<button class="warning-button" type="button" data-request-delete-act="${escapeHtml(act.practiceNumber)}">Richiedi eliminazione</button>` : ""}
     </div>
     ${act.readOnlyHtml || buildArchivedActFallback(act)}
   `;
   previewModal.hidden = false;
 }
 
+function showQualityFeedback(practiceNumber) {
+  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+  if (!act || !canViewActQuality(act) || act.qualityReview?.status !== "negative") {
+    showToast("Feedback non disponibile per questo utente.");
+    return;
+  }
+  previewTitle.textContent = `Feedback controllo qualità ${practiceNumber}`;
+  previewBody.innerHTML = `
+    <section class="level-unlock-message quality-feedback-message">
+      <h3>Flag negativo</h3>
+      <p>${escapeHtml(act.qualityReview.feedback || "Feedback non inserito.")}</p>
+    </section>
+  `;
+  previewModal.hidden = false;
+}
+
+async function requestActDeletion(practiceNumber) {
+  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+  if (!act || !canRequestActDeletion(act)) {
+    showToast("Non puoi richiedere l'eliminazione di questo atto.");
+    return;
+  }
+
+  if (act.deletionRequest?.status === "pending") {
+    showToast("Richiesta di eliminazione gia inviata al Responsabile o a Elite.");
+    return;
+  }
+
+  const confirmed = window.confirm(`Vuoi inviare al Responsabile o a Elite la richiesta di eliminazione dell'atto ${practiceNumber}?`);
+  if (!confirmed) return;
+
+  const updatedAct = {
+    ...act,
+    deletionRequest: {
+      status: "pending",
+      requestedBy: displayUsername(state.currentUser),
+      requestedByRole: roleLabel(state.currentUser?.ruolo),
+      requestedAt: new Date().toISOString()
+    }
+  };
+
+  try {
+    await saveActRecord(updatedAct, "PUT");
+    await syncActsFromServer();
+    showToast("Richiesta di eliminazione inviata al Responsabile o a Elite.");
+  } catch {
+    showToast("Richiesta non inviata: controlla la connessione al database.");
+  }
+}
+
 async function deleteAct(practiceNumber) {
-  const index = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
-  if (index < 0) {
+  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+  if (!act) {
     showToast("Atto di vendita non trovato.");
+    return;
+  }
+
+  if (!canDeleteActDirectly(act)) {
+    await requestActDeletion(practiceNumber);
     return;
   }
 
@@ -1329,6 +1447,19 @@ async function deleteAct(practiceNumber) {
 
   if (!previewModal.hidden) previewModal.hidden = true;
   showToast(`Atto ${practiceNumber} eliminato.`);
+}
+
+async function approveDeleteAct(practiceNumber) {
+  const act = demoActs.find((item) => item.practiceNumber === practiceNumber);
+  if (!act || !canDeleteActDirectly(act)) {
+    showToast("Autorizzazione non disponibile.");
+    return;
+  }
+  if (!act.deletionRequest || act.deletionRequest.status !== "pending") {
+    showToast("Non ci sono richieste di eliminazione per questo atto.");
+    return;
+  }
+  await deleteAct(practiceNumber);
 }
 
 function cededItemRowMarkup(item = {}) {
@@ -1461,6 +1592,10 @@ async function loadActForEdit(practiceNumber) {
   const act = await getActRecord(practiceNumber);
   if (!act) {
     showToast("Atto di vendita non trovato.");
+    return;
+  }
+  if (!canModifyAct(act)) {
+    showToast("Puoi modificare solo gli atti di vendita effettuati da te.");
     return;
   }
 
@@ -1607,6 +1742,11 @@ async function deleteCurrentPractice() {
 
   const existingIndex = demoActs.findIndex((act) => act.practiceNumber === practiceNumber);
   if (existingIndex >= 0) {
+    const existingAct = demoActs[existingIndex];
+    if (!canDeleteActDirectly(existingAct)) {
+      await requestActDeletion(practiceNumber);
+      return;
+    }
     try {
       await deleteActRecord(practiceNumber);
     } catch {
@@ -1857,9 +1997,14 @@ function fusionActRows(acts, options = {}) {
           <span>${escapeHtml(material.metal)} ${escapeHtml(material.weight)} gr</span>
           <div class="row-actions">
             <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
-            <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
+            ${canModifyAct(act) ? `<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>` : ""}
             ${isActFused(act) ? "" : `<button class="warning-button" type="button" data-fuse-act="${escapeHtml(act.practiceNumber)}">Fondi</button>`}
-            <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
+            ${canDeleteActDirectly(act) ? `<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>` : ""}
+            ${canRequestActDeletion(act) ? (
+              act.deletionRequest?.status === "pending"
+                ? '<span class="request-pending">Richiesta inviata</span>'
+                : `<button class="warning-button" type="button" data-request-delete-act="${escapeHtml(act.practiceNumber)}">Richiedi eliminazione</button>`
+            ) : ""}
           </div>
         </div>
       `)).join("")}
@@ -2928,6 +3073,21 @@ document.getElementById("practiceDate").addEventListener("change", async () => {
 document.getElementById("archiveStoreFilter").addEventListener("change", renderArchiveGroups);
 
 document.getElementById("archiveGroups").addEventListener("click", (event) => {
+  const feedbackButton = event.target.closest("[data-quality-feedback]");
+  if (feedbackButton) {
+    showQualityFeedback(feedbackButton.dataset.qualityFeedback);
+    return;
+  }
+  const requestDeleteButton = event.target.closest("[data-request-delete-act]");
+  if (requestDeleteButton) {
+    requestActDeletion(requestDeleteButton.dataset.requestDeleteAct);
+    return;
+  }
+  const approveDeleteButton = event.target.closest("[data-approve-delete-act]");
+  if (approveDeleteButton) {
+    approveDeleteAct(approveDeleteButton.dataset.approveDeleteAct);
+    return;
+  }
   const deleteButton = event.target.closest("[data-delete-act]");
   if (deleteButton) {
     deleteAct(deleteButton.dataset.deleteAct);
@@ -2944,6 +3104,16 @@ document.getElementById("archiveGroups").addEventListener("click", (event) => {
 });
 
 document.getElementById("fusionGroups").addEventListener("click", (event) => {
+  const requestDeleteButton = event.target.closest("[data-request-delete-act]");
+  if (requestDeleteButton) {
+    requestActDeletion(requestDeleteButton.dataset.requestDeleteAct);
+    return;
+  }
+  const approveDeleteButton = event.target.closest("[data-approve-delete-act]");
+  if (approveDeleteButton) {
+    approveDeleteAct(approveDeleteButton.dataset.approveDeleteAct);
+    return;
+  }
   const ddtButton = event.target.closest("[data-fusion-ddt-store]");
   if (ddtButton) {
     printFusionDdt(ddtButton.dataset.fusionDdtStore, ddtButton.dataset.fusionDdtDate);
@@ -2970,6 +3140,11 @@ document.getElementById("fusionGroups").addEventListener("click", (event) => {
 });
 
 previewBody.addEventListener("click", (event) => {
+  const requestDeleteButton = event.target.closest("[data-request-delete-act]");
+  if (requestDeleteButton) {
+    requestActDeletion(requestDeleteButton.dataset.requestDeleteAct);
+    return;
+  }
   const editButton = event.target.closest("[data-edit-act]");
   if (editButton) {
     loadActForEdit(editButton.dataset.editAct);

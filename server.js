@@ -447,6 +447,23 @@ function canAccessAct(row, user) {
   return roleSeesAllStores(user?.ruolo) || row?.store === user?.negozio;
 }
 
+function canReviewActs(user) {
+  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
+}
+
+function actorKey(user = {}) {
+  return String(user.username || user.nome || "").trim().toLowerCase();
+}
+
+function actOwnerKey(row = {}) {
+  const payload = row.payload || {};
+  return String(payload.operatorUsername || payload.operatorName || "").trim().toLowerCase();
+}
+
+function canEditAct(row, user) {
+  return canReviewActs(user) || actOwnerKey(row) === actorKey(user);
+}
+
 async function saveAct(input, user) {
   const protectedInput = enforceActStore(input, user);
   const existing = protectedInput.id
@@ -496,6 +513,11 @@ async function updateAct(identifier, input, user) {
   if (!existing) return null;
   if (!canAccessAct(existing, user)) {
     const error = new Error("Atto non accessibile per il negozio assegnato");
+    error.status = 403;
+    throw error;
+  }
+  if (!canEditAct(existing, user)) {
+    const error = new Error("Puoi modificare solo gli atti effettuati da te");
     error.status = 403;
     throw error;
   }
@@ -549,6 +571,11 @@ async function deleteAct(identifier, user) {
   if (!existing) return false;
   if (!canAccessAct(existing, user)) {
     const error = new Error("Atto non accessibile per il negozio assegnato");
+    error.status = 403;
+    throw error;
+  }
+  if (!canReviewActs(user)) {
+    const error = new Error("Eliminazione riservata a Responsabile o Elite");
     error.status = 403;
     throw error;
   }

@@ -1978,6 +1978,37 @@ canvas {
   color: var(--soft-ink);
 }
 
+.table-row em.quality-hidden {
+  background: #f5f1ea;
+  color: var(--soft-ink);
+}
+
+.quality-review-badge {
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 950;
+}
+
+button.quality-review-badge {
+  cursor: pointer;
+}
+
+.request-pending,
+.row-actions small {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #fff1b8;
+  color: #0b0b0a;
+  font-size: 12px;
+  font-weight: 950;
+}
+
 .table-row em.done {
   background: #e8f5ed;
   color: var(--green);
@@ -2677,8 +2708,16 @@ canvas {
     page-break-inside: avoid;
   }
 
+  .print-attachments.full-attachments .print-attachment.with-image {
+    page-break-after: always;
+  }
+
+  .print-attachments.full-attachments .print-attachment.with-image:last-child {
+    page-break-after: auto;
+  }
+
   .print-attachments.full-attachments .print-attachment img {
-    max-height: 210mm;
+    max-height: 198mm;
     object-fit: contain;
   }
 
