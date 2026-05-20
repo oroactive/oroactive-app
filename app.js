@@ -1700,8 +1700,9 @@ function renderWeightFields() {
   });
 
   container.innerHTML = activeMetals().map((metal) => `
-    <label class="metal-weight-field"><span>Peso totale ${metal.toLowerCase()} in grammi</span>
+    <label class="metal-weight-field">
       <input data-metal-weight="${metal}" type="number" value="${escapeHtml(previousValues[metal] || "0")}" min="0" step="0.01">
+      <span>Peso totale ${metal.toLowerCase()} in grammi</span>
     </label>
   `).join("");
 }
