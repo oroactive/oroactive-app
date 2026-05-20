@@ -1701,8 +1701,11 @@ function renderWeightFields() {
 
   container.innerHTML = activeMetals().map((metal) => `
     <label class="metal-weight-field">
-      <input data-metal-weight="${metal}" type="number" value="${escapeHtml(previousValues[metal] || "0")}" min="0" step="0.01">
-      <span>Peso totale ${metal.toLowerCase()} in grammi</span>
+      <span>Peso totale oggetti preziosi in ${metal.toLowerCase()}</span>
+      <div class="metal-weight-input-wrap">
+        <input data-metal-weight="${metal}" type="number" value="${escapeHtml(previousValues[metal] || "0")}" min="0" step="0.01">
+        <em>gr</em>
+      </div>
     </label>
   `).join("");
 }
@@ -1715,7 +1718,7 @@ function weightRows() {
 }
 
 function buildWeightBlock(label) {
-  const rows = weightRows().map((row) => `<li>${escapeHtml(row.metal)}: ${escapeHtml(row.value)} g</li>`).join("");
+  const rows = weightRows().map((row) => `<li>Peso totale oggetti preziosi in ${escapeHtml(row.metal.toLowerCase())}: ${escapeHtml(row.value)} gr</li>`).join("");
   return `
     <div class="print-internal">
       ${label ? `<span>${escapeHtml(label)}</span>` : ""}

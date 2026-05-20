@@ -9,9 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
   <title>OroActive Gestionale</title>
-  <link rel="manifest" href="manifest.webmanifest?v=20260520-05">
+  <link rel="manifest" href="manifest.webmanifest?v=20260520-06">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260520-05">
+  <link rel="stylesheet" href="styles.css?v=20260520-06">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -252,7 +252,6 @@
                 <div class="internal-weight">
                   <div>
                     <span class="internal-badge">Dato interno</span>
-                    <strong>Peso totale oggetti preziosi</strong>
                     <p>Viene stampato sulla copia cliente solo se autorizzato con la casella dedicata.</p>
                   </div>
                   <div class="weight-fields">
@@ -422,18 +421,6 @@
                 </div>
               </div>
 
-              <div class="document-preview">
-                <div>
-                  <h3>Anteprima di stampa</h3>
-                  <p>Controlla la copia cliente e la copia aziendale interna prima di procedere con la stampa finale.</p>
-                </div>
-                <div class="preview-actions">
-                  <div class="preview-action-stack">
-                    <button class="ghost-button" type="button" data-preview-copy="customer">Copia cliente</button>
-                    <button class="primary-button" type="button" id="printCustomerCopySummary">Stampa Copia cliente</button>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div class="bottom-actions">
@@ -464,6 +451,8 @@
               <h3>Stampa</h3>
               <p>Il PDF finale viene prodotto in duplice copia: cliente e negozio.</p>
               <div class="preview-action-stack">
+                <button class="ghost-button" type="button" data-preview-copy="customer">Copia cliente</button>
+                <button class="primary-button" type="button" id="printCustomerCopySummary">Stampa Copia cliente</button>
                 <button class="ghost-button" type="button" data-preview-copy="company">Copia aziendale</button>
                 <button class="primary-button" type="button" id="printCompanyCopySummary">Stampa Copia aziendale</button>
               </div>
@@ -575,6 +564,6 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260520-05"></script>
+  <script src="app.js?v=20260520-06"></script>
 </body>
 </html>

@@ -963,16 +963,16 @@ textarea {
 
 .metal-weight-fields {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
 .metal-weight-field {
   display: grid;
-  grid-template-columns: minmax(110px, 0.75fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.45fr);
   align-items: center;
-  gap: 10px;
-  padding: 10px;
+  gap: 14px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
@@ -980,13 +980,28 @@ textarea {
 
 .metal-weight-field span {
   color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
   line-height: 1.25;
   text-align: left;
 }
 
-.metal-weight-field input {
+.metal-weight-input-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.metal-weight-input-wrap input {
   min-height: 44px;
   padding: 10px 12px;
+}
+
+.metal-weight-input-wrap em {
+  color: var(--soft-ink);
+  font-style: normal;
+  font-weight: 900;
 }
 
 .inline-check {
