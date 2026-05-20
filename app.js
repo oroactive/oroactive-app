@@ -11,7 +11,8 @@ const state = {
   authToken: localStorage.getItem("oroactive-auth-token") || "",
   currentUser: null,
   syncTimer: null,
-  cashLimitWarningShown: false
+  cashLimitWarningShown: false,
+  bullionVaultPrices: {}
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -277,6 +278,7 @@ async function startAuthenticatedApp() {
   renderArchiveGroups();
   renderFusionGroups();
   if (isAdmin()) await loadUsers();
+  await refreshBullionVaultPrices();
   if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 5000);
 }
 
@@ -1313,6 +1315,39 @@ function formatEuro(value) {
   }).format(value || 0);
 }
 
+function formatBullionPrice(value) {
+  return new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value || 0);
+}
+
+function applyBullionVaultPrices() {
+  document.querySelectorAll("#bullionQuotePanel input[data-bullion-quote]").forEach((input) => {
+    const quote = state.bullionVaultPrices[input.dataset.bullionQuote];
+    if (!quote) return;
+    input.value = Number(quote.value || 0).toFixed(2);
+    input.dataset.bullionSource = quote.source || "";
+    input.dataset.bullionFetchedAt = quote.fetchedAt || "";
+    const field = input.closest(".bullion-quote-field");
+    const info = field?.querySelector("em");
+    if (info) {
+      info.textContent = `Dato BullionVault live: ${formatBullionPrice(quote.value)} EUR al kg. Fonte ${quote.source || "mercato BullionVault"}.`;
+    }
+  });
+}
+
+async function refreshBullionVaultPrices(options = {}) {
+  try {
+    const data = await apiRequest("/bullionvault/prices");
+    state.bullionVaultPrices = Object.fromEntries((data.prices || []).map((quote) => [quote.metal, quote]));
+    applyBullionVaultPrices();
+    if (options.notify) showToast("Quotazioni BullionVault aggiornate.");
+  } catch {
+    if (options.notify) showToast("Quotazioni BullionVault non disponibili. Puoi inserire il dato manualmente.");
+  }
+}
+
 async function setPracticeMeta() {
   const now = new Date();
   document.getElementById("practiceDate").value = now.toISOString().slice(0, 10);
@@ -1563,6 +1598,8 @@ function renderBullionQuoteFields() {
   container.innerHTML = `
     <div class="bullion-quote-heading">
       <span class="internal-badge">Quotazione giornaliera</span>
+      <strong>Dato BullionVault automatico</strong>
+      <button class="small-button" id="refreshBullionVaultPrices" type="button">Aggiorna</button>
     </div>
     ${(metals.length ? metals : ["Oro"]).map((metal) => `
       <label class="bullion-quote-field">
@@ -1572,6 +1609,7 @@ function renderBullionQuoteFields() {
       </label>
     `).join("")}
   `;
+  applyBullionVaultPrices();
 }
 
 function bullionQuoteRows() {
@@ -1662,7 +1700,7 @@ function renderWeightFields() {
   });
 
   container.innerHTML = activeMetals().map((metal) => `
-    <label>Peso totale ${metal.toLowerCase()} in grammi
+    <label class="metal-weight-field"><span>Peso totale ${metal.toLowerCase()} in grammi</span>
       <input data-metal-weight="${metal}" type="number" value="${escapeHtml(previousValues[metal] || "0")}" min="0" step="0.01">
     </label>
   `).join("");
@@ -1978,6 +2016,7 @@ document.getElementById("addCededItem").addEventListener("click", () => {
   updateTitleOptions(row);
   updateCededItems();
   updateChecklistState();
+  refreshBullionVaultPrices();
   showToast("Nuova riga oggetto aggiunta alla scheda cliente.");
 });
 
@@ -1997,6 +2036,7 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
     renderPreciousCaptureCards();
     updateAttachmentState();
     updateChecklistState();
+    refreshBullionVaultPrices();
   }
 });
 
@@ -2179,6 +2219,12 @@ document.addEventListener("change", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+  if (event.target.closest("#refreshBullionVaultPrices")) {
+    event.preventDefault();
+    refreshBullionVaultPrices({ notify: true });
+    return;
+  }
+
   const viewButton = event.target.closest("[data-view-capture]");
   const deleteButton = event.target.closest("[data-delete-capture]");
   if (!viewButton && !deleteButton) return;

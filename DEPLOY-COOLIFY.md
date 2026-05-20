@@ -10,6 +10,7 @@ PORT=3000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
 JWT_SECRET=UNA_CHIAVE_LUNGA_CASUALE
 JWT_EXPIRES_IN=7d
+BULLIONVAULT_MARKET_URL=https://www.bullionvault.com/view_market_xml.do
 ADMIN_USERNAME=Elite
 ADMIN_EMAIL=elite@oroactive.it
 ADMIN_PASSWORD=Snoopdoggydogg.8
@@ -53,6 +54,7 @@ GET    /api/utenti
 POST   /api/utenti
 PUT    /api/utenti/:id
 GET    /api/atti
+GET    /api/bullionvault/prices
 POST   /api/atti
 GET    /api/atti/:id
 GET    /api/atti/search?q=Rossi
@@ -65,6 +67,7 @@ DELETE /api/atti/:id
 ```
 
 Il frontend usa queste API per salvare, leggere, cercare, modificare/eliminare e numerare gli atti di vendita. Per compatibilita, gli endpoint `:id` accettano anche il numero atto `OA-NEGOZIO-ANNO-NUMERO`.
+L'endpoint BullionVault aggiorna le quotazioni oro, argento e platino in EUR al kg e le inserisce automaticamente nell'atto di vendita.
 
 ## Ruoli
 

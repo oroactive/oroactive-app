@@ -15,8 +15,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const port = Number(process.env.PORT || 3000);
 const actsTable = "atti_vendita";
+const CASH_PAYMENT_LIMIT = 499.99;
 const jwtSecret = process.env.JWT_SECRET || "cambia-questa-chiave-jwt-oroactive";
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
+const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
+const bullionVaultMarkets = {
+  Oro: { securityId: "AUXZU", source: "Zurigo" },
+  Argento: { securityId: "AGXZU", source: "Zurigo" },
+  Platino: { securityId: "PTXLN", source: "Londra" }
+};
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -150,6 +157,49 @@ function numberFrom(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function parseBullionVaultPrices(xml) {
+  const buyMatch = xml.match(/<buyPrices>[\s\S]*?<price\b[^>]*\blimit="([^"]+)"/i);
+  const sellMatch = xml.match(/<sellPrices>[\s\S]*?<price\b[^>]*\blimit="([^"]+)"/i);
+  const buy = buyMatch ? Number(buyMatch[1]) : null;
+  const sell = sellMatch ? Number(sellMatch[1]) : null;
+  const validPrices = [buy, sell].filter((value) => Number.isFinite(value) && value > 0);
+  if (!validPrices.length) return null;
+  const value = validPrices.length === 2 ? (validPrices[0] + validPrices[1]) / 2 : validPrices[0];
+  return { value, buy, sell };
+}
+
+async function fetchBullionVaultPrice(metal, market) {
+  const url = new URL(bullionVaultMarketUrl);
+  url.searchParams.set("considerationCurrency", "EUR");
+  url.searchParams.set("securityId", market.securityId);
+  url.searchParams.set("quantity", "0.001");
+  url.searchParams.set("marketWidth", "1");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/xml,text/xml,*/*" }
+    });
+    if (!response.ok) throw new Error(`BullionVault HTTP ${response.status}`);
+    const xml = await response.text();
+    const prices = parseBullionVaultPrices(xml);
+    if (!prices) throw new Error("Prezzo BullionVault non disponibile");
+    return {
+      metal,
+      securityId: market.securityId,
+      currency: "EUR",
+      unit: "KG",
+      source: market.source,
+      fetchedAt: new Date().toISOString(),
+      ...prices
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function materialWeight(input, metalName) {
   const row = Array.isArray(input.materials) ? input.materials.find((material) => material.metal === metalName) : null;
   return numberFrom(row?.weight);
@@ -190,6 +240,13 @@ function normalizeAct(input = {}, existing = null) {
   const payload = { ...(existing?.payload || {}), ...input, practiceNumber };
   const actDate = input.date || input.data_atto || existing?.data_atto || null;
   const oroWeight = materialWeight(payload, "Oro") || numberFrom(input.peso_oro ?? existing?.peso_oro);
+  const totale = numberFrom(input.amount ?? input.totale ?? existing?.totale);
+  const paymentMethod = input.paymentMethod || existing?.payment_method || "";
+  if (String(paymentMethod).toLowerCase().includes("contanti") && totale > CASH_PAYMENT_LIMIT) {
+    const error = new Error("Il pagamento in contanti non puo superare 499,99 euro. Seleziona Bonifico o Assegno come pagamento a norma di legge.");
+    error.status = 400;
+    throw error;
+  }
 
   return {
     id: input.id || existing?.id || null,
@@ -205,8 +262,8 @@ function normalizeAct(input = {}, existing = null) {
     telefono: input.phone ?? input.telefono ?? existing?.telefono ?? "",
     pesoOro: oroWeight,
     quotazione: quoteValue(payload, "Oro") || numberFrom(existing?.quotazione),
-    totale: numberFrom(input.amount ?? input.totale ?? existing?.totale),
-    paymentMethod: input.paymentMethod || existing?.payment_method || "",
+    totale,
+    paymentMethod,
     status: normalizeWorkflowStatus(input.status || existing?.status || "Archiviata"),
     payload
   };
@@ -710,6 +767,29 @@ app.get(["/api/atti", "/api/acts"], async (request, response, next) => {
 app.get(["/api/atti/search", "/api/acts/search"], async (request, response, next) => {
   try {
     response.json(await listActs(request.query, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/bullionvault/prices", async (_request, response, next) => {
+  try {
+    const results = await Promise.allSettled(
+      Object.entries(bullionVaultMarkets).map(([metal, market]) => fetchBullionVaultPrice(metal, market))
+    );
+    const prices = results
+      .filter((result) => result.status === "fulfilled")
+      .map((result) => result.value);
+
+    if (!prices.length) {
+      return response.status(502).json({ error: "Quotazioni BullionVault momentaneamente non disponibili" });
+    }
+
+    response.json({
+      provider: "BullionVault",
+      note: "Prezzo medio tra miglior acquisto e miglior vendita espresso in EUR al kg.",
+      prices
+    });
   } catch (error) {
     next(error);
   }

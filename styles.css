@@ -861,10 +861,15 @@ textarea {
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .bullion-quote-heading strong {
   color: var(--ink);
+}
+
+.bullion-quote-heading button {
+  margin-left: auto;
 }
 
 .bullion-quote-field {
@@ -960,6 +965,27 @@ textarea {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.metal-weight-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.8fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.metal-weight-field span {
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.metal-weight-field input {
+  min-height: 44px;
+  padding: 10px 12px;
 }
 
 .inline-check {
@@ -1891,6 +1917,7 @@ canvas {
   .internal-weight,
   .weight-fields,
   .metal-weight-fields,
+  .metal-weight-field,
   .signature-grid,
   .capture-grid,
   .summary-grid,
