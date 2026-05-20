@@ -768,11 +768,12 @@ function renderArchiveGroups() {
           <h4>Giorno ${escapeHtml(day)}</h4>
           ${archiveTotalsMarkup(archiveTotals(dayActs), "Giornaliero")}
           <div class="archive-table">
-            <div class="table-row head"><span>Pratica</span><span>Cliente</span><span>Data</span><span>Stato</span><span>Azioni</span></div>
+            <div class="table-row head"><span>Pratica</span><span>Cliente</span><span>Operatore</span><span>Data</span><span>Stato</span><span>Azioni</span></div>
             ${dayActs.map((act) => `
               <div class="table-row">
                 <span>${escapeHtml(act.practiceNumber)}</span>
                 <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
+                <span>${escapeHtml(act.operatorUsername || act.operatorName || "Dato non inserito")}</span>
                 <span>${escapeHtml(act.date)}</span>
                 <em class="${statusClass(act.status)}">${escapeHtml(normalizeWorkflowStatus(act.status))}</em>
                 <div class="row-actions">
