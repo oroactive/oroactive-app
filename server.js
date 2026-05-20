@@ -156,6 +156,11 @@ function parsePracticeNumber(practiceNumber = "") {
   };
 }
 
+function actNumberValue(practiceNumber = "") {
+  const parsed = parsePracticeNumber(practiceNumber);
+  return parsed?.number || 0;
+}
+
 function numberFrom(value) {
   const normalized = String(value ?? "").replace(",", ".");
   const parsed = Number(normalized);
@@ -946,15 +951,17 @@ function drawPdfFields(doc, fields, y, columns = 2) {
   const gap = 10;
   const width = (511 - gap * (columns - 1)) / columns;
   let currentY = y;
+  const rowHeight = 46;
+  const boxHeight = 40;
   fields.forEach((field, index) => {
     const column = index % columns;
-    if (index && column === 0) currentY += 42;
+    if (index && column === 0) currentY += rowHeight;
     const x = 42 + column * (width + gap);
-    doc.roundedRect(x, currentY, width, 34, 4).strokeColor("#e6d6c8").stroke();
+    doc.roundedRect(x, currentY, width, boxHeight, 4).strokeColor("#e6d6c8").stroke();
     doc.fillColor("#777").font("Helvetica-Bold").fontSize(7).text(field.label, x + 7, currentY + 6, { width: width - 14 });
-    doc.fillColor("#111").font("Helvetica").fontSize(9).text(String(field.value || "Dato non inserito"), x + 7, currentY + 18, { width: width - 14 });
+    doc.fillColor("#111").font("Helvetica").fontSize(8.5).text(String(field.value || "Dato non inserito"), x + 7, currentY + 18, { width: width - 14, height: 20, ellipsis: true });
   });
-  return currentY + 46;
+  return currentY + rowHeight + 6;
 }
 
 function ensurePdfSpace(doc, y, needed = 90) {
@@ -984,14 +991,14 @@ function drawActMainPdfPage(doc, act, title) {
   y = ensurePdfSpace(doc, y, 150);
   y = drawPdfSectionTitle(doc, "2. Oggetti ceduti", y);
   (act.items || []).forEach((item, index) => {
-    y = ensurePdfSpace(doc, y, 34);
-    doc.roundedRect(42, y, 511, 26, 4).strokeColor("#e6d6c8").stroke();
-    doc.fillColor("#111").font("Helvetica-Bold").fontSize(9).text(`${index + 1}. ${item.description || "Oggetto prezioso"}`, 50, y + 7, { width: 280 });
-    doc.fillColor("#555").font("Helvetica").text(`${item.metal || ""} - ${item.title || ""}`, 355, y + 7, { width: 185 });
-    y += 32;
+    y = ensurePdfSpace(doc, y, 42);
+    doc.roundedRect(42, y, 511, 34, 4).strokeColor("#e6d6c8").stroke();
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(9).text(`${index + 1}. ${item.description || "Oggetto prezioso"}`, 50, y + 7, { width: 300, height: 18, ellipsis: true });
+    doc.fillColor("#555").font("Helvetica").fontSize(9).text(`${item.metal || ""} - ${item.title || ""}`, 365, y + 7, { width: 175 });
+    y += 40;
   });
 
-  y = ensurePdfSpace(doc, y, 130);
+  y = ensurePdfSpace(doc, y, 170);
   y = drawPdfSectionTitle(doc, "3. Peso totale e pagamento", y);
   const materialFields = actMaterialsForPdf(act).map((material) => ({
     label: `Peso totale ${material.metal}`,
@@ -1008,18 +1015,21 @@ function drawActMainPdfPage(doc, act, title) {
     ...amountFields
   ], y, 2);
 
-  y = ensurePdfSpace(doc, y, 110);
+  y = ensurePdfSpace(doc, y, 135);
   y = drawPdfSectionTitle(doc, "6. Firme cliente", y);
   const signatures = (act.signatureImages || []).filter(Boolean);
   if (signatures.length) {
     signatures.forEach((signature, index) => {
       const x = 42 + index * 172;
       const buffer = dataUrlToBuffer(signature);
-      doc.roundedRect(x, y, 154, 58, 4).strokeColor("#e6d6c8").stroke();
+      doc.roundedRect(x, y, 154, 72, 4).strokeColor("#e6d6c8").stroke();
       doc.fillColor("#777").font("Helvetica-Bold").fontSize(7).text(`Firma ${index + 1}`, x + 7, y + 6);
-      if (buffer) drawPdfImage(doc, buffer, x + 8, y + 18, { fit: [138, 34], align: "center", valign: "center" });
+      if (buffer) drawPdfImage(doc, buffer, x + 8, y + 18, { fit: [138, 48], align: "center", valign: "center" });
     });
-    y += 72;
+    y += 86;
+  } else {
+    doc.fillColor("#111").font("Helvetica").fontSize(9).text("Firme non disponibili nell'archivio digitale.", 42, y, { width: 511 });
+    y += 28;
   }
 
   y = ensurePdfSpace(doc, y, 75);
@@ -1054,9 +1064,14 @@ function buildPdfForActs(response, { title = "Atto di vendita OroActive", subtit
   if (subtitle) {
     doc.addPage();
     drawPdfHeader(doc, { practiceNumber: "", store: "", operatorUsername: "" }, title);
+    const orderedActs = [...acts].sort((first, second) => actNumberValue(first.practiceNumber) - actNumberValue(second.practiceNumber));
+    const firstPractice = orderedActs[0]?.practiceNumber || "Dato non inserito";
+    const lastPractice = orderedActs.at(-1)?.practiceNumber || "Dato non inserito";
     doc.fillColor("#111").font("Helvetica-Bold").fontSize(16).text(subtitle, 42, 140, { width: 511 });
     doc.fillColor("#555").font("Helvetica").fontSize(10).text(`Atti inclusi: ${acts.length}`, 42, 170);
-    doc.text(`Data generazione: ${new Date().toLocaleString("it-IT")}`, 42, 188);
+    doc.text(`Da pratica: ${firstPractice}`, 42, 188);
+    doc.text(`A pratica: ${lastPractice}`, 42, 206);
+    doc.text(`Data generazione: ${new Date().toLocaleString("it-IT")}`, 42, 224);
   }
   acts.forEach((act) => {
     const heading = act.practiceNumber ? `Atto di vendita ${act.practiceNumber}` : title;

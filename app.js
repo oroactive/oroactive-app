@@ -596,7 +596,13 @@ async function enterSectionFromMainMenu(section) {
   setScreen(section);
 }
 
-function returnToMainMenu() {
+async function returnToMainMenu() {
+  const isPracticeActive = document.getElementById("practice")?.classList.contains("active-screen");
+  if (isPracticeActive && !isPracticeFormEmpty()) {
+    const saved = await archiveCurrentPractice("Archiviata");
+    if (!saved) return;
+    showToast("Atto di vendita in fase di compilazione archiviato. Puoi completarlo successivamente tramite Elenco.");
+  }
   closeBrandMenu();
   clearActSearch();
   mainMenuScreen.hidden = false;
