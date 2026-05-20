@@ -10,7 +10,8 @@ const state = {
   editingPracticeNumber: null,
   authToken: localStorage.getItem("oroactive-auth-token") || "",
   currentUser: null,
-  syncTimer: null
+  syncTimer: null,
+  cashLimitWarningShown: false
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -47,6 +48,7 @@ const documentLabels = {
   Passaporto: "passaporto"
 };
 const apiBase = "/api";
+const CASH_PAYMENT_LIMIT = 499.99;
 const demoActs = [];
 
 function removeLegacySearchMenu() {
@@ -1214,6 +1216,36 @@ function selectedPaymentMethod() {
   return fieldValue("#paymentMethod");
 }
 
+function saleTotalAmount() {
+  const total = Number(fieldValue("#saleTotal"));
+  return Number.isFinite(total) ? total : 0;
+}
+
+function isCashPayment() {
+  return selectedPaymentMethod().toLowerCase().includes("contanti");
+}
+
+function cashPaymentLimitViolation() {
+  return isCashPayment() && saleTotalAmount() > CASH_PAYMENT_LIMIT;
+}
+
+function cashPaymentLimitMessage() {
+  return "Il pagamento in contanti non puo superare 499,99 euro. Seleziona Bonifico o Assegno come pagamento a norma di legge.";
+}
+
+function notifyCashPaymentLimitIfNeeded(options = {}) {
+  if (!cashPaymentLimitViolation()) {
+    state.cashLimitWarningShown = false;
+    return false;
+  }
+
+  if (options.force || !state.cashLimitWarningShown) {
+    showToast(cashPaymentLimitMessage());
+    state.cashLimitWarningShown = true;
+  }
+  return true;
+}
+
 function paymentRequiresProof() {
   return ["Bonifico", "Assegno"].includes(selectedPaymentMethod());
 }
@@ -1323,8 +1355,7 @@ async function updatePracticeNumber() {
 }
 
 function updateSaleTotal() {
-  const total = Number(document.getElementById("saleTotal").value);
-  document.getElementById("summaryTotal").textContent = formatEuro(Number.isFinite(total) ? total : 0);
+  document.getElementById("summaryTotal").textContent = formatEuro(saleTotalAmount());
 }
 
 function updateCustomerSummary() {
@@ -1455,9 +1486,9 @@ function missingCustomerFields() {
 
 function missingSaleFields() {
   const missing = [];
-  const saleTotal = Number(fieldValue("#saleTotal"));
   if (!hasValue("#paymentMethod")) missing.push("Metodo pagamento");
-  if (!Number.isFinite(saleTotal) || saleTotal <= 0) missing.push("Totale corrisposto");
+  if (saleTotalAmount() <= 0) missing.push("Totale corrisposto");
+  if (cashPaymentLimitViolation()) missing.push("Metodo pagamento a norma di legge");
 
   const itemRows = [...document.querySelectorAll(".ceded-item-row")];
   if (!itemRows.length) {
@@ -1752,6 +1783,7 @@ function preparePrintPacket() {
 }
 
 function printBothCopies() {
+  if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
   const missing = validatePrintScope("company");
   if (missing.length) {
     showToast(validationMessage(missing, "le copie cliente e aziendale"));
@@ -1762,6 +1794,7 @@ function printBothCopies() {
 }
 
 function printCustomerCopy() {
+  if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
   const missing = validatePrintScope("customer");
   if (missing.length) {
     showToast(validationMessage(missing, "la copia cliente"));
@@ -1778,6 +1811,7 @@ function printCustomerCopy() {
 }
 
 function printCompanyCopy() {
+  if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
   const missing = validatePrintScope("company");
   if (missing.length) {
     showToast(validationMessage(missing, "la copia aziendale"));
@@ -1790,6 +1824,7 @@ function printCompanyCopy() {
 
 function showPrintPreview(scope) {
   renderPaymentCaptureCard();
+  if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
   const isCompany = scope === "company";
   const missing = validatePrintScope(scope);
   if (missing.length) {
@@ -1808,6 +1843,7 @@ function showPrintPreview(scope) {
 }
 
 async function archiveCurrentPractice(status = "Archiviata") {
+  if (notifyCashPaymentLimitIfNeeded({ force: true })) return false;
   const isCompletion = status === "Completato";
   const missing = isCompletion ? validatePrintScope("company") : [];
   if (isCompletion && missing.length) {
@@ -1966,6 +2002,7 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
 
 document.getElementById("saleTotal").addEventListener("input", () => {
   updateSaleTotal();
+  notifyCashPaymentLimitIfNeeded();
   updateChecklistState();
 });
 
@@ -1980,6 +2017,7 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
 });
 
 document.getElementById("paymentMethod").addEventListener("change", () => {
+  notifyCashPaymentLimitIfNeeded();
   renderPaymentCaptureCard();
   updateAttachmentState();
   updateChecklistState();
