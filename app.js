@@ -213,7 +213,7 @@ function isFounder() {
 }
 
 function userSeesAllStores(user = state.currentUser) {
-  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
+  return ["founder", "responsabile", "commesso"].includes(normalizeRole(user?.ruolo));
 }
 
 function managedRolesForCurrentUser() {
@@ -396,7 +396,7 @@ function configureUserFormPermissions() {
   });
   if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles[0] || "commesso";
   const role = normalizeRole(roleSelect.value);
-  if (["founder", "responsabile"].includes(role)) {
+  if (["founder", "responsabile", "commesso"].includes(role)) {
     storeSelect.value = "Tutti";
     storeSelect.disabled = true;
     [...storeSelect.options].forEach((option) => {
@@ -673,18 +673,19 @@ function printableAttachmentRows(keys, uploadedKeys, attachments = new Map()) {
 }
 
 function fullActPrintHtml(act, heading = "Atto di vendita - Fascicolo aziendale") {
-  if (act.readOnlyHtml) return act.readOnlyHtml;
   const attachments = actAttachmentMap(act);
+  const attachmentPage = attachments.size ? `
+    <section class="print-copy company-copy readonly-copy">
+      <h1>${escapeHtml(heading)} - Allegati fotografici</h1>
+      <div class="print-attachments full-attachments">${printableAttachmentRows([...attachments.keys()], new Set(act.captures || []), attachments)}</div>
+    </section>` : "";
+  if (act.readOnlyHtml) return `${act.readOnlyHtml}${attachmentPage}`;
   const fallback = buildArchivedActFallback(act).replace(
     "<h1>Atto di vendita OroActive - Anteprima aziendale sola lettura</h1>",
     `<h1>${escapeHtml(heading)}</h1>`
   );
   if (!attachments.size) return fallback;
-  return `${fallback}
-    <section class="print-copy company-copy readonly-copy">
-      <h1>${escapeHtml(heading)} - Allegati fotografici</h1>
-      <div class="print-attachments full-attachments">${printableAttachmentRows([...attachments.keys()], new Set(act.captures || []), attachments)}</div>
-    </section>`;
+  return `${fallback}${attachmentPage}`;
 }
 
 function buildActsPdfPacket(title, subtitle, acts) {
@@ -1320,21 +1321,68 @@ function actMaterials(act) {
   return [{ metal: "Oro", weight: act.weight || "0" }];
 }
 
+function addDays(date, days) {
+  const copy = parseActDate(date);
+  copy.setDate(copy.getDate() + days);
+  return localDateKey(copy);
+}
+
+function materialTotalMap(acts) {
+  return metalOrder.reduce((totals, metal) => {
+    totals[metal] = acts.reduce((sum, act) => {
+      const material = actMaterials(act).find((item) => item.metal === metal);
+      return sum + Number(material?.weight || 0);
+    }, 0);
+    return totals;
+  }, {});
+}
+
+function materialTotalsMarkup(totals, label = "Totali giacenza") {
+  return `
+    <div class="fusion-totals material-total-grid">
+      <strong>${escapeHtml(label)}</strong>
+      ${metalOrder.map((metal) => `<span>${escapeHtml(metal)}: ${escapeHtml((totals[metal] || 0).toFixed(2))} gr</span>`).join("")}
+    </div>
+  `;
+}
+
+function fusionActRows(acts, options = {}) {
+  if (!acts.length) return '<div class="empty-state">Nessun atto presente.</div>';
+  return `
+    <div class="archive-table fusion-table">
+      <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Data acquisto</span><span>Fondibile dal</span><span>Materiale</span><span>Azioni</span></div>
+      ${acts.flatMap((act) => actMaterials(act).map((material) => `
+        <div class="table-row">
+          <span>${escapeHtml(act.practiceNumber)}</span>
+          <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
+          <span>${escapeHtml(act.date)}</span>
+          <em class="${options.ready ? "done" : ""}">${escapeHtml(addDays(act.date, 10))}</em>
+          <span>${escapeHtml(material.metal)} ${escapeHtml(material.weight)} gr</span>
+          <div class="row-actions">
+            <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
+            <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
+            <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
+          </div>
+        </div>
+      `)).join("")}
+    </div>
+  `;
+}
+
 function renderFusionGroups() {
   const container = document.getElementById("fusionGroups");
   if (!container) return;
 
-  const eligibleActs = demoActs
-    .map((act) => ({ ...act, daysElapsed: daysFromPurchase(act.date) }))
-    .filter((act) => act.daysElapsed >= 10)
-    .sort((first, second) => second.daysElapsed - first.daysElapsed);
+  const acts = demoActs
+    .map((act) => ({ ...act, daysElapsed: daysFromPurchase(act.date), fusionDate: addDays(act.date, 10) }))
+    .sort((first, second) => dateValue(second.date) - dateValue(first.date));
 
-  if (!eligibleActs.length) {
-    container.innerHTML = '<div class="empty-state">Nessun atto disponibile per fusione. Verranno mostrati solo gli atti acquistati da almeno 10 giorni.</div>';
+  if (!acts.length) {
+    container.innerHTML = '<div class="empty-state">Nessuna giacenza disponibile per i negozi autorizzati.</div>';
     return;
   }
 
-  const grouped = eligibleActs.reduce((groups, act) => {
+  const grouped = acts.reduce((groups, act) => {
     groups[act.store] ||= [];
     groups[act.store].push(act);
     return groups;
@@ -1344,15 +1392,19 @@ function renderFusionGroups() {
   container.innerHTML = stores
     .filter((store) => grouped[store]?.length)
     .map((store) => {
-      const acts = grouped[store];
-      const totalWeight = acts.reduce((sum, act) => sum + Number(act.weight || 0), 0);
-      const totalAmount = acts.reduce((sum, act) => sum + Number(act.amount || 0), 0);
-      const actsByMaterial = acts.reduce((materials, act) => {
-        actMaterials(act).forEach((material) => {
-          materials[material.metal] ||= [];
-          materials[material.metal].push({ ...act, materialWeight: material.weight });
-        });
-        return materials;
+      const storeActs = grouped[store];
+      const storeTotals = materialTotalMap(storeActs);
+      const readyActs = storeActs.filter((act) => act.daysElapsed >= 10);
+      const readyTotals = materialTotalMap(readyActs);
+      const actsByDay = storeActs.reduce((days, act) => {
+        days[act.date] ||= [];
+        days[act.date].push(act);
+        return days;
+      }, {});
+      const upcomingByDate = storeActs.reduce((days, act) => {
+        days[act.fusionDate] ||= [];
+        days[act.fusionDate].push(act);
+        return days;
       }, {});
 
       return `
@@ -1360,43 +1412,42 @@ function renderFusionGroups() {
           <div class="fusion-store-heading">
             <div>
               <h3>${escapeHtml(store)}</h3>
-              <p>${acts.length} ${acts.length === 1 ? "atto pronto" : "atti pronti"} per fusione</p>
+              <p>Giacenza complessiva per negozio, giorno e materiale.</p>
             </div>
-            <div class="fusion-totals">
-              <span>${escapeHtml(totalWeight.toFixed(2))} g</span>
-              <strong>${escapeHtml(formatEuro(totalAmount))}</strong>
-            </div>
+            ${materialTotalsMarkup(storeTotals)}
           </div>
           <div class="fusion-materials">
-            ${metalOrder.filter((metal) => actsByMaterial[metal]?.length).map((metal) => {
-              const materialActs = actsByMaterial[metal];
-              const materialWeight = materialActs.reduce((sum, act) => sum + Number(act.materialWeight || 0), 0);
-              return `
-                <section class="fusion-material ${captureClassForMetal(metal)}">
-                  <div class="fusion-material-heading">
-                    <h4>${escapeHtml(metal)}</h4>
-                    <span>${escapeHtml(materialWeight.toFixed(2))} g da fondere</span>
-                  </div>
-                  <div class="archive-table fusion-table">
-                    <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Data acquisto</span><span>Giorni</span><span>Peso materiale</span><span>Azioni</span></div>
-                    ${materialActs.map((act) => `
-                      <div class="table-row">
-                        <span>${escapeHtml(act.practiceNumber)}</span>
-                        <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
-                        <span>${escapeHtml(act.date)}</span>
-                        <em class="done">${escapeHtml(act.daysElapsed)} giorni</em>
-                        <span>${escapeHtml(act.materialWeight)} g</span>
-                        <div class="row-actions">
-                          <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
-                          <button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>
-                          <button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>
-                        </div>
-                      </div>
-                    `).join("")}
-                  </div>
-                </section>
-              `;
-            }).join("")}
+            <section class="fusion-material">
+              <div class="fusion-material-heading">
+                <h4>Fondibile oggi</h4>
+                <span>${escapeHtml(readyActs.length)} atti pronti</span>
+              </div>
+              ${materialTotalsMarkup(readyTotals, "Totali fondibili oggi")}
+              ${fusionActRows(readyActs, { ready: true })}
+            </section>
+            ${Object.entries(actsByDay).sort(([a], [b]) => b.localeCompare(a)).map(([day, dayActs]) => `
+              <section class="fusion-material">
+                <div class="fusion-material-heading">
+                  <h4>Giacenza giorno ${escapeHtml(day)}</h4>
+                  <span>${escapeHtml(dayActs.length)} atti</span>
+                </div>
+                ${materialTotalsMarkup(materialTotalMap(dayActs), "Totali giorno")}
+                ${fusionActRows(dayActs)}
+              </section>
+            `).join("")}
+            <section class="fusion-material platinum">
+              <div class="fusion-material-heading">
+                <h4>Calendario prossime fusioni</h4>
+                <span>Atti fondibili per data</span>
+              </div>
+              ${Object.entries(upcomingByDate).sort(([a], [b]) => a.localeCompare(b)).map(([date, dateActs]) => `
+                <div class="fusion-calendar-day">
+                  <h5>${escapeHtml(date)}</h5>
+                  ${materialTotalsMarkup(materialTotalMap(dateActs), "Totali fondibili")}
+                  ${fusionActRows(dateActs, { ready: date <= localDateKey() })}
+                </div>
+              `).join("")}
+            </section>
           </div>
         </section>
       `;

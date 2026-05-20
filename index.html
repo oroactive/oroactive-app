@@ -9,9 +9,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="format-detection" content="telephone=no">
   <title>OroActive Gestionale</title>
-  <link rel="manifest" href="manifest.webmanifest?v=20260520-12">
+  <link rel="manifest" href="manifest.webmanifest?v=20260520-13">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260520-12">
+  <link rel="stylesheet" href="styles.css?v=20260520-13">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -40,7 +40,7 @@
       <nav class="main-menu-actions">
         <button type="button" data-section="practice">Atto di Vendita</button>
         <button type="button" data-section="archive">Elenco</button>
-        <button type="button" data-section="fusion">Fusione</button>
+        <button type="button" data-section="fusion">Giacenza</button>
         <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
       </nav>
     </div>
@@ -61,7 +61,7 @@
         <div class="brand-dropdown" id="brandDropdown" hidden>
           <button type="button" data-section="practice">Atto di Vendita</button>
           <button type="button" data-section="archive">Elenco</button>
-          <button type="button" data-section="fusion">Fusione</button>
+          <button type="button" data-section="fusion">Giacenza</button>
           <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
         </div>
       </div>
@@ -507,9 +507,9 @@
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
           <div>
-            <p class="eyebrow">Fonderia</p>
-            <h2>Fusione</h2>
-            <p class="muted">Atti di vendita acquistati e da inviare in fusione, suddivisi per negozio.</p>
+            <p class="eyebrow">Giacenza</p>
+            <h2>Giacenza</h2>
+            <p class="muted">Materiale prezioso in giacenza e calendario fusioni, suddiviso per negozio.</p>
           </div>
         </div>
         <div class="fusion-groups" id="fusionGroups" aria-live="polite"></div>
@@ -567,6 +567,6 @@
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260520-12"></script>
+  <script src="app.js?v=20260520-13"></script>
 </body>
 </html>

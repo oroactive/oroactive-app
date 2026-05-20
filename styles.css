@@ -1455,7 +1455,7 @@ canvas {
 
 .fusion-totals {
   display: grid;
-  justify-items: end;
+  justify-items: start;
   gap: 4px;
   color: var(--soft-ink);
   font-weight: 900;
@@ -1463,6 +1463,29 @@ canvas {
 
 .fusion-totals strong {
   color: var(--ink);
+}
+
+.material-total-grid {
+  min-width: min(430px, 100%);
+  padding: 10px;
+  border: 1px solid #ffc39e;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.fusion-calendar-day {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.fusion-calendar-day h5 {
+  margin: 0;
+  color: var(--gold-dark);
+  font-size: 15px;
 }
 
 .fusion-materials {

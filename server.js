@@ -85,7 +85,7 @@ function normalizeRole(role = "commesso") {
 }
 
 function roleSeesAllStores(role) {
-  return ["founder", "responsabile"].includes(normalizeRole(role));
+  return ["founder", "responsabile", "commesso"].includes(normalizeRole(role));
 }
 
 function canManageAccess(user) {
