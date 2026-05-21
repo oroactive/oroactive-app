@@ -2105,24 +2105,30 @@ function documentScanReviewMarkup() {
 
 function documentScanDataRowsMarkup(data = {}) {
   const rows = [
-    ["Nome", data.name],
-    ["Cognome", data.surname],
-    ["Codice fiscale", data.fiscalCode],
-    ["Data di nascita", data.birthDate],
-    ["Luogo di nascita", data.birthPlace],
-    ["Indirizzo residenza", data.address],
-    ["Numero documento", data.documentNumber],
-    ["Data rilascio/emissione", data.documentIssueDate],
-    ["Data scadenza", data.documentExpiry],
-    ["Cittadinanza", data.citizenship],
-    ["Sesso", data.sex]
+    ["name", "Nome", data.name],
+    ["surname", "Cognome", data.surname],
+    ["fiscalCode", "Codice fiscale", data.fiscalCode],
+    ["birthDate", "Data di nascita", data.birthDate],
+    ["birthPlace", "Luogo di nascita", data.birthPlace],
+    ["address", "Indirizzo residenza", data.address],
+    ["documentNumber", "Numero documento", data.documentNumber],
+    ["documentIssueDate", "Data rilascio/emissione", data.documentIssueDate],
+    ["documentExpiry", "Data scadenza", data.documentExpiry],
+    ["documentIssuer", "Ente rilascio", data.documentIssuer],
+    ["citizenship", "Cittadinanza", data.citizenship],
+    ["sex", "Sesso", data.sex]
   ];
-  return rows.map(([label, value]) => `
-    <div>
+  return rows.map(([field, label, value]) => {
+    const confidence = detectedConfidence(data, field);
+    const low = value && confidence === "basso";
+    return `
+    <div class="${low ? "confidence-low" : confidence ? `confidence-${confidence}` : ""}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value || "Dato non letto")}</strong>
+      ${low ? "<em>Controlla questo dato</em>" : confidence ? `<em>Affidabilità ${escapeHtml(confidence)}</em>` : ""}
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function documentScanCameraMarkup(ready, sideLabel) {
@@ -2360,8 +2366,36 @@ function retakeDocumentScanPhoto() {
   renderDocumentScanModal();
 }
 
+const CIE_OCR_ZONES = {
+  front: {
+    surname: { x: 0.32, y: 0.05, w: 0.62, h: 0.12 },
+    name: { x: 0.32, y: 0.16, w: 0.62, h: 0.12 },
+    birth: { x: 0.32, y: 0.27, w: 0.62, h: 0.12 },
+    sex: { x: 0.32, y: 0.39, w: 0.2, h: 0.1 },
+    citizenship: { x: 0.32, y: 0.49, w: 0.62, h: 0.11 },
+    issue: { x: 0.32, y: 0.59, w: 0.3, h: 0.12 },
+    expiry: { x: 0.58, y: 0.59, w: 0.32, h: 0.12 },
+    documentNumber: { x: 0.32, y: 0.71, w: 0.62, h: 0.12 }
+  },
+  back: {
+    fiscalCode: { x: 0.04, y: 0.19, w: 0.62, h: 0.13 },
+    address: { x: 0.04, y: 0.47, w: 0.62, h: 0.16 },
+    mrz: { x: 0.04, y: 0.72, w: 0.92, h: 0.24 },
+    barcode: { x: 0.72, y: 0.12, w: 0.22, h: 0.48 }
+  }
+};
+
 function detectedDocumentHasValues(data = {}) {
-  return Object.values(data).some((value) => String(value || "").trim());
+  return Object.entries(data).some(([key, value]) => key !== "_confidence" && String(value || "").trim());
+}
+
+function missingDetectedDocumentFields(data = {}) {
+  return ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "address", "documentNumber", "documentIssueDate", "documentExpiry", "citizenship", "sex"]
+    .filter((field) => !String(data[field] || "").trim());
+}
+
+function hasLowConfidenceFields(data = {}) {
+  return Object.values(data._confidence || {}).some((confidence) => confidence === "basso");
 }
 
 async function prepareDocumentScanReview() {
@@ -2381,8 +2415,8 @@ async function prepareDocumentScanReview() {
   state.documentScan.ocrRead = detectedDocumentHasValues(detected);
   state.documentScan.review = true;
   renderDocumentScanModal();
-  if (!state.documentScan.ocrRead) {
-    showToast("Documento non letto correttamente, puoi rifare la scansione oppure compilare i campi manualmente.");
+  if (!state.documentScan.ocrRead || missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
+    showToast("Alcuni dati non sono stati letti correttamente, controlla e completa manualmente.");
   }
 }
 
@@ -2413,14 +2447,107 @@ function setCaptureFile(key, file) {
   state.attachments = state.uploadedCaptures.size;
 }
 
-function setFieldIfDetected(selector, value) {
+function confidenceRank(confidence = "basso") {
+  return { alto: 3, medio: 2, basso: 1 }[confidence] || 1;
+}
+
+function detectedConfidence(data = {}, field) {
+  return data._confidence?.[field] || (data[field] ? "basso" : "");
+}
+
+function setFieldIfDetected(selector, value, confidence = "basso") {
   if (!value) return false;
   const field = document.querySelector(selector);
   if (!field) return false;
   field.value = value;
+  field.classList.toggle("ocr-low-confidence", confidence === "basso");
+  field.title = confidence === "basso" ? "Controlla questo dato" : "";
   field.dispatchEvent(new Event("input", { bubbles: true }));
   field.dispatchEvent(new Event("change", { bubbles: true }));
+  field.classList.toggle("ocr-low-confidence", confidence === "basso");
+  field.title = confidence === "basso" ? "Controlla questo dato" : "";
   return true;
+}
+
+function imageFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = dataUrl;
+  });
+}
+
+function enhancedImageDataUrl(canvas, options = {}) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  const contrast = options.contrast || 1.35;
+  const threshold = options.threshold || 0;
+  for (let index = 0; index < data.length; index += 4) {
+    const gray = (data[index] * 0.299) + (data[index + 1] * 0.587) + (data[index + 2] * 0.114);
+    let value = (gray - 128) * contrast + 128;
+    value = Math.max(0, Math.min(255, value));
+    if (threshold) value = value > threshold ? 255 : 0;
+    data[index] = value;
+    data[index + 1] = value;
+    data[index + 2] = value;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/jpeg", 0.86);
+}
+
+async function preprocessDocumentImage(dataUrl) {
+  const image = await imageFromDataUrl(dataUrl);
+  let cropWidth = image.width * 0.82;
+  let cropHeight = cropWidth / 1.586;
+  if (cropHeight > image.height * 0.86) {
+    cropHeight = image.height * 0.86;
+    cropWidth = cropHeight * 1.586;
+  }
+  const sourceX = Math.max(0, (image.width - cropWidth) / 2);
+  const sourceY = Math.max(0, (image.height - cropHeight) / 2);
+  const outputWidth = 1300;
+  const outputHeight = Math.round(outputWidth / 1.586);
+  const canvas = document.createElement("canvas");
+  canvas.width = outputWidth;
+  canvas.height = outputHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, sourceX, sourceY, cropWidth, cropHeight, 0, 0, outputWidth, outputHeight);
+  const enhanced = await imageFromDataUrl(enhancedImageDataUrl(canvas, { contrast: 1.45 }));
+  ctx.filter = "contrast(1.08) saturate(0.35)";
+  ctx.drawImage(enhanced, 0, 0, outputWidth, outputHeight);
+  ctx.filter = "none";
+  return {
+    full: canvas.toDataURL("image/jpeg", 0.86),
+    canvas
+  };
+}
+
+function cropZoneFromCanvas(canvas, zone, options = {}) {
+  const output = document.createElement("canvas");
+  output.width = Math.max(1, Math.round(canvas.width * zone.w));
+  output.height = Math.max(1, Math.round(canvas.height * zone.h));
+  const ctx = output.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(
+    canvas,
+    Math.round(canvas.width * zone.x),
+    Math.round(canvas.height * zone.y),
+    Math.round(canvas.width * zone.w),
+    Math.round(canvas.height * zone.h),
+    0,
+    0,
+    output.width,
+    output.height
+  );
+  return enhancedImageDataUrl(output, {
+    contrast: options.contrast || 1.65,
+    threshold: options.threshold || 0
+  });
 }
 
 function normalizeOcrDate(value = "") {
@@ -2516,34 +2643,126 @@ function firstValue(...values) {
   return values.find((value) => String(value || "").trim()) || "";
 }
 
-function parseCieDocumentData(frontText = "", backText = "") {
+function ocrConfidence(score = 0, value = "") {
+  if (!String(value || "").trim()) return "";
+  if (score >= 78) return "alto";
+  if (score >= 52) return "medio";
+  return "basso";
+}
+
+function setCandidate(candidates, field, value, confidence, source = "") {
+  const cleanValue = cleanOcrValue(value);
+  if (!cleanValue) return;
+  candidates[field] ||= [];
+  candidates[field].push({ value: cleanValue, confidence: confidence || "basso", source });
+}
+
+function selectCandidate(candidates = [], validator = null) {
+  const valid = candidates.filter((candidate) => candidate?.value && (!validator || validator(candidate.value)));
+  if (!valid.length) return { value: "", confidence: "" };
+  valid.sort((first, second) => confidenceRank(second.confidence) - confidenceRank(first.confidence));
+  return valid[0];
+}
+
+function isFiscalCode(value = "") {
+  return /^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/i.test(String(value).trim());
+}
+
+function isDocumentNumber(value = "") {
+  return /^[A-Z]{1,3}\d{4,7}[A-Z]{0,2}$/i.test(String(value).replace(/\s/g, ""));
+}
+
+function isIsoDate(value = "") {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value));
+}
+
+function zonePrimaryText(text = "") {
+  return String(text || "")
+    .split(/\n+/)
+    .map((line) => cleanOcrValue(line.replace(/^(cognome|surname|nome|name|sesso|sex|cittadinanza|nationality|scadenza|expiry|emissione|numero documento|document no)\b[:\s-]*/i, "")))
+    .filter(Boolean)
+    .sort((first, second) => second.length - first.length)[0] || "";
+}
+
+function parseCieDocumentData(frontText = "", backText = "", zoneTexts = {}) {
   const front = parseCieSideText(frontText);
   const back = parseCieSideText(backText);
-  const mrz = parseMrzText(backText) || {};
-  return {
-    name: firstValue(front.name, mrz.name, back.name),
-    surname: firstValue(front.surname, mrz.surname, back.surname),
-    fiscalCode: firstValue(back.fiscalCode, front.fiscalCode),
-    birthDate: firstValue(front.birthDate, mrz.birthDate, back.birthDate),
-    birthPlace: firstValue(front.birthPlace, back.birthPlace),
-    address: firstValue(back.address, front.address),
-    documentNumber: firstValue(front.documentNumber, mrz.documentNumber, back.documentNumber),
-    documentIssueDate: firstValue(front.documentIssueDate, back.documentIssueDate),
-    documentExpiry: firstValue(front.documentExpiry, mrz.documentExpiry, back.documentExpiry),
-    documentIssuer: firstValue(front.documentIssuer, back.documentIssuer),
-    citizenship: firstValue(front.citizenship, mrz.citizenship, back.citizenship),
-    sex: firstValue(front.sex, mrz.sex, back.sex)
+  const mrz = parseMrzText(`${backText}\n${zoneTexts.back?.mrz?.text || ""}`) || {};
+  const candidates = {};
+
+  Object.entries(front).forEach(([field, value]) => setCandidate(candidates, field, value, "medio", "front-full"));
+  Object.entries(back).forEach(([field, value]) => setCandidate(candidates, field, value, "medio", "back-full"));
+  Object.entries(mrz).forEach(([field, value]) => setCandidate(candidates, field, value, "alto", "mrz"));
+
+  setCandidate(candidates, "surname", zonePrimaryText(zoneTexts.front?.surname?.text), ocrConfidence(zoneTexts.front?.surname?.confidence, zoneTexts.front?.surname?.text), "front-zone");
+  setCandidate(candidates, "name", zonePrimaryText(zoneTexts.front?.name?.text), ocrConfidence(zoneTexts.front?.name?.confidence, zoneTexts.front?.name?.text), "front-zone");
+  const birth = parseBirthPlaceAndDate(zonePrimaryText(zoneTexts.front?.birth?.text));
+  setCandidate(candidates, "birthPlace", birth.place, ocrConfidence(zoneTexts.front?.birth?.confidence, birth.place), "front-zone");
+  setCandidate(candidates, "birthDate", birth.date, ocrConfidence(zoneTexts.front?.birth?.confidence, birth.date), "front-zone");
+  setCandidate(candidates, "sex", zonePrimaryText(zoneTexts.front?.sex?.text).charAt(0).toUpperCase(), ocrConfidence(zoneTexts.front?.sex?.confidence, zoneTexts.front?.sex?.text), "front-zone");
+  setCandidate(candidates, "citizenship", zonePrimaryText(zoneTexts.front?.citizenship?.text), ocrConfidence(zoneTexts.front?.citizenship?.confidence, zoneTexts.front?.citizenship?.text), "front-zone");
+  setCandidate(candidates, "documentIssueDate", normalizeOcrDate(zonePrimaryText(zoneTexts.front?.issue?.text)), ocrConfidence(zoneTexts.front?.issue?.confidence, zoneTexts.front?.issue?.text), "front-zone");
+  setCandidate(candidates, "documentExpiry", normalizeOcrDate(zonePrimaryText(zoneTexts.front?.expiry?.text)), ocrConfidence(zoneTexts.front?.expiry?.confidence, zoneTexts.front?.expiry?.text), "front-zone");
+  setCandidate(candidates, "documentNumber", zonePrimaryText(zoneTexts.front?.documentNumber?.text).replace(/\s/g, ""), ocrConfidence(zoneTexts.front?.documentNumber?.confidence, zoneTexts.front?.documentNumber?.text), "front-zone");
+
+  const fiscalZone = (zoneTexts.back?.fiscalCode?.text || "").match(/[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i)?.[0] || "";
+  setCandidate(candidates, "fiscalCode", fiscalZone.toUpperCase(), ocrConfidence(zoneTexts.back?.fiscalCode?.confidence, fiscalZone), "back-zone");
+  setCandidate(candidates, "address", zonePrimaryText(zoneTexts.back?.address?.text), ocrConfidence(zoneTexts.back?.address?.confidence, zoneTexts.back?.address?.text), "back-zone");
+
+  const validators = {
+    fiscalCode: isFiscalCode,
+    birthDate: isIsoDate,
+    documentIssueDate: isIsoDate,
+    documentExpiry: isIsoDate,
+    documentNumber: isDocumentNumber,
+    sex: (value) => ["M", "F"].includes(String(value).toUpperCase())
   };
+  const fields = ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "address", "documentNumber", "documentIssueDate", "documentExpiry", "documentIssuer", "citizenship", "sex"];
+  const output = { _confidence: {} };
+  fields.forEach((field) => {
+    const selected = selectCandidate(candidates[field], validators[field]);
+    output[field] = selected.value || "";
+    if (selected.value) output._confidence[field] = selected.confidence || "basso";
+  });
+  return output;
 }
 
 async function runDocumentOcr(front, back) {
   const available = await loadOcrEngine();
   if (!available || !window.Tesseract?.recognize) return {};
-  const [frontResult, backResult] = await Promise.all([
-    window.Tesseract.recognize(front.dataUrl, "ita+eng"),
-    window.Tesseract.recognize(back.dataUrl, "ita+eng")
+  const frontPrepared = await preprocessDocumentImage(front.dataUrl);
+  const backPrepared = await preprocessDocumentImage(back.dataUrl);
+  const [frontResult, backResult, frontZones, backZones] = await Promise.all([
+    window.Tesseract.recognize(frontPrepared.full, "ita+eng"),
+    window.Tesseract.recognize(backPrepared.full, "ita+eng"),
+    recognizeCieZones(frontPrepared.canvas, "front"),
+    recognizeCieZones(backPrepared.canvas, "back")
   ]);
-  return parseCieDocumentData(frontResult?.data?.text || "", backResult?.data?.text || "");
+  return parseCieDocumentData(
+    frontResult?.data?.text || "",
+    backResult?.data?.text || "",
+    { front: frontZones, back: backZones }
+  );
+}
+
+async function recognizeCieZones(canvas, side) {
+  const zones = CIE_OCR_ZONES[side] || {};
+  const entries = await Promise.all(Object.entries(zones).map(async ([name, zone]) => {
+    const dataUrl = cropZoneFromCanvas(canvas, zone, {
+      contrast: name === "mrz" ? 1.9 : 1.65,
+      threshold: name === "mrz" ? 138 : 0
+    });
+    try {
+      const result = await window.Tesseract.recognize(dataUrl, "ita+eng");
+      return [name, {
+        text: result?.data?.text || "",
+        confidence: Number(result?.data?.confidence || 0)
+      }];
+    } catch {
+      return [name, { text: "", confidence: 0 }];
+    }
+  }));
+  return Object.fromEntries(entries);
 }
 
 function loadScriptOnce(src, id) {
@@ -2575,18 +2794,18 @@ async function loadOcrEngine() {
 
 function applyDetectedDocumentData(data = {}) {
   const applied = [
-    setFieldIfDetected('[name="nome"]', data.name),
-    setFieldIfDetected('[name="cognome"]', data.surname),
-    setFieldIfDetected('[name="cf"]', data.fiscalCode),
-    setFieldIfDetected('[name="nascita"]', data.birthDate),
-    setFieldIfDetected('[name="luogo"]', data.birthPlace),
-    setFieldIfDetected('[name="indirizzo"]', data.address),
-    setFieldIfDetected('[name="numeroDocumento"]', data.documentNumber),
-    setFieldIfDetected('[name="dataRilascioDocumento"]', data.documentIssueDate),
-    setFieldIfDetected('[name="scadenzaDocumento"]', data.documentExpiry),
-    setFieldIfDetected('[name="enteRilascioDocumento"]', data.documentIssuer),
-    setFieldIfDetected('[name="cittadinanza"]', data.citizenship),
-    setFieldIfDetected('[name="sesso"]', data.sex)
+    setFieldIfDetected('[name="nome"]', data.name, detectedConfidence(data, "name")),
+    setFieldIfDetected('[name="cognome"]', data.surname, detectedConfidence(data, "surname")),
+    setFieldIfDetected('[name="cf"]', data.fiscalCode, detectedConfidence(data, "fiscalCode")),
+    setFieldIfDetected('[name="nascita"]', data.birthDate, detectedConfidence(data, "birthDate")),
+    setFieldIfDetected('[name="luogo"]', data.birthPlace, detectedConfidence(data, "birthPlace")),
+    setFieldIfDetected('[name="indirizzo"]', data.address, detectedConfidence(data, "address")),
+    setFieldIfDetected('[name="numeroDocumento"]', data.documentNumber, detectedConfidence(data, "documentNumber")),
+    setFieldIfDetected('[name="dataRilascioDocumento"]', data.documentIssueDate, detectedConfidence(data, "documentIssueDate")),
+    setFieldIfDetected('[name="scadenzaDocumento"]', data.documentExpiry, detectedConfidence(data, "documentExpiry")),
+    setFieldIfDetected('[name="enteRilascioDocumento"]', data.documentIssuer, detectedConfidence(data, "documentIssuer")),
+    setFieldIfDetected('[name="cittadinanza"]', data.citizenship, detectedConfidence(data, "citizenship")),
+    setFieldIfDetected('[name="sesso"]', data.sex, detectedConfidence(data, "sex"))
   ];
   updateCustomerSummary();
   updateChecklistState();
@@ -2615,8 +2834,13 @@ async function confirmDocumentScan() {
   updateDocumentCaptureCards();
   updateAttachmentState();
 
-  const applied = applyDetectedDocumentData(state.documentScan.detected || {});
-  showToast(applied ? "Controlla i dati estratti e correggi eventuali errori" : "Documento non letto correttamente, puoi rifare la scansione oppure compilare i campi manualmente.");
+  const detected = state.documentScan.detected || {};
+  const applied = applyDetectedDocumentData(detected);
+  if (!applied || missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
+    showToast("Alcuni dati non sono stati letti correttamente, controlla e completa manualmente.");
+  } else {
+    showToast("Controlla i dati estratti e correggi eventuali errori");
+  }
   stopDocumentCamera();
   previewModal.hidden = true;
 }
@@ -4161,11 +4385,15 @@ document.getElementById("saleTotal").addEventListener("input", () => {
 document.getElementById("materialAmountFields").addEventListener("input", updateChecklistState);
 
 document.querySelector(".form-panel").addEventListener("input", (event) => {
+  event.target.classList?.remove("ocr-low-confidence");
+  if (event.target.title === "Controlla questo dato") event.target.title = "";
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
   updateChecklistState();
 });
 
 document.querySelector(".form-panel").addEventListener("change", (event) => {
+  event.target.classList?.remove("ocr-low-confidence");
+  if (event.target.title === "Controlla questo dato") event.target.title = "";
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
   updateChecklistState();
 });

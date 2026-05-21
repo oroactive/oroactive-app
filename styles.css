@@ -2483,9 +2483,38 @@ button.quality-review-badge {
   gap: 4px;
 }
 
+.document-scan-data-grid div.confidence-low {
+  border-color: #f1c45b;
+  background: #fff8da;
+}
+
+.document-scan-data-grid div.confidence-medio {
+  border-color: #f0d5a5;
+  background: #fffaf2;
+}
+
+.document-scan-data-grid div.confidence-alto {
+  border-color: #9fd9b6;
+  background: #f0fbf4;
+}
+
 .document-scan-data-grid strong {
   color: var(--ink);
   overflow-wrap: anywhere;
+}
+
+.document-scan-data-grid em {
+  color: var(--soft-ink);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.form-panel input.ocr-low-confidence,
+.form-panel select.ocr-low-confidence {
+  border-color: #e4b22c;
+  background: #fff8da;
+  box-shadow: 0 0 0 3px rgba(228, 178, 44, 0.18);
 }
 
 .archive-pagination {
