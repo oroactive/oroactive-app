@@ -121,6 +121,10 @@ const PROVINCE_NAMES = {
 };
 const PROVINCE_CODES = Object.keys(PROVINCE_NAMES).sort();
 const FISCAL_MONTH_CODES = ["A", "B", "C", "D", "E", "H", "L", "M", "P", "R", "S", "T"];
+const NAME_SEX_HINTS = {
+  M: new Set("ALESSANDRO ANDREA ANGELO ANTONIO CHRISTIAN CRISTIAN DANIELE DAVIDE DOMENICO EMANUELE FABIO FEDERICO FILIPPO FRANCESCO GABRIELE GIACOMO GIANLUCA GIOVANNI GIUSEPPE LORENZO LUCA MARCO MARIO MATTEO MICHELE NICOLA PAOLO PIETRO RICCARDO ROBERTO SALVATORE SIMONE STEFANO TOMMASO VINCENZO".split(" ")),
+  F: new Set("ALESSANDRA ANNA ANTONELLA ARIANNA AURORA BARBARA BENEDETTA CATERINA CHIARA CRISTINA ELENA ELISA ELISABETTA FEDERICA FRANCESCA GIADA GIULIA ILARIA LAURA MARTINA MARIA MONICA PAOLA ROBERTA SARA SERENA SILVIA SOFIA VALENTINA VERONICA".split(" "))
+};
 const documentLabels = {
   "Carta identita": "carta identita",
   Patente: "patente",
@@ -544,6 +548,25 @@ function fiscalNamePart(value = "", isName = false) {
     ? `${consonants[0]}${consonants[2]}${consonants[3]}`
     : `${consonants}${vowels}XXX`;
   return source.slice(0, 3);
+}
+
+function inferSexFromName(value = "") {
+  const firstName = normalizeText(value).split(/\s+/).filter(Boolean)[0] || "";
+  if (!firstName) return "";
+  if (NAME_SEX_HINTS.M.has(firstName)) return "M";
+  if (NAME_SEX_HINTS.F.has(firstName)) return "F";
+  if (firstName.endsWith("A")) return "F";
+  if (firstName.endsWith("O") || firstName.endsWith("E") || firstName.endsWith("I")) return "M";
+  return "";
+}
+
+function autofillSexFromName() {
+  const sexField = document.querySelector('[name="sesso"]');
+  if (!sexField || sexField.value) return false;
+  const inferred = inferSexFromName(fieldValue('[name="nome"]'));
+  if (!inferred) return false;
+  setFieldIfDetected('[name="sesso"]', inferred, "medio");
+  return true;
 }
 
 function fiscalControlChar(code15) {
@@ -4969,6 +4992,7 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
     }
   }
   if (event.target.matches('[name="nome"], [name="cognome"], [name="sesso"], [name="nascita"], [name="luogo"], [name="provinciaNascita"]')) {
+    if (event.target.matches('[name="nome"]')) autofillSexFromName();
     if (event.target.matches('[name="luogo"]')) updateCitizenshipFromBirthPlace();
     maybeAutofillFiscalCode();
   }
@@ -4986,6 +5010,7 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
     maybeAutofillFiscalCode();
   }
   if (event.target.matches('[name="nome"], [name="cognome"], [name="sesso"], [name="nascita"], [name="provinciaNascita"]')) {
+    if (event.target.matches('[name="nome"]')) autofillSexFromName();
     maybeAutofillFiscalCode();
   }
   if (event.target.matches('[name="cf"]')) {
