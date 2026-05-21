@@ -1010,6 +1010,8 @@ function drawActMainPdfPage(doc, act, title) {
     { label: "Cognome", value: act.surname },
     { label: "Codice fiscale", value: act.fiscalCode },
     { label: "Telefono", value: act.phone },
+    { label: "Cittadinanza", value: act.citizenship },
+    { label: "Sesso", value: act.sex },
     { label: "Data nascita", value: act.birthDate },
     { label: "Luogo nascita", value: act.birthPlace },
     { label: "Provincia nascita", value: act.birthProvince },

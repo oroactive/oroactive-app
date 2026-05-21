@@ -1261,6 +1261,8 @@ function actCompanyMainPage(act, heading) {
         <div class="print-field"><span>Cognome</span>${escapeHtml(act.surname || missing)}</div>
         <div class="print-field"><span>Codice fiscale</span>${escapeHtml(act.fiscalCode || missing)}</div>
         <div class="print-field"><span>Telefono</span>${escapeHtml(act.phone || missing)}</div>
+        <div class="print-field"><span>Cittadinanza</span>${escapeHtml(act.citizenship || missing)}</div>
+        <div class="print-field"><span>Sesso</span>${escapeHtml(act.sex || missing)}</div>
         <div class="print-field"><span>Data nascita</span>${escapeHtml(act.birthDate || missing)}</div>
         <div class="print-field"><span>Luogo nascita</span>${escapeHtml(act.birthPlace || missing)}</div>
         <div class="print-field"><span>Provincia nascita</span>${escapeHtml(act.birthProvince || missing)}</div>
@@ -1382,6 +1384,8 @@ function currentActSnapshot(status = "Archiviata") {
     birthProvince: fieldValue('[name="provinciaNascita"]'),
     fiscalCode: fieldValue('[name="cf"]'),
     phone: fieldValue('[name="telefono"]'),
+    citizenship: fieldValue('[name="cittadinanza"]'),
+    sex: fieldValue('[name="sesso"]'),
     address: fieldValue('[name="indirizzo"]'),
     residenceProvince: fieldValue('[name="provinciaResidenza"]'),
     documentType: fieldValue('[name="tipoDocumento"]'),
@@ -1707,6 +1711,8 @@ function buildArchivedActFallback(act) {
         <div class="print-field"><span>Provincia residenza</span>${escapeHtml(act.residenceProvince || missing)}</div>
         <div class="print-field"><span>Codice fiscale</span>${escapeHtml(act.fiscalCode || missing)}</div>
         <div class="print-field"><span>Telefono</span>${escapeHtml(act.phone || missing)}</div>
+        <div class="print-field"><span>Cittadinanza</span>${escapeHtml(act.citizenship || missing)}</div>
+        <div class="print-field"><span>Sesso</span>${escapeHtml(act.sex || missing)}</div>
         <div class="print-field"><span>Tipo documento</span>${escapeHtml(act.documentType || missing)}</div>
         <div class="print-field"><span>Numero documento</span>${escapeHtml(act.documentNumber || missing)}</div>
         <div class="print-field"><span>Data rilascio documento</span>${escapeHtml(act.documentIssueDate || missing)}</div>
@@ -2054,20 +2060,13 @@ function documentScanModalMarkup() {
 }
 
 function documentScanCameraMarkup(ready, sideLabel) {
+  const side = state.documentScan?.side || "front";
   return `
     <div class="document-camera-shell ${ready ? "ready" : "warn"}">
       <video id="documentScanVideo" playsinline muted autoplay></video>
       <canvas id="documentScanAnalysisCanvas" hidden></canvas>
       <div class="scan-guide-frame ${ready ? "ready" : "warn"}">
-        <div class="identity-card-wireframe">
-          <span class="wire-photo"></span>
-          <span class="wire-line wire-name">Nome</span>
-          <span class="wire-line wire-surname">Cognome</span>
-          <span class="wire-line wire-birth">Data nascita</span>
-          <span class="wire-line wire-fiscal">Codice fiscale</span>
-          <span class="wire-line wire-number">Numero documento</span>
-          <span class="wire-line wire-expiry">Scadenza</span>
-        </div>
+        ${identityCardGuideMarkup(side)}
       </div>
       <div class="scan-status ${ready ? "ready" : "warn"}" id="documentScanStatus">
         ${ready ? "Documento centrato correttamente" : "Centra il documento nel rettangolo"}
@@ -2078,11 +2077,43 @@ function documentScanCameraMarkup(ready, sideLabel) {
       </div>
     </div>
     <div class="document-scan-controls">
-      <button class="${ready ? "primary-button" : "warning-button"}" type="button" id="captureDocumentPhoto">Scatta ${escapeHtml(sideLabel)}</button>
+      <button class="${ready ? "primary-button" : "warning-button"}" type="button" id="captureDocumentPhoto" ${ready ? "" : "disabled"}>Scatta foto</button>
       <label class="ghost-button scan-file-fallback">
         Carica ${escapeHtml(sideLabel)}
         <input type="file" accept="image/*" capture="environment" data-document-scan-input="${state.documentScan?.side || "front"}">
       </label>
+    </div>
+  `;
+}
+
+function identityCardGuideMarkup(side) {
+  if (side === "back") {
+    return `
+      <div class="identity-card-wireframe cie-back">
+        <span class="wire-line wire-parent">Genitori / Tutore</span>
+        <span class="wire-line wire-fiscal-back">Codice fiscale</span>
+        <span class="wire-line wire-birth-act">Estremi atto nascita</span>
+        <span class="wire-line wire-address">Indirizzo residenza</span>
+        <span class="wire-barcode">Barcode</span>
+        <span class="wire-mrz wire-mrz-1"></span>
+        <span class="wire-mrz wire-mrz-2"></span>
+        <span class="wire-mrz wire-mrz-3"></span>
+      </div>
+    `;
+  }
+  return `
+    <div class="identity-card-wireframe cie-front">
+      <span class="wire-photo">Foto</span>
+      <span class="wire-line wire-surname">Cognome</span>
+      <span class="wire-line wire-name">Nome</span>
+      <span class="wire-line wire-birth">Luogo e data nascita</span>
+      <span class="wire-line wire-sex">Sesso</span>
+      <span class="wire-line wire-height">Statura</span>
+      <span class="wire-line wire-citizenship">Cittadinanza</span>
+      <span class="wire-line wire-issue">Emissione</span>
+      <span class="wire-line wire-expiry">Scadenza</span>
+      <span class="wire-line wire-number">Numero documento</span>
+      <span class="wire-signature">Firma</span>
     </div>
   `;
 }
@@ -2168,6 +2199,7 @@ function updateDocumentScanStatus(ready, message) {
   if (button) {
     button.classList.toggle("primary-button", ready);
     button.classList.toggle("warning-button", !ready);
+    button.disabled = !ready;
   }
 }
 
@@ -2284,6 +2316,15 @@ function normalizeOcrDate(value = "") {
   return `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
+function normalizeMrzDate(value = "") {
+  const text = String(value || "").replace(/\D/g, "");
+  if (text.length !== 6) return "";
+  const year = Number(text.slice(0, 2));
+  const currentYear = new Date().getFullYear() % 100;
+  const century = year > currentYear ? 1900 : 2000;
+  return `${century + year}-${text.slice(2, 4)}-${text.slice(4, 6)}`;
+}
+
 function valueAfterLabel(text, labels) {
   for (const label of labels) {
     const regex = new RegExp(`${label}\\s*[:\\-]?\\s*([^\\n]+)`, "i");
@@ -2293,33 +2334,100 @@ function valueAfterLabel(text, labels) {
   return "";
 }
 
-function parseDocumentOcrText(text = "") {
+function cleanOcrValue(value = "") {
+  return String(value || "").trim().replace(/[|;]/g, "").replace(/\s{2,}/g, " ");
+}
+
+function parseBirthPlaceAndDate(value = "") {
+  const cleaned = cleanOcrValue(value);
+  const date = normalizeOcrDate(cleaned);
+  const place = cleaned
+    .replace(/\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return { place, date };
+}
+
+function extractMrzLines(text = "") {
+  const candidates = String(text || "")
+    .toUpperCase()
+    .replace(/[«‹]/g, "<")
+    .split(/\n+/)
+    .map((line) => line.replace(/[^A-Z0-9<]/g, ""))
+    .filter((line) => line.includes("<") && line.length >= 20);
+  return candidates.slice(-3);
+}
+
+function parseMrzText(text = "") {
+  const lines = extractMrzLines(text);
+  if (lines.length < 2) return {};
+  const [line1 = "", line2 = "", line3 = ""] = lines;
+  const names = line3.split("<<");
+  const surname = names[0]?.replace(/</g, " ").trim() || "";
+  const name = names.slice(1).join(" ").replace(/</g, " ").trim();
+  return {
+    documentNumber: line1.slice(5, 14).replace(/</g, "").trim(),
+    birthDate: normalizeMrzDate(line2.slice(0, 6)),
+    sex: ["M", "F"].includes(line2.charAt(7)) ? line2.charAt(7) : "",
+    documentExpiry: normalizeMrzDate(line2.slice(8, 14)),
+    citizenship: line2.slice(15, 18).replace(/</g, "").trim(),
+    surname,
+    name
+  };
+}
+
+function parseCieSideText(text = "") {
   const normalized = String(text || "").replace(/\r/g, "\n");
   const fiscalCode = (normalized.match(/[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i)?.[0] || "").toUpperCase();
-  const documentNumber = valueAfterLabel(normalized, ["numero documento", "documento n", "n documento", "n\\."]);
-  const birthDate = normalizeOcrDate(valueAfterLabel(normalized, ["data di nascita", "nato il", "nata il"]));
-  const documentIssueDate = normalizeOcrDate(valueAfterLabel(normalized, ["data rilascio", "rilasciata il", "rilasciato il"]));
-  const documentExpiry = normalizeOcrDate(valueAfterLabel(normalized, ["data scadenza", "scadenza", "valida fino al"]));
+  const birth = parseBirthPlaceAndDate(valueAfterLabel(normalized, ["luogo e data di nascita", "place and date of birth", "data di nascita", "nato il", "nata il"]));
   return {
-    name: valueAfterLabel(normalized, ["nome"]),
-    surname: valueAfterLabel(normalized, ["cognome"]),
+    name: cleanOcrValue(valueAfterLabel(normalized, ["nome", "name"])),
+    surname: cleanOcrValue(valueAfterLabel(normalized, ["cognome", "surname"])),
     fiscalCode,
-    birthDate,
-    birthPlace: valueAfterLabel(normalized, ["luogo di nascita", "nato a", "nata a"]),
-    address: valueAfterLabel(normalized, ["residenza", "indirizzo"]),
-    documentNumber,
-    documentIssueDate,
-    documentExpiry,
-    documentIssuer: valueAfterLabel(normalized, ["ente rilascio", "rilasciata da", "rilasciato da"])
+    birthDate: birth.date || normalizeOcrDate(valueAfterLabel(normalized, ["data nascita", "data di nascita", "date of birth"])),
+    birthPlace: birth.place || cleanOcrValue(valueAfterLabel(normalized, ["luogo di nascita", "nato a", "nata a"])),
+    address: cleanOcrValue(valueAfterLabel(normalized, ["indirizzo di residenza", "residenza", "indirizzo", "address"])),
+    documentNumber: cleanOcrValue(valueAfterLabel(normalized, ["numero documento", "documento n", "document no", "n documento", "n\\."])),
+    documentIssueDate: normalizeOcrDate(valueAfterLabel(normalized, ["data emissione", "emissione", "data rilascio", "rilasciata il", "rilasciato il"])),
+    documentExpiry: normalizeOcrDate(valueAfterLabel(normalized, ["data scadenza", "scadenza", "expiry", "valida fino al"])),
+    documentIssuer: cleanOcrValue(valueAfterLabel(normalized, ["ente rilascio", "rilasciata da", "rilasciato da"])),
+    citizenship: cleanOcrValue(valueAfterLabel(normalized, ["cittadinanza", "nationality"])),
+    sex: cleanOcrValue(valueAfterLabel(normalized, ["sesso", "sex"])).charAt(0).toUpperCase()
+  };
+}
+
+function firstValue(...values) {
+  return values.find((value) => String(value || "").trim()) || "";
+}
+
+function parseCieDocumentData(frontText = "", backText = "") {
+  const front = parseCieSideText(frontText);
+  const back = parseCieSideText(backText);
+  const mrz = parseMrzText(backText) || {};
+  return {
+    name: firstValue(front.name, mrz.name, back.name),
+    surname: firstValue(front.surname, mrz.surname, back.surname),
+    fiscalCode: firstValue(back.fiscalCode, front.fiscalCode),
+    birthDate: firstValue(front.birthDate, mrz.birthDate, back.birthDate),
+    birthPlace: firstValue(front.birthPlace, back.birthPlace),
+    address: firstValue(back.address, front.address),
+    documentNumber: firstValue(front.documentNumber, mrz.documentNumber, back.documentNumber),
+    documentIssueDate: firstValue(front.documentIssueDate, back.documentIssueDate),
+    documentExpiry: firstValue(front.documentExpiry, mrz.documentExpiry, back.documentExpiry),
+    documentIssuer: firstValue(front.documentIssuer, back.documentIssuer),
+    citizenship: firstValue(front.citizenship, mrz.citizenship, back.citizenship),
+    sex: firstValue(front.sex, mrz.sex, back.sex)
   };
 }
 
 async function runDocumentOcr(front, back) {
   const available = await loadOcrEngine();
   if (!available || !window.Tesseract?.recognize) return {};
-  const results = await Promise.all([front, back].filter(Boolean).map((scan) => window.Tesseract.recognize(scan.dataUrl, "ita+eng")));
-  const text = results.map((result) => result?.data?.text || "").join("\n");
-  return parseDocumentOcrText(text);
+  const [frontResult, backResult] = await Promise.all([
+    window.Tesseract.recognize(front.dataUrl, "ita+eng"),
+    window.Tesseract.recognize(back.dataUrl, "ita+eng")
+  ]);
+  return parseCieDocumentData(frontResult?.data?.text || "", backResult?.data?.text || "");
 }
 
 function loadScriptOnce(src, id) {
@@ -2360,7 +2468,9 @@ function applyDetectedDocumentData(data = {}) {
     setFieldIfDetected('[name="numeroDocumento"]', data.documentNumber),
     setFieldIfDetected('[name="dataRilascioDocumento"]', data.documentIssueDate),
     setFieldIfDetected('[name="scadenzaDocumento"]', data.documentExpiry),
-    setFieldIfDetected('[name="enteRilascioDocumento"]', data.documentIssuer)
+    setFieldIfDetected('[name="enteRilascioDocumento"]', data.documentIssuer),
+    setFieldIfDetected('[name="cittadinanza"]', data.citizenship),
+    setFieldIfDetected('[name="sesso"]', data.sex)
   ];
   updateCustomerSummary();
   updateChecklistState();
@@ -2393,9 +2503,9 @@ async function confirmDocumentScan() {
     showLoading("Lettura documento...");
     const detected = await runDocumentOcr(front, back);
     const applied = applyDetectedDocumentData(detected);
-    showToast(applied ? "Controlla i dati estratti e correggi eventuali errori" : "Documento non letto correttamente, controlla e correggi i campi manualmente");
+    showToast(applied ? "Controlla i dati estratti e correggi eventuali errori" : "Documento non letto correttamente, compila i campi manualmente.");
   } catch {
-    showToast("Documento non letto correttamente, controlla e correggi i campi manualmente");
+    showToast("Documento non letto correttamente, compila i campi manualmente.");
   } finally {
     hideLoading();
     stopDocumentCamera();
@@ -2428,6 +2538,8 @@ async function loadActForEdit(practiceNumber) {
   setFieldValue('[name="provinciaNascita"]', act.birthProvince);
   setFieldValue('[name="cf"]', act.fiscalCode);
   setFieldValue('[name="telefono"]', act.phone);
+  setFieldValue('[name="cittadinanza"]', act.citizenship);
+  setFieldValue('[name="sesso"]', act.sex);
   setFieldValue('[name="indirizzo"]', act.address);
   setFieldValue('[name="provinciaResidenza"]', act.residenceProvince);
   setFieldValue('[name="tipoDocumento"]', act.documentType);
@@ -3653,6 +3765,8 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
         <div class="print-field"><span>Provincia residenza</span>${escapeHtml(fieldValue('[name="provinciaResidenza"]'))}</div>
         <div class="print-field"><span>Codice fiscale</span>${escapeHtml(fieldValue('[name="cf"]'))}</div>
         <div class="print-field"><span>Telefono</span>${escapeHtml(fieldValue('[name="telefono"]'))}</div>
+        <div class="print-field"><span>Cittadinanza</span>${escapeHtml(fieldValue('[name="cittadinanza"]'))}</div>
+        <div class="print-field"><span>Sesso</span>${escapeHtml(fieldValue('[name="sesso"]'))}</div>
         <div class="print-field"><span>Tipo documento</span>${escapeHtml(fieldValue('[name="tipoDocumento"]'))}</div>
         <div class="print-field"><span>Numero documento</span>${escapeHtml(fieldValue('[name="numeroDocumento"]'))}</div>
         <div class="print-field"><span>Data rilascio documento</span>${escapeHtml(fieldValue('[name="dataRilascioDocumento"]'))}</div>
@@ -4199,7 +4313,7 @@ document.addEventListener("change", async (event) => {
       };
       renderDocumentScanModal();
     } catch {
-      showToast("Documento non letto correttamente, controlla e correggi i campi manualmente");
+      showToast("Documento non letto correttamente, compila i campi manualmente.");
     } finally {
       hideLoading();
     }
