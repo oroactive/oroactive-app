@@ -642,6 +642,20 @@ textarea {
   margin-bottom: 18px;
 }
 
+.panel-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.scan-document-button {
+  border-color: var(--orange);
+  color: var(--ink);
+  background: #fff7f0;
+}
+
 .status-pill {
   border-radius: 999px;
   padding: 8px 12px;
@@ -2174,6 +2188,74 @@ button.quality-review-badge {
   animation: spin 0.8s linear infinite;
 }
 
+.document-scan-flow {
+  display: grid;
+  gap: 18px;
+}
+
+.scan-note {
+  margin: 0;
+  color: var(--soft-ink);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.document-scan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.document-scan-card {
+  min-height: 260px;
+  border: 2px dashed var(--line);
+  border-radius: 8px;
+  background: #fff9f2;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.document-scan-card.loaded {
+  border-style: solid;
+  border-color: #2e9f68;
+  background: #edf8f1;
+}
+
+.document-scan-card input {
+  display: none;
+}
+
+.document-scan-card span {
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.document-scan-card strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.document-scan-card img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.document-scan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .archive-pagination {
   display: flex;
   align-items: center;
@@ -2404,6 +2486,7 @@ button.quality-review-badge {
   .stepper,
   .item-row,
   .ceded-item-row,
+  .document-scan-grid,
   .bullion-quote-field,
   .material-amount-field,
   .internal-weight,
@@ -2428,6 +2511,16 @@ button.quality-review-badge {
   .archive-search-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .panel-heading-actions,
+  .document-scan-actions {
+    justify-content: stretch;
+  }
+
+  .panel-heading-actions > *,
+  .document-scan-actions > * {
+    width: 100%;
   }
 
   .ceded-items-head {

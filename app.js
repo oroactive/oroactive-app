@@ -15,6 +15,7 @@ const state = {
   archivePage: 1,
   archivePageSize: 10,
   searchActive: false,
+  documentScan: { front: null, back: null },
   cashLimitWarningShown: false,
   bullionVaultPrices: {},
   lastActCaptureAttachments: [],
@@ -277,6 +278,8 @@ function isPracticeFormEmpty() {
     '[name="telefono"]',
     '[name="indirizzo"]',
     '[name="numeroDocumento"]',
+    '[name="dataRilascioDocumento"]',
+    '[name="enteRilascioDocumento"]',
     '[name="scadenzaDocumento"]',
     "#saleTotal"
   ];
@@ -1265,6 +1268,8 @@ function actCompanyMainPage(act, heading) {
         <div class="print-field"><span>Provincia residenza</span>${escapeHtml(act.residenceProvince || missing)}</div>
         <div class="print-field"><span>Documento</span>${escapeHtml(act.documentType || missing)}</div>
         <div class="print-field"><span>Numero documento</span>${escapeHtml(act.documentNumber || missing)}</div>
+        <div class="print-field"><span>Data rilascio documento</span>${escapeHtml(act.documentIssueDate || missing)}</div>
+        <div class="print-field"><span>Ente rilascio documento</span>${escapeHtml(act.documentIssuer || missing)}</div>
         <div class="print-field"><span>Scadenza documento</span>${escapeHtml(act.documentExpiry || missing)}</div>
         <div class="print-field"><span>Professione</span>${escapeHtml(act.profession || missing)}</div>
       </div>
@@ -1381,6 +1386,8 @@ function currentActSnapshot(status = "Archiviata") {
     residenceProvince: fieldValue('[name="provinciaResidenza"]'),
     documentType: fieldValue('[name="tipoDocumento"]'),
     documentNumber: fieldValue('[name="numeroDocumento"]'),
+    documentIssueDate: fieldValue('[name="dataRilascioDocumento"]'),
+    documentIssuer: fieldValue('[name="enteRilascioDocumento"]'),
     documentExpiry: fieldValue('[name="scadenzaDocumento"]'),
     profession: fieldValue('[name="professione"]'),
     practiceNumber: fieldValue("#practiceNumber"),
@@ -1702,6 +1709,8 @@ function buildArchivedActFallback(act) {
         <div class="print-field"><span>Telefono</span>${escapeHtml(act.phone || missing)}</div>
         <div class="print-field"><span>Tipo documento</span>${escapeHtml(act.documentType || missing)}</div>
         <div class="print-field"><span>Numero documento</span>${escapeHtml(act.documentNumber || missing)}</div>
+        <div class="print-field"><span>Data rilascio documento</span>${escapeHtml(act.documentIssueDate || missing)}</div>
+        <div class="print-field"><span>Ente rilascio documento</span>${escapeHtml(act.documentIssuer || missing)}</div>
         <div class="print-field"><span>Scadenza documento</span>${escapeHtml(act.documentExpiry || missing)}</div>
         <div class="print-field"><span>Professione lavorativa</span>${escapeHtml(act.profession || missing)}</div>
       </div>
@@ -1991,6 +2000,162 @@ function restoreCaptureStateFromAct(act) {
   state.attachments = restoredCaptures.size;
 }
 
+function openDocumentScanModal() {
+  state.documentScan = { front: null, back: null };
+  previewTitle.textContent = "Scansione documento fronte e retro";
+  previewBody.innerHTML = documentScanModalMarkup();
+  previewModal.hidden = false;
+}
+
+function documentScanModalMarkup() {
+  return `
+    <section class="document-scan-flow">
+      <p class="scan-note">Acquisisci fronte e retro del documento con la fotocamera. Dopo l'anteprima potrai confermare e lasciare i campi sempre modificabili manualmente.</p>
+      <div class="document-scan-grid">
+        ${documentScanCardMarkup("front", "Fronte documento identità")}
+        ${documentScanCardMarkup("back", "Retro documento identità")}
+      </div>
+      <div class="document-scan-actions">
+        <button class="ghost-button" type="button" id="cancelDocumentScan">Annulla</button>
+        <button class="primary-button" type="button" id="confirmDocumentScan">Conferma e compila</button>
+      </div>
+    </section>
+  `;
+}
+
+function documentScanCardMarkup(side, label) {
+  const scan = state.documentScan?.[side];
+  return `
+    <label class="document-scan-card ${scan ? "loaded" : ""}">
+      <input type="file" accept="image/*" capture="environment" data-document-scan-input="${side}">
+      <span>${escapeHtml(label)}</span>
+      ${scan ? `<img src="${scan.dataUrl}" alt="${escapeHtml(label)}">` : `<strong>Tocca per scansionare</strong>`}
+    </label>
+  `;
+}
+
+function refreshDocumentScanPreview() {
+  const section = previewBody.querySelector(".document-scan-flow");
+  if (section) section.outerHTML = documentScanModalMarkup();
+}
+
+function setCaptureFile(key, file) {
+  const previous = state.captureFiles.get(key);
+  revokeCaptureUrl(previous);
+  state.captureFiles.set(key, file);
+  state.uploadedCaptures.add(key);
+  state.attachments = state.uploadedCaptures.size;
+}
+
+function setFieldIfDetected(selector, value) {
+  if (!value) return false;
+  const field = document.querySelector(selector);
+  if (!field) return false;
+  field.value = value;
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function normalizeOcrDate(value = "") {
+  const text = String(value).trim();
+  const dateMatch = text.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+  if (!dateMatch) return "";
+  const [, day, month, year] = dateMatch;
+  const fullYear = year.length === 2 ? `20${year}` : year;
+  return `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function valueAfterLabel(text, labels) {
+  for (const label of labels) {
+    const regex = new RegExp(`${label}\\s*[:\\-]?\\s*([^\\n]+)`, "i");
+    const match = text.match(regex);
+    if (match?.[1]) return match[1].trim().replace(/\s{2,}/g, " ");
+  }
+  return "";
+}
+
+function parseDocumentOcrText(text = "") {
+  const normalized = String(text || "").replace(/\r/g, "\n");
+  const fiscalCode = (normalized.match(/[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i)?.[0] || "").toUpperCase();
+  const documentNumber = valueAfterLabel(normalized, ["numero documento", "documento n", "n documento", "n\\."]);
+  const birthDate = normalizeOcrDate(valueAfterLabel(normalized, ["data di nascita", "nato il", "nata il"]));
+  const documentIssueDate = normalizeOcrDate(valueAfterLabel(normalized, ["data rilascio", "rilasciata il", "rilasciato il"]));
+  const documentExpiry = normalizeOcrDate(valueAfterLabel(normalized, ["data scadenza", "scadenza", "valida fino al"]));
+  return {
+    name: valueAfterLabel(normalized, ["nome"]),
+    surname: valueAfterLabel(normalized, ["cognome"]),
+    fiscalCode,
+    birthDate,
+    birthPlace: valueAfterLabel(normalized, ["luogo di nascita", "nato a", "nata a"]),
+    address: valueAfterLabel(normalized, ["residenza", "indirizzo"]),
+    documentNumber,
+    documentIssueDate,
+    documentExpiry,
+    documentIssuer: valueAfterLabel(normalized, ["ente rilascio", "rilasciata da", "rilasciato da"])
+  };
+}
+
+async function runDocumentOcr(front, back) {
+  if (!window.Tesseract?.recognize) return {};
+  const results = await Promise.all([front, back].filter(Boolean).map((scan) => window.Tesseract.recognize(scan.dataUrl, "ita+eng")));
+  const text = results.map((result) => result?.data?.text || "").join("\n");
+  return parseDocumentOcrText(text);
+}
+
+function applyDetectedDocumentData(data = {}) {
+  const applied = [
+    setFieldIfDetected('[name="nome"]', data.name),
+    setFieldIfDetected('[name="cognome"]', data.surname),
+    setFieldIfDetected('[name="cf"]', data.fiscalCode),
+    setFieldIfDetected('[name="nascita"]', data.birthDate),
+    setFieldIfDetected('[name="luogo"]', data.birthPlace),
+    setFieldIfDetected('[name="indirizzo"]', data.address),
+    setFieldIfDetected('[name="numeroDocumento"]', data.documentNumber),
+    setFieldIfDetected('[name="dataRilascioDocumento"]', data.documentIssueDate),
+    setFieldIfDetected('[name="scadenzaDocumento"]', data.documentExpiry),
+    setFieldIfDetected('[name="enteRilascioDocumento"]', data.documentIssuer)
+  ];
+  updateCustomerSummary();
+  updateChecklistState();
+  return applied.some(Boolean);
+}
+
+async function confirmDocumentScan() {
+  const { front, back } = state.documentScan || {};
+  if (!front || !back) {
+    showToast("Scansiona fronte e retro del documento prima di confermare.");
+    return;
+  }
+
+  setCaptureFile(documentCaptureKey("fronte"), {
+    name: "Documento fronte",
+    type: front.type || "image/jpeg",
+    dataUrl: front.dataUrl,
+    url: front.dataUrl
+  });
+  setCaptureFile(documentCaptureKey("retro"), {
+    name: "Documento retro",
+    type: back.type || "image/jpeg",
+    dataUrl: back.dataUrl,
+    url: back.dataUrl
+  });
+  updateDocumentCaptureCards();
+  updateAttachmentState();
+
+  try {
+    showLoading("Lettura documento...");
+    const detected = await runDocumentOcr(front, back);
+    const applied = applyDetectedDocumentData(detected);
+    showToast(applied ? "Documento letto. Controlla e conferma i campi compilati." : "Documento non letto correttamente, controlla e correggi i campi manualmente");
+  } catch {
+    showToast("Documento non letto correttamente, controlla e correggi i campi manualmente");
+  } finally {
+    hideLoading();
+    previewModal.hidden = true;
+  }
+}
+
 async function loadActForEdit(practiceNumber) {
   const act = await getActRecord(practiceNumber);
   if (!act) {
@@ -2020,6 +2185,8 @@ async function loadActForEdit(practiceNumber) {
   setFieldValue('[name="provinciaResidenza"]', act.residenceProvince);
   setFieldValue('[name="tipoDocumento"]', act.documentType);
   setFieldValue('[name="numeroDocumento"]', act.documentNumber);
+  setFieldValue('[name="dataRilascioDocumento"]', toDateInputValue(act.documentIssueDate));
+  setFieldValue('[name="enteRilascioDocumento"]', act.documentIssuer);
   setFieldValue('[name="scadenzaDocumento"]', toDateInputValue(act.documentExpiry));
   setFieldValue('[name="professione"]', act.profession);
   setFieldValue("#paymentMethod", act.paymentMethod);
@@ -2624,13 +2791,16 @@ function currentDocumentSlug() {
   return currentDocumentLabel().toLowerCase().replace(/\s+/g, "-");
 }
 
+function documentCaptureKey(side) {
+  return `documento-${side}-${currentDocumentSlug()}`;
+}
+
 function updateDocumentCaptureCards() {
   const label = currentDocumentLabel();
-  const slug = currentDocumentSlug();
 
   document.querySelectorAll("[data-document-capture]").forEach((card) => {
     const side = card.dataset.documentCapture;
-    const key = `documento-${side}-${slug}`;
+    const key = documentCaptureKey(side);
     card.dataset.captureKey = key;
     card.querySelector("strong").textContent = `${side === "fronte" ? "Fronte" : "Retro"} ${label}`;
     const loaded = state.uploadedCaptures.has(key);
@@ -3238,6 +3408,8 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
         <div class="print-field"><span>Telefono</span>${escapeHtml(fieldValue('[name="telefono"]'))}</div>
         <div class="print-field"><span>Tipo documento</span>${escapeHtml(fieldValue('[name="tipoDocumento"]'))}</div>
         <div class="print-field"><span>Numero documento</span>${escapeHtml(fieldValue('[name="numeroDocumento"]'))}</div>
+        <div class="print-field"><span>Data rilascio documento</span>${escapeHtml(fieldValue('[name="dataRilascioDocumento"]'))}</div>
+        <div class="print-field"><span>Ente rilascio documento</span>${escapeHtml(fieldValue('[name="enteRilascioDocumento"]'))}</div>
         <div class="print-field"><span>Scadenza documento</span>${escapeHtml(fieldValue('[name="scadenzaDocumento"]'))}</div>
         <div class="print-field"><span>Professione lavorativa</span>${escapeHtml(fieldValue('[name="professione"]'))}</div>
       </div>
@@ -3633,6 +3805,14 @@ document.getElementById("fusionGroups").addEventListener("click", (event) => {
 });
 
 previewBody.addEventListener("click", (event) => {
+  if (event.target.closest("#cancelDocumentScan")) {
+    previewModal.hidden = true;
+    return;
+  }
+  if (event.target.closest("#confirmDocumentScan")) {
+    confirmDocumentScan();
+    return;
+  }
   const requestDeleteButton = event.target.closest("[data-request-delete-act]");
   if (requestDeleteButton) {
     requestActDeletion(requestDeleteButton.dataset.requestDeleteAct);
@@ -3651,6 +3831,7 @@ previewBody.addEventListener("click", (event) => {
 document.getElementById("exportDailyPdf").addEventListener("click", exportDailySearchPdf);
 document.getElementById("exportMonthlyPdf").addEventListener("click", exportMonthlySearchPdf);
 document.getElementById("clearActSearch").addEventListener("click", clearActSearch);
+document.getElementById("scanDocumentButton").addEventListener("click", openDocumentScanModal);
 
 document.getElementById("documentType").addEventListener("change", () => {
   updateDocumentCaptureCards();
@@ -3743,6 +3924,27 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
 });
 
 document.addEventListener("change", async (event) => {
+  if (event.target.matches("[data-document-scan-input]")) {
+    const side = event.target.dataset.documentScanInput;
+    const file = event.target.files?.[0];
+    if (!side || !file) return;
+    try {
+      showLoading("Preparazione anteprima...");
+      const dataUrl = await fileToDataUrl(file);
+      state.documentScan[side] = {
+        name: file.name || (side === "front" ? "Documento fronte" : "Documento retro"),
+        type: file.type || "image/jpeg",
+        dataUrl
+      };
+      refreshDocumentScanPreview();
+    } catch {
+      showToast("Documento non letto correttamente, controlla e correggi i campi manualmente");
+    } finally {
+      hideLoading();
+    }
+    return;
+  }
+
   if (!event.target.matches(".capture-card input")) return;
   const card = event.target.closest(".capture-card");
   const key = card?.dataset.captureKey;

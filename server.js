@@ -1014,7 +1014,10 @@ function drawActMainPdfPage(doc, act, title) {
     { label: "Luogo nascita", value: act.birthPlace },
     { label: "Provincia nascita", value: act.birthProvince },
     { label: "Residenza", value: act.address },
+    { label: "Provincia residenza", value: act.residenceProvince },
     { label: "Documento", value: `${act.documentType || ""} ${act.documentNumber || ""}`.trim() },
+    { label: "Data rilascio", value: act.documentIssueDate },
+    { label: "Ente rilascio", value: act.documentIssuer },
     { label: "Scadenza documento", value: act.documentExpiry }
   ], y, 2);
 

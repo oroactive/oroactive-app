@@ -105,7 +105,10 @@
                   <p class="eyebrow">Step 1</p>
                   <h2>Scheda cliente</h2>
                 </div>
-                <span class="status-pill">Compilazione manuale</span>
+                <div class="panel-heading-actions">
+                  <button class="small-button scan-document-button" id="scanDocumentButton" type="button">Scansiona documento fronte e retro</button>
+                  <span class="status-pill">Compilazione manuale</span>
+                </div>
               </div>
 
               <div class="practice-meta">
@@ -185,6 +188,8 @@
                   </select>
                 </label>
                 <label>Numero documento <input name="numeroDocumento"></label>
+                <label>Data rilascio <input type="date" name="dataRilascioDocumento"></label>
+                <label>Ente rilascio <input name="enteRilascioDocumento"></label>
                 <label class="document-expiry-field">Scadenza <input type="date" name="scadenzaDocumento"></label>
                 <label>Professione lavorativa
                   <select name="professione">
@@ -590,6 +595,6 @@
     <div class="loading-spinner" aria-hidden="true"></div>
     <span>Caricamento in corso...</span>
   </div>
-  <script src="app.js?v=20260520-24"></script>
+  <script src="app.js?v=20260521-01"></script>
 </body>
 </html>
