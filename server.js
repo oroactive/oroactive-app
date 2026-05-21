@@ -163,7 +163,11 @@ function actNumberValue(practiceNumber = "") {
 }
 
 function numberFrom(value) {
-  const normalized = String(value ?? "").replace(",", ".");
+  const text = String(value ?? "").trim();
+  if (!text || text === "Dato non inserito") return 0;
+  const normalized = text.includes(",")
+    ? text.replace(/\./g, "").replace(",", ".")
+    : text.replace(/,/g, "");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }

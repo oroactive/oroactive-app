@@ -100,15 +100,13 @@
         <div class="practice-layout">
           <section class="form-panel">
             <div class="form-step active-step" data-step-panel="0">
-              <div class="panel-heading">
+              <div class="panel-heading client-panel-heading">
                 <div>
                   <p class="eyebrow">Step 1</p>
                   <h2>Scheda cliente</h2>
                 </div>
-                <div class="panel-heading-actions">
-                  <button class="small-button scan-document-button" id="scanDocumentButton" type="button">Scansiona documento fronte e retro</button>
-                  <span class="status-pill">Compilazione manuale</span>
-                </div>
+                <button class="small-button scan-document-button" id="scanDocumentButton" type="button">Scansione documento d'identit&agrave;</button>
+                <span class="status-pill">Compilazione manuale</span>
               </div>
 
               <div class="practice-meta">
@@ -259,7 +257,7 @@
                   </div>
                   <label class="bullion-quote-field">
                     <span>Quotazione oro in borsa giornaliera &egrave; di &euro;</span>
-                    <input data-bullion-quote="Oro" type="number" min="0" step="0.01" placeholder="Dato BullionVault">
+                    <input data-bullion-quote="Oro" type="text" inputmode="decimal" placeholder="Dato BullionVault">
                     <em>Dato estrapolato da BullionVault al Kg di oro puro.</em>
                   </label>
                 </div>
@@ -603,6 +601,6 @@
     <div class="loading-spinner" aria-hidden="true"></div>
     <span>Caricamento in corso...</span>
   </div>
-  <script src="app.js?v=20260521-05"></script>
+  <script src="app.js?v=20260521-06"></script>
 </body>
 </html>

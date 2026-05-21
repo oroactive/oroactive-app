@@ -642,6 +642,22 @@ textarea {
   margin-bottom: 18px;
 }
 
+.client-panel-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.client-panel-heading .scan-document-button {
+  justify-self: center;
+  text-align: center;
+  white-space: normal;
+}
+
+.client-panel-heading .status-pill {
+  justify-self: end;
+}
+
 .panel-heading-actions {
   display: flex;
   align-items: center;
@@ -2779,6 +2795,17 @@ button.quality-review-badge {
   .panel-heading-actions,
   .document-scan-actions {
     justify-content: stretch;
+  }
+
+  .client-panel-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .client-panel-heading .scan-document-button,
+  .client-panel-heading .status-pill {
+    justify-self: stretch;
+    width: 100%;
+    text-align: center;
   }
 
   .panel-heading-actions > *,

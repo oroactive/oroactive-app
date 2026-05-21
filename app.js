@@ -2021,7 +2021,7 @@ function openDocumentScanModal() {
     ready: false,
     status: "Centra il documento nel rettangolo"
   };
-  previewTitle.textContent = "Scansione documento fronte e retro";
+  previewTitle.textContent = "Scansione documento d'identità";
   renderDocumentScanModal();
   previewModal.hidden = false;
   startDocumentCamera();
@@ -2057,7 +2057,7 @@ function documentScanModalMarkup() {
 
       <div class="document-scan-actions">
         <button class="ghost-button" type="button" id="cancelDocumentScan">Annulla</button>
-        <button class="primary-button" type="button" id="confirmDocumentScan" ${frontDone && backDone ? "" : "disabled"}>Conferma e compila</button>
+        <button class="primary-button" type="button" id="confirmDocumentScan" ${frontDone && backDone ? "" : "disabled"}>Conferma dati</button>
       </div>
     </section>
   `;
@@ -2092,7 +2092,7 @@ function documentScanReviewMarkup() {
         <div class="document-scan-data-grid">
           ${documentScanDataRowsMarkup(detected)}
         </div>
-        <p>${ocrRead ? "Controlla i dati estratti e correggi eventuali errori dopo la conferma." : "Documento non letto correttamente, puoi rifare la scansione oppure compilare i campi manualmente."}</p>
+        <p>${ocrRead ? "Controlla i dati estratti e correggi eventuali errori dopo la conferma." : "Documento non letto correttamente. Riprova la scansione o compila manualmente."}</p>
       </div>
       <div class="document-scan-actions">
         <button class="ghost-button" type="button" id="cancelDocumentScan">Annulla</button>
@@ -2110,7 +2110,9 @@ function documentScanDataRowsMarkup(data = {}) {
     ["fiscalCode", "Codice fiscale", data.fiscalCode],
     ["birthDate", "Data di nascita", data.birthDate],
     ["birthPlace", "Luogo di nascita", data.birthPlace],
+    ["birthProvince", "Provincia nascita", data.birthProvince],
     ["address", "Indirizzo residenza", data.address],
+    ["residenceProvince", "Provincia residenza", data.residenceProvince],
     ["documentNumber", "Numero documento", data.documentNumber],
     ["documentIssueDate", "Data rilascio/emissione", data.documentIssueDate],
     ["documentExpiry", "Data scadenza", data.documentExpiry],
@@ -2581,14 +2583,36 @@ function cleanOcrValue(value = "") {
   return String(value || "").trim().replace(/[|;]/g, "").replace(/\s{2,}/g, " ");
 }
 
+const ITALIAN_PROVINCES = new Set("AG AL AN AO AR AP AT AV BA BT BL BN BG BI BO BZ BS BR CA CL CB CI CE CT CZ CH CO CS CR KR CN EN FM FE FI FG FC FR GE GO GR IM IS SP AQ LT LE LC LI LO LU MC MN MS MT ME MI MO MB NA NO NU OR PD PA PR PV PG PU PE PC PI PT PN PZ PO RG RA RC RE RI RN RM RO SA SS SV SI SR SO SU TA TE TR TO TP TN TV TS UD VA VE VB VC VR VV VI VT".split(" "));
+
+function extractProvinceCode(value = "") {
+  const upper = String(value || "").toUpperCase();
+  const explicit = upper.match(/\(([A-Z]{2})\)/);
+  if (explicit && ITALIAN_PROVINCES.has(explicit[1])) return explicit[1];
+  const tokens = upper.match(/\b[A-Z]{2}\b/g) || [];
+  return tokens.find((token) => ITALIAN_PROVINCES.has(token)) || "";
+}
+
+function stripProvinceCode(value = "") {
+  const province = extractProvinceCode(value);
+  if (!province) return cleanOcrValue(value);
+  return cleanOcrValue(String(value)
+    .replace(new RegExp(`\\(${province}\\)`, "i"), "")
+    .replace(new RegExp(`\\b${province}\\b\\.?$`, "i"), ""));
+}
+
 function parseBirthPlaceAndDate(value = "") {
   const cleaned = cleanOcrValue(value);
   const date = normalizeOcrDate(cleaned);
-  const place = cleaned
-    .replace(/\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-  return { place, date };
+  const province = extractProvinceCode(cleaned);
+  let place = cleaned.replace(/\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/, "");
+  if (province) {
+    place = place
+      .replace(new RegExp(`\\(${province}\\)`, "i"), "")
+      .replace(new RegExp(`\\b${province}\\b\\.?$`, "i"), "");
+  }
+  place = place.replace(/\s{2,}/g, " ").trim();
+  return { place, date, province };
 }
 
 function extractMrzLines(text = "") {
@@ -2623,13 +2647,16 @@ function parseCieSideText(text = "") {
   const normalized = String(text || "").replace(/\r/g, "\n");
   const fiscalCode = (normalized.match(/[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i)?.[0] || "").toUpperCase();
   const birth = parseBirthPlaceAndDate(valueAfterLabel(normalized, ["luogo e data di nascita", "place and date of birth", "data di nascita", "nato il", "nata il"]));
+  const address = cleanOcrValue(valueAfterLabel(normalized, ["indirizzo di residenza", "residenza", "indirizzo", "address"]));
   return {
     name: cleanOcrValue(valueAfterLabel(normalized, ["nome", "name"])),
     surname: cleanOcrValue(valueAfterLabel(normalized, ["cognome", "surname"])),
     fiscalCode,
     birthDate: birth.date || normalizeOcrDate(valueAfterLabel(normalized, ["data nascita", "data di nascita", "date of birth"])),
     birthPlace: birth.place || cleanOcrValue(valueAfterLabel(normalized, ["luogo di nascita", "nato a", "nata a"])),
-    address: cleanOcrValue(valueAfterLabel(normalized, ["indirizzo di residenza", "residenza", "indirizzo", "address"])),
+    birthProvince: birth.province,
+    address: stripProvinceCode(address),
+    residenceProvince: extractProvinceCode(address),
     documentNumber: cleanOcrValue(valueAfterLabel(normalized, ["numero documento", "documento n", "document no", "n documento", "n\\."])),
     documentIssueDate: normalizeOcrDate(valueAfterLabel(normalized, ["data emissione", "emissione", "data rilascio", "rilasciata il", "rilasciato il"])),
     documentExpiry: normalizeOcrDate(valueAfterLabel(normalized, ["data scadenza", "scadenza", "expiry", "valida fino al"])),
@@ -2699,6 +2726,7 @@ function parseCieDocumentData(frontText = "", backText = "", zoneTexts = {}) {
   const birth = parseBirthPlaceAndDate(zonePrimaryText(zoneTexts.front?.birth?.text));
   setCandidate(candidates, "birthPlace", birth.place, ocrConfidence(zoneTexts.front?.birth?.confidence, birth.place), "front-zone");
   setCandidate(candidates, "birthDate", birth.date, ocrConfidence(zoneTexts.front?.birth?.confidence, birth.date), "front-zone");
+  setCandidate(candidates, "birthProvince", birth.province, ocrConfidence(zoneTexts.front?.birth?.confidence, birth.province), "front-zone");
   setCandidate(candidates, "sex", zonePrimaryText(zoneTexts.front?.sex?.text).charAt(0).toUpperCase(), ocrConfidence(zoneTexts.front?.sex?.confidence, zoneTexts.front?.sex?.text), "front-zone");
   setCandidate(candidates, "citizenship", zonePrimaryText(zoneTexts.front?.citizenship?.text), ocrConfidence(zoneTexts.front?.citizenship?.confidence, zoneTexts.front?.citizenship?.text), "front-zone");
   setCandidate(candidates, "documentIssueDate", normalizeOcrDate(zonePrimaryText(zoneTexts.front?.issue?.text)), ocrConfidence(zoneTexts.front?.issue?.confidence, zoneTexts.front?.issue?.text), "front-zone");
@@ -2706,8 +2734,10 @@ function parseCieDocumentData(frontText = "", backText = "", zoneTexts = {}) {
   setCandidate(candidates, "documentNumber", zonePrimaryText(zoneTexts.front?.documentNumber?.text).replace(/\s/g, ""), ocrConfidence(zoneTexts.front?.documentNumber?.confidence, zoneTexts.front?.documentNumber?.text), "front-zone");
 
   const fiscalZone = (zoneTexts.back?.fiscalCode?.text || "").match(/[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]/i)?.[0] || "";
+  const addressZone = zonePrimaryText(zoneTexts.back?.address?.text);
   setCandidate(candidates, "fiscalCode", fiscalZone.toUpperCase(), ocrConfidence(zoneTexts.back?.fiscalCode?.confidence, fiscalZone), "back-zone");
-  setCandidate(candidates, "address", zonePrimaryText(zoneTexts.back?.address?.text), ocrConfidence(zoneTexts.back?.address?.confidence, zoneTexts.back?.address?.text), "back-zone");
+  setCandidate(candidates, "address", stripProvinceCode(addressZone), ocrConfidence(zoneTexts.back?.address?.confidence, addressZone), "back-zone");
+  setCandidate(candidates, "residenceProvince", extractProvinceCode(addressZone), ocrConfidence(zoneTexts.back?.address?.confidence, addressZone), "back-zone");
 
   const validators = {
     fiscalCode: isFiscalCode,
@@ -2715,9 +2745,11 @@ function parseCieDocumentData(frontText = "", backText = "", zoneTexts = {}) {
     documentIssueDate: isIsoDate,
     documentExpiry: isIsoDate,
     documentNumber: isDocumentNumber,
+    birthProvince: (value) => ITALIAN_PROVINCES.has(String(value).toUpperCase()),
+    residenceProvince: (value) => ITALIAN_PROVINCES.has(String(value).toUpperCase()),
     sex: (value) => ["M", "F"].includes(String(value).toUpperCase())
   };
-  const fields = ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "address", "documentNumber", "documentIssueDate", "documentExpiry", "documentIssuer", "citizenship", "sex"];
+  const fields = ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "birthProvince", "address", "residenceProvince", "documentNumber", "documentIssueDate", "documentExpiry", "documentIssuer", "citizenship", "sex"];
   const output = { _confidence: {} };
   fields.forEach((field) => {
     const selected = selectCandidate(candidates[field], validators[field]);
@@ -2799,7 +2831,9 @@ function applyDetectedDocumentData(data = {}) {
     setFieldIfDetected('[name="cf"]', data.fiscalCode, detectedConfidence(data, "fiscalCode")),
     setFieldIfDetected('[name="nascita"]', data.birthDate, detectedConfidence(data, "birthDate")),
     setFieldIfDetected('[name="luogo"]', data.birthPlace, detectedConfidence(data, "birthPlace")),
+    setFieldIfDetected('[name="provinciaNascita"]', data.birthProvince, detectedConfidence(data, "birthProvince")),
     setFieldIfDetected('[name="indirizzo"]', data.address, detectedConfidence(data, "address")),
+    setFieldIfDetected('[name="provinciaResidenza"]', data.residenceProvince, detectedConfidence(data, "residenceProvince")),
     setFieldIfDetected('[name="numeroDocumento"]', data.documentNumber, detectedConfidence(data, "documentNumber")),
     setFieldIfDetected('[name="dataRilascioDocumento"]', data.documentIssueDate, detectedConfidence(data, "documentIssueDate")),
     setFieldIfDetected('[name="scadenzaDocumento"]', data.documentExpiry, detectedConfidence(data, "documentExpiry")),
@@ -2819,24 +2853,11 @@ async function confirmDocumentScan() {
     return;
   }
 
-  setCaptureFile(documentCaptureKey("fronte"), {
-    name: "Documento fronte",
-    type: front.type || "image/jpeg",
-    dataUrl: front.dataUrl,
-    url: front.dataUrl
-  });
-  setCaptureFile(documentCaptureKey("retro"), {
-    name: "Documento retro",
-    type: back.type || "image/jpeg",
-    dataUrl: back.dataUrl,
-    url: back.dataUrl
-  });
-  updateDocumentCaptureCards();
-  updateAttachmentState();
-
   const detected = state.documentScan.detected || {};
   const applied = applyDetectedDocumentData(detected);
-  if (!applied || missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
+  if (!applied) {
+    showToast("Documento non letto correttamente. Riprova la scansione o compila manualmente.");
+  } else if (missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
     showToast("Alcuni dati non sono stati letti correttamente, controlla e completa manualmente.");
   } else {
     showToast("Controlla i dati estratti e correggi eventuali errori");
@@ -2909,7 +2930,7 @@ async function loadActForEdit(practiceNumber) {
   if (Array.isArray(act.bullionQuotes)) {
     act.bullionQuotes.forEach((quote) => {
       const input = document.querySelector(`#bullionQuotePanel input[data-bullion-quote="${quote.metal}"]`);
-      if (input) input.value = quote.value === "Dato non inserito" ? "" : quote.value;
+      if (input) input.value = formatBullionInputValue(quote.value);
     });
   }
 
@@ -3515,11 +3536,26 @@ function formatBullionPrice(value) {
   }).format(value || 0);
 }
 
+function parseItalianNumber(value) {
+  const text = String(value ?? "").trim();
+  if (!text || text === "Dato non inserito") return 0;
+  const normalized = text.includes(",")
+    ? text.replace(/\./g, "").replace(",", ".")
+    : text.replace(/,/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatBullionInputValue(value) {
+  if (value === undefined || value === null || value === "" || value === "Dato non inserito") return "";
+  return formatBullionPrice(parseItalianNumber(value));
+}
+
 function applyBullionVaultPrices() {
   document.querySelectorAll("#bullionQuotePanel input[data-bullion-quote]").forEach((input) => {
     const quote = state.bullionVaultPrices[input.dataset.bullionQuote];
     if (!quote) return;
-    input.value = Number(quote.value || 0).toFixed(2);
+    input.value = formatBullionPrice(quote.value || 0);
     input.dataset.bullionSource = quote.source || "";
     input.dataset.bullionFetchedAt = quote.fetchedAt || "";
     const field = input.closest(".bullion-quote-field");
@@ -3804,7 +3840,7 @@ function renderBullionQuoteFields() {
     ${(metals.length ? metals : ["Oro"]).map((metal) => `
       <label class="bullion-quote-field">
         <span>Quotazione ${metal.toLowerCase()} in borsa giornaliera &egrave; di &euro;</span>
-        <input data-bullion-quote="${metal}" type="number" min="0" step="0.01" value="${escapeHtml(previousValues[metal] || "")}" placeholder="Dato BullionVault">
+        <input data-bullion-quote="${metal}" type="text" inputmode="decimal" value="${escapeHtml(formatBullionInputValue(previousValues[metal]))}" placeholder="Dato BullionVault">
         <em>Dato estrapolato da BullionVault al Kg di ${escapeHtml(pureMaterialLabel(metal))} puro.</em>
       </label>
     `).join("")}
@@ -4653,7 +4689,7 @@ document.addEventListener("change", async (event) => {
       };
       renderDocumentScanModal();
     } catch {
-      showToast("Documento non letto correttamente, compila i campi manualmente.");
+      showToast("Documento non letto correttamente. Riprova la scansione o compila manualmente.");
     } finally {
       hideLoading();
     }
