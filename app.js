@@ -2001,42 +2001,260 @@ function restoreCaptureStateFromAct(act) {
 }
 
 function openDocumentScanModal() {
-  state.documentScan = { front: null, back: null };
+  stopDocumentCamera();
+  state.documentScan = {
+    front: null,
+    back: null,
+    side: "front",
+    preview: null,
+    stream: null,
+    cameraActive: false,
+    ready: false,
+    status: "Centra il documento nel rettangolo"
+  };
   previewTitle.textContent = "Scansione documento fronte e retro";
-  previewBody.innerHTML = documentScanModalMarkup();
+  renderDocumentScanModal();
   previewModal.hidden = false;
+  startDocumentCamera();
+}
+
+function currentDocumentScanLabel() {
+  return state.documentScan?.side === "back" ? "retro" : "fronte";
+}
+
+function renderDocumentScanModal() {
+  previewBody.innerHTML = documentScanModalMarkup();
+  attachDocumentStream();
 }
 
 function documentScanModalMarkup() {
+  const sideLabel = currentDocumentScanLabel();
+  const preview = state.documentScan?.preview;
+  const ready = Boolean(state.documentScan?.ready);
+  const frontDone = Boolean(state.documentScan?.front);
+  const backDone = Boolean(state.documentScan?.back);
   return `
     <section class="document-scan-flow">
-      <p class="scan-note">Acquisisci fronte e retro del documento con la fotocamera. Dopo l'anteprima potrai confermare e lasciare i campi sempre modificabili manualmente.</p>
-      <div class="document-scan-grid">
-        ${documentScanCardMarkup("front", "Fronte documento identità")}
-        ${documentScanCardMarkup("back", "Retro documento identità")}
+      <div class="scan-step-header">
+        <div>
+          <p class="eyebrow">Step ${sideLabel === "fronte" ? "1" : "2"}</p>
+          <h3>Scatta ${sideLabel} documento</h3>
+        </div>
+        <span class="scan-progress">${frontDone ? "Fronte acquisito" : "Fronte da acquisire"} · ${backDone ? "Retro acquisito" : "Retro da acquisire"}</span>
       </div>
+
+      ${preview ? documentScanPreviewMarkup(preview, sideLabel) : documentScanCameraMarkup(ready, sideLabel)}
+
       <div class="document-scan-actions">
         <button class="ghost-button" type="button" id="cancelDocumentScan">Annulla</button>
-        <button class="primary-button" type="button" id="confirmDocumentScan">Conferma e compila</button>
+        <button class="primary-button" type="button" id="confirmDocumentScan" ${frontDone && backDone ? "" : "disabled"}>Conferma e compila</button>
       </div>
     </section>
   `;
 }
 
-function documentScanCardMarkup(side, label) {
-  const scan = state.documentScan?.[side];
+function documentScanCameraMarkup(ready, sideLabel) {
   return `
-    <label class="document-scan-card ${scan ? "loaded" : ""}">
-      <input type="file" accept="image/*" capture="environment" data-document-scan-input="${side}">
-      <span>${escapeHtml(label)}</span>
-      ${scan ? `<img src="${scan.dataUrl}" alt="${escapeHtml(label)}">` : `<strong>Tocca per scansionare</strong>`}
-    </label>
+    <div class="document-camera-shell ${ready ? "ready" : "warn"}">
+      <video id="documentScanVideo" playsinline muted autoplay></video>
+      <canvas id="documentScanAnalysisCanvas" hidden></canvas>
+      <div class="scan-guide-frame ${ready ? "ready" : "warn"}">
+        <div class="identity-card-wireframe">
+          <span class="wire-photo"></span>
+          <span class="wire-line wire-name">Nome</span>
+          <span class="wire-line wire-surname">Cognome</span>
+          <span class="wire-line wire-birth">Data nascita</span>
+          <span class="wire-line wire-fiscal">Codice fiscale</span>
+          <span class="wire-line wire-number">Numero documento</span>
+          <span class="wire-line wire-expiry">Scadenza</span>
+        </div>
+      </div>
+      <div class="scan-status ${ready ? "ready" : "warn"}" id="documentScanStatus">
+        ${ready ? "Documento centrato correttamente" : "Centra il documento nel rettangolo"}
+      </div>
+      <div class="scan-fallback-panel" id="documentScanFallback">
+        <strong>Fotocamera diretta non disponibile</strong>
+        <span>Usa il caricamento foto: su iPad/iPhone si aprirà comunque la fotocamera.</span>
+      </div>
+    </div>
+    <div class="document-scan-controls">
+      <button class="${ready ? "primary-button" : "warning-button"}" type="button" id="captureDocumentPhoto">Scatta ${escapeHtml(sideLabel)}</button>
+      <label class="ghost-button scan-file-fallback">
+        Carica ${escapeHtml(sideLabel)}
+        <input type="file" accept="image/*" capture="environment" data-document-scan-input="${state.documentScan?.side || "front"}">
+      </label>
+    </div>
   `;
 }
 
-function refreshDocumentScanPreview() {
-  const section = previewBody.querySelector(".document-scan-flow");
-  if (section) section.outerHTML = documentScanModalMarkup();
+function documentScanPreviewMarkup(preview, sideLabel) {
+  return `
+    <div class="document-scan-preview">
+      <img src="${preview.dataUrl}" alt="Anteprima ${escapeHtml(sideLabel)} documento">
+      <div class="document-scan-preview-actions">
+        <button class="primary-button" type="button" id="useDocumentScanPhoto">Usa foto</button>
+        <button class="ghost-button" type="button" id="retakeDocumentScanPhoto">Rifai foto</button>
+      </div>
+    </div>
+  `;
+}
+
+function attachDocumentStream() {
+  const video = document.getElementById("documentScanVideo");
+  if (!video || !state.documentScan?.stream) return;
+  video.srcObject = state.documentScan.stream;
+  video.play().catch(() => {});
+  const fallback = document.getElementById("documentScanFallback");
+  if (fallback) fallback.hidden = true;
+}
+
+async function startDocumentCamera() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showDocumentCameraFallback();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1600 },
+        height: { ideal: 1000 }
+      },
+      audio: false
+    });
+    state.documentScan.stream = stream;
+    state.documentScan.cameraActive = true;
+    attachDocumentStream();
+    startDocumentScanAnalysis();
+  } catch {
+    showDocumentCameraFallback();
+  }
+}
+
+function showDocumentCameraFallback() {
+  const fallback = document.getElementById("documentScanFallback");
+  if (fallback) fallback.hidden = false;
+  updateDocumentScanStatus(false, "Centra il documento nel rettangolo e usa Carica foto");
+}
+
+function stopDocumentCamera() {
+  if (state.documentScan?.analysisTimer) window.clearInterval(state.documentScan.analysisTimer);
+  state.documentScan?.stream?.getTracks?.().forEach((track) => track.stop());
+  if (state.documentScan) {
+    state.documentScan.analysisTimer = null;
+    state.documentScan.stream = null;
+    state.documentScan.cameraActive = false;
+  }
+}
+
+function startDocumentScanAnalysis() {
+  if (state.documentScan?.analysisTimer) window.clearInterval(state.documentScan.analysisTimer);
+  state.documentScan.analysisTimer = window.setInterval(analyzeDocumentFrame, 550);
+}
+
+function updateDocumentScanStatus(ready, message) {
+  if (!state.documentScan) return;
+  state.documentScan.ready = ready;
+  state.documentScan.status = message;
+  const shell = document.querySelector(".document-camera-shell");
+  const guide = document.querySelector(".scan-guide-frame");
+  const status = document.getElementById("documentScanStatus");
+  const button = document.getElementById("captureDocumentPhoto");
+  [shell, guide, status].forEach((element) => {
+    element?.classList.toggle("ready", ready);
+    element?.classList.toggle("warn", !ready);
+  });
+  if (status) status.textContent = message;
+  if (button) {
+    button.classList.toggle("primary-button", ready);
+    button.classList.toggle("warning-button", !ready);
+  }
+}
+
+function analyzeDocumentFrame() {
+  const video = document.getElementById("documentScanVideo");
+  const canvas = document.getElementById("documentScanAnalysisCanvas");
+  if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
+
+  const width = 160;
+  const height = Math.max(1, Math.round(width * (video.videoHeight / video.videoWidth)));
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, width, height);
+
+  const guideWidth = Math.round(width * 0.78);
+  const guideHeight = Math.round(guideWidth / 1.586);
+  const x = Math.round((width - guideWidth) / 2);
+  const y = Math.round((height - guideHeight) / 2);
+  const data = ctx.getImageData(x, y, guideWidth, guideHeight).data;
+  let brightness = 0;
+  let contrast = 0;
+  let previous = 0;
+  let edges = 0;
+  const pixels = data.length / 4;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const gray = (data[index] + data[index + 1] + data[index + 2]) / 3;
+    brightness += gray;
+    contrast += Math.abs(gray - previous);
+    if (Math.abs(gray - previous) > 22) edges += 1;
+    previous = gray;
+  }
+
+  brightness /= pixels;
+  contrast /= pixels;
+  const edgeRatio = edges / pixels;
+  const goodLight = brightness > 45 && brightness < 230;
+  const enoughDetail = contrast > 7 && edgeRatio > 0.08;
+  const ready = goodLight && enoughDetail;
+  updateDocumentScanStatus(
+    ready,
+    ready ? "Documento centrato correttamente" : "Centra il documento nel rettangolo"
+  );
+}
+
+function dataUrlFromVideo(video) {
+  const sourceWidth = video.videoWidth || 1280;
+  const sourceHeight = video.videoHeight || 800;
+  const maxSide = 1400;
+  const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.78);
+}
+
+function captureDocumentPhoto() {
+  const video = document.getElementById("documentScanVideo");
+  if (!video || !video.videoWidth) {
+    showToast("Fotocamera non disponibile: usa Carica foto.");
+    return;
+  }
+  const side = state.documentScan?.side || "front";
+  state.documentScan.preview = {
+    name: side === "front" ? "Documento fronte" : "Documento retro",
+    type: "image/jpeg",
+    dataUrl: dataUrlFromVideo(video)
+  };
+  renderDocumentScanModal();
+}
+
+function useDocumentScanPhoto() {
+  const side = state.documentScan?.side || "front";
+  if (!state.documentScan?.preview) return;
+  state.documentScan[side] = state.documentScan.preview;
+  state.documentScan.preview = null;
+  if (side === "front") state.documentScan.side = "back";
+  renderDocumentScanModal();
+}
+
+function retakeDocumentScanPhoto() {
+  if (!state.documentScan) return;
+  state.documentScan.preview = null;
+  renderDocumentScanModal();
 }
 
 function setCaptureFile(key, file) {
@@ -2097,10 +2315,38 @@ function parseDocumentOcrText(text = "") {
 }
 
 async function runDocumentOcr(front, back) {
-  if (!window.Tesseract?.recognize) return {};
+  const available = await loadOcrEngine();
+  if (!available || !window.Tesseract?.recognize) return {};
   const results = await Promise.all([front, back].filter(Boolean).map((scan) => window.Tesseract.recognize(scan.dataUrl, "ita+eng")));
   const text = results.map((result) => result?.data?.text || "").join("\n");
   return parseDocumentOcrText(text);
+}
+
+function loadScriptOnce(src, id) {
+  return new Promise((resolve, reject) => {
+    if (document.getElementById(id)) {
+      document.getElementById(id).addEventListener("load", resolve, { once: true });
+      if (window.Tesseract?.recognize) resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = id;
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+async function loadOcrEngine() {
+  if (window.Tesseract?.recognize) return true;
+  try {
+    await loadScriptOnce("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js", "tesseractOcrScript");
+    return Boolean(window.Tesseract?.recognize);
+  } catch {
+    return false;
+  }
 }
 
 function applyDetectedDocumentData(data = {}) {
@@ -2147,11 +2393,12 @@ async function confirmDocumentScan() {
     showLoading("Lettura documento...");
     const detected = await runDocumentOcr(front, back);
     const applied = applyDetectedDocumentData(detected);
-    showToast(applied ? "Documento letto. Controlla e conferma i campi compilati." : "Documento non letto correttamente, controlla e correggi i campi manualmente");
+    showToast(applied ? "Controlla i dati estratti e correggi eventuali errori" : "Documento non letto correttamente, controlla e correggi i campi manualmente");
   } catch {
     showToast("Documento non letto correttamente, controlla e correggi i campi manualmente");
   } finally {
     hideLoading();
+    stopDocumentCamera();
     previewModal.hidden = true;
   }
 }
@@ -3806,7 +4053,20 @@ document.getElementById("fusionGroups").addEventListener("click", (event) => {
 
 previewBody.addEventListener("click", (event) => {
   if (event.target.closest("#cancelDocumentScan")) {
+    stopDocumentCamera();
     previewModal.hidden = true;
+    return;
+  }
+  if (event.target.closest("#captureDocumentPhoto")) {
+    captureDocumentPhoto();
+    return;
+  }
+  if (event.target.closest("#useDocumentScanPhoto")) {
+    useDocumentScanPhoto();
+    return;
+  }
+  if (event.target.closest("#retakeDocumentScanPhoto")) {
+    retakeDocumentScanPhoto();
     return;
   }
   if (event.target.closest("#confirmDocumentScan")) {
@@ -3931,12 +4191,13 @@ document.addEventListener("change", async (event) => {
     try {
       showLoading("Preparazione anteprima...");
       const dataUrl = await fileToDataUrl(file);
-      state.documentScan[side] = {
+      state.documentScan.side = side;
+      state.documentScan.preview = {
         name: file.name || (side === "front" ? "Documento fronte" : "Documento retro"),
         type: file.type || "image/jpeg",
         dataUrl
       };
-      refreshDocumentScanPreview();
+      renderDocumentScanModal();
     } catch {
       showToast("Documento non letto correttamente, controlla e correggi i campi manualmente");
     } finally {
@@ -4028,6 +4289,7 @@ document.querySelectorAll("[data-preview-copy]").forEach((button) => {
 });
 
 document.getElementById("closePreview").addEventListener("click", () => {
+  stopDocumentCamera();
   previewModal.hidden = true;
 });
 

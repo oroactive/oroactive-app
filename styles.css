@@ -2193,67 +2193,170 @@ button.quality-review-badge {
   gap: 18px;
 }
 
-.scan-note {
-  margin: 0;
-  color: var(--soft-ink);
-  font-weight: 700;
-  line-height: 1.45;
-}
-
-.document-scan-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.document-scan-card {
-  min-height: 260px;
-  border: 2px dashed var(--line);
-  border-radius: 8px;
-  background: #fff9f2;
-  display: grid;
-  place-items: center;
+.scan-step-header,
+.document-scan-actions,
+.document-scan-preview-actions,
+.document-scan-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
-  padding: 14px;
-  text-align: center;
-  cursor: pointer;
 }
 
-.document-scan-card.loaded {
-  border-style: solid;
-  border-color: #2e9f68;
-  background: #edf8f1;
+.scan-step-header h3 {
+  margin: 0;
+  font-size: 24px;
 }
 
-.document-scan-card input {
-  display: none;
-}
-
-.document-scan-card span {
+.scan-progress {
+  border-radius: 999px;
+  background: #fff2e8;
   color: var(--gold-dark);
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.document-camera-shell {
+  position: relative;
+  min-height: 430px;
+  overflow: hidden;
+  border: 2px solid #ffb385;
+  border-radius: 8px;
+  background: #080808;
+}
+
+.document-camera-shell.ready {
+  border-color: #2e9f68;
+}
+
+.document-camera-shell video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scan-guide-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(78%, 640px);
+  aspect-ratio: 1.586 / 1;
+  transform: translate(-50%, -50%);
+  border: 3px solid rgba(255, 113, 31, 0.96);
+  border-radius: 18px;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.42), 0 0 22px rgba(255, 113, 31, 0.42);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.scan-guide-frame.ready {
+  border-color: #31c66b;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.38), 0 0 26px rgba(49, 198, 107, 0.6);
+}
+
+.identity-card-wireframe {
+  position: absolute;
+  inset: 7%;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.13);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.document-scan-card strong {
-  color: var(--ink);
-  font-size: 18px;
+.wire-photo {
+  position: absolute;
+  left: 5%;
+  top: 18%;
+  width: 24%;
+  height: 54%;
+  border: 2px solid rgba(255, 255, 255, 0.58);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
-.document-scan-card img {
+.wire-line {
+  position: absolute;
+  left: 35%;
+  right: 6%;
+  height: 10%;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.58);
+}
+
+.wire-name { top: 14%; }
+.wire-surname { top: 27%; }
+.wire-birth { top: 40%; }
+.wire-fiscal { top: 53%; }
+.wire-number { top: 66%; }
+.wire-expiry { top: 79%; }
+
+.scan-status {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(180, 70, 35, 0.94);
+  color: #fff;
+  font-weight: 900;
+  text-align: center;
+  min-width: min(86%, 360px);
+}
+
+.scan-status.ready {
+  background: rgba(31, 132, 75, 0.95);
+}
+
+.scan-fallback-panel {
+  position: absolute;
+  inset: 18px;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  text-align: center;
+  font-weight: 800;
+}
+
+.scan-fallback-panel[hidden] {
+  display: none;
+}
+
+.scan-file-fallback {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scan-file-fallback input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.document-scan-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.document-scan-preview img {
   width: 100%;
-  max-height: 220px;
+  max-height: 520px;
   object-fit: contain;
-  border-radius: 7px;
-  background: #fff;
-}
-
-.document-scan-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111;
 }
 
 .archive-pagination {
@@ -2520,6 +2623,26 @@ button.quality-review-badge {
 
   .panel-heading-actions > *,
   .document-scan-actions > * {
+    width: 100%;
+  }
+
+  .document-camera-shell {
+    min-height: 310px;
+  }
+
+  .scan-guide-frame {
+    width: 88%;
+  }
+
+  .scan-step-header,
+  .document-scan-controls,
+  .document-scan-preview-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .document-scan-controls > *,
+  .document-scan-preview-actions > * {
     width: 100%;
   }
 
