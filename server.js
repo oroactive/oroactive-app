@@ -547,7 +547,6 @@ async function upsertClientFromAct(act) {
     documentType: act.payload?.documentType || act.documentType || "",
     documentNumber: act.payload?.documentNumber || act.documentNumber || "",
     documentIssueDate: act.payload?.documentIssueDate || act.documentIssueDate || "",
-    documentIssuer: act.payload?.documentIssuer || act.documentIssuer || "",
     documentExpiry: act.payload?.documentExpiry || act.documentExpiry || "",
     fiscalDocumentAttachments: (act.payload?.captureAttachments || act.captureAttachments || []).filter((attachment) => (
       String(attachment.key || "").startsWith("documento-") || String(attachment.key || "").startsWith("codice-fiscale-")
@@ -1334,7 +1333,6 @@ function drawActMainPdfPage(doc, act, title) {
     { label: "Provincia residenza", value: act.residenceProvince },
     { label: "Documento", value: `${act.documentType || ""} ${act.documentNumber || ""}`.trim() },
     { label: "Data rilascio", value: act.documentIssueDate },
-    { label: "Ente rilascio", value: act.documentIssuer },
     { label: "Scadenza documento", value: act.documentExpiry }
   ], y, 2);
 

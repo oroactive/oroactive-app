@@ -347,7 +347,6 @@ function isPracticeFormEmpty() {
     '[name="indirizzo"]',
     '[name="numeroDocumento"]',
     '[name="dataRilascioDocumento"]',
-    '[name="enteRilascioDocumento"]',
     '[name="scadenzaDocumento"]',
     "#saleTotal"
   ];
@@ -567,10 +566,10 @@ function fiscalControlChar(code15) {
 function generatedFiscalCode() {
   const name = fieldValue('[name="nome"]');
   const surname = fieldValue('[name="cognome"]');
-  const sex = fieldValue('[name="sesso"]');
+  const sex = fieldValue('[name="sesso"]') || "M";
   const birthDate = fieldValue('[name="nascita"]');
   const luogo = findComune(fieldValue('[name="luogo"]'));
-  if (!name || !surname || !sex || !birthDate || !luogo?.codice) return "";
+  if (!name || !surname || !birthDate || !luogo?.codice) return "";
   const date = new Date(`${birthDate}T00:00:00`);
   if (Number.isNaN(date.getTime())) return "";
   const year = String(date.getFullYear()).slice(-2);
@@ -587,7 +586,9 @@ function maybeAutofillFiscalCode() {
   if (!generated || !fiscalInput) return;
   fiscalInput.value = generated;
   updateCustomerSummary();
-  showToast("Verifica sempre il codice fiscale generato.");
+  showToast(fieldValue('[name="sesso"]')
+    ? "Codice fiscale generato automaticamente."
+    : "Codice fiscale generato automaticamente. Verifica il sesso del cliente.");
 }
 
 function decodeFiscalCodeData(value = "") {
@@ -671,7 +672,6 @@ function applyExistingClient(client = {}) {
     ['[name="tipoDocumento"]', client.documentType],
     ['[name="numeroDocumento"]', client.documentNumber],
     ['[name="dataRilascioDocumento"]', client.documentIssueDate],
-    ['[name="enteRilascioDocumento"]', client.documentIssuer],
     ['[name="scadenzaDocumento"]', client.documentExpiry],
     ["#paymentMethod", client.paymentMethod],
     ["#paymentIban", client.iban]
@@ -1581,7 +1581,6 @@ function actCompanyMainPage(act, heading) {
         <div class="print-field"><span>Documento</span>${escapeHtml(act.documentType || missing)}</div>
         <div class="print-field"><span>Numero documento</span>${escapeHtml(act.documentNumber || missing)}</div>
         <div class="print-field"><span>Data rilascio documento</span>${escapeHtml(act.documentIssueDate || missing)}</div>
-        <div class="print-field"><span>Ente rilascio documento</span>${escapeHtml(act.documentIssuer || missing)}</div>
         <div class="print-field"><span>Scadenza documento</span>${escapeHtml(act.documentExpiry || missing)}</div>
         <div class="print-field"><span>Professione</span>${escapeHtml(act.profession || missing)}</div>
       </div>
@@ -1702,7 +1701,6 @@ function currentActSnapshot(status = "Archiviata") {
     documentType: fieldValue('[name="tipoDocumento"]'),
     documentNumber: fieldValue('[name="numeroDocumento"]'),
     documentIssueDate: fieldValue('[name="dataRilascioDocumento"]'),
-    documentIssuer: fieldValue('[name="enteRilascioDocumento"]'),
     documentExpiry: fieldValue('[name="scadenzaDocumento"]'),
     profession: fieldValue('[name="professione"]'),
     practiceNumber: fieldValue("#practiceNumber"),
@@ -2028,7 +2026,6 @@ function buildArchivedActFallback(act) {
         <div class="print-field"><span>Tipo documento</span>${escapeHtml(act.documentType || missing)}</div>
         <div class="print-field"><span>Numero documento</span>${escapeHtml(act.documentNumber || missing)}</div>
         <div class="print-field"><span>Data rilascio documento</span>${escapeHtml(act.documentIssueDate || missing)}</div>
-        <div class="print-field"><span>Ente rilascio documento</span>${escapeHtml(act.documentIssuer || missing)}</div>
         <div class="print-field"><span>Scadenza documento</span>${escapeHtml(act.documentExpiry || missing)}</div>
         <div class="print-field"><span>Professione lavorativa</span>${escapeHtml(act.profession || missing)}</div>
       </div>
@@ -2428,7 +2425,6 @@ function documentScanDataRowsMarkup(data = {}) {
     ["documentNumber", "Numero documento", data.documentNumber],
     ["documentIssueDate", "Data rilascio/emissione", data.documentIssueDate],
     ["documentExpiry", "Data scadenza", data.documentExpiry],
-    ["documentIssuer", "Ente rilascio", data.documentIssuer],
     ["citizenship", "Cittadinanza", data.citizenship],
     ["sex", "Sesso", data.sex]
   ];
@@ -2972,7 +2968,6 @@ function parseCieSideText(text = "") {
     documentNumber: cleanOcrValue(valueAfterLabel(normalized, ["numero documento", "documento n", "document no", "n documento", "n\\."])),
     documentIssueDate: normalizeOcrDate(valueAfterLabel(normalized, ["data emissione", "emissione", "data rilascio", "rilasciata il", "rilasciato il"])),
     documentExpiry: normalizeOcrDate(valueAfterLabel(normalized, ["data scadenza", "scadenza", "expiry", "valida fino al"])),
-    documentIssuer: cleanOcrValue(valueAfterLabel(normalized, ["ente rilascio", "rilasciata da", "rilasciato da"])),
     citizenship: cleanOcrValue(valueAfterLabel(normalized, ["cittadinanza", "nationality"])),
     sex: cleanOcrValue(valueAfterLabel(normalized, ["sesso", "sex"])).charAt(0).toUpperCase()
   };
@@ -3061,7 +3056,7 @@ function parseCieDocumentData(frontText = "", backText = "", zoneTexts = {}) {
     residenceProvince: (value) => ITALIAN_PROVINCES.has(String(value).toUpperCase()),
     sex: (value) => ["M", "F"].includes(String(value).toUpperCase())
   };
-  const fields = ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "birthProvince", "address", "residenceProvince", "documentNumber", "documentIssueDate", "documentExpiry", "documentIssuer", "citizenship", "sex"];
+  const fields = ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "birthProvince", "address", "residenceProvince", "documentNumber", "documentIssueDate", "documentExpiry", "citizenship", "sex"];
   const output = { _confidence: {} };
   fields.forEach((field) => {
     const selected = selectCandidate(candidates[field], validators[field]);
@@ -3149,7 +3144,6 @@ function applyDetectedDocumentData(data = {}) {
     setFieldIfDetected('[name="numeroDocumento"]', data.documentNumber, detectedConfidence(data, "documentNumber")),
     setFieldIfDetected('[name="dataRilascioDocumento"]', data.documentIssueDate, detectedConfidence(data, "documentIssueDate")),
     setFieldIfDetected('[name="scadenzaDocumento"]', data.documentExpiry, detectedConfidence(data, "documentExpiry")),
-    setFieldIfDetected('[name="enteRilascioDocumento"]', data.documentIssuer, detectedConfidence(data, "documentIssuer")),
     setFieldIfDetected('[name="cittadinanza"]', data.citizenship, detectedConfidence(data, "citizenship")),
     setFieldIfDetected('[name="sesso"]', data.sex, detectedConfidence(data, "sex"))
   ];
@@ -3213,7 +3207,6 @@ async function loadActForEdit(practiceNumber) {
   setFieldValue('[name="tipoDocumento"]', act.documentType);
   setFieldValue('[name="numeroDocumento"]', act.documentNumber);
   setFieldValue('[name="dataRilascioDocumento"]', toDateInputValue(act.documentIssueDate));
-  setFieldValue('[name="enteRilascioDocumento"]', act.documentIssuer);
   setFieldValue('[name="scadenzaDocumento"]', toDateInputValue(act.documentExpiry));
   setFieldValue('[name="professione"]', act.profession);
   setFieldValue("#paymentMethod", act.paymentMethod);
@@ -4633,7 +4626,6 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
         <div class="print-field"><span>Tipo documento</span>${escapeHtml(fieldValue('[name="tipoDocumento"]'))}</div>
         <div class="print-field"><span>Numero documento</span>${escapeHtml(fieldValue('[name="numeroDocumento"]'))}</div>
         <div class="print-field"><span>Data rilascio documento</span>${escapeHtml(fieldValue('[name="dataRilascioDocumento"]'))}</div>
-        <div class="print-field"><span>Ente rilascio documento</span>${escapeHtml(fieldValue('[name="enteRilascioDocumento"]'))}</div>
         <div class="print-field"><span>Scadenza documento</span>${escapeHtml(fieldValue('[name="scadenzaDocumento"]'))}</div>
         <div class="print-field"><span>Professione lavorativa</span>${escapeHtml(fieldValue('[name="professione"]'))}</div>
       </div>
@@ -4991,6 +4983,9 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
   if (event.target.matches('[name="luogo"]')) {
     updateCitizenshipFromBirthPlace();
+    maybeAutofillFiscalCode();
+  }
+  if (event.target.matches('[name="nome"], [name="cognome"], [name="sesso"], [name="nascita"], [name="provinciaNascita"]')) {
     maybeAutofillFiscalCode();
   }
   if (event.target.matches('[name="cf"]')) {
