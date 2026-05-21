@@ -501,6 +501,14 @@ function findComune(value = "") {
   return LUOGHI_CATASTALI.find((item) => normalizeText(item.comune) === normalized) || null;
 }
 
+function findComuneInText(value = "") {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+  return LUOGHI_CATASTALI
+    .filter((item) => normalized.includes(normalizeText(item.comune)))
+    .sort((first, second) => second.comune.length - first.comune.length)[0] || null;
+}
+
 function populateAutocompleteLists() {
   const cityList = document.getElementById("citySuggestions");
   if (cityList) {
@@ -625,8 +633,14 @@ function updateCitizenshipFromBirthPlace() {
   if (place.provincia) setFieldIfDetected('[name="provinciaNascita"]', place.provincia, "alto");
 }
 
+function updateResidenceProvinceFromAddress() {
+  const place = findComuneInText(fieldValue('[name="indirizzo"]'));
+  if (place?.provincia) setFieldIfDetected('[name="provinciaResidenza"]', place.provincia, "alto");
+}
+
 async function lookupExistingClient(fiscalCode) {
   const code = String(fiscalCode || "").trim().toUpperCase();
+  if (code.length !== 16) return;
   if (!/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/.test(code)) return;
   try {
     const client = await apiRequest(`/clienti/${encodeURIComponent(code)}`, { timeoutMs: 9000 });
@@ -4956,6 +4970,7 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
     if (event.target.matches('[name="luogo"]')) updateCitizenshipFromBirthPlace();
     maybeAutofillFiscalCode();
   }
+  if (event.target.matches('[name="indirizzo"]')) updateResidenceProvinceFromAddress();
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
   updateChecklistState();
 });
@@ -4972,6 +4987,7 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
     applyFiscalCodeDecodedData(decodeFiscalCodeData(event.target.value));
     lookupExistingClient(event.target.value);
   }
+  if (event.target.matches('[name="indirizzo"]')) updateResidenceProvinceFromAddress();
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
   updateChecklistState();
 });

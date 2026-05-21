@@ -590,28 +590,46 @@ async function upsertClientFromAct(act) {
 async function getClientByFiscalCode(fiscalCode) {
   const normalized = normalizeFiscalCode(fiscalCode);
   if (!normalized) return null;
-  const result = await pool.query(
-    "SELECT * FROM clienti WHERE UPPER(codice_fiscale) = $1 LIMIT 1",
-    [normalized]
-  );
-  if (result.rowCount) return result.rows[0];
-
-  const actResult = await pool.query(
+  const latestActResult = await pool.query(
     `SELECT * FROM ${actsTable}
      WHERE UPPER(codice_fiscale) = $1
      ORDER BY updated_at DESC, id DESC
      LIMIT 1`,
     [normalized]
   );
-  if (!actResult.rowCount) return null;
-  const act = rowToAct(actResult.rows[0]);
+  const latestAct = latestActResult.rowCount ? rowToAct(latestActResult.rows[0]) : null;
+  const result = await pool.query(
+    "SELECT * FROM clienti WHERE UPPER(codice_fiscale) = $1 LIMIT 1",
+    [normalized]
+  );
+  if (result.rowCount) {
+    const row = result.rows[0];
+    const savedAttachments = Array.isArray(row.payload?.fiscalDocumentAttachments) ? row.payload.fiscalDocumentAttachments : [];
+    const latestAttachments = Array.isArray(latestAct?.captureAttachments)
+      ? latestAct.captureAttachments.filter((attachment) => (
+        String(attachment.key || "").startsWith("documento-") || String(attachment.key || "").startsWith("codice-fiscale-")
+      ))
+      : [];
+    return {
+      ...row,
+      payload: {
+        ...(latestAct || {}),
+        ...(row.payload || {}),
+        fiscalDocumentAttachments: savedAttachments.length ? savedAttachments : latestAttachments,
+        paymentMethod: row.payload?.paymentMethod || latestAct?.paymentMethod || "",
+        iban: row.iban || row.payload?.iban || latestAct?.iban || ""
+      }
+    };
+  }
+
+  if (!latestAct) return null;
   const client = await upsertClientFromAct({
-    ...act,
-    clienteNome: act.name,
-    clienteCognome: act.surname,
-    codiceFiscale: act.fiscalCode,
-    telefono: act.phone,
-    payload: act
+    ...latestAct,
+    clienteNome: latestAct.name,
+    clienteCognome: latestAct.surname,
+    codiceFiscale: latestAct.fiscalCode,
+    telefono: latestAct.phone,
+    payload: latestAct
   });
   return client;
 }
