@@ -2013,6 +2013,9 @@ function openDocumentScanModal() {
     back: null,
     side: "front",
     preview: null,
+    review: false,
+    detected: {},
+    ocrRead: false,
     stream: null,
     cameraActive: false,
     ready: false,
@@ -2034,6 +2037,7 @@ function renderDocumentScanModal() {
 }
 
 function documentScanModalMarkup() {
+  if (state.documentScan?.review) return documentScanReviewMarkup();
   const sideLabel = currentDocumentScanLabel();
   const preview = state.documentScan?.preview;
   const ready = Boolean(state.documentScan?.ready);
@@ -2057,6 +2061,68 @@ function documentScanModalMarkup() {
       </div>
     </section>
   `;
+}
+
+function documentScanReviewMarkup() {
+  const front = state.documentScan?.front;
+  const back = state.documentScan?.back;
+  const detected = state.documentScan?.detected || {};
+  const ocrRead = Boolean(state.documentScan?.ocrRead);
+  return `
+    <section class="document-scan-flow">
+      <div class="scan-step-header">
+        <div>
+          <p class="eyebrow">Controllo dati</p>
+          <h3>Documento fronte e retro acquisito</h3>
+        </div>
+        <span class="scan-progress">${ocrRead ? "Dati rilevati" : "Lettura da controllare"}</span>
+      </div>
+      <div class="document-scan-review-grid">
+        <article class="document-scan-review-card">
+          <span>Anteprima fronte</span>
+          ${front ? `<img src="${front.dataUrl}" alt="Anteprima fronte documento">` : "<strong>Fronte non acquisito</strong>"}
+        </article>
+        <article class="document-scan-review-card">
+          <span>Anteprima retro</span>
+          ${back ? `<img src="${back.dataUrl}" alt="Anteprima retro documento">` : "<strong>Retro non acquisito</strong>"}
+        </article>
+      </div>
+      <div class="document-scan-data-panel">
+        <h4>Dati estratti automaticamente</h4>
+        <div class="document-scan-data-grid">
+          ${documentScanDataRowsMarkup(detected)}
+        </div>
+        <p>${ocrRead ? "Controlla i dati estratti e correggi eventuali errori dopo la conferma." : "Documento non letto correttamente, puoi rifare la scansione oppure compilare i campi manualmente."}</p>
+      </div>
+      <div class="document-scan-actions">
+        <button class="ghost-button" type="button" id="cancelDocumentScan">Annulla</button>
+        <button class="warning-button" type="button" id="restartDocumentScan">Rifai scansione documento</button>
+        <button class="primary-button" type="button" id="confirmDocumentScan">Conferma dati</button>
+      </div>
+    </section>
+  `;
+}
+
+function documentScanDataRowsMarkup(data = {}) {
+  const rows = [
+    ["Nome", data.name],
+    ["Cognome", data.surname],
+    ["Codice fiscale", data.fiscalCode],
+    ["Data di nascita", data.birthDate],
+    ["Luogo di nascita", data.birthPlace],
+    ["Indirizzo residenza", data.address],
+    ["Numero documento", data.documentNumber],
+    ["Data rilascio/emissione", data.documentIssueDate],
+    ["Data scadenza", data.documentExpiry],
+    ["Cittadinanza", data.citizenship],
+    ["Sesso", data.sex]
+  ];
+  return rows.map(([label, value]) => `
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value || "Dato non letto")}</strong>
+    </div>
+  `).join("");
 }
 
 function documentScanCameraMarkup(ready, sideLabel) {
@@ -2274,12 +2340,17 @@ function captureDocumentPhoto() {
   renderDocumentScanModal();
 }
 
-function useDocumentScanPhoto() {
+async function useDocumentScanPhoto() {
   const side = state.documentScan?.side || "front";
   if (!state.documentScan?.preview) return;
   state.documentScan[side] = state.documentScan.preview;
   state.documentScan.preview = null;
-  if (side === "front") state.documentScan.side = "back";
+  if (side === "front") {
+    state.documentScan.side = "back";
+  } else {
+    await prepareDocumentScanReview();
+    return;
+  }
   renderDocumentScanModal();
 }
 
@@ -2287,6 +2358,51 @@ function retakeDocumentScanPhoto() {
   if (!state.documentScan) return;
   state.documentScan.preview = null;
   renderDocumentScanModal();
+}
+
+function detectedDocumentHasValues(data = {}) {
+  return Object.values(data).some((value) => String(value || "").trim());
+}
+
+async function prepareDocumentScanReview() {
+  const { front, back } = state.documentScan || {};
+  if (!front || !back) return;
+  stopDocumentCamera();
+  let detected = {};
+  try {
+    showLoading("Lettura documento...");
+    detected = await runDocumentOcr(front, back);
+  } catch {
+    detected = {};
+  } finally {
+    hideLoading();
+  }
+  state.documentScan.detected = detected;
+  state.documentScan.ocrRead = detectedDocumentHasValues(detected);
+  state.documentScan.review = true;
+  renderDocumentScanModal();
+  if (!state.documentScan.ocrRead) {
+    showToast("Documento non letto correttamente, puoi rifare la scansione oppure compilare i campi manualmente.");
+  }
+}
+
+function restartDocumentScan() {
+  stopDocumentCamera();
+  state.documentScan = {
+    front: null,
+    back: null,
+    side: "front",
+    preview: null,
+    review: false,
+    detected: {},
+    ocrRead: false,
+    stream: null,
+    cameraActive: false,
+    ready: false,
+    status: "Centra il documento nel rettangolo"
+  };
+  renderDocumentScanModal();
+  startDocumentCamera();
 }
 
 function setCaptureFile(key, file) {
@@ -2499,18 +2615,10 @@ async function confirmDocumentScan() {
   updateDocumentCaptureCards();
   updateAttachmentState();
 
-  try {
-    showLoading("Lettura documento...");
-    const detected = await runDocumentOcr(front, back);
-    const applied = applyDetectedDocumentData(detected);
-    showToast(applied ? "Controlla i dati estratti e correggi eventuali errori" : "Documento non letto correttamente, compila i campi manualmente.");
-  } catch {
-    showToast("Documento non letto correttamente, compila i campi manualmente.");
-  } finally {
-    hideLoading();
-    stopDocumentCamera();
-    previewModal.hidden = true;
-  }
+  const applied = applyDetectedDocumentData(state.documentScan.detected || {});
+  showToast(applied ? "Controlla i dati estratti e correggi eventuali errori" : "Documento non letto correttamente, puoi rifare la scansione oppure compilare i campi manualmente.");
+  stopDocumentCamera();
+  previewModal.hidden = true;
 }
 
 async function loadActForEdit(practiceNumber) {
@@ -4181,6 +4289,10 @@ previewBody.addEventListener("click", (event) => {
   }
   if (event.target.closest("#retakeDocumentScanPhoto")) {
     retakeDocumentScanPhoto();
+    return;
+  }
+  if (event.target.closest("#restartDocumentScan")) {
+    restartDocumentScan();
     return;
   }
   if (event.target.closest("#confirmDocumentScan")) {
