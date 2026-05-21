@@ -95,6 +95,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS clienti_codice_fiscale_unique
   ON clienti (UPPER(codice_fiscale))
   WHERE codice_fiscale IS NOT NULL AND codice_fiscale <> '';
 
+CREATE INDEX IF NOT EXISTS clienti_codice_fiscale_lookup_idx
+  ON clienti (codice_fiscale);
+
 CREATE TABLE IF NOT EXISTS utenti (
   id BIGSERIAL PRIMARY KEY,
   nome TEXT NOT NULL,

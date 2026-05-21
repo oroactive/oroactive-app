@@ -42,3 +42,6 @@ ALTER TABLE clienti ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW(
 CREATE UNIQUE INDEX IF NOT EXISTS clienti_codice_fiscale_unique
   ON clienti (UPPER(codice_fiscale))
   WHERE codice_fiscale IS NOT NULL AND codice_fiscale <> '';
+
+CREATE INDEX IF NOT EXISTS clienti_codice_fiscale_lookup_idx
+  ON clienti (codice_fiscale);

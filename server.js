@@ -554,28 +554,36 @@ async function upsertClientFromAct(act) {
     )),
     paymentMethod: act.payload?.paymentMethod || act.paymentMethod || ""
   };
-  const result = await pool.query(
-    `INSERT INTO clienti (codice_fiscale, nome, cognome, telefono, email, iban, payload)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (codice_fiscale) DO UPDATE SET
-       nome = COALESCE(NULLIF(EXCLUDED.nome, ''), clienti.nome),
-       cognome = COALESCE(NULLIF(EXCLUDED.cognome, ''), clienti.cognome),
-       telefono = COALESCE(NULLIF(EXCLUDED.telefono, ''), clienti.telefono),
-       email = COALESCE(NULLIF(EXCLUDED.email, ''), clienti.email),
-       iban = COALESCE(NULLIF(EXCLUDED.iban, ''), clienti.iban),
-       payload = COALESCE(clienti.payload, '{}'::jsonb) || COALESCE(EXCLUDED.payload, '{}'::jsonb),
-       updated_at = NOW()
-     RETURNING *`,
-    [
-      fiscalCode,
-      act.clienteNome || act.name || "",
-      act.clienteCognome || act.surname || "",
-      act.telefono || act.phone || "",
-      act.payload?.email || act.email || "",
-      act.iban || act.payload?.iban || "",
-      payload
-    ]
-  );
+  const values = [
+    fiscalCode,
+    act.clienteNome || act.name || "",
+    act.clienteCognome || act.surname || "",
+    act.telefono || act.phone || "",
+    act.payload?.email || act.email || "",
+    act.iban || act.payload?.iban || "",
+    payload
+  ];
+  const existing = await pool.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1 LIMIT 1", [fiscalCode]);
+  const result = existing.rowCount
+    ? await pool.query(
+      `UPDATE clienti SET
+        nome = COALESCE(NULLIF($2, ''), nome),
+        cognome = COALESCE(NULLIF($3, ''), cognome),
+        telefono = COALESCE(NULLIF($4, ''), telefono),
+        email = COALESCE(NULLIF($5, ''), email),
+        iban = COALESCE(NULLIF($6, ''), iban),
+        payload = COALESCE(payload, '{}'::jsonb) || COALESCE($7::jsonb, '{}'::jsonb),
+        updated_at = NOW()
+       WHERE id = $8
+       RETURNING *`,
+      [...values, existing.rows[0].id]
+    )
+    : await pool.query(
+      `INSERT INTO clienti (codice_fiscale, nome, cognome, telefono, email, iban, payload)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      values
+    );
   return result.rows[0] || null;
 }
 
@@ -611,14 +619,14 @@ async function getClientByFiscalCode(fiscalCode) {
 function publicClient(row) {
   if (!row) return null;
   return {
+    ...(row.payload || {}),
     id: row.id,
     fiscalCode: row.codice_fiscale,
     name: row.nome || row.payload?.name || "",
     surname: row.cognome || row.payload?.surname || "",
     phone: row.telefono || "",
     email: row.email || "",
-    iban: row.iban || "",
-    ...row.payload
+    iban: row.iban || row.payload?.iban || ""
   };
 }
 

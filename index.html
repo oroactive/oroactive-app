@@ -198,6 +198,7 @@
                 <label>Data rilascio <input type="date" name="dataRilascioDocumento"></label>
                 <label>Ente rilascio <input name="enteRilascioDocumento"></label>
                 <label class="document-expiry-field">Scadenza <input type="date" name="scadenzaDocumento"></label>
+                <div class="document-expiry-warning" id="documentExpiryWarning" hidden>Documento scaduto. Richiedere un documento valido ai sensi di legge.</div>
                 <label>Professione lavorativa
                   <select name="professione">
                     <option>Autonomo</option>
@@ -359,7 +360,7 @@
               </div>
 
               <div class="capture-grid">
-                <div class="capture-combo-card">
+                <div class="capture-combo-card" data-capture-group="identity">
                   <div>
                     <span>Documento</span>
                     <strong id="identityDocumentGroupTitle">Documento identit&agrave; / patente / passaporto</strong>
@@ -378,7 +379,7 @@
                     <em>Tocca per fotografare</em>
                   </label>
                 </div>
-                <div class="capture-combo-card">
+                <div class="capture-combo-card" data-capture-group="fiscal">
                   <div>
                     <span>Codice fiscale</span>
                     <strong>Codice fiscale / tessera sanitaria</strong>
@@ -621,6 +622,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260521-07"></script>
+  <script src="app.js?v=20260521-08"></script>
 </body>
 </html>

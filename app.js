@@ -22,7 +22,8 @@ const state = {
   loadedSignatureImages: [],
   saving: false,
   clientLookupTimer: null,
-  fiscalCodeEditedManually: false
+  fiscalCodeEditedManually: false,
+  captureGroup: null
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -95,7 +96,30 @@ const COMUNI_ITALIANI = [
   { comune: "Bari", provincia: "BA", codice: "A662" },
   { comune: "Catania", provincia: "CT", codice: "C351" }
 ];
-const PROVINCE_CODES = [...new Set(COMUNI_ITALIANI.map((item) => item.provincia))].sort();
+const STATI_ESTERI = [
+  { comune: "Francia", provincia: "EE", codice: "Z110", cittadinanza: "Francese" },
+  { comune: "Parigi", provincia: "EE", codice: "Z110", cittadinanza: "Francese" },
+  { comune: "Germania", provincia: "EE", codice: "Z112", cittadinanza: "Tedesca" },
+  { comune: "Berlino", provincia: "EE", codice: "Z112", cittadinanza: "Tedesca" },
+  { comune: "Svizzera", provincia: "EE", codice: "Z133", cittadinanza: "Svizzera" },
+  { comune: "Spagna", provincia: "EE", codice: "Z131", cittadinanza: "Spagnola" },
+  { comune: "Regno Unito", provincia: "EE", codice: "Z114", cittadinanza: "Britannica" },
+  { comune: "Stati Uniti", provincia: "EE", codice: "Z404", cittadinanza: "Statunitense" }
+];
+const LUOGHI_CATASTALI = [...COMUNI_ITALIANI.map((item) => ({ ...item, cittadinanza: "Italiana" })), ...STATI_ESTERI];
+const PROVINCE_NAMES = {
+  AG: "Agrigento", AL: "Alessandria", AN: "Ancona", AO: "Aosta", AR: "Arezzo", AP: "Ascoli Piceno", AT: "Asti", AV: "Avellino",
+  BA: "Bari", BT: "Barletta-Andria-Trani", BL: "Belluno", BN: "Benevento", BG: "Bergamo", BI: "Biella", BO: "Bologna", BZ: "Bolzano", BS: "Brescia", BR: "Brindisi",
+  CA: "Cagliari", CL: "Caltanissetta", CB: "Campobasso", CE: "Caserta", CT: "Catania", CZ: "Catanzaro", CH: "Chieti", CO: "Como", CS: "Cosenza", CR: "Cremona", KR: "Crotone", CN: "Cuneo",
+  EN: "Enna", FM: "Fermo", FE: "Ferrara", FI: "Firenze", FG: "Foggia", FC: "Forli-Cesena", FR: "Frosinone", GE: "Genova", GO: "Gorizia", GR: "Grosseto",
+  IM: "Imperia", IS: "Isernia", SP: "La Spezia", AQ: "L'Aquila", LT: "Latina", LE: "Lecce", LC: "Lecco", LI: "Livorno", LO: "Lodi", LU: "Lucca",
+  MC: "Macerata", MN: "Mantova", MS: "Massa-Carrara", MT: "Matera", ME: "Messina", MI: "Milano", MO: "Modena", MB: "Monza e Brianza",
+  NA: "Napoli", NO: "Novara", NU: "Nuoro", OR: "Oristano", PD: "Padova", PA: "Palermo", PR: "Parma", PV: "Pavia", PG: "Perugia", PU: "Pesaro e Urbino", PE: "Pescara", PC: "Piacenza", PI: "Pisa", PT: "Pistoia", PN: "Pordenone", PZ: "Potenza", PO: "Prato",
+  RG: "Ragusa", RA: "Ravenna", RC: "Reggio Calabria", RE: "Reggio Emilia", RI: "Rieti", RN: "Rimini", RM: "Roma", RO: "Rovigo",
+  SA: "Salerno", SS: "Sassari", SV: "Savona", SI: "Siena", SR: "Siracusa", SO: "Sondrio", SU: "Sud Sardegna", TA: "Taranto", TE: "Teramo", TR: "Terni", TO: "Torino", TP: "Trapani", TN: "Trento", TV: "Treviso", TS: "Trieste",
+  UD: "Udine", VA: "Varese", VE: "Venezia", VB: "Verbano-Cusio-Ossola", VC: "Vercelli", VR: "Verona", VV: "Vibo Valentia", VI: "Vicenza", VT: "Viterbo", EE: "Estero"
+};
+const PROVINCE_CODES = Object.keys(PROVINCE_NAMES).sort();
 const FISCAL_MONTH_CODES = ["A", "B", "C", "D", "E", "H", "L", "M", "P", "R", "S", "T"];
 const documentLabels = {
   "Carta identita": "carta identita",
@@ -474,20 +498,35 @@ function normalizeText(value = "") {
 
 function findComune(value = "") {
   const normalized = normalizeText(value);
-  return COMUNI_ITALIANI.find((item) => normalizeText(item.comune) === normalized) || null;
+  return LUOGHI_CATASTALI.find((item) => normalizeText(item.comune) === normalized) || null;
 }
 
 function populateAutocompleteLists() {
   const cityList = document.getElementById("citySuggestions");
   if (cityList) {
-    cityList.innerHTML = COMUNI_ITALIANI
-      .map((item) => `<option value="${escapeHtml(item.comune)}">${escapeHtml(item.provincia)}</option>`)
+    cityList.innerHTML = LUOGHI_CATASTALI
+      .map((item) => `<option value="${escapeHtml(item.comune)}">${escapeHtml(item.provincia)} - ${escapeHtml(item.cittadinanza || "Italiana")}</option>`)
       .join("");
   }
   const provinceList = document.getElementById("provinceSuggestions");
   if (provinceList) {
-    provinceList.innerHTML = PROVINCE_CODES.map((code) => `<option value="${escapeHtml(code)}"></option>`).join("");
+    provinceList.innerHTML = PROVINCE_CODES.map((code) => `<option value="${escapeHtml(code)}" label="${escapeHtml(code)} - ${escapeHtml(PROVINCE_NAMES[code])}"></option>`).join("");
   }
+}
+
+function upgradeProvinceFields() {
+  ["birthProvince", "residenceProvince"].forEach((id) => {
+    const select = document.getElementById(id);
+    if (!select || select.tagName !== "SELECT") return;
+    const input = document.createElement("input");
+    input.id = select.id;
+    input.name = select.name;
+    input.value = select.value || "";
+    input.setAttribute("list", "provinceSuggestions");
+    input.setAttribute("autocomplete", "off");
+    input.placeholder = "Es. MI - Milano";
+    select.replaceWith(input);
+  });
 }
 
 function fiscalNamePart(value = "", isName = false) {
@@ -522,14 +561,14 @@ function generatedFiscalCode() {
   const surname = fieldValue('[name="cognome"]');
   const sex = fieldValue('[name="sesso"]');
   const birthDate = fieldValue('[name="nascita"]');
-  const comune = findComune(fieldValue('[name="luogo"]'));
-  if (!name || !surname || !sex || !birthDate || !comune) return "";
+  const luogo = findComune(fieldValue('[name="luogo"]'));
+  if (!name || !surname || !sex || !birthDate || !luogo?.codice) return "";
   const date = new Date(`${birthDate}T00:00:00`);
   if (Number.isNaN(date.getTime())) return "";
   const year = String(date.getFullYear()).slice(-2);
   const month = FISCAL_MONTH_CODES[date.getMonth()];
   const day = String(date.getDate() + (sex === "F" ? 40 : 0)).padStart(2, "0");
-  const code15 = `${fiscalNamePart(surname)}${fiscalNamePart(name, true)}${year}${month}${day}${comune.codice}`;
+  const code15 = `${fiscalNamePart(surname)}${fiscalNamePart(name, true)}${year}${month}${day}${luogo.codice}`;
   return `${code15}${fiscalControlChar(code15)}`;
 }
 
@@ -554,12 +593,13 @@ function decodeFiscalCodeData(value = "") {
   const sex = rawDay > 40 ? "F" : "M";
   const day = rawDay > 40 ? rawDay - 40 : rawDay;
   const placeCode = code.slice(11, 15);
-  const comune = COMUNI_ITALIANI.find((item) => item.codice === placeCode);
+  const comune = LUOGHI_CATASTALI.find((item) => item.codice === placeCode);
   return {
     sex,
     birthDate: monthIndex >= 0 ? `${fullYear}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}` : "",
     birthPlace: comune?.comune || "",
-    birthProvince: comune?.provincia || ""
+    birthProvince: comune?.provincia || "",
+    citizenship: comune?.cittadinanza || ""
   };
 }
 
@@ -569,8 +609,20 @@ function applyFiscalCodeDecodedData(data) {
   setFieldIfDetected('[name="nascita"]', data.birthDate, "alto");
   setFieldIfDetected('[name="luogo"]', data.birthPlace, data.birthPlace ? "alto" : "");
   setFieldIfDetected('[name="provinciaNascita"]', data.birthProvince, data.birthProvince ? "alto" : "");
+  setFieldIfDetected('[name="cittadinanza"]', data.citizenship, data.citizenship ? "alto" : "");
+  updateDocumentExpiryWarning();
   updateChecklistState();
   return true;
+}
+
+function updateCitizenshipFromBirthPlace() {
+  const place = findComune(fieldValue('[name="luogo"]'));
+  if (!place?.cittadinanza) return;
+  const citizenship = document.querySelector('[name="cittadinanza"]');
+  if (citizenship && !citizenship.value.trim()) {
+    setFieldIfDetected('[name="cittadinanza"]', place.cittadinanza, "alto");
+  }
+  if (place.provincia) setFieldIfDetected('[name="provinciaNascita"]', place.provincia, "alto");
 }
 
 async function lookupExistingClient(fiscalCode) {
@@ -626,11 +678,25 @@ function applyExistingClient(client = {}) {
   renderPreciousCaptureCards();
   updateAttachmentState();
   updateCustomerSummary();
+  updateDocumentExpiryWarning();
   updateChecklistState();
 }
 
 function isValidIban(value = "") {
   return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/i.test(String(value || "").replace(/\s+/g, ""));
+}
+
+function updateDocumentExpiryWarning() {
+  const input = document.querySelector('[name="scadenzaDocumento"]');
+  const warning = document.getElementById("documentExpiryWarning");
+  const label = input?.closest("label");
+  if (!input || !warning) return false;
+  const value = input.value;
+  const expired = Boolean(value && new Date(`${value}T23:59:59`).getTime() < Date.now());
+  warning.hidden = !expired;
+  input.classList.toggle("document-expired", expired);
+  label?.classList.toggle("expired", expired);
+  return expired;
 }
 
 function isAdmin() {
@@ -3156,6 +3222,7 @@ async function loadActForEdit(practiceNumber) {
   renderPaymentCaptureCard();
   renderPreciousCaptureCards();
   updateAttachmentState();
+  updateDocumentExpiryWarning();
 
   if (Array.isArray(act.bullionQuotes)) {
     act.bullionQuotes.forEach((quote) => {
@@ -3750,13 +3817,20 @@ function renderPaymentCaptureCard() {
   const method = selectedPaymentMethod().toLowerCase();
   const loaded = state.uploadedCaptures.has(key);
   grid.innerHTML = `
-    <label class="capture-card ${loaded ? "loaded" : ""}" data-capture-key="${key}">
-      <input type="file" accept="image/*,.pdf" capture="environment">
-      <span>Pagamento</span>
-      <strong>Contabile ${method}</strong>
-      <em>${loaded ? "Allegato acquisito" : "Tocca per fotografare o allegare"}</em>
-      ${captureActionsMarkup()}
-    </label>
+    <div class="capture-combo-card" data-capture-group="payment">
+      <div>
+        <span>Pagamento</span>
+        <strong>Contabile pagamento</strong>
+        <em>Carica immagine o PDF della contabile ${escapeHtml(method)}.</em>
+      </div>
+      <label class="capture-card ${loaded ? "loaded" : ""}" data-capture-key="${key}">
+        <input type="file" accept="image/*,.pdf" capture="environment">
+        <span>Pagamento</span>
+        <strong>Contabile ${method}</strong>
+        <em>${loaded ? "Allegato acquisito" : "Tocca per fotografare o allegare"}</em>
+        ${captureActionsMarkup()}
+      </label>
+    </div>
   `;
   ensureCaptureActions();
   updateAttachmentState();
@@ -4226,6 +4300,104 @@ function captureActionsMarkup() {
   `;
 }
 
+function captureGroupConfig(group = "") {
+  if (group === "identity") {
+    const label = currentDocumentLabel();
+    return {
+      title: "Documento identità / patente / passaporto",
+      description: `Documento selezionato: ${fieldValue("#documentType") || "Carta identità"}`,
+      slots: [
+        { key: documentCaptureKey("fronte"), label: `Fronte ${label}`, action: "Rifai fronte" },
+        { key: documentCaptureKey("retro"), label: `Retro ${label}`, action: "Rifai retro" }
+      ]
+    };
+  }
+  if (group === "fiscal") {
+    return {
+      title: "Codice fiscale / tessera sanitaria",
+      description: "Carica fronte e retro della tessera.",
+      slots: [
+        { key: "codice-fiscale-fronte", label: "Fronte tessera", action: "Rifai fronte" },
+        { key: "codice-fiscale-retro", label: "Retro tessera", action: "Rifai retro" }
+      ]
+    };
+  }
+  if (group.startsWith("precious:")) {
+    const metal = group.split(":")[1] || "Oro";
+    return {
+      title: "Foto preziosi",
+      description: `Preziosi in ${metal.toLowerCase()}: foto frontale e foto fianco/laterale.`,
+      slots: [
+        { key: `preziosi-${metal.toLowerCase()}-fronte`, label: "Foto frontale preziosi", action: "Rifai fronte" },
+        { key: `preziosi-${metal.toLowerCase()}-retro`, label: "Foto fianco/laterale preziosi", action: "Rifai retro" }
+      ]
+    };
+  }
+  if (group === "payment") {
+    return {
+      title: "Contabile pagamento",
+      description: "Carica immagine o PDF della contabile.",
+      slots: [{ key: paymentCaptureKey(), label: "Contabile pagamento", action: "Rifai contabile" }]
+    };
+  }
+  return null;
+}
+
+function captureGroupSlotMarkup(slot) {
+  const file = state.captureFiles.get(slot.key);
+  const source = capturePreviewSource(file);
+  const loaded = state.uploadedCaptures.has(slot.key);
+  const preview = source && !isCapturePdf(file, source)
+    ? `<img src="${source}" alt="${escapeHtml(slot.label)}">`
+    : `<strong>${loaded ? "Allegato presente" : "Da caricare"}</strong>`;
+  return `
+    <article class="capture-group-slot ${loaded ? "loaded" : ""}">
+      <span>${escapeHtml(slot.label)}</span>
+      <div>${preview}</div>
+      <button class="ghost-button" type="button" data-trigger-capture-key="${escapeHtml(slot.key)}">${loaded ? escapeHtml(slot.action) : "Carica / scatta"}</button>
+    </article>
+  `;
+}
+
+function openCaptureGroupModal(group) {
+  const config = captureGroupConfig(group);
+  if (!config) return;
+  state.captureGroup = group;
+  previewTitle.textContent = config.title;
+  previewBody.innerHTML = `
+    <section class="capture-group-modal">
+      <p>${escapeHtml(config.description)}</p>
+      <div class="capture-group-grid">${config.slots.map(captureGroupSlotMarkup).join("")}</div>
+      <div class="document-scan-actions">
+        <button class="danger-button" type="button" data-remove-capture-group="${escapeHtml(group)}">Rimuovi</button>
+        <button class="warning-button" type="button" data-reload-capture-group="${escapeHtml(group)}">Aggiorna anteprima</button>
+        <button class="primary-button" type="button" data-confirm-capture-group>Conferma</button>
+      </div>
+    </section>
+  `;
+  previewModal.hidden = false;
+}
+
+function removeCaptureGroup(group) {
+  const config = captureGroupConfig(group);
+  if (!config) return;
+  config.slots.forEach((slot) => {
+    const previous = state.captureFiles.get(slot.key);
+    revokeCaptureUrl(previous);
+    state.captureFiles.delete(slot.key);
+    state.uploadedCaptures.delete(slot.key);
+    const input = document.querySelector(`.capture-card[data-capture-key="${cssEscape(slot.key)}"] input`);
+    if (input) input.value = "";
+  });
+  state.attachments = state.uploadedCaptures.size;
+  updateDocumentCaptureCards();
+  renderPaymentCaptureCard();
+  renderPreciousCaptureCards();
+  updateAttachmentState();
+  updateChecklistState();
+  openCaptureGroupModal(group);
+}
+
 function fileToDataUrl(file) {
   if (file.type && file.type.startsWith("image/")) return imageFileToOptimizedDataUrl(file);
   return new Promise((resolve, reject) => {
@@ -4295,7 +4467,7 @@ function renderPreciousCaptureCards() {
   if (!grid) return;
 
   grid.innerHTML = activeMetals().map((metal) => `
-    <div class="capture-combo-card ${captureClassForMetal(metal)}">
+    <div class="capture-combo-card ${captureClassForMetal(metal)}" data-capture-group="precious:${escapeHtml(metal)}">
       <div>
         <span>Preziosi ${escapeHtml(metal)}</span>
         <strong>Foto preziosi</strong>
@@ -4542,6 +4714,52 @@ function showPrintPreview(scope) {
   previewModal.hidden = false;
 }
 
+function showCustomerCopyOptions() {
+  const act = currentActSnapshot("Archiviata");
+  previewTitle.textContent = "Copia cliente";
+  previewBody.innerHTML = `
+    <section class="customer-copy-options">
+      <p>Scegli come consegnare la copia cliente. Il PDF puo essere scaricato in ogni momento.</p>
+      <div class="preview-action-stack">
+        <button class="primary-button" type="button" data-customer-copy-action="download">Scarica PDF</button>
+        <button class="ghost-button" type="button" data-customer-copy-action="email">Invia via email</button>
+        <button class="ghost-button" type="button" data-customer-copy-action="whatsapp">Invia via WhatsApp</button>
+      </div>
+      <div class="print-field"><span>Cliente</span>${escapeHtml([act.name, act.surname].filter(Boolean).join(" ") || "Dato non inserito")}</div>
+      <div class="print-field"><span>Email</span>${escapeHtml(act.email || "Dato non inserito")}</div>
+      <div class="print-field"><span>Telefono</span>${escapeHtml(act.phone || "Dato non inserito")}</div>
+    </section>
+  `;
+  previewModal.hidden = false;
+}
+
+async function handleCustomerCopyAction(action) {
+  const act = currentActSnapshot("Archiviata");
+  if (action === "download") {
+    await requestPdf("/pdf/act", { title: `Copia cliente ${act.practiceNumber}`, act }, `copia-cliente-${act.practiceNumber || "oroactive"}.pdf`);
+    return;
+  }
+  if (action === "email") {
+    if (!act.email) {
+      showToast("Inserisci l'email del cliente prima di preparare l'invio.");
+      return;
+    }
+    const subject = encodeURIComponent("Copia atto di vendita OroActive");
+    const body = encodeURIComponent("Gentile Cliente,\n\nle inviamo la copia dell'atto di vendita OroActive. Per tutela dei dati personali, il documento PDF deve essere allegato o condiviso tramite link sicuro generato dal gestionale.\n\nCordiali saluti,\nOroActive");
+    window.location.href = `mailto:${encodeURIComponent(act.email)}?subject=${subject}&body=${body}`;
+    return;
+  }
+  if (action === "whatsapp") {
+    if (!act.phone) {
+      showToast("Inserisci il telefono del cliente prima di preparare WhatsApp.");
+      return;
+    }
+    const phone = String(act.phone).replace(/\D/g, "");
+    const message = encodeURIComponent("Gentile Cliente, la copia del suo atto di vendita OroActive è pronta. Per sicurezza il PDF deve essere scaricato o condiviso tramite link sicuro dal gestionale.");
+    window.open(`https://wa.me/${phone}?text=${message}`, "_blank", "noopener");
+  }
+}
+
 async function archiveCurrentPractice(status = "Archiviata") {
   if (notifyCashPaymentLimitIfNeeded({ force: true })) return false;
   const review = currentQualityReview();
@@ -4730,12 +4948,15 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
   if (event.target.matches('[name="cf"]')) {
     const generated = generatedFiscalCode();
     state.fiscalCodeEditedManually = Boolean(event.target.value && event.target.value.toUpperCase() !== generated);
+    applyFiscalCodeDecodedData(decodeFiscalCodeData(event.target.value));
     window.clearTimeout(state.clientLookupTimer);
-    state.clientLookupTimer = window.setTimeout(() => lookupExistingClient(event.target.value), 500);
+    state.clientLookupTimer = window.setTimeout(() => lookupExistingClient(event.target.value), 350);
   }
   if (event.target.matches('[name="nome"], [name="cognome"], [name="sesso"], [name="nascita"], [name="luogo"], [name="provinciaNascita"]')) {
+    if (event.target.matches('[name="luogo"]')) updateCitizenshipFromBirthPlace();
     maybeAutofillFiscalCode();
   }
+  if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
   updateChecklistState();
 });
 
@@ -4744,13 +4965,14 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
   if (event.target.title === "Controlla questo dato") event.target.title = "";
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
   if (event.target.matches('[name="luogo"]')) {
-    const comune = findComune(event.target.value);
-    if (comune) setFieldIfDetected('[name="provinciaNascita"]', comune.provincia, "alto");
+    updateCitizenshipFromBirthPlace();
     maybeAutofillFiscalCode();
   }
   if (event.target.matches('[name="cf"]')) {
     applyFiscalCodeDecodedData(decodeFiscalCodeData(event.target.value));
+    lookupExistingClient(event.target.value);
   }
+  if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
   updateChecklistState();
 });
 
@@ -4881,6 +5103,33 @@ previewBody.addEventListener("click", (event) => {
   }
   if (event.target.closest("#confirmDocumentScan")) {
     confirmDocumentScan();
+    return;
+  }
+  const triggerCapture = event.target.closest("[data-trigger-capture-key]");
+  if (triggerCapture) {
+    const input = document.querySelector(`.capture-card[data-capture-key="${cssEscape(triggerCapture.dataset.triggerCaptureKey)}"] input`);
+    input?.click();
+    return;
+  }
+  const reloadCaptureGroup = event.target.closest("[data-reload-capture-group]");
+  if (reloadCaptureGroup) {
+    openCaptureGroupModal(reloadCaptureGroup.dataset.reloadCaptureGroup);
+    return;
+  }
+  const removeCaptureGroupButton = event.target.closest("[data-remove-capture-group]");
+  if (removeCaptureGroupButton) {
+    removeCaptureGroup(removeCaptureGroupButton.dataset.removeCaptureGroup);
+    return;
+  }
+  if (event.target.closest("[data-confirm-capture-group]")) {
+    state.captureGroup = null;
+    previewModal.hidden = true;
+    showToast("Allegati confermati.");
+    return;
+  }
+  const customerCopyAction = event.target.closest("[data-customer-copy-action]");
+  if (customerCopyAction) {
+    handleCustomerCopyAction(customerCopyAction.dataset.customerCopyAction);
     return;
   }
   const requestDeleteButton = event.target.closest("[data-request-delete-act]");
@@ -5043,12 +5292,19 @@ document.addEventListener("change", async (event) => {
   card.querySelector("em").textContent = "Foto acquisita";
   updateAttachmentState();
   updateChecklistState();
+  if (state.captureGroup && !previewModal.hidden) openCaptureGroupModal(state.captureGroup);
 });
 
 document.addEventListener("click", (event) => {
   if (event.target.closest("#refreshBullionVaultPrices")) {
     event.preventDefault();
     refreshBullionVaultPrices({ notify: true });
+    return;
+  }
+
+  const captureGroup = event.target.closest("[data-capture-group]");
+  if (captureGroup && !event.target.closest(".capture-card") && !event.target.closest(".capture-actions")) {
+    openCaptureGroupModal(captureGroup.dataset.captureGroup);
     return;
   }
 
@@ -5095,7 +5351,10 @@ document.addEventListener("click", (event) => {
 });
 
 document.querySelectorAll("[data-preview-copy]").forEach((button) => {
-  button.addEventListener("click", () => showPrintPreview(button.dataset.previewCopy));
+  button.addEventListener("click", () => {
+    if (button.dataset.previewCopy === "customer") showCustomerCopyOptions();
+    else showPrintPreview(button.dataset.previewCopy);
+  });
 });
 
 document.getElementById("closePreview").addEventListener("click", () => {
@@ -5105,6 +5364,7 @@ document.getElementById("closePreview").addEventListener("click", () => {
 
 async function initializeApp() {
   removeLegacySearchMenu();
+  upgradeProvinceFields();
   populateAutocompleteLists();
   appShell.hidden = true;
   await restoreSession();

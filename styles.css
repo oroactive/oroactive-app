@@ -1214,6 +1214,57 @@ canvas {
   font-style: normal;
 }
 
+.document-expiry-warning {
+  grid-column: 1 / -1;
+  border: 1px solid #d12c2c;
+  border-radius: 8px;
+  background: #fff0f0;
+  color: #8f1111;
+  padding: 12px;
+  font-weight: 900;
+}
+
+.document-expiry-field.expired input,
+input.document-expired {
+  border-color: #d12c2c !important;
+  background: #fff0f0 !important;
+  color: #8f1111;
+}
+
+.capture-group-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.capture-group-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.capture-group-slot {
+  min-height: 210px;
+  border: 1px dashed #ffad7a;
+  border-radius: 8px;
+  background: #fffdf8;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.capture-group-slot.loaded {
+  border-color: #2f8f57;
+  background: #effaf3;
+}
+
+.capture-group-slot img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  border-radius: 7px;
+  background: #fff;
+}
+
 .precious-captures,
 .payment-captures {
   margin-top: 18px;
@@ -2802,6 +2853,7 @@ button.quality-review-badge {
   .document-scan-grid,
   .document-scan-review-grid,
   .document-scan-data-grid,
+  .capture-group-grid,
   .bullion-quote-field,
   .material-amount-field,
   .internal-weight,
