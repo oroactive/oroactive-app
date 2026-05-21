@@ -610,15 +610,21 @@ async function getClientByFiscalCode(fiscalCode) {
         String(attachment.key || "").startsWith("documento-") || String(attachment.key || "").startsWith("codice-fiscale-")
       ))
       : [];
+    const mergedPayload = {
+      ...(latestAct || {}),
+      ...(row.payload || {}),
+      fiscalDocumentAttachments: savedAttachments.length ? savedAttachments : latestAttachments,
+      paymentMethod: row.payload?.paymentMethod || latestAct?.paymentMethod || "",
+      iban: row.iban || row.payload?.iban || latestAct?.iban || ""
+    };
     return {
       ...row,
-      payload: {
-        ...(latestAct || {}),
-        ...(row.payload || {}),
-        fiscalDocumentAttachments: savedAttachments.length ? savedAttachments : latestAttachments,
-        paymentMethod: row.payload?.paymentMethod || latestAct?.paymentMethod || "",
-        iban: row.iban || row.payload?.iban || latestAct?.iban || ""
-      }
+      nome: row.nome || mergedPayload.name || latestAct?.name || "",
+      cognome: row.cognome || mergedPayload.surname || latestAct?.surname || "",
+      telefono: row.telefono || mergedPayload.phone || latestAct?.phone || "",
+      email: row.email || mergedPayload.email || latestAct?.email || "",
+      iban: row.iban || mergedPayload.iban || latestAct?.iban || "",
+      payload: mergedPayload
     };
   }
 

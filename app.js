@@ -591,7 +591,7 @@ function maybeAutofillFiscalCode() {
 }
 
 function decodeFiscalCodeData(value = "") {
-  const code = String(value || "").trim().toUpperCase();
+  const code = normalizeFiscalCodeInput(value);
   if (!/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/.test(code)) return null;
   const year = Number(code.slice(6, 8));
   const currentYear = new Date().getFullYear() % 100;
@@ -611,6 +611,10 @@ function decodeFiscalCodeData(value = "") {
   };
 }
 
+function normalizeFiscalCodeInput(value = "") {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+}
+
 function applyFiscalCodeDecodedData(data) {
   if (!data) return false;
   setFieldIfDetected('[name="sesso"]', data.sex, "alto");
@@ -618,6 +622,7 @@ function applyFiscalCodeDecodedData(data) {
   setFieldIfDetected('[name="luogo"]', data.birthPlace, data.birthPlace ? "alto" : "");
   setFieldIfDetected('[name="provinciaNascita"]', data.birthProvince, data.birthProvince ? "alto" : "");
   setFieldIfDetected('[name="cittadinanza"]', data.citizenship, data.citizenship ? "alto" : "");
+  updateCustomerSummary();
   updateDocumentExpiryWarning();
   updateChecklistState();
   return true;
@@ -639,7 +644,7 @@ function updateResidenceProvinceFromAddress() {
 }
 
 async function lookupExistingClient(fiscalCode) {
-  const code = String(fiscalCode || "").trim().toUpperCase();
+  const code = normalizeFiscalCodeInput(fiscalCode);
   if (code.length !== 16) return;
   if (!/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/.test(code)) return;
   try {
@@ -692,6 +697,7 @@ function applyExistingClient(client = {}) {
   renderPreciousCaptureCards();
   updateAttachmentState();
   updateCustomerSummary();
+  updateSaleTotal();
   updateDocumentExpiryWarning();
   updateChecklistState();
 }
@@ -4960,11 +4966,15 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
   if (event.target.title === "Controlla questo dato") event.target.title = "";
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
   if (event.target.matches('[name="cf"]')) {
+    const normalizedCode = normalizeFiscalCodeInput(event.target.value);
+    if (event.target.value !== normalizedCode) event.target.value = normalizedCode;
     const generated = generatedFiscalCode();
-    state.fiscalCodeEditedManually = Boolean(event.target.value && event.target.value.toUpperCase() !== generated);
-    applyFiscalCodeDecodedData(decodeFiscalCodeData(event.target.value));
+    state.fiscalCodeEditedManually = Boolean(normalizedCode && normalizedCode !== generated);
+    if (normalizedCode.length === 16) applyFiscalCodeDecodedData(decodeFiscalCodeData(normalizedCode));
     window.clearTimeout(state.clientLookupTimer);
-    state.clientLookupTimer = window.setTimeout(() => lookupExistingClient(event.target.value), 350);
+    if (normalizedCode.length === 16) {
+      state.clientLookupTimer = window.setTimeout(() => lookupExistingClient(normalizedCode), 350);
+    }
   }
   if (event.target.matches('[name="nome"], [name="cognome"], [name="sesso"], [name="nascita"], [name="luogo"], [name="provinciaNascita"]')) {
     if (event.target.matches('[name="luogo"]')) updateCitizenshipFromBirthPlace();
@@ -4984,8 +4994,12 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
     maybeAutofillFiscalCode();
   }
   if (event.target.matches('[name="cf"]')) {
-    applyFiscalCodeDecodedData(decodeFiscalCodeData(event.target.value));
-    lookupExistingClient(event.target.value);
+    const normalizedCode = normalizeFiscalCodeInput(event.target.value);
+    if (event.target.value !== normalizedCode) event.target.value = normalizedCode;
+    if (normalizedCode.length === 16) {
+      applyFiscalCodeDecodedData(decodeFiscalCodeData(normalizedCode));
+      lookupExistingClient(normalizedCode);
+    }
   }
   if (event.target.matches('[name="indirizzo"]')) updateResidenceProvinceFromAddress();
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
