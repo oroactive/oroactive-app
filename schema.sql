@@ -35,6 +35,8 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS act_year INTEGER;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS act_number INTEGER;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS payment_method TEXT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Archiviata';
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS cliente_id BIGINT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS iban TEXT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
@@ -48,8 +50,50 @@ CREATE INDEX IF NOT EXISTS atti_vendita_store_year_number_idx
 CREATE INDEX IF NOT EXISTS atti_vendita_data_atto_idx
   ON atti_vendita (data_atto);
 
+CREATE INDEX IF NOT EXISTS atti_vendita_codice_fiscale_idx
+  ON atti_vendita (LOWER(codice_fiscale));
+
+CREATE INDEX IF NOT EXISTS atti_vendita_store_idx
+  ON atti_vendita (store);
+
+CREATE INDEX IF NOT EXISTS atti_vendita_store_code_idx
+  ON atti_vendita (store_code);
+
+CREATE INDEX IF NOT EXISTS atti_vendita_status_idx
+  ON atti_vendita (status);
+
+CREATE INDEX IF NOT EXISTS atti_vendita_cliente_id_idx
+  ON atti_vendita (cliente_id);
+
 CREATE INDEX IF NOT EXISTS atti_vendita_payload_idx
   ON atti_vendita USING GIN (payload);
+
+CREATE TABLE IF NOT EXISTS clienti (
+  id BIGSERIAL PRIMARY KEY,
+  codice_fiscale TEXT UNIQUE,
+  nome TEXT,
+  cognome TEXT,
+  telefono TEXT,
+  email TEXT,
+  iban TEXT,
+  payload JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS codice_fiscale TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS nome TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS cognome TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS telefono TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS iban TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+CREATE UNIQUE INDEX IF NOT EXISTS clienti_codice_fiscale_unique
+  ON clienti (UPPER(codice_fiscale))
+  WHERE codice_fiscale IS NOT NULL AND codice_fiscale <> '';
 
 CREATE TABLE IF NOT EXISTS utenti (
   id BIGSERIAL PRIMARY KEY,

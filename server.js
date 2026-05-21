@@ -243,6 +243,18 @@ function normalizeWorkflowStatus(status = "Archiviata") {
   return "Archiviata";
 }
 
+function normalizeFiscalCode(value = "") {
+  return String(value || "").trim().toUpperCase();
+}
+
+function isCompletedAct(rowOrAct = {}) {
+  return normalizeWorkflowStatus(rowOrAct.status || rowOrAct.payload?.status) === "Completato";
+}
+
+function isValidIban(value = "") {
+  return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/i.test(String(value || "").replace(/\s+/g, ""));
+}
+
 function normalizeAct(input = {}, existing = null) {
   const practiceNumber = input.practiceNumber || existing?.practice_number || "";
   const parsed = parsePracticeNumber(practiceNumber);
@@ -259,6 +271,12 @@ function normalizeAct(input = {}, existing = null) {
   const paymentMethod = input.paymentMethod || existing?.payment_method || "";
   if (String(paymentMethod).toLowerCase().includes("contanti") && totale > CASH_PAYMENT_LIMIT) {
     const error = new Error("Il pagamento in contanti non puo superare 499,99 euro. Seleziona Bonifico o Assegno come pagamento a norma di legge.");
+    error.status = 400;
+    throw error;
+  }
+  const iban = String(input.iban ?? payload.iban ?? existing?.iban ?? "").replace(/\s+/g, "").toUpperCase();
+  if (String(paymentMethod).toLowerCase().includes("bonifico") && iban && !isValidIban(iban)) {
+    const error = new Error("IBAN non valido. Controlla il formato prima di salvare.");
     error.status = 400;
     throw error;
   }
@@ -279,6 +297,7 @@ function normalizeAct(input = {}, existing = null) {
     quotazione: quoteValue(payload, "Oro") || numberFrom(existing?.quotazione),
     totale,
     paymentMethod,
+    iban,
     status: normalizeWorkflowStatus(input.status || existing?.status || "Archiviata"),
     payload
   };
@@ -307,6 +326,7 @@ function rowToAct(row, options = {}) {
     surname: row.cliente_cognome || payload.surname || "",
     fiscalCode: row.codice_fiscale || payload.fiscalCode || "",
     phone: row.telefono || payload.phone || "",
+    iban: row.iban || payload.iban || "",
     weight: payload.weight ?? row.peso_oro,
     amount: payload.amount ?? row.totale,
     paymentMethod: row.payment_method || payload.paymentMethod || "",
@@ -373,7 +393,7 @@ function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
   const values = [];
 
   const effectiveStore = roleSeesAllStores(user?.ruolo) ? store : user?.negozio;
-  if (effectiveStore) {
+  if (effectiveStore && effectiveStore !== "Tutti") {
     values.push(effectiveStore);
     where.push(`store = $${values.length}`);
   }
@@ -502,7 +522,187 @@ function actOwnerKey(row = {}) {
 }
 
 function canEditAct(row, user) {
+  if (isCompletedAct(row) && !canReviewActs(user)) return false;
   return canReviewActs(user) || actOwnerKey(row) === actorKey(user);
+}
+
+function completedActEditError() {
+  const error = new Error("Questo atto è completato. Solo responsabili e founder possono modificarlo.");
+  error.status = 403;
+  return error;
+}
+
+async function upsertClientFromAct(act) {
+  const fiscalCode = normalizeFiscalCode(act.codiceFiscale || act.fiscalCode);
+  if (!fiscalCode) return null;
+  const payload = {
+    name: act.clienteNome || act.name || "",
+    surname: act.clienteCognome || act.surname || "",
+    birthDate: act.payload?.birthDate || act.birthDate || "",
+    birthPlace: act.payload?.birthPlace || act.birthPlace || "",
+    birthProvince: act.payload?.birthProvince || act.birthProvince || "",
+    sex: act.payload?.sex || act.sex || "",
+    address: act.payload?.address || act.address || "",
+    residenceProvince: act.payload?.residenceProvince || act.residenceProvince || "",
+    documentType: act.payload?.documentType || act.documentType || "",
+    documentNumber: act.payload?.documentNumber || act.documentNumber || "",
+    documentIssueDate: act.payload?.documentIssueDate || act.documentIssueDate || "",
+    documentIssuer: act.payload?.documentIssuer || act.documentIssuer || "",
+    documentExpiry: act.payload?.documentExpiry || act.documentExpiry || "",
+    fiscalDocumentAttachments: (act.payload?.captureAttachments || act.captureAttachments || []).filter((attachment) => (
+      String(attachment.key || "").startsWith("documento-") || String(attachment.key || "").startsWith("codice-fiscale-")
+    )),
+    paymentMethod: act.payload?.paymentMethod || act.paymentMethod || ""
+  };
+  const result = await pool.query(
+    `INSERT INTO clienti (codice_fiscale, nome, cognome, telefono, email, iban, payload)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (codice_fiscale) DO UPDATE SET
+       nome = COALESCE(NULLIF(EXCLUDED.nome, ''), clienti.nome),
+       cognome = COALESCE(NULLIF(EXCLUDED.cognome, ''), clienti.cognome),
+       telefono = COALESCE(NULLIF(EXCLUDED.telefono, ''), clienti.telefono),
+       email = COALESCE(NULLIF(EXCLUDED.email, ''), clienti.email),
+       iban = COALESCE(NULLIF(EXCLUDED.iban, ''), clienti.iban),
+       payload = COALESCE(clienti.payload, '{}'::jsonb) || COALESCE(EXCLUDED.payload, '{}'::jsonb),
+       updated_at = NOW()
+     RETURNING *`,
+    [
+      fiscalCode,
+      act.clienteNome || act.name || "",
+      act.clienteCognome || act.surname || "",
+      act.telefono || act.phone || "",
+      act.payload?.email || act.email || "",
+      act.iban || act.payload?.iban || "",
+      payload
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+async function getClientByFiscalCode(fiscalCode) {
+  const normalized = normalizeFiscalCode(fiscalCode);
+  if (!normalized) return null;
+  const result = await pool.query(
+    "SELECT * FROM clienti WHERE UPPER(codice_fiscale) = $1 LIMIT 1",
+    [normalized]
+  );
+  if (result.rowCount) return result.rows[0];
+
+  const actResult = await pool.query(
+    `SELECT * FROM ${actsTable}
+     WHERE UPPER(codice_fiscale) = $1
+     ORDER BY updated_at DESC, id DESC
+     LIMIT 1`,
+    [normalized]
+  );
+  if (!actResult.rowCount) return null;
+  const act = rowToAct(actResult.rows[0]);
+  const client = await upsertClientFromAct({
+    ...act,
+    clienteNome: act.name,
+    clienteCognome: act.surname,
+    codiceFiscale: act.fiscalCode,
+    telefono: act.phone,
+    payload: act
+  });
+  return client;
+}
+
+function publicClient(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    fiscalCode: row.codice_fiscale,
+    name: row.nome || row.payload?.name || "",
+    surname: row.cognome || row.payload?.surname || "",
+    phone: row.telefono || "",
+    email: row.email || "",
+    iban: row.iban || "",
+    ...row.payload
+  };
+}
+
+function titlePurity(metal, title = "") {
+  const clean = String(title || "").toLowerCase().replace(",", ".").trim();
+  const kt = clean.match(/(\d+(?:\.\d+)?)\s*kt/);
+  if (kt) return Number(kt[1]) / 24;
+  const numeric = clean.match(/\d+(?:\.\d+)?/);
+  if (numeric) {
+    const value = Number(numeric[0]);
+    if (value > 24) return value / 1000;
+    if (metal === "Oro") return value / 24;
+  }
+  return 1;
+}
+
+function materialLotsFromAct(act = {}) {
+  const items = Array.isArray(act.items) ? act.items : [];
+  const materials = Array.isArray(act.materials) ? act.materials : [];
+  if (!materials.length) return [];
+  return materials.flatMap((material) => {
+    const metal = material.metal || "Oro";
+    const title = material.title || material.caratura || material.titolo;
+    if (title) return [{ metal, title, weight: numberFrom(material.weight), act }];
+    const titles = [...new Set(items
+      .filter((item) => (item.metal || "Oro") === metal)
+      .map((item) => item.title || item.titolo || item.caratura)
+      .filter(Boolean))];
+    const inferredTitle = titles.length === 1 ? titles[0] : titles.length ? `Titoli misti (${titles.join(", ")})` : "Titolo non indicato";
+    return [{ metal, title: inferredTitle, weight: numberFrom(material.weight), act }];
+  }).filter((lot) => lot.weight > 0);
+}
+
+function quoteForMetal(act = {}, metal = "Oro") {
+  const quote = Array.isArray(act.bullionQuotes)
+    ? act.bullionQuotes.find((row) => row.metal === metal)
+    : null;
+  return numberFrom(quote?.value || (metal === "Oro" ? act.quotazione : 0));
+}
+
+async function stockActs(query = {}, user = null) {
+  const { where, values } = buildActsQuery({ store: query.negozio_id || query.store || query.negozio }, user);
+  where.push("COALESCE((payload->'fusion'->>'fused')::boolean, false) = false");
+  const result = await pool.query(
+    `SELECT * FROM ${actsTable}
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY data_atto DESC NULLS LAST, act_number DESC NULLS LAST`,
+    values
+  );
+  return result.rows.map((row) => rowToAct(row));
+}
+
+function stockSummaryFromActs(acts = []) {
+  const grouped = new Map();
+  acts.forEach((act) => {
+    materialLotsFromAct(act).forEach((lot) => {
+      const key = `${act.store}|${lot.metal}|${lot.title}`;
+      const current = grouped.get(key) || {
+        negozio: act.store,
+        metallo: lot.metal,
+        titolo: lot.title,
+        grammiTotali: 0,
+        numeroAtti: 0,
+        valoreStimato: 0,
+        atti: new Set()
+      };
+      current.grammiTotali += lot.weight;
+      current.atti.add(act.practiceNumber || act.id);
+      const quote = quoteForMetal(act, lot.metal);
+      if (quote > 0) current.valoreStimato += (lot.weight / 1000) * quote * titlePurity(lot.metal, lot.title);
+      grouped.set(key, current);
+    });
+  });
+  return [...grouped.values()].map((row) => ({
+    ...row,
+    grammiTotali: Number(row.grammiTotali.toFixed(3)),
+    numeroAtti: row.atti.size,
+    valoreStimato: Number(row.valoreStimato.toFixed(2)),
+    atti: [...row.atti]
+  })).sort((a, b) => (
+    String(a.negozio).localeCompare(String(b.negozio))
+    || String(a.metallo).localeCompare(String(b.metallo))
+    || String(a.titolo).localeCompare(String(b.titolo))
+  ));
 }
 
 async function saveAct(input, user) {
@@ -524,8 +724,8 @@ async function saveAct(input, user) {
       cliente_nome, cliente_cognome, codice_fiscale, telefono,
       peso_oro, quotazione, totale, data_atto,
       practice_number, store, store_code, act_year, act_number,
-      payment_method, status, payload
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+      payment_method, status, iban, payload
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
     RETURNING *`,
     [
       act.clienteNome,
@@ -543,10 +743,19 @@ async function saveAct(input, user) {
       act.actNumber,
       act.paymentMethod,
       act.status,
+      act.iban,
       act.payload
     ]
   );
-  return rowToAct(result.rows[0]);
+  const client = await upsertClientFromAct({ ...act, payload: act.payload });
+  if (client?.id) {
+    const withClient = await pool.query(
+      `UPDATE ${actsTable} SET cliente_id = $2, iban = COALESCE(NULLIF($3, ''), iban) WHERE id = $1 RETURNING *`,
+      [result.rows[0].id, client.id, client.iban || act.iban || ""]
+    );
+    return rowToAct(withClient.rows[0], { full: false });
+  }
+  return rowToAct(result.rows[0], { full: false });
 }
 
 async function updateAct(identifier, input, user) {
@@ -558,7 +767,9 @@ async function updateAct(identifier, input, user) {
     throw error;
   }
   if (!canEditAct(existing, user)) {
-    const error = new Error("Puoi modificare solo gli atti effettuati da te");
+    const error = isCompletedAct(existing)
+      ? completedActEditError()
+      : new Error("Puoi modificare solo gli atti effettuati da te");
     error.status = 403;
     throw error;
   }
@@ -580,7 +791,8 @@ async function updateAct(identifier, input, user) {
       act_number = $14,
       payment_method = $15,
       status = $16,
-      payload = $17,
+      iban = $17,
+      payload = $18,
       updated_at = NOW()
      WHERE id = $1
      RETURNING *`,
@@ -601,10 +813,20 @@ async function updateAct(identifier, input, user) {
       act.actNumber,
       act.paymentMethod,
       act.status,
+      act.iban,
       act.payload
     ]
   );
-  return result.rowCount ? rowToAct(result.rows[0]) : null;
+  if (!result.rowCount) return null;
+  const client = await upsertClientFromAct({ ...act, payload: act.payload });
+  if (client?.id) {
+    const withClient = await pool.query(
+      `UPDATE ${actsTable} SET cliente_id = $2, iban = COALESCE(NULLIF($3, ''), iban) WHERE id = $1 RETURNING *`,
+      [result.rows[0].id, client.id, client.iban || act.iban || ""]
+    );
+    return rowToAct(withClient.rows[0], { full: false });
+  }
+  return rowToAct(result.rows[0], { full: false });
 }
 
 async function deleteAct(identifier, user) {
@@ -910,6 +1132,63 @@ app.get("/api/bullionvault/prices", async (_request, response, next) => {
       provider: "BullionVault",
       note: "Prezzo medio tra miglior acquisto e miglior vendita espresso in EUR al kg.",
       prices
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/clienti/:codiceFiscale", async (request, response, next) => {
+  try {
+    const client = await getClientByFiscalCode(request.params.codiceFiscale);
+    if (!client) return response.status(404).json({ error: "Cliente non trovato" });
+    response.json(publicClient(client));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/giacenza", async (request, response, next) => {
+  try {
+    const storeQuery = request.query.negozio_id || request.query.store || request.query.negozio || "";
+    const store = ["BUSTO", "CASSANO", "LEGNANO"].includes(String(storeQuery).toUpperCase())
+      ? storeNameFromCode(String(storeQuery).toUpperCase())
+      : storeQuery;
+    const acts = await stockActs({ store }, request.user);
+    response.json({
+      generatedAt: new Date().toISOString(),
+      giacenza: stockSummaryFromActs(acts)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/fusioni/riepilogo", async (request, response, next) => {
+  try {
+    const identifiers = String(request.query.atti || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const rows = [];
+    for (const identifier of identifiers) {
+      const row = await findExisting(identifier);
+      if (row && canAccessAct(row, request.user)) rows.push(rowToAct(row));
+    }
+    response.json({
+      count: rows.length,
+      riepilogo: stockSummaryFromActs(rows),
+      atti: rows.map((act) => ({
+        id: act.id,
+        practiceNumber: act.practiceNumber,
+        cliente: [act.name, act.surname].filter(Boolean).join(" "),
+        store: act.store,
+        materiali: materialLotsFromAct(act).map((lot) => ({
+          metallo: lot.metal,
+          titolo: lot.title,
+          grammi: Number(lot.weight.toFixed(3))
+        }))
+      }))
     });
   } catch (error) {
     next(error);

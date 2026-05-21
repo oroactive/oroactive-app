@@ -133,7 +133,7 @@
                   <span class="date-input-frame"><input type="date" name="nascita"></span>
                 </label>
                 <div class="birth-place-row">
-                  <label>Luogo di nascita <input name="luogo"></label>
+                  <label>Luogo di nascita <input name="luogo" list="citySuggestions" autocomplete="off"></label>
                   <label>Provincia
                     <select name="provinciaNascita" id="birthProvince">
                       <option value="">Seleziona</option>
@@ -153,6 +153,7 @@
                 </div>
                 <label>Codice fiscale <input name="cf"></label>
                 <label>Telefono <input name="telefono"></label>
+                <label>Email <input name="email" type="email"></label>
                 <label>Cittadinanza <input name="cittadinanza"></label>
                 <label>Sesso
                   <select name="sesso">
@@ -293,6 +294,9 @@
                   </select>
                 </label>
                 <label>Totale corrisposto <input id="saleTotal" type="number" min="0" step="0.01"></label>
+                <label class="iban-field" id="ibanField" hidden>IBAN
+                  <input id="paymentIban" name="iban" inputmode="text" autocomplete="off" placeholder="IT00X0000000000000000000000">
+                </label>
               </div>
               <div class="material-amount-panel">
                 <span class="internal-badge">Ripartizione importo</span>
@@ -355,30 +359,44 @@
               </div>
 
               <div class="capture-grid">
-                <label class="capture-card" data-document-capture="fronte" data-capture-key="documento-fronte-carta-identita">
-                  <input type="file" accept="image/*" capture="environment">
-                  <span>Documento</span>
-                  <strong>Fronte carta identita</strong>
-                  <em>Tocca per fotografare</em>
-                </label>
-                <label class="capture-card" data-document-capture="retro" data-capture-key="documento-retro-carta-identita">
-                  <input type="file" accept="image/*" capture="environment">
-                  <span>Documento</span>
-                  <strong>Retro carta identita</strong>
-                  <em>Tocca per fotografare</em>
-                </label>
-                <label class="capture-card" data-capture-key="codice-fiscale-fronte">
-                  <input type="file" accept="image/*" capture="environment">
-                  <span>Codice fiscale</span>
-                  <strong>Fronte tessera</strong>
-                  <em>Tocca per fotografare</em>
-                </label>
-                <label class="capture-card" data-capture-key="codice-fiscale-retro">
-                  <input type="file" accept="image/*" capture="environment">
-                  <span>Codice fiscale</span>
-                  <strong>Retro tessera</strong>
-                  <em>Tocca per fotografare</em>
-                </label>
+                <div class="capture-combo-card">
+                  <div>
+                    <span>Documento</span>
+                    <strong id="identityDocumentGroupTitle">Documento identit&agrave; / patente / passaporto</strong>
+                    <em>Carica o scatta fronte e retro manualmente.</em>
+                  </div>
+                  <label class="capture-card" data-document-capture="fronte" data-capture-key="documento-fronte-carta-identita">
+                    <input type="file" accept="image/*" capture="environment">
+                    <span>Fronte</span>
+                    <strong>Fronte carta identita</strong>
+                    <em>Tocca per fotografare</em>
+                  </label>
+                  <label class="capture-card" data-document-capture="retro" data-capture-key="documento-retro-carta-identita">
+                    <input type="file" accept="image/*" capture="environment">
+                    <span>Retro</span>
+                    <strong>Retro carta identita</strong>
+                    <em>Tocca per fotografare</em>
+                  </label>
+                </div>
+                <div class="capture-combo-card">
+                  <div>
+                    <span>Codice fiscale</span>
+                    <strong>Codice fiscale / tessera sanitaria</strong>
+                    <em>Carica o scatta fronte e retro manualmente.</em>
+                  </div>
+                  <label class="capture-card" data-capture-key="codice-fiscale-fronte">
+                    <input type="file" accept="image/*" capture="environment">
+                    <span>Fronte</span>
+                    <strong>Fronte tessera</strong>
+                    <em>Tocca per fotografare</em>
+                  </label>
+                  <label class="capture-card" data-capture-key="codice-fiscale-retro">
+                    <input type="file" accept="image/*" capture="environment">
+                    <span>Retro</span>
+                    <strong>Retro tessera</strong>
+                    <em>Tocca per fotografare</em>
+                  </label>
+                </div>
               </div>
 
               <div class="precious-captures">
@@ -601,6 +619,8 @@
     <div class="loading-spinner" aria-hidden="true"></div>
     <span>Caricamento in corso...</span>
   </div>
-  <script src="app.js?v=20260521-06"></script>
+  <datalist id="citySuggestions"></datalist>
+  <datalist id="provinceSuggestions"></datalist>
+  <script src="app.js?v=20260521-07"></script>
 </body>
 </html>

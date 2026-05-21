@@ -1178,6 +1178,42 @@ canvas {
   gap: 14px;
 }
 
+.capture-combo-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #ffc39e;
+  border-radius: 8px;
+  background: #fff9f4;
+}
+
+.capture-grid > .capture-combo-card {
+  grid-column: span 3;
+}
+
+.capture-combo-card > div:first-child {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+}
+
+.capture-combo-card span {
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.capture-combo-card strong {
+  color: var(--ink);
+}
+
+.capture-combo-card em {
+  color: var(--soft-ink);
+  font-style: normal;
+}
+
 .precious-captures,
 .payment-captures {
   margin-top: 18px;
@@ -2774,6 +2810,7 @@ button.quality-review-badge {
   .metal-weight-field,
   .signature-grid,
   .capture-grid,
+  .capture-combo-card,
   .summary-grid,
   .side-panel,
   .settings-grid,
@@ -2806,6 +2843,10 @@ button.quality-review-badge {
     justify-self: stretch;
     width: 100%;
     text-align: center;
+  }
+
+  .capture-grid > .capture-combo-card {
+    grid-column: auto;
   }
 
   .panel-heading-actions > *,

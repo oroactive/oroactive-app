@@ -19,7 +19,10 @@ const state = {
   cashLimitWarningShown: false,
   bullionVaultPrices: {},
   lastActCaptureAttachments: [],
-  loadedSignatureImages: []
+  loadedSignatureImages: [],
+  saving: false,
+  clientLookupTimer: null,
+  fiscalCodeEditedManually: false
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -53,6 +56,47 @@ const titleOptionsByMetal = {
   Platino: ["999", "950", "900", "850"]
 };
 const metalOrder = ["Oro", "Argento", "Platino"];
+const COMUNI_ITALIANI = [
+  { comune: "Busto Arsizio", provincia: "VA", codice: "B300" },
+  { comune: "Cassano Magnago", provincia: "VA", codice: "C004" },
+  { comune: "Legnano", provincia: "MI", codice: "E514" },
+  { comune: "Milano", provincia: "MI", codice: "F205" },
+  { comune: "Roma", provincia: "RM", codice: "H501" },
+  { comune: "Torino", provincia: "TO", codice: "L219" },
+  { comune: "Napoli", provincia: "NA", codice: "F839" },
+  { comune: "Palermo", provincia: "PA", codice: "G273" },
+  { comune: "Genova", provincia: "GE", codice: "D969" },
+  { comune: "Bologna", provincia: "BO", codice: "A944" },
+  { comune: "Firenze", provincia: "FI", codice: "D612" },
+  { comune: "Venezia", provincia: "VE", codice: "L736" },
+  { comune: "Verona", provincia: "VR", codice: "L781" },
+  { comune: "Varese", provincia: "VA", codice: "L682" },
+  { comune: "Gallarate", provincia: "VA", codice: "D869" },
+  { comune: "Saronno", provincia: "VA", codice: "I441" },
+  { comune: "Castellanza", provincia: "VA", codice: "C139" },
+  { comune: "Cinisello Balsamo", provincia: "MI", codice: "C707" },
+  { comune: "Sesto San Giovanni", provincia: "MI", codice: "I690" },
+  { comune: "Monza", provincia: "MB", codice: "F704" },
+  { comune: "Como", provincia: "CO", codice: "C933" },
+  { comune: "Bergamo", provincia: "BG", codice: "A794" },
+  { comune: "Brescia", provincia: "BS", codice: "B157" },
+  { comune: "Pavia", provincia: "PV", codice: "G388" },
+  { comune: "Novara", provincia: "NO", codice: "F952" },
+  { comune: "Padova", provincia: "PD", codice: "G224" },
+  { comune: "Vicenza", provincia: "VI", codice: "L840" },
+  { comune: "Treviso", provincia: "TV", codice: "L407" },
+  { comune: "Parma", provincia: "PR", codice: "G337" },
+  { comune: "Modena", provincia: "MO", codice: "F257" },
+  { comune: "Reggio Emilia", provincia: "RE", codice: "H223" },
+  { comune: "Rimini", provincia: "RN", codice: "H294" },
+  { comune: "Ancona", provincia: "AN", codice: "A271" },
+  { comune: "Perugia", provincia: "PG", codice: "G478" },
+  { comune: "Cagliari", provincia: "CA", codice: "B354" },
+  { comune: "Bari", provincia: "BA", codice: "A662" },
+  { comune: "Catania", provincia: "CT", codice: "C351" }
+];
+const PROVINCE_CODES = [...new Set(COMUNI_ITALIANI.map((item) => item.provincia))].sort();
+const FISCAL_MONTH_CODES = ["A", "B", "C", "D", "E", "H", "L", "M", "P", "R", "S", "T"];
 const documentLabels = {
   "Carta identita": "carta identita",
   Patente: "patente",
@@ -310,9 +354,14 @@ async function syncActsFromServer() {
 }
 
 async function saveActRecord(act, method = "POST") {
+  if (state.saving) throw new Error("Salvataggio già in corso.");
+  state.saving = true;
   const identifier = act.id || act.practiceNumber;
   const path = method === "PUT" ? `/atti/${encodeURIComponent(identifier)}` : "/atti";
-  showLoading("Salvataggio pratica...");
+  document.querySelectorAll("#archivePractice, #nextStep").forEach((button) => {
+    button.disabled = true;
+  });
+  showLoading("Salvataggio in corso...");
   let saved;
   try {
     saved = await apiRequest(path, {
@@ -321,12 +370,16 @@ async function saveActRecord(act, method = "POST") {
     });
   } finally {
     hideLoading();
+    state.saving = false;
+    document.querySelectorAll("#archivePractice, #nextStep").forEach((button) => {
+      button.disabled = false;
+    });
   }
   state.actsCache.clear();
   const index = demoActs.findIndex(
     (item) => (saved.id && item.id === saved.id) || item.practiceNumber === saved.practiceNumber
   );
-  if (index >= 0) demoActs[index] = saved;
+  if (index >= 0) demoActs[index] = { ...demoActs[index], ...saved };
   else demoActs.unshift(saved);
   return saved;
 }
@@ -408,6 +461,176 @@ function roleLabel(role) {
 function displayUsername(user = {}) {
   if (user.username) return user.username;
   return user.nome || "";
+}
+
+function normalizeText(value = "") {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z\s]/gi, "")
+    .toUpperCase()
+    .trim();
+}
+
+function findComune(value = "") {
+  const normalized = normalizeText(value);
+  return COMUNI_ITALIANI.find((item) => normalizeText(item.comune) === normalized) || null;
+}
+
+function populateAutocompleteLists() {
+  const cityList = document.getElementById("citySuggestions");
+  if (cityList) {
+    cityList.innerHTML = COMUNI_ITALIANI
+      .map((item) => `<option value="${escapeHtml(item.comune)}">${escapeHtml(item.provincia)}</option>`)
+      .join("");
+  }
+  const provinceList = document.getElementById("provinceSuggestions");
+  if (provinceList) {
+    provinceList.innerHTML = PROVINCE_CODES.map((code) => `<option value="${escapeHtml(code)}"></option>`).join("");
+  }
+}
+
+function fiscalNamePart(value = "", isName = false) {
+  const text = normalizeText(value).replace(/\s+/g, "");
+  const consonants = text.replace(/[AEIOU]/g, "");
+  const vowels = text.replace(/[^AEIOU]/g, "");
+  const source = isName && consonants.length >= 4
+    ? `${consonants[0]}${consonants[2]}${consonants[3]}`
+    : `${consonants}${vowels}XXX`;
+  return source.slice(0, 3);
+}
+
+function fiscalControlChar(code15) {
+  const odd = {
+    0: 1, 1: 0, 2: 5, 3: 7, 4: 9, 5: 13, 6: 15, 7: 17, 8: 19, 9: 21,
+    A: 1, B: 0, C: 5, D: 7, E: 9, F: 13, G: 15, H: 17, I: 19, J: 21,
+    K: 2, L: 4, M: 18, N: 20, O: 11, P: 3, Q: 6, R: 8, S: 12, T: 14,
+    U: 16, V: 10, W: 22, X: 25, Y: 24, Z: 23
+  };
+  const even = {
+    0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
+    A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, G: 6, H: 7, I: 8, J: 9,
+    K: 10, L: 11, M: 12, N: 13, O: 14, P: 15, Q: 16, R: 17, S: 18, T: 19,
+    U: 20, V: 21, W: 22, X: 23, Y: 24, Z: 25
+  };
+  const sum = [...code15].reduce((total, char, index) => total + (index % 2 === 0 ? odd[char] : even[char]), 0);
+  return String.fromCharCode(65 + (sum % 26));
+}
+
+function generatedFiscalCode() {
+  const name = fieldValue('[name="nome"]');
+  const surname = fieldValue('[name="cognome"]');
+  const sex = fieldValue('[name="sesso"]');
+  const birthDate = fieldValue('[name="nascita"]');
+  const comune = findComune(fieldValue('[name="luogo"]'));
+  if (!name || !surname || !sex || !birthDate || !comune) return "";
+  const date = new Date(`${birthDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = String(date.getFullYear()).slice(-2);
+  const month = FISCAL_MONTH_CODES[date.getMonth()];
+  const day = String(date.getDate() + (sex === "F" ? 40 : 0)).padStart(2, "0");
+  const code15 = `${fiscalNamePart(surname)}${fiscalNamePart(name, true)}${year}${month}${day}${comune.codice}`;
+  return `${code15}${fiscalControlChar(code15)}`;
+}
+
+function maybeAutofillFiscalCode() {
+  if (state.fiscalCodeEditedManually) return;
+  const generated = generatedFiscalCode();
+  const fiscalInput = document.querySelector('[name="cf"]');
+  if (!generated || !fiscalInput) return;
+  fiscalInput.value = generated;
+  updateCustomerSummary();
+  showToast("Verifica sempre il codice fiscale generato.");
+}
+
+function decodeFiscalCodeData(value = "") {
+  const code = String(value || "").trim().toUpperCase();
+  if (!/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/.test(code)) return null;
+  const year = Number(code.slice(6, 8));
+  const currentYear = new Date().getFullYear() % 100;
+  const fullYear = year > currentYear ? 1900 + year : 2000 + year;
+  const monthIndex = FISCAL_MONTH_CODES.indexOf(code[8]);
+  const rawDay = Number(code.slice(9, 11));
+  const sex = rawDay > 40 ? "F" : "M";
+  const day = rawDay > 40 ? rawDay - 40 : rawDay;
+  const placeCode = code.slice(11, 15);
+  const comune = COMUNI_ITALIANI.find((item) => item.codice === placeCode);
+  return {
+    sex,
+    birthDate: monthIndex >= 0 ? `${fullYear}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}` : "",
+    birthPlace: comune?.comune || "",
+    birthProvince: comune?.provincia || ""
+  };
+}
+
+function applyFiscalCodeDecodedData(data) {
+  if (!data) return false;
+  setFieldIfDetected('[name="sesso"]', data.sex, "alto");
+  setFieldIfDetected('[name="nascita"]', data.birthDate, "alto");
+  setFieldIfDetected('[name="luogo"]', data.birthPlace, data.birthPlace ? "alto" : "");
+  setFieldIfDetected('[name="provinciaNascita"]', data.birthProvince, data.birthProvince ? "alto" : "");
+  updateChecklistState();
+  return true;
+}
+
+async function lookupExistingClient(fiscalCode) {
+  const code = String(fiscalCode || "").trim().toUpperCase();
+  if (!/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/.test(code)) return;
+  try {
+    const client = await apiRequest(`/clienti/${encodeURIComponent(code)}`, { timeoutMs: 9000 });
+    applyExistingClient(client);
+    showToast("Cliente già presente. Dati caricati automaticamente.");
+  } catch {
+    applyFiscalCodeDecodedData(decodeFiscalCodeData(code));
+  }
+}
+
+function applyExistingClient(client = {}) {
+  const fields = [
+    ['[name="nome"]', client.name],
+    ['[name="cognome"]', client.surname],
+    ['[name="nascita"]', client.birthDate],
+    ['[name="luogo"]', client.birthPlace],
+    ['[name="provinciaNascita"]', client.birthProvince],
+    ['[name="sesso"]', client.sex],
+    ['[name="indirizzo"]', client.address],
+    ['[name="provinciaResidenza"]', client.residenceProvince],
+    ['[name="telefono"]', client.phone],
+    ['[name="email"]', client.email],
+    ['[name="tipoDocumento"]', client.documentType],
+    ['[name="numeroDocumento"]', client.documentNumber],
+    ['[name="dataRilascioDocumento"]', client.documentIssueDate],
+    ['[name="enteRilascioDocumento"]', client.documentIssuer],
+    ['[name="scadenzaDocumento"]', client.documentExpiry],
+    ["#paymentMethod", client.paymentMethod],
+    ["#paymentIban", client.iban]
+  ];
+  fields.forEach(([selector, value]) => {
+    if (value) setFieldIfDetected(selector, value, "alto");
+  });
+  if (Array.isArray(client.fiscalDocumentAttachments)) {
+    client.fiscalDocumentAttachments.forEach((attachment) => {
+      if (!attachment?.key || !attachment.dataUrl) return;
+      state.uploadedCaptures.add(attachment.key);
+      state.captureFiles.set(attachment.key, {
+        name: attachment.name || "Documento cliente",
+        type: attachment.type || "image/jpeg",
+        dataUrl: attachment.dataUrl,
+        url: attachment.dataUrl
+      });
+    });
+    state.attachments = state.uploadedCaptures.size;
+  }
+  updateDocumentCaptureCards();
+  renderPaymentCaptureCard();
+  renderPreciousCaptureCards();
+  updateAttachmentState();
+  updateCustomerSummary();
+  updateChecklistState();
+}
+
+function isValidIban(value = "") {
+  return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/i.test(String(value || "").replace(/\s+/g, ""));
 }
 
 function isAdmin() {
@@ -1113,6 +1336,7 @@ function canViewActQuality(act) {
 }
 
 function canModifyAct(act) {
+  if (normalizeWorkflowStatus(act.status) === "Completato" && !canReviewActs()) return false;
   return canReviewActs() || isCurrentUserActOwner(act);
 }
 
@@ -1374,7 +1598,7 @@ function currentActSnapshot(status = "Archiviata") {
   }));
   const materials = weightRows()
     .filter((row) => Number(row.value || 0) > 0)
-    .map((row) => ({ metal: row.metal, weight: row.value }));
+    .map((row) => ({ metal: row.metal, title: row.title, weight: row.value }));
   const totalWeight = materials.reduce((sum, row) => sum + Number(row.weight || 0), 0);
   return {
     name: fieldValue('[name="nome"]'),
@@ -1384,6 +1608,7 @@ function currentActSnapshot(status = "Archiviata") {
     birthProvince: fieldValue('[name="provinciaNascita"]'),
     fiscalCode: fieldValue('[name="cf"]'),
     phone: fieldValue('[name="telefono"]'),
+    email: fieldValue('[name="email"]'),
     citizenship: fieldValue('[name="cittadinanza"]'),
     sex: fieldValue('[name="sesso"]'),
     address: fieldValue('[name="indirizzo"]'),
@@ -1405,6 +1630,7 @@ function currentActSnapshot(status = "Archiviata") {
     printWeightCustomer: shouldPrintWeightOnCustomerCopy(),
     amount: fieldValue("#saleTotal"),
     paymentMethod: fieldValue("#paymentMethod"),
+    iban: fieldValue("#paymentIban"),
     operatorNotes: document.querySelector(".textarea-label textarea")?.value || "",
     operatorId: state.currentUser?.id || null,
     operatorUsername: displayUsername(state.currentUser),
@@ -2873,7 +3099,9 @@ async function loadActForEdit(practiceNumber) {
     return;
   }
   if (!canModifyAct(act)) {
-    showToast("Puoi modificare solo gli atti di vendita effettuati da te.");
+    showToast(normalizeWorkflowStatus(act.status) === "Completato"
+      ? "Questo atto è completato. Solo responsabili e founder possono modificarlo."
+      : "Puoi modificare solo gli atti di vendita effettuati da te.");
     return;
   }
 
@@ -2891,6 +3119,7 @@ async function loadActForEdit(practiceNumber) {
   setFieldValue('[name="provinciaNascita"]', act.birthProvince);
   setFieldValue('[name="cf"]', act.fiscalCode);
   setFieldValue('[name="telefono"]', act.phone);
+  setFieldValue('[name="email"]', act.email);
   setFieldValue('[name="cittadinanza"]', act.citizenship);
   setFieldValue('[name="sesso"]', act.sex);
   setFieldValue('[name="indirizzo"]', act.address);
@@ -2902,6 +3131,7 @@ async function loadActForEdit(practiceNumber) {
   setFieldValue('[name="scadenzaDocumento"]', toDateInputValue(act.documentExpiry));
   setFieldValue('[name="professione"]', act.profession);
   setFieldValue("#paymentMethod", act.paymentMethod);
+  setFieldValue("#paymentIban", act.iban);
   setFieldValue("#saleTotal", act.amount);
   setFieldValue(".textarea-label textarea", act.operatorNotes);
   setQualityReview(act.qualityReview || null);
@@ -2936,7 +3166,9 @@ async function loadActForEdit(practiceNumber) {
 
   if (Array.isArray(act.materials)) {
     act.materials.forEach((material) => {
-      const input = document.querySelector(`#totalWeightFields input[data-metal-weight="${material.metal}"]`);
+      const titleSelector = material.title ? `[data-metal-title="${cssEscape(material.title)}"]` : "";
+      const input = document.querySelector(`#totalWeightFields input[data-metal-weight="${cssEscape(material.metal)}"]${titleSelector}`)
+        || document.querySelector(`#totalWeightFields input[data-metal-weight="${cssEscape(material.metal)}"]`);
       if (input) input.value = material.weight || "";
     });
   }
@@ -2994,6 +3226,7 @@ async function resetCurrentPractice(options = {}) {
   state.step = 0;
   state.editingPracticeNumber = null;
   state.loadedSignatureImages = [];
+  state.fiscalCodeEditedManually = false;
   setQualityReview(null);
 
   await setPracticeMeta();
@@ -3006,6 +3239,7 @@ async function resetCurrentPractice(options = {}) {
   updateSaleTotal();
   updateDocumentCaptureCards();
   renderPaymentCaptureCard();
+  updateIbanVisibility();
   updateAttachmentState();
   updateChecklistState();
 }
@@ -3102,7 +3336,7 @@ function materialLotsForAct(act) {
     return {
       act,
       metal: material.metal,
-      title: titles.length ? titles.join(", ") : "Titolo non indicato",
+      title: material.title || (titles.length === 1 ? titles[0] : titles.length ? `Titoli misti (${titles.join(", ")})` : "Titolo non indicato"),
       weight: Number(material.weight || 0)
     };
   });
@@ -3127,6 +3361,27 @@ function fusionSummaryText(acts) {
   return lots
     .map((lot) => `${lot.metal} ${lot.title}: ${lot.weight.toFixed(2)} gr`)
     .join(" - ");
+}
+
+function stockByTitleMarkup(acts) {
+  const lots = Object.values(fusionLotTotals(acts));
+  if (!lots.length) return '<div class="empty-state">Nessun materiale in giacenza.</div>';
+  return `
+    <div class="archive-table giacenza-title-table">
+      <div class="table-row head"><span>Metallo</span><span>Titolo</span><span>Grammi totali</span><span>Atti collegati</span></div>
+      ${lots.map((lot) => {
+        const linkedActs = acts.filter((act) => materialLotsForAct(act).some((actLot) => actLot.metal === lot.metal && actLot.title === lot.title));
+        return `
+          <div class="table-row">
+            <strong>${escapeHtml(lot.metal)}</strong>
+            <span>${escapeHtml(lot.title)}</span>
+            <span>${escapeHtml(lot.weight.toFixed(2))} gr</span>
+            <span>${escapeHtml(linkedActs.length)}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function fusionDdtCode(store, date, number) {
@@ -3263,13 +3518,13 @@ function fusionActRows(acts, options = {}) {
   return `
     <div class="archive-table fusion-table">
       <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Data acquisto</span><span>Fondibile dal</span><span>Materiale</span><span>Azioni</span></div>
-      ${acts.flatMap((act) => actMaterials(act).map((material) => `
+      ${acts.flatMap((act) => materialLotsForAct(act).map((material) => `
         <div class="table-row">
           <span>${escapeHtml(act.practiceNumber)}</span>
           <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
           <span>${escapeHtml(act.date)}</span>
           <em class="${(options.ready || act.fusionDate <= today) ? "done" : ""}">${escapeHtml(act.fusionDate || addDays(act.date, 10))}</em>
-          <span>${escapeHtml(material.metal)} ${escapeHtml(material.weight)} gr</span>
+          <span>${escapeHtml(material.metal)} ${escapeHtml(material.title)} - ${escapeHtml(material.weight.toFixed(2))} gr</span>
           <div class="row-actions">
             <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
             ${canModifyAct(act) ? `<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>` : ""}
@@ -3342,6 +3597,11 @@ function renderFusionGroups() {
             </div>
           </div>
           <div class="fusion-materials single-fusion-table">
+            <div class="fusion-material-heading">
+              <h4>Giacenza metalli per titolo/caratura</h4>
+              <span>Raggruppata per materiale e negozio</span>
+            </div>
+            ${stockByTitleMarkup(stockActs)}
             ${fusionActRows(orderedStoreActs)}
           </div>
           <div class="fusion-history">
@@ -3463,6 +3723,12 @@ function paymentRequiresProof() {
   return ["Bonifico", "Assegno"].includes(selectedPaymentMethod());
 }
 
+function updateIbanVisibility() {
+  const field = document.getElementById("ibanField");
+  if (!field) return;
+  field.hidden = selectedPaymentMethod() !== "Bonifico";
+}
+
 function paymentCaptureKey() {
   return `pagamento-${selectedPaymentMethod().toLowerCase().replace(/\s+/g, "-")}`;
 }
@@ -3471,6 +3737,7 @@ function renderPaymentCaptureCard() {
   const section = document.getElementById("paymentCaptureSection");
   const grid = document.getElementById("paymentCaptureGrid");
   if (!section || !grid) return;
+  updateIbanVisibility();
 
   section.hidden = !paymentRequiresProof();
   if (!paymentRequiresProof()) {
@@ -3509,6 +3776,8 @@ function documentCaptureKey(side) {
 
 function updateDocumentCaptureCards() {
   const label = currentDocumentLabel();
+  const title = document.getElementById("identityDocumentGroupTitle");
+  if (title) title.textContent = `${fieldValue("#documentType") || "Documento identità"} / patente / passaporto`;
 
   document.querySelectorAll("[data-document-capture]").forEach((card) => {
     const side = card.dataset.documentCapture;
@@ -3675,6 +3944,11 @@ function escapeHtml(value) {
   })[char]);
 }
 
+function cssEscape(value) {
+  if (window.CSS?.escape) return CSS.escape(String(value ?? ""));
+  return String(value ?? "").replace(/["\\]/g, "\\$&");
+}
+
 function fieldValue(selector) {
   return document.querySelector(selector)?.value || "";
 }
@@ -3754,6 +4028,9 @@ function missingSaleFields() {
   if (!hasValue("#paymentMethod")) missing.push("Metodo pagamento");
   if (saleTotalAmount() <= 0) missing.push("Totale corrisposto");
   if (cashPaymentLimitViolation()) missing.push("Metodo pagamento a norma di legge");
+  if (selectedPaymentMethod() === "Bonifico" && !isValidIban(fieldValue("#paymentIban"))) {
+    missing.push("IBAN valido per bonifico");
+  }
   materialAmountRows().forEach((row) => {
     if (Number(row.amount || 0) <= 0) missing.push(`Importo ${row.metal}`);
   });
@@ -3811,6 +4088,20 @@ function shouldPrintWeightOnCustomerCopy() {
 function activeMetals() {
   const metals = new Set([...document.querySelectorAll(".ceded-item-row")].map((row) => row.querySelector("select")?.value).filter(Boolean));
   return metalOrder.filter((metal) => metals.has(metal));
+}
+
+function activeMetalTitleLots() {
+  const lots = new Map();
+  collectCededItems().forEach((item) => {
+    const metal = item.metal || "Oro";
+    const title = item.title || "Titolo non indicato";
+    const key = `${metal}|${title}`;
+    lots.set(key, { key, metal, title });
+  });
+  return [...lots.values()].sort((first, second) => (
+    metalOrder.indexOf(first.metal) - metalOrder.indexOf(second.metal)
+    || String(first.title).localeCompare(String(second.title))
+  ));
 }
 
 function pureMaterialLabel(metal) {
@@ -4003,22 +4294,31 @@ function renderPreciousCaptureCards() {
   const grid = document.getElementById("preciousCaptureGrid");
   if (!grid) return;
 
-  grid.innerHTML = activeMetals().map((metal) => [
-    { side: "fronte", label: "Foto frontale" },
-    { side: "retro", label: "Foto retro" }
-  ].map((photo) => {
-    const key = `preziosi-${metal.toLowerCase()}-${photo.side}`;
-    const loaded = state.uploadedCaptures.has(key);
-    return `
-      <label class="capture-card ${captureClassForMetal(metal)} ${loaded ? "loaded" : ""}" data-capture-key="${key}">
-        <input type="file" accept="image/*" capture="environment">
-        <span>Preziosi ${metal}</span>
-        <strong>${photo.label} ${metal.toLowerCase()}</strong>
-        <em>${loaded ? "Foto acquisita" : "Tocca per fotografare"}</em>
-        ${captureActionsMarkup()}
-      </label>
-    `;
-  }).join("")).join("");
+  grid.innerHTML = activeMetals().map((metal) => `
+    <div class="capture-combo-card ${captureClassForMetal(metal)}">
+      <div>
+        <span>Preziosi ${escapeHtml(metal)}</span>
+        <strong>Foto preziosi</strong>
+        <em>Carica o scatta due foto dei preziosi in ${escapeHtml(metal.toLowerCase())}.</em>
+      </div>
+      ${[
+        { side: "fronte", label: "Foto 1" },
+        { side: "retro", label: "Foto 2" }
+      ].map((photo) => {
+        const key = `preziosi-${metal.toLowerCase()}-${photo.side}`;
+        const loaded = state.uploadedCaptures.has(key);
+        return `
+          <label class="capture-card ${captureClassForMetal(metal)} ${loaded ? "loaded" : ""}" data-capture-key="${key}">
+            <input type="file" accept="image/*" capture="environment">
+            <span>${escapeHtml(photo.label)}</span>
+            <strong>${escapeHtml(photo.label)} ${escapeHtml(metal.toLowerCase())}</strong>
+            <em>${loaded ? "Foto acquisita" : "Tocca per fotografare"}</em>
+            ${captureActionsMarkup()}
+          </label>
+        `;
+      }).join("")}
+    </div>
+  `).join("");
   ensureCaptureActions();
 }
 
@@ -4029,13 +4329,14 @@ function renderWeightFields() {
   const previousValues = {};
   container.querySelectorAll("input[data-metal-weight]").forEach((input) => {
     previousValues[input.dataset.metalWeight] = input.value;
+    if (input.dataset.metalKey) previousValues[input.dataset.metalKey] = input.value;
   });
 
-  container.innerHTML = activeMetals().map((metal) => `
+  container.innerHTML = activeMetalTitleLots().map((lot) => `
     <label class="metal-weight-field">
-      <span>Peso totale oggetti preziosi in ${metal.toLowerCase()}</span>
+      <span>Peso totale oggetti preziosi in ${lot.metal.toLowerCase()} ${lot.title}</span>
       <div class="metal-weight-input-wrap">
-        <input data-metal-weight="${metal}" type="number" value="${escapeHtml(previousValues[metal] || "0")}" min="0" step="0.01">
+        <input data-metal-weight="${lot.metal}" data-metal-title="${escapeHtml(lot.title)}" data-metal-key="${escapeHtml(lot.key)}" type="number" value="${escapeHtml(previousValues[lot.key] || previousValues[lot.metal] || "0")}" min="0" step="0.01">
         <em>gr</em>
       </div>
     </label>
@@ -4045,6 +4346,8 @@ function renderWeightFields() {
 function weightRows() {
   return [...document.querySelectorAll("#totalWeightFields input[data-metal-weight]")].map((input) => ({
     metal: input.dataset.metalWeight,
+    title: input.dataset.metalTitle || "",
+    key: input.dataset.metalKey || input.dataset.metalWeight,
     value: input.value || "0"
   }));
 }
@@ -4424,6 +4727,15 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
   event.target.classList?.remove("ocr-low-confidence");
   if (event.target.title === "Controlla questo dato") event.target.title = "";
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
+  if (event.target.matches('[name="cf"]')) {
+    const generated = generatedFiscalCode();
+    state.fiscalCodeEditedManually = Boolean(event.target.value && event.target.value.toUpperCase() !== generated);
+    window.clearTimeout(state.clientLookupTimer);
+    state.clientLookupTimer = window.setTimeout(() => lookupExistingClient(event.target.value), 500);
+  }
+  if (event.target.matches('[name="nome"], [name="cognome"], [name="sesso"], [name="nascita"], [name="luogo"], [name="provinciaNascita"]')) {
+    maybeAutofillFiscalCode();
+  }
   updateChecklistState();
 });
 
@@ -4431,6 +4743,14 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
   event.target.classList?.remove("ocr-low-confidence");
   if (event.target.title === "Controlla questo dato") event.target.title = "";
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
+  if (event.target.matches('[name="luogo"]')) {
+    const comune = findComune(event.target.value);
+    if (comune) setFieldIfDetected('[name="provinciaNascita"]', comune.provincia, "alto");
+    maybeAutofillFiscalCode();
+  }
+  if (event.target.matches('[name="cf"]')) {
+    applyFiscalCodeDecodedData(decodeFiscalCodeData(event.target.value));
+  }
   updateChecklistState();
 });
 
@@ -4785,6 +5105,7 @@ document.getElementById("closePreview").addEventListener("click", () => {
 
 async function initializeApp() {
   removeLegacySearchMenu();
+  populateAutocompleteLists();
   appShell.hidden = true;
   await restoreSession();
   window.addEventListener("focus", () => {
