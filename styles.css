@@ -258,7 +258,8 @@ textarea {
 }
 
 .main-menu-actions button.user-menu-button,
-.brand-dropdown button.user-menu-button {
+.brand-dropdown button.user-menu-button,
+.main-menu-actions button.tutorial-menu-button {
   border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 8px;
   padding: 8px 16px;
@@ -431,6 +432,21 @@ textarea {
   background: #111;
   color: #fff;
   font-weight: 900;
+}
+
+.tutorial-sidebar-button {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: transparent;
+  color: #fff7ef;
+  font-weight: 900;
+}
+
+.tutorial-sidebar-button:hover {
+  background: #22150f;
 }
 
 .workspace {
@@ -2260,6 +2276,83 @@ button.quality-review-badge {
   opacity: 1;
 }
 
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+}
+
+.tutorial-overlay[hidden] {
+  display: none;
+}
+
+.tutorial-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 5, 0.18);
+  pointer-events: none;
+}
+
+.tutorial-card {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: min(430px, calc(100vw - 32px));
+  border: 1px solid rgba(255, 115, 28, 0.4);
+  border-radius: 8px;
+  padding: 18px;
+  background: #fff8f1;
+  box-shadow: 0 22px 64px rgba(17, 12, 8, 0.28);
+  pointer-events: auto;
+}
+
+.tutorial-count {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #ffe6d5;
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.tutorial-card h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.tutorial-card p {
+  margin: 0;
+  color: var(--soft-ink);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.tutorial-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tutorial-actions button {
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.tutorial-highlight {
+  position: relative;
+  z-index: 91;
+  outline: 4px solid rgba(255, 115, 28, 0.82);
+  outline-offset: 5px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9px rgba(255, 115, 28, 0.16);
+}
+
 .loading-indicator {
   position: fixed;
   right: 22px;
@@ -3033,6 +3126,18 @@ button.quality-review-badge {
   .main-menu-actions button {
     font-size: 20px;
     min-height: 56px;
+  }
+
+  .tutorial-card {
+    left: 12px;
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: auto;
+    padding: 14px;
+  }
+
+  .tutorial-actions {
+    grid-template-columns: 1fr;
   }
 
   .user-form-actions {

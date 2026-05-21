@@ -23,7 +23,13 @@ const state = {
   saving: false,
   clientLookupTimer: null,
   fiscalCodeEditedManually: false,
-  captureGroup: null
+  captureGroup: null,
+  tutorial: {
+    active: false,
+    index: 0,
+    steps: [],
+    pendingFirstRun: false
+  }
 };
 
 const screens = document.querySelectorAll(".screen");
@@ -51,6 +57,13 @@ const loggedUserName = document.getElementById("loggedUserName");
 const sessionUsername = document.getElementById("sessionUsername");
 const loadingIndicator = document.getElementById("loadingIndicator");
 const appShell = document.querySelector(".app-shell");
+const tutorialOverlay = document.getElementById("tutorialOverlay");
+const tutorialTitle = document.getElementById("tutorialTitle");
+const tutorialText = document.getElementById("tutorialText");
+const tutorialCount = document.getElementById("tutorialCount");
+const tutorialNext = document.getElementById("tutorialNext");
+const tutorialBack = document.getElementById("tutorialBack");
+const tutorialSkip = document.getElementById("tutorialSkip");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -490,6 +503,192 @@ function displayUsername(user = {}) {
   return user.nome || "";
 }
 
+function tutorialStorageKey(user = state.currentUser) {
+  const userKey = user?.id || displayUsername(user) || "utente";
+  return `oroactive-tutorial-completato-${normalizeRole(user?.ruolo)}-${userKey}`;
+}
+
+function tutorialRoleIntro() {
+  const role = normalizeRole(state.currentUser?.ruolo);
+  if (role === "founder") {
+    return "Come Founder puoi vedere tutti i negozi, controllare gli utenti, verificare gli atti e supervisionare l'intero flusso. Questo tutorial ti mostra la compilazione perfetta di un atto, cosi puoi formare e correggere il team.";
+  }
+  if (role === "responsabile") {
+    return "Come Responsabile puoi seguire gli atti dei negozi, controllare la qualita delle pratiche e supportare gli operatori. Il tutorial ti accompagna nella compilazione completa e nei controlli finali.";
+  }
+  if (role === "aiuto_commesso") {
+    return "Come Aiuto Commesso/a il tuo obiettivo e compilare ogni pratica con ordine e precisione. Segui questi passaggi: il tutorial resta aperto mentre compili realmente l'atto.";
+  }
+  return "Come Commesso/a puoi creare e completare gli atti di vendita dei negozi abilitati. Il tutorial ti guida campo dopo campo fino all'archiviazione corretta.";
+}
+
+function openPracticeForTutorial(step = 0) {
+  splashScreen.classList.add("hidden");
+  mainMenuScreen.hidden = true;
+  setScreen("practice");
+  state.step = step;
+  renderStep();
+}
+
+function buildTutorialSteps() {
+  return [
+    {
+      title: "Benvenuto nel tutorial OroActive",
+      text: `${tutorialRoleIntro()} Premi Avanti per iniziare: entreremo nella scheda Atto di Vendita e compileremo ogni sezione nell'ordine corretto.`,
+      selector: ".main-menu-actions"
+    },
+    {
+      title: "Inizia dall'Atto di Vendita",
+      text: "Questa e la schermata dove nasce la pratica. Controlla negozio, numero atto, data e ora: il gestionale li prepara in automatico, ma vanno sempre verificati prima di procedere.",
+      selector: ".practice-meta",
+      action: () => openPracticeForTutorial(0)
+    },
+    {
+      title: "Dati anagrafici cliente",
+      text: "Inserisci nome e cognome. Il sesso viene suggerito dal nome quando riconosciuto, ma resta modificabile. Se il cliente e gia presente, il codice fiscale recupera automaticamente i dati salvati.",
+      selector: '[name="nome"]',
+      action: () => openPracticeForTutorial(0)
+    },
+    {
+      title: "Codice fiscale e nascita",
+      text: "Compila codice fiscale, data di nascita, luogo e provincia. Se scrivi un codice fiscale valido, il sistema ricava data, sesso, comune e provincia quando possibile.",
+      selector: '[name="cf"]',
+      action: () => openPracticeForTutorial(0)
+    },
+    {
+      title: "Residenza",
+      text: "Compila l'indirizzo nel formato consigliato: Via, numero civico e citta. Quando la citta viene riconosciuta, la provincia di residenza si compila automaticamente.",
+      selector: '[name="indirizzo"]',
+      action: () => openPracticeForTutorial(0)
+    },
+    {
+      title: "Documento del cliente",
+      text: "Seleziona tipo documento, numero, data rilascio, scadenza e professione. Se il documento e scaduto, OroActive evidenzia l'avviso per richiedere un documento valido.",
+      selector: '[name="tipoDocumento"]',
+      action: () => openPracticeForTutorial(0)
+    },
+    {
+      title: "Oggetti preziosi ceduti",
+      text: "Descrivi ogni oggetto, scegli metallo e titolo. Usa Aggiungi riga per inserire piu oggetti: da qui nasceranno pesi, quotazioni, foto preziosi e giacenza.",
+      selector: "#cededItemsTable",
+      action: () => openPracticeForTutorial(0)
+    },
+    {
+      title: "Quotazioni e pesi",
+      text: "Controlla la quotazione BullionVault per ogni metallo e inserisci il peso totale per titolo o materiale. Spunta la casella solo se vuoi stampare il peso sulla copia cliente.",
+      selector: "#totalWeightFields",
+      action: () => openPracticeForTutorial(0)
+    },
+    {
+      title: "Pagamento e ripartizione",
+      text: "Scegli il metodo di pagamento, inserisci il totale corrisposto e ripartisci l'importo per metallo se ci sono piu tipologie. Con Bonifico appare anche il campo IBAN.",
+      selector: "#paymentMethod",
+      action: () => openPracticeForTutorial(1)
+    },
+    {
+      title: "Note operatore",
+      text: "Usa le note solo per dettagli utili alla pratica. Evita informazioni superflue: devono aiutare chi rilegge l'atto in elenco, controllo qualita o stampa aziendale.",
+      selector: ".textarea-label textarea",
+      action: () => openPracticeForTutorial(1)
+    },
+    {
+      title: "Firme cliente",
+      text: "Fai firmare il cliente in tutte e tre le aree. Il gestionale non ti fa completare correttamente la pratica se le firme richieste non sono state acquisite.",
+      selector: ".signature-grid",
+      action: () => openPracticeForTutorial(2)
+    },
+    {
+      title: "Documenti e fotografie",
+      text: "Carica o fotografa documento, tessera sanitaria, preziosi e contabile quando richiesta. I riquadri diventano verdi quando la foto e presente e resta visionabile.",
+      selector: ".capture-grid",
+      action: () => openPracticeForTutorial(3)
+    },
+    {
+      title: "Riepilogo e controlli obbligatori",
+      text: "Nel riepilogo controlla cliente, codice fiscale, oggetti, totale, firme e allegati. La checklist laterale ti mostra cosa manca prima di completare la pratica.",
+      selector: ".summary-grid",
+      action: () => openPracticeForTutorial(4)
+    },
+    {
+      title: "Stampa, archiviazione e completamento",
+      text: "Copia cliente e copia aziendale servono per anteprima e stampa. Chiudi e archivia salva una pratica incompleta; Completa pratica salva definitivamente solo se i controlli sono positivi.",
+      selector: ".print-box",
+      action: () => openPracticeForTutorial(4)
+    },
+    {
+      title: "Tutorial completato",
+      text: "Ora puoi compilare l'atto seguendo lo stesso ordine. Se vuoi rivedere la guida, usa il pulsante Tutorial nel menu principale o nella barra laterale.",
+      selector: ".bottom-actions",
+      action: () => openPracticeForTutorial(0)
+    }
+  ];
+}
+
+function clearTutorialHighlight() {
+  document.querySelectorAll(".tutorial-highlight").forEach((element) => element.classList.remove("tutorial-highlight"));
+}
+
+function applyTutorialHighlight(selector) {
+  clearTutorialHighlight();
+  if (!selector) return;
+  const target = document.querySelector(selector);
+  if (!target) return;
+  target.classList.add("tutorial-highlight");
+  window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }), 80);
+}
+
+function renderTutorialStep() {
+  if (!state.tutorial.active) return;
+  const step = state.tutorial.steps[state.tutorial.index];
+  if (!step) {
+    finishTutorial();
+    return;
+  }
+  step.action?.();
+  tutorialTitle.textContent = step.title;
+  tutorialText.textContent = step.text;
+  tutorialCount.textContent = `Passo ${state.tutorial.index + 1} di ${state.tutorial.steps.length}`;
+  tutorialBack.disabled = state.tutorial.index === 0;
+  tutorialNext.textContent = state.tutorial.index === state.tutorial.steps.length - 1 ? "Fine tutorial" : "Avanti";
+  tutorialOverlay.hidden = false;
+  window.setTimeout(() => applyTutorialHighlight(step.selector), 120);
+}
+
+function markTutorialSeen() {
+  if (!state.currentUser) return;
+  localStorage.setItem(tutorialStorageKey(), "1");
+  state.tutorial.pendingFirstRun = false;
+}
+
+function finishTutorial(options = {}) {
+  const shouldRemember = state.tutorial.firstRun || options.remember;
+  if (shouldRemember) markTutorialSeen();
+  state.tutorial.active = false;
+  state.tutorial.index = 0;
+  state.tutorial.steps = [];
+  state.tutorial.firstRun = false;
+  tutorialOverlay.hidden = true;
+  clearTutorialHighlight();
+}
+
+function startTutorial(options = {}) {
+  if (!state.currentUser) return;
+  state.tutorial.active = true;
+  state.tutorial.index = 0;
+  state.tutorial.steps = buildTutorialSteps();
+  state.tutorial.firstRun = Boolean(options.firstRun);
+  renderTutorialStep();
+}
+
+function maybeStartFirstRunTutorial() {
+  if (!state.tutorial.pendingFirstRun || !state.currentUser) return;
+  if (localStorage.getItem(tutorialStorageKey())) {
+    state.tutorial.pendingFirstRun = false;
+    return;
+  }
+  window.setTimeout(() => startTutorial({ firstRun: true }), 450);
+}
+
 function normalizeText(value = "") {
   return String(value || "")
     .normalize("NFD")
@@ -814,6 +1013,7 @@ function applyRolePermissions() {
 
 async function startAuthenticatedApp() {
   showAuthenticatedShell();
+  state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
   applyRolePermissions();
   renderStep();
   await setPracticeMeta();
@@ -1026,6 +1226,7 @@ function openBrandMenu() {
 function showMainMenuFromSplash() {
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = false;
+  maybeStartFirstRunTutorial();
 }
 
 async function enterSectionFromMainMenu(section) {
@@ -4882,7 +5083,40 @@ brandMenuButton.addEventListener("click", (event) => {
 enterSoftware.addEventListener("click", showMainMenuFromSplash);
 
 document.querySelectorAll(".main-menu-actions button").forEach((button) => {
-  button.addEventListener("click", () => enterSectionFromMainMenu(button.dataset.section));
+  button.addEventListener("click", () => {
+    if (button.matches("[data-start-tutorial]")) return;
+    enterSectionFromMainMenu(button.dataset.section);
+  });
+});
+
+document.querySelectorAll("[data-start-tutorial]").forEach((button) => {
+  button.addEventListener("click", () => {
+    closeBrandMenu();
+    if (!button.closest(".main-menu-actions")) mainMenuScreen.hidden = true;
+    startTutorial({ firstRun: false });
+  });
+});
+
+tutorialNext.addEventListener("click", () => {
+  if (!state.tutorial.active) return;
+  if (state.tutorial.index >= state.tutorial.steps.length - 1) {
+    finishTutorial({ remember: true });
+    showToast("Tutorial completato. Puoi iniziare la compilazione dell'atto.");
+    return;
+  }
+  state.tutorial.index += 1;
+  renderTutorialStep();
+});
+
+tutorialBack.addEventListener("click", () => {
+  if (!state.tutorial.active || state.tutorial.index === 0) return;
+  state.tutorial.index -= 1;
+  renderTutorialStep();
+});
+
+tutorialSkip.addEventListener("click", () => {
+  finishTutorial({ remember: true });
+  showToast("Tutorial chiuso. Puoi riaprirlo dal menu quando vuoi.");
 });
 
 document.querySelectorAll("[data-return-menu]").forEach((button) => {
@@ -4891,6 +5125,7 @@ document.querySelectorAll("[data-return-menu]").forEach((button) => {
 
 brandDropdown.querySelectorAll("button").forEach((button) => {
   button.addEventListener("click", async () => {
+    if (button.matches("[data-start-tutorial]")) return;
     if (button.dataset.section === "practice") await resetCurrentPractice();
     setScreen(button.dataset.section);
     closeBrandMenu();

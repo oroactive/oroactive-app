@@ -11,7 +11,7 @@
   <title>OroActive Gestionale</title>
   <link rel="manifest" href="manifest.webmanifest?v=20260520-13">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260520-13">
+  <link rel="stylesheet" href="styles.css?v=20260521-14">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -43,6 +43,7 @@
         <button type="button" data-section="archive">Elenco</button>
         <button type="button" data-section="fusion">Giacenza</button>
         <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
+        <button class="tutorial-menu-button" type="button" data-start-tutorial>Tutorial</button>
       </nav>
     </div>
     <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
@@ -64,6 +65,7 @@
           <button type="button" data-section="archive">Elenco</button>
           <button type="button" data-section="fusion">Giacenza</button>
           <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
+          <button type="button" data-start-tutorial>Tutorial</button>
         </div>
       </div>
 
@@ -72,6 +74,7 @@
         <strong id="operatorStoreName">Negozio Busto Arsizio</strong>
         <small id="loggedUserName"></small>
         <button class="faceid-button" type="button" id="registerFaceIdButton">Registra Face ID</button>
+        <button class="tutorial-sidebar-button" type="button" data-start-tutorial>Tutorial</button>
         <button class="logout-button" type="button" id="logoutButton">Logout</button>
       </div>
     </aside>
@@ -614,6 +617,19 @@
       <div class="preview-body" id="previewBody"></div>
     </div>
   </div>
+  <div class="tutorial-overlay" id="tutorialOverlay" hidden>
+    <div class="tutorial-backdrop"></div>
+    <section class="tutorial-card" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+      <span class="tutorial-count" id="tutorialCount">Tutorial</span>
+      <h2 id="tutorialTitle">Benvenuto in OroActive</h2>
+      <p id="tutorialText"></p>
+      <div class="tutorial-actions">
+        <button class="ghost-button" type="button" id="tutorialSkip">Salta tutorial</button>
+        <button class="ghost-button" type="button" id="tutorialBack">Indietro</button>
+        <button class="primary-button" type="button" id="tutorialNext">Avanti</button>
+      </div>
+    </section>
+  </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="loading-indicator" id="loadingIndicator" hidden>
     <div class="loading-spinner" aria-hidden="true"></div>
@@ -621,6 +637,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260521-13"></script>
+  <script src="app.js?v=20260521-14"></script>
 </body>
 </html>
