@@ -287,44 +287,44 @@ const documentAiSchema = {
   properties: {
     nome: { type: "string" },
     cognome: { type: "string" },
-    codice_fiscale: { type: "string" },
-    data_nascita: { type: "string", description: "Formato YYYY-MM-DD se leggibile, altrimenti stringa vuota." },
+    data_nascita: { type: "string", description: "Formato GG/MM/AAAA se leggibile, altrimenti stringa vuota." },
     luogo_nascita: { type: "string" },
-    provincia_nascita: { type: "string" },
-    sesso: { type: "string", enum: ["M", "F", ""] },
+    codice_fiscale: { type: "string" },
     cittadinanza: { type: "string" },
     indirizzo_residenza: { type: "string" },
     provincia_residenza: { type: "string" },
+    tipo_documento: { type: "string" },
     numero_documento: { type: "string" },
-    data_emissione: { type: "string", description: "Formato YYYY-MM-DD se leggibile, altrimenti stringa vuota." },
-    data_scadenza: { type: "string", description: "Formato YYYY-MM-DD se leggibile, altrimenti stringa vuota." },
+    data_rilascio: { type: "string", description: "Formato GG/MM/AAAA se leggibile, altrimenti stringa vuota." },
+    data_scadenza: { type: "string", description: "Formato GG/MM/AAAA se leggibile, altrimenti stringa vuota." },
     confidence: {
       type: "object",
       additionalProperties: false,
       properties: {
         nome: { type: "string", enum: ["alto", "medio", "basso", ""] },
         cognome: { type: "string", enum: ["alto", "medio", "basso", ""] },
-        codice_fiscale: { type: "string", enum: ["alto", "medio", "basso", ""] },
         data_nascita: { type: "string", enum: ["alto", "medio", "basso", ""] },
         luogo_nascita: { type: "string", enum: ["alto", "medio", "basso", ""] },
-        indirizzo_residenza: { type: "string", enum: ["alto", "medio", "basso", ""] }
+        codice_fiscale: { type: "string", enum: ["alto", "medio", "basso", ""] },
+        indirizzo_residenza: { type: "string", enum: ["alto", "medio", "basso", ""] },
+        numero_documento: { type: "string", enum: ["alto", "medio", "basso", ""] },
+        data_scadenza: { type: "string", enum: ["alto", "medio", "basso", ""] }
       },
-      required: ["nome", "cognome", "codice_fiscale", "data_nascita", "luogo_nascita", "indirizzo_residenza"]
+      required: ["nome", "cognome", "data_nascita", "luogo_nascita", "codice_fiscale", "indirizzo_residenza", "numero_documento", "data_scadenza"]
     }
   },
   required: [
     "nome",
     "cognome",
-    "codice_fiscale",
     "data_nascita",
     "luogo_nascita",
-    "provincia_nascita",
-    "sesso",
+    "codice_fiscale",
     "cittadinanza",
     "indirizzo_residenza",
     "provincia_residenza",
+    "tipo_documento",
     "numero_documento",
-    "data_emissione",
+    "data_rilascio",
     "data_scadenza",
     "confidence"
   ]
@@ -387,10 +387,13 @@ async function readDocumentWithOpenAi(frontImage, backImage) {
       content: [
         {
           type: "input_text",
-          text: `Leggi una Carta d'Identita Elettronica italiana usando fronte e retro.
-Estrai solo dati visibili. Se un dato non e leggibile restituisci stringa vuota.
-Usa date in formato YYYY-MM-DD. Il codice fiscale si trova spesso sul retro o nella MRZ.
-La confidence deve essere: alto, medio, basso oppure stringa vuota. Rispondi solo in JSON strutturato.`
+          text: `Analizza fronte e retro di una carta d'identita, patente o passaporto italiano.
+Estrai solo dati visibili e leggibili.
+Se un dato non e leggibile, lascia stringa vuota.
+Non inventare dati.
+Usa formato date GG/MM/AAAA.
+Restituisci esclusivamente JSON valido nel formato richiesto.
+La confidence deve essere: alto, medio, basso oppure stringa vuota.`
         },
         { type: "input_image", image_url: front, detail: "high" },
         { type: "input_image", image_url: back, detail: "high" }
@@ -1268,10 +1271,7 @@ app.post("/api/ai/leggi-documento", async (request, response, next) => {
       request.body.immagine_fronte || request.body.frontImage || request.body.front,
       request.body.immagine_retro || request.body.backImage || request.body.back
     );
-    response.json({
-      ...raw,
-      fields: documentAiToClientFields(raw)
-    });
+    response.json(raw);
   } catch (error) {
     if (!error.status) error.status = 502;
     if (!error.message) error.message = "Lettura AI documento non disponibile.";

@@ -2510,6 +2510,14 @@ function toDateInputValue(value) {
   return year && month && day ? `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}` : "";
 }
 
+function normalizeDocumentTypeValue(value = "") {
+  const normalized = normalizeText(value);
+  if (normalized.includes("PATENTE")) return "Patente";
+  if (normalized.includes("PASSAPORTO")) return "Passaporto";
+  if (normalized.includes("CARTA") || normalized.includes("IDENTITA")) return "Carta identita";
+  return value || "";
+}
+
 function storeCodeFromAct(act) {
   if (act.storeCode) return act.storeCode;
   return {
@@ -2590,7 +2598,6 @@ function documentScanModalMarkup() {
 
       <div class="document-scan-actions">
         <button class="ghost-button" type="button" id="cancelDocumentScan">Annulla</button>
-        <button class="primary-button" type="button" id="confirmDocumentScan" ${frontDone && backDone ? "" : "disabled"}>Conferma dati</button>
       </div>
     </section>
   `;
@@ -2601,6 +2608,7 @@ function documentScanReviewMarkup() {
   const back = state.documentScan?.back;
   const detected = state.documentScan?.detected || {};
   const ocrRead = Boolean(state.documentScan?.ocrRead);
+  const analyzed = Boolean(state.documentScan?.analyzed);
   return `
     <section class="document-scan-flow">
       <div class="scan-step-header">
@@ -2622,15 +2630,19 @@ function documentScanReviewMarkup() {
       </div>
       <div class="document-scan-data-panel">
         <h4>Dati estratti automaticamente</h4>
-        <div class="document-scan-data-grid">
-          ${documentScanDataRowsMarkup(detected)}
-        </div>
-        <p>${ocrRead ? "Controlla i dati estratti e correggi eventuali errori dopo la conferma." : "Documento non letto correttamente. Riprova la scansione o compila manualmente."}</p>
+        ${analyzed ? `
+          <div class="document-scan-data-grid">
+            ${documentScanDataRowsMarkup(detected)}
+          </div>
+          <p>${ocrRead ? "Controlla i dati estratti e correggi eventuali errori." : "Documento non letto correttamente. Riprova la scansione o compila manualmente."}</p>
+        ` : "<p>Foto fronte e retro acquisite. Premi Analizza con AI per leggere il documento e compilare la sezione Cliente.</p>"}
       </div>
       <div class="document-scan-actions">
         <button class="ghost-button" type="button" id="cancelDocumentScan">Annulla</button>
-        <button class="warning-button" type="button" id="restartDocumentScan">Rifai scansione documento</button>
-        <button class="primary-button" type="button" id="confirmDocumentScan">Conferma dati</button>
+        <button class="warning-button" type="button" data-retake-document-side="front">Rifai fronte</button>
+        <button class="warning-button" type="button" data-retake-document-side="back">Rifai retro</button>
+        <button class="primary-button" type="button" id="analyzeDocumentWithAi">Analizza con AI</button>
+        ${analyzed ? '<button class="ghost-button" type="button" id="confirmDocumentScan">Chiudi</button>' : ""}
       </div>
     </section>
   `;
@@ -2646,6 +2658,7 @@ function documentScanDataRowsMarkup(data = {}) {
     ["birthProvince", "Provincia nascita", data.birthProvince],
     ["address", "Indirizzo residenza", data.address],
     ["residenceProvince", "Provincia residenza", data.residenceProvince],
+    ["documentType", "Tipo documento", data.documentType],
     ["documentNumber", "Numero documento", data.documentNumber],
     ["documentIssueDate", "Data rilascio/emissione", data.documentIssueDate],
     ["documentExpiry", "Data scadenza", data.documentExpiry],
@@ -2888,7 +2901,12 @@ async function useDocumentScanPhoto() {
   if (side === "front") {
     state.documentScan.side = "back";
   } else {
-    await prepareDocumentScanReview();
+    stopDocumentCamera();
+    state.documentScan.review = true;
+    state.documentScan.analyzed = false;
+    state.documentScan.detected = {};
+    state.documentScan.ocrRead = false;
+    renderDocumentScanModal();
     return;
   }
   renderDocumentScanModal();
@@ -2898,6 +2916,20 @@ function retakeDocumentScanPhoto() {
   if (!state.documentScan) return;
   state.documentScan.preview = null;
   renderDocumentScanModal();
+}
+
+function retakeDocumentScanSide(side) {
+  if (!state.documentScan) return;
+  stopDocumentCamera();
+  state.documentScan.side = side === "back" ? "back" : "front";
+  state.documentScan.preview = null;
+  state.documentScan.review = false;
+  state.documentScan.analyzed = false;
+  state.documentScan.detected = {};
+  state.documentScan.ocrRead = false;
+  state.documentScan.ready = false;
+  renderDocumentScanModal();
+  startDocumentCamera();
 }
 
 const CIE_OCR_ZONES = {
@@ -2924,7 +2956,7 @@ function detectedDocumentHasValues(data = {}) {
 }
 
 function missingDetectedDocumentFields(data = {}) {
-  return ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "address", "documentNumber", "documentIssueDate", "documentExpiry", "citizenship", "sex"]
+  return ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "address", "documentNumber", "documentIssueDate", "documentExpiry", "citizenship"]
     .filter((field) => !String(data[field] || "").trim());
 }
 
@@ -2932,13 +2964,13 @@ function hasLowConfidenceFields(data = {}) {
   return Object.values(data._confidence || {}).some((confidence) => confidence === "basso");
 }
 
-async function prepareDocumentScanReview() {
+async function analyzeDocumentScanWithAi() {
   const { front, back } = state.documentScan || {};
   if (!front || !back) return;
   stopDocumentCamera();
   let detected = {};
   try {
-    showLoading("Lettura documento...");
+    showLoading("Analisi documento in corso...");
     detected = await runAiDocumentRecognition(front, back);
     if (!detectedDocumentHasValues(detected)) detected = await runDocumentOcr(front, back);
   } catch {
@@ -2953,10 +2985,18 @@ async function prepareDocumentScanReview() {
   state.documentScan.detected = detected;
   state.documentScan.ocrRead = detectedDocumentHasValues(detected);
   state.documentScan.review = true;
+  state.documentScan.analyzed = true;
   renderDocumentScanModal();
-  if (!state.documentScan.ocrRead || missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
-    showToast("Alcuni dati non sono stati letti correttamente, controlla e completa manualmente.");
+  if (!state.documentScan.ocrRead) {
+    showToast("Documento non letto correttamente. Riprova la scansione o compila manualmente.");
+    return;
   }
+  applyDetectedDocumentData(detected);
+  if (missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
+    showToast("Controlla i dati estratti e correggi eventuali errori.");
+    return;
+  }
+  showToast("Controlla i dati estratti e correggi eventuali errori.");
 }
 
 async function runAiDocumentRecognition(front, back) {
@@ -2974,7 +3014,7 @@ async function runAiDocumentRecognition(front, back) {
     name: fields.name || data.nome || "",
     surname: fields.surname || data.cognome || "",
     fiscalCode: fields.fiscalCode || data.codice_fiscale || "",
-    birthDate: fields.birthDate || data.data_nascita || "",
+    birthDate: toDateInputValue(fields.birthDate || data.data_nascita || ""),
     birthPlace: fields.birthPlace || data.luogo_nascita || "",
     birthProvince: fields.birthProvince || data.provincia_nascita || "",
     sex: fields.sex || data.sesso || "",
@@ -2982,15 +3022,18 @@ async function runAiDocumentRecognition(front, back) {
     address: fields.address || data.indirizzo_residenza || "",
     residenceProvince: fields.residenceProvince || data.provincia_residenza || "",
     documentNumber: fields.documentNumber || data.numero_documento || "",
-    documentIssueDate: fields.documentIssueDate || data.data_emissione || "",
-    documentExpiry: fields.documentExpiry || data.data_scadenza || "",
+    documentIssueDate: toDateInputValue(fields.documentIssueDate || data.data_rilascio || data.data_emissione || ""),
+    documentExpiry: toDateInputValue(fields.documentExpiry || data.data_scadenza || ""),
+    documentType: normalizeDocumentTypeValue(fields.documentType || data.tipo_documento || ""),
     _confidence: {
       name: fields._confidence?.name || data.confidence?.nome || "",
       surname: fields._confidence?.surname || data.confidence?.cognome || "",
       fiscalCode: fields._confidence?.fiscalCode || data.confidence?.codice_fiscale || "",
       birthDate: fields._confidence?.birthDate || data.confidence?.data_nascita || "",
       birthPlace: fields._confidence?.birthPlace || data.confidence?.luogo_nascita || "",
-      address: fields._confidence?.address || data.confidence?.indirizzo_residenza || ""
+      address: fields._confidence?.address || data.confidence?.indirizzo_residenza || "",
+      documentNumber: fields._confidence?.documentNumber || data.confidence?.numero_documento || "",
+      documentExpiry: fields._confidence?.documentExpiry || data.confidence?.data_scadenza || ""
     }
   };
 }
@@ -3406,6 +3449,7 @@ function applyDetectedDocumentData(data = {}) {
     setFieldIfDetected('[name="provinciaNascita"]', data.birthProvince, detectedConfidence(data, "birthProvince")),
     setFieldIfDetected('[name="indirizzo"]', data.address, detectedConfidence(data, "address")),
     setFieldIfDetected('[name="provinciaResidenza"]', data.residenceProvince, detectedConfidence(data, "residenceProvince")),
+    setFieldIfDetected('[name="tipoDocumento"]', data.documentType, detectedConfidence(data, "documentType")),
     setFieldIfDetected('[name="numeroDocumento"]', data.documentNumber, detectedConfidence(data, "documentNumber")),
     setFieldIfDetected('[name="dataRilascioDocumento"]', data.documentIssueDate, detectedConfidence(data, "documentIssueDate")),
     setFieldIfDetected('[name="scadenzaDocumento"]', data.documentExpiry, detectedConfidence(data, "documentExpiry")),
@@ -5474,6 +5518,15 @@ previewBody.addEventListener("click", (event) => {
   }
   if (event.target.closest("#restartDocumentScan")) {
     restartDocumentScan();
+    return;
+  }
+  const retakeSideButton = event.target.closest("[data-retake-document-side]");
+  if (retakeSideButton) {
+    retakeDocumentScanSide(retakeSideButton.dataset.retakeDocumentSide);
+    return;
+  }
+  if (event.target.closest("#analyzeDocumentWithAi")) {
+    analyzeDocumentScanWithAi();
     return;
   }
   if (event.target.closest("#confirmDocumentScan")) {
