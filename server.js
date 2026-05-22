@@ -6,6 +6,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import jwt from "jsonwebtoken";
+import OpenAI from "openai";
 import PDFDocument from "pdfkit";
 import pg from "pg";
 
@@ -20,6 +21,7 @@ const CASH_PAYMENT_LIMIT = 499.99;
 const ACT_LIST_LIMIT = 50;
 const jwtSecret = process.env.JWT_SECRET || "cambia-questa-chiave-jwt-oroactive";
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
+const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
 const bullionVaultMarkets = {
   Oro: { securityId: "AUXZU", source: "Zurigo" },
@@ -31,6 +33,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined
 });
+
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 const app = express();
 app.use(cors());
@@ -253,6 +257,178 @@ function isCompletedAct(rowOrAct = {}) {
 
 function isValidIban(value = "") {
   return /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/i.test(String(value || "").replace(/\s+/g, ""));
+}
+
+function openAiUnavailableError() {
+  const error = new Error("AI OpenAI non configurata: imposta OPENAI_API_KEY sul backend.");
+  error.status = 503;
+  return error;
+}
+
+function requireOpenAiClient() {
+  if (!openai) throw openAiUnavailableError();
+  return openai;
+}
+
+function validImageDataUrl(value = "") {
+  const text = String(value || "");
+  return /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(text) ? text : "";
+}
+
+function parseOpenAiJson(response) {
+  const text = response.output_text || "";
+  if (!text.trim()) return {};
+  return JSON.parse(text);
+}
+
+const documentAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    nome: { type: "string" },
+    cognome: { type: "string" },
+    codice_fiscale: { type: "string" },
+    data_nascita: { type: "string", description: "Formato YYYY-MM-DD se leggibile, altrimenti stringa vuota." },
+    luogo_nascita: { type: "string" },
+    provincia_nascita: { type: "string" },
+    sesso: { type: "string", enum: ["M", "F", ""] },
+    cittadinanza: { type: "string" },
+    indirizzo_residenza: { type: "string" },
+    provincia_residenza: { type: "string" },
+    numero_documento: { type: "string" },
+    data_emissione: { type: "string", description: "Formato YYYY-MM-DD se leggibile, altrimenti stringa vuota." },
+    data_scadenza: { type: "string", description: "Formato YYYY-MM-DD se leggibile, altrimenti stringa vuota." },
+    confidence: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        nome: { type: "string", enum: ["alto", "medio", "basso", ""] },
+        cognome: { type: "string", enum: ["alto", "medio", "basso", ""] },
+        codice_fiscale: { type: "string", enum: ["alto", "medio", "basso", ""] },
+        data_nascita: { type: "string", enum: ["alto", "medio", "basso", ""] },
+        luogo_nascita: { type: "string", enum: ["alto", "medio", "basso", ""] },
+        indirizzo_residenza: { type: "string", enum: ["alto", "medio", "basso", ""] }
+      },
+      required: ["nome", "cognome", "codice_fiscale", "data_nascita", "luogo_nascita", "indirizzo_residenza"]
+    }
+  },
+  required: [
+    "nome",
+    "cognome",
+    "codice_fiscale",
+    "data_nascita",
+    "luogo_nascita",
+    "provincia_nascita",
+    "sesso",
+    "cittadinanza",
+    "indirizzo_residenza",
+    "provincia_residenza",
+    "numero_documento",
+    "data_emissione",
+    "data_scadenza",
+    "confidence"
+  ]
+};
+
+const actCheckAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ok: { type: "boolean" },
+    errori: { type: "array", items: { type: "string" } },
+    campi_mancanti: { type: "array", items: { type: "string" } },
+    incongruenze: { type: "array", items: { type: "string" } },
+    suggerimenti: { type: "array", items: { type: "string" } }
+  },
+  required: ["ok", "errori", "campi_mancanti", "incongruenze", "suggerimenti"]
+};
+
+function documentAiToClientFields(result = {}) {
+  const confidence = result.confidence || {};
+  return {
+    name: result.nome || "",
+    surname: result.cognome || "",
+    fiscalCode: result.codice_fiscale || "",
+    birthDate: result.data_nascita || "",
+    birthPlace: result.luogo_nascita || "",
+    birthProvince: result.provincia_nascita || "",
+    sex: result.sesso || "",
+    citizenship: result.cittadinanza || "",
+    address: result.indirizzo_residenza || "",
+    residenceProvince: result.provincia_residenza || "",
+    documentNumber: result.numero_documento || "",
+    documentIssueDate: result.data_emissione || "",
+    documentExpiry: result.data_scadenza || "",
+    _confidence: {
+      name: confidence.nome || "",
+      surname: confidence.cognome || "",
+      fiscalCode: confidence.codice_fiscale || "",
+      birthDate: confidence.data_nascita || "",
+      birthPlace: confidence.luogo_nascita || "",
+      address: confidence.indirizzo_residenza || ""
+    }
+  };
+}
+
+async function readDocumentWithOpenAi(frontImage, backImage) {
+  const client = requireOpenAiClient();
+  const front = validImageDataUrl(frontImage);
+  const back = validImageDataUrl(backImage);
+  if (!front || !back) {
+    const error = new Error("Immagini documento non valide.");
+    error.status = 400;
+    throw error;
+  }
+
+  const result = await client.responses.create({
+    model: openaiModel,
+    input: [{
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: `Leggi una Carta d'Identita Elettronica italiana usando fronte e retro.
+Estrai solo dati visibili. Se un dato non e leggibile restituisci stringa vuota.
+Usa date in formato YYYY-MM-DD. Il codice fiscale si trova spesso sul retro o nella MRZ.
+La confidence deve essere: alto, medio, basso oppure stringa vuota. Rispondi solo in JSON strutturato.`
+        },
+        { type: "input_image", image_url: front, detail: "high" },
+        { type: "input_image", image_url: back, detail: "high" }
+      ]
+    }],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "lettura_documento_oroactive",
+        strict: true,
+        schema: documentAiSchema
+      }
+    }
+  });
+  return parseOpenAiJson(result);
+}
+
+async function checkActWithOpenAi(act) {
+  const client = requireOpenAiClient();
+  const compactAct = compactActPayload(act || {});
+  const result = await client.responses.create({
+    model: openaiModel,
+    input: `Controlla questo atto di vendita OroActive e restituisci JSON.
+Verifica campi mancanti, documento scaduto, codice fiscale, firme, pagamento, foto documenti, foto preziosi, contabile se Bonifico o Assegno, importo contanti massimo 499,99 EUR.
+Non inventare dati. Evidenzia solo problemi concreti o suggerimenti utili all'operatore.
+
+ATTO:
+${JSON.stringify(compactAct)}`,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "controllo_atto_oroactive",
+        strict: true,
+        schema: actCheckAiSchema
+      }
+    }
+  });
+  return parseOpenAiJson(result);
 }
 
 function normalizeAct(input = {}, existing = null) {
@@ -1085,6 +1261,33 @@ app.get("/api/auth/me", authenticate, (request, response) => {
 });
 
 app.use("/api", authenticate);
+
+app.post("/api/ai/leggi-documento", async (request, response, next) => {
+  try {
+    const raw = await readDocumentWithOpenAi(
+      request.body.immagine_fronte || request.body.frontImage || request.body.front,
+      request.body.immagine_retro || request.body.backImage || request.body.back
+    );
+    response.json({
+      ...raw,
+      fields: documentAiToClientFields(raw)
+    });
+  } catch (error) {
+    if (!error.status) error.status = 502;
+    if (!error.message) error.message = "Lettura AI documento non disponibile.";
+    next(error);
+  }
+});
+
+app.post("/api/ai/controlla-atto", async (request, response, next) => {
+  try {
+    response.json(await checkActWithOpenAi(request.body.atto || request.body.act || request.body));
+  } catch (error) {
+    if (!error.status) error.status = 502;
+    if (!error.message) error.message = "Controllo AI atto non disponibile.";
+    next(error);
+  }
+});
 
 app.post("/api/auth/faceid/register", async (request, response, next) => {
   try {

@@ -2939,9 +2939,14 @@ async function prepareDocumentScanReview() {
   let detected = {};
   try {
     showLoading("Lettura documento...");
-    detected = await runDocumentOcr(front, back);
+    detected = await runAiDocumentRecognition(front, back);
+    if (!detectedDocumentHasValues(detected)) detected = await runDocumentOcr(front, back);
   } catch {
-    detected = {};
+    try {
+      detected = await runDocumentOcr(front, back);
+    } catch {
+      detected = {};
+    }
   } finally {
     hideLoading();
   }
@@ -2952,6 +2957,42 @@ async function prepareDocumentScanReview() {
   if (!state.documentScan.ocrRead || missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
     showToast("Alcuni dati non sono stati letti correttamente, controlla e completa manualmente.");
   }
+}
+
+async function runAiDocumentRecognition(front, back) {
+  if (!front?.dataUrl || !back?.dataUrl) return {};
+  const data = await apiRequest("/ai/leggi-documento", {
+    method: "POST",
+    timeoutMs: 70000,
+    body: JSON.stringify({
+      immagine_fronte: front.dataUrl,
+      immagine_retro: back.dataUrl
+    })
+  });
+  const fields = data.fields || {};
+  return {
+    name: fields.name || data.nome || "",
+    surname: fields.surname || data.cognome || "",
+    fiscalCode: fields.fiscalCode || data.codice_fiscale || "",
+    birthDate: fields.birthDate || data.data_nascita || "",
+    birthPlace: fields.birthPlace || data.luogo_nascita || "",
+    birthProvince: fields.birthProvince || data.provincia_nascita || "",
+    sex: fields.sex || data.sesso || "",
+    citizenship: fields.citizenship || data.cittadinanza || "",
+    address: fields.address || data.indirizzo_residenza || "",
+    residenceProvince: fields.residenceProvince || data.provincia_residenza || "",
+    documentNumber: fields.documentNumber || data.numero_documento || "",
+    documentIssueDate: fields.documentIssueDate || data.data_emissione || "",
+    documentExpiry: fields.documentExpiry || data.data_scadenza || "",
+    _confidence: {
+      name: fields._confidence?.name || data.confidence?.nome || "",
+      surname: fields._confidence?.surname || data.confidence?.cognome || "",
+      fiscalCode: fields._confidence?.fiscalCode || data.confidence?.codice_fiscale || "",
+      birthDate: fields._confidence?.birthDate || data.confidence?.data_nascita || "",
+      birthPlace: fields._confidence?.birthPlace || data.confidence?.luogo_nascita || "",
+      address: fields._confidence?.address || data.confidence?.indirizzo_residenza || ""
+    }
+  };
 }
 
 function restartDocumentScan() {
@@ -5025,9 +5066,58 @@ async function archiveCurrentPractice(status = "Archiviata") {
   return true;
 }
 
+function compactActForAi(act = {}) {
+  const {
+    captureAttachments,
+    signatureImages,
+    readOnlyHtml,
+    lastActCaptureAttachments,
+    ...compact
+  } = act;
+  return {
+    ...compact,
+    capturesCount: Array.isArray(captureAttachments) ? captureAttachments.length : state.uploadedCaptures.size,
+    signaturesStatus: Array.isArray(signatureImages)
+      ? signatureImages.map(Boolean)
+      : state.signatures
+  };
+}
+
+async function runAiActCheck(act) {
+  try {
+    showLoading("Controllo AI pratica...");
+    return await apiRequest("/ai/controlla-atto", {
+      method: "POST",
+      timeoutMs: 45000,
+      body: JSON.stringify({ atto: compactActForAi(act) })
+    });
+  } catch {
+    return null;
+  } finally {
+    hideLoading();
+  }
+}
+
 async function completeCurrentPractice() {
   const missing = validatePrintScope("company");
-  if (!missing.length) return archiveCurrentPractice("Completato");
+  if (!missing.length) {
+    const act = currentActSnapshot("Completato");
+    const aiCheck = await runAiActCheck(act);
+    const aiProblems = [
+      ...(aiCheck?.errori || []),
+      ...(aiCheck?.campi_mancanti || []),
+      ...(aiCheck?.incongruenze || [])
+    ];
+    if (aiCheck && !aiCheck.ok && aiProblems.length) {
+      const preview = aiProblems.slice(0, 6).join(", ");
+      const proceed = window.confirm(`Controllo AI: ${preview}. Vuoi completare comunque la pratica?`);
+      if (!proceed) {
+        if (aiCheck.suggerimenti?.length) showToast(`Suggerimento AI: ${aiCheck.suggerimenti[0]}`);
+        return false;
+      }
+    }
+    return archiveCurrentPractice("Completato");
+  }
 
   const preview = missing.slice(0, 8).join(", ");
   const suffix = missing.length > 8 ? ` e altri ${missing.length - 8} elementi` : "";
