@@ -21,6 +21,9 @@ const state = {
   suppressDirtyTracking: false,
   documentScan: { front: null, back: null },
   cashLimitWarningShown: false,
+  amlCashCheck: null,
+  amlCashCheckTimer: null,
+  amlCashCheckLoading: false,
   bullionVaultPrices: {},
   lastActCaptureAttachments: [],
   loadedSignatureImages: [],
@@ -55,6 +58,9 @@ const brandDropdown = document.getElementById("brandDropdown");
 const splashScreen = document.getElementById("splashScreen");
 const enterSoftware = document.getElementById("enterSoftware");
 const mainMenuScreen = document.getElementById("mainMenuScreen");
+const mainUserMenuButton = document.getElementById("mainUserMenuButton");
+const mainUserDropdown = document.getElementById("mainUserDropdown");
+const profileCard = document.getElementById("profileCard");
 const practiceTopbar = document.getElementById("practiceTopbar");
 const loginScreen = document.getElementById("loginScreen");
 const loginForm = document.getElementById("loginForm");
@@ -165,7 +171,7 @@ const documentLabels = {
   Passaporto: "passaporto"
 };
 const apiBase = "/api";
-const CASH_PAYMENT_LIMIT = 499.99;
+const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
 const QUALITY_FLAG_POINTS = 1;
@@ -515,6 +521,8 @@ function showLogin() {
   loginScreen.hidden = false;
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = true;
+  closeMainMenuDropdowns();
+  closeMainUserMenu();
   appShell.hidden = true;
   if (state.syncTimer) window.clearInterval(state.syncTimer);
   state.syncTimer = null;
@@ -1117,6 +1125,9 @@ function applyRolePermissions() {
   if (sessionUsername && state.currentUser) {
     sessionUsername.textContent = displayUsername(state.currentUser);
   }
+  if (mainUserMenuButton && state.currentUser) {
+    mainUserMenuButton.textContent = `${displayUsername(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
+  }
   const qualityPanel = document.getElementById("qualityReviewPanel");
   if (qualityPanel) qualityPanel.hidden = !canReviewActs();
   configureUserFormPermissions();
@@ -1303,6 +1314,8 @@ function setScreen(id) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
+  closeMainMenuDropdowns();
+  closeMainUserMenu();
   const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
   if (leavingArchive) clearActSearch();
   screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
@@ -1329,6 +1342,61 @@ async function handleScreenDataLoad(id) {
     await loadKnowledgeNotes();
     if (isFounder()) await loadAiFeedback();
   }
+  if (id === "profile") {
+    renderProfileCard();
+  }
+}
+
+function renderProfileCard() {
+  if (!profileCard || !state.currentUser) return;
+  const user = state.currentUser;
+  profileCard.innerHTML = `
+    <div class="profile-row"><span>Nome</span><strong>${escapeHtml(displayUsername(user))}</strong></div>
+    <div class="profile-row"><span>Ruolo</span><strong>${escapeHtml(roleLabel(user.ruolo))}</strong></div>
+    <div class="profile-row"><span>Negozio</span><strong>${escapeHtml(user.negozio || "Tutti")}</strong></div>
+    <div class="profile-row"><span>Nome utente</span><strong>${escapeHtml(user.username || "Dato non inserito")}</strong></div>
+    <div class="profile-row"><span>Email</span><strong>${escapeHtml(user.email || "Dato non inserito")}</strong></div>
+    <div class="profile-row"><span>Face ID</span><strong>${user.hasFaceId ? "Registrato" : "Non registrato"}</strong></div>
+    <div class="user-form-actions">
+      <button class="ghost-button" type="button" id="profileRegisterFaceId">Registra Face ID</button>
+      ${isAdmin() ? '<button class="primary-button" type="button" id="profileManageUsers">Gestione utenti</button>' : ""}
+    </div>
+  `;
+  document.getElementById("profileRegisterFaceId")?.addEventListener("click", registerFaceId);
+  document.getElementById("profileManageUsers")?.addEventListener("click", () => setScreen("users"));
+}
+
+function closeMainMenuDropdowns() {
+  document.querySelectorAll(".main-menu-submenu").forEach((submenu) => {
+    submenu.hidden = true;
+  });
+  document.querySelectorAll("[data-main-menu-toggle]").forEach((button) => {
+    button.setAttribute("aria-expanded", "false");
+  });
+}
+
+function toggleMainMenuDropdown(id) {
+  const submenu = document.getElementById(id);
+  if (!submenu) return;
+  const willOpen = submenu.hidden;
+  closeMainMenuDropdowns();
+  submenu.hidden = !willOpen;
+  [...document.querySelectorAll("[data-main-menu-toggle]")]
+    .find((button) => button.dataset.mainMenuToggle === id)
+    ?.setAttribute("aria-expanded", String(willOpen));
+}
+
+function closeMainUserMenu() {
+  if (!mainUserDropdown || !mainUserMenuButton) return;
+  mainUserDropdown.hidden = true;
+  mainUserMenuButton.setAttribute("aria-expanded", "false");
+}
+
+function toggleMainUserMenu() {
+  if (!mainUserDropdown || !mainUserMenuButton) return;
+  const willOpen = mainUserDropdown.hidden;
+  mainUserDropdown.hidden = !willOpen;
+  mainUserMenuButton.setAttribute("aria-expanded", String(willOpen));
 }
 
 function closeBrandMenu() {
@@ -4233,6 +4301,9 @@ async function resetCurrentPractice(options = {}) {
   state.captureGroup = null;
   state.lastActCaptureAttachments = [];
   state.cashLimitWarningShown = false;
+  state.amlCashCheck = null;
+  window.clearTimeout(state.amlCashCheckTimer);
+  renderAmlCashAlert();
   setQualityReview(null);
 
   await setPracticeMeta();
@@ -4705,11 +4776,11 @@ function isCashPayment() {
 }
 
 function cashPaymentLimitViolation() {
-  return isCashPayment() && saleTotalAmount() > CASH_PAYMENT_LIMIT;
+  return isCashPayment() && (saleTotalAmount() > CASH_PAYMENT_LIMIT || state.amlCashCheck?.ok === false);
 }
 
 function cashPaymentLimitMessage() {
-  return "Il pagamento in contanti non puo superare 499,99 euro. Seleziona Bonifico o Assegno come pagamento a norma di legge.";
+  return state.amlCashCheck?.messaggio || "Attenzione: questo cliente ha raggiunto o supererebbe il limite di 500€ in contanti negli ultimi 7 giorni. Per rispettare le norme antiriciclaggio, utilizzare un metodo di pagamento tracciabile.";
 }
 
 function notifyCashPaymentLimitIfNeeded(options = {}) {
@@ -4723,6 +4794,69 @@ function notifyCashPaymentLimitIfNeeded(options = {}) {
     state.cashLimitWarningShown = true;
   }
   return true;
+}
+
+function renderAmlCashAlert() {
+  const box = document.getElementById("amlCashAlert");
+  if (!box) return;
+  const data = state.amlCashCheck;
+  if (!isCashPayment() || !data) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  const over = data.ok === false;
+  box.hidden = false;
+  box.classList.toggle("blocking", over);
+  box.innerHTML = `
+    <strong>${over ? "Limite contanti superato" : "Controllo contanti ultimi 7 giorni"}</strong>
+    <span>Contanti ricevuti ultimi 7 giorni: ${escapeHtml(formatEuro(Number(data.totale_ultimi_7_giorni || 0)))}</span>
+    <span>Importo atto corrente: ${escapeHtml(formatEuro(Number(data.importo_corrente || 0)))}</span>
+    <span>Totale previsto: ${escapeHtml(formatEuro(Number(data.totale_previsto || 0)))}</span>
+    <span>Residuo disponibile: ${escapeHtml(formatEuro(Math.max(0, Number(data.residuo_disponibile || 0))))}</span>
+    ${Number(data.superamento || 0) > 0 ? `<span>Superamento limite: ${escapeHtml(formatEuro(Number(data.superamento || 0)))}</span>` : ""}
+    <em>${over ? "Per normativa antiriciclaggio, non possiamo erogare ulteriori contanti oltre il limite consentito negli ultimi 7 giorni. È necessario utilizzare Bonifico o Assegno." : "Metodo utilizzabile entro il residuo indicato."}</em>
+  `;
+}
+
+function scheduleAmlCashCheck() {
+  window.clearTimeout(state.amlCashCheckTimer);
+  state.amlCashCheckTimer = window.setTimeout(() => refreshAmlCashCheck(), 400);
+}
+
+async function refreshAmlCashCheck(options = {}) {
+  if (!isCashPayment()) {
+    state.amlCashCheck = null;
+    renderAmlCashAlert();
+    return null;
+  }
+  const fiscalCode = normalizeFiscalCodeInput(fieldValue('[name="cf"]'));
+  const amount = saleTotalAmount();
+  const date = fieldValue("#practiceDate");
+  if (!fiscalCode || fiscalCode.length !== 16 || amount <= 0 || !date) {
+    state.amlCashCheck = null;
+    renderAmlCashAlert();
+    return null;
+  }
+  try {
+    state.amlCashCheckLoading = true;
+    const query = queryString({
+      codice_fiscale: fiscalCode,
+      data_atto: date,
+      importo_corrente: amount,
+      atto_id: state.editingActId || ""
+    });
+    const data = await apiRequest(`/antiriciclaggio/contanti-check?${query}`, { timeoutMs: 12000 });
+    state.amlCashCheck = data;
+    renderAmlCashAlert();
+    if (options.force && data.ok === false) showToast(cashPaymentLimitMessage());
+    return data;
+  } catch (error) {
+    if (options.force) showToast(error.message || "Controllo antiriciclaggio non disponibile.");
+    return null;
+  } finally {
+    state.amlCashCheckLoading = false;
+  }
 }
 
 function paymentRequiresProof() {
@@ -5714,7 +5848,8 @@ async function handleCustomerCopyAction(action) {
 }
 
 async function archiveCurrentPractice(status = "Archiviata", options = {}) {
-  if (notifyCashPaymentLimitIfNeeded({ force: true })) return false;
+  await refreshAmlCashCheck({ force: true });
+  if (normalizeWorkflowStatus(status) !== "Bozza" && notifyCashPaymentLimitIfNeeded({ force: true })) return false;
   const review = currentQualityReview();
   if (review?.status === "negative" && !review.feedback) {
     showToast("Inserisci il feedback scritto per il controllo qualità negativo.");
@@ -5885,14 +6020,37 @@ brandMenuButton.addEventListener("click", (event) => {
 enterSoftware.addEventListener("click", showMainMenuFromSplash);
 
 document.querySelectorAll(".main-menu-actions button").forEach((button) => {
-  button.addEventListener("click", () => {
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (button.dataset.mainMenuToggle) {
+      toggleMainMenuDropdown(button.dataset.mainMenuToggle);
+      return;
+    }
     if (button.matches("[data-start-tutorial]")) return;
-    enterSectionFromMainMenu(button.dataset.section);
+    if (button.dataset.section) enterSectionFromMainMenu(button.dataset.section);
   });
+});
+
+mainUserMenuButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleMainUserMenu();
+});
+
+mainUserDropdown?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  if (event.target.closest("[data-user-profile]")) {
+    mainMenuScreen.hidden = true;
+    setScreen("profile");
+    return;
+  }
+  if (event.target.closest("[data-user-logout]")) {
+    handleLogout();
+  }
 });
 
 document.querySelectorAll("[data-start-tutorial]").forEach((button) => {
   button.addEventListener("click", () => {
+    closeMainMenuDropdowns();
     closeBrandMenu();
     if (!button.closest(".main-menu-actions")) mainMenuScreen.hidden = true;
     startTutorial({ firstRun: false });
@@ -5936,6 +6094,8 @@ brandDropdown.querySelectorAll("button").forEach((button) => {
 
 document.addEventListener("click", (event) => {
   if (!brandDropdown.hidden && !event.target.closest(".brand-wrap")) closeBrandMenu();
+  if (mainUserDropdown && !mainUserDropdown.hidden && !event.target.closest(".main-user-menu")) closeMainUserMenu();
+  if (mainMenuScreen && !mainMenuScreen.hidden && !event.target.closest(".main-menu-group")) closeMainMenuDropdowns();
 });
 
 steps.forEach((step) => {
@@ -6035,6 +6195,7 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
     if (normalizedCode.length === 16) {
       state.clientLookupTimer = window.setTimeout(() => lookupExistingClient(normalizedCode), 350);
     }
+    scheduleAmlCashCheck();
   }
   if (event.target.matches('[name="nome"], [name="cognome"], [name="sesso"], [name="nascita"], [name="luogo"], [name="provinciaNascita"]')) {
     if (event.target.matches('[name="nome"]')) autofillSexFromName();
@@ -6046,6 +6207,7 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
     event.target.value = event.target.value.toUpperCase();
   }
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
+  if (event.target.matches("#saleTotal")) scheduleAmlCashCheck();
   updateChecklistState();
 });
 
@@ -6069,17 +6231,22 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
       applyFiscalCodeDecodedData(decodeFiscalCodeData(normalizedCode));
       lookupExistingClient(normalizedCode);
     }
+    scheduleAmlCashCheck();
   }
   if (event.target.matches('[name="indirizzo"]')) updateResidenceProvinceFromAddress();
   if (event.target.matches('[name="provinciaNascita"], [name="provinciaResidenza"]')) normalizeProvinceField(event.target);
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
+  if (event.target.matches("#saleTotal")) scheduleAmlCashCheck();
   updateChecklistState();
 });
 
 document.getElementById("paymentMethod").addEventListener("change", () => {
   markPracticeDirty();
+  scheduleAmlCashCheck();
   notifyCashPaymentLimitIfNeeded();
+  renderAmlCashAlert();
   renderPaymentCaptureCard();
+  scheduleAmlCashCheck();
   updateAttachmentState();
   updateChecklistState();
 });
@@ -6092,6 +6259,7 @@ document.getElementById("storeCode").addEventListener("change", async () => {
 document.getElementById("practiceDate").addEventListener("change", async () => {
   markPracticeDirty();
   await updatePracticeNumber();
+  scheduleAmlCashCheck();
   updateChecklistState();
 });
 

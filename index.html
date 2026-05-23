@@ -36,16 +36,32 @@
   </section>
 
   <section class="main-menu-screen" id="mainMenuScreen" hidden aria-label="Menu principale OroActive">
+    <div class="main-user-menu">
+      <button class="main-user-button" id="mainUserMenuButton" type="button" aria-expanded="false" aria-controls="mainUserDropdown">Utente</button>
+      <div class="main-user-dropdown" id="mainUserDropdown" hidden>
+        <button type="button" data-user-profile>Dati utente</button>
+        <button type="button" data-user-logout>Logout</button>
+      </div>
+    </div>
     <div class="main-menu-inner">
       <img class="main-menu-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
       <nav class="main-menu-actions">
-        <button type="button" data-section="practice">Atto di Vendita</button>
-        <button type="button" data-section="archive">Elenco</button>
-        <button type="button" data-section="fusion">Giacenza</button>
-        <button type="button" data-section="assistant">Assistente IA OroActive</button>
-        <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-        <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
-        <button class="tutorial-menu-button" type="button" data-start-tutorial>Tutorial</button>
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="salesSubmenu" aria-expanded="false">Atti di vendita</button>
+          <div class="main-menu-submenu" id="salesSubmenu" hidden>
+            <button type="button" data-section="practice">Nuovo atto di vendita</button>
+            <button type="button" data-section="archive">Elenco</button>
+            <button type="button" data-section="fusion">Giacenza</button>
+          </div>
+        </div>
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="trainingSubmenu" aria-expanded="false">Formazione</button>
+          <div class="main-menu-submenu" id="trainingSubmenu" hidden>
+            <button type="button" data-section="assistant">Assistente IA OroActive</button>
+            <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+            <button type="button" data-start-tutorial>Tutorial</button>
+          </div>
+        </div>
       </nav>
     </div>
     <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
@@ -63,12 +79,13 @@
           </div>
         </button>
         <div class="brand-dropdown" id="brandDropdown" hidden>
-          <button type="button" data-section="practice">Atto di Vendita</button>
+          <strong class="brand-dropdown-title">Atti di vendita</strong>
+          <button type="button" data-section="practice">Nuovo atto di vendita</button>
           <button type="button" data-section="archive">Elenco</button>
           <button type="button" data-section="fusion">Giacenza</button>
+          <strong class="brand-dropdown-title">Formazione</strong>
           <button type="button" data-section="assistant">Assistente IA OroActive</button>
           <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-          <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
           <button type="button" data-start-tutorial>Tutorial</button>
         </div>
       </div>
@@ -305,6 +322,7 @@
                   <input id="paymentIban" name="iban" inputmode="text" autocomplete="off" placeholder="IT00X0000000000000000000000">
                 </label>
               </div>
+              <div class="aml-cash-alert" id="amlCashAlert" hidden aria-live="polite"></div>
               <div class="material-amount-panel" id="materialAmountPanel" hidden>
                 <span class="internal-badge">Ripartizione importo</span>
                 <div id="materialAmountFields" class="material-amount-fields"></div>
@@ -677,6 +695,18 @@
         </section>
       </section>
 
+      <section id="profile" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Account</p>
+            <h2>Dati utente</h2>
+            <p class="muted">Profilo e impostazioni dell'utente attualmente connesso.</p>
+          </div>
+          <div class="settings-list profile-card" id="profileCard"></div>
+        </div>
+      </section>
+
       <section id="users" class="screen admin-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="settings-grid">
@@ -749,6 +779,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260523-24"></script>
+  <script src="app.js?v=20260523-26"></script>
 </body>
 </html>

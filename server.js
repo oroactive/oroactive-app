@@ -18,7 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const port = Number(process.env.PORT || 3000);
 const actsTable = "atti_vendita";
-const CASH_PAYMENT_LIMIT = 499.99;
+const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const jwtSecret = process.env.JWT_SECRET || "cambia-questa-chiave-jwt-oroactive";
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
@@ -510,7 +510,7 @@ async function checkActWithOpenAi(act) {
   const result = await client.responses.create({
     model: openaiModel,
     input: `Controlla questo atto di vendita OroActive e restituisci JSON.
-Verifica campi mancanti, documento scaduto, codice fiscale, firme, pagamento, foto documenti, foto preziosi, contabile se Bonifico o Assegno, importo contanti massimo 499,99 EUR.
+Verifica campi mancanti, documento scaduto, codice fiscale, firme, pagamento, foto documenti, foto preziosi, contabile se Bonifico o Assegno, importo contanti massimo 500 EUR ogni 7 giorni per cliente.
 Non inventare dati. Evidenzia solo problemi concreti o suggerimenti utili all'operatore.
 
 ATTO:
@@ -1294,8 +1294,9 @@ function normalizeAct(input = {}, existing = null) {
   const oroWeight = materialWeight(payload, "Oro") || numberFrom(input.peso_oro ?? existing?.peso_oro);
   const totale = numberFrom(input.amount ?? input.totale ?? existing?.totale);
   const paymentMethod = input.paymentMethod || existing?.payment_method || "";
-  if (String(paymentMethod).toLowerCase().includes("contanti") && totale > CASH_PAYMENT_LIMIT) {
-    const error = new Error("Il pagamento in contanti non puo superare 499,99 euro. Seleziona Bonifico o Assegno come pagamento a norma di legge.");
+  const normalizedStatus = normalizeWorkflowStatus(input.status || existing?.status || "Archiviata");
+  if (String(paymentMethod).toLowerCase().includes("contanti") && totale > 500 && !isDraftLikeStatus(normalizedStatus)) {
+    const error = new Error("Il pagamento in contanti non puo superare 500 euro. Seleziona Bonifico o Assegno come pagamento a norma di legge.");
     error.status = 400;
     throw error;
   }
@@ -1323,9 +1324,126 @@ function normalizeAct(input = {}, existing = null) {
     totale,
     paymentMethod,
     iban,
-    status: normalizeWorkflowStatus(input.status || existing?.status || "Archiviata"),
+    status: normalizedStatus,
     payload
   };
+}
+
+function isCashPaymentMethod(method = "") {
+  return String(method || "").toLowerCase().includes("contanti");
+}
+
+function isDraftLikeStatus(status = "") {
+  const normalized = normalizeWorkflowStatus(status).toLowerCase();
+  return normalized === "bozza" || normalized === "annullata";
+}
+
+function amlMessage(ok) {
+  return ok
+    ? "Controllo contanti entro limite negli ultimi 7 giorni."
+    : "Attenzione: questo cliente ha raggiunto o supererebbe il limite di 500€ in contanti negli ultimi 7 giorni. Per rispettare le norme antiriciclaggio, utilizzare un metodo di pagamento tracciabile.";
+}
+
+async function cashAntiMoneyLaunderingCheck(input = {}) {
+  const fiscalCode = normalizeFiscalCode(input.codice_fiscale || input.fiscalCode || "");
+  const clientId = input.cliente_id || input.clienteId || "";
+  const currentAmount = numberFrom(input.importo_corrente ?? input.amount ?? input.totale ?? 0);
+  const actDate = input.data_atto || input.date || new Date().toISOString().slice(0, 10);
+  const actId = input.atto_id || input.actId || input.id || "";
+  const where = [
+    "LOWER(COALESCE(payment_method, '')) LIKE '%contanti%'",
+    "COALESCE(status, '') NOT ILIKE 'Bozza'",
+    "COALESCE(status, '') NOT ILIKE 'Annullata'",
+    "data_atto BETWEEN ($1::date - INTERVAL '7 days') AND $1::date"
+  ];
+  const values = [actDate];
+  if (fiscalCode) {
+    values.push(fiscalCode);
+    where.push(`UPPER(COALESCE(codice_fiscale, '')) = $${values.length}`);
+  } else if (clientId) {
+    values.push(clientId);
+    where.push(`cliente_id = $${values.length}`);
+  } else {
+    return {
+      ok: true,
+      limite: 500,
+      totale_ultimi_7_giorni: 0,
+      importo_corrente: currentAmount,
+      totale_previsto: currentAmount,
+      residuo_disponibile: Math.max(0, 500 - currentAmount),
+      superamento: Math.max(0, currentAmount - 500),
+      messaggio: "Codice fiscale cliente non disponibile per il controllo contanti."
+    };
+  }
+  if (actId) {
+    values.push(String(actId));
+    where.push(`id::text <> $${values.length}`);
+  }
+  const result = await pool.query(
+    `SELECT COALESCE(SUM(totale), 0)::numeric AS total
+     FROM ${actsTable}
+     WHERE ${where.join(" AND ")}`,
+    values
+  );
+  const previousTotal = Number(result.rows[0]?.total || 0);
+  const predicted = previousTotal + currentAmount;
+  const available = Math.max(0, 500 - previousTotal);
+  const over = Math.max(0, predicted - 500);
+  const ok = predicted <= 500;
+  return {
+    ok,
+    limite: 500,
+    totale_ultimi_7_giorni: Number(previousTotal.toFixed(2)),
+    importo_corrente: Number(currentAmount.toFixed(2)),
+    totale_previsto: Number(predicted.toFixed(2)),
+    residuo_disponibile: Number(available.toFixed(2)),
+    superamento: Number(over.toFixed(2)),
+    messaggio: amlMessage(ok)
+  };
+}
+
+async function saveAmlAlert({ check, act = {}, user = null, attoId = null }) {
+  if (!check || Number(check.totale_previsto || 0) < 500) return;
+  await pool.query(
+    `INSERT INTO antiriciclaggio_alerts
+      (cliente_id, codice_fiscale, atto_id, totale_ultimi_7_giorni, importo_corrente, totale_previsto, superamento, user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [
+      act.clienteId || act.cliente_id || null,
+      normalizeFiscalCode(act.codiceFiscale || act.fiscalCode || ""),
+      attoId || act.id || null,
+      check.totale_ultimi_7_giorni || 0,
+      check.importo_corrente || 0,
+      check.totale_previsto || 0,
+      check.superamento || 0,
+      user?.id || null
+    ]
+  );
+}
+
+async function enforceCashAntiMoneyLaundering(act, user, existing = null) {
+  if (!isCashPaymentMethod(act.paymentMethod)) return null;
+  const check = await cashAntiMoneyLaunderingCheck({
+    codice_fiscale: act.codiceFiscale,
+    cliente_id: existing?.cliente_id || act.clienteId || null,
+    data_atto: act.dataAtto,
+    importo_corrente: act.totale,
+    atto_id: existing?.id || act.id || null
+  });
+  if (!isDraftLikeStatus(act.status) && (existing?.id || act.id)) {
+    await saveAmlAlert({ check, act, user, attoId: existing?.id || act.id || null });
+  }
+  if (!isDraftLikeStatus(act.status) && !check.ok) {
+    const error = new Error(check.messaggio);
+    error.status = 400;
+    error.details = check;
+    throw error;
+  }
+  act.payload = {
+    ...(act.payload || {}),
+    amlCashCheck: check
+  };
+  return check;
 }
 
 function compactActPayload(payload = {}) {
@@ -1824,6 +1942,7 @@ async function saveAct(input, user) {
   }
   if (existing) return updateAct(existing.id, protectedInput, user);
   const act = normalizeAct(protectedInput, existing);
+  const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing);
   const result = await pool.query(
     `INSERT INTO ${actsTable} (
       cliente_nome, cliente_cognome, codice_fiscale, telefono,
@@ -1852,6 +1971,7 @@ async function saveAct(input, user) {
       act.payload
     ]
   );
+  if (!isDraftLikeStatus(act.status)) await saveAmlAlert({ check: amlCheck, act, user, attoId: result.rows[0].id });
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
   if (client?.id) {
     const withClient = await pool.query(
@@ -1879,6 +1999,7 @@ async function updateAct(identifier, input, user) {
     throw error;
   }
   const act = normalizeAct(enforceActStore(input, user), existing);
+  await enforceCashAntiMoneyLaundering(act, user, existing);
   const result = await pool.query(
     `UPDATE ${actsTable} SET
       cliente_nome = $2,
@@ -2161,6 +2282,14 @@ app.get("/api/auth/me", authenticate, (request, response) => {
 });
 
 app.use("/api", authenticate);
+
+app.get("/api/antiriciclaggio/contanti-check", async (request, response, next) => {
+  try {
+    response.json(await cashAntiMoneyLaunderingCheck(request.query));
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.post("/api/ai/leggi-documento", async (request, response, next) => {
   try {
