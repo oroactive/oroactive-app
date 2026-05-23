@@ -43,6 +43,7 @@
         <button type="button" data-section="archive">Elenco</button>
         <button type="button" data-section="fusion">Giacenza</button>
         <button type="button" data-section="assistant">Assistente IA OroActive</button>
+        <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
         <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
         <button class="tutorial-menu-button" type="button" data-start-tutorial>Tutorial</button>
       </nav>
@@ -66,6 +67,7 @@
           <button type="button" data-section="archive">Elenco</button>
           <button type="button" data-section="fusion">Giacenza</button>
           <button type="button" data-section="assistant">Assistente IA OroActive</button>
+          <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
           <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
           <button type="button" data-start-tutorial>Tutorial</button>
         </div>
@@ -581,6 +583,12 @@
             </div>
             <div class="assistant-chat" id="assistantChat" aria-live="polite"></div>
             <form class="assistant-form" id="assistantForm">
+              <label>Modalit&agrave;
+                <select id="assistantMode">
+                  <option value="chat">Assistente IA</option>
+                  <option value="quiz">Quiz Operatore</option>
+                </select>
+              </label>
               <label>Domanda
                 <textarea id="assistantQuestion" rows="3" placeholder="Scrivi una domanda per l'assistente IA OroActive"></textarea>
               </label>
@@ -605,6 +613,68 @@
             <div class="knowledge-status" id="knowledgeStatus"></div>
           </section>
         </div>
+      </section>
+
+      <section id="knowledgeNotes" class="screen knowledge-editor-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Knowledge base viva</p>
+            <h2>Nuova conoscenza OroActive</h2>
+            <p class="muted">Inserisci procedure, casi reali e contenuti formativi. Le conoscenze dei responsabili entrano nell'AI solo dopo approvazione founder.</p>
+          </div>
+          <form class="settings-list" id="knowledgeNoteForm">
+            <input type="hidden" id="knowledgeNoteId">
+            <label>Titolo <input id="knowledgeNoteTitle" required></label>
+            <label>Categoria
+              <select id="knowledgeNoteCategory">
+                <option>Oro</option>
+                <option>Argento</option>
+                <option>Platino</option>
+                <option>Diamanti</option>
+                <option>Gemme</option>
+                <option>Normativa</option>
+                <option>Antiriciclaggio</option>
+                <option>Gestione negozio</option>
+                <option>Vendita</option>
+                <option>Sicurezza</option>
+                <option>Fusioni</option>
+                <option>Clienti</option>
+                <option>Casi reali</option>
+                <option>Procedure operative</option>
+                <option>Formazione operatori</option>
+              </select>
+            </label>
+            <label>Fonte <input id="knowledgeNoteSource" placeholder="Libro, procedura interna, esperienza negozio"></label>
+            <label>Autore <input id="knowledgeNoteAuthor" readonly></label>
+            <label>Ruolo autore <input id="knowledgeNoteRole" readonly></label>
+            <label>Contenuto
+              <textarea id="knowledgeNoteContent" rows="10" required></textarea>
+            </label>
+            <div class="user-form-actions">
+              <button class="primary-button" type="submit" id="saveKnowledgeNoteButton">Salva conoscenza</button>
+              <button class="ghost-button" type="button" id="resetKnowledgeNoteForm">Nuova scheda</button>
+            </div>
+          </form>
+        </div>
+        <section class="knowledge-notes-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Revisione</p>
+              <h3>Conoscenze inserite</h3>
+            </div>
+          </div>
+          <div class="knowledge-notes-list" id="knowledgeNotesList"></div>
+        </section>
+        <section class="knowledge-notes-panel founder-only" id="aiFeedbackPanel" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Miglioramento AI</p>
+              <h3>Feedback risposte assistente</h3>
+            </div>
+          </div>
+          <div class="knowledge-notes-list" id="aiFeedbackList"></div>
+        </section>
       </section>
 
       <section id="users" class="screen admin-only">
@@ -679,6 +749,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260523-23"></script>
+  <script src="app.js?v=20260523-24"></script>
 </body>
 </html>

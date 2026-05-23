@@ -259,7 +259,9 @@ textarea {
 
 .main-menu-actions button.user-menu-button,
 .brand-dropdown button.user-menu-button,
-.main-menu-actions button.tutorial-menu-button {
+.main-menu-actions button.tutorial-menu-button,
+.main-menu-actions button.knowledge-editor-only,
+.brand-dropdown button.knowledge-editor-only {
   border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 8px;
   padding: 8px 16px;
@@ -322,6 +324,23 @@ textarea {
   font-weight: 900;
 }
 
+.assistant-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.assistant-feedback button {
+  border: 1px solid #f0c4a8;
+  border-radius: 8px;
+  background: #fff8f2;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 8px;
+}
+
 .assistant-form,
 .knowledge-form {
   display: grid;
@@ -330,7 +349,8 @@ textarea {
 }
 
 .assistant-form textarea,
-.knowledge-form input {
+.knowledge-form input,
+#knowledgeNoteForm textarea {
   width: 100%;
 }
 
@@ -357,6 +377,40 @@ textarea {
 
 .knowledge-row strong {
   color: var(--ink);
+}
+
+.knowledge-notes-panel {
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.knowledge-notes-list {
+  display: grid;
+  gap: 12px;
+}
+
+.knowledge-note-row {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #f0d7c2;
+  border-radius: 8px;
+  background: #fffaf6;
+}
+
+.knowledge-note-row strong,
+.knowledge-note-row span,
+.knowledge-note-row small {
+  display: block;
+}
+
+.knowledge-note-row p {
+  margin: 0;
+  line-height: 1.45;
 }
 
 .app-shell {

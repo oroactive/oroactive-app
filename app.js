@@ -31,6 +31,8 @@ const state = {
   assistantMessages: [],
   aiBooks: [],
   aiStatus: null,
+  knowledgeNotes: [],
+  aiFeedback: [],
   tutorial: {
     active: false,
     index: 0,
@@ -74,10 +76,15 @@ const tutorialSkip = document.getElementById("tutorialSkip");
 const assistantChat = document.getElementById("assistantChat");
 const assistantForm = document.getElementById("assistantForm");
 const assistantQuestion = document.getElementById("assistantQuestion");
+const assistantMode = document.getElementById("assistantMode");
 const assistantLoading = document.getElementById("assistantLoading");
 const knowledgeForm = document.getElementById("knowledgeForm");
 const knowledgeStatus = document.getElementById("knowledgeStatus");
 const reindexKnowledge = document.getElementById("reindexKnowledge");
+const knowledgeNoteForm = document.getElementById("knowledgeNoteForm");
+const knowledgeNotesList = document.getElementById("knowledgeNotesList");
+const aiFeedbackList = document.getElementById("aiFeedbackList");
+const resetKnowledgeNoteButton = document.getElementById("resetKnowledgeNoteForm");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -1042,6 +1049,10 @@ function isFounder() {
   return normalizeRole(state.currentUser?.ruolo) === "founder";
 }
 
+function canManageKnowledgeUi() {
+  return ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+}
+
 function canReviewActs(user = state.currentUser) {
   return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
@@ -1068,6 +1079,9 @@ function applyRolePermissions() {
   });
   document.querySelectorAll(".founder-only").forEach((element) => {
     element.hidden = !isFounder();
+  });
+  document.querySelectorAll(".knowledge-editor-only").forEach((element) => {
+    element.hidden = !canManageKnowledgeUi();
   });
 
   const storeCode = document.getElementById("storeCode");
@@ -1285,6 +1299,10 @@ function setScreen(id) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
+  if (id === "knowledgeNotes" && !canManageKnowledgeUi()) {
+    showToast("Sezione riservata a Founder o Responsabile.");
+    return;
+  }
   const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
   if (leavingArchive) clearActSearch();
   screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
@@ -1305,6 +1323,11 @@ async function handleScreenDataLoad(id) {
   if (id === "assistant") {
     renderAssistantMessages();
     if (isFounder()) await loadKnowledgeStatus();
+  }
+  if (id === "knowledgeNotes") {
+    resetKnowledgeNoteFormValues();
+    await loadKnowledgeNotes();
+    if (isFounder()) await loadAiFeedback();
   }
 }
 
@@ -1570,10 +1593,18 @@ function renderAssistantMessages() {
     assistantChat.innerHTML = '<div class="empty-state">Scrivi una domanda per consultare l’assistente IA OroActive.</div>';
     return;
   }
-  assistantChat.innerHTML = state.assistantMessages.map((message) => `
+  assistantChat.innerHTML = state.assistantMessages.map((message, index) => `
     <article class="assistant-message ${message.role === "user" ? "user" : "ai"}">
       ${escapeHtml(message.content)}
       ${message.source ? `<span class="assistant-source">Fonte: ${escapeHtml(message.source)}</span>` : ""}
+      ${message.role === "assistant" ? `
+        <div class="assistant-feedback" data-assistant-feedback-index="${index}">
+          <button type="button" data-ai-feedback="utile">Risposta utile</button>
+          <button type="button" data-ai-feedback="non_utile">Risposta non utile</button>
+          <button type="button" data-ai-feedback="errore">Segnala errore</button>
+          <button type="button" data-ai-feedback="miglioramento">Suggerisci miglioramento</button>
+        </div>
+      ` : ""}
     </article>
   `).join("");
   assistantChat.scrollTop = assistantChat.scrollHeight;
@@ -1597,13 +1628,14 @@ async function askAssistant(event) {
   try {
     const data = await apiRequest("/ai/assistente", {
       method: "POST",
-      body: JSON.stringify({ domanda: question }),
+      body: JSON.stringify({ domanda: question, mode: assistantMode?.value || "chat" }),
       timeoutMs: 60000
     });
     state.assistantMessages.push({
       role: "assistant",
       content: data.risposta || "Risposta non disponibile.",
-      source: data.fonte || "Integrazione generale"
+      source: data.fonte || "Integrazione generale",
+      question
     });
   } catch (error) {
     state.assistantMessages.push({
@@ -1729,6 +1761,215 @@ async function deleteKnowledgeBook(id) {
     showToast("Libro eliminato dalla Knowledge Base.");
   } catch (error) {
     showToast(error.message || "Libro non eliminato.");
+  }
+}
+
+function knowledgeStatusLabel(status = "") {
+  const normalized = String(status || "in revisione").toLowerCase();
+  if (normalized === "approvata") return "Approvata";
+  if (normalized === "rifiutata") return "Rifiutata";
+  return "In revisione";
+}
+
+function resetKnowledgeNoteFormValues() {
+  if (!knowledgeNoteForm) return;
+  knowledgeNoteForm.reset();
+  document.getElementById("knowledgeNoteId").value = "";
+  document.getElementById("knowledgeNoteAuthor").value = displayUsername(state.currentUser || {});
+  document.getElementById("knowledgeNoteRole").value = roleLabel(state.currentUser?.ruolo || "");
+  const saveButton = document.getElementById("saveKnowledgeNoteButton");
+  if (saveButton) saveButton.textContent = "Salva conoscenza";
+}
+
+function renderKnowledgeNotes() {
+  if (!knowledgeNotesList) return;
+  if (!state.knowledgeNotes.length) {
+    knowledgeNotesList.innerHTML = '<div class="empty-state">Nessuna conoscenza inserita.</div>';
+    return;
+  }
+  knowledgeNotesList.innerHTML = state.knowledgeNotes.map((note) => `
+    <article class="knowledge-note-row">
+      <div>
+        <strong>${escapeHtml(note.title || "Conoscenza OroActive")}</strong>
+        <span>${escapeHtml(note.category || "Procedure operative")} · ${escapeHtml(knowledgeStatusLabel(note.status))}</span>
+        <small>${escapeHtml(note.source || "Fonte non indicata")} · ${escapeHtml(new Date(note.created_at).toLocaleDateString("it-IT"))}</small>
+      </div>
+      <p>${escapeHtml(String(note.content || "").slice(0, 220))}${String(note.content || "").length > 220 ? "..." : ""}</p>
+      <div class="row-actions">
+        ${note.can_edit ? `<button type="button" data-edit-knowledge="${escapeHtml(String(note.id))}">Modifica</button>` : ""}
+        ${isFounder() && note.status !== "approvata" ? `<button class="primary-button" type="button" data-approve-knowledge="${escapeHtml(String(note.id))}">Approva</button>` : ""}
+        ${isFounder() && note.status !== "rifiutata" ? `<button type="button" data-reject-knowledge="${escapeHtml(String(note.id))}">Rifiuta</button>` : ""}
+        ${note.can_delete ? `<button class="danger-button" type="button" data-delete-knowledge="${escapeHtml(String(note.id))}">Elimina</button>` : ""}
+      </div>
+    </article>
+  `).join("");
+}
+
+async function loadKnowledgeNotes() {
+  if (!canManageKnowledgeUi()) return;
+  try {
+    const data = await apiRequest("/ai/knowledge");
+    state.knowledgeNotes = data.notes || [];
+    renderKnowledgeNotes();
+  } catch (error) {
+    if (knowledgeNotesList) knowledgeNotesList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Conoscenze non caricate.")}</div>`;
+  }
+}
+
+async function saveKnowledgeNote(event) {
+  event.preventDefault();
+  if (!canManageKnowledgeUi()) return;
+  const id = document.getElementById("knowledgeNoteId")?.value;
+  const payload = {
+    title: document.getElementById("knowledgeNoteTitle")?.value.trim(),
+    category: document.getElementById("knowledgeNoteCategory")?.value,
+    source: document.getElementById("knowledgeNoteSource")?.value.trim(),
+    content: document.getElementById("knowledgeNoteContent")?.value.trim(),
+    status: isFounder() ? "approvata" : "in revisione"
+  };
+  if (!payload.title || !payload.content) {
+    showToast("Titolo e contenuto sono obbligatori.");
+    return;
+  }
+  try {
+    showLoading("Salvataggio conoscenza...");
+    await apiRequest(id ? `/ai/knowledge/${encodeURIComponent(id)}` : "/ai/knowledge", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(payload),
+      timeoutMs: 60000
+    });
+    resetKnowledgeNoteFormValues();
+    await loadKnowledgeNotes();
+    showToast(isFounder() ? "Conoscenza approvata e indicizzata." : "Conoscenza salvata in revisione.");
+  } catch (error) {
+    showToast(error.message || "Conoscenza non salvata.");
+  } finally {
+    hideLoading();
+  }
+}
+
+function editKnowledgeNote(id) {
+  const note = state.knowledgeNotes.find((item) => String(item.id) === String(id));
+  if (!note) return;
+  document.getElementById("knowledgeNoteId").value = note.id;
+  document.getElementById("knowledgeNoteTitle").value = note.title || "";
+  document.getElementById("knowledgeNoteCategory").value = note.category || "Procedure operative";
+  document.getElementById("knowledgeNoteSource").value = note.source || "";
+  document.getElementById("knowledgeNoteContent").value = note.content || "";
+  document.getElementById("knowledgeNoteAuthor").value = displayUsername(state.currentUser || {});
+  document.getElementById("knowledgeNoteRole").value = roleLabel(state.currentUser?.ruolo || "");
+  const saveButton = document.getElementById("saveKnowledgeNoteButton");
+  if (saveButton) saveButton.textContent = "Salva modifiche";
+}
+
+async function approveKnowledgeNote(id) {
+  if (!isFounder()) return;
+  try {
+    showLoading("Approvazione e indicizzazione...");
+    await apiRequest(`/ai/knowledge/${encodeURIComponent(id)}/approve`, { method: "POST", body: JSON.stringify({}), timeoutMs: 60000 });
+    await loadKnowledgeNotes();
+    showToast("Conoscenza approvata e indicizzata.");
+  } catch (error) {
+    showToast(error.message || "Conoscenza non approvata.");
+  } finally {
+    hideLoading();
+  }
+}
+
+async function rejectKnowledgeNote(id) {
+  if (!isFounder()) return;
+  try {
+    await apiRequest(`/ai/knowledge/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify({}) });
+    await loadKnowledgeNotes();
+    showToast("Conoscenza rifiutata.");
+  } catch (error) {
+    showToast(error.message || "Conoscenza non aggiornata.");
+  }
+}
+
+async function deleteKnowledgeNote(id) {
+  const confirmed = window.confirm("Vuoi eliminare questa conoscenza OroActive?");
+  if (!confirmed) return;
+  try {
+    await apiRequest(`/ai/knowledge/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await loadKnowledgeNotes();
+    showToast("Conoscenza eliminata.");
+  } catch (error) {
+    showToast(error.message || "Conoscenza non eliminata.");
+  }
+}
+
+function renderAiFeedback() {
+  if (!aiFeedbackList) return;
+  if (!isFounder()) {
+    aiFeedbackList.innerHTML = "";
+    return;
+  }
+  if (!state.aiFeedback.length) {
+    aiFeedbackList.innerHTML = '<div class="empty-state">Nessun feedback AI registrato.</div>';
+    return;
+  }
+  aiFeedbackList.innerHTML = state.aiFeedback.map((item) => `
+    <article class="knowledge-note-row">
+      <div>
+        <strong>${escapeHtml(item.feedback_type || "feedback")}</strong>
+        <span>${escapeHtml(new Date(item.created_at).toLocaleString("it-IT"))}</span>
+      </div>
+      <p><b>Domanda:</b> ${escapeHtml(String(item.question || "").slice(0, 180))}</p>
+      <p><b>Commento:</b> ${escapeHtml(item.comment || "Nessun commento")}</p>
+      <div class="row-actions">
+        <button type="button" data-feedback-to-knowledge="${escapeHtml(String(item.id))}">Trasforma in conoscenza approvata</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+async function loadAiFeedback() {
+  if (!isFounder()) return;
+  try {
+    const data = await apiRequest("/ai/feedback");
+    state.aiFeedback = data.feedback || [];
+    renderAiFeedback();
+  } catch (error) {
+    if (aiFeedbackList) aiFeedbackList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Feedback non caricato.")}</div>`;
+  }
+}
+
+async function sendAssistantFeedback(messageIndex, type) {
+  const message = state.assistantMessages[Number(messageIndex)];
+  if (!message || message.role !== "assistant") return;
+  let comment = "";
+  if (type === "errore" || type === "miglioramento") {
+    comment = window.prompt(type === "errore" ? "Descrivi l'errore rilevato" : "Scrivi il miglioramento suggerito") || "";
+    if (!comment.trim()) return;
+  }
+  try {
+    await apiRequest("/ai/feedback", {
+      method: "POST",
+      body: JSON.stringify({
+        question: message.question || "",
+        answer: message.content || "",
+        feedback_type: type,
+        comment
+      })
+    });
+    showToast("Feedback salvato. Grazie.");
+  } catch (error) {
+    showToast(error.message || "Feedback non salvato.");
+  }
+}
+
+async function feedbackToKnowledge(id) {
+  if (!isFounder()) return;
+  try {
+    await apiRequest(`/ai/feedback/${encodeURIComponent(id)}/to-knowledge`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    await Promise.all([loadKnowledgeNotes(), loadAiFeedback()]);
+    showToast("Feedback trasformato in conoscenza approvata.");
+  } catch (error) {
+    showToast(error.message || "Feedback non trasformato.");
   }
 }
 
@@ -5609,9 +5850,31 @@ document.getElementById("userRole").addEventListener("change", configureUserForm
 assistantForm?.addEventListener("submit", askAssistant);
 knowledgeForm?.addEventListener("submit", uploadKnowledgeBook);
 reindexKnowledge?.addEventListener("click", reindexKnowledgeBase);
+knowledgeNoteForm?.addEventListener("submit", saveKnowledgeNote);
+resetKnowledgeNoteButton?.addEventListener("click", resetKnowledgeNoteFormValues);
 knowledgeStatus?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-delete-book]");
   if (button) deleteKnowledgeBook(button.dataset.deleteBook);
+});
+knowledgeNotesList?.addEventListener("click", (event) => {
+  const edit = event.target.closest("[data-edit-knowledge]");
+  const approve = event.target.closest("[data-approve-knowledge]");
+  const reject = event.target.closest("[data-reject-knowledge]");
+  const remove = event.target.closest("[data-delete-knowledge]");
+  if (edit) editKnowledgeNote(edit.dataset.editKnowledge);
+  if (approve) approveKnowledgeNote(approve.dataset.approveKnowledge);
+  if (reject) rejectKnowledgeNote(reject.dataset.rejectKnowledge);
+  if (remove) deleteKnowledgeNote(remove.dataset.deleteKnowledge);
+});
+aiFeedbackList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-feedback-to-knowledge]");
+  if (button) feedbackToKnowledge(button.dataset.feedbackToKnowledge);
+});
+assistantChat?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-ai-feedback]");
+  if (!button) return;
+  const wrapper = button.closest("[data-assistant-feedback-index]");
+  sendAssistantFeedback(wrapper?.dataset.assistantFeedbackIndex, button.dataset.aiFeedback);
 });
 
 brandMenuButton.addEventListener("click", (event) => {

@@ -41,9 +41,26 @@ const aiRuntime = {
   pgvector: false,
   vectorColumn: null,
   jsonColumn: "embedding_json",
-  pgvectorMessage: "pgvector non verificato",
+  pgvectorMessage: "pgvector non disponibile, uso ricerca testuale fallback",
   embeddingDimension: 1536
 };
+const knowledgeCategories = [
+  "Oro",
+  "Argento",
+  "Platino",
+  "Diamanti",
+  "Gemme",
+  "Normativa",
+  "Antiriciclaggio",
+  "Gestione negozio",
+  "Vendita",
+  "Sicurezza",
+  "Fusioni",
+  "Clienti",
+  "Casi reali",
+  "Procedure operative",
+  "Formazione operatori"
+];
 
 const app = express();
 app.use(cors());
@@ -164,6 +181,17 @@ function requireAdmin(request, response, next) {
 
 function requireFounder(request, response, next) {
   if (normalizeRole(request.user?.ruolo) !== "founder") {
+    return response.status(403).json({ error: "Non autorizzato" });
+  }
+  next();
+}
+
+function canManageKnowledge(user) {
+  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
+}
+
+function requireKnowledgeEditor(request, response, next) {
+  if (!canManageKnowledge(request.user)) {
     return response.status(403).json({ error: "Non autorizzato" });
   }
   next();
@@ -394,7 +422,13 @@ const assistantAiSchema = {
     risposta: { type: "string" },
     fonte: {
       type: "string",
-      enum: ["La bilancia d'oro", "La bilancia d'oro + integrazione generale", "Integrazione generale"]
+      enum: [
+        "La bilancia d'oro",
+        "La bilancia d'oro + Procedura OroActive approvata",
+        "Procedura OroActive approvata",
+        "La bilancia d'oro + integrazione generale",
+        "Integrazione generale"
+      ]
     },
     dal_libro: { type: "boolean" },
     citazioni: { type: "array", items: { type: "string" } }
@@ -618,45 +652,11 @@ async function setupAiVectorStorage() {
   await pool.query("ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS content_tsv TSVECTOR");
   await pool.query("UPDATE ai_document_chunks SET content_tsv = to_tsvector('italian', COALESCE(content, '')) WHERE content_tsv IS NULL");
   await pool.query("CREATE INDEX IF NOT EXISTS ai_document_chunks_content_fts_idx ON ai_document_chunks USING GIN (content_tsv)");
-  const initialColumns = await aiChunkColumns();
-  const legacyEmbedding = initialColumns.find((column) => column.column_name === "embedding");
-  aiRuntime.jsonColumn = legacyEmbedding && legacyEmbedding.data_type !== "USER-DEFINED" ? "embedding" : "embedding_json";
-
-  try {
-    const installed = await pool.query("SELECT * FROM pg_extension WHERE extname = 'vector'");
-    if (!installed.rowCount) {
-      await pool.query("CREATE EXTENSION IF NOT EXISTS vector");
-    }
-    const active = await pool.query("SELECT * FROM pg_extension WHERE extname = 'vector'");
-    if (!active.rowCount) throw new Error("Estensione vector non attiva");
-
-    const columns = await aiChunkColumns();
-    const embeddingColumn = columns.find((column) => column.column_name === "embedding");
-    if (!embeddingColumn) {
-      await pool.query(`ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS embedding vector(${aiRuntime.embeddingDimension})`);
-      aiRuntime.vectorColumn = "embedding";
-    } else if (embeddingColumn.udt_name === "vector") {
-      aiRuntime.vectorColumn = "embedding";
-    } else {
-      await pool.query(`ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS embedding_vector vector(${aiRuntime.embeddingDimension})`);
-      aiRuntime.vectorColumn = "embedding_vector";
-    }
-
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_ai_chunks_embedding
-      ON ai_document_chunks
-      USING ivfflat (${sqlIdentifier(aiRuntime.vectorColumn)} vector_cosine_ops)
-    `);
-    aiRuntime.pgvector = true;
-    aiRuntime.pgvectorMessage = `pgvector attivo su colonna ${aiRuntime.vectorColumn}`;
-    console.log(aiRuntime.pgvectorMessage);
-  } catch (error) {
-    aiRuntime.pgvector = false;
-    aiRuntime.vectorColumn = null;
-    aiRuntime.pgvectorMessage = "pgvector non disponibile, uso ricerca testuale fallback";
-    console.log(aiRuntime.pgvectorMessage);
-    if (error?.message) console.log(`Dettaglio pgvector: ${error.message}`);
-  }
+  aiRuntime.pgvector = false;
+  aiRuntime.vectorColumn = null;
+  aiRuntime.jsonColumn = "embedding_json";
+  aiRuntime.pgvectorMessage = "pgvector non disponibile, uso ricerca testuale fallback";
+  console.log(aiRuntime.pgvectorMessage);
 }
 
 async function insertAiChunk(db, { document, index, content, embedding }) {
@@ -746,6 +746,7 @@ async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
         {
           chunks: chunks.length,
           bookHash,
+          sourceType: "book",
           searchMode: aiRuntime.pgvector ? "pgvector" : "full-text",
           embeddingModel: aiRuntime.pgvector ? openaiEmbeddingModel : null
         }
@@ -840,6 +841,7 @@ async function updateAiBook(id, input = {}, user = null) {
           JSON.stringify({
             chunks: chunks.length,
             bookHash,
+            sourceType: "book",
             searchMode: aiRuntime.pgvector ? "pgvector" : "full-text",
             embeddingModel: aiRuntime.pgvector ? openaiEmbeddingModel : null,
             replacedAt: new Date().toISOString()
@@ -884,49 +886,278 @@ async function deleteAiBook(id) {
   return result.rowCount > 0;
 }
 
-async function searchAiChunks(question = "") {
+function normalizeKnowledgeStatus(status = "in revisione") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "approvata" || normalized === "approvato") return "approvata";
+  if (normalized === "rifiutata" || normalized === "rifiutato") return "rifiutata";
+  return "in revisione";
+}
+
+function normalizeKnowledgeCategory(category = "") {
+  const found = knowledgeCategories.find((item) => item.toLowerCase() === String(category || "").trim().toLowerCase());
+  return found || "Procedure operative";
+}
+
+function publicKnowledgeNote(row = {}, user = null) {
+  const role = normalizeRole(user?.ruolo);
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.category,
+    content: row.content,
+    source: row.source,
+    author_id: row.author_id,
+    author_role: row.author_role,
+    status: row.status,
+    approved_by: row.approved_by,
+    approved_at: row.approved_at,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    can_edit: role === "founder" || (role === "responsabile" && String(row.author_id || "") === String(user?.id || "")),
+    can_delete: role === "founder" || (role === "responsabile" && String(row.author_id || "") === String(user?.id || "") && row.status !== "approvata")
+  };
+}
+
+async function indexKnowledgeNote(note = {}) {
+  if (!note?.id || normalizeKnowledgeStatus(note.status) !== "approvata") return { indexed: false, chunks: 0 };
+  const chunks = chunkBookText(note.content || "");
+  if (!chunks.length) return { indexed: false, chunks: 0 };
+  console.log("Chunks loaded:", chunks.length);
+
+  const db = await pool.connect();
+  try {
+    await db.query("BEGIN");
+    await db.query(
+      "DELETE FROM ai_documents WHERE metadata->>'sourceType' = 'note' AND metadata->>'noteId' = $1",
+      [String(note.id)]
+    );
+    const documentResult = await db.query(
+      `INSERT INTO ai_documents (titolo, autore, filename, uploaded_by, metadata)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, titolo, autore, filename, uploaded_by, created_at`,
+      [
+        note.title || "Procedura OroActive approvata",
+        note.author_role || "OroActive",
+        `knowledge-note-${note.id}`,
+        note.author_id || null,
+        {
+          sourceType: "note",
+          noteId: String(note.id),
+          category: note.category || "Procedure operative",
+          status: "approvata",
+          searchMode: "full-text"
+        }
+      ]
+    );
+    const document = documentResult.rows[0];
+    for (let index = 0; index < chunks.length; index += 1) {
+      await insertAiChunk(db, { document, index, content: chunks[index], embedding: [] });
+    }
+    await db.query("COMMIT");
+    return { indexed: true, chunks: chunks.length };
+  } catch (error) {
+    await db.query("ROLLBACK");
+    throw error;
+  } finally {
+    db.release();
+  }
+}
+
+async function listKnowledgeNotes(user) {
+  const role = normalizeRole(user?.ruolo);
+  if (role === "founder") {
+    const result = await pool.query("SELECT * FROM ai_knowledge_notes ORDER BY created_at DESC");
+    return { categories: knowledgeCategories, notes: result.rows.map((row) => publicKnowledgeNote(row, user)) };
+  }
+  if (role === "responsabile") {
+    const result = await pool.query(
+      "SELECT * FROM ai_knowledge_notes WHERE author_id = $1 OR status = 'approvata' ORDER BY created_at DESC",
+      [user.id]
+    );
+    return { categories: knowledgeCategories, notes: result.rows.map((row) => publicKnowledgeNote(row, user)) };
+  }
+  const error = new Error("Non autorizzato");
+  error.status = 403;
+  throw error;
+}
+
+async function createKnowledgeNote(input = {}, user) {
+  const title = String(input.title || "").trim();
+  const content = String(input.content || "").trim();
+  if (!title || !content) {
+    const error = new Error("Titolo e contenuto sono obbligatori.");
+    error.status = 400;
+    throw error;
+  }
+  const isFounderRole = normalizeRole(user?.ruolo) === "founder";
+  const requestedStatus = normalizeKnowledgeStatus(input.status);
+  const status = isFounderRole && requestedStatus === "approvata" ? "approvata" : "in revisione";
+  const result = await pool.query(
+    `INSERT INTO ai_knowledge_notes
+      (title, category, content, source, author_id, author_role, status, approved_by, approved_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 = 'approvata' THEN NOW() ELSE NULL END)
+     RETURNING *`,
+    [
+      title,
+      normalizeKnowledgeCategory(input.category),
+      content,
+      String(input.source || "").trim(),
+      user.id,
+      normalizeRole(user.ruolo),
+      status,
+      status === "approvata" ? user.id : null
+    ]
+  );
+  const note = result.rows[0];
+  if (note.status === "approvata") await indexKnowledgeNote(note);
+  return publicKnowledgeNote(note, user);
+}
+
+async function updateKnowledgeNote(id, input = {}, user) {
+  const existing = await pool.query("SELECT * FROM ai_knowledge_notes WHERE id = $1", [id]);
+  const note = existing.rows[0];
+  if (!note) return null;
+  const role = normalizeRole(user?.ruolo);
+  const ownNote = String(note.author_id || "") === String(user?.id || "");
+  if (role !== "founder" && !(role === "responsabile" && ownNote)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  if (role === "responsabile" && note.status === "approvata") {
+    const error = new Error("La conoscenza approvata dal founder non puo essere modificata dal responsabile.");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `UPDATE ai_knowledge_notes
+     SET title = COALESCE(NULLIF($2, ''), title),
+         category = COALESCE(NULLIF($3, ''), category),
+         content = COALESCE(NULLIF($4, ''), content),
+         source = COALESCE($5, source),
+         status = CASE WHEN $6 = 'founder' THEN $7 ELSE 'in revisione' END,
+         approved_by = CASE WHEN $6 = 'founder' AND $7 = 'approvata' THEN $8 ELSE NULL END,
+         approved_at = CASE WHEN $6 = 'founder' AND $7 = 'approvata' THEN NOW() ELSE NULL END,
+         updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [
+      id,
+      String(input.title || "").trim(),
+      normalizeKnowledgeCategory(input.category),
+      String(input.content || "").trim(),
+      String(input.source || "").trim(),
+      role,
+      normalizeKnowledgeStatus(input.status || note.status),
+      user.id
+    ]
+  );
+  const updated = result.rows[0];
+  await pool.query("DELETE FROM ai_documents WHERE metadata->>'sourceType' = 'note' AND metadata->>'noteId' = $1", [String(id)]);
+  if (updated.status === "approvata") await indexKnowledgeNote(updated);
+  return publicKnowledgeNote(updated, user);
+}
+
+async function setKnowledgeNoteStatus(id, status, user) {
+  const normalized = normalizeKnowledgeStatus(status);
+  const result = await pool.query(
+    `UPDATE ai_knowledge_notes
+     SET status = $2,
+         approved_by = CASE WHEN $2 = 'approvata' THEN $3 ELSE NULL END,
+         approved_at = CASE WHEN $2 = 'approvata' THEN NOW() ELSE NULL END,
+         updated_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id, normalized, user.id]
+  );
+  const note = result.rows[0];
+  if (!note) return null;
+  await pool.query("DELETE FROM ai_documents WHERE metadata->>'sourceType' = 'note' AND metadata->>'noteId' = $1", [String(id)]);
+  if (note.status === "approvata") await indexKnowledgeNote(note);
+  return publicKnowledgeNote(note, user);
+}
+
+async function deleteKnowledgeNote(id, user) {
+  const existing = await pool.query("SELECT * FROM ai_knowledge_notes WHERE id = $1", [id]);
+  const note = existing.rows[0];
+  if (!note) return false;
+  const role = normalizeRole(user?.ruolo);
+  const ownNote = String(note.author_id || "") === String(user?.id || "");
+  if (role !== "founder" && !(role === "responsabile" && ownNote && note.status !== "approvata")) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  await pool.query("DELETE FROM ai_documents WHERE metadata->>'sourceType' = 'note' AND metadata->>'noteId' = $1", [String(id)]);
+  await pool.query("DELETE FROM ai_knowledge_notes WHERE id = $1", [id]);
+  return true;
+}
+
+async function listAiFeedback() {
+  const result = await pool.query("SELECT * FROM ai_feedback ORDER BY created_at DESC LIMIT 200");
+  return { feedback: result.rows };
+}
+
+async function createAiFeedback(input = {}, user) {
+  const result = await pool.query(
+    `INSERT INTO ai_feedback (user_id, question, answer, feedback_type, comment)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [
+      user.id,
+      String(input.question || "").slice(0, 6000),
+      String(input.answer || "").slice(0, 12000),
+      String(input.feedback_type || input.type || "utile").slice(0, 80),
+      String(input.comment || "").slice(0, 4000)
+    ]
+  );
+  return result.rows[0];
+}
+
+async function feedbackToKnowledge(id, input = {}, user) {
+  const feedbackResult = await pool.query("SELECT * FROM ai_feedback WHERE id = $1", [id]);
+  const feedback = feedbackResult.rows[0];
+  if (!feedback) return null;
+  const content = String(input.content || `Domanda operatore:\n${feedback.question}\n\nRisposta AI:\n${feedback.answer}\n\nFeedback:\n${feedback.comment || feedback.feedback_type}`).trim();
+  return createKnowledgeNote({
+    title: input.title || `Miglioramento AI #${feedback.id}`,
+    category: input.category || "Formazione operatori",
+    source: input.source || "Feedback Assistente IA OroActive",
+    content,
+    status: "approvata"
+  }, user);
+}
+
+async function searchAiChunksBySource(question = "", sourceType = "book", limit = 6) {
   const text = String(question || "").trim();
   if (!text) return [];
-
-  if (aiRuntime.pgvector && aiRuntime.vectorColumn) {
-    try {
-      const questionEmbedding = await createTextEmbedding(text);
-      const vectorColumn = sqlIdentifier(aiRuntime.vectorColumn);
-      const result = await pool.query(
-        `SELECT c.id, c.content, c.chunk_index, d.titolo, d.autore,
-                1 - (c.${vectorColumn} <=> $1::vector) AS score
-         FROM ai_document_chunks c
-         JOIN ai_documents d ON d.id = c.document_id
-         WHERE c.${vectorColumn} IS NOT NULL
-         ORDER BY c.${vectorColumn} <=> $1::vector
-         LIMIT 10`,
-        [vectorInput(questionEmbedding)]
-      );
-      if (result.rows.length) return result.rows;
-    } catch (error) {
-      console.log(`Ricerca pgvector non disponibile, uso fallback testuale: ${error.message}`);
-    }
-  }
-
   if (!aiRuntime.pgvector) {
     console.log("pgvector non disponibile, uso ricerca testuale fallback");
   }
-
+  const sourceCondition = sourceType === "note"
+    ? "d.metadata->>'sourceType' = 'note'"
+    : "(d.metadata->>'sourceType' = 'book' OR d.metadata->>'sourceType' IS NULL)";
   const fullTextResult = await pool.query(
-    `SELECT c.id, c.title, c.content, c.chunk_index, d.titolo, d.autore,
+    `SELECT c.id, c.title, c.content, c.chunk_index, d.titolo, d.autore, d.metadata,
             ts_rank_cd(c.content_tsv, plainto_tsquery('italian', $1)) AS score
      FROM ai_document_chunks c
      JOIN ai_documents d ON d.id = c.document_id
-     WHERE c.content_tsv @@ plainto_tsquery('italian', $1)
-        OR c.content ILIKE $2
+     WHERE (${sourceCondition})
+       AND (c.content_tsv @@ plainto_tsquery('italian', $1) OR c.content ILIKE $2)
      ORDER BY score DESC, c.created_at DESC
-     LIMIT 10`,
-    [text, `%${text.slice(0, 120)}%`]
+     LIMIT $3`,
+    [text, `%${text.slice(0, 120)}%`, limit]
   );
   return fullTextResult.rows;
 }
 
-async function askOroActiveAssistant(question = "") {
+async function searchAiChunks(question = "") {
+  const bookChunks = await searchAiChunksBySource(question, "book", 6);
+  const noteChunks = await searchAiChunksBySource(question, "note", Math.max(4, 10 - bookChunks.length));
+  return [...bookChunks, ...noteChunks].slice(0, 10);
+}
+
+async function askOroActiveAssistant(question = "", options = {}) {
   const domanda = String(question || "").trim();
   if (!domanda) {
     const error = new Error("Inserisci una domanda per l'assistente.");
@@ -935,15 +1166,18 @@ async function askOroActiveAssistant(question = "") {
   }
 
   const chunks = limitAssistantContext(await searchAiChunks(domanda));
-  const hasBookContext = chunks.length > 0;
+  const hasContext = chunks.length > 0;
+  const hasBookContext = chunks.some((chunk) => chunk.metadata?.sourceType !== "note");
+  const hasApprovedKnowledge = chunks.some((chunk) => chunk.metadata?.sourceType === "note");
+  const mode = options.mode === "quiz" ? "quiz" : "chat";
   const context = chunks.map((chunk, index) => (
-    `[Fonte ${index + 1}: ${chunk.titolo || "La bilancia d'oro"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
+    `[Fonte ${index + 1}: ${chunk.metadata?.sourceType === "note" ? "Procedura OroActive approvata" : "La bilancia d'oro"} - ${chunk.titolo || "Knowledge base"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
   )).join("\n\n---\n\n");
 
   if (!openai) {
     return {
-      risposta: "Non trovo informazioni sufficienti nel libro.",
-      fonte: hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
+      risposta: "Questa informazione non è presente nella knowledge base OroActive.",
+      fonte: hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
       dal_libro: false,
       citazioni: [],
       risultati: chunks.map((chunk) => ({
@@ -962,15 +1196,16 @@ async function askOroActiveAssistant(question = "") {
       model: openaiModel,
       input: `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
-Usa come fonte primaria il libro "La bilancia d'oro" di Christian Dinato.
-Se il contesto del libro e sufficiente, inizia con "Dal libro risulta...".
-Se il contesto del libro non contiene abbastanza informazioni, devi scrivere esattamente: "Questa informazione non è presente nel libro".
+Usa prima il libro "La bilancia d'oro" di Christian Dinato, poi le procedure/conoscenze OroActive approvate.
+Se il contesto della knowledge base e sufficiente, rispondi usando solo i passaggi forniti.
+Se il contesto non contiene abbastanza informazioni, devi scrivere esattamente: "Questa informazione non è presente nella knowledge base OroActive."
 Solo dopo quella frase puoi aggiungere una sezione "In integrazione generale..." con conoscenza generale, senza inventare fonti.
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
+Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : "Assistente operativo."}
 
-CONTESTO DAL LIBRO:
-${hasBookContext ? context : "Nessun passaggio del libro trovato per questa domanda."}
+CONTESTO KNOWLEDGE BASE:
+${hasContext ? context : "Nessun passaggio trovato per questa domanda."}
 
 DOMANDA:
 ${domanda}`,
@@ -987,7 +1222,7 @@ ${domanda}`,
     const parsed = parseOpenAiJson(result);
     return {
       risposta: parsed.risposta || "",
-      fonte: parsed.fonte || (hasBookContext ? "La bilancia d'oro" : "Integrazione generale"),
+      fonte: parsed.fonte || (hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale"),
       dal_libro: Boolean(parsed.dal_libro && hasBookContext),
       citazioni: Array.isArray(parsed.citazioni) ? parsed.citazioni : [],
       risultati: chunks.map((chunk) => ({
@@ -999,8 +1234,8 @@ ${domanda}`,
     };
   } catch (error) {
     return {
-      risposta: "Non trovo informazioni sufficienti nel libro.",
-      fonte: hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
+      risposta: "Questa informazione non è presente nella knowledge base OroActive.",
+      fonte: hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
       dal_libro: false,
       citazioni: [],
       risultati: chunks.map((chunk) => ({
@@ -1953,7 +2188,7 @@ app.post("/api/ai/controlla-atto", async (request, response, next) => {
 
 app.post("/api/ai/assistente", async (request, response, next) => {
   try {
-    response.json(await askOroActiveAssistant(request.body.domanda || request.body.question || ""));
+    response.json(await askOroActiveAssistant(request.body.domanda || request.body.question || "", { mode: request.body.mode }));
   } catch (error) {
     if (!error.status) error.status = 502;
     if (!error.message) error.message = "Assistente IA non disponibile.";
@@ -2008,6 +2243,88 @@ app.delete("/api/ai/book/:id", requireFounder, async (request, response, next) =
     const deleted = await deleteAiBook(request.params.id);
     if (!deleted) return response.status(404).json({ error: "Libro non trovato" });
     response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/ai/knowledge", requireKnowledgeEditor, async (request, response, next) => {
+  try {
+    response.json(await listKnowledgeNotes(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/knowledge", requireKnowledgeEditor, async (request, response, next) => {
+  try {
+    response.status(201).json(await createKnowledgeNote(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/ai/knowledge/:id", requireKnowledgeEditor, async (request, response, next) => {
+  try {
+    const note = await updateKnowledgeNote(request.params.id, request.body, request.user);
+    if (!note) return response.status(404).json({ error: "Conoscenza non trovata" });
+    response.json(note);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/ai/knowledge/:id", requireKnowledgeEditor, async (request, response, next) => {
+  try {
+    const deleted = await deleteKnowledgeNote(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Conoscenza non trovata" });
+    response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/knowledge/:id/approve", requireFounder, async (request, response, next) => {
+  try {
+    const note = await setKnowledgeNoteStatus(request.params.id, "approvata", request.user);
+    if (!note) return response.status(404).json({ error: "Conoscenza non trovata" });
+    response.json(note);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/knowledge/:id/reject", requireFounder, async (request, response, next) => {
+  try {
+    const note = await setKnowledgeNoteStatus(request.params.id, "rifiutata", request.user);
+    if (!note) return response.status(404).json({ error: "Conoscenza non trovata" });
+    response.json(note);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/feedback", async (request, response, next) => {
+  try {
+    response.status(201).json(await createAiFeedback(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/ai/feedback", requireFounder, async (_request, response, next) => {
+  try {
+    response.json(await listAiFeedback());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/feedback/:id/to-knowledge", requireFounder, async (request, response, next) => {
+  try {
+    const note = await feedbackToKnowledge(request.params.id, request.body, request.user);
+    if (!note) return response.status(404).json({ error: "Feedback non trovato" });
+    response.status(201).json(note);
   } catch (error) {
     next(error);
   }
