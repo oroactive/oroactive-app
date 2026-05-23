@@ -2115,6 +2115,13 @@ input.document-expired {
   color: #0b0b0a;
 }
 
+.table-row em.status-draft,
+.archive-export-row em.status-draft {
+  background: #fff0e6;
+  color: var(--gold-dark);
+  border: 1px solid rgba(255, 115, 28, 0.32);
+}
+
 .table-row em.quality-review-badge {
   justify-self: start;
   font-weight: 950;

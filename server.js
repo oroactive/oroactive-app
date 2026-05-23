@@ -79,6 +79,7 @@ function publicUser(row) {
 function normalizeRole(role = "commesso") {
   const normalized = String(role || "").trim().toLowerCase();
   if (normalized === "founder") return "founder";
+  if (normalized === "supervisore") return "supervisore";
   if (normalized === "admin") return "responsabile";
   if (normalized === "responsabile") return "responsabile";
   if (normalized === "aiuto_commesso" || normalized === "aiuto commesso" || normalized === "aiuto_commessa" || normalized === "aiuto commessa") {
@@ -92,16 +93,17 @@ function normalizeRole(role = "commesso") {
 }
 
 function roleSeesAllStores(role) {
-  return ["founder", "responsabile", "commesso"].includes(normalizeRole(role));
+  return ["founder", "supervisore", "responsabile", "commesso"].includes(normalizeRole(role));
 }
 
 function canManageAccess(user) {
-  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
 
 function managedRolesForActor(actor) {
   const role = normalizeRole(actor?.ruolo);
-  if (role === "founder") return ["aiuto_commesso", "commesso", "responsabile"];
+  if (role === "founder") return ["aiuto_commesso", "commesso", "responsabile", "supervisore"];
+  if (role === "supervisore") return ["aiuto_commesso", "commesso", "responsabile"];
   if (role === "responsabile") return ["aiuto_commesso", "commesso"];
   return [];
 }
@@ -243,6 +245,7 @@ function normalizeWorkflowStatus(status = "Archiviata") {
   if (typeof status !== "string") return "Archiviata";
   const normalized = status.trim().toLowerCase();
   if (normalized === "completato" || normalized === "completata") return "Completato";
+  if (normalized === "bozza") return "Bozza";
   if (normalized === "archiviato" || normalized === "archiviata") return "Archiviata";
   return "Archiviata";
 }
@@ -688,7 +691,7 @@ function canAccessAct(row, user) {
 }
 
 function canReviewActs(user) {
-  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
 
 function actorKey(user = {}) {
@@ -721,6 +724,7 @@ async function upsertClientFromAct(act) {
     birthPlace: act.payload?.birthPlace || act.birthPlace || "",
     birthProvince: act.payload?.birthProvince || act.birthProvince || "",
     sex: act.payload?.sex || act.sex || "",
+    citizenship: act.payload?.citizenship || act.citizenship || "",
     address: act.payload?.address || act.address || "",
     residenceProvince: act.payload?.residenceProvince || act.residenceProvince || "",
     documentType: act.payload?.documentType || act.documentType || "",
@@ -1141,16 +1145,18 @@ async function updateUser(id, input, actor) {
   return result.rowCount ? publicUser(result.rows[0]) : null;
 }
 
-async function listUsers() {
+async function listUsers(options = {}) {
+  const where = options.includeFounder ? "" : "WHERE ruolo <> 'founder'";
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen FROM utenti WHERE ruolo <> 'founder' ORDER BY data_creazione DESC"
+    `SELECT id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen FROM utenti ${where} ORDER BY data_creazione DESC`
   );
   return result.rows.map(publicUser);
 }
 
 async function listUsersForActor(actor) {
   const actorRole = normalizeRole(actor?.ruolo);
-  if (actorRole === "founder") return listUsers();
+  if (actorRole === "founder") return listUsers({ includeFounder: true });
+  if (actorRole === "supervisore") return listUsers();
   const roles = managedRolesForActor(actor);
   if (!roles.length) return [];
   const values = [roles];
@@ -1588,6 +1594,45 @@ function drawActMainPdfPage(doc, act, title) {
   doc.fillColor("#111").font("Helvetica").fontSize(9).text("Atto di vendita generato e archiviato nel gestionale OroActive con allegati fotografici e firme integrate.", 42, y, { width: 511, lineGap: 2 });
 }
 
+function drawCustomerPdfPage(doc, act, title) {
+  doc.addPage();
+  drawPdfHeader(doc, act, title);
+  let y = 122;
+  y = drawPdfSectionTitle(doc, "Sezione cliente", y);
+  y = drawPdfFields(doc, [
+    { label: "Nome", value: act.name },
+    { label: "Cognome", value: act.surname },
+    { label: "Codice fiscale", value: act.fiscalCode },
+    { label: "Telefono", value: act.phone },
+    { label: "Cittadinanza", value: act.citizenship },
+    { label: "Sesso", value: act.sex },
+    { label: "Data nascita", value: act.birthDate },
+    { label: "Luogo nascita", value: act.birthPlace },
+    { label: "Provincia nascita", value: act.birthProvince },
+    { label: "Residenza", value: act.address },
+    { label: "Provincia residenza", value: act.residenceProvince },
+    { label: "Documento", value: `${act.documentType || ""} ${act.documentNumber || ""}`.trim() },
+    { label: "Data rilascio", value: act.documentIssueDate },
+    { label: "Scadenza documento", value: act.documentExpiry }
+  ], y, 2);
+
+  y = ensurePdfSpace(doc, y, 150);
+  y = drawPdfSectionTitle(doc, "Sezione vendita", y);
+  (act.items || []).forEach((item, index) => {
+    y = ensurePdfSpace(doc, y, 42);
+    doc.roundedRect(42, y, 511, 34, 4).strokeColor("#e6d6c8").stroke();
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(9).text(`${index + 1}. ${item.description || "Oggetto prezioso"}`, 50, y + 7, { width: 300, height: 18, ellipsis: true });
+    doc.fillColor("#555").font("Helvetica").fontSize(9).text(`${item.metal || ""} - ${item.title || ""}`, 365, y + 7, { width: 175 });
+    y += 40;
+  });
+  y = ensurePdfSpace(doc, y, 110);
+  y = drawPdfFields(doc, [
+    { label: "Metodo pagamento", value: act.paymentMethod },
+    { label: "Totale corrisposto", value: pdfFormatEuro(act.amount) },
+    ...(act.materialAmounts || []).map((row) => ({ label: `Totale corrisposto ${row.metal}`, value: pdfFormatEuro(row.amount) }))
+  ], y, 2);
+}
+
 function drawActAttachmentPdfPages(doc, act, title) {
   const attachments = actAttachmentsForPdf(act);
   doc.addPage();
@@ -1607,7 +1652,7 @@ function drawActAttachmentPdfPages(doc, act, title) {
   });
 }
 
-function buildPdfForActs(response, { title = "Atto di vendita OroActive", subtitle = "", acts = [] }) {
+function buildPdfForActs(response, { title = "Atto di vendita OroActive", subtitle = "", acts = [], scope = "company" }) {
   response.setHeader("Content-Type", "application/pdf");
   response.setHeader("Content-Disposition", `attachment; filename=\"oroactive-atti.pdf\"`);
   const doc = new PDFDocument({ size: "A4", autoFirstPage: false, margin: 42, bufferPages: true });
@@ -1626,15 +1671,19 @@ function buildPdfForActs(response, { title = "Atto di vendita OroActive", subtit
   }
   acts.forEach((act) => {
     const heading = act.practiceNumber ? `Atto di vendita ${act.practiceNumber}` : title;
-    drawActMainPdfPage(doc, act, heading);
-    drawActAttachmentPdfPages(doc, act, heading);
+    if (scope === "customer") {
+      drawCustomerPdfPage(doc, act, heading);
+    } else {
+      drawActMainPdfPage(doc, act, heading);
+      drawActAttachmentPdfPages(doc, act, heading);
+    }
   });
   doc.end();
 }
 
 app.post("/api/pdf/act", async (request, response, next) => {
   try {
-    buildPdfForActs(response, { title: request.body.title || "Atto di vendita OroActive", acts: [request.body.act || {}] });
+    buildPdfForActs(response, { title: request.body.title || "Atto di vendita OroActive", scope: request.body.scope || "company", acts: [request.body.act || {}] });
   } catch (error) {
     next(error);
   }

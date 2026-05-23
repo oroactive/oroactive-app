@@ -15,6 +15,8 @@ const state = {
   archivePage: 1,
   archivePageSize: 10,
   searchActive: false,
+  editingActId: null,
+  editingOriginalStatus: "",
   documentScan: { front: null, back: null },
   cashLimitWarningShown: false,
   bullionVaultPrices: {},
@@ -372,6 +374,26 @@ function isPracticeFormEmpty() {
   return !hasFilledFields && !hasFilledItems && state.uploadedCaptures.size === 0 && state.signatures.every((signed) => !signed);
 }
 
+function hasStartedClientSection() {
+  return [
+    '[name="nome"]',
+    '[name="cognome"]',
+    '[name="nascita"]',
+    '[name="luogo"]',
+    '[name="provinciaNascita"]',
+    '[name="cf"]',
+    '[name="telefono"]',
+    '[name="email"]',
+    '[name="cittadinanza"]',
+    '[name="sesso"]',
+    '[name="indirizzo"]',
+    '[name="provinciaResidenza"]',
+    '[name="numeroDocumento"]',
+    '[name="dataRilascioDocumento"]',
+    '[name="scadenzaDocumento"]'
+  ].some((selector) => hasValue(selector));
+}
+
 async function syncActsFromServer() {
   const activeArchive = document.getElementById("archive")?.classList.contains("active-screen");
   const activeFusion = document.getElementById("fusion")?.classList.contains("active-screen");
@@ -396,7 +418,7 @@ async function syncActsFromServer() {
 async function saveActRecord(act, method = "POST") {
   if (state.saving) throw new Error("Salvataggio già in corso.");
   state.saving = true;
-  const identifier = act.id || act.practiceNumber;
+  const identifier = act.id || state.editingActId || state.editingPracticeNumber || act.practiceNumber;
   const path = method === "PUT" ? `/atti/${encodeURIComponent(identifier)}` : "/atti";
   document.querySelectorAll("#archivePractice, #nextStep").forEach((button) => {
     button.disabled = true;
@@ -408,6 +430,8 @@ async function saveActRecord(act, method = "POST") {
       method,
       body: JSON.stringify(act)
     });
+  } catch (error) {
+    throw error;
   } finally {
     hideLoading();
     state.saving = false;
@@ -481,6 +505,7 @@ function showAuthenticatedShell() {
 function normalizeRole(role = "commesso") {
   const normalized = String(role || "").toLowerCase();
   if (normalized === "founder") return "founder";
+  if (normalized === "supervisore") return "supervisore";
   if (normalized === "admin") return "responsabile";
   if (normalized === "responsabile") return "responsabile";
   if (normalized === "aiuto_commesso" || normalized === "aiuto commesso" || normalized === "aiuto commessa" || normalized === "aiuto_commessa") {
@@ -492,6 +517,7 @@ function normalizeRole(role = "commesso") {
 function roleLabel(role) {
   return {
     founder: "Founder",
+    supervisore: "Supervisore",
     responsabile: "Responsabile",
     commesso: "Commesso/a",
     aiuto_commesso: "Aiuto Commesso/a"
@@ -720,7 +746,7 @@ function populateAutocompleteLists() {
   }
   const provinceList = document.getElementById("provinceSuggestions");
   if (provinceList) {
-    provinceList.innerHTML = PROVINCE_CODES.map((code) => `<option value="${escapeHtml(code)}" label="${escapeHtml(code)} - ${escapeHtml(PROVINCE_NAMES[code])}"></option>`).join("");
+    provinceList.innerHTML = PROVINCE_CODES.map((code) => `<option value="${escapeHtml(`${code} - ${PROVINCE_NAMES[code]}`)}"></option>`).join("");
   }
 }
 
@@ -866,6 +892,12 @@ function updateResidenceProvinceFromAddress() {
   if (place?.provincia) setFieldIfDetected('[name="provinciaResidenza"]', place.provincia, "alto");
 }
 
+function normalizeProvinceField(input) {
+  if (!input?.matches?.('[name="provinciaNascita"], [name="provinciaResidenza"]')) return;
+  const normalized = normalizeProvinceValue(input.value);
+  if (normalized && input.value !== normalized) input.value = normalized;
+}
+
 async function lookupExistingClient(fiscalCode) {
   const code = normalizeFiscalCodeInput(fiscalCode);
   if (code.length !== 16) return;
@@ -887,6 +919,7 @@ function applyExistingClient(client = {}) {
     ['[name="luogo"]', client.birthPlace],
     ['[name="provinciaNascita"]', client.birthProvince],
     ['[name="sesso"]', client.sex],
+    ['[name="cittadinanza"]', client.citizenship],
     ['[name="indirizzo"]', client.address],
     ['[name="provinciaResidenza"]', client.residenceProvince],
     ['[name="telefono"]', client.phone],
@@ -942,7 +975,7 @@ function updateDocumentExpiryWarning() {
 }
 
 function isAdmin() {
-  return ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
 function isFounder() {
@@ -950,16 +983,17 @@ function isFounder() {
 }
 
 function canReviewActs(user = state.currentUser) {
-  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
 
 function userSeesAllStores(user = state.currentUser) {
-  return ["founder", "responsabile", "commesso"].includes(normalizeRole(user?.ruolo));
+  return ["founder", "supervisore", "responsabile", "commesso"].includes(normalizeRole(user?.ruolo));
 }
 
 function managedRolesForCurrentUser() {
   const role = normalizeRole(state.currentUser?.ruolo);
-  if (role === "founder") return ["aiuto_commesso", "commesso", "responsabile"];
+  if (role === "founder") return ["aiuto_commesso", "commesso", "responsabile", "supervisore"];
+  if (role === "supervisore") return ["aiuto_commesso", "commesso", "responsabile"];
   if (role === "responsabile") return ["aiuto_commesso", "commesso"];
   return [];
 }
@@ -1238,13 +1272,49 @@ async function enterSectionFromMainMenu(section) {
 async function returnToMainMenu() {
   const isPracticeActive = document.getElementById("practice")?.classList.contains("active-screen");
   if (isPracticeActive && !isPracticeFormEmpty()) {
-    const saved = await archiveCurrentPractice("Archiviata");
-    if (!saved) return;
-    showToast("Atto di vendita in fase di compilazione archiviato. Puoi completarlo successivamente tramite Elenco.");
+    if (!state.editingPracticeNumber && hasStartedClientSection()) {
+      const choice = await askDraftExitChoice();
+      if (choice === "cancel") return;
+      if (choice === "save") {
+        const saved = await archiveCurrentPractice("Bozza", { skipReset: true });
+        if (!saved) return;
+        showToast("Bozza salvata. Puoi completarla successivamente tramite Elenco.");
+      }
+      if (choice === "discard") await resetCurrentPractice({ preserveStoreCode: true });
+    } else {
+      const saved = await archiveCurrentPractice(state.editingOriginalStatus || "Archiviata", { skipReset: true });
+      if (!saved) return;
+      showToast("Atto di vendita in fase di compilazione archiviato. Puoi completarlo successivamente tramite Elenco.");
+    }
   }
   closeBrandMenu();
   clearActSearch();
   mainMenuScreen.hidden = false;
+}
+
+function askDraftExitChoice() {
+  previewTitle.textContent = "Atto in compilazione";
+  previewBody.innerHTML = `
+    <section class="customer-copy-options">
+      <p>Hai iniziato a compilare questo atto. Vuoi salvarlo come bozza per completarlo successivamente?</p>
+      <div class="preview-action-stack">
+        <button class="primary-button" type="button" data-draft-exit-choice="save">Salva bozza</button>
+        <button class="danger-button" type="button" data-draft-exit-choice="discard">Esci senza salvare</button>
+        <button class="ghost-button" type="button" data-draft-exit-choice="cancel">Annulla</button>
+      </div>
+    </section>
+  `;
+  previewModal.hidden = false;
+  return new Promise((resolve) => {
+    const handler = (event) => {
+      const button = event.target.closest("[data-draft-exit-choice]");
+      if (!button) return;
+      previewBody.removeEventListener("click", handler);
+      previewModal.hidden = true;
+      resolve(button.dataset.draftExitChoice);
+    };
+    previewBody.addEventListener("click", handler);
+  });
 }
 
 function resetUserForm() {
@@ -1267,7 +1337,7 @@ function configureUserFormPermissions() {
   });
   if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles[0] || "commesso";
   const role = normalizeRole(roleSelect.value);
-  if (["founder", "responsabile", "commesso"].includes(role)) {
+  if (["founder", "supervisore", "responsabile", "commesso"].includes(role)) {
     storeSelect.value = "Tutti";
     storeSelect.disabled = true;
     [...storeSelect.options].forEach((option) => {
@@ -1614,6 +1684,7 @@ function normalizeWorkflowStatus(status = "Archiviata") {
   if (typeof status !== "string") return "Archiviata";
   const normalized = status.trim().toLowerCase();
   if (normalized === "completato" || normalized === "completata") return "Completato";
+  if (normalized === "bozza") return "Bozza";
   if (normalized === "archiviato" || normalized === "archiviata") return "Archiviata";
   return "Archiviata";
 }
@@ -1621,6 +1692,7 @@ function normalizeWorkflowStatus(status = "Archiviata") {
 function statusClass(status = "") {
   const normalized = normalizeWorkflowStatus(status).toLowerCase();
   if (normalized === "completato" || normalized === "completata") return "status-completed";
+  if (normalized === "bozza") return "status-draft";
   if (normalized === "archiviato" || normalized === "archiviata") return "status-archived";
   return "";
 }
@@ -1910,6 +1982,7 @@ function currentActSnapshot(status = "Archiviata") {
     .map((row) => ({ metal: row.metal, title: row.title, weight: row.value }));
   const totalWeight = materials.reduce((sum, row) => sum + Number(row.weight || 0), 0);
   return {
+    id: state.editingActId || null,
     name: fieldValue('[name="nome"]'),
     surname: fieldValue('[name="cognome"]'),
     birthDate: fieldValue('[name="nascita"]'),
@@ -2518,6 +2591,10 @@ function normalizeDocumentTypeValue(value = "") {
   return value || "";
 }
 
+function normalizeProvinceValue(value = "") {
+  return extractProvinceCode(value) || String(value || "").trim().toUpperCase().slice(0, 2);
+}
+
 function storeCodeFromAct(act) {
   if (act.storeCode) return act.storeCode;
   return {
@@ -2679,16 +2756,12 @@ function documentScanDataRowsMarkup(data = {}) {
 }
 
 function documentScanCameraMarkup(ready, sideLabel) {
-  const side = state.documentScan?.side || "front";
   return `
-    <div class="document-camera-shell ${ready ? "ready" : "warn"}">
+    <div class="document-camera-shell ready simple-scan">
       <video id="documentScanVideo" playsinline muted autoplay></video>
       <canvas id="documentScanAnalysisCanvas" hidden></canvas>
-      <div class="scan-guide-frame ${ready ? "ready" : "warn"}">
-        ${identityCardGuideMarkup(side)}
-      </div>
-      <div class="scan-status ${ready ? "ready" : "warn"}" id="documentScanStatus">
-        ${ready ? "Documento centrato correttamente" : "Centra il documento nel rettangolo"}
+      <div class="scan-status ready" id="documentScanStatus">
+        Inquadra il documento e scatta ${escapeHtml(sideLabel)}
       </div>
       <div class="scan-fallback-panel" id="documentScanFallback">
         <strong>Fotocamera diretta non disponibile</strong>
@@ -2696,7 +2769,7 @@ function documentScanCameraMarkup(ready, sideLabel) {
       </div>
     </div>
     <div class="document-scan-controls">
-      <button class="${ready ? "primary-button" : "warning-button"}" type="button" id="captureDocumentPhoto" ${ready ? "" : "disabled"}>Scatta foto</button>
+      <button class="primary-button" type="button" id="captureDocumentPhoto">Scatta foto</button>
       <label class="ghost-button scan-file-fallback">
         Carica ${escapeHtml(sideLabel)}
         <input type="file" accept="image/*" capture="environment" data-document-scan-input="${state.documentScan?.side || "front"}">
@@ -2775,7 +2848,7 @@ async function startDocumentCamera() {
     state.documentScan.stream = stream;
     state.documentScan.cameraActive = true;
     attachDocumentStream();
-    startDocumentScanAnalysis();
+    updateDocumentScanStatus(true, "Inquadra il documento e scatta foto");
   } catch {
     showDocumentCameraFallback();
   }
@@ -3496,6 +3569,8 @@ async function loadActForEdit(practiceNumber) {
 
   await resetCurrentPractice();
   state.editingPracticeNumber = act.practiceNumber;
+  state.editingActId = act.id || null;
+  state.editingOriginalStatus = normalizeWorkflowStatus(act.status || "Archiviata");
 
   setFieldValue("#storeCode", storeCodeFromAct(act));
   setFieldValue("#practiceNumber", act.practiceNumber);
@@ -3614,6 +3689,8 @@ async function resetCurrentPractice(options = {}) {
   state.attachments = 0;
   state.step = 0;
   state.editingPracticeNumber = null;
+  state.editingActId = null;
+  state.editingOriginalStatus = "";
   state.loadedSignatureImages = [];
   state.fiscalCodeEditedManually = false;
   setQualityReview(null);
@@ -4909,6 +4986,7 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
   const internalSections = scope === "company" ? `
       ${internalWeight}
   ` : internalWeight;
+  const customerOnly = scope === "customer";
 
   const mainCopy = `
     <section class="print-copy ${scope === "company" ? "company-copy" : "customer-copy"}">
@@ -4944,17 +5022,19 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
         <div class="print-field"><span>Metodo pagamento</span>${escapeHtml(fieldValue("#paymentMethod"))}</div>
         <div class="print-field"><span>Totale corrisposto</span>${escapeHtml(formatEuro(Number(fieldValue("#saleTotal"))))}</div>
         ${materialAmountsBlockFromRows()}
-        <div class="print-field"><span>Note operatore</span>${escapeHtml(document.querySelector(".textarea-label textarea")?.value || "")}</div>
+        ${customerOnly ? "" : `<div class="print-field"><span>Note operatore</span>${escapeHtml(document.querySelector(".textarea-label textarea")?.value || "")}</div>`}
       </div>
 
       <h2>Oggetti ceduti</h2>
       <div class="print-items">${items}</div>
-      ${buildBullionQuoteBlock()}
+      ${customerOnly ? "" : buildBullionQuoteBlock()}
       ${internalSections}
-      <h2>Dichiarazioni</h2>
-      <p class="print-legal">Gli oggetti venduti sopra descritti sono usati e/o in cattivo stato di conservazione. Autorizzo la loro ulteriore alterazione per poter eseguire il test di verifica del metallo, determinarne il titolo e calcolarne il prezzo. Dichiaro inoltre che gli stessi sopra indicati oggetti non sono di illecita provenienza, di essere in possesso di tutti i diritti atti alla vendita degli stessi e di accettare e consentire il trattamento dei propri dati personali (Legge 196/03). La presente vale quale ricevuta e saldo per la somma riportata alla voce prezzo complessivo. Il venditore si obbliga fin da ora a restituire il ricavato della vendita qualora, a seguito di controlli di verifica, risulti che gli oggetti consegnati non siano corrispondenti nel valore e nella qualità a quelli dichiarati al momento della vendita e/o risultino di non essere di metallo prezioso. Dichiaro infine di aver letto attentamente quanto sopra riportato e che ai sensi e per gli effetti degli art. 1341 e 1342 del c.c. approvo incondizionatamente.</p>
-      <h2>Firme</h2>
-      <div class="print-signatures">${signatureRows()}</div>
+      ${customerOnly ? "" : `
+        <h2>Dichiarazioni</h2>
+        <p class="print-legal">Gli oggetti venduti sopra descritti sono usati e/o in cattivo stato di conservazione. Autorizzo la loro ulteriore alterazione per poter eseguire il test di verifica del metallo, determinarne il titolo e calcolarne il prezzo. Dichiaro inoltre che gli stessi sopra indicati oggetti non sono di illecita provenienza, di essere in possesso di tutti i diritti atti alla vendita degli stessi e di accettare e consentire il trattamento dei propri dati personali (Legge 196/03). La presente vale quale ricevuta e saldo per la somma riportata alla voce prezzo complessivo. Il venditore si obbliga fin da ora a restituire il ricavato della vendita qualora, a seguito di controlli di verifica, risulti che gli oggetti consegnati non siano corrispondenti nel valore e nella qualità a quelli dichiarati al momento della vendita e/o risultino di non essere di metallo prezioso. Dichiaro infine di aver letto attentamente quanto sopra riportato e che ai sensi e per gli effetti degli art. 1341 e 1342 del c.c. approvo incondizionatamente.</p>
+        <h2>Firme</h2>
+        <div class="print-signatures">${signatureRows()}</div>
+      `}
     </section>
   `;
 
@@ -5037,19 +5117,18 @@ function showPrintPreview(scope) {
 
 function showCustomerCopyOptions() {
   const act = currentActSnapshot("Archiviata");
-  previewTitle.textContent = "Copia cliente";
+  const previewHtml = buildPrintCopy("Copia cliente", "", "customer", shouldPrintWeightOnCustomerCopy());
+  previewTitle.textContent = "Anteprima copia cliente";
   previewBody.innerHTML = `
     <section class="customer-copy-options">
-      <p>Scegli come consegnare la copia cliente. Il PDF puo essere scaricato in ogni momento.</p>
+      <p>Anteprima stampa copia cliente: contiene solo sezione cliente e sezione vendita.</p>
       <div class="preview-action-stack">
         <button class="primary-button" type="button" data-customer-copy-action="download">Scarica PDF</button>
         <button class="ghost-button" type="button" data-customer-copy-action="email">Invia via email</button>
         <button class="ghost-button" type="button" data-customer-copy-action="whatsapp">Invia via WhatsApp</button>
       </div>
-      <div class="print-field"><span>Cliente</span>${escapeHtml([act.name, act.surname].filter(Boolean).join(" ") || "Dato non inserito")}</div>
-      <div class="print-field"><span>Email</span>${escapeHtml(act.email || "Dato non inserito")}</div>
-      <div class="print-field"><span>Telefono</span>${escapeHtml(act.phone || "Dato non inserito")}</div>
     </section>
+    ${previewHtml}
   `;
   previewModal.hidden = false;
 }
@@ -5057,7 +5136,7 @@ function showCustomerCopyOptions() {
 async function handleCustomerCopyAction(action) {
   const act = currentActSnapshot("Archiviata");
   if (action === "download") {
-    await requestPdf("/pdf/act", { title: `Copia cliente ${act.practiceNumber}`, act }, `copia-cliente-${act.practiceNumber || "oroactive"}.pdf`);
+    await requestPdf("/pdf/act", { title: `Copia cliente ${act.practiceNumber}`, scope: "customer", act }, `copia-cliente-${act.practiceNumber || "oroactive"}.pdf`);
     return;
   }
   if (action === "email") {
@@ -5081,7 +5160,7 @@ async function handleCustomerCopyAction(action) {
   }
 }
 
-async function archiveCurrentPractice(status = "Archiviata") {
+async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   if (notifyCashPaymentLimitIfNeeded({ force: true })) return false;
   const review = currentQualityReview();
   if (review?.status === "negative" && !review.feedback) {
@@ -5099,13 +5178,14 @@ async function archiveCurrentPractice(status = "Archiviata") {
   const wasEditing = Boolean(state.editingPracticeNumber);
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
-  } catch {
-    showToast("Salvataggio non riuscito: controlla la connessione al database.");
+  } catch (error) {
+    showToast(error.message || "Salvataggio non riuscito: controlla la connessione al database.");
     return false;
   }
   renderArchiveGroups();
   renderFusionGroups();
-  await resetCurrentPractice({ preserveStoreCode: true });
+  if (!options.skipReset) await resetCurrentPractice({ preserveStoreCode: true });
+  if (wasEditing && !options.skipReset) setScreen("archive");
   showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`);
   return true;
 }
@@ -5366,6 +5446,9 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
     maybeAutofillFiscalCode();
   }
   if (event.target.matches('[name="indirizzo"]')) updateResidenceProvinceFromAddress();
+  if (event.target.matches('[name="provinciaNascita"], [name="provinciaResidenza"]')) {
+    event.target.value = event.target.value.toUpperCase();
+  }
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
   updateChecklistState();
 });
@@ -5391,6 +5474,7 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
     }
   }
   if (event.target.matches('[name="indirizzo"]')) updateResidenceProvinceFromAddress();
+  if (event.target.matches('[name="provinciaNascita"], [name="provinciaResidenza"]')) normalizeProvinceField(event.target);
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
   updateChecklistState();
 });
