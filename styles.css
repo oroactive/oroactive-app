@@ -1162,14 +1162,8 @@ textarea {
 
 .client-panel-heading {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-}
-
-.client-panel-heading .scan-document-button {
-  justify-self: center;
-  text-align: center;
-  white-space: normal;
 }
 
 .client-panel-heading .status-pill {
@@ -1182,12 +1176,6 @@ textarea {
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 10px;
-}
-
-.scan-document-button {
-  border-color: var(--orange);
-  color: var(--ink);
-  background: #fff7f0;
 }
 
 .status-pill {
@@ -3518,7 +3506,6 @@ button.quality-review-badge {
     grid-template-columns: 1fr;
   }
 
-  .client-panel-heading .scan-document-button,
   .client-panel-heading .status-pill {
     justify-self: stretch;
     width: 100%;
