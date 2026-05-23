@@ -1629,8 +1629,9 @@ function renderKnowledgeStatus() {
     <article class="knowledge-row">
       <strong>Stato AI</strong>
       <span>OpenAI: ${status.openai ? "attivo" : "non configurato"}</span>
-      <span>Ricerca: ${status.pgvector ? "pgvector attivo" : "fallback full-text"}</span>
-      <span>Embeddings: ${status.embeddings ? "presenti" : "non presenti"}</span>
+      <span>Ricerca: ${status.pgvector ? "pgvector attivo" : "fallback full-text attivo"}</span>
+      <span>${status.fallback_full_text ? "Full-text PostgreSQL: attivo" : `Embeddings: ${status.embeddings ? "presenti" : "non presenti"}`}</span>
+      <span>${status.knowledge_base_loaded ? "Libro indicizzato correttamente" : "Libro non ancora indicizzato"}</span>
       <span>${escapeHtml(status.pgvector_message || "")}</span>
     </article>
   ` : "";
@@ -1644,6 +1645,8 @@ function renderKnowledgeStatus() {
       <strong>${escapeHtml(book.titolo || "La bilancia d'oro")}</strong>
       <span>${escapeHtml(book.autore || "Christian Dinato")} · ${escapeHtml(book.filename || "file caricato")}</span>
       <span>${Number(book.chunks || 0)} blocchi indicizzati</span>
+      <span>Knowledge base pronta</span>
+      <span>Ricerca fallback attiva</span>
       <button class="danger-button" type="button" data-delete-book="${escapeHtml(String(book.id))}">Elimina libro</button>
     </article>
   `).join("");
@@ -1690,7 +1693,7 @@ async function uploadKnowledgeBook(event) {
     document.getElementById("knowledgeTitle").value = "La bilancia d'oro";
     document.getElementById("knowledgeAuthor").value = "Christian Dinato";
     await loadKnowledgeStatus();
-    showToast(`Libro indicizzato: ${Number(data.chunks || 0)} blocchi creati.`);
+    showToast(data.message || `Knowledge base pronta: ${Number(data.chunks || 0)} chunk creati.`);
   } catch (error) {
     showToast(error.message || "Libro non indicizzato.");
   } finally {

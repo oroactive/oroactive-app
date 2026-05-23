@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import bcrypt from "bcrypt";
@@ -299,6 +300,20 @@ function vectorInput(embedding = []) {
   return `[${(Array.isArray(embedding) ? embedding : []).map((value) => Number(value) || 0).join(",")}]`;
 }
 
+function limitAssistantContext(chunks = [], maxChars = 60000) {
+  const selected = [];
+  let length = 0;
+  for (const chunk of chunks) {
+    const content = String(chunk.content || "");
+    if (!content) continue;
+    const nextLength = length + content.length;
+    if (selected.length && nextLength > maxChars) break;
+    selected.push(chunk);
+    length = nextLength;
+  }
+  return selected;
+}
+
 function validImageDataUrl(value = "") {
   const text = String(value || "");
   return /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(text) ? text : "";
@@ -532,14 +547,19 @@ function normalizeBookText(text = "") {
     .trim();
 }
 
-function chunkBookText(text = "", maxChars = 3200, overlap = 350) {
+function chunkBookText(text = "", maxChars = 1100, overlap = 140) {
   const normalized = normalizeBookText(text);
   const chunks = [];
   let index = 0;
   while (index < normalized.length) {
     const targetEnd = Math.min(index + maxChars, normalized.length);
-    const nextBreak = normalized.lastIndexOf("\n\n", targetEnd);
-    const end = nextBreak > index + 1200 ? nextBreak : targetEnd;
+    const paragraphBreak = normalized.lastIndexOf("\n\n", targetEnd);
+    const sentenceBreak = normalized.lastIndexOf(". ", targetEnd);
+    const end = paragraphBreak > index + 500
+      ? paragraphBreak
+      : sentenceBreak > index + 500
+        ? sentenceBreak + 1
+        : targetEnd;
     const content = normalized.slice(index, end).trim();
     if (content.length > 80) chunks.push(content);
     if (end >= normalized.length) break;
@@ -578,6 +598,10 @@ function cosineSimilarity(first = [], second = []) {
   return firstNorm && secondNorm ? dot / (Math.sqrt(firstNorm) * Math.sqrt(secondNorm)) : 0;
 }
 
+function textHash(text = "") {
+  return crypto.createHash("sha256").update(String(text || "")).digest("hex");
+}
+
 async function aiChunkColumns() {
   const result = await pool.query(`
     SELECT column_name, data_type, udt_name
@@ -590,6 +614,10 @@ async function aiChunkColumns() {
 
 async function setupAiVectorStorage() {
   await pool.query("ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS embedding_json JSONB");
+  await pool.query("ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS title TEXT");
+  await pool.query("ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS content_tsv TSVECTOR");
+  await pool.query("UPDATE ai_document_chunks SET content_tsv = to_tsvector('italian', COALESCE(content, '')) WHERE content_tsv IS NULL");
+  await pool.query("CREATE INDEX IF NOT EXISTS ai_document_chunks_content_fts_idx ON ai_document_chunks USING GIN (content_tsv)");
   const initialColumns = await aiChunkColumns();
   const legacyEmbedding = initialColumns.find((column) => column.column_name === "embedding");
   aiRuntime.jsonColumn = legacyEmbedding && legacyEmbedding.data_type !== "USER-DEFINED" ? "embedding" : "embedding_json";
@@ -637,17 +665,17 @@ async function insertAiChunk(db, { document, index, content, embedding }) {
   if (aiRuntime.pgvector && aiRuntime.vectorColumn) {
     const vectorColumn = sqlIdentifier(aiRuntime.vectorColumn);
     await db.query(
-      `INSERT INTO ai_document_chunks (document_id, chunk_index, content, ${jsonColumn}, ${vectorColumn}, metadata)
-       VALUES ($1, $2, $3, $4::jsonb, $5::vector, $6)`,
-      [document.id, index, content, JSON.stringify(embedding || []), vectorInput(embedding), metadata]
+      `INSERT INTO ai_document_chunks (document_id, chunk_index, title, content, content_tsv, ${jsonColumn}, ${vectorColumn}, metadata)
+       VALUES ($1, $2, $3, $4, to_tsvector('italian', $4), $5::jsonb, $6::vector, $7)`,
+      [document.id, index, document.titolo, content, JSON.stringify(embedding || []), vectorInput(embedding), metadata]
     );
     return;
   }
 
   await db.query(
-    `INSERT INTO ai_document_chunks (document_id, chunk_index, content, ${jsonColumn}, metadata)
-     VALUES ($1, $2, $3, $4::jsonb, $5)`,
-    [document.id, index, content, JSON.stringify(embedding || []), metadata]
+    `INSERT INTO ai_document_chunks (document_id, chunk_index, title, content, content_tsv, ${jsonColumn}, metadata)
+     VALUES ($1, $2, $3, $4, to_tsvector('italian', $4), $5::jsonb, $6)`,
+    [document.id, index, document.titolo, content, JSON.stringify(embedding || []), metadata]
   );
 }
 
@@ -685,13 +713,22 @@ async function updateAiChunkEmbedding(id, embedding) {
 }
 
 async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
-  requireOpenAiClient();
   const extractedText = normalizeBookText(await extractBookText({ filename, dataUrl }));
+  const bookHash = textHash(extractedText);
   const chunks = chunkBookText(extractedText);
   if (!chunks.length) {
     const error = new Error("Il libro non contiene testo estraibile sufficiente.");
     error.status = 400;
     throw error;
+  }
+  console.log("Chunks loaded:", chunks.length);
+
+  const duplicate = await pool.query(
+    "SELECT id, titolo, autore, filename, uploaded_by, created_at, (metadata->>'chunks')::int AS chunks FROM ai_documents WHERE metadata->>'bookHash' = $1 ORDER BY created_at DESC LIMIT 1",
+    [bookHash]
+  );
+  if (duplicate.rowCount) {
+    return { ...duplicate.rows[0], chunks: duplicate.rows[0].chunks || chunks.length, duplicate: true, message: "Knowledge base pronta" };
   }
 
   const db = await pool.connect();
@@ -706,18 +743,23 @@ async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
         autore || "Christian Dinato",
         filename || "libro-ai",
         user.id,
-        { chunks: chunks.length, embeddingModel: openaiEmbeddingModel }
+        {
+          chunks: chunks.length,
+          bookHash,
+          searchMode: aiRuntime.pgvector ? "pgvector" : "full-text",
+          embeddingModel: aiRuntime.pgvector ? openaiEmbeddingModel : null
+        }
       ]
     );
     const document = documentResult.rows[0];
-    const embeddings = await createTextEmbeddings(chunks);
+    const embeddings = aiRuntime.pgvector ? await createTextEmbeddings(chunks) : [];
     for (let index = 0; index < chunks.length; index += 1) {
       const content = chunks[index];
-      const embedding = embeddings[index];
+      const embedding = embeddings[index] || [];
       await insertAiChunk(db, { document, index, content, embedding });
     }
     await db.query("COMMIT");
-    return { ...document, chunks: chunks.length };
+    return { ...document, chunks: chunks.length, message: "Knowledge base pronta" };
   } catch (error) {
     await db.query("ROLLBACK");
     throw error;
@@ -728,7 +770,9 @@ async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
 
 async function aiKnowledgeStatus() {
   const result = await pool.query(`
-    SELECT d.id, d.titolo, d.autore, d.filename, d.uploaded_by, d.created_at, COUNT(c.id)::int AS chunks
+    SELECT d.id, d.titolo, d.autore, d.filename, d.uploaded_by, d.created_at, COUNT(c.id)::int AS chunks,
+           d.metadata->>'searchMode' AS search_mode,
+           d.metadata->>'bookHash' AS book_hash
     FROM ai_documents d
     LEFT JOIN ai_document_chunks c ON c.document_id = d.id
     GROUP BY d.id
@@ -738,7 +782,6 @@ async function aiKnowledgeStatus() {
 }
 
 async function reindexAiBook(documentId) {
-  requireOpenAiClient();
   const params = [];
   let where = "";
   if (documentId) {
@@ -746,6 +789,13 @@ async function reindexAiBook(documentId) {
     where = "WHERE document_id = $1";
   }
   const result = await pool.query(`SELECT id, content FROM ai_document_chunks ${where} ORDER BY document_id, chunk_index`, params);
+  if (!aiRuntime.pgvector) {
+    await pool.query(`UPDATE ai_document_chunks SET content_tsv = to_tsvector('italian', COALESCE(content, '')) ${where}`, params);
+    console.log("pgvector non disponibile, uso ricerca testuale fallback");
+    return { ok: true, chunks: result.rowCount, fallback_full_text: true, message: "Knowledge base pronta" };
+  }
+
+  requireOpenAiClient();
   for (let index = 0; index < result.rows.length; index += 50) {
     const batch = result.rows.slice(index, index + 50);
     const embeddings = await createTextEmbeddings(batch.map((row) => row.content));
@@ -759,14 +809,15 @@ async function reindexAiBook(documentId) {
 
 async function updateAiBook(id, input = {}, user = null) {
   if (input.dataUrl) {
-    requireOpenAiClient();
     const extractedText = normalizeBookText(await extractBookText({ filename: input.filename, dataUrl: input.dataUrl }));
+    const bookHash = textHash(extractedText);
     const chunks = chunkBookText(extractedText);
     if (!chunks.length) {
       const error = new Error("Il libro non contiene testo estraibile sufficiente.");
       error.status = 400;
       throw error;
     }
+    console.log("Chunks loaded:", chunks.length);
 
     const db = await pool.connect();
     try {
@@ -786,7 +837,13 @@ async function updateAiBook(id, input = {}, user = null) {
           input.autore || "",
           input.filename || "",
           user?.id || null,
-          JSON.stringify({ chunks: chunks.length, embeddingModel: openaiEmbeddingModel, replacedAt: new Date().toISOString() })
+          JSON.stringify({
+            chunks: chunks.length,
+            bookHash,
+            searchMode: aiRuntime.pgvector ? "pgvector" : "full-text",
+            embeddingModel: aiRuntime.pgvector ? openaiEmbeddingModel : null,
+            replacedAt: new Date().toISOString()
+          })
         ]
       );
       const document = documentResult.rows[0];
@@ -795,14 +852,14 @@ async function updateAiBook(id, input = {}, user = null) {
         return null;
       }
       await db.query("DELETE FROM ai_document_chunks WHERE document_id = $1", [id]);
-      const embeddings = await createTextEmbeddings(chunks);
+      const embeddings = aiRuntime.pgvector ? await createTextEmbeddings(chunks) : [];
       for (let index = 0; index < chunks.length; index += 1) {
         const content = chunks[index];
-        const embedding = embeddings[index];
+        const embedding = embeddings[index] || [];
         await insertAiChunk(db, { document, index, content, embedding });
       }
       await db.query("COMMIT");
-      return { ...document, chunks: chunks.length };
+      return { ...document, chunks: chunks.length, message: "Knowledge base pronta" };
     } catch (error) {
       await db.query("ROLLBACK");
       throw error;
@@ -842,7 +899,7 @@ async function searchAiChunks(question = "") {
          JOIN ai_documents d ON d.id = c.document_id
          WHERE c.${vectorColumn} IS NOT NULL
          ORDER BY c.${vectorColumn} <=> $1::vector
-         LIMIT 6`,
+         LIMIT 10`,
         [vectorInput(questionEmbedding)]
       );
       if (result.rows.length) return result.rows;
@@ -856,44 +913,20 @@ async function searchAiChunks(question = "") {
   }
 
   const fullTextResult = await pool.query(
-    `SELECT c.id, c.content, c.chunk_index, d.titolo, d.autore,
-            ts_rank_cd(to_tsvector('italian', c.content), plainto_tsquery('italian', $1)) AS score
+    `SELECT c.id, c.title, c.content, c.chunk_index, d.titolo, d.autore,
+            ts_rank_cd(c.content_tsv, plainto_tsquery('italian', $1)) AS score
      FROM ai_document_chunks c
      JOIN ai_documents d ON d.id = c.document_id
-     WHERE to_tsvector('italian', c.content) @@ plainto_tsquery('italian', $1)
+     WHERE c.content_tsv @@ plainto_tsquery('italian', $1)
         OR c.content ILIKE $2
      ORDER BY score DESC, c.created_at DESC
-     LIMIT 6`,
+     LIMIT 10`,
     [text, `%${text.slice(0, 120)}%`]
   );
-  if (fullTextResult.rows.length || !openai) return fullTextResult.rows;
-
-  try {
-    const questionEmbedding = await createTextEmbedding(text);
-    const jsonColumn = sqlIdentifier(aiRuntime.jsonColumn);
-    const rows = await pool.query(`
-      SELECT c.id, c.content, c.${jsonColumn} AS embedding_json, c.chunk_index, d.titolo, d.autore
-      FROM ai_document_chunks c
-      JOIN ai_documents d ON d.id = c.document_id
-      WHERE c.${jsonColumn} IS NOT NULL
-      ORDER BY c.created_at DESC
-      LIMIT 1500
-    `);
-    return rows.rows
-      .map((row) => ({
-        ...row,
-        score: cosineSimilarity(questionEmbedding, Array.isArray(row.embedding_json) ? row.embedding_json : [])
-      }))
-      .filter((row) => row.score > 0.18)
-      .sort((first, second) => second.score - first.score)
-      .slice(0, 6);
-  } catch {
-    return [];
-  }
+  return fullTextResult.rows;
 }
 
 async function askOroActiveAssistant(question = "") {
-  const client = requireOpenAiClient();
   const domanda = String(question || "").trim();
   if (!domanda) {
     const error = new Error("Inserisci una domanda per l'assistente.");
@@ -901,15 +934,33 @@ async function askOroActiveAssistant(question = "") {
     throw error;
   }
 
-  const chunks = await searchAiChunks(domanda);
+  const chunks = limitAssistantContext(await searchAiChunks(domanda));
   const hasBookContext = chunks.length > 0;
   const context = chunks.map((chunk, index) => (
     `[Fonte ${index + 1}: ${chunk.titolo || "La bilancia d'oro"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
   )).join("\n\n---\n\n");
 
-  const result = await client.responses.create({
-    model: openaiModel,
-    input: `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.
+  if (!openai) {
+    return {
+      risposta: "Non trovo informazioni sufficienti nel libro.",
+      fonte: hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
+      dal_libro: false,
+      citazioni: [],
+      risultati: chunks.map((chunk) => ({
+        titolo: chunk.titolo,
+        autore: chunk.autore,
+        chunk_index: chunk.chunk_index,
+        score: Number(chunk.score || 0)
+      })),
+      error: "OpenAI non configurato"
+    };
+  }
+
+  try {
+    const client = openai;
+    const result = await client.responses.create({
+      model: openaiModel,
+      input: `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Usa come fonte primaria il libro "La bilancia d'oro" di Christian Dinato.
 Se il contesto del libro e sufficiente, inizia con "Dal libro risulta...".
@@ -923,29 +974,44 @@ ${hasBookContext ? context : "Nessun passaggio del libro trovato per questa doma
 
 DOMANDA:
 ${domanda}`,
-    text: {
-      format: {
-        type: "json_schema",
-        name: "assistente_oroactive",
-        strict: true,
-        schema: assistantAiSchema
+      text: {
+        format: {
+          type: "json_schema",
+          name: "assistente_oroactive",
+          strict: true,
+          schema: assistantAiSchema
+        }
       }
-    }
-  });
+    });
 
-  const parsed = parseOpenAiJson(result);
-  return {
-    risposta: parsed.risposta || "",
-    fonte: parsed.fonte || (hasBookContext ? "La bilancia d'oro" : "Integrazione generale"),
-    dal_libro: Boolean(parsed.dal_libro && hasBookContext),
-    citazioni: Array.isArray(parsed.citazioni) ? parsed.citazioni : [],
-    risultati: chunks.map((chunk) => ({
-      titolo: chunk.titolo,
-      autore: chunk.autore,
-      chunk_index: chunk.chunk_index,
-      score: Number(chunk.score || 0)
-    }))
-  };
+    const parsed = parseOpenAiJson(result);
+    return {
+      risposta: parsed.risposta || "",
+      fonte: parsed.fonte || (hasBookContext ? "La bilancia d'oro" : "Integrazione generale"),
+      dal_libro: Boolean(parsed.dal_libro && hasBookContext),
+      citazioni: Array.isArray(parsed.citazioni) ? parsed.citazioni : [],
+      risultati: chunks.map((chunk) => ({
+        titolo: chunk.titolo,
+        autore: chunk.autore,
+        chunk_index: chunk.chunk_index,
+        score: Number(chunk.score || 0)
+      }))
+    };
+  } catch (error) {
+    return {
+      risposta: "Non trovo informazioni sufficienti nel libro.",
+      fonte: hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
+      dal_libro: false,
+      citazioni: [],
+      risultati: chunks.map((chunk) => ({
+        titolo: chunk.titolo,
+        autore: chunk.autore,
+        chunk_index: chunk.chunk_index,
+        score: Number(chunk.score || 0)
+      })),
+      error: error.message || "OpenAI non disponibile"
+    };
+  }
 }
 
 async function aiAssistantStatus() {
@@ -970,6 +1036,7 @@ async function aiAssistantStatus() {
   return {
     openai: Boolean(openai),
     pgvector: Boolean(aiRuntime.pgvector),
+    fallback_full_text: !aiRuntime.pgvector,
     embeddings: vectorEmbeddings > 0 || jsonEmbeddings > 0,
     knowledge_base_loaded: Number(knowledge.rows[0]?.documents || 0) > 0 && Number(chunks.rows[0]?.chunks || 0) > 0,
     pgvector_message: aiRuntime.pgvectorMessage,
