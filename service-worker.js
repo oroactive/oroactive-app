@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260523-1";
+const STATIC_CACHE = "oroactive-static-v20260523-2";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260523-22",
-  "/app.js?v=20260523-29",
+  "/styles.css?v=20260523-23",
+  "/app.js?v=20260523-30",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",
@@ -10,6 +10,46 @@ const STATIC_ASSETS = [
   "/icons/icon-192.png",
   "/icons/icon-512.png"
 ];
+const SENSITIVE_PATHS = [
+  "/api/",
+  "/uploads/",
+  "/documents/",
+  "/pdf/",
+  "/firme/",
+  "/contabili/",
+  "/atti/",
+  "/clienti/",
+  "/backups/"
+];
+
+function isSensitiveRequest(requestUrl) {
+  const path = requestUrl.pathname.toLowerCase();
+  return SENSITIVE_PATHS.some((prefix) => path.startsWith(prefix))
+    || path.includes("codice-fiscale")
+    || path.includes("documento")
+    || path.includes("firma")
+    || path.includes("contabile")
+    || path.includes("pdf")
+    || path.includes("cliente");
+}
+
+function isStaticAsset(requestUrl) {
+  if (requestUrl.origin !== self.location.origin) return false;
+  return STATIC_ASSETS.some((asset) => {
+    const assetUrl = new URL(asset, self.location.origin);
+    return requestUrl.pathname === assetUrl.pathname;
+  });
+}
+
+function networkFirst(request) {
+  return fetch(request).then((response) => {
+    if (response.ok) {
+      const clone = response.clone();
+      caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+    }
+    return response;
+  }).catch(() => caches.match(request));
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -27,26 +67,27 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
-  const isSensitive =
-    requestUrl.pathname.startsWith("/api/")
-    || requestUrl.pathname.includes("pdf")
-    || requestUrl.pathname.includes("document")
-    || requestUrl.pathname.includes("backup");
 
-  if (event.request.method !== "GET" || isSensitive) {
-    event.respondWith(fetch(event.request));
+  if (event.request.method !== "GET" || isSensitiveRequest(requestUrl)) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
     return;
   }
 
-  if (requestUrl.origin === self.location.origin) {
+  if (event.request.mode === "navigate") {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
+
+  if (isStaticAsset(requestUrl)) {
     event.respondWith(
       caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-        if (response.ok && STATIC_ASSETS.some((asset) => requestUrl.pathname === new URL(asset, self.location.origin).pathname)) {
-          const clone = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, clone));
-        }
+        const clone = response.clone();
+        if (response.ok) caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, clone));
         return response;
       }))
     );
+    return;
   }
+
+  event.respondWith(fetch(event.request));
 });

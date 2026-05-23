@@ -190,7 +190,7 @@ CREATE INDEX IF NOT EXISTS utenti_negozio_id_idx
 
 CREATE TABLE IF NOT EXISTS backup_jobs (
   id BIGSERIAL PRIMARY KEY,
-  tipo TEXT DEFAULT 'automatico',
+  tipo TEXT DEFAULT 'giornaliero',
   filename TEXT,
   percorso TEXT,
   stato TEXT DEFAULT 'in corso',
@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS backup_jobs (
   completed_at TIMESTAMPTZ
 );
 
-ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'automatico';
+ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS tipo TEXT DEFAULT 'giornaliero';
 ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS filename TEXT;
 ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS percorso TEXT;
 ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS stato TEXT DEFAULT 'in corso';

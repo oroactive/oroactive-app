@@ -31,6 +31,7 @@ const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://ww
 const backupDirectory = process.env.BACKUP_DIR || path.join(__dirname, "backups");
 const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const backupIntervalMs = 24 * 60 * 60 * 1000;
+const backupFolders = ["atti", "documenti", "preziosi", "contabili", "pdf", "firme", "utenti", "giacenza", "fusioni", "knowledge-base", "formazione", "antifrode", "crm"];
 const bullionVaultMarkets = {
   Oro: { securityId: "AUXZU", source: "Zurigo" },
   Argento: { securityId: "AGXZU", source: "Zurigo" },
@@ -1499,18 +1500,23 @@ async function initDatabase() {
 
 async function listBackups() {
   const result = await pool.query(
-    `SELECT id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at
+    `SELECT id, tipo, filename, percorso, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at
      FROM backup_jobs
      ORDER BY created_at DESC
      LIMIT 60`
   );
-  return result.rows;
+  return result.rows.map((row) => ({
+    ...row,
+    mese: row.created_at ? new Date(row.created_at).toISOString().slice(0, 7) : "",
+    download_disponibile: row.stato === "completato" && Boolean(row.percorso)
+  }));
 }
 
 async function latestBackupToday() {
   const result = await pool.query(
     `SELECT id FROM backup_jobs
      WHERE created_at::date = CURRENT_DATE
+       AND tipo = 'giornaliero'
        AND stato = 'completato'
      ORDER BY created_at DESC
      LIMIT 1`
@@ -1518,17 +1524,76 @@ async function latestBackupToday() {
   return result.rows[0] || null;
 }
 
-async function runBackup(tipo = "automatico") {
+async function latestMonthlyBackup(monthKey) {
+  const result = await pool.query(
+    `SELECT id FROM backup_jobs
+     WHERE tipo = 'mensile'
+       AND filename LIKE $1
+       AND stato = 'completato'
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [`%${monthKey}%`]
+  );
+  return result.rows[0] || null;
+}
+
+async function backupPathFor(tipo, date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const monthKey = `${year}_${month}`;
+  const root = path.join(backupDirectory, `backup_${monthKey}`);
+  const targetDir = tipo === "mensile" ? root : path.join(root, "giornalieri", `${year}_${month}_${day}`);
+  await fs.mkdir(targetDir, { recursive: true });
+  await Promise.all(backupFolders.map((folder) => fs.mkdir(path.join(root, folder), { recursive: true })));
+  const filename = tipo === "mensile" ? `database_${monthKey}.sql` : `database_${year}_${month}_${day}.sql`;
+  return { root, targetDir, filename, outputPath: path.join(targetDir, filename), monthKey };
+}
+
+async function writeBackupManifest({ tipo, root, targetDir, filename, monthKey, status, detail, size }) {
+  const manifest = {
+    app: "OroActive",
+    tipo,
+    mese: monthKey,
+    filename,
+    stato: status,
+    dettaglio: detail,
+    dimensione_bytes: size || 0,
+    contenuto: [
+      "database PostgreSQL completo",
+      "atti di vendita",
+      "clienti",
+      "documenti fronte/retro",
+      "codice fiscale fronte/retro",
+      "foto preziosi",
+      "contabili",
+      "firme",
+      "PDF",
+      "utenti",
+      "giacenza",
+      "fusioni",
+      "knowledge base AI",
+      "formazione",
+      "antifrode",
+      "CRM"
+    ],
+    storage_futuro: "Predisposto per S3 / Cloudflare R2 / n8n",
+    created_at: new Date().toISOString()
+  };
+  const manifestPath = path.join(tipo === "mensile" ? root : targetDir, "manifest_backup.json");
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+async function runBackup(tipo = "giornaliero") {
+  const normalizedType = tipo === "mensile" ? "mensile" : "giornaliero";
   await fs.mkdir(backupDirectory, { recursive: true });
   const createdAt = new Date();
-  const stamp = createdAt.toISOString().replace(/[:.]/g, "-");
-  const filename = `oroactive-backup-${stamp}.sql`;
-  const outputPath = path.join(backupDirectory, filename);
+  const { root, targetDir, filename, outputPath, monthKey } = await backupPathFor(normalizedType, createdAt);
   const job = await pool.query(
     `INSERT INTO backup_jobs (tipo, filename, percorso, stato, dettaglio, n8n_ready)
      VALUES ($1, $2, $3, 'in corso', $4, TRUE)
      RETURNING id`,
-    [tipo, filename, outputPath, "Backup database PostgreSQL con allegati salvati nel database. Documenti, PDF, firme e foto in payload sono inclusi nel dump."]
+    [normalizedType, filename, outputPath, "Backup server PostgreSQL. Documenti, PDF, firme, foto, CRM, AI, formazione e antifrode sono inclusi nel dump database quando salvati nei record OroActive."]
   );
 
   try {
@@ -1540,6 +1605,16 @@ async function runBackup(tipo = "automatico") {
       maxBuffer: 1024 * 1024
     });
     const stats = await fs.stat(outputPath);
+    await writeBackupManifest({
+      tipo: normalizedType,
+      root,
+      targetDir,
+      filename,
+      monthKey,
+      status: "completato",
+      detail: "Backup completato e protetto lato server.",
+      size: stats.size
+    });
     const result = await pool.query(
       `UPDATE backup_jobs
        SET stato = 'completato',
@@ -1548,10 +1623,20 @@ async function runBackup(tipo = "automatico") {
            completed_at = NOW()
        WHERE id = $1
        RETURNING id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at`,
-      [job.rows[0].id, "Backup completato. Pronto per integrazione futura n8n download/restore.", stats.size]
+      [job.rows[0].id, "Backup completato. Download protetto founder e predisposizione futura S3/R2/n8n.", stats.size]
     );
     return result.rows[0];
   } catch (error) {
+    await writeBackupManifest({
+      tipo: normalizedType,
+      root,
+      targetDir,
+      filename,
+      monthKey,
+      status: "errore",
+      detail: error.message || "Backup non riuscito",
+      size: 0
+    }).catch(() => {});
     const result = await pool.query(
       `UPDATE backup_jobs
        SET stato = 'errore',
@@ -1568,16 +1653,34 @@ async function runBackup(tipo = "automatico") {
 async function runDailyBackupIfNeeded() {
   try {
     if (await latestBackupToday()) return;
-    const result = await runBackup("automatico");
+    const result = await runBackup("giornaliero");
     console.log(`Backup OroActive ${result.stato}: ${result.filename || "senza file"}`);
   } catch (error) {
     console.error("Backup automatico non riuscito", error.message || error);
   }
 }
 
+async function runMonthlyBackupIfNeeded() {
+  try {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const isLastDayOfMonth = tomorrow.getMonth() !== now.getMonth();
+    if (!isLastDayOfMonth && process.env.FORCE_MONTHLY_BACKUP !== "true") return;
+    const monthKey = `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, "0")}`;
+    if (await latestMonthlyBackup(monthKey)) return;
+    const result = await runBackup("mensile");
+    console.log(`Backup mensile OroActive ${result.stato}: ${result.filename || "senza file"}`);
+  } catch (error) {
+    console.error("Backup mensile non riuscito", error.message || error);
+  }
+}
+
 function scheduleBackups() {
   runDailyBackupIfNeeded();
+  runMonthlyBackupIfNeeded();
   setInterval(runDailyBackupIfNeeded, backupIntervalMs);
+  setInterval(runMonthlyBackupIfNeeded, backupIntervalMs);
 }
 
 async function bootstrapStores() {
@@ -2976,7 +3079,29 @@ app.get("/api/backups", requireFounder, async (_request, response, next) => {
 
 app.post("/api/backups/run", requireFounder, async (_request, response, next) => {
   try {
-    response.status(201).json(await runBackup("manuale"));
+    response.status(201).json(await runBackup(_request.body?.tipo === "mensile" ? "mensile" : "giornaliero"));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/backups/:id/download", requireFounder, async (request, response, next) => {
+  try {
+    const result = await pool.query(
+      "SELECT filename, percorso, stato FROM backup_jobs WHERE id = $1",
+      [request.params.id]
+    );
+    const backup = result.rows[0];
+    if (!backup || backup.stato !== "completato" || !backup.percorso) {
+      return response.status(404).json({ error: "Backup non disponibile" });
+    }
+    const resolved = path.resolve(backup.percorso);
+    const allowedRoot = path.resolve(backupDirectory);
+    const relative = path.relative(allowedRoot, resolved);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      return response.status(403).json({ error: "Non autorizzato" });
+    }
+    response.download(resolved, backup.filename || path.basename(resolved));
   } catch (error) {
     next(error);
   }

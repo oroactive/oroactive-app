@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260523-22">
+  <link rel="stylesheet" href="styles.css?v=20260523-23">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -60,13 +60,19 @@
             <button type="button" data-section="archive">Elenco</button>
             <button type="button" data-section="fusion">Giacenza</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
-            <button class="founder-only" type="button" data-section="backups">Backup</button>
-            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
-            <button type="button" data-section="crm">CRM Clienti</button>
           </div>
         </div>
         <div class="main-menu-group">
           <button class="main-menu-group-button" type="button" data-section="quotes">Quotazione</button>
+        </div>
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-section="crm">CRM Clienti</button>
+        </div>
+        <div class="main-menu-group control-only">
+          <button class="main-menu-group-button" type="button" data-section="antifraud">Antifrode</button>
+        </div>
+        <div class="main-menu-group founder-only">
+          <button class="main-menu-group-button" type="button" data-section="backups">Backup</button>
         </div>
         <div class="main-menu-group">
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="trainingSubmenu" aria-expanded="false">Formazione</button>
@@ -101,11 +107,11 @@
             <button type="button" data-section="archive">Elenco</button>
             <button type="button" data-section="fusion">Giacenza</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
-            <button class="founder-only" type="button" data-section="backups">Backup</button>
-            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
-            <button type="button" data-section="crm">CRM Clienti</button>
           </div>
           <button class="brand-dropdown-title" type="button" data-section="quotes">Quotazione</button>
+          <button class="brand-dropdown-title" type="button" data-section="crm">CRM Clienti</button>
+          <button class="brand-dropdown-title control-only" type="button" data-section="antifraud">Antifrode</button>
+          <button class="brand-dropdown-title founder-only" type="button" data-section="backups">Backup</button>
           <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandTrainingSubmenu" aria-expanded="false">Formazione</button>
           <div class="brand-submenu" id="brandTrainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
@@ -683,6 +689,9 @@
           <strong>Protezione dati OroActive</strong>
           <span>Il service worker non memorizza dati sensibili: atti, clienti, documenti, PDF e API restano sempre esclusi dalla cache PWA.</span>
         </div>
+        <div class="user-form-actions">
+          <button class="ghost-button" type="button" id="runMonthlyBackupNow">Esegui backup mensile completo</button>
+        </div>
         <div class="archive-table users-table" id="backupsList" aria-live="polite"></div>
       </section>
 
@@ -926,6 +935,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260523-29"></script>
+  <script src="app.js?v=20260523-30"></script>
 </body>
 </html>

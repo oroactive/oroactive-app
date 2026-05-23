@@ -2225,15 +2225,18 @@ function renderBackups() {
     return;
   }
   backupsList.innerHTML = `
-    <div class="table-row head"><span>Data/ora</span><span>Tipo</span><span>Stato</span><span>File</span><span>Dimensione</span><span>n8n</span></div>
+    <div class="table-row head"><span>Mese</span><span>Data backup</span><span>Tipo</span><span>Stato</span><span>Dimensione</span><span>Azioni</span></div>
     ${state.backups.map((backup) => `
       <div class="table-row">
+        <span>${escapeHtml(backup.mese || "Dato non inserito")}</span>
         <span>${escapeHtml(backup.created_at ? new Date(backup.created_at).toLocaleString("it-IT") : "Dato non inserito")}</span>
         <span>${escapeHtml(backup.tipo || "automatico")}</span>
         <em class="${backup.stato === "completato" ? "done" : backup.stato === "errore" ? "warning" : ""}">${escapeHtml(backup.stato || "in corso")}</em>
-        <span>${escapeHtml(backup.filename || "File non disponibile")}</span>
         <span>${Number(backup.dimensione_bytes || 0) ? `${(Number(backup.dimensione_bytes) / 1024 / 1024).toFixed(2)} MB` : "Dato non inserito"}</span>
-        <span>${backup.n8n_ready ? "Pronto" : "Da configurare"}</span>
+        <div class="row-actions">
+          ${backup.download_disponibile ? `<button type="button" data-download-backup="${escapeHtml(String(backup.id))}">Download</button>` : ""}
+          ${backup.stato === "errore" ? `<button type="button" data-backup-error="${escapeHtml(backup.dettaglio || "Errore non specificato")}">Log errore</button>` : ""}
+        </div>
       </div>
     `).join("")}
   `;
@@ -2250,15 +2253,46 @@ async function loadBackups() {
   }
 }
 
-async function runBackupNow() {
+async function runBackupNow(tipo = "giornaliero") {
   if (!isFounder()) return;
   try {
     showLoading("Backup in corso...");
-    await apiRequest("/backups/run", { method: "POST", body: JSON.stringify({}), timeoutMs: 900000 });
+    await apiRequest("/backups/run", { method: "POST", body: JSON.stringify({ tipo }), timeoutMs: 900000 });
     await loadBackups();
-    showToast("Backup avviato e registrato.");
+    showToast(tipo === "mensile" ? "Backup mensile registrato." : "Backup giornaliero registrato.");
   } catch (error) {
     showToast(error.message || "Backup non riuscito.");
+  } finally {
+    hideLoading();
+  }
+}
+
+async function downloadBackup(id) {
+  if (!isFounder() || !id) return;
+  try {
+    showLoading("Download backup...");
+    const response = await fetch(`${apiBase}/backups/${encodeURIComponent(id)}/download`, {
+      headers: state.authToken ? { Authorization: `Bearer ${state.authToken}` } : {},
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || "Download non disponibile");
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    const filename = match?.[1] || `oroactive-backup-${id}.sql`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    showToast(error.message || "Download backup non riuscito.");
   } finally {
     hideLoading();
   }
@@ -6490,7 +6524,14 @@ crmList?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-crm-client]");
   if (button) openCrmClient(button.dataset.openCrmClient);
 });
-document.getElementById("runBackupNow")?.addEventListener("click", runBackupNow);
+document.getElementById("runBackupNow")?.addEventListener("click", () => runBackupNow("giornaliero"));
+document.getElementById("runMonthlyBackupNow")?.addEventListener("click", () => runBackupNow("mensile"));
+backupsList?.addEventListener("click", (event) => {
+  const download = event.target.closest("[data-download-backup]");
+  const error = event.target.closest("[data-backup-error]");
+  if (download) downloadBackup(download.dataset.downloadBackup);
+  if (error) window.alert(error.dataset.backupError || "Errore non specificato");
+});
 document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
   refreshBullionVaultPrices({ notify: true });
   initBullionVaultChart();
