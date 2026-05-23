@@ -903,32 +903,40 @@ async function lookupExistingClient(fiscalCode) {
   if (code.length !== 16) return;
   if (!/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/.test(code)) return;
   try {
-    const client = await apiRequest(`/clienti/${encodeURIComponent(code)}`, { timeoutMs: 9000 });
-    applyExistingClient(client);
-    showToast("Cliente già presente. Dati caricati automaticamente.");
+    showLoading("Ricerca cliente...");
+    const result = await apiRequest(`/clienti/codice-fiscale/${encodeURIComponent(code)}`, { timeoutMs: 9000 });
+    if (result?.found && result.cliente) {
+      applyExistingClient(result.cliente);
+      showToast("Cliente già presente. Dati caricati automaticamente.");
+      return;
+    }
+    applyFiscalCodeDecodedData(decodeFiscalCodeData(code));
   } catch {
     applyFiscalCodeDecodedData(decodeFiscalCodeData(code));
+  } finally {
+    hideLoading();
   }
 }
 
 function applyExistingClient(client = {}) {
+  const documentData = client.documenti || {};
   const fields = [
-    ['[name="nome"]', client.name],
-    ['[name="cognome"]', client.surname],
-    ['[name="nascita"]', client.birthDate],
-    ['[name="luogo"]', client.birthPlace],
-    ['[name="provinciaNascita"]', client.birthProvince],
-    ['[name="sesso"]', client.sex],
-    ['[name="cittadinanza"]', client.citizenship],
-    ['[name="indirizzo"]', client.address],
-    ['[name="provinciaResidenza"]', client.residenceProvince],
-    ['[name="telefono"]', client.phone],
+    ['[name="nome"]', client.name || client.nome],
+    ['[name="cognome"]', client.surname || client.cognome],
+    ['[name="nascita"]', toDateInputValue(client.birthDate || client.data_nascita)],
+    ['[name="luogo"]', client.birthPlace || client.luogo_nascita],
+    ['[name="provinciaNascita"]', client.birthProvince || client.provincia_nascita],
+    ['[name="sesso"]', client.sex || client.sesso],
+    ['[name="cittadinanza"]', client.citizenship || client.cittadinanza],
+    ['[name="indirizzo"]', client.address || client.indirizzo_residenza],
+    ['[name="provinciaResidenza"]', client.residenceProvince || client.provincia_residenza],
+    ['[name="telefono"]', client.phone || client.telefono],
     ['[name="email"]', client.email],
-    ['[name="tipoDocumento"]', client.documentType],
-    ['[name="numeroDocumento"]', client.documentNumber],
-    ['[name="dataRilascioDocumento"]', client.documentIssueDate],
-    ['[name="scadenzaDocumento"]', client.documentExpiry],
-    ["#paymentMethod", client.paymentMethod],
+    ['[name="tipoDocumento"]', normalizeDocumentTypeValue(client.documentType || client.tipo_documento || documentData.documento_tipo)],
+    ['[name="numeroDocumento"]', client.documentNumber || client.numero_documento],
+    ['[name="dataRilascioDocumento"]', toDateInputValue(client.documentIssueDate || client.data_rilascio_documento)],
+    ['[name="scadenzaDocumento"]', toDateInputValue(client.documentExpiry || client.data_scadenza_documento)],
+    ["#paymentMethod", client.paymentMethod || client.metodo_pagamento],
     ["#paymentIban", client.iban]
   ];
   fields.forEach(([selector, value]) => {
@@ -947,6 +955,7 @@ function applyExistingClient(client = {}) {
     });
     state.attachments = state.uploadedCaptures.size;
   }
+  applyExistingClientDocuments(documentData);
   updateDocumentCaptureCards();
   renderPaymentCaptureCard();
   renderPreciousCaptureCards();
@@ -955,6 +964,39 @@ function applyExistingClient(client = {}) {
   updateSaleTotal();
   updateDocumentExpiryWarning();
   updateChecklistState();
+}
+
+function setClientDocumentCapture(key, dataUrl, name) {
+  if (!key || !dataUrl) return;
+  state.uploadedCaptures.add(key);
+  state.captureFiles.set(key, {
+    name,
+    type: String(dataUrl).startsWith("data:application/pdf") ? "application/pdf" : "image/jpeg",
+    dataUrl,
+    url: dataUrl
+  });
+}
+
+function applyExistingClientDocuments(documenti = {}) {
+  if (!documenti || typeof documenti !== "object") return;
+  const frontKey = documentCaptureKey("fronte");
+  const backKey = documentCaptureKey("retro");
+  setClientDocumentCapture(frontKey, documenti.documento_fronte_url, "Documento fronte cliente");
+  setClientDocumentCapture(backKey, documenti.documento_retro_url, "Documento retro cliente");
+  setClientDocumentCapture("codice-fiscale-fronte", documenti.codice_fiscale_fronte_url, "Codice fiscale fronte cliente");
+  setClientDocumentCapture("codice-fiscale-retro", documenti.codice_fiscale_retro_url, "Codice fiscale retro cliente");
+  state.attachments = state.uploadedCaptures.size;
+  refreshCaptureCardStates();
+}
+
+function refreshCaptureCardStates() {
+  document.querySelectorAll(".capture-card[data-capture-key]").forEach((card) => {
+    const key = card.dataset.captureKey;
+    const loaded = state.uploadedCaptures.has(key) || state.captureFiles.has(key);
+    card.classList.toggle("loaded", loaded);
+    const note = card.querySelector("em");
+    if (note && loaded) note.textContent = "Foto acquisita";
+  });
 }
 
 function isValidIban(value = "") {

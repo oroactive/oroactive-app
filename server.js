@@ -836,6 +836,53 @@ function publicClient(row) {
   };
 }
 
+function attachmentByKey(attachments = [], matcher) {
+  const item = attachments.find((attachment) => matcher(String(attachment.key || "")));
+  return item?.dataUrl || item?.url || "";
+}
+
+function publicClientLookup(row) {
+  if (!row) return { found: false };
+  const payload = row.payload || {};
+  const attachments = Array.isArray(payload.fiscalDocumentAttachments)
+    ? payload.fiscalDocumentAttachments
+    : Array.isArray(payload.captureAttachments)
+      ? payload.captureAttachments
+      : [];
+  return {
+    found: true,
+    cliente: {
+      nome: row.nome || payload.name || "",
+      cognome: row.cognome || payload.surname || "",
+      codice_fiscale: row.codice_fiscale || payload.fiscalCode || "",
+      data_nascita: payload.birthDate || "",
+      luogo_nascita: payload.birthPlace || "",
+      provincia_nascita: payload.birthProvince || "",
+      sesso: payload.sex || "",
+      cittadinanza: payload.citizenship || "",
+      indirizzo_residenza: payload.address || "",
+      provincia_residenza: payload.residenceProvince || "",
+      telefono: row.telefono || payload.phone || "",
+      email: row.email || payload.email || "",
+      metodo_pagamento: payload.paymentMethod || "",
+      iban: row.iban || payload.iban || "",
+      intestatario_conto: payload.accountHolder || payload.intestatarioConto || "",
+      note_pagamento: payload.paymentNotes || "",
+      tipo_documento: payload.documentType || "",
+      numero_documento: payload.documentNumber || "",
+      data_rilascio_documento: payload.documentIssueDate || "",
+      data_scadenza_documento: payload.documentExpiry || "",
+      documenti: {
+        documento_tipo: payload.documentType || "",
+        documento_fronte_url: attachmentByKey(attachments, (key) => key.startsWith("documento-fronte")),
+        documento_retro_url: attachmentByKey(attachments, (key) => key.startsWith("documento-retro")),
+        codice_fiscale_fronte_url: attachmentByKey(attachments, (key) => key === "codice-fiscale-fronte"),
+        codice_fiscale_retro_url: attachmentByKey(attachments, (key) => key === "codice-fiscale-retro")
+      }
+    }
+  };
+}
+
 function titlePurity(metal, title = "") {
   const clean = String(title || "").toLowerCase().replace(",", ".").trim();
   const kt = clean.match(/(\d+(?:\.\d+)?)\s*kt/);
@@ -1383,6 +1430,15 @@ app.get("/api/clienti/:codiceFiscale", async (request, response, next) => {
     const client = await getClientByFiscalCode(request.params.codiceFiscale);
     if (!client) return response.status(404).json({ error: "Cliente non trovato" });
     response.json(publicClient(client));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/clienti/codice-fiscale/:codiceFiscale", async (request, response, next) => {
+  try {
+    const client = await getClientByFiscalCode(request.params.codiceFiscale);
+    response.json(client ? publicClientLookup(client) : { found: false });
   } catch (error) {
     next(error);
   }

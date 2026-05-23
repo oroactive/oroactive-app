@@ -53,6 +53,9 @@ CREATE INDEX IF NOT EXISTS atti_vendita_data_atto_idx
 CREATE INDEX IF NOT EXISTS atti_vendita_codice_fiscale_idx
   ON atti_vendita (LOWER(codice_fiscale));
 
+CREATE INDEX IF NOT EXISTS idx_atti_codice_fiscale
+  ON atti_vendita (codice_fiscale);
+
 CREATE INDEX IF NOT EXISTS atti_vendita_store_idx
   ON atti_vendita (store);
 
@@ -98,6 +101,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS clienti_codice_fiscale_unique
 CREATE INDEX IF NOT EXISTS clienti_codice_fiscale_lookup_idx
   ON clienti (codice_fiscale);
 
+CREATE INDEX IF NOT EXISTS idx_clienti_codice_fiscale
+  ON clienti (codice_fiscale);
+
 CREATE TABLE IF NOT EXISTS utenti (
   id BIGSERIAL PRIMARY KEY,
   nome TEXT NOT NULL,
@@ -105,7 +111,7 @@ CREATE TABLE IF NOT EXISTS utenti (
   username TEXT,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
-  ruolo TEXT NOT NULL CHECK (ruolo IN ('founder', 'responsabile', 'commesso', 'aiuto_commesso')),
+  ruolo TEXT NOT NULL CHECK (ruolo IN ('founder', 'supervisore', 'responsabile', 'commesso', 'aiuto_commesso')),
   negozio TEXT NOT NULL DEFAULT 'Busto Arsizio',
   face_id_credential TEXT,
   data_creazione TIMESTAMPTZ DEFAULT NOW(),
@@ -128,7 +134,7 @@ UPDATE utenti SET ruolo = 'commesso' WHERE ruolo IN ('commessa', 'utente', 'oper
 
 ALTER TABLE utenti DROP CONSTRAINT IF EXISTS utenti_ruolo_check;
 ALTER TABLE utenti ADD CONSTRAINT utenti_ruolo_check
-  CHECK (ruolo IN ('founder', 'responsabile', 'commesso', 'aiuto_commesso'));
+  CHECK (ruolo IN ('founder', 'supervisore', 'responsabile', 'commesso', 'aiuto_commesso'));
 
 CREATE UNIQUE INDEX IF NOT EXISTS utenti_email_unique
   ON utenti (LOWER(email));

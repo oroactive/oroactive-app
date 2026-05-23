@@ -4,6 +4,9 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS iban TEXT;
 CREATE INDEX IF NOT EXISTS atti_vendita_codice_fiscale_idx
   ON atti_vendita (LOWER(codice_fiscale));
 
+CREATE INDEX IF NOT EXISTS idx_atti_codice_fiscale
+  ON atti_vendita (codice_fiscale);
+
 CREATE INDEX IF NOT EXISTS atti_vendita_store_idx
   ON atti_vendita (store);
 
@@ -44,4 +47,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS clienti_codice_fiscale_unique
   WHERE codice_fiscale IS NOT NULL AND codice_fiscale <> '';
 
 CREATE INDEX IF NOT EXISTS clienti_codice_fiscale_lookup_idx
+  ON clienti (codice_fiscale);
+
+CREATE INDEX IF NOT EXISTS idx_clienti_codice_fiscale
   ON clienti (codice_fiscale);
