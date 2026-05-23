@@ -5491,7 +5491,7 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   } catch (error) {
-    showToast(error.message || "Salvataggio non riuscito: controlla la connessione al database.");
+    showToast("Errore nel salvataggio dell'atto. Controllare i campi compilati.");
     return false;
   }
   state.editingDirty = false;

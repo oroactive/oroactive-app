@@ -298,6 +298,48 @@ function dateText(value) {
   return String(value).slice(0, 10);
 }
 
+function dateOrNull(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const normalized = text.includes("T") ? text.slice(0, 10) : text;
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
+}
+
+function nullIfEmpty(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && !value.trim()) return null;
+  return value;
+}
+
+function sanitizeForPostgres(value) {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  if (Array.isArray(value)) return value.map((item) => sanitizeForPostgres(item));
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeForPostgres(item)]));
+  }
+  return value;
+}
+
+function redactedActPayloadForLog(act = {}) {
+  const payload = act.payload || {};
+  return {
+    id: act.id || null,
+    practiceNumber: act.practiceNumber || "",
+    status: act.status || "",
+    store: act.store || "",
+    dataAtto: act.dataAtto || null,
+    clienteNome: Boolean(act.clienteNome),
+    clienteCognome: Boolean(act.clienteCognome),
+    codiceFiscale: act.codiceFiscale ? "***" : "",
+    totale: act.totale,
+    paymentMethod: act.paymentMethod || "",
+    payloadKeys: Object.keys(payload),
+    captureAttachmentsCount: Array.isArray(payload.captureAttachments) ? payload.captureAttachments.length : 0,
+    signatureImagesCount: Array.isArray(payload.signatureImages) ? payload.signatureImages.length : 0
+  };
+}
+
 function normalizeWorkflowStatus(status = "Archiviata") {
   if (typeof status !== "string") return "Archiviata";
   const normalized = status.trim().toLowerCase();
@@ -1302,8 +1344,8 @@ function normalizeAct(input = {}, existing = null) {
     throw error;
   }
 
-  const payload = { ...(existing?.payload || {}), ...input, practiceNumber };
-  const actDate = input.date || input.data_atto || existing?.data_atto || null;
+  const payload = sanitizeForPostgres({ ...(existing?.payload || {}), ...input, practiceNumber });
+  const actDate = dateOrNull(input.date || input.data_atto || existing?.data_atto);
   const oroWeight = materialWeight(payload, "Oro") || numberFrom(input.peso_oro ?? existing?.peso_oro);
   const totale = numberFrom(input.amount ?? input.totale ?? existing?.totale);
   const paymentMethod = input.paymentMethod || existing?.payment_method || "";
@@ -1321,17 +1363,17 @@ function normalizeAct(input = {}, existing = null) {
   }
 
   return {
-    id: input.id || existing?.id || null,
+    id: nullIfEmpty(input.id || existing?.id),
     practiceNumber,
     store: input.store || existing?.store || "",
     storeCode: parsed.storeCode,
     actYear: parsed.year,
     actNumber: parsed.number,
     dataAtto: actDate,
-    clienteNome: input.name ?? input.cliente_nome ?? existing?.cliente_nome ?? "",
-    clienteCognome: input.surname ?? input.cliente_cognome ?? existing?.cliente_cognome ?? "",
-    codiceFiscale: input.fiscalCode ?? input.codice_fiscale ?? existing?.codice_fiscale ?? "",
-    telefono: input.phone ?? input.telefono ?? existing?.telefono ?? "",
+    clienteNome: nullIfEmpty(input.name ?? input.cliente_nome ?? existing?.cliente_nome) || "",
+    clienteCognome: nullIfEmpty(input.surname ?? input.cliente_cognome ?? existing?.cliente_cognome) || "",
+    codiceFiscale: nullIfEmpty(input.fiscalCode ?? input.codice_fiscale ?? existing?.codice_fiscale) || "",
+    telefono: nullIfEmpty(input.phone ?? input.telefono ?? existing?.telefono) || "",
     pesoOro: oroWeight,
     quotazione: quoteValue(payload, "Oro") || numberFrom(existing?.quotazione),
     totale,
@@ -1369,13 +1411,13 @@ async function cashAntiMoneyLaunderingCheck(input = {}) {
     "COALESCE(status, '') NOT ILIKE 'Annullata'",
     "data_atto BETWEEN ($1::date - INTERVAL '7 days') AND $1::date"
   ];
-  const values = [actDate];
+  const values = [dateOrNull(actDate) || new Date().toISOString().slice(0, 10)];
   if (fiscalCode) {
     values.push(fiscalCode);
-    where.push(`UPPER(COALESCE(codice_fiscale, '')) = $${values.length}`);
+    where.push(`UPPER(COALESCE(codice_fiscale, '')) = $${values.length}::text`);
   } else if (clientId) {
     values.push(clientId);
-    where.push(`cliente_id = $${values.length}`);
+    where.push(`cliente_id = $${values.length}::bigint`);
   } else {
     return {
       ok: true,
@@ -1390,7 +1432,7 @@ async function cashAntiMoneyLaunderingCheck(input = {}) {
   }
   if (actId) {
     values.push(String(actId));
-    where.push(`id::text <> $${values.length}`);
+    where.push(`id::text <> $${values.length}::text`);
   }
   const result = await pool.query(
     `SELECT COALESCE(SUM(totale), 0)::numeric AS total
@@ -2009,8 +2051,8 @@ async function enrichActStore(act, user) {
 }
 
 async function findExisting(identifier) {
-  const result = await pool.query(`SELECT * FROM ${actsTable} WHERE id::text = $1 OR practice_number = $1 LIMIT 1`, [
-    identifier
+  const result = await pool.query(`SELECT * FROM ${actsTable} WHERE id::text = $1::text OR practice_number = $1::text LIMIT 1`, [
+    String(identifier ?? "")
   ]);
   return result.rowCount ? result.rows[0] : null;
 }
@@ -2078,33 +2120,33 @@ async function upsertClientFromAct(act) {
   };
   const values = [
     fiscalCode,
-    act.clienteNome || act.name || "",
-    act.clienteCognome || act.surname || "",
-    act.telefono || act.phone || "",
-    act.payload?.email || act.email || "",
-    act.iban || act.payload?.iban || "",
-    act.negozioId || act.negozio_id || act.payload?.negozio_id || null,
-    payload
+    nullIfEmpty(act.clienteNome || act.name),
+    nullIfEmpty(act.clienteCognome || act.surname),
+    nullIfEmpty(act.telefono || act.phone),
+    nullIfEmpty(act.payload?.email || act.email),
+    nullIfEmpty(act.iban || act.payload?.iban),
+    nullIfEmpty(act.negozioId || act.negozio_id || act.payload?.negozio_id),
+    sanitizeForPostgres(payload)
   ];
-  const existing = await pool.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1 LIMIT 1", [fiscalCode]);
+  const existing = await pool.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1", [fiscalCode]);
   const result = existing.rowCount
     ? await pool.query(
       `UPDATE clienti SET
-        nome = COALESCE(NULLIF($2, ''), nome),
-        cognome = COALESCE(NULLIF($3, ''), cognome),
-        telefono = COALESCE(NULLIF($4, ''), telefono),
-        email = COALESCE(NULLIF($5, ''), email),
-        iban = COALESCE(NULLIF($6, ''), iban),
-        negozio_id = COALESCE($7, negozio_id),
+        nome = COALESCE(NULLIF($2::text, ''), nome),
+        cognome = COALESCE(NULLIF($3::text, ''), cognome),
+        telefono = COALESCE(NULLIF($4::text, ''), telefono),
+        email = COALESCE(NULLIF($5::text, ''), email),
+        iban = COALESCE(NULLIF($6::text, ''), iban),
+        negozio_id = COALESCE($7::bigint, negozio_id),
         payload = COALESCE(payload, '{}'::jsonb) || COALESCE($8::jsonb, '{}'::jsonb),
         updated_at = NOW()
-       WHERE id = $9
+       WHERE id = $9::bigint
        RETURNING *`,
       [...values, existing.rows[0].id]
     )
     : await pool.query(
       `INSERT INTO clienti (codice_fiscale, nome, cognome, telefono, email, iban, negozio_id, payload)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::bigint, $8::jsonb)
        RETURNING *`,
       values
     );
@@ -2116,14 +2158,14 @@ async function getClientByFiscalCode(fiscalCode) {
   if (!normalized) return null;
   const latestActResult = await pool.query(
     `SELECT * FROM ${actsTable}
-     WHERE UPPER(codice_fiscale) = $1
+     WHERE UPPER(codice_fiscale) = $1::text
      ORDER BY updated_at DESC, id DESC
      LIMIT 1`,
     [normalized]
   );
   const latestAct = latestActResult.rowCount ? rowToAct(latestActResult.rows[0]) : null;
   const result = await pool.query(
-    "SELECT * FROM clienti WHERE UPPER(codice_fiscale) = $1 LIMIT 1",
+    "SELECT * FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1",
     [normalized]
   );
   if (result.rowCount) {
@@ -2298,10 +2340,10 @@ async function dashboardKpis(user = {}) {
 async function createAntifraudAlert(input = {}) {
   const duplicate = await pool.query(
     `SELECT id FROM antifrode_alerts
-     WHERE COALESCE(atto_id, 0) = COALESCE($1, 0)
-       AND COALESCE(cliente_id, 0) = COALESCE($2, 0)
-       AND tipo_alert = $3
-       AND COALESCE(descrizione, '') = COALESCE($4, '')
+     WHERE COALESCE(atto_id, 0) = COALESCE($1::bigint, 0)
+       AND COALESCE(cliente_id, 0) = COALESCE($2::bigint, 0)
+       AND tipo_alert = $3::text
+       AND COALESCE(descrizione, '') = COALESCE($4::text, '')
        AND stato IN ('nuovo', 'in verifica')
      LIMIT 1`,
     [input.atto_id || null, input.cliente_id || null, input.tipo_alert || "", input.descrizione || ""]
@@ -2309,7 +2351,7 @@ async function createAntifraudAlert(input = {}) {
   if (duplicate.rowCount) return null;
   const result = await pool.query(
     `INSERT INTO antifrode_alerts (cliente_id, atto_id, tipo_alert, livello, descrizione, stato, creato_da_sistema)
-     VALUES ($1,$2,$3,$4,$5,'nuovo',TRUE)
+     VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::text,'nuovo',TRUE)
      RETURNING *`,
     [input.cliente_id || null, input.atto_id || null, input.tipo_alert, input.livello || "medio", input.descrizione || ""]
   );
@@ -2680,37 +2722,47 @@ async function saveAct(input, user) {
       practice_number, store, store_code, act_year, act_number,
       payment_method, status, iban, payload,
       negozio_id, codice_negozio, numero_atto_negozio, operatore_id
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+    ) VALUES (
+      $1::text,$2::text,$3::text,$4::text,
+      $5::numeric,$6::numeric,$7::numeric,$8::date,
+      $9::text,$10::text,$11::text,$12::integer,$13::integer,
+      $14::text,$15::text,$16::text,$17::jsonb,
+      $18::bigint,$19::text,$20::integer,$21::bigint
+    )
     RETURNING *`,
     [
-      act.clienteNome,
-      act.clienteCognome,
-      act.codiceFiscale,
-      act.telefono,
+      nullIfEmpty(act.clienteNome),
+      nullIfEmpty(act.clienteCognome),
+      nullIfEmpty(act.codiceFiscale),
+      nullIfEmpty(act.telefono),
       act.pesoOro,
       act.quotazione,
       act.totale,
-      act.dataAtto,
-      act.practiceNumber,
-      act.store,
-      act.storeCode,
+      dateOrNull(act.dataAtto),
+      nullIfEmpty(act.practiceNumber),
+      nullIfEmpty(act.store),
+      nullIfEmpty(act.storeCode),
       act.actYear,
       act.actNumber,
-      act.paymentMethod,
-      act.status,
-      act.iban,
-      act.payload,
-      act.negozioId,
-      act.codiceNegozio,
+      nullIfEmpty(act.paymentMethod),
+      nullIfEmpty(act.status),
+      nullIfEmpty(act.iban),
+      sanitizeForPostgres(act.payload),
+      nullIfEmpty(act.negozioId),
+      nullIfEmpty(act.codiceNegozio),
       act.numeroAttoNegozio,
-      act.operatoreId
+      nullIfEmpty(act.operatoreId)
     ]
   );
   if (!isDraftLikeStatus(act.status)) await saveAmlAlert({ check: amlCheck, act, user, attoId: result.rows[0].id });
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
   if (client?.id) {
     const withClient = await pool.query(
-      `UPDATE ${actsTable} SET cliente_id = $2, iban = COALESCE(NULLIF($3, ''), iban) WHERE id = $1 RETURNING *`,
+      `UPDATE ${actsTable}
+       SET cliente_id = $2::bigint,
+           iban = COALESCE(NULLIF($3::text, ''), iban)
+       WHERE id = $1::bigint
+       RETURNING *`,
       [result.rows[0].id, client.id, client.iban || act.iban || ""]
     );
     return rowToAct(withClient.rows[0], { full: false });
@@ -2732,63 +2784,76 @@ async function updateAct(identifier, input, user) {
     throw error;
   }
   const act = await enrichActStore(normalizeAct(enforceActStore(input, user), existing), user);
+  const updateValues = [
+    existing.id,
+    nullIfEmpty(act.clienteNome),
+    nullIfEmpty(act.clienteCognome),
+    nullIfEmpty(act.codiceFiscale),
+    nullIfEmpty(act.telefono),
+    act.pesoOro,
+    act.quotazione,
+    act.totale,
+    dateOrNull(act.dataAtto),
+    nullIfEmpty(act.practiceNumber),
+    nullIfEmpty(act.store),
+    nullIfEmpty(act.storeCode),
+    act.actYear,
+    act.actNumber,
+    nullIfEmpty(act.paymentMethod),
+    nullIfEmpty(act.status),
+    nullIfEmpty(act.iban),
+    sanitizeForPostgres(act.payload),
+    nullIfEmpty(act.negozioId),
+    nullIfEmpty(act.codiceNegozio),
+    act.numeroAttoNegozio,
+    nullIfEmpty(act.operatoreId)
+  ];
   await enforceCashAntiMoneyLaundering(act, user, existing);
-  const result = await pool.query(
-    `UPDATE ${actsTable} SET
-      cliente_nome = $2,
-      cliente_cognome = $3,
-      codice_fiscale = $4,
-      telefono = $5,
-      peso_oro = $6,
-      quotazione = $7,
-      totale = $8,
-      data_atto = $9,
-      practice_number = $10,
-      store = $11,
-      store_code = $12,
-      act_year = $13,
-      act_number = $14,
-      payment_method = $15,
-      status = $16,
-      iban = $17,
-      payload = $18,
-      negozio_id = $19,
-      codice_negozio = $20,
-      numero_atto_negozio = $21,
-      operatore_id = $22,
-      updated_at = NOW()
-     WHERE id = $1
-     RETURNING *`,
-    [
-      existing.id,
-      act.clienteNome,
-      act.clienteCognome,
-      act.codiceFiscale,
-      act.telefono,
-      act.pesoOro,
-      act.quotazione,
-      act.totale,
-      act.dataAtto,
-      act.practiceNumber,
-      act.store,
-      act.storeCode,
-      act.actYear,
-      act.actNumber,
-      act.paymentMethod,
-      act.status,
-      act.iban,
-      act.payload,
-      act.negozioId,
-      act.codiceNegozio,
-      act.numeroAttoNegozio,
-      act.operatoreId
-    ]
-  );
+  console.log("UPDATE PAYLOAD", redactedActPayloadForLog(act));
+  console.log("ATTO ID", existing.id);
+  let result;
+  try {
+    result = await pool.query(
+      `UPDATE ${actsTable} SET
+        cliente_nome = $2::text,
+        cliente_cognome = $3::text,
+        codice_fiscale = $4::text,
+        telefono = $5::text,
+        peso_oro = $6::numeric,
+        quotazione = $7::numeric,
+        totale = $8::numeric,
+        data_atto = $9::date,
+        practice_number = $10::text,
+        store = $11::text,
+        store_code = $12::text,
+        act_year = $13::integer,
+        act_number = $14::integer,
+        payment_method = $15::text,
+        status = $16::text,
+        iban = $17::text,
+        payload = $18::jsonb,
+        negozio_id = $19::bigint,
+        codice_negozio = $20::text,
+        numero_atto_negozio = $21::integer,
+        operatore_id = $22::bigint,
+        updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      updateValues
+    );
+  } catch (err) {
+    console.error("UPDATE ATTO ERROR", err);
+    throw err;
+  }
   if (!result.rowCount) return null;
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
   if (client?.id) {
     const withClient = await pool.query(
-      `UPDATE ${actsTable} SET cliente_id = $2, iban = COALESCE(NULLIF($3, ''), iban) WHERE id = $1 RETURNING *`,
+      `UPDATE ${actsTable}
+       SET cliente_id = $2::bigint,
+           iban = COALESCE(NULLIF($3::text, ''), iban)
+       WHERE id = $1::bigint
+       RETURNING *`,
       [result.rows[0].id, client.id, client.iban || act.iban || ""]
     );
     return rowToAct(withClient.rows[0], { full: false });
@@ -2809,7 +2874,7 @@ async function deleteAct(identifier, user) {
     error.status = 403;
     throw error;
   }
-  const result = await pool.query(`DELETE FROM ${actsTable} WHERE id = $1 RETURNING id`, [
+  const result = await pool.query(`DELETE FROM ${actsTable} WHERE id = $1::bigint RETURNING id`, [
     existing.id
   ]);
   return result.rowCount > 0;
@@ -3862,7 +3927,11 @@ app.get("*", (_request, response) => response.sendFile(path.join(__dirname, "ind
 
 app.use((error, _request, response, _next) => {
   console.error(error);
-  response.status(error.status || 500).json({ error: error.message || "Errore server" });
+  const isDatabaseError = Boolean(error.code || error.severity || error.routine);
+  const message = isDatabaseError
+    ? "Errore nel salvataggio dell'atto. Controllare i campi compilati."
+    : error.message || "Errore server";
+  response.status(error.status || 500).json({ error: message });
 });
 
 initDatabase()
