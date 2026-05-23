@@ -1224,7 +1224,6 @@ async function startAuthenticatedApp() {
   if (isAdmin()) loadUsers();
   refreshBullionVaultPrices();
   renderQuoteDashboard();
-  initBullionVaultChart();
   maybeShowLevelUnlockMessage();
   if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 30000);
 }
@@ -1407,6 +1406,10 @@ function setScreen(id) {
   screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
   navItems.forEach((item) => item.classList.toggle("active", item.dataset.section === id));
   if (practiceTopbar) practiceTopbar.hidden = id !== "practice";
+  if (id !== "quotes" && bullionVaultChart) {
+    bullionVaultChart.innerHTML = "";
+    state.bullionChartLoaded = false;
+  }
   handleScreenDataLoad(id);
 }
 
@@ -1420,6 +1423,11 @@ async function handleScreenDataLoad(id) {
     renderFusionGroups();
   }
   if (id === "dashboard") await loadDashboard();
+  if (id === "quotes") {
+    renderQuoteDashboard();
+    await refreshBullionVaultPrices();
+    initBullionVaultChart();
+  }
   if (id === "backups") await loadBackups();
   if (id === "stores") await loadStores();
   if (id === "antifraud") await loadAntifraud();

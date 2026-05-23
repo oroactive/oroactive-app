@@ -66,6 +66,9 @@
           </div>
         </div>
         <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-section="quotes">Quotazione</button>
+        </div>
+        <div class="main-menu-group">
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="trainingSubmenu" aria-expanded="false">Formazione</button>
           <div class="main-menu-submenu" id="trainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
@@ -100,6 +103,7 @@
           <button class="founder-only" type="button" data-section="backups">Backup</button>
           <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
           <button type="button" data-section="crm">CRM Clienti</button>
+          <button type="button" data-section="quotes">Quotazione</button>
           <strong class="brand-dropdown-title">Formazione</strong>
           <button type="button" data-section="assistant">Assistente IA OroActive</button>
           <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
@@ -127,21 +131,6 @@
             <h1>Atto di Vendita</h1>
           </div>
         </div>
-        <section class="quote-strip" aria-label="Quotazione metalli preziosi">
-          <div class="quote-strip-heading">
-            <span>Quotazione</span>
-            <button class="small-button" type="button" id="refreshQuoteDashboard">Aggiorna</button>
-          </div>
-          <div class="quote-strip-grid" id="quoteDashboard">
-            <article><span>Oro</span><strong>Dato non inserito</strong></article>
-            <article><span>Argento</span><strong>Dato non inserito</strong></article>
-            <article><span>Diamanti</span><strong>Da configurare</strong></article>
-          </div>
-          <div class="quote-chart-panel">
-            <div id="bullionVaultChart" class="bullionvault-chart"></div>
-            <p id="bullionVaultChartFallback" class="quote-fallback" hidden>Grafico BullionVault non incorporabile direttamente. <a href="https://www.bullionvault.com/gold-price-chart.do" target="_blank" rel="noopener">Apri grafico BullionVault</a>.</p>
-          </div>
-        </section>
       </header>
 
       <section id="practice" class="screen active-screen">
@@ -632,6 +621,33 @@
         </div>
         <div class="dashboard-grid" id="dashboardGrid"></div>
         <div class="dashboard-panels" id="dashboardPanels"></div>
+      </section>
+
+      <section id="quotes" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Mercati</p>
+            <h2>Quotazione</h2>
+            <p class="muted">Quotazioni e andamento di oro, argento, platino e diamanti.</p>
+          </div>
+          <button class="primary-button" type="button" id="refreshQuoteDashboard">Aggiorna quotazioni</button>
+        </div>
+        <section class="quote-strip quote-section-panel" aria-label="Quotazione metalli preziosi">
+          <div class="quote-strip-heading">
+            <span>Quotazione OroActive</span>
+          </div>
+          <div class="quote-strip-grid" id="quoteDashboard">
+            <article><span>Oro</span><strong>Dato non inserito</strong></article>
+            <article><span>Argento</span><strong>Dato non inserito</strong></article>
+            <article><span>Platino</span><strong>Dato non inserito</strong></article>
+            <article><span>Diamanti</span><strong>Da configurare</strong></article>
+          </div>
+          <div class="quote-chart-panel">
+            <div id="bullionVaultChart" class="bullionvault-chart"></div>
+            <p id="bullionVaultChartFallback" class="quote-fallback" hidden>Grafico BullionVault non incorporabile direttamente. <a href="https://www.bullionvault.com/gold-price-chart.do" target="_blank" rel="noopener">Apri grafico BullionVault</a>.</p>
+          </div>
+        </section>
       </section>
 
       <section id="stores" class="screen founder-only">

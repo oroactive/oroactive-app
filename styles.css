@@ -781,15 +781,19 @@ textarea {
 }
 
 .quote-strip {
-  flex: 1 1 430px;
   display: grid;
   gap: 10px;
-  min-width: min(420px, 100%);
   padding: 12px;
   border: 1px solid rgba(255, 122, 0, 0.42);
   border-radius: 8px;
   background: #080604;
   color: #fff8ef;
+}
+
+.quote-section-panel {
+  margin-top: 18px;
+  padding: 18px;
+  min-height: 520px;
 }
 
 .quote-strip-heading {
@@ -841,7 +845,7 @@ textarea {
 }
 
 .bullionvault-chart {
-  min-height: 170px;
+  min-height: 420px;
   border: 1px solid rgba(255, 122, 0, 0.3);
   border-radius: 8px;
   background: #111;
@@ -4038,20 +4042,12 @@ button.quality-review-badge {
 }
 
 @media (max-width: 900px) {
-  .topbar {
-    flex-direction: column;
-  }
-
-  .quote-strip {
-    min-width: 0;
-  }
-
   .quote-strip-grid {
     grid-template-columns: 1fr;
   }
 
   .bullionvault-chart {
-    min-height: 150px;
+    min-height: 360px;
   }
 }
 
