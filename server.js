@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import bcrypt from "bcrypt";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -16,6 +18,7 @@ dotenv.config();
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const execFileAsync = promisify(execFile);
 const port = Number(process.env.PORT || 3000);
 const actsTable = "atti_vendita";
 const CASH_PAYMENT_LIMIT = 500;
@@ -25,6 +28,9 @@ const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
+const backupDirectory = process.env.BACKUP_DIR || path.join(__dirname, "backups");
+const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
+const backupIntervalMs = 24 * 60 * 60 * 1000;
 const bullionVaultMarkets = {
   Oro: { securityId: "AUXZU", source: "Zurigo" },
   Argento: { securityId: "AGXZU", source: "Zurigo" },
@@ -180,7 +186,7 @@ async function authenticate(request, response, next) {
 
 function requireAdmin(request, response, next) {
   if (!canManageAccess(request.user)) {
-    return response.status(403).json({ error: "Operazione riservata a Founder o Responsabile" });
+    return response.status(403).json({ error: "Non autorizzato" });
   }
   next();
 }
@@ -1491,6 +1497,89 @@ async function initDatabase() {
   await bootstrapAdminUser();
 }
 
+async function listBackups() {
+  const result = await pool.query(
+    `SELECT id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at
+     FROM backup_jobs
+     ORDER BY created_at DESC
+     LIMIT 60`
+  );
+  return result.rows;
+}
+
+async function latestBackupToday() {
+  const result = await pool.query(
+    `SELECT id FROM backup_jobs
+     WHERE created_at::date = CURRENT_DATE
+       AND stato = 'completato'
+     ORDER BY created_at DESC
+     LIMIT 1`
+  );
+  return result.rows[0] || null;
+}
+
+async function runBackup(tipo = "automatico") {
+  await fs.mkdir(backupDirectory, { recursive: true });
+  const createdAt = new Date();
+  const stamp = createdAt.toISOString().replace(/[:.]/g, "-");
+  const filename = `oroactive-backup-${stamp}.sql`;
+  const outputPath = path.join(backupDirectory, filename);
+  const job = await pool.query(
+    `INSERT INTO backup_jobs (tipo, filename, percorso, stato, dettaglio, n8n_ready)
+     VALUES ($1, $2, $3, 'in corso', $4, TRUE)
+     RETURNING id`,
+    [tipo, filename, outputPath, "Backup database PostgreSQL con allegati salvati nel database. Documenti, PDF, firme e foto in payload sono inclusi nel dump."]
+  );
+
+  try {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL non configurato: backup PostgreSQL non eseguito.");
+    }
+    await execFileAsync(pgDumpPath, [process.env.DATABASE_URL, "--file", outputPath, "--no-owner", "--no-privileges"], {
+      timeout: 15 * 60 * 1000,
+      maxBuffer: 1024 * 1024
+    });
+    const stats = await fs.stat(outputPath);
+    const result = await pool.query(
+      `UPDATE backup_jobs
+       SET stato = 'completato',
+           dettaglio = $2,
+           dimensione_bytes = $3,
+           completed_at = NOW()
+       WHERE id = $1
+       RETURNING id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at`,
+      [job.rows[0].id, "Backup completato. Pronto per integrazione futura n8n download/restore.", stats.size]
+    );
+    return result.rows[0];
+  } catch (error) {
+    const result = await pool.query(
+      `UPDATE backup_jobs
+       SET stato = 'errore',
+           dettaglio = $2,
+           completed_at = NOW()
+       WHERE id = $1
+       RETURNING id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at`,
+      [job.rows[0].id, error.message || "Backup non riuscito"]
+    );
+    return result.rows[0];
+  }
+}
+
+async function runDailyBackupIfNeeded() {
+  try {
+    if (await latestBackupToday()) return;
+    const result = await runBackup("automatico");
+    console.log(`Backup OroActive ${result.stato}: ${result.filename || "senza file"}`);
+  } catch (error) {
+    console.error("Backup automatico non riuscito", error.message || error);
+  }
+}
+
+function scheduleBackups() {
+  runDailyBackupIfNeeded();
+  setInterval(runDailyBackupIfNeeded, backupIntervalMs);
+}
+
 async function bootstrapStores() {
   for (const store of defaultStores) {
     await pool.query(
@@ -2631,8 +2720,15 @@ async function createUser(input, actor) {
   const role = normalizeRole(input.ruolo);
   const allowedRoles = managedRolesForActor(actor);
   const finalRole = allowedRoles.includes(role) ? role : allowedRoles.at(-1) || "commesso";
-  const store = roleSeesAllStores(finalRole) ? null : await storeByCodeOrName(input.negozio || input.negozio_id || "Busto Arsizio");
-  const finalStore = roleSeesAllStores(finalRole) ? "Tutti" : store?.nome || input.negozio || "Busto Arsizio";
+  const actorStore = actorRole === "responsabile" ? await storeForUser(actor) : null;
+  const store = roleSeesAllStores(finalRole)
+    ? null
+    : actorRole === "responsabile"
+      ? actorStore
+      : await storeByCodeOrName(input.negozio || input.negozio_id || "Busto Arsizio");
+  const finalStore = roleSeesAllStores(finalRole)
+    ? "Tutti"
+    : store?.nome || (actorRole === "responsabile" ? actor.negozio : input.negozio) || "Busto Arsizio";
   const username = String(input.username || "").trim();
   const generatedEmail = `${username || `utente-${Date.now()}`}@oroactive.local`;
   const result = await pool.query(
@@ -2667,7 +2763,14 @@ function assertCanManageTarget(actor, target, requestedRole = target?.ruolo) {
     throw error;
   }
   const allowedRoles = managedRolesForActor(actor);
-  if (allowedRoles.includes(targetRole) && allowedRoles.includes(normalizeRole(requestedRole))) return;
+  const sameStore = !actor?.negozio_id
+    ? String(target?.negozio || "") === String(actor?.negozio || "")
+    : String(target?.negozio_id || "") === String(actor.negozio_id);
+  if (
+    allowedRoles.includes(targetRole)
+    && allowedRoles.includes(normalizeRole(requestedRole))
+    && (actorRole !== "responsabile" || sameStore)
+  ) return;
   const error = new Error("Permesso non consentito per questo utente");
   error.status = 403;
   throw error;
@@ -2682,7 +2785,9 @@ async function updateUser(id, input, actor) {
   const allowed = ["nome", "cognome", "username", "ruolo", "negozio"];
   let selectedStore = null;
   if (input.negozio !== undefined || input.negozio_id !== undefined) {
-    selectedStore = await storeByCodeOrName(input.negozio_id || input.negozio);
+    selectedStore = normalizeRole(actor?.ruolo) === "responsabile"
+      ? await storeForUser(actor)
+      : await storeByCodeOrName(input.negozio_id || input.negozio);
   }
   allowed.forEach((field) => {
     if (input[field] === undefined) return;
@@ -2728,12 +2833,16 @@ async function listUsersForActor(actor) {
   if (actorRole === "founder") return listUsers({ includeFounder: true });
   if (actorRole === "supervisore") return listUsers();
   const roles = managedRolesForActor(actor);
-  if (!roles.length) return [];
+  if (!roles.length) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
   const values = [roles];
   let where = "WHERE ruolo = ANY($1)";
   if (actorRole === "responsabile" && !roleSeesAllStores(actor.ruolo)) {
-    values.push(actor.negozio);
-    where += " AND negozio = $2";
+    values.push(actor.negozio_id || null, actor.negozio || "");
+    where += " AND (negozio_id = $2 OR negozio = $3)";
   }
   const result = await pool.query(
     `SELECT id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen
@@ -2852,6 +2961,22 @@ app.get("/api/antiriciclaggio/contanti-check", async (request, response, next) =
 app.get("/api/dashboard", async (request, response, next) => {
   try {
     response.json(await dashboardKpis(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/backups", requireFounder, async (_request, response, next) => {
+  try {
+    response.json({ backups: await listBackups(), n8n_ready: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/backups/run", requireFounder, async (_request, response, next) => {
+  try {
+    response.status(201).json(await runBackup("manuale"));
   } catch (error) {
     next(error);
   }
@@ -3613,6 +3738,7 @@ app.use((error, _request, response, _next) => {
 
 initDatabase()
   .then(() => {
+    scheduleBackups();
     app.listen(port, () => {
       console.log(`OroActive gestionale in ascolto sulla porta ${port}`);
     });

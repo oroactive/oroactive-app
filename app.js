@@ -42,6 +42,9 @@ const state = {
   trainingCourses: [],
   crmClients: [],
   crmSearchTimer: null,
+  backups: [],
+  clockTimer: null,
+  bullionChartLoaded: false,
   tutorial: {
     active: false,
     index: 0,
@@ -66,6 +69,11 @@ const enterSoftware = document.getElementById("enterSoftware");
 const mainMenuScreen = document.getElementById("mainMenuScreen");
 const mainUserMenuButton = document.getElementById("mainUserMenuButton");
 const mainUserDropdown = document.getElementById("mainUserDropdown");
+const mainMenuClock = document.getElementById("mainMenuClock");
+const installHint = document.getElementById("installHint");
+const quoteDashboard = document.getElementById("quoteDashboard");
+const bullionVaultChart = document.getElementById("bullionVaultChart");
+const bullionVaultChartFallback = document.getElementById("bullionVaultChartFallback");
 const profileCard = document.getElementById("profileCard");
 const practiceTopbar = document.getElementById("practiceTopbar");
 const loginScreen = document.getElementById("loginScreen");
@@ -106,6 +114,7 @@ const trainingCourseForm = document.getElementById("trainingCourseForm");
 const trainingList = document.getElementById("trainingList");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
+const backupsList = document.getElementById("backupsList");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -310,6 +319,44 @@ function showLoading(message = "Caricamento in corso...") {
 
 function hideLoading() {
   if (loadingIndicator) loadingIndicator.hidden = true;
+}
+
+function isStandalonePwa() {
+  return window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+}
+
+function isAppleTouchDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+      // La PWA resta utilizzabile anche senza service worker.
+    });
+  });
+}
+
+function maybeShowInstallHint() {
+  if (!installHint || localStorage.getItem("oroactive-install-hint-dismissed")) return;
+  if (isStandalonePwa() || !isAppleTouchDevice()) return;
+  installHint.hidden = false;
+}
+
+function updateMainMenuClock() {
+  if (!mainMenuClock) return;
+  mainMenuClock.textContent = new Intl.DateTimeFormat("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(new Date());
+}
+
+function startMainMenuClock() {
+  updateMainMenuClock();
+  if (state.clockTimer) return;
+  state.clockTimer = window.setInterval(updateMainMenuClock, 1000);
 }
 
 function queryString(params = {}) {
@@ -1159,6 +1206,8 @@ async function startAuthenticatedApp() {
   showAuthenticatedShell();
   state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
   applyRolePermissions();
+  startMainMenuClock();
+  maybeShowInstallHint();
   await loadAvailableStores();
   renderStep();
   await setPracticeMeta();
@@ -1174,6 +1223,8 @@ async function startAuthenticatedApp() {
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   if (isAdmin()) loadUsers();
   refreshBullionVaultPrices();
+  renderQuoteDashboard();
+  initBullionVaultChart();
   maybeShowLevelUnlockMessage();
   if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 30000);
 }
@@ -1330,7 +1381,7 @@ async function handleLogout() {
 
 function setScreen(id) {
   if (id === "users" && !isAdmin()) {
-    showToast("Sezione riservata a Founder o Responsabile.");
+    showToast("Non autorizzato");
     return;
   }
   if (id === "knowledgeNotes" && !canManageKnowledgeUi()) {
@@ -1342,6 +1393,10 @@ function setScreen(id) {
     return;
   }
   if (id === "stores" && !isFounder()) {
+    showToast("Sezione riservata al Founder.");
+    return;
+  }
+  if (id === "backups" && !isFounder()) {
     showToast("Sezione riservata al Founder.");
     return;
   }
@@ -1365,6 +1420,7 @@ async function handleScreenDataLoad(id) {
     renderFusionGroups();
   }
   if (id === "dashboard") await loadDashboard();
+  if (id === "backups") await loadBackups();
   if (id === "stores") await loadStores();
   if (id === "antifraud") await loadAntifraud();
   if (id === "training") await loadTraining();
@@ -1386,20 +1442,22 @@ async function handleScreenDataLoad(id) {
 function renderProfileCard() {
   if (!profileCard || !state.currentUser) return;
   const user = state.currentUser;
+  const createdAt = user.data_creazione
+    ? new Date(user.data_creazione).toLocaleString("it-IT")
+    : "Dato non inserito";
   profileCard.innerHTML = `
-    <div class="profile-row"><span>Nome</span><strong>${escapeHtml(displayUsername(user))}</strong></div>
+    <div class="profile-row"><span>Nome</span><strong>${escapeHtml(user.nome || displayUsername(user) || "Dato non inserito")}</strong></div>
+    <div class="profile-row"><span>Cognome</span><strong>${escapeHtml(user.cognome || "Dato non inserito")}</strong></div>
+    <div class="profile-row"><span>Username / email</span><strong>${escapeHtml(user.username || user.email || "Dato non inserito")}</strong></div>
     <div class="profile-row"><span>Ruolo</span><strong>${escapeHtml(roleLabel(user.ruolo))}</strong></div>
     <div class="profile-row"><span>Negozio</span><strong>${escapeHtml(user.negozio || "Tutti")}</strong></div>
-    <div class="profile-row"><span>Nome utente</span><strong>${escapeHtml(user.username || "Dato non inserito")}</strong></div>
-    <div class="profile-row"><span>Email</span><strong>${escapeHtml(user.email || "Dato non inserito")}</strong></div>
+    <div class="profile-row"><span>Data creazione account</span><strong>${escapeHtml(createdAt)}</strong></div>
     <div class="profile-row"><span>Face ID</span><strong>${user.hasFaceId ? "Registrato" : "Non registrato"}</strong></div>
     <div class="user-form-actions">
       <button class="ghost-button" type="button" id="profileRegisterFaceId">Registra Face ID</button>
-      ${isAdmin() ? '<button class="primary-button" type="button" id="profileManageUsers">Gestione utenti</button>' : ""}
     </div>
   `;
   document.getElementById("profileRegisterFaceId")?.addEventListener("click", registerFaceId);
-  document.getElementById("profileManageUsers")?.addEventListener("click", () => setScreen("users"));
 }
 
 function closeMainMenuDropdowns() {
@@ -1882,7 +1940,11 @@ function resetKnowledgeNoteFormValues() {
   document.getElementById("knowledgeNoteAuthor").value = displayUsername(state.currentUser || {});
   document.getElementById("knowledgeNoteRole").value = roleLabel(state.currentUser?.ruolo || "");
   const saveButton = document.getElementById("saveKnowledgeNoteButton");
-  if (saveButton) saveButton.textContent = "Salva conoscenza";
+  if (saveButton) {
+    saveButton.textContent = "Salva conoscenza";
+    saveButton.classList.remove("success-button", "knowledge-save-editing");
+    saveButton.classList.add("primary-button");
+  }
 }
 
 function renderKnowledgeNotes() {
@@ -1924,6 +1986,7 @@ async function saveKnowledgeNote(event) {
   event.preventDefault();
   if (!canManageKnowledgeUi()) return;
   const id = document.getElementById("knowledgeNoteId")?.value;
+  const isEditing = Boolean(id);
   const payload = {
     title: document.getElementById("knowledgeNoteTitle")?.value.trim(),
     category: document.getElementById("knowledgeNoteCategory")?.value,
@@ -1936,7 +1999,7 @@ async function saveKnowledgeNote(event) {
     return;
   }
   try {
-    showLoading("Salvataggio conoscenza...");
+    showLoading(isEditing ? "Aggiornamento conoscenza..." : "Salvataggio conoscenza...");
     await apiRequest(id ? `/ai/knowledge/${encodeURIComponent(id)}` : "/ai/knowledge", {
       method: id ? "PUT" : "POST",
       body: JSON.stringify(payload),
@@ -1944,7 +2007,11 @@ async function saveKnowledgeNote(event) {
     });
     resetKnowledgeNoteFormValues();
     await loadKnowledgeNotes();
-    showToast(isFounder() ? "Conoscenza approvata e indicizzata." : "Conoscenza salvata in revisione.");
+    showToast(isEditing
+      ? "Conoscenza aggiornata con successo"
+      : isFounder()
+        ? "Conoscenza approvata e indicizzata."
+        : "Conoscenza salvata in revisione.");
   } catch (error) {
     showToast(error.message || "Conoscenza non salvata.");
   } finally {
@@ -1963,7 +2030,11 @@ function editKnowledgeNote(id) {
   document.getElementById("knowledgeNoteAuthor").value = displayUsername(state.currentUser || {});
   document.getElementById("knowledgeNoteRole").value = roleLabel(state.currentUser?.ruolo || "");
   const saveButton = document.getElementById("saveKnowledgeNoteButton");
-  if (saveButton) saveButton.textContent = "Salva modifiche";
+  if (saveButton) {
+    saveButton.textContent = "Salva modifiche";
+    saveButton.classList.remove("primary-button");
+    saveButton.classList.add("success-button", "knowledge-save-editing");
+  }
 }
 
 async function approveKnowledgeNote(id) {
@@ -2116,6 +2187,52 @@ async function loadDashboard() {
     renderDashboard();
   } catch (error) {
     if (dashboardGrid) dashboardGrid.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Dashboard non caricata.")}</div>`;
+  }
+}
+
+function renderBackups() {
+  if (!backupsList) return;
+  if (!state.backups.length) {
+    backupsList.innerHTML = '<div class="empty-state">Nessun backup registrato.</div>';
+    return;
+  }
+  backupsList.innerHTML = `
+    <div class="table-row head"><span>Data/ora</span><span>Tipo</span><span>Stato</span><span>File</span><span>Dimensione</span><span>n8n</span></div>
+    ${state.backups.map((backup) => `
+      <div class="table-row">
+        <span>${escapeHtml(backup.created_at ? new Date(backup.created_at).toLocaleString("it-IT") : "Dato non inserito")}</span>
+        <span>${escapeHtml(backup.tipo || "automatico")}</span>
+        <em class="${backup.stato === "completato" ? "done" : backup.stato === "errore" ? "warning" : ""}">${escapeHtml(backup.stato || "in corso")}</em>
+        <span>${escapeHtml(backup.filename || "File non disponibile")}</span>
+        <span>${Number(backup.dimensione_bytes || 0) ? `${(Number(backup.dimensione_bytes) / 1024 / 1024).toFixed(2)} MB` : "Dato non inserito"}</span>
+        <span>${backup.n8n_ready ? "Pronto" : "Da configurare"}</span>
+      </div>
+    `).join("")}
+  `;
+}
+
+async function loadBackups() {
+  if (!isFounder()) return;
+  try {
+    const data = await apiRequest("/backups");
+    state.backups = data.backups || [];
+    renderBackups();
+  } catch (error) {
+    if (backupsList) backupsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Backup non caricati.")}</div>`;
+  }
+}
+
+async function runBackupNow() {
+  if (!isFounder()) return;
+  try {
+    showLoading("Backup in corso...");
+    await apiRequest("/backups/run", { method: "POST", body: JSON.stringify({}), timeoutMs: 900000 });
+    await loadBackups();
+    showToast("Backup avviato e registrato.");
+  } catch (error) {
+    showToast(error.message || "Backup non riuscito.");
+  } finally {
+    hideLoading();
   }
 }
 
@@ -4414,16 +4531,23 @@ async function recognizeCieZones(canvas, side) {
 
 function loadScriptOnce(src, id) {
   return new Promise((resolve, reject) => {
-    if (document.getElementById(id)) {
-      document.getElementById(id).addEventListener("load", resolve, { once: true });
-      if (window.Tesseract?.recognize) resolve();
+    const existing = document.getElementById(id);
+    if (existing) {
+      if (existing.dataset.loaded === "true" || window.Tesseract?.recognize || window.BullionVaultChart) {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", resolve, { once: true });
       return;
     }
     const script = document.createElement("script");
     script.id = id;
     script.src = src;
     script.async = true;
-    script.onload = resolve;
+    script.onload = () => {
+      script.dataset.loaded = "true";
+      resolve();
+    };
     script.onerror = reject;
     document.head.appendChild(script);
   });
@@ -5323,6 +5447,54 @@ function applyBullionVaultPrices() {
       info.textContent = `Dato BullionVault live: ${formatBullionPrice(quote.value)} EUR al kg. Fonte ${quote.source || "mercato BullionVault"}.`;
     }
   });
+  renderQuoteDashboard();
+}
+
+function renderQuoteDashboard() {
+  if (!quoteDashboard) return;
+  const metals = ["Oro", "Argento", "Platino"];
+  const rows = metals.map((metal) => {
+    const quote = state.bullionVaultPrices[metal];
+    return `
+      <article>
+        <span>${escapeHtml(metal)}</span>
+        <strong>${quote ? `${formatBullionPrice(quote.value)} EUR/kg` : "Dato non inserito"}</strong>
+      </article>
+    `;
+  });
+  rows.push(`
+    <article>
+      <span>Diamanti</span>
+      <strong>Quotazione diamanti da configurare</strong>
+    </article>
+  `);
+  quoteDashboard.innerHTML = rows.join("");
+}
+
+async function initBullionVaultChart() {
+  if (!bullionVaultChart || state.bullionChartLoaded) return;
+  try {
+    await loadScriptOnce("https://www.bullionvault.com/chart/bullionvaultchart.js?v=1", "bullionvault-chart-script");
+    if (typeof window.BullionVaultChart !== "function") throw new Error("Widget non disponibile");
+    bullionVaultChart.innerHTML = "";
+    new window.BullionVaultChart({
+      bullion: "gold",
+      currency: "EUR",
+      timeframe: "1w",
+      chartType: "line",
+      containerDefinedSize: true,
+      displayLatestPriceLine: true,
+      switchBullion: true,
+      switchCurrency: true,
+      switchTimeframe: true,
+      switchChartType: false,
+      exportButton: false
+    }, "bullionVaultChart");
+    state.bullionChartLoaded = true;
+    if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = true;
+  } catch {
+    if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = false;
+  }
 }
 
 async function refreshBullionVaultPrices(options = {}) {
@@ -5330,8 +5502,10 @@ async function refreshBullionVaultPrices(options = {}) {
     const data = await apiRequest("/bullionvault/prices");
     state.bullionVaultPrices = Object.fromEntries((data.prices || []).map((quote) => [quote.metal, quote]));
     applyBullionVaultPrices();
+    renderQuoteDashboard();
     if (options.notify) showToast("Quotazioni BullionVault aggiornate.");
   } catch {
+    renderQuoteDashboard();
     if (options.notify) showToast("Quotazioni BullionVault non disponibili. Puoi inserire il dato manualmente.");
   }
 }
@@ -6353,6 +6527,15 @@ crmList?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-crm-client]");
   if (button) openCrmClient(button.dataset.openCrmClient);
 });
+document.getElementById("runBackupNow")?.addEventListener("click", runBackupNow);
+document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
+  refreshBullionVaultPrices({ notify: true });
+  initBullionVaultChart();
+});
+document.getElementById("dismissInstallHint")?.addEventListener("click", () => {
+  localStorage.setItem("oroactive-install-hint-dismissed", "1");
+  if (installHint) installHint.hidden = true;
+});
 knowledgeStatus?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-delete-book]");
   if (button) deleteKnowledgeBook(button.dataset.deleteBook);
@@ -6407,6 +6590,11 @@ mainUserDropdown?.addEventListener("click", (event) => {
   if (event.target.closest("[data-user-profile]")) {
     mainMenuScreen.hidden = true;
     setScreen("profile");
+    return;
+  }
+  if (event.target.closest("[data-user-users]")) {
+    mainMenuScreen.hidden = true;
+    setScreen("users");
     return;
   }
   if (event.target.closest("[data-user-logout]")) {
@@ -7014,11 +7202,14 @@ document.getElementById("closePreview").addEventListener("click", () => {
 });
 
 async function initializeApp() {
+  registerServiceWorker();
   removeLegacySearchMenu();
   upgradeProvinceFields();
   populateAutocompleteLists();
+  startMainMenuClock();
   appShell.hidden = true;
   await restoreSession();
+  maybeShowInstallHint();
   window.addEventListener("focus", () => {
     if (state.authToken) syncActsFromServer();
   });

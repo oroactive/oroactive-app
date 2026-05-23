@@ -1,7 +1,7 @@
 {
   "name": "OroActive Gestionale",
   "short_name": "OroActive",
-  "description": "Software gestionale OroActive per atti di vendita.",
+  "description": "Software gestionale OroActive per atti di vendita, giacenza e formazione.",
   "start_url": "/index.html",
   "scope": "/",
   "id": "/oroactive-gestionale",

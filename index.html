@@ -5,13 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#17130d">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="OroActive">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="OroActive">
   <meta name="format-detection" content="telephone=no">
   <title>OroActive Gestionale</title>
-  <link rel="manifest" href="manifest.webmanifest?v=20260520-13">
-  <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260523-20">
+  <link rel="manifest" href="manifest.json?v=20260523-1">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <link rel="stylesheet" href="styles.css?v=20260523-22">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -36,10 +40,12 @@
   </section>
 
   <section class="main-menu-screen" id="mainMenuScreen" hidden aria-label="Menu principale OroActive">
+    <div class="main-menu-clock" id="mainMenuClock" aria-live="off">--:--:--</div>
     <div class="main-user-menu">
       <button class="main-user-button" id="mainUserMenuButton" type="button" aria-expanded="false" aria-controls="mainUserDropdown">Utente</button>
       <div class="main-user-dropdown" id="mainUserDropdown" hidden>
         <button type="button" data-user-profile>Dati utente</button>
+        <button class="admin-only" type="button" data-user-users>Utenti</button>
         <button type="button" data-user-logout>Logout</button>
       </div>
     </div>
@@ -54,6 +60,7 @@
             <button type="button" data-section="archive">Elenco</button>
             <button type="button" data-section="fusion">Giacenza</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
+            <button class="founder-only" type="button" data-section="backups">Backup</button>
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
             <button type="button" data-section="crm">CRM Clienti</button>
           </div>
@@ -90,6 +97,7 @@
           <button type="button" data-section="archive">Elenco</button>
           <button type="button" data-section="fusion">Giacenza</button>
           <button class="founder-only" type="button" data-section="stores">Negozi</button>
+          <button class="founder-only" type="button" data-section="backups">Backup</button>
           <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
           <button type="button" data-section="crm">CRM Clienti</button>
           <strong class="brand-dropdown-title">Formazione</strong>
@@ -119,6 +127,21 @@
             <h1>Atto di Vendita</h1>
           </div>
         </div>
+        <section class="quote-strip" aria-label="Quotazione metalli preziosi">
+          <div class="quote-strip-heading">
+            <span>Quotazione</span>
+            <button class="small-button" type="button" id="refreshQuoteDashboard">Aggiorna</button>
+          </div>
+          <div class="quote-strip-grid" id="quoteDashboard">
+            <article><span>Oro</span><strong>Dato non inserito</strong></article>
+            <article><span>Argento</span><strong>Dato non inserito</strong></article>
+            <article><span>Diamanti</span><strong>Da configurare</strong></article>
+          </div>
+          <div class="quote-chart-panel">
+            <div id="bullionVaultChart" class="bullionvault-chart"></div>
+            <p id="bullionVaultChartFallback" class="quote-fallback" hidden>Grafico BullionVault non incorporabile direttamente. <a href="https://www.bullionvault.com/gold-price-chart.do" target="_blank" rel="noopener">Apri grafico BullionVault</a>.</p>
+          </div>
+        </section>
       </header>
 
       <section id="practice" class="screen active-screen">
@@ -638,6 +661,23 @@
         <div class="archive-table users-table" id="storesList" aria-live="polite"></div>
       </section>
 
+      <section id="backups" class="screen founder-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Founder</p>
+            <h2>Backup</h2>
+            <p class="muted">Backup giornalieri automatici di database, documenti, PDF, firme e foto salvati nel gestionale. Predisposto per integrazione futura n8n.</p>
+          </div>
+          <button class="primary-button" type="button" id="runBackupNow">Esegui backup ora</button>
+        </div>
+        <div class="backup-status-card">
+          <strong>Protezione dati OroActive</strong>
+          <span>Il service worker non memorizza dati sensibili: atti, clienti, documenti, PDF e API restano sempre esclusi dalla cache PWA.</span>
+        </div>
+        <div class="archive-table users-table" id="backupsList" aria-live="polite"></div>
+      </section>
+
       <section id="antifraud" class="screen control-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
@@ -871,8 +911,13 @@
     <div class="loading-spinner" aria-hidden="true"></div>
     <span>Caricamento in corso...</span>
   </div>
+  <div class="install-hint" id="installHint" hidden>
+    <strong>Aggiungi OroActive alla schermata Home</strong>
+    <span>Su iPhone/iPad apri Condividi e scegli “Aggiungi alla schermata Home”.</span>
+    <button type="button" id="dismissInstallHint">Ok</button>
+  </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260523-27"></script>
+  <script src="app.js?v=20260523-29"></script>
 </body>
 </html>
