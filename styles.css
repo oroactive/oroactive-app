@@ -648,15 +648,36 @@ textarea {
   font-weight: 800;
 }
 
+.brand-submenu {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 4px 0 6px 10px;
+  border-left: 1px solid rgba(255, 115, 28, 0.34);
+}
+
+.brand-submenu[hidden] {
+  display: none;
+}
+
 .brand-dropdown-title {
   display: block;
+  width: 100%;
   padding: 8px 10px 4px;
+  border: 0;
+  background: transparent;
   color: var(--gold);
   font-family: "Courier New", Courier, monospace;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
+  text-align: left;
+}
+
+.brand-dropdown-title:hover {
+  background: #22150f;
+  color: #ff9656;
 }
 
 .brand-dropdown button:hover {
@@ -1382,54 +1403,6 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
-}
-
-.bullion-quote-panel {
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid #ffc39e;
-  border-radius: 8px;
-  background: #fff9f4;
-}
-
-.bullion-quote-heading {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.bullion-quote-heading strong {
-  color: var(--ink);
-}
-
-.bullion-quote-heading button {
-  margin-left: auto;
-}
-
-.bullion-quote-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(180px, 0.45fr) minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid #ffc39e;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.bullion-quote-field span {
-  color: var(--ink);
-  font-size: 14px;
-}
-
-.bullion-quote-field em {
-  color: var(--soft-ink);
-  font-style: normal;
-  line-height: 1.35;
 }
 
 .material-amount-panel {
@@ -3493,7 +3466,6 @@ button.quality-review-badge {
   .topbar,
   .panel-heading,
   .subsection-heading,
-  .bullion-quote-heading,
   .archive-header,
   .document-preview,
   .fusion-store-heading,
@@ -3510,7 +3482,6 @@ button.quality-review-badge {
   .document-scan-review-grid,
   .document-scan-data-grid,
   .capture-group-grid,
-  .bullion-quote-field,
   .material-amount-field,
   .internal-weight,
   .weight-fields,

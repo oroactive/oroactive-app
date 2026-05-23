@@ -94,21 +94,25 @@
           </div>
         </button>
         <div class="brand-dropdown" id="brandDropdown" hidden>
-          <strong class="brand-dropdown-title">Atti di vendita</strong>
-          <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
-          <button type="button" data-section="practice">Nuovo atto di vendita</button>
-          <button type="button" data-section="archive">Elenco</button>
-          <button type="button" data-section="fusion">Giacenza</button>
-          <button class="founder-only" type="button" data-section="stores">Negozi</button>
-          <button class="founder-only" type="button" data-section="backups">Backup</button>
-          <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
-          <button type="button" data-section="crm">CRM Clienti</button>
-          <button type="button" data-section="quotes">Quotazione</button>
-          <strong class="brand-dropdown-title">Formazione</strong>
-          <button type="button" data-section="assistant">Assistente IA OroActive</button>
-          <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-          <button type="button" data-section="training">Formazione Staff</button>
-          <button type="button" data-start-tutorial>Tutorial</button>
+          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandSalesSubmenu" aria-expanded="false">Atti di vendita</button>
+          <div class="brand-submenu" id="brandSalesSubmenu" hidden>
+            <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
+            <button type="button" data-section="practice">Nuovo atto di vendita</button>
+            <button type="button" data-section="archive">Elenco</button>
+            <button type="button" data-section="fusion">Giacenza</button>
+            <button class="founder-only" type="button" data-section="stores">Negozi</button>
+            <button class="founder-only" type="button" data-section="backups">Backup</button>
+            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button type="button" data-section="crm">CRM Clienti</button>
+          </div>
+          <button class="brand-dropdown-title" type="button" data-section="quotes">Quotazione</button>
+          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandTrainingSubmenu" aria-expanded="false">Formazione</button>
+          <div class="brand-submenu" id="brandTrainingSubmenu" hidden>
+            <button type="button" data-section="assistant">Assistente IA OroActive</button>
+            <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+            <button type="button" data-section="training">Formazione Staff</button>
+            <button type="button" data-start-tutorial>Tutorial</button>
+          </div>
         </div>
       </div>
 
@@ -297,18 +301,6 @@
                     <button class="remove-row" type="button" aria-label="Rimuovi riga" disabled>-</button>
                   </article>
                 </div>
-
-                <div class="bullion-quote-panel" id="bullionQuotePanel" aria-live="polite">
-                  <div class="bullion-quote-heading">
-                    <span class="internal-badge">Quotazione giornaliera</span>
-                  </div>
-                  <label class="bullion-quote-field">
-                    <span>Quotazione oro in borsa giornaliera &egrave; di &euro;</span>
-                    <input data-bullion-quote="Oro" type="text" inputmode="decimal" placeholder="Dato BullionVault">
-                    <em>Dato estrapolato da BullionVault al Kg di oro puro.</em>
-                  </label>
-                </div>
-
                 <div class="internal-weight">
                   <div>
                     <span class="internal-badge">Dato interno</span>

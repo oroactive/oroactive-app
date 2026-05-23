@@ -1504,12 +1504,32 @@ function toggleMainUserMenu() {
 function closeBrandMenu() {
   brandDropdown.hidden = true;
   brandMenuButton.setAttribute("aria-expanded", "false");
+  document.querySelectorAll(".brand-submenu").forEach((submenu) => {
+    submenu.hidden = true;
+  });
+  document.querySelectorAll("[data-brand-submenu-toggle]").forEach((button) => {
+    button.setAttribute("aria-expanded", "false");
+  });
 }
 
 function toggleBrandMenu() {
   const willOpen = brandDropdown.hidden;
   brandDropdown.hidden = !willOpen;
   brandMenuButton.setAttribute("aria-expanded", String(willOpen));
+}
+
+function toggleBrandSubmenu(id) {
+  const submenu = document.getElementById(id);
+  if (!submenu) return;
+  const willOpen = submenu.hidden;
+  document.querySelectorAll(".brand-submenu").forEach((item) => {
+    item.hidden = true;
+  });
+  document.querySelectorAll("[data-brand-submenu-toggle]").forEach((button) => {
+    button.setAttribute("aria-expanded", "false");
+  });
+  submenu.hidden = !willOpen;
+  document.querySelector(`[data-brand-submenu-toggle="${cssEscape(id)}"]`)?.setAttribute("aria-expanded", String(willOpen));
 }
 
 function openBrandMenu() {
@@ -3059,7 +3079,6 @@ function currentActSnapshot(status = "Archiviata") {
     store: storeSelect?.selectedOptions[0]?.textContent || "",
     storeCode: storeSelect?.value || "",
     items,
-    bullionQuotes: bullionQuoteRows(),
     materialAmounts: materialAmountRows(),
     printWeightCustomer: shouldPrintWeightOnCustomerCopy(),
     amount: fieldValue("#saleTotal"),
@@ -4685,13 +4704,6 @@ async function loadActForEdit(practiceNumber) {
   updateAttachmentState();
   updateDocumentExpiryWarning();
 
-  if (Array.isArray(act.bullionQuotes)) {
-    act.bullionQuotes.forEach((quote) => {
-      const input = document.querySelector(`#bullionQuotePanel input[data-bullion-quote="${quote.metal}"]`);
-      if (input) input.value = formatBullionInputValue(quote.value);
-    });
-  }
-
   if (Array.isArray(act.materials)) {
     act.materials.forEach((material) => {
       const titleSelector = material.title ? `[data-metal-title="${cssEscape(material.title)}"]` : "";
@@ -5443,18 +5455,6 @@ function formatBullionInputValue(value) {
 }
 
 function applyBullionVaultPrices() {
-  document.querySelectorAll("#bullionQuotePanel input[data-bullion-quote]").forEach((input) => {
-    const quote = state.bullionVaultPrices[input.dataset.bullionQuote];
-    if (!quote) return;
-    input.value = formatBullionPrice(quote.value || 0);
-    input.dataset.bullionSource = quote.source || "";
-    input.dataset.bullionFetchedAt = quote.fetchedAt || "";
-    const field = input.closest(".bullion-quote-field");
-    const info = field?.querySelector("em");
-    if (info) {
-      info.textContent = `Dato BullionVault live: ${formatBullionPrice(quote.value)} EUR al kg. Fonte ${quote.source || "mercato BullionVault"}.`;
-    }
-  });
   renderQuoteDashboard();
 }
 
@@ -5586,7 +5586,6 @@ function updateCededItems() {
   document.getElementById("summaryItems").textContent = materialTypes === 1
     ? "1 tipologia di prezioso registrato"
     : `${materialTypes} tipologie di preziosi registrati`;
-  renderBullionQuoteFields();
   renderWeightFields();
   renderMaterialAmountFields();
   renderPreciousCaptureCards();
@@ -5784,40 +5783,6 @@ function pureMaterialLabel(metal) {
   }[metal] || "materiale prezioso";
 }
 
-function renderBullionQuoteFields() {
-  const container = document.getElementById("bullionQuotePanel");
-  if (!container) return;
-
-  const previousValues = {};
-  container.querySelectorAll("input[data-bullion-quote]").forEach((input) => {
-    previousValues[input.dataset.bullionQuote] = input.value;
-  });
-
-  const metals = activeMetals();
-  container.innerHTML = `
-    <div class="bullion-quote-heading">
-      <span class="internal-badge">Quotazione giornaliera</span>
-      <strong>Dato BullionVault automatico</strong>
-      <button class="small-button" id="refreshBullionVaultPrices" type="button">Aggiorna</button>
-    </div>
-    ${(metals.length ? metals : ["Oro"]).map((metal) => `
-      <label class="bullion-quote-field">
-        <span>Quotazione ${metal.toLowerCase()} in borsa giornaliera &egrave; di &euro;</span>
-        <input data-bullion-quote="${metal}" type="text" inputmode="decimal" value="${escapeHtml(formatBullionInputValue(previousValues[metal]))}" placeholder="Dato BullionVault">
-        <em>Dato estrapolato da BullionVault al Kg di ${escapeHtml(pureMaterialLabel(metal))} puro.</em>
-      </label>
-    `).join("")}
-  `;
-  applyBullionVaultPrices();
-}
-
-function bullionQuoteRows() {
-  return [...document.querySelectorAll("#bullionQuotePanel input[data-bullion-quote]")].map((input) => ({
-    metal: input.dataset.bullionQuote,
-    value: input.value || "Dato non inserito"
-  }));
-}
-
 function renderMaterialAmountFields() {
   const container = document.getElementById("materialAmountFields");
   if (!container) return;
@@ -5866,17 +5831,7 @@ function materialAmountsBlockFromRows(rows = materialAmountRows()) {
 }
 
 function buildBullionQuoteBlock() {
-  const rows = bullionQuoteRows().map((row) => `
-    <div class="print-field">
-      <span>Quotazione ${escapeHtml(row.metal.toLowerCase())} BullionVault</span>
-      EUR ${escapeHtml(row.value)} al Kg di ${escapeHtml(pureMaterialLabel(row.metal))} puro
-    </div>
-  `).join("");
-
-  return `
-    <h2>Quotazioni borsa giornaliera</h2>
-    <div class="print-grid">${rows}</div>
-  `;
+  return "";
 }
 
 function requiredCaptureKeys() {
@@ -6646,9 +6601,15 @@ document.querySelectorAll("[data-return-menu]").forEach((button) => {
 });
 
 brandDropdown.querySelectorAll("button").forEach((button) => {
-  button.addEventListener("click", async () => {
+  button.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    if (button.dataset.brandSubmenuToggle) {
+      toggleBrandSubmenu(button.dataset.brandSubmenuToggle);
+      return;
+    }
     if (button.matches("[data-start-tutorial]")) return;
     if (button.dataset.section === "practice") await resetCurrentPractice();
+    if (!button.dataset.section) return;
     setScreen(button.dataset.section);
     closeBrandMenu();
   });
@@ -6704,7 +6665,6 @@ document.getElementById("addCededItem").addEventListener("click", () => {
   updateTitleOptions(row);
   updateCededItems();
   updateChecklistState();
-  refreshBullionVaultPrices();
   showToast("Nuova riga oggetto aggiunta alla scheda cliente.");
 });
 
@@ -6721,12 +6681,10 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
   const selects = row.querySelectorAll("select");
   if (event.target === selects[0]) {
     updateTitleOptions(row);
-    renderBullionQuoteFields();
     renderWeightFields();
     renderPreciousCaptureCards();
     updateAttachmentState();
     updateChecklistState();
-    refreshBullionVaultPrices();
   }
 });
 
@@ -7142,12 +7100,6 @@ document.addEventListener("change", async (event) => {
 });
 
 document.addEventListener("click", (event) => {
-  if (event.target.closest("#refreshBullionVaultPrices")) {
-    event.preventDefault();
-    refreshBullionVaultPrices({ notify: true });
-    return;
-  }
-
   const captureGroup = event.target.closest("[data-capture-group]");
   if (captureGroup && !event.target.closest(".capture-card") && !event.target.closest(".capture-actions")) {
     openCaptureGroupModal(captureGroup.dataset.captureGroup);
