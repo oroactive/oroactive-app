@@ -1315,8 +1315,14 @@ function showMainMenuFromSplash() {
 
 async function enterSectionFromMainMenu(section) {
   mainMenuScreen.hidden = true;
-  if (section === "practice") await resetCurrentPractice();
+  if (section === "practice") await clearPracticeForFreshStart();
   setScreen(section);
+}
+
+async function clearPracticeForFreshStart(options = {}) {
+  previewModal.hidden = true;
+  stopDocumentCamera();
+  await resetCurrentPractice(options);
 }
 
 async function returnToMainMenu() {
@@ -1330,9 +1336,9 @@ async function returnToMainMenu() {
           const saved = await archiveCurrentPractice(state.editingOriginalStatus || "Archiviata", { destination: "menu" });
           if (!saved) return;
         }
-        if (choice === "discard") await resetCurrentPractice({ preserveStoreCode: true });
+        if (choice === "discard") await clearPracticeForFreshStart();
       } else {
-        await resetCurrentPractice({ preserveStoreCode: true });
+        await clearPracticeForFreshStart();
       }
     } else if (hasStartedClientSection()) {
       const choice = await askDraftExitChoice();
@@ -1340,12 +1346,14 @@ async function returnToMainMenu() {
       if (choice === "save") {
         const saved = await archiveCurrentPractice("Bozza", { skipReset: true });
         if (!saved) return;
+        await clearPracticeForFreshStart();
         showToast("Bozza salvata. Puoi completarla successivamente tramite Elenco.");
       }
-      if (choice === "discard") await resetCurrentPractice({ preserveStoreCode: true });
+      if (choice === "discard") await clearPracticeForFreshStart();
     } else {
       const saved = await archiveCurrentPractice(state.editingOriginalStatus || "Archiviata", { skipReset: true });
       if (!saved) return;
+      await clearPracticeForFreshStart();
       showToast("Atto di vendita in fase di compilazione archiviato. Puoi completarlo successivamente tramite Elenco.");
     }
   }
@@ -2098,7 +2106,7 @@ function currentActSnapshot(status = "Archiviata") {
     printWeightCustomer: shouldPrintWeightOnCustomerCopy(),
     amount: fieldValue("#saleTotal"),
     paymentMethod: fieldValue("#paymentMethod"),
-    iban: fieldValue("#paymentIban"),
+    iban: paymentRequiresIban() ? fieldValue("#paymentIban") : "",
     operatorNotes: document.querySelector(".textarea-label textarea")?.value || "",
     operatorId: state.currentUser?.id || null,
     operatorUsername: displayUsername(state.currentUser),
@@ -2806,7 +2814,7 @@ function documentScanReviewMarkup() {
         <button class="warning-button" type="button" data-retake-document-side="front">Rifai fronte</button>
         <button class="warning-button" type="button" data-retake-document-side="back">Rifai retro</button>
         <button class="primary-button" type="button" id="analyzeDocumentWithAi">Analizza con AI</button>
-        ${analyzed ? '<button class="ghost-button" type="button" id="confirmDocumentScan">Chiudi</button>' : ""}
+        ${analyzed ? '<button class="success-button" type="button" id="confirmDocumentScan">Conferma</button>' : ""}
       </div>
     </section>
   `;
@@ -2899,7 +2907,7 @@ function identityCardGuideMarkup(side) {
 
 function documentScanPreviewMarkup(preview, sideLabel) {
   return `
-    <div class="document-scan-preview">
+    <div class="document-scan-preview full-document-preview">
       <img src="${preview.dataUrl}" alt="Anteprima ${escapeHtml(sideLabel)} documento">
       <div class="document-scan-preview-actions">
         <button class="primary-button" type="button" id="useDocumentScanPhoto">Usa foto</button>
@@ -3151,7 +3159,6 @@ async function analyzeDocumentScanWithAi() {
     showToast("Documento non letto correttamente. Riprova la scansione o compila manualmente.");
     return;
   }
-  applyDetectedDocumentData(detected);
   if (missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
     showToast("Controlla i dati estratti e correggi eventuali errori.");
     return;
@@ -3627,13 +3634,17 @@ async function confirmDocumentScan() {
     showToast("Scansiona fronte e retro del documento prima di confermare.");
     return;
   }
+  if (!state.documentScan?.analyzed) {
+    showToast("Prima analizza il documento con AI.");
+    return;
+  }
 
   const detected = state.documentScan.detected || {};
   const applied = applyDetectedDocumentData(detected);
   if (!applied) {
     showToast("Documento non letto correttamente. Riprova la scansione o compila manualmente.");
   } else if (missingDetectedDocumentFields(detected).length || hasLowConfidenceFields(detected)) {
-    showToast("Alcuni dati non sono stati letti correttamente, controlla e completa manualmente.");
+    showToast("Controlla i dati estratti e correggi eventuali errori.");
   } else {
     showToast("Controlla i dati estratti e correggi eventuali errori");
   }
@@ -3744,8 +3755,15 @@ async function loadActForEdit(practiceNumber) {
 async function resetCurrentPractice(options = {}) {
   const preservedStoreCode = options.preserveStoreCode ? fieldValue("#storeCode") : "";
 
+  stopDocumentCamera();
+  previewModal.hidden = true;
+
   document.querySelectorAll(".form-panel input").forEach((input) => {
-    if (input.readOnly || input.type === "file") return;
+    if (input.type === "file") {
+      input.value = "";
+      return;
+    }
+    if (input.readOnly) return;
     if (input.type === "checkbox") {
       input.checked = false;
       return;
@@ -3785,6 +3803,10 @@ async function resetCurrentPractice(options = {}) {
   state.suppressDirtyTracking = false;
   state.loadedSignatureImages = [];
   state.fiscalCodeEditedManually = false;
+  state.documentScan = { front: null, back: null };
+  state.captureGroup = null;
+  state.lastActCaptureAttachments = [];
+  state.cashLimitWarningShown = false;
   setQualityReview(null);
 
   await setPracticeMeta();
@@ -4281,10 +4303,14 @@ function paymentRequiresProof() {
   return ["Bonifico", "Assegno"].includes(selectedPaymentMethod());
 }
 
+function paymentRequiresIban() {
+  return selectedPaymentMethod().trim().toLowerCase() === "bonifico";
+}
+
 function updateIbanVisibility() {
   const field = document.getElementById("ibanField");
   if (!field) return;
-  field.hidden = selectedPaymentMethod() !== "Bonifico";
+  field.hidden = !paymentRequiresIban();
 }
 
 function paymentCaptureKey() {
@@ -4593,7 +4619,7 @@ function missingSaleFields() {
   if (!hasValue("#paymentMethod")) missing.push("Metodo pagamento");
   if (saleTotalAmount() <= 0) missing.push("Totale corrisposto");
   if (cashPaymentLimitViolation()) missing.push("Metodo pagamento a norma di legge");
-  if (selectedPaymentMethod() === "Bonifico" && !isValidIban(fieldValue("#paymentIban"))) {
+  if (paymentRequiresIban() && !isValidIban(fieldValue("#paymentIban"))) {
     missing.push("IBAN valido per bonifico");
   }
   materialAmountRows().forEach((row) => {
@@ -4714,13 +4740,22 @@ function bullionQuoteRows() {
 function renderMaterialAmountFields() {
   const container = document.getElementById("materialAmountFields");
   if (!container) return;
+  const panel = document.getElementById("materialAmountPanel") || container.closest(".material-amount-panel");
+  const metals = activeMetals();
+  const shouldShowSplit = metals.length > 1;
 
   const previousValues = {};
   container.querySelectorAll("input[data-material-amount]").forEach((input) => {
     previousValues[input.dataset.materialAmount] = input.value;
   });
 
-  container.innerHTML = activeMetals().map((metal) => `
+  if (panel) panel.hidden = !shouldShowSplit;
+  if (!shouldShowSplit) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = metals.map((metal) => `
     <label class="material-amount-field">
       <span>Di cui ${metal}</span>
       <input data-material-amount="${metal}" type="number" min="0" step="0.01" value="${escapeHtml(previousValues[metal] || "")}" placeholder="Importo ${metal.toLowerCase()}">
@@ -4740,7 +4775,7 @@ function materialAmountTotal() {
 }
 
 function materialAmountsBlockFromRows(rows = materialAmountRows()) {
-  if (!rows.length) return "";
+  if (rows.length < 2) return "";
   return `
     <div class="print-field material-amount-print">
       <span>Ripartizione importo</span>

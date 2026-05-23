@@ -11,7 +11,7 @@
   <title>OroActive Gestionale</title>
   <link rel="manifest" href="manifest.webmanifest?v=20260520-13">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260523-17">
+  <link rel="stylesheet" href="styles.css?v=20260523-19">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -301,7 +301,7 @@
                   <input id="paymentIban" name="iban" inputmode="text" autocomplete="off" placeholder="IT00X0000000000000000000000">
                 </label>
               </div>
-              <div class="material-amount-panel">
+              <div class="material-amount-panel" id="materialAmountPanel" hidden>
                 <span class="internal-badge">Ripartizione importo</span>
                 <div id="materialAmountFields" class="material-amount-fields"></div>
               </div>
@@ -638,6 +638,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260523-18"></script>
+  <script src="app.js?v=20260523-21"></script>
 </body>
 </html>

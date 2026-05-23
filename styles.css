@@ -531,7 +531,8 @@ textarea {
 .ghost-button,
 .small-button,
 .warning-button,
-.danger-button {
+.danger-button,
+.success-button {
   min-height: 46px;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -562,6 +563,12 @@ textarea {
   background: #ffd24a;
   color: #17130d;
   border-color: #e0a900;
+}
+
+.success-button {
+  background: #16834a;
+  color: #fff;
+  border-color: #106738;
 }
 
 .screen {
@@ -2614,11 +2621,18 @@ button.quality-review-badge {
 
 .document-scan-preview img {
   width: 100%;
-  max-height: 520px;
+  max-height: min(72vh, 920px);
   object-fit: contain;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #111;
+}
+
+.document-scan-preview.full-document-preview img {
+  width: 100%;
+  height: min(76vh, 940px);
+  max-height: none;
+  object-fit: contain;
 }
 
 .document-scan-review-grid {
@@ -2650,7 +2664,7 @@ button.quality-review-badge {
 
 .document-scan-review-card img {
   width: 100%;
-  max-height: 260px;
+  max-height: min(42vh, 460px);
   object-fit: contain;
   border-radius: 7px;
   background: #111;
