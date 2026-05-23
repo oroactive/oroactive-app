@@ -265,6 +265,100 @@ textarea {
   padding: 8px 16px;
 }
 
+.assistant-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 18px;
+}
+
+.assistant-chat-card,
+.knowledge-card {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 52px rgba(51, 36, 19, 0.08);
+}
+
+.assistant-chat {
+  min-height: 360px;
+  max-height: 52vh;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #ead9c8;
+  border-radius: 8px;
+  background: #fff9f4;
+}
+
+.assistant-message {
+  width: min(760px, 92%);
+  padding: 12px 14px;
+  border-radius: 8px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.assistant-message.user {
+  justify-self: end;
+  background: #17130d;
+  color: #fff;
+}
+
+.assistant-message.ai {
+  justify-self: start;
+  border: 1px solid #ffc39e;
+  background: #fff;
+  color: var(--ink);
+}
+
+.assistant-source {
+  display: block;
+  margin-top: 8px;
+  color: var(--orange-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.assistant-form,
+.knowledge-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.assistant-form textarea,
+.knowledge-form input {
+  width: 100%;
+}
+
+.assistant-loading {
+  margin: 12px 0 0;
+  color: var(--orange-dark);
+  font-weight: 900;
+}
+
+.knowledge-status {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.knowledge-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #ead9c8;
+  border-radius: 8px;
+  background: #fff9f4;
+}
+
+.knowledge-row strong {
+  color: var(--ink);
+}
+
 .app-shell {
   min-height: 100vh;
   display: grid;
@@ -2980,6 +3074,7 @@ button.quality-review-badge {
   .summary-grid,
   .side-panel,
   .settings-grid,
+  .assistant-layout,
   .archive-search-panel,
   .archive-totals,
   .table-row,

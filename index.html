@@ -11,7 +11,7 @@
   <title>OroActive Gestionale</title>
   <link rel="manifest" href="manifest.webmanifest?v=20260520-13">
   <link rel="apple-touch-icon" href="oroactive-logo.png">
-  <link rel="stylesheet" href="styles.css?v=20260523-19">
+  <link rel="stylesheet" href="styles.css?v=20260523-20">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -42,6 +42,7 @@
         <button type="button" data-section="practice">Atto di Vendita</button>
         <button type="button" data-section="archive">Elenco</button>
         <button type="button" data-section="fusion">Giacenza</button>
+        <button type="button" data-section="assistant">Assistente IA OroActive</button>
         <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
         <button class="tutorial-menu-button" type="button" data-start-tutorial>Tutorial</button>
       </nav>
@@ -64,6 +65,7 @@
           <button type="button" data-section="practice">Atto di Vendita</button>
           <button type="button" data-section="archive">Elenco</button>
           <button type="button" data-section="fusion">Giacenza</button>
+          <button type="button" data-section="assistant">Assistente IA OroActive</button>
           <button class="admin-only user-menu-button" type="button" data-section="users">Utenti</button>
           <button type="button" data-start-tutorial>Tutorial</button>
         </div>
@@ -566,6 +568,45 @@
         <div class="fusion-groups" id="fusionGroups" aria-live="polite"></div>
       </section>
 
+      <section id="assistant" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="assistant-layout">
+          <section class="assistant-chat-card">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Formazione OroActive</p>
+                <h2>Assistente IA OroActive</h2>
+                <p class="muted">Consulta La bilancia d'oro e ricevi supporto operativo su compro oro, metalli preziosi, gemme, negozio e procedure.</p>
+              </div>
+            </div>
+            <div class="assistant-chat" id="assistantChat" aria-live="polite"></div>
+            <form class="assistant-form" id="assistantForm">
+              <label>Domanda
+                <textarea id="assistantQuestion" rows="3" placeholder="Scrivi una domanda per l'assistente IA OroActive"></textarea>
+              </label>
+              <button class="primary-button" type="submit" id="assistantSend">Invia</button>
+            </form>
+            <p class="assistant-loading" id="assistantLoading" hidden>Sto consultando La bilancia d'oro...</p>
+          </section>
+
+          <section class="knowledge-card founder-only" id="knowledgeBasePanel" hidden>
+            <div>
+              <p class="eyebrow">Founder</p>
+              <h3>Knowledge Base / Libro AI</h3>
+              <p class="muted">Carica o aggiorna il libro usato come fonte primaria dell'assistente. Funzione riservata al founder.</p>
+            </div>
+            <form class="knowledge-form" id="knowledgeForm">
+              <label>Titolo <input id="knowledgeTitle" value="La bilancia d'oro"></label>
+              <label>Autore <input id="knowledgeAuthor" value="Christian Dinato"></label>
+              <label>Libro PDF, DOCX o TXT <input id="knowledgeFile" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></label>
+              <button class="primary-button" type="submit">Carica e indicizza libro</button>
+            </form>
+            <button class="ghost-button" type="button" id="reindexKnowledge">Rigenera embeddings</button>
+            <div class="knowledge-status" id="knowledgeStatus"></div>
+          </section>
+        </div>
+      </section>
+
       <section id="users" class="screen admin-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="settings-grid">
@@ -638,6 +679,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260523-21"></script>
+  <script src="app.js?v=20260523-22"></script>
 </body>
 </html>

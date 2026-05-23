@@ -22,6 +22,7 @@ const ACT_LIST_LIMIT = 50;
 const jwtSecret = process.env.JWT_SECRET || "cambia-questa-chiave-jwt-oroactive";
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
 const bullionVaultMarkets = {
   Oro: { securityId: "AUXZU", source: "Zurigo" },
@@ -35,6 +36,13 @@ const pool = new Pool({
 });
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const aiRuntime = {
+  pgvector: false,
+  vectorColumn: null,
+  jsonColumn: "embedding_json",
+  pgvectorMessage: "pgvector non verificato",
+  embeddingDimension: 1536
+};
 
 const app = express();
 app.use(cors());
@@ -149,6 +157,13 @@ async function authenticate(request, response, next) {
 function requireAdmin(request, response, next) {
   if (!canManageAccess(request.user)) {
     return response.status(403).json({ error: "Operazione riservata a Founder o Responsabile" });
+  }
+  next();
+}
+
+function requireFounder(request, response, next) {
+  if (normalizeRole(request.user?.ruolo) !== "founder") {
+    return response.status(403).json({ error: "Non autorizzato" });
   }
   next();
 }
@@ -273,6 +288,17 @@ function requireOpenAiClient() {
   return openai;
 }
 
+function sqlIdentifier(name) {
+  if (!/^[a-z_][a-z0-9_]*$/i.test(String(name || ""))) {
+    throw new Error("Identificatore SQL non valido");
+  }
+  return `"${name}"`;
+}
+
+function vectorInput(embedding = []) {
+  return `[${(Array.isArray(embedding) ? embedding : []).map((value) => Number(value) || 0).join(",")}]`;
+}
+
 function validImageDataUrl(value = "") {
   const text = String(value || "");
   return /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/i.test(text) ? text : "";
@@ -344,6 +370,21 @@ const actCheckAiSchema = {
     suggerimenti: { type: "array", items: { type: "string" } }
   },
   required: ["ok", "errori", "campi_mancanti", "incongruenze", "suggerimenti"]
+};
+
+const assistantAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    risposta: { type: "string" },
+    fonte: {
+      type: "string",
+      enum: ["La bilancia d'oro", "La bilancia d'oro + integrazione generale", "Integrazione generale"]
+    },
+    dal_libro: { type: "boolean" },
+    citazioni: { type: "array", items: { type: "string" } }
+  },
+  required: ["risposta", "fonte", "dal_libro", "citazioni"]
 };
 
 function documentAiToClientFields(result = {}) {
@@ -437,6 +478,506 @@ ${JSON.stringify(compactAct)}`,
   return parseOpenAiJson(result);
 }
 
+function uploadedDataUrlToBuffer(dataUrl = "") {
+  const match = String(dataUrl || "").match(/^data:([^;]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  if (!match) {
+    const error = new Error("File non valido o non leggibile.");
+    error.status = 400;
+    throw error;
+  }
+  return {
+    mimeType: match[1].toLowerCase(),
+    buffer: Buffer.from(match[2].replace(/\s+/g, ""), "base64")
+  };
+}
+
+function bookFileKind(filename = "", mimeType = "") {
+  const lowerName = String(filename || "").toLowerCase();
+  const lowerMime = String(mimeType || "").toLowerCase();
+  if (lowerName.endsWith(".txt") || lowerMime.includes("text/plain")) return "txt";
+  if (lowerName.endsWith(".pdf") || lowerMime.includes("pdf")) return "pdf";
+  if (lowerName.endsWith(".docx") || lowerMime.includes("wordprocessingml")) return "docx";
+  return "";
+}
+
+async function extractBookText({ filename = "", dataUrl = "" }) {
+  const { mimeType, buffer } = uploadedDataUrlToBuffer(dataUrl);
+  const kind = bookFileKind(filename, mimeType);
+  if (!kind) {
+    const error = new Error("Formato libro non supportato. Carica PDF, DOCX o TXT.");
+    error.status = 400;
+    throw error;
+  }
+
+  if (kind === "txt") return buffer.toString("utf8");
+
+  if (kind === "docx") {
+    const mammothModule = await import("mammoth");
+    const mammoth = mammothModule.default || mammothModule;
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value || "";
+  }
+
+  const pdfModule = await import("pdf-parse");
+  const pdfParse = pdfModule.default || pdfModule;
+  const result = await pdfParse(buffer);
+  return result.text || "";
+}
+
+function normalizeBookText(text = "") {
+  return String(text || "")
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function chunkBookText(text = "", maxChars = 3200, overlap = 350) {
+  const normalized = normalizeBookText(text);
+  const chunks = [];
+  let index = 0;
+  while (index < normalized.length) {
+    const targetEnd = Math.min(index + maxChars, normalized.length);
+    const nextBreak = normalized.lastIndexOf("\n\n", targetEnd);
+    const end = nextBreak > index + 1200 ? nextBreak : targetEnd;
+    const content = normalized.slice(index, end).trim();
+    if (content.length > 80) chunks.push(content);
+    if (end >= normalized.length) break;
+    index = Math.max(0, end - overlap);
+  }
+  return chunks;
+}
+
+async function createTextEmbedding(text = "") {
+  const [embedding] = await createTextEmbeddings([text]);
+  return embedding || null;
+}
+
+async function createTextEmbeddings(texts = []) {
+  const client = requireOpenAiClient();
+  const result = await client.embeddings.create({
+    model: openaiEmbeddingModel,
+    ...(openaiEmbeddingModel.includes("text-embedding-3") ? { dimensions: aiRuntime.embeddingDimension } : {}),
+    input: texts.map((text) => String(text || "").slice(0, 8000))
+  });
+  return (result.data || []).map((item) => item.embedding || null);
+}
+
+function cosineSimilarity(first = [], second = []) {
+  if (!Array.isArray(first) || !Array.isArray(second) || first.length !== second.length) return 0;
+  let dot = 0;
+  let firstNorm = 0;
+  let secondNorm = 0;
+  for (let index = 0; index < first.length; index += 1) {
+    const left = Number(first[index]) || 0;
+    const right = Number(second[index]) || 0;
+    dot += left * right;
+    firstNorm += left * left;
+    secondNorm += right * right;
+  }
+  return firstNorm && secondNorm ? dot / (Math.sqrt(firstNorm) * Math.sqrt(secondNorm)) : 0;
+}
+
+async function aiChunkColumns() {
+  const result = await pool.query(`
+    SELECT column_name, data_type, udt_name
+    FROM information_schema.columns
+    WHERE table_name = 'ai_document_chunks'
+      AND column_name IN ('embedding', 'embedding_json', 'embedding_vector')
+  `);
+  return result.rows;
+}
+
+async function setupAiVectorStorage() {
+  await pool.query("ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS embedding_json JSONB");
+  const initialColumns = await aiChunkColumns();
+  const legacyEmbedding = initialColumns.find((column) => column.column_name === "embedding");
+  aiRuntime.jsonColumn = legacyEmbedding && legacyEmbedding.data_type !== "USER-DEFINED" ? "embedding" : "embedding_json";
+
+  try {
+    const installed = await pool.query("SELECT * FROM pg_extension WHERE extname = 'vector'");
+    if (!installed.rowCount) {
+      await pool.query("CREATE EXTENSION IF NOT EXISTS vector");
+    }
+    const active = await pool.query("SELECT * FROM pg_extension WHERE extname = 'vector'");
+    if (!active.rowCount) throw new Error("Estensione vector non attiva");
+
+    const columns = await aiChunkColumns();
+    const embeddingColumn = columns.find((column) => column.column_name === "embedding");
+    if (!embeddingColumn) {
+      await pool.query(`ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS embedding vector(${aiRuntime.embeddingDimension})`);
+      aiRuntime.vectorColumn = "embedding";
+    } else if (embeddingColumn.udt_name === "vector") {
+      aiRuntime.vectorColumn = "embedding";
+    } else {
+      await pool.query(`ALTER TABLE ai_document_chunks ADD COLUMN IF NOT EXISTS embedding_vector vector(${aiRuntime.embeddingDimension})`);
+      aiRuntime.vectorColumn = "embedding_vector";
+    }
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_ai_chunks_embedding
+      ON ai_document_chunks
+      USING ivfflat (${sqlIdentifier(aiRuntime.vectorColumn)} vector_cosine_ops)
+    `);
+    aiRuntime.pgvector = true;
+    aiRuntime.pgvectorMessage = `pgvector attivo su colonna ${aiRuntime.vectorColumn}`;
+    console.log(aiRuntime.pgvectorMessage);
+  } catch (error) {
+    aiRuntime.pgvector = false;
+    aiRuntime.vectorColumn = null;
+    aiRuntime.pgvectorMessage = "pgvector non disponibile, uso ricerca testuale fallback";
+    console.log(aiRuntime.pgvectorMessage);
+    if (error?.message) console.log(`Dettaglio pgvector: ${error.message}`);
+  }
+}
+
+async function insertAiChunk(db, { document, index, content, embedding }) {
+  const jsonColumn = sqlIdentifier(aiRuntime.jsonColumn);
+  const metadata = { titolo: document.titolo, autore: document.autore };
+  if (aiRuntime.pgvector && aiRuntime.vectorColumn) {
+    const vectorColumn = sqlIdentifier(aiRuntime.vectorColumn);
+    await db.query(
+      `INSERT INTO ai_document_chunks (document_id, chunk_index, content, ${jsonColumn}, ${vectorColumn}, metadata)
+       VALUES ($1, $2, $3, $4::jsonb, $5::vector, $6)`,
+      [document.id, index, content, JSON.stringify(embedding || []), vectorInput(embedding), metadata]
+    );
+    return;
+  }
+
+  await db.query(
+    `INSERT INTO ai_document_chunks (document_id, chunk_index, content, ${jsonColumn}, metadata)
+     VALUES ($1, $2, $3, $4::jsonb, $5)`,
+    [document.id, index, content, JSON.stringify(embedding || []), metadata]
+  );
+}
+
+async function updateAiChunkEmbedding(id, embedding) {
+  const jsonColumn = sqlIdentifier(aiRuntime.jsonColumn);
+  if (aiRuntime.pgvector && aiRuntime.vectorColumn) {
+    const vectorColumn = sqlIdentifier(aiRuntime.vectorColumn);
+    await pool.query(
+      `UPDATE ai_document_chunks
+       SET ${jsonColumn} = $2::jsonb,
+           ${vectorColumn} = $3::vector,
+           metadata = metadata || $4::jsonb
+       WHERE id = $1`,
+      [
+        id,
+        JSON.stringify(embedding || []),
+        vectorInput(embedding),
+        JSON.stringify({ embeddingModel: openaiEmbeddingModel, reindexedAt: new Date().toISOString() })
+      ]
+    );
+    return;
+  }
+
+  await pool.query(
+    `UPDATE ai_document_chunks
+     SET ${jsonColumn} = $2::jsonb,
+         metadata = metadata || $3::jsonb
+     WHERE id = $1`,
+    [
+      id,
+      JSON.stringify(embedding || []),
+      JSON.stringify({ embeddingModel: openaiEmbeddingModel, reindexedAt: new Date().toISOString() })
+    ]
+  );
+}
+
+async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
+  requireOpenAiClient();
+  const extractedText = normalizeBookText(await extractBookText({ filename, dataUrl }));
+  const chunks = chunkBookText(extractedText);
+  if (!chunks.length) {
+    const error = new Error("Il libro non contiene testo estraibile sufficiente.");
+    error.status = 400;
+    throw error;
+  }
+
+  const db = await pool.connect();
+  try {
+    await db.query("BEGIN");
+    const documentResult = await db.query(
+      `INSERT INTO ai_documents (titolo, autore, filename, uploaded_by, metadata)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, titolo, autore, filename, uploaded_by, created_at`,
+      [
+        titolo || "La bilancia d'oro",
+        autore || "Christian Dinato",
+        filename || "libro-ai",
+        user.id,
+        { chunks: chunks.length, embeddingModel: openaiEmbeddingModel }
+      ]
+    );
+    const document = documentResult.rows[0];
+    const embeddings = await createTextEmbeddings(chunks);
+    for (let index = 0; index < chunks.length; index += 1) {
+      const content = chunks[index];
+      const embedding = embeddings[index];
+      await insertAiChunk(db, { document, index, content, embedding });
+    }
+    await db.query("COMMIT");
+    return { ...document, chunks: chunks.length };
+  } catch (error) {
+    await db.query("ROLLBACK");
+    throw error;
+  } finally {
+    db.release();
+  }
+}
+
+async function aiKnowledgeStatus() {
+  const result = await pool.query(`
+    SELECT d.id, d.titolo, d.autore, d.filename, d.uploaded_by, d.created_at, COUNT(c.id)::int AS chunks
+    FROM ai_documents d
+    LEFT JOIN ai_document_chunks c ON c.document_id = d.id
+    GROUP BY d.id
+    ORDER BY d.created_at DESC
+  `);
+  return result.rows;
+}
+
+async function reindexAiBook(documentId) {
+  requireOpenAiClient();
+  const params = [];
+  let where = "";
+  if (documentId) {
+    params.push(documentId);
+    where = "WHERE document_id = $1";
+  }
+  const result = await pool.query(`SELECT id, content FROM ai_document_chunks ${where} ORDER BY document_id, chunk_index`, params);
+  for (let index = 0; index < result.rows.length; index += 50) {
+    const batch = result.rows.slice(index, index + 50);
+    const embeddings = await createTextEmbeddings(batch.map((row) => row.content));
+    for (let batchIndex = 0; batchIndex < batch.length; batchIndex += 1) {
+      const row = batch[batchIndex];
+      await updateAiChunkEmbedding(row.id, embeddings[batchIndex]);
+    }
+  }
+  return { ok: true, chunks: result.rowCount };
+}
+
+async function updateAiBook(id, input = {}, user = null) {
+  if (input.dataUrl) {
+    requireOpenAiClient();
+    const extractedText = normalizeBookText(await extractBookText({ filename: input.filename, dataUrl: input.dataUrl }));
+    const chunks = chunkBookText(extractedText);
+    if (!chunks.length) {
+      const error = new Error("Il libro non contiene testo estraibile sufficiente.");
+      error.status = 400;
+      throw error;
+    }
+
+    const db = await pool.connect();
+    try {
+      await db.query("BEGIN");
+      const documentResult = await db.query(
+        `UPDATE ai_documents
+         SET titolo = COALESCE(NULLIF($2, ''), titolo),
+             autore = COALESCE(NULLIF($3, ''), autore),
+             filename = COALESCE(NULLIF($4, ''), filename),
+             uploaded_by = COALESCE($5, uploaded_by),
+             metadata = metadata || $6::jsonb
+         WHERE id = $1
+         RETURNING id, titolo, autore, filename, uploaded_by, created_at`,
+        [
+          id,
+          input.titolo || "",
+          input.autore || "",
+          input.filename || "",
+          user?.id || null,
+          JSON.stringify({ chunks: chunks.length, embeddingModel: openaiEmbeddingModel, replacedAt: new Date().toISOString() })
+        ]
+      );
+      const document = documentResult.rows[0];
+      if (!document) {
+        await db.query("ROLLBACK");
+        return null;
+      }
+      await db.query("DELETE FROM ai_document_chunks WHERE document_id = $1", [id]);
+      const embeddings = await createTextEmbeddings(chunks);
+      for (let index = 0; index < chunks.length; index += 1) {
+        const content = chunks[index];
+        const embedding = embeddings[index];
+        await insertAiChunk(db, { document, index, content, embedding });
+      }
+      await db.query("COMMIT");
+      return { ...document, chunks: chunks.length };
+    } catch (error) {
+      await db.query("ROLLBACK");
+      throw error;
+    } finally {
+      db.release();
+    }
+  }
+
+  const result = await pool.query(
+    `UPDATE ai_documents
+     SET titolo = COALESCE(NULLIF($2, ''), titolo),
+         autore = COALESCE(NULLIF($3, ''), autore)
+     WHERE id = $1
+     RETURNING id, titolo, autore, filename, uploaded_by, created_at`,
+    [id, input.titolo || "", input.autore || ""]
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteAiBook(id) {
+  const result = await pool.query("DELETE FROM ai_documents WHERE id = $1 RETURNING id", [id]);
+  return result.rowCount > 0;
+}
+
+async function searchAiChunks(question = "") {
+  const text = String(question || "").trim();
+  if (!text) return [];
+
+  if (aiRuntime.pgvector && aiRuntime.vectorColumn) {
+    try {
+      const questionEmbedding = await createTextEmbedding(text);
+      const vectorColumn = sqlIdentifier(aiRuntime.vectorColumn);
+      const result = await pool.query(
+        `SELECT c.id, c.content, c.chunk_index, d.titolo, d.autore,
+                1 - (c.${vectorColumn} <=> $1::vector) AS score
+         FROM ai_document_chunks c
+         JOIN ai_documents d ON d.id = c.document_id
+         WHERE c.${vectorColumn} IS NOT NULL
+         ORDER BY c.${vectorColumn} <=> $1::vector
+         LIMIT 6`,
+        [vectorInput(questionEmbedding)]
+      );
+      if (result.rows.length) return result.rows;
+    } catch (error) {
+      console.log(`Ricerca pgvector non disponibile, uso fallback testuale: ${error.message}`);
+    }
+  }
+
+  if (!aiRuntime.pgvector) {
+    console.log("pgvector non disponibile, uso ricerca testuale fallback");
+  }
+
+  const fullTextResult = await pool.query(
+    `SELECT c.id, c.content, c.chunk_index, d.titolo, d.autore,
+            ts_rank_cd(to_tsvector('italian', c.content), plainto_tsquery('italian', $1)) AS score
+     FROM ai_document_chunks c
+     JOIN ai_documents d ON d.id = c.document_id
+     WHERE to_tsvector('italian', c.content) @@ plainto_tsquery('italian', $1)
+        OR c.content ILIKE $2
+     ORDER BY score DESC, c.created_at DESC
+     LIMIT 6`,
+    [text, `%${text.slice(0, 120)}%`]
+  );
+  if (fullTextResult.rows.length || !openai) return fullTextResult.rows;
+
+  try {
+    const questionEmbedding = await createTextEmbedding(text);
+    const jsonColumn = sqlIdentifier(aiRuntime.jsonColumn);
+    const rows = await pool.query(`
+      SELECT c.id, c.content, c.${jsonColumn} AS embedding_json, c.chunk_index, d.titolo, d.autore
+      FROM ai_document_chunks c
+      JOIN ai_documents d ON d.id = c.document_id
+      WHERE c.${jsonColumn} IS NOT NULL
+      ORDER BY c.created_at DESC
+      LIMIT 1500
+    `);
+    return rows.rows
+      .map((row) => ({
+        ...row,
+        score: cosineSimilarity(questionEmbedding, Array.isArray(row.embedding_json) ? row.embedding_json : [])
+      }))
+      .filter((row) => row.score > 0.18)
+      .sort((first, second) => second.score - first.score)
+      .slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
+async function askOroActiveAssistant(question = "") {
+  const client = requireOpenAiClient();
+  const domanda = String(question || "").trim();
+  if (!domanda) {
+    const error = new Error("Inserisci una domanda per l'assistente.");
+    error.status = 400;
+    throw error;
+  }
+
+  const chunks = await searchAiChunks(domanda);
+  const hasBookContext = chunks.length > 0;
+  const context = chunks.map((chunk, index) => (
+    `[Fonte ${index + 1}: ${chunk.titolo || "La bilancia d'oro"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
+  )).join("\n\n---\n\n");
+
+  const result = await client.responses.create({
+    model: openaiModel,
+    input: `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.
+Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
+Usa come fonte primaria il libro "La bilancia d'oro" di Christian Dinato.
+Se il contesto del libro e sufficiente, inizia con "Dal libro risulta...".
+Se il contesto del libro non contiene abbastanza informazioni, devi scrivere esattamente: "Questa informazione non è presente nel libro".
+Solo dopo quella frase puoi aggiungere una sezione "In integrazione generale..." con conoscenza generale, senza inventare fonti.
+Non attribuire al libro contenuti non presenti nei passaggi forniti.
+Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
+
+CONTESTO DAL LIBRO:
+${hasBookContext ? context : "Nessun passaggio del libro trovato per questa domanda."}
+
+DOMANDA:
+${domanda}`,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "assistente_oroactive",
+        strict: true,
+        schema: assistantAiSchema
+      }
+    }
+  });
+
+  const parsed = parseOpenAiJson(result);
+  return {
+    risposta: parsed.risposta || "",
+    fonte: parsed.fonte || (hasBookContext ? "La bilancia d'oro" : "Integrazione generale"),
+    dal_libro: Boolean(parsed.dal_libro && hasBookContext),
+    citazioni: Array.isArray(parsed.citazioni) ? parsed.citazioni : [],
+    risultati: chunks.map((chunk) => ({
+      titolo: chunk.titolo,
+      autore: chunk.autore,
+      chunk_index: chunk.chunk_index,
+      score: Number(chunk.score || 0)
+    }))
+  };
+}
+
+async function aiAssistantStatus() {
+  const knowledge = await pool.query("SELECT COUNT(*)::int AS documents FROM ai_documents");
+  const chunks = await pool.query("SELECT COUNT(*)::int AS chunks FROM ai_document_chunks");
+  let vectorEmbeddings = 0;
+  if (aiRuntime.pgvector && aiRuntime.vectorColumn) {
+    const vectorColumn = sqlIdentifier(aiRuntime.vectorColumn);
+    const result = await pool.query(`SELECT COUNT(*)::int AS count FROM ai_document_chunks WHERE ${vectorColumn} IS NOT NULL`);
+    vectorEmbeddings = result.rows[0]?.count || 0;
+  }
+
+  let jsonEmbeddings = 0;
+  try {
+    const jsonColumn = sqlIdentifier(aiRuntime.jsonColumn);
+    const result = await pool.query(`SELECT COUNT(*)::int AS count FROM ai_document_chunks WHERE ${jsonColumn} IS NOT NULL`);
+    jsonEmbeddings = result.rows[0]?.count || 0;
+  } catch {
+    jsonEmbeddings = 0;
+  }
+
+  return {
+    openai: Boolean(openai),
+    pgvector: Boolean(aiRuntime.pgvector),
+    embeddings: vectorEmbeddings > 0 || jsonEmbeddings > 0,
+    knowledge_base_loaded: Number(knowledge.rows[0]?.documents || 0) > 0 && Number(chunks.rows[0]?.chunks || 0) > 0,
+    pgvector_message: aiRuntime.pgvectorMessage,
+    vector_column: aiRuntime.vectorColumn,
+    fallback: aiRuntime.pgvector ? "pgvector" : "full-text"
+  };
+}
+
 function normalizeAct(input = {}, existing = null) {
   const practiceNumber = input.practiceNumber || existing?.practice_number || "";
   const parsed = parsePracticeNumber(practiceNumber);
@@ -519,6 +1060,7 @@ function rowToAct(row, options = {}) {
 async function initDatabase() {
   const schema = await fs.readFile(path.join(__dirname, "schema.sql"), "utf8");
   await pool.query(schema);
+  await setupAiVectorStorage();
   await bootstrapAdminUser();
 }
 
@@ -1338,6 +1880,68 @@ app.post("/api/ai/controlla-atto", async (request, response, next) => {
   } catch (error) {
     if (!error.status) error.status = 502;
     if (!error.message) error.message = "Controllo AI atto non disponibile.";
+    next(error);
+  }
+});
+
+app.post("/api/ai/assistente", async (request, response, next) => {
+  try {
+    response.json(await askOroActiveAssistant(request.body.domanda || request.body.question || ""));
+  } catch (error) {
+    if (!error.status) error.status = 502;
+    if (!error.message) error.message = "Assistente IA non disponibile.";
+    next(error);
+  }
+});
+
+app.get("/api/ai/status", async (_request, response, next) => {
+  try {
+    response.json(await aiAssistantStatus());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/ai/books/status", requireFounder, async (_request, response, next) => {
+  try {
+    response.json({ documents: await aiKnowledgeStatus() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/upload-book", requireFounder, async (request, response, next) => {
+  try {
+    response.status(201).json(await uploadAiBook(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/reindex", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await reindexAiBook(request.body.document_id || request.body.id || null));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/ai/book/:id", requireFounder, async (request, response, next) => {
+  try {
+    const document = await updateAiBook(request.params.id, request.body, request.user);
+    if (!document) return response.status(404).json({ error: "Libro non trovato" });
+    response.json(document);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/ai/book/:id", requireFounder, async (request, response, next) => {
+  try {
+    const deleted = await deleteAiBook(request.params.id);
+    if (!deleted) return response.status(404).json({ error: "Libro non trovato" });
+    response.json({ ok: true });
+  } catch (error) {
     next(error);
   }
 });

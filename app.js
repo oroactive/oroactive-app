@@ -28,6 +28,9 @@ const state = {
   clientLookupTimer: null,
   fiscalCodeEditedManually: false,
   captureGroup: null,
+  assistantMessages: [],
+  aiBooks: [],
+  aiStatus: null,
   tutorial: {
     active: false,
     index: 0,
@@ -68,6 +71,13 @@ const tutorialCount = document.getElementById("tutorialCount");
 const tutorialNext = document.getElementById("tutorialNext");
 const tutorialBack = document.getElementById("tutorialBack");
 const tutorialSkip = document.getElementById("tutorialSkip");
+const assistantChat = document.getElementById("assistantChat");
+const assistantForm = document.getElementById("assistantForm");
+const assistantQuestion = document.getElementById("assistantQuestion");
+const assistantLoading = document.getElementById("assistantLoading");
+const knowledgeForm = document.getElementById("knowledgeForm");
+const knowledgeStatus = document.getElementById("knowledgeStatus");
+const reindexKnowledge = document.getElementById("reindexKnowledge");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -1056,6 +1066,9 @@ function applyRolePermissions() {
   document.querySelectorAll(".admin-only").forEach((element) => {
     element.hidden = !isAdmin();
   });
+  document.querySelectorAll(".founder-only").forEach((element) => {
+    element.hidden = !isFounder();
+  });
 
   const storeCode = document.getElementById("storeCode");
   const archiveStore = document.getElementById("archiveStoreFilter");
@@ -1288,6 +1301,10 @@ async function handleScreenDataLoad(id) {
   if (id === "fusion") {
     await loadFusionScreenData();
     renderFusionGroups();
+  }
+  if (id === "assistant") {
+    renderAssistantMessages();
+    if (isFounder()) await loadKnowledgeStatus();
   }
 }
 
@@ -1544,6 +1561,171 @@ async function deleteUser(id) {
     showToast("Utente eliminato.");
   } catch (error) {
     showToast(error.message || "Utente non eliminato.");
+  }
+}
+
+function renderAssistantMessages() {
+  if (!assistantChat) return;
+  if (!state.assistantMessages.length) {
+    assistantChat.innerHTML = '<div class="empty-state">Scrivi una domanda per consultare l’assistente IA OroActive.</div>';
+    return;
+  }
+  assistantChat.innerHTML = state.assistantMessages.map((message) => `
+    <article class="assistant-message ${message.role === "user" ? "user" : "ai"}">
+      ${escapeHtml(message.content)}
+      ${message.source ? `<span class="assistant-source">Fonte: ${escapeHtml(message.source)}</span>` : ""}
+    </article>
+  `).join("");
+  assistantChat.scrollTop = assistantChat.scrollHeight;
+}
+
+async function askAssistant(event) {
+  event.preventDefault();
+  const question = assistantQuestion?.value.trim();
+  if (!question) {
+    showToast("Scrivi una domanda per l'assistente IA.");
+    return;
+  }
+
+  state.assistantMessages.push({ role: "user", content: question });
+  assistantQuestion.value = "";
+  renderAssistantMessages();
+  if (assistantLoading) assistantLoading.hidden = false;
+  const sendButton = document.getElementById("assistantSend");
+  if (sendButton) sendButton.disabled = true;
+
+  try {
+    const data = await apiRequest("/ai/assistente", {
+      method: "POST",
+      body: JSON.stringify({ domanda: question }),
+      timeoutMs: 60000
+    });
+    state.assistantMessages.push({
+      role: "assistant",
+      content: data.risposta || "Risposta non disponibile.",
+      source: data.fonte || "Integrazione generale"
+    });
+  } catch (error) {
+    state.assistantMessages.push({
+      role: "assistant",
+      content: error.message || "Assistente IA non disponibile. Puoi riprovare tra poco.",
+      source: "Sistema"
+    });
+  } finally {
+    if (assistantLoading) assistantLoading.hidden = true;
+    if (sendButton) sendButton.disabled = false;
+    renderAssistantMessages();
+  }
+}
+
+function renderKnowledgeStatus() {
+  if (!knowledgeStatus) return;
+  if (!isFounder()) {
+    knowledgeStatus.innerHTML = "";
+    return;
+  }
+  const status = state.aiStatus;
+  const statusMarkup = status ? `
+    <article class="knowledge-row">
+      <strong>Stato AI</strong>
+      <span>OpenAI: ${status.openai ? "attivo" : "non configurato"}</span>
+      <span>Ricerca: ${status.pgvector ? "pgvector attivo" : "fallback full-text"}</span>
+      <span>Embeddings: ${status.embeddings ? "presenti" : "non presenti"}</span>
+      <span>${escapeHtml(status.pgvector_message || "")}</span>
+    </article>
+  ` : "";
+  if (!state.aiBooks.length) {
+    knowledgeStatus.innerHTML = `${statusMarkup}<div class="empty-state">Nessun libro indicizzato.</div>`;
+    return;
+  }
+  state.aiBooks.sort((first, second) => new Date(second.created_at) - new Date(first.created_at));
+  knowledgeStatus.innerHTML = statusMarkup + state.aiBooks.map((book) => `
+    <article class="knowledge-row">
+      <strong>${escapeHtml(book.titolo || "La bilancia d'oro")}</strong>
+      <span>${escapeHtml(book.autore || "Christian Dinato")} · ${escapeHtml(book.filename || "file caricato")}</span>
+      <span>${Number(book.chunks || 0)} blocchi indicizzati</span>
+      <button class="danger-button" type="button" data-delete-book="${escapeHtml(String(book.id))}">Elimina libro</button>
+    </article>
+  `).join("");
+}
+
+async function loadKnowledgeStatus() {
+  if (!isFounder()) return;
+  try {
+    const [data, status] = await Promise.all([
+      apiRequest("/ai/books/status"),
+      apiRequest("/ai/status")
+    ]);
+    state.aiBooks = data.documents || [];
+    state.aiStatus = status;
+    renderKnowledgeStatus();
+  } catch (error) {
+    if (knowledgeStatus) knowledgeStatus.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Knowledge base non caricata.")}</div>`;
+  }
+}
+
+async function uploadKnowledgeBook(event) {
+  event.preventDefault();
+  if (!isFounder()) return;
+  const file = document.getElementById("knowledgeFile")?.files?.[0];
+  if (!file) {
+    showToast("Seleziona un file PDF, DOCX o TXT.");
+    return;
+  }
+
+  try {
+    showLoading("Caricamento e indicizzazione libro...");
+    const dataUrl = await fileToDataUrl(file);
+    const data = await apiRequest("/ai/upload-book", {
+      method: "POST",
+      body: JSON.stringify({
+        titolo: document.getElementById("knowledgeTitle")?.value.trim() || "La bilancia d'oro",
+        autore: document.getElementById("knowledgeAuthor")?.value.trim() || "Christian Dinato",
+        filename: file.name,
+        dataUrl
+      }),
+      timeoutMs: 180000
+    });
+    knowledgeForm.reset();
+    document.getElementById("knowledgeTitle").value = "La bilancia d'oro";
+    document.getElementById("knowledgeAuthor").value = "Christian Dinato";
+    await loadKnowledgeStatus();
+    showToast(`Libro indicizzato: ${Number(data.chunks || 0)} blocchi creati.`);
+  } catch (error) {
+    showToast(error.message || "Libro non indicizzato.");
+  } finally {
+    hideLoading();
+  }
+}
+
+async function reindexKnowledgeBase() {
+  if (!isFounder()) return;
+  try {
+    showLoading("Rigenerazione embeddings...");
+    const data = await apiRequest("/ai/reindex", {
+      method: "POST",
+      body: JSON.stringify({}),
+      timeoutMs: 180000
+    });
+    await loadKnowledgeStatus();
+    showToast(`Embeddings rigenerati per ${Number(data.chunks || 0)} blocchi.`);
+  } catch (error) {
+    showToast(error.message || "Rigenerazione non riuscita.");
+  } finally {
+    hideLoading();
+  }
+}
+
+async function deleteKnowledgeBook(id) {
+  if (!isFounder()) return;
+  const confirmed = window.confirm("Vuoi eliminare questo libro dalla Knowledge Base AI?");
+  if (!confirmed) return;
+  try {
+    await apiRequest(`/ai/book/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await loadKnowledgeStatus();
+    showToast("Libro eliminato dalla Knowledge Base.");
+  } catch (error) {
+    showToast(error.message || "Libro non eliminato.");
   }
 }
 
@@ -5421,6 +5603,13 @@ document.getElementById("usersList").addEventListener("change", (event) => {
   select.value = "";
 });
 document.getElementById("userRole").addEventListener("change", configureUserFormPermissions);
+assistantForm?.addEventListener("submit", askAssistant);
+knowledgeForm?.addEventListener("submit", uploadKnowledgeBook);
+reindexKnowledge?.addEventListener("click", reindexKnowledgeBase);
+knowledgeStatus?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-delete-book]");
+  if (button) deleteKnowledgeBook(button.dataset.deleteBook);
+});
 
 brandMenuButton.addEventListener("click", (event) => {
   event.stopPropagation();
