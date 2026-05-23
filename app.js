@@ -521,6 +521,7 @@ async function saveActRecord(act, method = "POST") {
   try {
     saved = await apiRequest(path, {
       method,
+      timeoutMs: 60000,
       body: JSON.stringify(act)
     });
   } catch (error) {
@@ -690,13 +691,13 @@ function buildTutorialSteps() {
     },
     {
       title: "Oggetti preziosi ceduti",
-      text: "Descrivi ogni oggetto, scegli metallo e titolo. Usa Aggiungi riga per inserire piu oggetti: da qui nasceranno pesi, quotazioni, foto preziosi e giacenza.",
+      text: "Descrivi ogni oggetto, scegli metallo e titolo. Usa Aggiungi riga per inserire piu oggetti: da qui nasceranno pesi, foto preziosi e giacenza.",
       selector: "#cededItemsTable",
       action: () => openPracticeForTutorial(0)
     },
     {
-      title: "Quotazioni e pesi",
-      text: "Controlla la quotazione BullionVault per ogni metallo e inserisci il peso totale per titolo o materiale. Spunta la casella solo se vuoi stampare il peso sulla copia cliente.",
+      title: "Pesi e giacenza",
+      text: "Inserisci il peso totale per titolo o materiale. Spunta la casella solo se vuoi stampare il peso sulla copia cliente.",
       selector: "#totalWeightFields",
       action: () => openPracticeForTutorial(0)
     },
@@ -1222,8 +1223,6 @@ async function startAuthenticatedApp() {
   updateChecklistState();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   if (isAdmin()) loadUsers();
-  refreshBullionVaultPrices();
-  renderQuoteDashboard();
   maybeShowLevelUnlockMessage();
   if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 30000);
 }
@@ -1406,7 +1405,7 @@ function setScreen(id) {
   screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
   navItems.forEach((item) => item.classList.toggle("active", item.dataset.section === id));
   if (practiceTopbar) practiceTopbar.hidden = id !== "practice";
-  if (id !== "quotes" && bullionVaultChart) {
+  if (id !== "quotazione" && bullionVaultChart) {
     bullionVaultChart.innerHTML = "";
     state.bullionChartLoaded = false;
   }
@@ -1423,7 +1422,7 @@ async function handleScreenDataLoad(id) {
     renderFusionGroups();
   }
   if (id === "dashboard") await loadDashboard();
-  if (id === "quotes") {
+  if (id === "quotazione") {
     renderQuoteDashboard();
     await refreshBullionVaultPrices();
     initBullionVaultChart();
@@ -2817,6 +2816,7 @@ function qualityReviewClass(review) {
 }
 
 function isCurrentUserActOwner(act) {
+  if (act?.operatorId && state.currentUser?.id && String(act.operatorId) === String(state.currentUser.id)) return true;
   return actOperatorKey(act) === userOperatorKey(state.currentUser || {});
 }
 
@@ -2825,7 +2825,6 @@ function canViewActQuality(act) {
 }
 
 function canModifyAct(act) {
-  if (normalizeWorkflowStatus(act.status) === "Completato" && !canReviewActs()) return false;
   return canReviewActs() || isCurrentUserActOwner(act);
 }
 
@@ -4677,9 +4676,7 @@ async function loadActForEdit(practiceNumber) {
     return;
   }
   if (!canModifyAct(act)) {
-    showToast(normalizeWorkflowStatus(act.status) === "Completato"
-      ? "Questo atto è completato. Solo responsabili e founder possono modificarlo."
-      : "Puoi modificare solo gli atti di vendita effettuati da te.");
+    showToast("Puoi modificare solo gli atti effettuati da te oppure gli atti autorizzati dal tuo ruolo.");
     return;
   }
 
@@ -6371,9 +6368,20 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
     showToast(validationMessage(missing, "la copia aziendale"));
     return false;
   }
-  const archivedAct = currentActSnapshot(status);
-  archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
   const wasEditing = Boolean(state.editingPracticeNumber);
+  const originalAct = wasEditing
+    ? demoActs.find((act) => (
+      (state.editingActId && String(act.id) === String(state.editingActId))
+      || act.practiceNumber === state.editingPracticeNumber
+    ))
+    : null;
+  const archivedAct = currentActSnapshot(status);
+  if (originalAct) {
+    archivedAct.operatorId = originalAct.operatorId ?? archivedAct.operatorId;
+    archivedAct.operatorUsername = originalAct.operatorUsername || archivedAct.operatorUsername;
+    archivedAct.operatorName = originalAct.operatorName || archivedAct.operatorName;
+  }
+  archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   } catch (error) {
@@ -6383,8 +6391,14 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   state.editingDirty = false;
   renderArchiveGroups();
   renderFusionGroups();
-  if (!options.skipReset) await resetCurrentPractice({ preserveStoreCode: true });
-  if (wasEditing && !options.skipReset) setScreen(options.destination === "menu" ? "practice" : "archive");
+  if (!options.skipReset) {
+    await resetCurrentPractice({ preserveStoreCode: true });
+    if (options.destination === "menu") {
+      if (wasEditing) setScreen("practice");
+    } else {
+      setScreen("archive");
+    }
+  }
   if (wasEditing && options.destination === "menu") mainMenuScreen.hidden = false;
   showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`);
   return true;
@@ -6423,10 +6437,6 @@ async function runAiActCheck(act) {
 }
 
 async function completeCurrentPractice() {
-  if (state.editingPracticeNumber) {
-    return archiveCurrentPractice("Completato", { skipValidation: true });
-  }
-
   const missing = validatePrintScope("company");
   if (!missing.length) {
     const act = currentActSnapshot("Completato");

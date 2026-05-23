@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260523-23">
+  <link rel="stylesheet" href="styles.css?v=20260523-24">
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -59,20 +59,17 @@
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
             <button type="button" data-section="fusion">Giacenza</button>
-            <button class="founder-only" type="button" data-section="stores">Negozi</button>
           </div>
         </div>
         <div class="main-menu-group">
-          <button class="main-menu-group-button" type="button" data-section="quotes">Quotazione</button>
-        </div>
-        <div class="main-menu-group">
-          <button class="main-menu-group-button" type="button" data-section="crm">CRM Clienti</button>
-        </div>
-        <div class="main-menu-group control-only">
-          <button class="main-menu-group-button" type="button" data-section="antifraud">Antifrode</button>
-        </div>
-        <div class="main-menu-group founder-only">
-          <button class="main-menu-group-button" type="button" data-section="backups">Backup</button>
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="toolsSubmenu" aria-expanded="false">Strumenti</button>
+          <div class="main-menu-submenu" id="toolsSubmenu" hidden>
+            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button class="founder-only" type="button" data-section="backups">Backup</button>
+            <button type="button" data-section="crm">CRM Clienti</button>
+            <button class="founder-only" type="button" data-section="stores">Negozi</button>
+            <button type="button" data-section="quotazione">Quotazione</button>
+          </div>
         </div>
         <div class="main-menu-group">
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="trainingSubmenu" aria-expanded="false">Formazione</button>
@@ -106,12 +103,15 @@
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
             <button type="button" data-section="fusion">Giacenza</button>
-            <button class="founder-only" type="button" data-section="stores">Negozi</button>
           </div>
-          <button class="brand-dropdown-title" type="button" data-section="quotes">Quotazione</button>
-          <button class="brand-dropdown-title" type="button" data-section="crm">CRM Clienti</button>
-          <button class="brand-dropdown-title control-only" type="button" data-section="antifraud">Antifrode</button>
-          <button class="brand-dropdown-title founder-only" type="button" data-section="backups">Backup</button>
+          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandToolsSubmenu" aria-expanded="false">Strumenti</button>
+          <div class="brand-submenu" id="brandToolsSubmenu" hidden>
+            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button class="founder-only" type="button" data-section="backups">Backup</button>
+            <button type="button" data-section="crm">CRM Clienti</button>
+            <button class="founder-only" type="button" data-section="stores">Negozi</button>
+            <button type="button" data-section="quotazione">Quotazione</button>
+          </div>
           <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandTrainingSubmenu" aria-expanded="false">Formazione</button>
           <div class="brand-submenu" id="brandTrainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
@@ -621,7 +621,7 @@
         <div class="dashboard-panels" id="dashboardPanels"></div>
       </section>
 
-      <section id="quotes" class="screen">
+      <section id="quotazione" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
           <div>
@@ -935,6 +935,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260523-30"></script>
+  <script src="app.js?v=20260523-32"></script>
 </body>
 </html>

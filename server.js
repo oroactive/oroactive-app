@@ -2037,13 +2037,19 @@ function actOwnerKey(row = {}) {
   return String(payload.operatorUsername || payload.operatorName || "").trim().toLowerCase();
 }
 
+function actOwnerId(row = {}) {
+  const payload = row.payload || {};
+  return row.operatore_id || payload.operatorId || payload.operatore_id || null;
+}
+
 function canEditAct(row, user) {
-  if (isCompletedAct(row) && !canReviewActs(user)) return false;
+  const ownerId = actOwnerId(row);
+  if (ownerId && user?.id && String(ownerId) === String(user.id)) return true;
   return canReviewActs(user) || actOwnerKey(row) === actorKey(user);
 }
 
 function completedActEditError() {
-  const error = new Error("Questo atto è completato. Solo responsabili e founder possono modificarlo.");
+  const error = new Error("Puoi modificare solo gli atti effettuati da te oppure gli atti autorizzati dal tuo ruolo.");
   error.status = 403;
   return error;
 }
@@ -2721,9 +2727,7 @@ async function updateAct(identifier, input, user) {
     throw error;
   }
   if (!canEditAct(existing, user)) {
-    const error = isCompletedAct(existing)
-      ? completedActEditError()
-      : new Error("Puoi modificare solo gli atti effettuati da te");
+    const error = completedActEditError();
     error.status = 403;
     throw error;
   }
