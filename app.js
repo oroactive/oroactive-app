@@ -17,6 +17,8 @@ const state = {
   searchActive: false,
   editingActId: null,
   editingOriginalStatus: "",
+  editingDirty: false,
+  suppressDirtyTracking: false,
   documentScan: { front: null, back: null },
   cashLimitWarningShown: false,
   bullionVaultPrices: {},
@@ -392,6 +394,12 @@ function hasStartedClientSection() {
     '[name="dataRilascioDocumento"]',
     '[name="scadenzaDocumento"]'
   ].some((selector) => hasValue(selector));
+}
+
+function markPracticeDirty() {
+  if (state.editingPracticeNumber && !state.suppressDirtyTracking) {
+    state.editingDirty = true;
+  }
 }
 
 async function syncActsFromServer() {
@@ -1314,7 +1322,19 @@ async function enterSectionFromMainMenu(section) {
 async function returnToMainMenu() {
   const isPracticeActive = document.getElementById("practice")?.classList.contains("active-screen");
   if (isPracticeActive && !isPracticeFormEmpty()) {
-    if (!state.editingPracticeNumber && hasStartedClientSection()) {
+    if (state.editingPracticeNumber) {
+      if (state.editingDirty) {
+        const choice = await askEditingExitChoice();
+        if (choice === "cancel") return;
+        if (choice === "save") {
+          const saved = await archiveCurrentPractice(state.editingOriginalStatus || "Archiviata", { destination: "menu" });
+          if (!saved) return;
+        }
+        if (choice === "discard") await resetCurrentPractice({ preserveStoreCode: true });
+      } else {
+        await resetCurrentPractice({ preserveStoreCode: true });
+      }
+    } else if (hasStartedClientSection()) {
       const choice = await askDraftExitChoice();
       if (choice === "cancel") return;
       if (choice === "save") {
@@ -1332,6 +1352,31 @@ async function returnToMainMenu() {
   closeBrandMenu();
   clearActSearch();
   mainMenuScreen.hidden = false;
+}
+
+function askEditingExitChoice() {
+  previewTitle.textContent = "Modifiche non salvate";
+  previewBody.innerHTML = `
+    <section class="customer-copy-options">
+      <p>Hai modifiche non salvate. Vuoi salvarle prima di uscire?</p>
+      <div class="preview-action-stack">
+        <button class="primary-button" type="button" data-editing-exit-choice="save">Salva ed esci</button>
+        <button class="danger-button" type="button" data-editing-exit-choice="discard">Esci senza salvare</button>
+        <button class="ghost-button" type="button" data-editing-exit-choice="cancel">Annulla</button>
+      </div>
+    </section>
+  `;
+  previewModal.hidden = false;
+  return new Promise((resolve) => {
+    const handler = (event) => {
+      const button = event.target.closest("[data-editing-exit-choice]");
+      if (!button) return;
+      previewBody.removeEventListener("click", handler);
+      previewModal.hidden = true;
+      resolve(button.dataset.editingExitChoice);
+    };
+    previewBody.addEventListener("click", handler);
+  });
 }
 
 function askDraftExitChoice() {
@@ -3610,6 +3655,7 @@ async function loadActForEdit(practiceNumber) {
   }
 
   await resetCurrentPractice();
+  state.suppressDirtyTracking = true;
   state.editingPracticeNumber = act.practiceNumber;
   state.editingActId = act.id || null;
   state.editingOriginalStatus = normalizeWorkflowStatus(act.status || "Archiviata");
@@ -3690,6 +3736,8 @@ async function loadActForEdit(practiceNumber) {
   renderStep();
   setScreen("practice");
   previewModal.hidden = true;
+  state.editingDirty = false;
+  state.suppressDirtyTracking = false;
   showToast(`Atto ${practiceNumber} aperto in modifica.`);
 }
 
@@ -3733,6 +3781,8 @@ async function resetCurrentPractice(options = {}) {
   state.editingPracticeNumber = null;
   state.editingActId = null;
   state.editingOriginalStatus = "";
+  state.editingDirty = false;
+  state.suppressDirtyTracking = false;
   state.loadedSignatureImages = [];
   state.fiscalCodeEditedManually = false;
   setQualityReview(null);
@@ -5211,7 +5261,7 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   }
   const isCompletion = status === "Completato";
   const missing = isCompletion ? validatePrintScope("company") : [];
-  if (isCompletion && missing.length) {
+  if (isCompletion && missing.length && !options.skipValidation) {
     showToast(validationMessage(missing, "la copia aziendale"));
     return false;
   }
@@ -5224,10 +5274,12 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
     showToast(error.message || "Salvataggio non riuscito: controlla la connessione al database.");
     return false;
   }
+  state.editingDirty = false;
   renderArchiveGroups();
   renderFusionGroups();
   if (!options.skipReset) await resetCurrentPractice({ preserveStoreCode: true });
-  if (wasEditing && !options.skipReset) setScreen("archive");
+  if (wasEditing && !options.skipReset) setScreen(options.destination === "menu" ? "practice" : "archive");
+  if (wasEditing && options.destination === "menu") mainMenuScreen.hidden = false;
   showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`);
   return true;
 }
@@ -5265,6 +5317,10 @@ async function runAiActCheck(act) {
 }
 
 async function completeCurrentPractice() {
+  if (state.editingPracticeNumber) {
+    return archiveCurrentPractice("Completato", { skipValidation: true });
+  }
+
   const missing = validatePrintScope("company");
   if (!missing.length) {
     const act = currentActSnapshot("Completato");
@@ -5428,6 +5484,7 @@ document.getElementById("printCompanyCopySummary").addEventListener("click", pri
 document.getElementById("archivePractice").addEventListener("click", () => archiveCurrentPractice("Archiviata"));
 
 document.getElementById("addCededItem").addEventListener("click", () => {
+  markPracticeDirty();
   const row = document.createElement("article");
   row.className = "ceded-item-row";
   row.innerHTML = cededItemRowMarkup().replace('<article class="ceded-item-row">', "").replace("</article>", "");
@@ -5440,11 +5497,13 @@ document.getElementById("addCededItem").addEventListener("click", () => {
 });
 
 document.getElementById("cededItemsTable").addEventListener("input", (event) => {
+  markPracticeDirty();
   updateCededItems();
   updateChecklistState();
 });
 
 document.getElementById("cededItemsTable").addEventListener("change", (event) => {
+  markPracticeDirty();
   const row = event.target.closest(".ceded-item-row");
   if (!row || !event.target.matches("select")) return;
   const selects = row.querySelectorAll("select");
@@ -5460,14 +5519,19 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
 });
 
 document.getElementById("saleTotal").addEventListener("input", () => {
+  markPracticeDirty();
   updateSaleTotal();
   notifyCashPaymentLimitIfNeeded();
   updateChecklistState();
 });
 
-document.getElementById("materialAmountFields").addEventListener("input", updateChecklistState);
+document.getElementById("materialAmountFields").addEventListener("input", () => {
+  markPracticeDirty();
+  updateChecklistState();
+});
 
 document.querySelector(".form-panel").addEventListener("input", (event) => {
+  markPracticeDirty();
   event.target.classList?.remove("ocr-low-confidence");
   if (event.target.title === "Controlla questo dato") event.target.title = "";
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
@@ -5496,6 +5560,7 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
 });
 
 document.querySelector(".form-panel").addEventListener("change", (event) => {
+  markPracticeDirty();
   event.target.classList?.remove("ocr-low-confidence");
   if (event.target.title === "Controlla questo dato") event.target.title = "";
   if (event.target.matches('[name="nome"], [name="cognome"], [name="cf"]')) updateCustomerSummary();
@@ -5522,6 +5587,7 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
 });
 
 document.getElementById("paymentMethod").addEventListener("change", () => {
+  markPracticeDirty();
   notifyCashPaymentLimitIfNeeded();
   renderPaymentCaptureCard();
   updateAttachmentState();
@@ -5529,10 +5595,12 @@ document.getElementById("paymentMethod").addEventListener("change", () => {
 });
 
 document.getElementById("storeCode").addEventListener("change", async () => {
+  markPracticeDirty();
   await updatePracticeNumber();
   updateChecklistState();
 });
 document.getElementById("practiceDate").addEventListener("change", async () => {
+  markPracticeDirty();
   await updatePracticeNumber();
   updateChecklistState();
 });
@@ -5731,6 +5799,7 @@ document.getElementById("searchKeyword").addEventListener("input", () => {
 
 document.getElementById("cededItemsTable").addEventListener("click", (event) => {
   if (!event.target.classList.contains("remove-row") || event.target.disabled) return;
+  markPracticeDirty();
   event.target.closest(".ceded-item-row").remove();
   updateCededItems();
   updateChecklistState();
@@ -5772,6 +5841,7 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
     const signatureIndex = Number(canvas.dataset.signature);
     state.signatures[signatureIndex] = true;
     state.loadedSignatureImages[signatureIndex] = "";
+    markPracticeDirty();
     updateSignatureState();
   }
 
@@ -5792,6 +5862,7 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
     const signatureIndex = Number(canvas.dataset.signature);
     state.signatures[signatureIndex] = false;
     state.loadedSignatureImages[signatureIndex] = "";
+    markPracticeDirty();
     updateSignatureState();
   });
 });
@@ -5825,6 +5896,7 @@ document.addEventListener("change", async (event) => {
   if (!card || !key) return;
   const file = event.target.files?.[0];
   if (file) {
+    markPracticeDirty();
     const previous = state.captureFiles.get(key);
     revokeCaptureUrl(previous);
     let dataUrl = "";
@@ -5888,6 +5960,7 @@ document.addEventListener("click", (event) => {
   }
 
   const previous = state.captureFiles.get(key);
+  markPracticeDirty();
   revokeCaptureUrl(previous);
   state.captureFiles.delete(key);
   state.uploadedCaptures.delete(key);
