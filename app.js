@@ -36,6 +36,12 @@ const state = {
   aiStatus: null,
   knowledgeNotes: [],
   aiFeedback: [],
+  stores: [],
+  dashboard: null,
+  antifraudAlerts: [],
+  trainingCourses: [],
+  crmClients: [],
+  crmSearchTimer: null,
   tutorial: {
     active: false,
     index: 0,
@@ -91,6 +97,15 @@ const knowledgeNoteForm = document.getElementById("knowledgeNoteForm");
 const knowledgeNotesList = document.getElementById("knowledgeNotesList");
 const aiFeedbackList = document.getElementById("aiFeedbackList");
 const resetKnowledgeNoteButton = document.getElementById("resetKnowledgeNoteForm");
+const dashboardGrid = document.getElementById("dashboardGrid");
+const dashboardPanels = document.getElementById("dashboardPanels");
+const storeForm = document.getElementById("storeForm");
+const storesList = document.getElementById("storesList");
+const antifraudList = document.getElementById("antifraudList");
+const trainingCourseForm = document.getElementById("trainingCourseForm");
+const trainingList = document.getElementById("trainingList");
+const crmSearch = document.getElementById("crmSearch");
+const crmList = document.getElementById("crmList");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -1061,12 +1076,16 @@ function canManageKnowledgeUi() {
   return ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
+function canViewControlSectionsUi() {
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+}
+
 function canReviewActs(user = state.currentUser) {
   return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
 
 function userSeesAllStores(user = state.currentUser) {
-  return ["founder", "supervisore", "responsabile", "commesso"].includes(normalizeRole(user?.ruolo));
+  return ["founder", "supervisore"].includes(normalizeRole(user?.ruolo));
 }
 
 function managedRolesForCurrentUser() {
@@ -1090,6 +1109,9 @@ function applyRolePermissions() {
   });
   document.querySelectorAll(".knowledge-editor-only").forEach((element) => {
     element.hidden = !canManageKnowledgeUi();
+  });
+  document.querySelectorAll(".control-only").forEach((element) => {
+    element.hidden = !canViewControlSectionsUi();
   });
 
   const storeCode = document.getElementById("storeCode");
@@ -1137,6 +1159,7 @@ async function startAuthenticatedApp() {
   showAuthenticatedShell();
   state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
   applyRolePermissions();
+  await loadAvailableStores();
   renderStep();
   await setPracticeMeta();
   applyRolePermissions();
@@ -1314,6 +1337,14 @@ function setScreen(id) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
+  if (["dashboard", "antifraud"].includes(id) && !canViewControlSectionsUi()) {
+    showToast("Sezione riservata a Founder, Supervisore o Responsabile.");
+    return;
+  }
+  if (id === "stores" && !isFounder()) {
+    showToast("Sezione riservata al Founder.");
+    return;
+  }
   closeMainMenuDropdowns();
   closeMainUserMenu();
   const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
@@ -1333,6 +1364,11 @@ async function handleScreenDataLoad(id) {
     await loadFusionScreenData();
     renderFusionGroups();
   }
+  if (id === "dashboard") await loadDashboard();
+  if (id === "stores") await loadStores();
+  if (id === "antifraud") await loadAntifraud();
+  if (id === "training") await loadTraining();
+  if (id === "crm") await loadCrmClients();
   if (id === "assistant") {
     renderAssistantMessages();
     if (isFounder()) await loadKnowledgeStatus();
@@ -1540,7 +1576,7 @@ function configureUserFormPermissions() {
   });
   if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles[0] || "commesso";
   const role = normalizeRole(roleSelect.value);
-  if (["founder", "supervisore", "responsabile", "commesso"].includes(role)) {
+  if (["founder", "supervisore"].includes(role)) {
     storeSelect.value = "Tutti";
     storeSelect.disabled = true;
     [...storeSelect.options].forEach((option) => {
@@ -2039,6 +2075,309 @@ async function feedbackToKnowledge(id) {
   } catch (error) {
     showToast(error.message || "Feedback non trasformato.");
   }
+}
+
+function metricCard(label, value) {
+  return `<article class="dashboard-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong></article>`;
+}
+
+function renderDashboard() {
+  if (!dashboardGrid || !dashboardPanels) return;
+  const data = state.dashboard || {};
+  const kpi = data.kpi || {};
+  dashboardGrid.innerHTML = [
+    metricCard("Fatturato giornaliero", formatEuro(kpi.fatturato_giornaliero || 0)),
+    metricCard("Fatturato mensile", formatEuro(kpi.fatturato_mensile || 0)),
+    metricCard("Atti giornalieri", kpi.numero_atti_giornalieri || 0),
+    metricCard("Atti mensili", kpi.numero_atti_mensili || 0),
+    metricCard("Media margine", kpi.media_margine ? `${Number(kpi.media_margine).toFixed(2)}%` : "Dato non disponibile"),
+    metricCard("Oro mensile", `${Number(kpi.grammi_mensili?.Oro || 0).toFixed(2)} gr`),
+    metricCard("Argento mensile", `${Number(kpi.grammi_mensili?.Argento || 0).toFixed(2)} gr`),
+    metricCard("Platino mensile", `${Number(kpi.grammi_mensili?.Platino || 0).toFixed(2)} gr`)
+  ].join("");
+  const ranking = (rows = [], labelKey = "negozio") => rows.slice(0, 8).map((row, index) => `
+    <div class="dashboard-rank-row">
+      <span>${index + 1}. ${escapeHtml(row[labelKey] || "Dato non inserito")}</span>
+      <strong>${escapeHtml(formatEuro(row.fatturato || 0))}</strong>
+      <em>${Number(row.grammi || 0).toFixed(2)} gr · ${Number(row.atti || 0)} atti</em>
+    </div>
+  `).join("") || '<div class="empty-state">Nessun dato disponibile.</div>';
+  dashboardPanels.innerHTML = `
+    <section class="dashboard-panel"><h3>Ranking negozi</h3>${ranking(data.ranking_negozi, "negozio")}</section>
+    <section class="dashboard-panel"><h3>Ranking operatori</h3>${ranking(data.ranking_operatori, "operatore")}</section>
+    <section class="dashboard-panel"><h3>Carature frequenti</h3>${(data.carature_frequenti || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.titolo)}</span><strong>${item.count}</strong></div>`).join("") || '<div class="empty-state">Nessun dato disponibile.</div>'}</section>
+    <section class="dashboard-panel"><h3>Pagamenti</h3>${Object.entries(data.pagamenti || {}).map(([key, value]) => `<div class="dashboard-rank-row"><span>${escapeHtml(key)}</span><strong>${escapeHtml(formatEuro(value))}</strong></div>`).join("") || '<div class="empty-state">Nessun dato disponibile.</div>'}</section>
+  `;
+}
+
+async function loadDashboard() {
+  try {
+    state.dashboard = await apiRequest("/dashboard");
+    renderDashboard();
+  } catch (error) {
+    if (dashboardGrid) dashboardGrid.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Dashboard non caricata.")}</div>`;
+  }
+}
+
+function renderStores() {
+  if (!storesList) return;
+  if (!state.stores.length) {
+    storesList.innerHTML = '<div class="empty-state">Nessun negozio configurato.</div>';
+    return;
+  }
+  storesList.innerHTML = `
+    <div class="table-row head"><span>Codice</span><span>Negozio</span><span>Città</span><span>Provincia</span><span>Stato</span><span>Azioni</span></div>
+    ${state.stores.map((store) => `
+      <div class="table-row">
+        <span>${escapeHtml(store.codice || "")}</span>
+        <strong>${escapeHtml(store.nome || "")}</strong>
+        <span>${escapeHtml(store.citta || "")}</span>
+        <span>${escapeHtml(store.provincia || "")}</span>
+        <em class="${store.attivo ? "status-completed" : "status-draft"}">${store.attivo ? "Attivo" : "Non attivo"}</em>
+        <span class="row-actions"><button type="button" data-edit-store="${store.id}">Modifica</button><button class="warning-button" type="button" data-toggle-store="${store.id}">${store.attivo ? "Disattiva" : "Attiva"}</button></span>
+      </div>
+    `).join("")}
+  `;
+}
+
+async function loadStores() {
+  try {
+    const data = await apiRequest("/negozi");
+    state.stores = data.stores || [];
+    populateStoreSelectors();
+    renderStores();
+  } catch (error) {
+    if (storesList) storesList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Negozi non caricati.")}</div>`;
+  }
+}
+
+function populateStoreSelectors() {
+  const stores = state.stores.length ? state.stores : [
+    { nome: "Busto Arsizio", codice: "BUSTO" },
+    { nome: "Cassano Magnago", codice: "CASSANO" },
+    { nome: "Legnano", codice: "LEGNANO" }
+  ];
+  const currentValues = {
+    userStore: document.getElementById("userStore")?.value,
+    archive: document.getElementById("archiveStoreFilter")?.value,
+    fusion: document.getElementById("fusionStoreFilter")?.value,
+    storeCode: document.getElementById("storeCode")?.value
+  };
+  const userStore = document.getElementById("userStore");
+  if (userStore) {
+    userStore.innerHTML = '<option>Tutti</option>' + stores.map((store) => `<option>${escapeHtml(store.nome)}</option>`).join("");
+    if (currentValues.userStore) userStore.value = currentValues.userStore;
+  }
+  ["archiveStoreFilter", "fusionStoreFilter"].forEach((id) => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const includeAll = id === "fusionStoreFilter";
+    select.innerHTML = `${includeAll ? "<option>Tutti</option>" : ""}${stores.map((store) => `<option>${escapeHtml(store.nome)}</option>`).join("")}`;
+    const previous = id === "archiveStoreFilter" ? currentValues.archive : currentValues.fusion;
+    if (previous) select.value = previous;
+  });
+  const storeCodeSelect = document.getElementById("storeCode");
+  if (storeCodeSelect) {
+    storeCodeSelect.innerHTML = stores.map((store) => `<option value="${escapeHtml(store.codice)}">${escapeHtml(store.nome)}</option>`).join("");
+    if (currentValues.storeCode) storeCodeSelect.value = currentValues.storeCode;
+  }
+  configureUserFormPermissions();
+}
+
+async function loadAvailableStores() {
+  try {
+    const data = await apiRequest("/negozi");
+    state.stores = data.stores || [];
+    populateStoreSelectors();
+  } catch {
+    populateStoreSelectors();
+  }
+}
+
+function resetStoreForm() {
+  storeForm?.reset();
+  document.getElementById("storeId").value = "";
+  document.getElementById("storeActiveInput").checked = true;
+}
+
+async function saveStore(event) {
+  event.preventDefault();
+  if (!isFounder()) return;
+  const id = document.getElementById("storeId").value;
+  const payload = {
+    nome: document.getElementById("storeNameInput").value.trim(),
+    codice: document.getElementById("storeCodeInput").value.trim().toUpperCase(),
+    indirizzo: document.getElementById("storeAddressInput").value.trim(),
+    citta: document.getElementById("storeCityInput").value.trim(),
+    provincia: document.getElementById("storeProvinceInput").value.trim().toUpperCase(),
+    telefono: document.getElementById("storePhoneInput").value.trim(),
+    email: document.getElementById("storeEmailInput").value.trim(),
+    attivo: document.getElementById("storeActiveInput").checked
+  };
+  try {
+    await apiRequest(id ? `/negozi/${id}` : "/negozi", { method: id ? "PUT" : "POST", body: JSON.stringify(payload) });
+    resetStoreForm();
+    await loadStores();
+    showToast("Negozio salvato.");
+  } catch (error) {
+    showToast(error.message || "Negozio non salvato.");
+  }
+}
+
+function editStore(id) {
+  const store = state.stores.find((item) => String(item.id) === String(id));
+  if (!store) return;
+  document.getElementById("storeId").value = store.id;
+  document.getElementById("storeNameInput").value = store.nome || "";
+  document.getElementById("storeCodeInput").value = store.codice || "";
+  document.getElementById("storeAddressInput").value = store.indirizzo || "";
+  document.getElementById("storeCityInput").value = store.citta || "";
+  document.getElementById("storeProvinceInput").value = store.provincia || "";
+  document.getElementById("storePhoneInput").value = store.telefono || "";
+  document.getElementById("storeEmailInput").value = store.email || "";
+  document.getElementById("storeActiveInput").checked = store.attivo !== false;
+}
+
+async function toggleStore(id) {
+  const store = state.stores.find((item) => String(item.id) === String(id));
+  if (!store) return;
+  await apiRequest(`/negozi/${id}`, { method: "PUT", body: JSON.stringify({ attivo: !store.attivo }) });
+  await loadStores();
+}
+
+function renderAntifraud() {
+  if (!antifraudList) return;
+  if (!state.antifraudAlerts.length) {
+    antifraudList.innerHTML = '<div class="empty-state">Nessun alert antifrode presente.</div>';
+    return;
+  }
+  antifraudList.innerHTML = `
+    <div class="table-row head"><span>Livello</span><span>Tipo</span><span>Atto</span><span>Cliente</span><span>Stato</span><span>Azioni</span></div>
+    ${state.antifraudAlerts.map((alert) => `
+      <div class="table-row">
+        <strong>${escapeHtml(alert.livello || "medio")}</strong>
+        <span>${escapeHtml(alert.tipo_alert || "")}</span>
+        <span>${escapeHtml(alert.practice_number || "")}</span>
+        <span>${escapeHtml([alert.cliente_nome, alert.cliente_cognome].filter(Boolean).join(" ") || "Dato non inserito")}</span>
+        <em>${escapeHtml(alert.stato || "nuovo")}</em>
+        <select data-antifraud-status="${alert.id}">
+          <option value="">Aggiorna</option>
+          <option value="in verifica">In verifica</option>
+          <option value="risolto">Risolto</option>
+          <option value="falso positivo">Falso positivo</option>
+        </select>
+        <small>${escapeHtml(alert.descrizione || "")}</small>
+      </div>
+    `).join("")}
+  `;
+}
+
+async function loadAntifraud() {
+  try {
+    const data = await apiRequest("/antifrode");
+    state.antifraudAlerts = data.alerts || [];
+    renderAntifraud();
+  } catch (error) {
+    if (antifraudList) antifraudList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Antifrode non caricato.")}</div>`;
+  }
+}
+
+async function scanAntifraud() {
+  try {
+    showLoading("Analisi antifrode in corso...");
+    const data = await apiRequest("/antifrode/scan", { method: "POST", body: JSON.stringify({}) });
+    await loadAntifraud();
+    showToast(`Analisi completata. Nuovi alert: ${Number(data.created || 0)}.`);
+  } catch (error) {
+    showToast(error.message || "Analisi antifrode non riuscita.");
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderTraining() {
+  if (!trainingList) return;
+  if (!state.trainingCourses.length) {
+    trainingList.innerHTML = '<div class="empty-state">Nessun corso attivo.</div>';
+    return;
+  }
+  trainingList.innerHTML = state.trainingCourses.map((course) => `
+    <article class="knowledge-note-row">
+      <div><strong>${escapeHtml(course.title)}</strong><span>${escapeHtml(course.category || "Formazione")}</span></div>
+      <p>${escapeHtml(course.description || "")}</p>
+      <div class="score-bar"><span style="width:${course.completed ? 100 : Math.min(100, Number(course.score || 0))}%"></span></div>
+      <small>Punteggio: ${Number(course.score || 0)} · ${course.completed ? "Completato" : "Da completare"}</small>
+    </article>
+  `).join("");
+}
+
+async function loadTraining() {
+  const data = await apiRequest("/training");
+  state.trainingCourses = data.courses || [];
+  renderTraining();
+}
+
+async function createTrainingCourse(event) {
+  event.preventDefault();
+  if (!isFounder()) return;
+  await apiRequest("/training/courses", {
+    method: "POST",
+    body: JSON.stringify({
+      title: document.getElementById("trainingCourseTitle").value.trim(),
+      category: document.getElementById("trainingCourseCategory").value.trim(),
+      description: document.getElementById("trainingCourseDescription").value.trim()
+    })
+  });
+  trainingCourseForm.reset();
+  await loadTraining();
+  showToast("Corso creato.");
+}
+
+function renderCrmClients() {
+  if (!crmList) return;
+  if (!state.crmClients.length) {
+    crmList.innerHTML = '<div class="empty-state">Nessun cliente trovato.</div>';
+    return;
+  }
+  crmList.innerHTML = `
+    <div class="table-row head"><span>Cliente</span><span>Codice fiscale</span><span>Telefono</span><span>Livello</span><span>Storico</span><span>Azioni</span></div>
+    ${state.crmClients.map((client) => `
+      <div class="table-row">
+        <strong>${escapeHtml(`${client.name || ""} ${client.surname || ""}`.trim() || "Dato non inserito")}</strong>
+        <span>${escapeHtml(client.fiscalCode || "")}</span>
+        <span>${escapeHtml(client.phone || "")}</span>
+        <em>${escapeHtml(client.livello_cliente || "nuovo")}</em>
+        <span>${Number(client.atti_count || 0)} atti · ${escapeHtml(formatEuro(client.totale_pagato || 0))}</span>
+        <button type="button" data-open-crm-client="${client.id}">Apri</button>
+      </div>
+    `).join("")}
+  `;
+}
+
+async function loadCrmClients() {
+  const query = queryString({ q: crmSearch?.value.trim() || "" });
+  const data = await apiRequest(`/crm/clienti${query ? `?${query}` : ""}`);
+  state.crmClients = data.clients || [];
+  renderCrmClients();
+}
+
+async function openCrmClient(id) {
+  const detail = await apiRequest(`/crm/clienti/${id}`);
+  const client = detail.client || {};
+  previewTitle.textContent = "Scheda CRM cliente";
+  previewBody.innerHTML = `
+    <section class="customer-copy-options">
+      <h3>${escapeHtml(`${client.name || ""} ${client.surname || ""}`.trim() || "Cliente")}</h3>
+      <p>Codice fiscale: ${escapeHtml(client.fiscalCode || "Dato non inserito")}</p>
+      <p>Telefono: ${escapeHtml(client.phone || "Dato non inserito")} · Email: ${escapeHtml(client.email || "Dato non inserito")}</p>
+      <p>IBAN: ${escapeHtml(client.iban || "Dato non inserito")}</p>
+      <h4>Storico atti</h4>
+      ${(detail.acts || []).map((act) => `<p>${escapeHtml(act.practiceNumber)} · ${escapeHtml(act.date)} · ${escapeHtml(formatEuro(act.amount || 0))}</p>`).join("") || "<p>Nessun atto collegato.</p>"}
+      <h4>Note interne</h4>
+      ${(detail.notes || []).map((note) => `<p>${escapeHtml(note.note)}</p>`).join("") || "<p>Nessuna nota.</p>"}
+    </section>
+  `;
+  previewModal.hidden = false;
 }
 
 function actOperatorKey(act) {
@@ -5987,6 +6326,33 @@ knowledgeForm?.addEventListener("submit", uploadKnowledgeBook);
 reindexKnowledge?.addEventListener("click", reindexKnowledgeBase);
 knowledgeNoteForm?.addEventListener("submit", saveKnowledgeNote);
 resetKnowledgeNoteButton?.addEventListener("click", resetKnowledgeNoteFormValues);
+storeForm?.addEventListener("submit", saveStore);
+document.getElementById("resetStoreForm")?.addEventListener("click", resetStoreForm);
+storesList?.addEventListener("click", (event) => {
+  const edit = event.target.closest("[data-edit-store]");
+  const toggle = event.target.closest("[data-toggle-store]");
+  if (edit) editStore(edit.dataset.editStore);
+  if (toggle) toggleStore(toggle.dataset.toggleStore);
+});
+document.getElementById("scanAntifraud")?.addEventListener("click", scanAntifraud);
+antifraudList?.addEventListener("change", async (event) => {
+  const select = event.target.closest("[data-antifraud-status]");
+  if (!select || !select.value) return;
+  await apiRequest(`/antifrode/${select.dataset.antifraudStatus}`, {
+    method: "PUT",
+    body: JSON.stringify({ stato: select.value })
+  });
+  await loadAntifraud();
+});
+trainingCourseForm?.addEventListener("submit", createTrainingCourse);
+crmSearch?.addEventListener("input", () => {
+  window.clearTimeout(state.crmSearchTimer);
+  state.crmSearchTimer = window.setTimeout(loadCrmClients, 350);
+});
+crmList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-open-crm-client]");
+  if (button) openCrmClient(button.dataset.openCrmClient);
+});
 knowledgeStatus?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-delete-book]");
   if (button) deleteKnowledgeBook(button.dataset.deleteBook);

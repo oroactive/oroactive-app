@@ -49,9 +49,13 @@
         <div class="main-menu-group">
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="salesSubmenu" aria-expanded="false">Atti di vendita</button>
           <div class="main-menu-submenu" id="salesSubmenu" hidden>
+            <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
             <button type="button" data-section="fusion">Giacenza</button>
+            <button class="founder-only" type="button" data-section="stores">Negozi</button>
+            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button type="button" data-section="crm">CRM Clienti</button>
           </div>
         </div>
         <div class="main-menu-group">
@@ -59,6 +63,7 @@
           <div class="main-menu-submenu" id="trainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
             <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+            <button type="button" data-section="training">Formazione Staff</button>
             <button type="button" data-start-tutorial>Tutorial</button>
           </div>
         </div>
@@ -80,12 +85,17 @@
         </button>
         <div class="brand-dropdown" id="brandDropdown" hidden>
           <strong class="brand-dropdown-title">Atti di vendita</strong>
+          <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
           <button type="button" data-section="practice">Nuovo atto di vendita</button>
           <button type="button" data-section="archive">Elenco</button>
           <button type="button" data-section="fusion">Giacenza</button>
+          <button class="founder-only" type="button" data-section="stores">Negozi</button>
+          <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+          <button type="button" data-section="crm">CRM Clienti</button>
           <strong class="brand-dropdown-title">Formazione</strong>
           <button type="button" data-section="assistant">Assistente IA OroActive</button>
           <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+          <button type="button" data-section="training">Formazione Staff</button>
           <button type="button" data-start-tutorial>Tutorial</button>
         </div>
       </div>
@@ -588,6 +598,59 @@
         <div class="fusion-groups" id="fusionGroups" aria-live="polite"></div>
       </section>
 
+      <section id="dashboard" class="screen control-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">KPI OroActive</p>
+            <h2>Dashboard</h2>
+            <p class="muted">Fatturato, grammi acquistati, pagamenti, ranking negozi e operatori.</p>
+          </div>
+        </div>
+        <div class="dashboard-grid" id="dashboardGrid"></div>
+        <div class="dashboard-panels" id="dashboardPanels"></div>
+      </section>
+
+      <section id="stores" class="screen founder-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Founder</p>
+            <h2>Negozi</h2>
+            <p class="muted">Gestione punti vendita OroActive, codici negozio e stato sede.</p>
+          </div>
+          <form class="settings-list" id="storeForm">
+            <input type="hidden" id="storeId">
+            <label>Nome negozio <input id="storeNameInput" required></label>
+            <label>Codice negozio <input id="storeCodeInput" required></label>
+            <label>Indirizzo <input id="storeAddressInput"></label>
+            <label>Citt&agrave; <input id="storeCityInput"></label>
+            <label>Provincia <input id="storeProvinceInput"></label>
+            <label>Telefono <input id="storePhoneInput"></label>
+            <label>Email <input id="storeEmailInput" type="email"></label>
+            <label class="inline-check"><input id="storeActiveInput" type="checkbox" checked> Negozio attivo</label>
+            <div class="user-form-actions">
+              <button class="primary-button" type="submit">Salva negozio</button>
+              <button class="ghost-button" type="button" id="resetStoreForm">Nuovo negozio</button>
+            </div>
+          </form>
+        </div>
+        <div class="archive-table users-table" id="storesList" aria-live="polite"></div>
+      </section>
+
+      <section id="antifraud" class="screen control-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Controlli interni</p>
+            <h2>Antifrode</h2>
+            <p class="muted">Alert su clienti, documenti, pagamenti, atti e comportamenti anomali.</p>
+          </div>
+          <button class="primary-button" type="button" id="scanAntifraud">Analizza anomalie</button>
+        </div>
+        <div class="archive-table users-table" id="antifraudList" aria-live="polite"></div>
+      </section>
+
       <section id="assistant" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="assistant-layout">
@@ -631,6 +694,37 @@
             <div class="knowledge-status" id="knowledgeStatus"></div>
           </section>
         </div>
+      </section>
+
+      <section id="training" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Formazione Staff</p>
+            <h2>Corsi e quiz operatori</h2>
+            <p class="muted">Corsi interni, quiz, test finale e storico risultati dello staff.</p>
+          </div>
+          <form class="settings-list founder-only" id="trainingCourseForm">
+            <label>Titolo corso <input id="trainingCourseTitle"></label>
+            <label>Categoria <input id="trainingCourseCategory" placeholder="oro, antiriciclaggio, procedure OroActive"></label>
+            <label>Descrizione <textarea id="trainingCourseDescription" rows="5"></textarea></label>
+            <button class="primary-button" type="submit">Crea corso</button>
+          </form>
+        </div>
+        <div class="knowledge-notes-list" id="trainingList"></div>
+      </section>
+
+      <section id="crm" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Relazione clienti</p>
+            <h2>CRM Clienti</h2>
+            <p class="muted">Anagrafica, storico atti, note, livello cliente e prossime azioni.</p>
+          </div>
+          <input class="search" id="crmSearch" placeholder="Cerca cliente, codice fiscale, telefono o email">
+        </div>
+        <div class="archive-table users-table" id="crmList" aria-live="polite"></div>
       </section>
 
       <section id="knowledgeNotes" class="screen knowledge-editor-only">
@@ -779,6 +873,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260523-26"></script>
+  <script src="app.js?v=20260523-27"></script>
 </body>
 </html>

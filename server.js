@@ -30,6 +30,11 @@ const bullionVaultMarkets = {
   Argento: { securityId: "AGXZU", source: "Zurigo" },
   Platino: { securityId: "PTXLN", source: "Londra" }
 };
+const defaultStores = [
+  { nome: "Busto Arsizio", codice: "BUSTO", citta: "Busto Arsizio", provincia: "VA" },
+  { nome: "Cassano Magnago", codice: "CASSANO", citta: "Cassano Magnago", provincia: "VA" },
+  { nome: "Legnano", codice: "LEGNANO", citta: "Legnano", provincia: "MI" }
+];
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -93,6 +98,7 @@ function publicUser(row) {
     username: row.username,
     email: row.email,
     ruolo: normalizeRole(row.ruolo),
+    negozio_id: row.negozio_id || null,
     negozio: roleSeesAllStores(row.ruolo) ? "Tutti" : row.negozio,
     hasFaceId: Boolean(row.face_id_credential),
     data_creazione: row.data_creazione,
@@ -119,7 +125,7 @@ function normalizeRole(role = "commesso") {
 }
 
 function roleSeesAllStores(role) {
-  return ["founder", "supervisore", "responsabile", "commesso"].includes(normalizeRole(role));
+  return ["founder", "supervisore"].includes(normalizeRole(role));
 }
 
 function canManageAccess(user) {
@@ -148,7 +154,7 @@ function signUserToken(user) {
 
 async function findUserById(id) {
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen FROM utenti WHERE id = $1",
+    "SELECT id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen FROM utenti WHERE id = $1",
     [id]
   );
   return result.rows[0] || null;
@@ -1481,7 +1487,39 @@ async function initDatabase() {
   const schema = await fs.readFile(path.join(__dirname, "schema.sql"), "utf8");
   await pool.query(schema);
   await setupAiVectorStorage();
+  await bootstrapStores();
   await bootstrapAdminUser();
+}
+
+async function bootstrapStores() {
+  for (const store of defaultStores) {
+    await pool.query(
+      `INSERT INTO negozi (nome, codice, citta, provincia, attivo)
+       VALUES ($1, $2, $3, $4, TRUE)
+       ON CONFLICT (codice) DO UPDATE
+       SET nome = EXCLUDED.nome,
+           citta = COALESCE(negozi.citta, EXCLUDED.citta),
+           provincia = COALESCE(negozi.provincia, EXCLUDED.provincia)`,
+      [store.nome, store.codice, store.citta, store.provincia]
+    );
+  }
+  await pool.query(`
+    UPDATE utenti u
+    SET negozio_id = n.id
+    FROM negozi n
+    WHERE u.negozio_id IS NULL
+      AND u.negozio = n.nome
+  `);
+  await pool.query(`
+    UPDATE atti_vendita a
+    SET negozio_id = n.id,
+        codice_negozio = COALESCE(a.codice_negozio, n.codice),
+        numero_atto_negozio = COALESCE(a.numero_atto_negozio, a.act_number),
+        operatore_id = COALESCE(a.operatore_id, CASE WHEN (a.payload->>'operatorId') ~ '^[0-9]+$' THEN (a.payload->>'operatorId')::bigint ELSE NULL END)
+    FROM negozi n
+    WHERE a.negozio_id IS NULL
+      AND (a.store = n.nome OR a.store_code = n.codice)
+  `);
 }
 
 async function bootstrapAdminUser() {
@@ -1530,6 +1568,125 @@ async function bootstrapAdminUser() {
       "Tutti"
     ]
   );
+}
+
+async function storeByCodeOrName(value = "") {
+  const text = String(value || "").trim();
+  if (!text || text === "Tutti") return null;
+  const result = await pool.query(
+    "SELECT * FROM negozi WHERE codice = $1 OR nome = $1 ORDER BY id LIMIT 1",
+    [text]
+  );
+  return result.rows[0] || null;
+}
+
+async function storeForUser(user = {}) {
+  if (user.negozio_id) {
+    const result = await pool.query("SELECT * FROM negozi WHERE id = $1 LIMIT 1", [user.negozio_id]);
+    if (result.rows[0]) return result.rows[0];
+  }
+  return storeByCodeOrName(user.negozio);
+}
+
+function canManageStores(user = {}) {
+  return normalizeRole(user.ruolo) === "founder";
+}
+
+function canViewControlSections(user = {}) {
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user.ruolo));
+}
+
+async function listStores(user = {}) {
+  if (roleSeesAllStores(user.ruolo)) {
+    const result = await pool.query("SELECT * FROM negozi ORDER BY nome");
+    return result.rows;
+  }
+  const store = await storeForUser(user);
+  return store ? [store] : [];
+}
+
+async function createStore(input = {}, user = {}) {
+  if (!canManageStores(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const nome = String(input.nome || input.name || "").trim();
+  const codice = String(input.codice || input.code || storeCodeFromName(nome)).trim().toUpperCase();
+  if (!nome || !codice) {
+    const error = new Error("Nome negozio e codice negozio sono obbligatori.");
+    error.status = 400;
+    throw error;
+  }
+  const result = await pool.query(
+    `INSERT INTO negozi (nome, codice, indirizzo, citta, provincia, telefono, email, responsabile_id, attivo)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, TRUE))
+     ON CONFLICT (codice) DO UPDATE
+     SET nome = EXCLUDED.nome,
+         indirizzo = EXCLUDED.indirizzo,
+         citta = EXCLUDED.citta,
+         provincia = EXCLUDED.provincia,
+         telefono = EXCLUDED.telefono,
+         email = EXCLUDED.email,
+         responsabile_id = EXCLUDED.responsabile_id,
+         attivo = EXCLUDED.attivo
+     RETURNING *`,
+    [
+      nome,
+      codice,
+      input.indirizzo || "",
+      input.citta || "",
+      input.provincia || "",
+      input.telefono || "",
+      input.email || "",
+      input.responsabile_id || null,
+      input.attivo !== false
+    ]
+  );
+  return result.rows[0];
+}
+
+async function updateStore(id, input = {}, user = {}) {
+  if (!canManageStores(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `UPDATE negozi
+     SET nome = COALESCE(NULLIF($2, ''), nome),
+         codice = COALESCE(NULLIF($3, ''), codice),
+         indirizzo = COALESCE($4, indirizzo),
+         citta = COALESCE($5, citta),
+         provincia = COALESCE($6, provincia),
+         telefono = COALESCE($7, telefono),
+         email = COALESCE($8, email),
+         responsabile_id = COALESCE($9, responsabile_id),
+         attivo = COALESCE($10, attivo)
+     WHERE id = $1
+     RETURNING *`,
+    [
+      id,
+      String(input.nome || input.name || "").trim(),
+      String(input.codice || input.code || "").trim().toUpperCase(),
+      input.indirizzo ?? null,
+      input.citta ?? null,
+      input.provincia ?? null,
+      input.telefono ?? null,
+      input.email ?? null,
+      input.responsabile_id || null,
+      typeof input.attivo === "boolean" ? input.attivo : null
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+async function visibleStoreWhere(user = {}, values = [], alias = "a") {
+  if (roleSeesAllStores(user.ruolo)) return "";
+  const store = await storeForUser(user);
+  if (!store) return " AND 1 = 0";
+  values.push(store.id, store.nome);
+  return ` AND (${alias}.negozio_id = $${values.length - 1} OR ${alias}.store = $${values.length})`;
 }
 
 function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
@@ -1616,9 +1773,9 @@ async function listActs(query = {}, user = null) {
 
 async function nextActNumber(storeCode, year) {
   const result = await pool.query(
-    `SELECT COALESCE(MAX(act_number), 0) + 1 AS next_number
+    `SELECT COALESCE(MAX(COALESCE(numero_atto_negozio, act_number)), 0) + 1 AS next_number
      FROM ${actsTable}
-     WHERE store_code = $1 AND act_year = $2`,
+     WHERE COALESCE(codice_negozio, store_code) = $1 AND act_year = $2`,
     [storeCode, year]
   );
   return Number(result.rows[0].next_number);
@@ -1634,6 +1791,29 @@ function enforceActStore(input, user) {
     storeCode,
     practiceNumber
   };
+}
+
+async function enrichActStore(act, user) {
+  const store = roleSeesAllStores(user?.ruolo)
+    ? await storeByCodeOrName(act.storeCode || act.store)
+    : await storeForUser(user);
+  if (!store) return act;
+  act.negozioId = store.id;
+  act.store = store.nome;
+  act.storeCode = store.codice;
+  act.codiceNegozio = store.codice;
+  act.practiceNumber = String(act.practiceNumber || "").replace(/^OA-[^-]+-/, `OA-${store.codice}-`);
+  act.numeroAttoNegozio = act.actNumber;
+  act.operatoreId = act.payload?.operatorId || user?.id || null;
+  act.payload = {
+    ...(act.payload || {}),
+    store: store.nome,
+    storeCode: store.codice,
+    negozio_id: store.id,
+    codice_negozio: store.codice,
+    operatore_id: act.operatoreId
+  };
+  return act;
 }
 
 async function findExisting(identifier) {
@@ -1705,6 +1885,7 @@ async function upsertClientFromAct(act) {
     act.telefono || act.phone || "",
     act.payload?.email || act.email || "",
     act.iban || act.payload?.iban || "",
+    act.negozioId || act.negozio_id || act.payload?.negozio_id || null,
     payload
   ];
   const existing = await pool.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1 LIMIT 1", [fiscalCode]);
@@ -1716,15 +1897,16 @@ async function upsertClientFromAct(act) {
         telefono = COALESCE(NULLIF($4, ''), telefono),
         email = COALESCE(NULLIF($5, ''), email),
         iban = COALESCE(NULLIF($6, ''), iban),
-        payload = COALESCE(payload, '{}'::jsonb) || COALESCE($7::jsonb, '{}'::jsonb),
+        negozio_id = COALESCE($7, negozio_id),
+        payload = COALESCE(payload, '{}'::jsonb) || COALESCE($8::jsonb, '{}'::jsonb),
         updated_at = NOW()
-       WHERE id = $8
+       WHERE id = $9
        RETURNING *`,
       [...values, existing.rows[0].id]
     )
     : await pool.query(
-      `INSERT INTO clienti (codice_fiscale, nome, cognome, telefono, email, iban, payload)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO clienti (codice_fiscale, nome, cognome, telefono, email, iban, negozio_id, payload)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       values
     );
@@ -1845,6 +2027,356 @@ function publicClientLookup(row) {
   };
 }
 
+async function dashboardKpis(user = {}) {
+  const values = [];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  const result = await pool.query(
+    `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome
+     FROM ${actsTable} a
+     LEFT JOIN utenti u ON u.id = a.operatore_id
+     WHERE COALESCE(a.status, '') NOT ILIKE 'Bozza'
+       AND COALESCE(a.status, '') NOT ILIKE 'Annullata'
+       ${storeWhere}
+     ORDER BY a.data_atto DESC NULLS LAST
+     LIMIT 1000`,
+    values
+  );
+  const acts = result.rows.map((row) => rowToAct(row));
+  const today = new Date().toISOString().slice(0, 10);
+  const month = today.slice(0, 7);
+  const sum = (rows, getter) => rows.reduce((total, row) => total + Number(getter(row) || 0), 0);
+  const dailyActs = acts.filter((act) => String(act.date || "").slice(0, 10) === today);
+  const monthlyActs = acts.filter((act) => String(act.date || "").slice(0, 7) === month);
+  const materials = acts.flatMap(materialLotsFromAct);
+  const dailyMaterials = dailyActs.flatMap(materialLotsFromAct);
+  const monthlyMaterials = monthlyActs.flatMap(materialLotsFromAct);
+  const weightByMetal = (rows) => rows.reduce((totals, row) => {
+    totals[row.metal] = (totals[row.metal] || 0) + Number(row.weight || 0);
+    return totals;
+  }, {});
+  const frequency = materials.reduce((items, row) => {
+    const key = `${row.metal} ${row.title || ""}`.trim();
+    items[key] = (items[key] || 0) + 1;
+    return items;
+  }, {});
+  const byStore = acts.reduce((groups, act) => {
+    const key = act.store || "Dato non inserito";
+    groups[key] ||= { negozio: key, fatturato: 0, atti: 0, grammi: 0 };
+    groups[key].fatturato += Number(act.amount || 0);
+    groups[key].atti += 1;
+    groups[key].grammi += Number(act.weight || 0);
+    return groups;
+  }, {});
+  const byOperator = acts.reduce((groups, act) => {
+    const key = act.operatorUsername || act.operatorName || "Dato non inserito";
+    groups[key] ||= { operatore: key, fatturato: 0, atti: 0, grammi: 0 };
+    groups[key].fatturato += Number(act.amount || 0);
+    groups[key].atti += 1;
+    groups[key].grammi += Number(act.weight || 0);
+    return groups;
+  }, {});
+  const paymentSplit = acts.reduce((groups, act) => {
+    const key = act.paymentMethod || "Dato non inserito";
+    groups[key] = (groups[key] || 0) + Number(act.amount || 0);
+    return groups;
+  }, {});
+  return {
+    kpi: {
+      fatturato_giornaliero: sum(dailyActs, (act) => act.amount),
+      fatturato_mensile: sum(monthlyActs, (act) => act.amount),
+      numero_atti_giornalieri: dailyActs.length,
+      numero_atti_mensili: monthlyActs.length,
+      media_margine: 0,
+      grammi_giornalieri: weightByMetal(dailyMaterials),
+      grammi_mensili: weightByMetal(monthlyMaterials)
+    },
+    carature_frequenti: Object.entries(frequency).map(([titolo, count]) => ({ titolo, count })).sort((a, b) => b.count - a.count).slice(0, 8),
+    pagamenti: paymentSplit,
+    ranking_negozi: Object.values(byStore).sort((a, b) => b.fatturato - a.fatturato),
+    ranking_operatori: Object.values(byOperator).sort((a, b) => b.fatturato - a.fatturato)
+  };
+}
+
+async function createAntifraudAlert(input = {}) {
+  const duplicate = await pool.query(
+    `SELECT id FROM antifrode_alerts
+     WHERE COALESCE(atto_id, 0) = COALESCE($1, 0)
+       AND COALESCE(cliente_id, 0) = COALESCE($2, 0)
+       AND tipo_alert = $3
+       AND COALESCE(descrizione, '') = COALESCE($4, '')
+       AND stato IN ('nuovo', 'in verifica')
+     LIMIT 1`,
+    [input.atto_id || null, input.cliente_id || null, input.tipo_alert || "", input.descrizione || ""]
+  );
+  if (duplicate.rowCount) return null;
+  const result = await pool.query(
+    `INSERT INTO antifrode_alerts (cliente_id, atto_id, tipo_alert, livello, descrizione, stato, creato_da_sistema)
+     VALUES ($1,$2,$3,$4,$5,'nuovo',TRUE)
+     RETURNING *`,
+    [input.cliente_id || null, input.atto_id || null, input.tipo_alert, input.livello || "medio", input.descrizione || ""]
+  );
+  return result.rows[0];
+}
+
+async function scanAntifraud(user = {}) {
+  if (!canViewControlSections(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const values = [];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  const actsResult = await pool.query(
+    `SELECT * FROM ${actsTable} a
+     WHERE COALESCE(a.status, '') NOT ILIKE 'Bozza'
+       ${storeWhere}
+     ORDER BY a.updated_at DESC
+     LIMIT 500`,
+    values
+  );
+  let created = 0;
+  for (const row of actsResult.rows) {
+    const act = rowToAct(row);
+    if (act.documentExpiry && new Date(act.documentExpiry) < new Date()) {
+      if (await createAntifraudAlert({
+        cliente_id: row.cliente_id,
+        atto_id: row.id,
+        tipo_alert: "documento_scaduto",
+        livello: "alto",
+        descrizione: `Documento scaduto nell'atto ${act.practiceNumber}.`
+      })) created += 1;
+    }
+    if (Number(act.amount || 0) > 15000) {
+      if (await createAntifraudAlert({
+        cliente_id: row.cliente_id,
+        atto_id: row.id,
+        tipo_alert: "importo_anomalo",
+        livello: "medio",
+        descrizione: `Importo anomalo di ${act.amount} EUR nell'atto ${act.practiceNumber}.`
+      })) created += 1;
+    }
+    if (Number(act.weight || 0) > 500) {
+      if (await createAntifraudAlert({
+        cliente_id: row.cliente_id,
+        atto_id: row.id,
+        tipo_alert: "peso_anomalo",
+        livello: "medio",
+        descrizione: `Peso preziosi anomalo di ${act.weight} grammi nell'atto ${act.practiceNumber}.`
+      })) created += 1;
+    }
+  }
+  const cashResult = await pool.query("SELECT * FROM antiriciclaggio_alerts WHERE superamento > 0 ORDER BY created_at DESC LIMIT 100");
+  for (const alert of cashResult.rows) {
+    if (await createAntifraudAlert({
+      cliente_id: alert.cliente_id,
+      atto_id: alert.atto_id,
+      tipo_alert: "contanti_limite",
+      livello: "critico",
+      descrizione: `Cliente vicino o oltre limite contanti: totale previsto ${alert.totale_previsto} EUR, superamento ${alert.superamento} EUR.`
+    })) created += 1;
+  }
+  const repeatedClients = await pool.query(`
+    SELECT cliente_id, codice_fiscale, COUNT(*)::int AS count, MAX(id) AS atto_id
+    FROM ${actsTable}
+    WHERE data_atto >= CURRENT_DATE - INTERVAL '7 days'
+      AND COALESCE(status, '') NOT ILIKE 'Bozza'
+      AND codice_fiscale IS NOT NULL
+    GROUP BY cliente_id, codice_fiscale
+    HAVING COUNT(*) >= 3
+    LIMIT 50
+  `);
+  for (const row of repeatedClients.rows) {
+    if (await createAntifraudAlert({
+      cliente_id: row.cliente_id,
+      atto_id: row.atto_id,
+      tipo_alert: "atti_ravvicinati",
+      livello: "medio",
+      descrizione: `Cliente con ${row.count} atti negli ultimi 7 giorni.`
+    })) created += 1;
+  }
+  const duplicateIbans = await pool.query(`
+    SELECT iban, COUNT(DISTINCT codice_fiscale)::int AS clients
+    FROM ${actsTable}
+    WHERE iban IS NOT NULL AND iban <> ''
+    GROUP BY iban
+    HAVING COUNT(DISTINCT codice_fiscale) > 1
+    LIMIT 50
+  `);
+  for (const row of duplicateIbans.rows) {
+    if (await createAntifraudAlert({
+      tipo_alert: "iban_condiviso",
+      livello: "alto",
+      descrizione: `IBAN ${row.iban} usato da ${row.clients} clienti diversi.`
+    })) created += 1;
+  }
+  return { ok: true, created };
+}
+
+async function listAntifraudAlerts(user = {}) {
+  if (!canViewControlSections(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const values = [];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  const result = await pool.query(
+    `SELECT af.*, a.practice_number, a.store, a.cliente_nome, a.cliente_cognome
+     FROM antifrode_alerts af
+     LEFT JOIN ${actsTable} a ON a.id = af.atto_id
+     WHERE 1 = 1 ${storeWhere}
+     ORDER BY af.created_at DESC
+     LIMIT 200`,
+    values
+  );
+  return result.rows;
+}
+
+async function updateAntifraudAlert(id, input = {}, user = {}) {
+  if (!canViewControlSections(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `UPDATE antifrode_alerts
+     SET stato = COALESCE(NULLIF($2, ''), stato),
+         reviewed_by = $3,
+         reviewed_at = NOW()
+     WHERE id = $1
+     RETURNING *`,
+    [id, input.stato || input.status || "", user.id]
+  );
+  return result.rows[0] || null;
+}
+
+async function listTraining(user = {}) {
+  const courses = await pool.query(`
+    SELECT c.*, COALESCE(r.score, 0) AS score, COALESCE(r.completed, FALSE) AS completed, r.completed_at
+    FROM training_courses c
+    LEFT JOIN training_results r ON r.course_id = c.id AND r.user_id = $1
+    WHERE c.active = TRUE
+    ORDER BY c.created_at DESC
+  `, [user.id]);
+  return { courses: courses.rows };
+}
+
+async function createTrainingCourse(input = {}, user = {}) {
+  if (!["founder"].includes(normalizeRole(user.ruolo))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `INSERT INTO training_courses (title, category, description, created_by)
+     VALUES ($1,$2,$3,$4)
+     RETURNING *`,
+    [input.title || "", input.category || "procedure OroActive", input.description || "", user.id]
+  );
+  return result.rows[0];
+}
+
+async function saveTrainingResult(input = {}, user = {}) {
+  const result = await pool.query(
+    `INSERT INTO training_results (user_id, course_id, score, completed, completed_at, payload)
+     VALUES ($1,$2,$3,$4,CASE WHEN $4 THEN NOW() ELSE NULL END,$5)
+     RETURNING *`,
+    [user.id, input.course_id, numberFrom(input.score), Boolean(input.completed), input.payload || {}]
+  );
+  return result.rows[0];
+}
+
+async function crmClients(user = {}, query = {}) {
+  const values = [];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  let searchWhere = "";
+  if (query.q) {
+    values.push(`%${String(query.q).toLowerCase()}%`);
+    const parameter = `$${values.length}`;
+    searchWhere = ` AND (
+      LOWER(COALESCE(c.nome, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(c.cognome, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(c.codice_fiscale, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(c.telefono, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(c.email, '')) LIKE ${parameter}
+    )`;
+  }
+  const result = await pool.query(
+    `SELECT c.*,
+            COUNT(a.id)::int AS atti_count,
+            COALESCE(SUM(a.totale), 0)::numeric AS totale_pagato,
+            MAX(a.data_atto) AS ultimo_atto
+     FROM clienti c
+     LEFT JOIN ${actsTable} a ON UPPER(a.codice_fiscale) = UPPER(c.codice_fiscale)
+     WHERE 1 = 1 ${storeWhere} ${searchWhere}
+     GROUP BY c.id
+     ORDER BY ultimo_atto DESC NULLS LAST, c.updated_at DESC
+     LIMIT 100`,
+    values
+  );
+  return {
+    clients: result.rows.map((row) => ({
+      ...publicClient(row),
+      livello_cliente: row.livello_cliente || "nuovo",
+      atti_count: row.atti_count,
+      totale_pagato: Number(row.totale_pagato || 0),
+      ultimo_atto: row.ultimo_atto,
+      prossima_azione: row.prossima_azione || ""
+    }))
+  };
+}
+
+async function crmClientDetail(id, user = {}) {
+  const clientResult = await pool.query("SELECT * FROM clienti WHERE id = $1", [id]);
+  const client = clientResult.rows[0];
+  if (!client) return null;
+  const values = [client.codice_fiscale || ""];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  const acts = await pool.query(
+    `SELECT * FROM ${actsTable} a
+     WHERE UPPER(a.codice_fiscale) = UPPER($1) ${storeWhere}
+     ORDER BY a.data_atto DESC NULLS LAST`,
+    values
+  );
+  const notes = await pool.query("SELECT * FROM client_notes WHERE cliente_id = $1 ORDER BY created_at DESC LIMIT 50", [id]);
+  return { client: publicClient(client), acts: acts.rows.map((row) => rowToAct(row, { full: false })), notes: notes.rows };
+}
+
+async function addClientNote(id, input = {}, user = {}) {
+  const result = await pool.query(
+    `INSERT INTO client_notes (cliente_id, user_id, note)
+     VALUES ($1,$2,$3)
+     RETURNING *`,
+    [id, user.id, input.note || ""]
+  );
+  return result.rows[0];
+}
+
+async function createInventoryTransfer(input = {}, user = {}) {
+  if (!["founder", "supervisore"].includes(normalizeRole(user.ruolo))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `INSERT INTO giacenza_trasferimenti
+      (negozio_partenza_id, negozio_destinazione_id, metallo, titolo, grammi, data_trasferimento, operatore_id, note)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     RETURNING *`,
+    [
+      input.negozio_partenza_id || null,
+      input.negozio_destinazione_id || null,
+      input.metallo || "",
+      input.titolo || "",
+      numberFrom(input.grammi),
+      input.data_trasferimento || new Date().toISOString().slice(0, 10),
+      user.id,
+      input.note || ""
+    ]
+  );
+  return result.rows[0];
+}
+
 function titlePurity(metal, title = "") {
   const clean = String(title || "").toLowerCase().replace(",", ".").trim();
   const kt = clean.match(/(\d+(?:\.\d+)?)\s*kt/);
@@ -1941,15 +2473,16 @@ async function saveAct(input, user) {
     throw error;
   }
   if (existing) return updateAct(existing.id, protectedInput, user);
-  const act = normalizeAct(protectedInput, existing);
+  const act = await enrichActStore(normalizeAct(protectedInput, existing), user);
   const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing);
   const result = await pool.query(
     `INSERT INTO ${actsTable} (
       cliente_nome, cliente_cognome, codice_fiscale, telefono,
       peso_oro, quotazione, totale, data_atto,
       practice_number, store, store_code, act_year, act_number,
-      payment_method, status, iban, payload
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+      payment_method, status, iban, payload,
+      negozio_id, codice_negozio, numero_atto_negozio, operatore_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
     RETURNING *`,
     [
       act.clienteNome,
@@ -1968,7 +2501,11 @@ async function saveAct(input, user) {
       act.paymentMethod,
       act.status,
       act.iban,
-      act.payload
+      act.payload,
+      act.negozioId,
+      act.codiceNegozio,
+      act.numeroAttoNegozio,
+      act.operatoreId
     ]
   );
   if (!isDraftLikeStatus(act.status)) await saveAmlAlert({ check: amlCheck, act, user, attoId: result.rows[0].id });
@@ -1998,7 +2535,7 @@ async function updateAct(identifier, input, user) {
     error.status = 403;
     throw error;
   }
-  const act = normalizeAct(enforceActStore(input, user), existing);
+  const act = await enrichActStore(normalizeAct(enforceActStore(input, user), existing), user);
   await enforceCashAntiMoneyLaundering(act, user, existing);
   const result = await pool.query(
     `UPDATE ${actsTable} SET
@@ -2019,6 +2556,10 @@ async function updateAct(identifier, input, user) {
       status = $16,
       iban = $17,
       payload = $18,
+      negozio_id = $19,
+      codice_negozio = $20,
+      numero_atto_negozio = $21,
+      operatore_id = $22,
       updated_at = NOW()
      WHERE id = $1
      RETURNING *`,
@@ -2040,7 +2581,11 @@ async function updateAct(identifier, input, user) {
       act.paymentMethod,
       act.status,
       act.iban,
-      act.payload
+      act.payload,
+      act.negozioId,
+      act.codiceNegozio,
+      act.numeroAttoNegozio,
+      act.operatoreId
     ]
   );
   if (!result.rowCount) return null;
@@ -2086,13 +2631,14 @@ async function createUser(input, actor) {
   const role = normalizeRole(input.ruolo);
   const allowedRoles = managedRolesForActor(actor);
   const finalRole = allowedRoles.includes(role) ? role : allowedRoles.at(-1) || "commesso";
-  const finalStore = roleSeesAllStores(finalRole) ? "Tutti" : input.negozio || "Busto Arsizio";
+  const store = roleSeesAllStores(finalRole) ? null : await storeByCodeOrName(input.negozio || input.negozio_id || "Busto Arsizio");
+  const finalStore = roleSeesAllStores(finalRole) ? "Tutti" : store?.nome || input.negozio || "Busto Arsizio";
   const username = String(input.username || "").trim();
   const generatedEmail = `${username || `utente-${Date.now()}`}@oroactive.local`;
   const result = await pool.query(
-    `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
-     VALUES ($1, $2, NULLIF($3, ''), LOWER($4), $5, $6, $7)
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen`,
+    `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio, negozio_id)
+     VALUES ($1, $2, NULLIF($3, ''), LOWER($4), $5, $6, $7, $8)
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
     [
       input.nome || "",
       input.cognome || "",
@@ -2100,7 +2646,8 @@ async function createUser(input, actor) {
       generatedEmail,
       passwordHash,
       finalRole,
-      finalStore
+      finalStore,
+      store?.id || null
     ]
   );
   return publicUser(result.rows[0]);
@@ -2133,14 +2680,25 @@ async function updateUser(id, input, actor) {
   const fields = [];
   const values = [];
   const allowed = ["nome", "cognome", "username", "ruolo", "negozio"];
+  let selectedStore = null;
+  if (input.negozio !== undefined || input.negozio_id !== undefined) {
+    selectedStore = await storeByCodeOrName(input.negozio_id || input.negozio);
+  }
   allowed.forEach((field) => {
     if (input[field] === undefined) return;
     let value = input[field];
     if (field === "ruolo") value = normalizeRole(value);
-    if (field === "negozio" && roleSeesAllStores(input.ruolo || target.ruolo)) value = "Tutti";
+    if (field === "negozio") {
+      value = roleSeesAllStores(input.ruolo || target.ruolo) ? "Tutti" : selectedStore?.nome || value;
+    }
     values.push(field === "username" && !value ? null : value);
     fields.push(`${field} = $${values.length}`);
   });
+  if (input.negozio !== undefined || input.negozio_id !== undefined || input.ruolo !== undefined) {
+    const finalRole = normalizeRole(input.ruolo || target.ruolo);
+    values.push(roleSeesAllStores(finalRole) ? null : selectedStore?.id || target.negozio_id || null);
+    fields.push(`negozio_id = $${values.length}`);
+  }
 
   if (input.password) {
     values.push(await bcrypt.hash(String(input.password), 12));
@@ -2151,7 +2709,7 @@ async function updateUser(id, input, actor) {
   values.push(id);
   const result = await pool.query(
     `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen`,
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
     values
   );
   return result.rowCount ? publicUser(result.rows[0]) : null;
@@ -2160,7 +2718,7 @@ async function updateUser(id, input, actor) {
 async function listUsers(options = {}) {
   const where = options.includeFounder ? "" : "WHERE ruolo <> 'founder'";
   const result = await pool.query(
-    `SELECT id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen FROM utenti ${where} ORDER BY data_creazione DESC`
+    `SELECT id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen FROM utenti ${where} ORDER BY data_creazione DESC`
   );
   return result.rows.map(publicUser);
 }
@@ -2178,7 +2736,7 @@ async function listUsersForActor(actor) {
     where += " AND negozio = $2";
   }
   const result = await pool.query(
-    `SELECT id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen
+    `SELECT id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen
      FROM utenti ${where}
      ORDER BY data_creazione DESC`,
     values
@@ -2230,7 +2788,7 @@ async function registerFaceId(user, credentialId) {
   }
   const result = await pool.query(
     `UPDATE utenti SET face_id_credential = $2 WHERE id = $1
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, face_id_credential, data_creazione, last_seen`,
+     RETURNING id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
     [user.id, credential]
   );
   return publicUser(result.rows[0]);
@@ -2286,6 +2844,124 @@ app.use("/api", authenticate);
 app.get("/api/antiriciclaggio/contanti-check", async (request, response, next) => {
   try {
     response.json(await cashAntiMoneyLaunderingCheck(request.query));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/dashboard", async (request, response, next) => {
+  try {
+    response.json(await dashboardKpis(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/negozi", async (request, response, next) => {
+  try {
+    response.json({ stores: await listStores(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/negozi", requireFounder, async (request, response, next) => {
+  try {
+    response.status(201).json(await createStore(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/negozi/:id", requireFounder, async (request, response, next) => {
+  try {
+    const store = await updateStore(request.params.id, request.body, request.user);
+    if (!store) return response.status(404).json({ error: "Negozio non trovato" });
+    response.json(store);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/antifrode", async (request, response, next) => {
+  try {
+    response.json({ alerts: await listAntifraudAlerts(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/antifrode/scan", async (request, response, next) => {
+  try {
+    response.json(await scanAntifraud(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/antifrode/:id", async (request, response, next) => {
+  try {
+    const alert = await updateAntifraudAlert(request.params.id, request.body, request.user);
+    if (!alert) return response.status(404).json({ error: "Alert non trovato" });
+    response.json(alert);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/training", async (request, response, next) => {
+  try {
+    response.json(await listTraining(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/training/courses", async (request, response, next) => {
+  try {
+    response.status(201).json(await createTrainingCourse(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/training/results", async (request, response, next) => {
+  try {
+    response.status(201).json(await saveTrainingResult(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/crm/clienti", async (request, response, next) => {
+  try {
+    response.json(await crmClients(request.user, request.query));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/crm/clienti/:id", async (request, response, next) => {
+  try {
+    const detail = await crmClientDetail(request.params.id, request.user);
+    if (!detail) return response.status(404).json({ error: "Cliente non trovato" });
+    response.json(detail);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/crm/clienti/:id/note", async (request, response, next) => {
+  try {
+    response.status(201).json(await addClientNote(request.params.id, request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/giacenza/trasferimenti", async (request, response, next) => {
+  try {
+    response.status(201).json(await createInventoryTransfer(request.body, request.user));
   } catch (error) {
     next(error);
   }
@@ -2876,9 +3552,10 @@ app.post("/api/pdf/acts", async (request, response, next) => {
 
 app.get(["/api/atti/next-number", "/api/acts/next-number"], async (request, response, next) => {
   try {
+    const userStore = await storeForUser(request.user);
     const storeCode = roleSeesAllStores(request.user.ruolo)
-      ? String(request.query.storeCode || "")
-      : storeCodeFromName(request.user.negozio);
+      ? String(request.query.storeCode || userStore?.codice || "BUSTO")
+      : userStore?.codice || storeCodeFromName(request.user.negozio);
     const year = Number(request.query.year || new Date().getFullYear());
     response.json({ nextNumber: await nextActNumber(storeCode, year) });
   } catch (error) {
