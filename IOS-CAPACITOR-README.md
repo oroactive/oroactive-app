@@ -43,10 +43,16 @@ npm run ios:open
 L'app nativa usa il backend esistente. In ambiente nativo il frontend punta a:
 
 ```text
-https://app.oroactive.it/api
+API_BASE_URL = https://app.oroactive.it
 ```
 
-Se il dominio cambia, aggiornare `apiBase` in `app.js` oppure impostare `window.OROACTIVE_API_BASE` prima del caricamento di `app.js`.
+Tutte le chiamate vengono composte come:
+
+```text
+https://app.oroactive.it/api/...
+```
+
+Se il dominio cambia, aggiornare `API_BASE_URL` in `app.js` oppure impostare `window.OROACTIVE_API_BASE_URL` prima del caricamento di `app.js`.
 
 ## Permessi iOS da verificare in Xcode
 

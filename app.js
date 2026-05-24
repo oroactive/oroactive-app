@@ -197,8 +197,13 @@ const documentLabels = {
   Patente: "patente",
   Passaporto: "passaporto"
 };
-const apiBase = window.OROACTIVE_API_BASE
-  || (window.Capacitor?.isNativePlatform?.() ? "https://app.oroactive.it/api" : "/api");
+const API_BASE_URL = (
+  window.OROACTIVE_API_BASE_URL
+  || window.OROACTIVE_API_BASE
+  || (window.Capacitor ? "https://app.oroactive.it" : window.location.origin)
+).replace(/\/+$/, "").replace(/\/api$/i, "");
+const apiBase = `${API_BASE_URL}/api`;
+console.log("API_BASE_URL", API_BASE_URL);
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
@@ -410,6 +415,12 @@ function shouldRetryApi(error, responseStatus) {
   return error?.name === "AbortError" || !navigator.onLine || !responseStatus || responseStatus >= 500 || responseStatus === 429;
 }
 
+function serverConnectionError() {
+  const error = new Error("Connessione al server OroActive non riuscita");
+  error.isConnectionError = true;
+  return error;
+}
+
 function sanitizeForSave(value) {
   if (value === undefined) return null;
   if (value === null) return null;
@@ -454,13 +465,15 @@ async function apiRequest(path, options = {}) {
         await wait(350 * attempt);
         continue;
       }
-      if (error.name === "AbortError") throw new Error("Connessione lenta: salvataggio in ritardo, riprovo automaticamente.");
+      if (error.name === "AbortError" || error instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(error.message || "")) {
+        throw serverConnectionError();
+      }
       throw error;
     } finally {
       window.clearTimeout(timeout);
     }
   }
-  throw lastError || new Error("Errore comunicazione server");
+  throw lastError || serverConnectionError();
 }
 
 function mergeActsIntoCache(acts = []) {
@@ -1410,7 +1423,11 @@ async function handleLogin(event) {
     loginForm.reset();
     await startAuthenticatedApp();
   } catch (error) {
-    loginMessage.textContent = error.message || "Accesso non riuscito.";
+    loginMessage.textContent = error.status === 401
+      ? "Credenziali non valide"
+      : error.isConnectionError
+        ? "Connessione al server OroActive non riuscita"
+        : error.message || "Accesso non riuscito.";
   }
 }
 
@@ -1513,7 +1530,11 @@ async function loginWithFaceId() {
     localStorage.setItem("oroactive-faceid-credential", credentialId);
     await startAuthenticatedApp();
   } catch (error) {
-    loginMessage.textContent = error.message || "Accesso Face ID non riuscito.";
+    loginMessage.textContent = error.status === 401
+      ? "Credenziali non valide"
+      : error.isConnectionError
+        ? "Connessione al server OroActive non riuscita"
+        : error.message || "Accesso Face ID non riuscito.";
   }
 }
 
