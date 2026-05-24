@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17130d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="OroActive">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="OroActive">
+  <meta name="format-detection" content="telephone=no">
+  <title>OroActive Gestionale</title>
+  <link rel="manifest" href="manifest.json?v=20260523-1">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <link rel="stylesheet" href="styles.css?v=20260523-25">
+  <script src="capacitor-native.js?v=20260524-ios-1"></script>
+</head>
+<body>
+  <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
+    <form class="login-card" id="loginForm">
+      <img src="oroactive-logo.png" alt="OroActive Compro Oro">
+      <p class="eyebrow">Accesso riservato</p>
+      <h1>Gestionale OroActive</h1>
+      <label>Nome utente <input id="loginUsername" type="text" autocomplete="username" required></label>
+      <label>Password <input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <button class="primary-button" type="submit">Accedi</button>
+      <button class="ghost-button" type="button" id="faceIdLoginButton">Accedi con Face ID</button>
+      <p class="login-message" id="loginMessage"></p>
+    </form>
+  </section>
+
+  <section class="splash-screen" id="splashScreen" aria-label="Accesso OroActive">
+    <button class="splash-logo-button" id="enterSoftware" type="button" aria-label="Entra nel software OroActive">
+      <img src="oroactive-logo.png" alt="OroActive Compro Oro">
+    </button>
+    <p class="splash-motto">La differenza non la fanno i preziosi che acquisti, ma il valore che porti ogni giorno.<br>Cresci come persona, evolvi come professionista, brilla come OroActive.</p>
+    <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
+  </section>
+
+  <section class="main-menu-screen" id="mainMenuScreen" hidden aria-label="Menu principale OroActive">
+    <div class="main-menu-clock" id="mainMenuClock" aria-live="off">--:--:--</div>
+    <div class="main-user-menu">
+      <button class="main-user-button" id="mainUserMenuButton" type="button" aria-expanded="false" aria-controls="mainUserDropdown">Utente</button>
+      <div class="main-user-dropdown" id="mainUserDropdown" hidden>
+        <button type="button" data-user-profile>Dati utente</button>
+        <button class="admin-only" type="button" data-user-users>Utenti</button>
+        <button type="button" data-user-logout>Logout</button>
+      </div>
+    </div>
+    <div class="main-menu-inner">
+      <img class="main-menu-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
+      <nav class="main-menu-actions">
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="salesSubmenu" aria-expanded="false">Atti di vendita</button>
+          <div class="main-menu-submenu" id="salesSubmenu" hidden>
+            <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
+            <button type="button" data-section="practice">Nuovo atto di vendita</button>
+            <button type="button" data-section="archive">Elenco</button>
+            <button type="button" data-section="fusion">Giacenza</button>
+          </div>
+        </div>
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="toolsSubmenu" aria-expanded="false">Strumenti</button>
+          <div class="main-menu-submenu" id="toolsSubmenu" hidden>
+            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button class="founder-only" type="button" data-section="backups">Backup</button>
+            <button type="button" data-section="crm">CRM Clienti</button>
+            <button class="founder-only" type="button" data-section="stores">Negozi</button>
+            <button type="button" data-section="quotazione">Quotazione</button>
+          </div>
+        </div>
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="trainingSubmenu" aria-expanded="false">Formazione</button>
+          <div class="main-menu-submenu" id="trainingSubmenu" hidden>
+            <button type="button" data-section="assistant">Assistente IA OroActive</button>
+            <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+            <button type="button" data-section="training">Formazione Staff</button>
+            <button type="button" data-start-tutorial>Tutorial</button>
+          </div>
+        </div>
+      </nav>
+    </div>
+    <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
+  </section>
+
+  <div class="app-shell">
+    <div class="session-username" id="sessionUsername"></div>
+    <aside class="sidebar" aria-label="Navigazione principale">
+      <div class="brand-wrap">
+        <button class="brand" id="brandMenuButton" type="button" aria-expanded="false" aria-controls="brandDropdown">
+          <img class="brand-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
+          <div>
+            <strong>OroActive</strong>
+            <span>Compro Oro</span>
+          </div>
+        </button>
+        <div class="brand-dropdown" id="brandDropdown" hidden>
+          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandSalesSubmenu" aria-expanded="false">Atti di vendita</button>
+          <div class="brand-submenu" id="brandSalesSubmenu" hidden>
+            <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
+            <button type="button" data-section="practice">Nuovo atto di vendita</button>
+            <button type="button" data-section="archive">Elenco</button>
+            <button type="button" data-section="fusion">Giacenza</button>
+          </div>
+          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandToolsSubmenu" aria-expanded="false">Strumenti</button>
+          <div class="brand-submenu" id="brandToolsSubmenu" hidden>
+            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button class="founder-only" type="button" data-section="backups">Backup</button>
+            <button type="button" data-section="crm">CRM Clienti</button>
+            <button class="founder-only" type="button" data-section="stores">Negozi</button>
+            <button type="button" data-section="quotazione">Quotazione</button>
+          </div>
+          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandTrainingSubmenu" aria-expanded="false">Formazione</button>
+          <div class="brand-submenu" id="brandTrainingSubmenu" hidden>
+            <button type="button" data-section="assistant">Assistente IA OroActive</button>
+            <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+            <button type="button" data-section="training">Formazione Staff</button>
+            <button type="button" data-start-tutorial>Tutorial</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="operator">
+        <span>Accesso</span>
+        <strong id="operatorStoreName">Negozio Busto Arsizio</strong>
+        <small id="loggedUserName"></small>
+        <button class="faceid-button" type="button" id="registerFaceIdButton">Registra Face ID</button>
+        <button class="tutorial-sidebar-button" type="button" data-start-tutorial>Tutorial</button>
+        <button class="logout-button" type="button" id="logoutButton">Logout</button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar" id="practiceTopbar">
+        <div class="title-block">
+          <img class="top-logo" src="oroactive-logo.png" alt="">
+          <div>
+            <p class="eyebrow">Gestionale OroActive</p>
+            <h1>Atto di Vendita</h1>
+          </div>
+        </div>
+      </header>
+
+      <section id="practice" class="screen active-screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <ol class="stepper" aria-label="Stato pratica">
+          <li class="step active" data-step="0"><span>1</span>Cliente</li>
+          <li class="step" data-step="1"><span>2</span>Vendita</li>
+          <li class="step" data-step="2"><span>3</span>Firme</li>
+          <li class="step" data-step="3"><span>4</span>Documenti</li>
+          <li class="step" data-step="4"><span>5</span>Riepilogo</li>
+        </ol>
+
+        <div class="practice-layout">
+          <section class="form-panel">
+            <div class="form-step active-step" data-step-panel="0">
+              <div class="panel-heading client-panel-heading">
+                <div>
+                  <p class="eyebrow">Step 1</p>
+                  <h2>Scheda cliente</h2>
+                </div>
+                <span class="status-pill">Compilazione manuale</span>
+              </div>
+
+              <div class="practice-meta">
+                <div class="practice-meta-row">
+                  <label>Negozio
+                    <select id="storeCode">
+                      <option value="BUSTO" selected>Busto Arsizio</option>
+                      <option value="CASSANO">Cassano Magnago</option>
+                      <option value="LEGNANO">Legnano</option>
+                    </select>
+                  </label>
+                  <label>Atto di vendita n. <input id="practiceNumber" readonly></label>
+                </div>
+                <div class="practice-meta-row">
+                  <label>Data compilazione <input id="practiceDate" type="date"></label>
+                  <label>Ora compilazione <input id="practiceTime" type="time"></label>
+                </div>
+              </div>
+
+              <div class="field-grid two">
+                <label>Nome <input name="nome"></label>
+                <label>Cognome <input name="cognome"></label>
+                <label class="birth-date-field">Data di nascita
+                  <span class="date-input-frame"><input type="date" name="nascita"></span>
+                </label>
+                <div class="birth-place-row">
+                  <label>Luogo di nascita <input name="luogo" list="citySuggestions" autocomplete="off"></label>
+                  <label>Provincia
+                    <select name="provinciaNascita" id="birthProvince">
+                      <option value="">Seleziona</option>
+                      <option>AG</option><option>AL</option><option>AN</option><option>AO</option><option>AR</option><option>AP</option><option>AT</option><option>AV</option>
+                      <option>BA</option><option>BT</option><option>BL</option><option>BN</option><option>BG</option><option>BI</option><option>BO</option><option>BZ</option><option>BS</option><option>BR</option>
+                      <option>CA</option><option>CL</option><option>CB</option><option>CI</option><option>CE</option><option>CT</option><option>CZ</option><option>CH</option><option>CO</option><option>CS</option><option>CR</option><option>KR</option><option>CN</option>
+                      <option>EN</option><option>FM</option><option>FE</option><option>FI</option><option>FG</option><option>FC</option><option>FR</option>
+                      <option>GE</option><option>GO</option><option>GR</option><option>IM</option><option>IS</option><option>SP</option><option>AQ</option><option>LT</option><option>LE</option><option>LC</option><option>LI</option><option>LO</option><option>LU</option>
+                      <option>MC</option><option>MN</option><option>MS</option><option>MT</option><option>ME</option><option>MI</option><option>MO</option><option>MB</option>
+                      <option>NA</option><option>NO</option><option>NU</option><option>OR</option><option>PD</option><option>PA</option><option>PR</option><option>PV</option><option>PG</option><option>PU</option><option>PE</option><option>PC</option><option>PI</option><option>PT</option><option>PN</option><option>PZ</option><option>PO</option>
+                      <option>RG</option><option>RA</option><option>RC</option><option>RE</option><option>RI</option><option>RN</option><option>RM</option><option>RO</option>
+                      <option>SA</option><option>SS</option><option>SV</option><option>SI</option><option>SR</option><option>SO</option><option>SU</option>
+                      <option>TA</option><option>TE</option><option>TR</option><option>TO</option><option>TP</option><option>TN</option><option>TV</option><option>TS</option>
+                      <option>UD</option><option>VA</option><option>VE</option><option>VB</option><option>VC</option><option>VR</option><option>VV</option><option>VI</option><option>VT</option>
+                    </select>
+                  </label>
+                </div>
+                <label>Codice fiscale <input name="cf"></label>
+                <label>Telefono <input name="telefono"></label>
+                <label>Email <input name="email" type="email"></label>
+                <label>Nazionalit&agrave; <input name="cittadinanza"></label>
+                <label>Sesso
+                  <select name="sesso">
+                    <option value="">Seleziona</option>
+                    <option value="M">M</option>
+                    <option value="F">F</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="field-grid">
+                <div class="birth-place-row">
+                  <label>Indirizzo di residenza <input name="indirizzo" placeholder="Via (nome della via), (numero civico), (Città di residenza)"></label>
+                  <label>Provincia
+                    <select name="provinciaResidenza" id="residenceProvince">
+                      <option value="">Seleziona</option>
+                      <option>AG</option><option>AL</option><option>AN</option><option>AO</option><option>AR</option><option>AP</option><option>AT</option><option>AV</option>
+                      <option>BA</option><option>BT</option><option>BL</option><option>BN</option><option>BG</option><option>BI</option><option>BO</option><option>BZ</option><option>BS</option><option>BR</option>
+                      <option>CA</option><option>CL</option><option>CB</option><option>CI</option><option>CE</option><option>CT</option><option>CZ</option><option>CH</option><option>CO</option><option>CS</option><option>CR</option><option>KR</option><option>CN</option>
+                      <option>EN</option><option>FM</option><option>FE</option><option>FI</option><option>FG</option><option>FC</option><option>FR</option>
+                      <option>GE</option><option>GO</option><option>GR</option><option>IM</option><option>IS</option><option>SP</option><option>AQ</option><option>LT</option><option>LE</option><option>LC</option><option>LI</option><option>LO</option><option>LU</option>
+                      <option>MC</option><option>MN</option><option>MS</option><option>MT</option><option>ME</option><option>MI</option><option>MO</option><option>MB</option>
+                      <option>NA</option><option>NO</option><option>NU</option><option>OR</option><option>PD</option><option>PA</option><option>PR</option><option>PV</option><option>PG</option><option>PU</option><option>PE</option><option>PC</option><option>PI</option><option>PT</option><option>PN</option><option>PZ</option><option>PO</option>
+                      <option>RG</option><option>RA</option><option>RC</option><option>RE</option><option>RI</option><option>RN</option><option>RM</option><option>RO</option>
+                      <option>SA</option><option>SS</option><option>SV</option><option>SI</option><option>SR</option><option>SO</option><option>SU</option>
+                      <option>TA</option><option>TE</option><option>TR</option><option>TO</option><option>TP</option><option>TN</option><option>TV</option><option>TS</option>
+                      <option>UD</option><option>VA</option><option>VE</option><option>VB</option><option>VC</option><option>VR</option><option>VV</option><option>VI</option><option>VT</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div class="field-grid three">
+                <label>Tipo documento
+                  <select name="tipoDocumento" id="documentType">
+                    <option>Carta identita</option>
+                    <option>Patente</option>
+                    <option>Passaporto</option>
+                  </select>
+                </label>
+                <label>Numero documento <input name="numeroDocumento"></label>
+                <label>Data rilascio <input type="date" name="dataRilascioDocumento"></label>
+                <label class="document-expiry-field">Scadenza <input type="date" name="scadenzaDocumento"></label>
+                <div class="document-expiry-warning" id="documentExpiryWarning" hidden>Documento scaduto. Richiedere un documento valido ai sensi di legge.</div>
+                <label>Professione lavorativa
+                  <select name="professione">
+                    <option>Autonomo</option>
+                    <option>Dipendente</option>
+                    <option>Disoccupato</option>
+                    <option>Pensionato</option>
+                    <option>Studente</option>
+                  </select>
+                </label>
+              </div>
+
+              <section class="ceded-items-panel" aria-labelledby="cededItemsTitle">
+                <div class="subsection-heading">
+                  <div>
+                    <p class="eyebrow">Oggetti ceduti</p>
+                    <h3 id="cededItemsTitle">Il cliente cede i seguenti oggetti preziosi</h3>
+                  </div>
+                  <button class="small-button" id="addCededItem" type="button">Aggiungi riga</button>
+                </div>
+
+                <div class="ceded-items-table" id="cededItemsTable">
+                  <div class="ceded-items-head">
+                    <span>N.</span>
+                    <span>Descrizione oggetto</span>
+                    <span>Metallo</span>
+                    <span>Titolo</span>
+                    <span></span>
+                  </div>
+                  <article class="ceded-item-row">
+                    <strong class="row-number">1</strong>
+                    <label>Descrizione oggetto <input></label>
+                    <label>Metallo
+                      <select>
+                        <option>Oro</option>
+                        <option>Argento</option>
+                        <option>Platino</option>
+                      </select>
+                    </label>
+                    <label>Titolo
+                      <select>
+                        <option>24 kt</option>
+                        <option>22 kt</option>
+                        <option>21 kt</option>
+                        <option selected>18 kt</option>
+                        <option>14 kt</option>
+                        <option>12 kt</option>
+                        <option>9 kt</option>
+                        <option>6 kt</option>
+                      </select>
+                    </label>
+                    <button class="remove-row" type="button" aria-label="Rimuovi riga" disabled>-</button>
+                  </article>
+                </div>
+                <div class="internal-weight">
+                  <div>
+                    <span class="internal-badge">Dato interno</span>
+                    <p>Viene stampato sulla copia cliente solo se autorizzato con la casella dedicata.</p>
+                  </div>
+                  <div class="weight-fields">
+                    <div id="totalWeightFields" class="metal-weight-fields"></div>
+                    <label class="inline-check"><input id="printWeightCustomer" type="checkbox"> Stampa peso totale su copia cliente</label>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="form-step" data-step-panel="1">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 2</p>
+                  <h2>Pagamento e note vendita</h2>
+                </div>
+                <span class="status-pill">Oggetti inseriti nella scheda cliente</span>
+              </div>
+
+              <div class="field-grid two">
+                <label>Metodo pagamento
+                  <select id="paymentMethod">
+                    <option>Bonifico</option>
+                    <option>Contanti nei limiti di legge</option>
+                    <option>Assegno</option>
+                  </select>
+                </label>
+                <label>Totale corrisposto <input id="saleTotal" type="number" min="0" step="0.01"></label>
+                <label class="iban-field" id="ibanField" hidden>IBAN
+                  <input id="paymentIban" name="iban" inputmode="text" autocomplete="off" placeholder="IT00X0000000000000000000000">
+                </label>
+              </div>
+              <div class="aml-cash-alert" id="amlCashAlert" hidden aria-live="polite"></div>
+              <div class="material-amount-panel" id="materialAmountPanel" hidden>
+                <span class="internal-badge">Ripartizione importo</span>
+                <div id="materialAmountFields" class="material-amount-fields"></div>
+              </div>
+
+              <label class="textarea-label">Note operatore
+                <textarea></textarea>
+              </label>
+            </div>
+
+            <div class="form-step" data-step-panel="2">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 3</p>
+                  <h2>Firma cliente</h2>
+                </div>
+                <span class="status-pill warning" id="signatureStatus">3 firme richieste</span>
+              </div>
+
+              <section class="legal-text" aria-label="Testo dichiarazioni cliente">
+                <p>Gli oggetti venduti sopra descritti sono usati e/o in cattivo stato di conservazione. Autorizzo la loro ulteriore alterazione per poter eseguire il test di verifica del metallo, determinarne il titolo e calcolarne il prezzo. Dichiaro inoltre che gli stessi sopra indicati oggetti non sono di illecita provenienza, di essere in possesso di tutti i diritti atti alla vendita degli stessi e di accettare e consentire il trattamento dei propri dati personali (Legge 196/03). La presente vale quale ricevuta e saldo per la somma riportata alla voce prezzo complessivo. Il venditore si obbliga fin da ora a restituire il ricavato della vendita qualora, a seguito di controlli di verifica, risulti che gli oggetti consegnati non siano corrispondenti nel valore e nella qualità a quelli dichiarati al momento della vendita e/o risultino di non essere di metallo prezioso. Dichiaro infine di aver letto attentamente quanto sopra riportato e che ai sensi e per gli effetti degli art. 1341 e 1342 del c.c. approvo incondizionatamente.</p>
+              </section>
+
+              <div class="signature-grid">
+                <div class="signature-box">
+                  <div>
+                    <strong>Firma vendita</strong>
+                    <span>Conferma dati e cessione beni</span>
+                  </div>
+                  <canvas width="520" height="160" data-signature="0"></canvas>
+                  <button type="button" class="clear-signature">Cancella</button>
+                </div>
+                <div class="signature-box">
+                  <div>
+                    <strong>Firma dichiarazioni</strong>
+                    <span>Proprieta e provenienza lecita</span>
+                  </div>
+                  <canvas width="520" height="160" data-signature="1"></canvas>
+                  <button type="button" class="clear-signature">Cancella</button>
+                </div>
+                <div class="signature-box">
+                  <div>
+                    <strong>Firma privacy</strong>
+                    <span>Consenso trattamento dati</span>
+                  </div>
+                  <canvas width="520" height="160" data-signature="2"></canvas>
+                  <button type="button" class="clear-signature">Cancella</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-step" data-step-panel="3">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 4</p>
+                  <h2>Documenti e fotografie</h2>
+                </div>
+                <span class="status-pill">Allegati alla pratica</span>
+              </div>
+
+              <div class="capture-grid">
+                <div class="capture-combo-card" data-capture-group="identity">
+                  <div>
+                    <span>Documento</span>
+                    <strong id="identityDocumentGroupTitle">Documento identit&agrave; / patente / passaporto</strong>
+                    <em>Carica o scatta fronte e retro manualmente.</em>
+                  </div>
+                  <label class="capture-card" data-document-capture="fronte" data-capture-key="documento-fronte-carta-identita">
+                    <input type="file" accept="image/*" capture="environment">
+                    <span>Fronte</span>
+                    <strong>Fronte carta identita</strong>
+                    <em>Tocca per fotografare</em>
+                  </label>
+                  <label class="capture-card" data-document-capture="retro" data-capture-key="documento-retro-carta-identita">
+                    <input type="file" accept="image/*" capture="environment">
+                    <span>Retro</span>
+                    <strong>Retro carta identita</strong>
+                    <em>Tocca per fotografare</em>
+                  </label>
+                </div>
+                <div class="capture-combo-card" data-capture-group="fiscal">
+                  <div>
+                    <span>Codice fiscale</span>
+                    <strong>Codice fiscale / tessera sanitaria</strong>
+                    <em>Carica o scatta fronte e retro manualmente.</em>
+                  </div>
+                  <label class="capture-card" data-capture-key="codice-fiscale-fronte">
+                    <input type="file" accept="image/*" capture="environment">
+                    <span>Fronte</span>
+                    <strong>Fronte tessera</strong>
+                    <em>Tocca per fotografare</em>
+                  </label>
+                  <label class="capture-card" data-capture-key="codice-fiscale-retro">
+                    <input type="file" accept="image/*" capture="environment">
+                    <span>Retro</span>
+                    <strong>Retro tessera</strong>
+                    <em>Tocca per fotografare</em>
+                  </label>
+                </div>
+              </div>
+
+              <div class="precious-captures">
+                <div class="subsection-heading">
+                  <div>
+                    <p class="eyebrow">Preziosi</p>
+                    <h3>Foto preziosi divise per metallo</h3>
+                  </div>
+                </div>
+                <div class="capture-grid" id="preciousCaptureGrid"></div>
+              </div>
+
+              <div class="payment-captures" id="paymentCaptureSection" hidden>
+                <div class="subsection-heading">
+                  <div>
+                    <p class="eyebrow">Pagamento</p>
+                    <h3>Contabile pagamento</h3>
+                  </div>
+                </div>
+                <div class="capture-grid" id="paymentCaptureGrid"></div>
+              </div>
+            </div>
+
+            <div class="form-step" data-step-panel="4">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Step 5</p>
+                  <h2>Riepilogo pratica</h2>
+                </div>
+                <span class="status-pill success">Pronta per archivio</span>
+              </div>
+
+              <div class="summary-grid">
+                <div>
+                  <span>Cliente</span>
+                  <strong id="summaryClient">Dati non inseriti</strong>
+                </div>
+                <div>
+                  <span>Codice fiscale</span>
+                  <strong id="summaryFiscalCode">Dato non inserito</strong>
+                </div>
+                <div>
+                  <span>Oggetti</span>
+                  <strong id="summaryItems">1 tipologia di prezioso registrato</strong>
+                </div>
+                <div>
+                  <span>Totale</span>
+                  <strong id="summaryTotal">EUR 0,00</strong>
+                </div>
+                <div>
+                  <span>Firme</span>
+                  <strong id="summarySignatures">Da completare</strong>
+                </div>
+                <div>
+                  <span>Allegati</span>
+                  <strong id="summaryAttachments">0 di 6 caricati</strong>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="bottom-actions">
+              <button class="ghost-button" type="button" id="previousStep">Indietro</button>
+              <button class="primary-button" type="button" id="nextStep">Avanti</button>
+            </div>
+          </section>
+
+          <aside class="side-panel">
+            <div class="practice-card">
+              <span>Numero pratica</span>
+              <strong id="sidePracticeNumber">OA-BUSTO-2026-000184</strong>
+              <p>Atto archiviabile per completamento successivo</p>
+              <button class="warning-button practice-archive-button" type="button" id="archivePractice">Chiudi e archivia</button>
+              <button class="danger-button practice-delete-button" type="button" id="deleteCurrentPractice">Elimina atto</button>
+              <div class="quality-review-panel" id="qualityReviewPanel" hidden>
+                <span>Controllo qualità atto</span>
+                <div class="quality-review-actions">
+                  <label><input type="radio" name="qualityReviewStatus" value="positive"> Positivo</label>
+                  <label><input type="radio" name="qualityReviewStatus" value="negative"> Negativo</label>
+                </div>
+                <textarea id="qualityReviewFeedback" placeholder="Feedback obbligatorio se negativo"></textarea>
+                <button class="primary-button quality-review-save" type="button" id="saveQualityReview">Salva controllo qualità</button>
+              </div>
+            </div>
+
+            <div class="checklist">
+              <h3>Controlli obbligatori</h3>
+              <label><input type="checkbox" disabled> Dati cliente compilati</label>
+              <label><input type="checkbox" disabled> Documento valido</label>
+              <label><input type="checkbox" disabled> Tre firme acquisite</label>
+              <label><input type="checkbox" disabled> Foto documenti allegate</label>
+              <label><input type="checkbox" disabled> Preziosi e pagamento allegati</label>
+            </div>
+
+            <div class="print-box">
+              <h3>Stampa</h3>
+              <div class="preview-action-stack">
+                <button class="ghost-button" type="button" data-preview-copy="customer">Copia cliente</button>
+                <button class="primary-button" type="button" id="printCustomerCopySummary">Stampa Copia cliente</button>
+                <button class="ghost-button" type="button" data-preview-copy="company">Copia aziendale</button>
+                <button class="primary-button" type="button" id="printCompanyCopySummary">Stampa Copia aziendale</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="archive" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Archivio</p>
+            <h2>Elenco Atti di Vendita</h2>
+          </div>
+          <label class="filter-field">Negozio
+            <select id="archiveStoreFilter">
+              <option value="Busto Arsizio">Busto Arsizio</option>
+              <option value="Cassano Magnago">Cassano Magnago</option>
+              <option value="Legnano">Legnano</option>
+            </select>
+          </label>
+        </div>
+        <div class="settings-list archive-search-panel">
+          <label>Campo da ricercare
+            <select id="searchField">
+              <option value="name">Nome</option>
+              <option value="surname">Cognome</option>
+              <option value="practiceNumber">Numero atto di vendita</option>
+              <option value="date">Data atto di vendita</option>
+              <option value="store">Negozio</option>
+              <option value="amount">Importo</option>
+              <option value="paymentMethod">Metodo di pagamento</option>
+              <option value="weight">Peso totale in grammi</option>
+            </select>
+          </label>
+          <input class="search" id="searchKeyword" placeholder="Inserisci parola chiave">
+          <div class="archive-search-actions">
+            <button type="button" id="runActSearch">Cerca</button>
+            <button class="ghost-button" type="button" id="clearActSearch">Cancella ricerca</button>
+            <button class="small-button" type="button" id="exportDailyPdf">ESPORTA PDF giornaliero</button>
+            <button class="small-button" type="button" id="exportMonthlyPdf">ESPORTA PDF mensile</button>
+          </div>
+        </div>
+        <div class="archive-groups" id="archiveGroups"></div>
+      </section>
+
+      <section id="fusion" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Giacenza</p>
+            <h2>Giacenza</h2>
+            <p class="muted">Materiale prezioso in giacenza e calendario fusioni, suddiviso per negozio.</p>
+          </div>
+          <label>Negozio
+            <select id="fusionStoreFilter">
+              <option>Tutti</option>
+              <option>Busto Arsizio</option>
+              <option>Cassano Magnago</option>
+              <option>Legnano</option>
+            </select>
+          </label>
+        </div>
+        <div class="fusion-groups" id="fusionGroups" aria-live="polite"></div>
+      </section>
+
+      <section id="dashboard" class="screen control-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">KPI OroActive</p>
+            <h2>Dashboard</h2>
+            <p class="muted">Fatturato, grammi acquistati, pagamenti, ranking negozi e operatori.</p>
+          </div>
+        </div>
+        <div class="dashboard-grid" id="dashboardGrid"></div>
+        <div class="dashboard-panels" id="dashboardPanels"></div>
+      </section>
+
+      <section id="quotazione" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Mercati</p>
+            <h2>Quotazione</h2>
+            <p class="muted">Quotazioni e andamento di oro, argento, platino e diamanti.</p>
+          </div>
+          <button class="primary-button" type="button" id="refreshQuoteDashboard">Aggiorna quotazioni</button>
+        </div>
+        <section class="quote-strip quote-section-panel" aria-label="Quotazione metalli preziosi">
+          <div class="quote-strip-heading">
+            <span>Quotazione OroActive</span>
+          </div>
+          <div class="quote-strip-grid" id="quoteDashboard">
+            <article><span>Oro</span><strong>Dato non inserito</strong></article>
+            <article><span>Argento</span><strong>Dato non inserito</strong></article>
+            <article><span>Platino</span><strong>Dato non inserito</strong></article>
+            <article><span>Diamanti</span><strong>Da configurare</strong></article>
+          </div>
+          <div class="quote-chart-panel">
+            <div id="bullionVaultChart" class="bullionvault-chart"></div>
+            <p id="bullionVaultChartFallback" class="quote-fallback" hidden>Grafico BullionVault non incorporabile direttamente. <a href="https://www.bullionvault.com/gold-price-chart.do" target="_blank" rel="noopener">Apri grafico BullionVault</a>.</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="stores" class="screen founder-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Founder</p>
+            <h2>Negozi</h2>
+            <p class="muted">Gestione punti vendita OroActive, codici negozio e stato sede.</p>
+          </div>
+          <form class="settings-list" id="storeForm">
+            <input type="hidden" id="storeId">
+            <label>Nome negozio <input id="storeNameInput" required></label>
+            <label>Codice negozio <input id="storeCodeInput" required></label>
+            <label>Indirizzo <input id="storeAddressInput"></label>
+            <label>Citt&agrave; <input id="storeCityInput"></label>
+            <label>Provincia <input id="storeProvinceInput"></label>
+            <label>Telefono <input id="storePhoneInput"></label>
+            <label>Email <input id="storeEmailInput" type="email"></label>
+            <label class="inline-check"><input id="storeActiveInput" type="checkbox" checked> Negozio attivo</label>
+            <div class="user-form-actions">
+              <button class="primary-button" type="submit">Salva negozio</button>
+              <button class="ghost-button" type="button" id="resetStoreForm">Nuovo negozio</button>
+            </div>
+          </form>
+        </div>
+        <div class="archive-table users-table" id="storesList" aria-live="polite"></div>
+      </section>
+
+      <section id="backups" class="screen founder-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Founder</p>
+            <h2>Backup</h2>
+            <p class="muted">Backup giornalieri automatici di database, documenti, PDF, firme e foto salvati nel gestionale. Predisposto per integrazione futura n8n.</p>
+          </div>
+          <button class="primary-button" type="button" id="runBackupNow">Esegui backup ora</button>
+        </div>
+        <div class="backup-status-card">
+          <strong>Protezione dati OroActive</strong>
+          <span>Il service worker non memorizza dati sensibili: atti, clienti, documenti, PDF e API restano sempre esclusi dalla cache PWA.</span>
+        </div>
+        <div class="user-form-actions">
+          <button class="ghost-button" type="button" id="runMonthlyBackupNow">Esegui backup mensile completo</button>
+        </div>
+        <div class="archive-table users-table" id="backupsList" aria-live="polite"></div>
+      </section>
+
+      <section id="antifraud" class="screen control-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Controlli interni</p>
+            <h2>Antifrode</h2>
+            <p class="muted">Alert su clienti, documenti, pagamenti, atti e comportamenti anomali.</p>
+          </div>
+          <button class="primary-button" type="button" id="scanAntifraud">Analizza anomalie</button>
+        </div>
+        <div class="archive-table users-table" id="antifraudList" aria-live="polite"></div>
+      </section>
+
+      <section id="assistant" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="assistant-layout">
+          <section class="assistant-chat-card">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Formazione OroActive</p>
+                <h2>Assistente IA OroActive</h2>
+                <p class="muted">Consulta La bilancia d'oro e ricevi supporto operativo su compro oro, metalli preziosi, gemme, negozio e procedure.</p>
+              </div>
+            </div>
+            <div class="assistant-chat" id="assistantChat" aria-live="polite"></div>
+            <form class="assistant-form" id="assistantForm">
+              <label>Modalit&agrave;
+                <select id="assistantMode">
+                  <option value="chat">Assistente IA</option>
+                  <option value="quiz">Quiz Operatore</option>
+                </select>
+              </label>
+              <label>Domanda
+                <textarea id="assistantQuestion" rows="3" placeholder="Scrivi una domanda per l'assistente IA OroActive"></textarea>
+              </label>
+              <button class="primary-button" type="submit" id="assistantSend">Invia</button>
+            </form>
+            <p class="assistant-loading" id="assistantLoading" hidden>Sto consultando La bilancia d'oro...</p>
+          </section>
+
+          <section class="knowledge-card founder-only" id="knowledgeBasePanel" hidden>
+            <div>
+              <p class="eyebrow">Founder</p>
+              <h3>Knowledge Base / Libro AI</h3>
+              <p class="muted">Carica o aggiorna il libro usato come fonte primaria dell'assistente. Funzione riservata al founder.</p>
+            </div>
+            <form class="knowledge-form" id="knowledgeForm">
+              <label>Titolo <input id="knowledgeTitle" value="La bilancia d'oro"></label>
+              <label>Autore <input id="knowledgeAuthor" value="Christian Dinato"></label>
+              <label>Libro PDF, DOCX o TXT <input id="knowledgeFile" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"></label>
+              <button class="primary-button" type="submit">Carica e indicizza libro</button>
+            </form>
+            <button class="ghost-button" type="button" id="reindexKnowledge">Rigenera embeddings</button>
+            <div class="knowledge-status" id="knowledgeStatus"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="training" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Formazione Staff</p>
+            <h2>Corsi e quiz operatori</h2>
+            <p class="muted">Corsi interni, quiz, test finale e storico risultati dello staff.</p>
+          </div>
+          <form class="settings-list founder-only" id="trainingCourseForm">
+            <label>Titolo corso <input id="trainingCourseTitle"></label>
+            <label>Categoria <input id="trainingCourseCategory" placeholder="oro, antiriciclaggio, procedure OroActive"></label>
+            <label>Descrizione <textarea id="trainingCourseDescription" rows="5"></textarea></label>
+            <button class="primary-button" type="submit">Crea corso</button>
+          </form>
+        </div>
+        <div class="knowledge-notes-list" id="trainingList"></div>
+      </section>
+
+      <section id="crm" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Relazione clienti</p>
+            <h2>CRM Clienti</h2>
+            <p class="muted">Anagrafica, storico atti, note, livello cliente e prossime azioni.</p>
+          </div>
+          <input class="search" id="crmSearch" placeholder="Cerca cliente, codice fiscale, telefono o email">
+        </div>
+        <div class="archive-table users-table" id="crmList" aria-live="polite"></div>
+      </section>
+
+      <section id="knowledgeNotes" class="screen knowledge-editor-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Knowledge base viva</p>
+            <h2>Nuova conoscenza OroActive</h2>
+            <p class="muted">Inserisci procedure, casi reali e contenuti formativi. Le conoscenze dei responsabili entrano nell'AI solo dopo approvazione founder.</p>
+          </div>
+          <form class="settings-list" id="knowledgeNoteForm">
+            <input type="hidden" id="knowledgeNoteId">
+            <label>Titolo <input id="knowledgeNoteTitle" required></label>
+            <label>Categoria
+              <select id="knowledgeNoteCategory">
+                <option>Oro</option>
+                <option>Argento</option>
+                <option>Platino</option>
+                <option>Diamanti</option>
+                <option>Gemme</option>
+                <option>Normativa</option>
+                <option>Antiriciclaggio</option>
+                <option>Gestione negozio</option>
+                <option>Vendita</option>
+                <option>Sicurezza</option>
+                <option>Fusioni</option>
+                <option>Clienti</option>
+                <option>Casi reali</option>
+                <option>Procedure operative</option>
+                <option>Formazione operatori</option>
+              </select>
+            </label>
+            <label>Fonte <input id="knowledgeNoteSource" placeholder="Libro, procedura interna, esperienza negozio"></label>
+            <label>Autore <input id="knowledgeNoteAuthor" readonly></label>
+            <label>Ruolo autore <input id="knowledgeNoteRole" readonly></label>
+            <label>Contenuto
+              <textarea id="knowledgeNoteContent" rows="10" required></textarea>
+            </label>
+            <div class="user-form-actions">
+              <button class="primary-button" type="submit" id="saveKnowledgeNoteButton">Salva conoscenza</button>
+              <button class="ghost-button" type="button" id="resetKnowledgeNoteForm">Nuova scheda</button>
+            </div>
+          </form>
+        </div>
+        <section class="knowledge-notes-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Revisione</p>
+              <h3>Conoscenze inserite</h3>
+            </div>
+          </div>
+          <div class="knowledge-notes-list" id="knowledgeNotesList"></div>
+        </section>
+        <section class="knowledge-notes-panel founder-only" id="aiFeedbackPanel" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Miglioramento AI</p>
+              <h3>Feedback risposte assistente</h3>
+            </div>
+          </div>
+          <div class="knowledge-notes-list" id="aiFeedbackList"></div>
+        </section>
+      </section>
+
+      <section id="profile" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Account</p>
+            <h2>Dati utente</h2>
+            <p class="muted">Profilo e impostazioni dell'utente attualmente connesso.</p>
+          </div>
+          <div class="settings-list profile-card" id="profileCard"></div>
+        </div>
+      </section>
+
+      <section id="users" class="screen admin-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="settings-grid">
+          <div>
+            <p class="eyebrow">Amministrazione</p>
+            <h2>Utenti e negozi</h2>
+            <p class="muted">Gestisci accessi, ruoli e negozi assegnati.</p>
+          </div>
+          <form class="settings-list" id="userForm">
+            <input type="hidden" id="userId">
+            <label>Nome <input id="userName" required></label>
+            <label>Cognome <input id="userSurname" required></label>
+            <label>Nome utente <input id="userUsername" autocomplete="username"></label>
+            <label>Password <input id="userPassword" type="password" autocomplete="new-password" placeholder="Minimo 8 caratteri" required></label>
+            <label>Ruolo
+              <select id="userRole">
+                <option value="aiuto_commesso">Aiuto Commesso/a</option>
+                <option value="commesso">Commesso/a</option>
+                <option value="responsabile">Responsabile</option>
+                <option value="supervisore">Supervisore</option>
+              </select>
+            </label>
+            <label>Negozio
+              <select id="userStore">
+                <option>Tutti</option>
+                <option>Busto Arsizio</option>
+                <option>Cassano Magnago</option>
+                <option>Legnano</option>
+              </select>
+            </label>
+            <div class="user-form-actions">
+              <button type="submit" id="saveUserButton">Salva Utente</button>
+              <button class="ghost-button" type="button" id="resetUserForm">Nuovo utente</button>
+            </div>
+          </form>
+        </div>
+        <div class="archive-table users-table" id="usersList" aria-live="polite"></div>
+      </section>
+      <footer class="software-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
+    </main>
+  </div>
+
+  <div id="printPacket" aria-hidden="true"></div>
+  <div class="preview-modal" id="previewModal" hidden>
+    <div class="preview-dialog" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+      <div class="preview-topbar">
+        <h2 id="previewTitle">Anteprima stampa</h2>
+        <button class="ghost-button" id="closePreview" type="button">Chiudi</button>
+      </div>
+      <div class="preview-body" id="previewBody"></div>
+    </div>
+  </div>
+  <div class="tutorial-overlay" id="tutorialOverlay" hidden>
+    <div class="tutorial-backdrop"></div>
+    <section class="tutorial-card" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+      <span class="tutorial-count" id="tutorialCount">Tutorial</span>
+      <h2 id="tutorialTitle">Benvenuto in OroActive</h2>
+      <p id="tutorialText"></p>
+      <div class="tutorial-actions">
+        <button class="ghost-button" type="button" id="tutorialSkip">Salta tutorial</button>
+        <button class="ghost-button" type="button" id="tutorialBack">Indietro</button>
+        <button class="primary-button" type="button" id="tutorialNext">Avanti</button>
+      </div>
+    </section>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="loading-indicator" id="loadingIndicator" hidden>
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <span>Caricamento in corso...</span>
+  </div>
+  <div class="install-hint" id="installHint" hidden>
+    <strong>Aggiungi OroActive alla schermata Home</strong>
+    <span>Su iPhone/iPad apri Condividi e scegli “Aggiungi alla schermata Home”.</span>
+    <button type="button" id="dismissInstallHint">Ok</button>
+  </div>
+  <datalist id="citySuggestions"></datalist>
+  <datalist id="provinceSuggestions"></datalist>
+  <script src="app.js?v=20260524-enterprise-1"></script>
+</body>
+</html>

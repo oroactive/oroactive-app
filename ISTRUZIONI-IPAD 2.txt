@@ -1,0 +1,11 @@
+OROACTIVE GESTIONALE - INSTALLAZIONE SU IPAD
+
+1. Carica la cartella del software su uno spazio web, server aziendale o computer collegato alla stessa rete dell'iPad.
+2. Apri Safari su iPad e vai all'indirizzo del file index.html.
+3. Tocca il pulsante Condividi di Safari.
+4. Seleziona Aggiungi a Home.
+5. Conferma il nome OroActive.
+
+Da quel momento l'icona OroActive comparira nella schermata Home dell'iPad e aprira direttamente il software gestionale.
+
+Nota: su iPad l'apertura diretta da file scaricato non permette sempre l'installazione come app in Home. Per avere l'icona stabile e l'apertura diretta, il gestionale deve essere aperto almeno una volta da Safari tramite indirizzo web o server locale.
