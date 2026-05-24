@@ -75,7 +75,29 @@ const knowledgeCategories = [
 ];
 
 const app = express();
-app.use(cors());
+const allowedCorsOrigins = new Set([
+  "https://app.oroactive.it",
+  "capacitor://localhost",
+  "ionic://localhost",
+  "http://localhost",
+  "http://localhost:3000",
+  "http://localhost:4173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:4173"
+]);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedCorsOrigins.has(origin)) return callback(null, true);
+    if (/^https:\/\/app\.oroactive\.it$/i.test(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false,
+  maxAge: 86400
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "250mb" }));
 const apiRateBuckets = new Map();
 
@@ -3289,6 +3311,14 @@ app.get("/api/health", (_request, response) => {
 });
 
 app.post("/api/auth/login", async (request, response, next) => {
+  try {
+    response.json(await loginUser(request.body.username, request.body.password));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/login", async (request, response, next) => {
   try {
     response.json(await loginUser(request.body.username, request.body.password));
   } catch (error) {
