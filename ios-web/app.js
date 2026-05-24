@@ -197,10 +197,13 @@ const documentLabels = {
   Patente: "patente",
   Passaporto: "passaporto"
 };
+const isCapacitorRuntime = window.location.protocol === "capacitor:"
+  || window.location.protocol === "ionic:"
+  || Boolean(window.Capacitor?.isNativePlatform?.());
 const API_BASE_URL = (
   window.OROACTIVE_API_BASE_URL
   || window.OROACTIVE_API_BASE
-  || (window.Capacitor ? "https://app.oroactive.it" : window.location.origin)
+  || (isCapacitorRuntime ? "https://app.oroactive.it" : window.location.origin)
 ).replace(/\/+$/, "").replace(/\/api$/i, "");
 const apiBase = `${API_BASE_URL}/api`;
 console.log("API_BASE_URL", API_BASE_URL);
@@ -1409,6 +1412,7 @@ async function restoreSession() {
 async function handleLogin(event) {
   event.preventDefault();
   loginMessage.textContent = "";
+  console.log("LOGIN API URL:", `${apiBase}/auth/login`);
   try {
     const data = await apiRequest("/auth/login", {
       method: "POST",
@@ -1427,7 +1431,9 @@ async function handleLogin(event) {
       ? "Credenziali non valide"
       : error.isConnectionError
         ? "Connessione al server OroActive non riuscita"
-        : error.message || "Accesso non riuscito.";
+        : error.status
+          ? `Errore ${error.status}: ${error.message || "Accesso non riuscito."}`
+          : error.message || "Accesso non riuscito.";
   }
 }
 
