@@ -77,6 +77,49 @@ const knowledgeCategories = [
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "250mb" }));
+const apiRateBuckets = new Map();
+
+function apiRateLimit(request, response, next) {
+  if (!request.path.startsWith("/api")) return next();
+  const key = `${request.ip || request.socket.remoteAddress || "local"}:${request.headers.authorization || "anon"}`;
+  const now = Date.now();
+  const bucket = apiRateBuckets.get(key) || { count: 0, resetAt: now + 60_000 };
+  if (now > bucket.resetAt) {
+    bucket.count = 0;
+    bucket.resetAt = now + 60_000;
+  }
+  bucket.count += 1;
+  apiRateBuckets.set(key, bucket);
+  if (bucket.count > 360) {
+    return response.status(429).json({ error: "Troppe richieste: attendere qualche secondo." });
+  }
+  next();
+}
+
+function auditApiRequest(request, response, next) {
+  const startedAt = Date.now();
+  response.on("finish", () => {
+    if (!request.user?.id) return;
+    const method = request.method;
+    const route = request.originalUrl.split("?")[0];
+    if (route.includes("/auth/me")) return;
+    pool.query(
+      `INSERT INTO audit_logs (user_id, method, route, status_code, duration_ms, ip_address, created_at)
+       VALUES ($1::bigint,$2::text,$3::text,$4::integer,$5::integer,$6::text,NOW())`,
+      [
+        request.user.id,
+        method,
+        route,
+        response.statusCode,
+        Date.now() - startedAt,
+        request.ip || request.socket.remoteAddress || ""
+      ]
+    ).catch((error) => console.error("AUDIT LOG ERROR", error));
+  });
+  next();
+}
+
+app.use(apiRateLimit);
 
 function storeCodeFromName(storeName) {
   return {
@@ -296,6 +339,13 @@ function dateText(value) {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
+}
+
+function daysBetween(start, end = new Date()) {
+  const first = new Date(dateText(start) || "");
+  const second = new Date(dateText(end) || "");
+  if (Number.isNaN(first.getTime()) || Number.isNaN(second.getTime())) return 0;
+  return Math.floor((second.getTime() - first.getTime()) / (24 * 60 * 60 * 1000));
 }
 
 function dateOrNull(value) {
@@ -1462,7 +1512,7 @@ async function saveAmlAlert({ check, act = {}, user = null, attoId = null }) {
   await pool.query(
     `INSERT INTO antiriciclaggio_alerts
       (cliente_id, codice_fiscale, atto_id, totale_ultimi_7_giorni, importo_corrente, totale_previsto, superamento, user_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+     VALUES ($1::bigint,$2::text,$3::bigint,$4::numeric,$5::numeric,$6::numeric,$7::numeric,$8::bigint)`,
     [
       act.clienteId || act.cliente_id || null,
       normalizeFiscalCode(act.codiceFiscale || act.fiscalCode || ""),
@@ -1474,6 +1524,30 @@ async function saveAmlAlert({ check, act = {}, user = null, attoId = null }) {
       user?.id || null
     ]
   );
+}
+
+async function saveDocumentIntegrityLog(act = {}, attoId = null, user = null) {
+  const legal = act.payload?.legalSignature || act.legalSignature || null;
+  if (!legal?.documentHashSha256 || !attoId) return null;
+  const result = await pool.query(
+    `INSERT INTO document_integrity_logs
+      (atto_id, practice_number, hash_sha256, timestamp_firma, geolocation, operator_id, payload)
+     VALUES ($1::bigint,$2::text,$3::text,$4::timestamptz,$5::jsonb,$6::bigint,$7::jsonb)
+     RETURNING *`,
+    [
+      attoId,
+      act.practiceNumber || act.payload?.practiceNumber || "",
+      legal.documentHashSha256,
+      legal.timestamp || new Date().toISOString(),
+      sanitizeForPostgres(legal.location || {}),
+      legal.operatorId || user?.id || null,
+      sanitizeForPostgres(legal)
+    ]
+  ).catch((error) => {
+    console.error("DOCUMENT INTEGRITY LOG ERROR", error);
+    return { rows: [] };
+  });
+  return result.rows[0] || null;
 }
 
 async function enforceCashAntiMoneyLaundering(act, user, existing = null) {
@@ -1920,7 +1994,7 @@ async function visibleStoreWhere(user = {}, values = [], alias = "a") {
   const store = await storeForUser(user);
   if (!store) return " AND 1 = 0";
   values.push(store.id, store.nome);
-  return ` AND (${alias}.negozio_id = $${values.length - 1} OR ${alias}.store = $${values.length})`;
+  return ` AND (${alias}.negozio_id = $${values.length - 1}::bigint OR ${alias}.store = $${values.length}::text)`;
 }
 
 function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
@@ -1930,7 +2004,7 @@ function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
   const effectiveStore = roleSeesAllStores(user?.ruolo) ? store : user?.negozio;
   if (effectiveStore && effectiveStore !== "Tutti") {
     values.push(effectiveStore);
-    where.push(`store = $${values.length}`);
+    where.push(`store = $${values.length}::text`);
   }
 
   if (q && field) {
@@ -1949,11 +2023,11 @@ function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
     const column = allowedFields[field];
     if (column) {
       values.push(`%${String(q).toLowerCase()}%`);
-      where.push(`LOWER(${column}) LIKE $${values.length}`);
+      where.push(`LOWER(${column}) LIKE $${values.length}::text`);
     }
   } else if (q) {
     values.push(`%${String(q).toLowerCase()}%`);
-    const parameter = `$${values.length}`;
+    const parameter = `$${values.length}::text`;
     where.push(`(
       LOWER(COALESCE(practice_number, '')) LIKE ${parameter}
       OR LOWER(COALESCE(cliente_nome, '')) LIKE ${parameter}
@@ -1999,7 +2073,7 @@ async function listActs(query = {}, user = null) {
     `SELECT * FROM ${actsTable}
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
      ORDER BY data_atto DESC NULLS LAST, act_number DESC NULLS LAST, updated_at DESC
-     LIMIT ${limitParameter} OFFSET ${offsetParameter}`,
+     LIMIT ${limitParameter}::integer OFFSET ${offsetParameter}::integer`,
     values
   );
   return result.rows.map((row) => rowToAct(row, { full: false }));
@@ -2009,7 +2083,7 @@ async function nextActNumber(storeCode, year) {
   const result = await pool.query(
     `SELECT COALESCE(MAX(COALESCE(numero_atto_negozio, act_number)), 0) + 1 AS next_number
      FROM ${actsTable}
-     WHERE COALESCE(codice_negozio, store_code) = $1 AND act_year = $2`,
+     WHERE COALESCE(codice_negozio, store_code) = $1::text AND act_year = $2::integer`,
     [storeCode, year]
   );
   return Number(result.rows[0].next_number);
@@ -2284,8 +2358,10 @@ async function dashboardKpis(user = {}) {
   const acts = result.rows.map((row) => rowToAct(row));
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
+  const weekAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const sum = (rows, getter) => rows.reduce((total, row) => total + Number(getter(row) || 0), 0);
   const dailyActs = acts.filter((act) => String(act.date || "").slice(0, 10) === today);
+  const weeklyActs = acts.filter((act) => String(act.date || "").slice(0, 10) >= weekAgo);
   const monthlyActs = acts.filter((act) => String(act.date || "").slice(0, 7) === month);
   const materials = acts.flatMap(materialLotsFromAct);
   const dailyMaterials = dailyActs.flatMap(materialLotsFromAct);
@@ -2320,20 +2396,83 @@ async function dashboardKpis(user = {}) {
     groups[key] = (groups[key] || 0) + Number(act.amount || 0);
     return groups;
   }, {});
+  const estimatedMargin = (rows) => sum(rows, (act) => act.amount) * 0.08;
+  const incomplete = acts.filter((act) => normalizeWorkflowStatus(act.status) !== "Completato").length;
+  const expiredDocuments = acts.filter((act) => act.documentExpiry && new Date(act.documentExpiry) < new Date()).length;
+  const missingUploads = acts.filter((act) => !Array.isArray(act.captureAttachments) || act.captureAttachments.length < 2).length;
+  const fusedActs = acts.filter((act) => act.fusion?.fused);
+  const openLots = acts.filter((act) => !act.fusion?.fused && daysBetween(act.date, today) >= 10).length;
+  const bestStore = Object.values(byStore).sort((a, b) => b.fatturato - a.fatturato)[0] || null;
+  const lowOperator = Object.values(byOperator).sort((a, b) => (a.fatturato / Math.max(a.atti, 1)) - (b.fatturato / Math.max(b.atti, 1)))[0] || null;
+  const alerts = [
+    { label: "Atti incompleti", value: incomplete, detail: "Da completare o verificare" },
+    { label: "Documenti scaduti", value: expiredDocuments, detail: "Controllo legale richiesto" },
+    { label: "Upload mancanti", value: missingUploads, detail: "Documenti o foto da integrare" }
+  ];
+  const insights = [
+    bestStore ? { title: "Negozio piu performante", level: "trend", text: `${bestStore.negozio} guida il periodo con ${bestStore.atti} atti e ${Number(bestStore.grammi || 0).toFixed(2)} gr.` } : null,
+    lowOperator ? { title: "Operatore da monitorare", level: "attenzione", text: `${lowOperator.operatore} ha media acquisto piu bassa: verificare margini e formazione.` } : null,
+    openLots ? { title: "Fusioni consigliate", level: "operativo", text: `${openLots} atti risultano fondibili: pianificare invio in raffineria.` } : null
+  ].filter(Boolean);
   return {
     kpi: {
       fatturato_giornaliero: sum(dailyActs, (act) => act.amount),
+      fatturato_settimanale: sum(weeklyActs, (act) => act.amount),
       fatturato_mensile: sum(monthlyActs, (act) => act.amount),
       numero_atti_giornalieri: dailyActs.length,
       numero_atti_mensili: monthlyActs.length,
-      media_margine: 0,
+      media_acquisto_giorno: dailyActs.length ? sum(dailyActs, (act) => act.amount) / dailyActs.length : 0,
+      media_margine: 8,
+      utile_giornaliero: estimatedMargin(dailyActs),
+      utile_settimanale: estimatedMargin(weeklyActs),
+      utile_mensile: estimatedMargin(monthlyActs),
+      contanti_erogati: paymentSplit.Contanti || paymentSplit.contanti || 0,
+      bonifici: paymentSplit.Bonifico || paymentSplit.bonifico || 0,
       grammi_giornalieri: weightByMetal(dailyMaterials),
       grammi_mensili: weightByMetal(monthlyMaterials)
+    },
+    alerts,
+    insights,
+    fusioni: {
+      "Lotti aperti": openLots,
+      "Atti inviati in fusione": fusedActs.length,
+      "Profitto fusioni stimato": estimatedMargin(fusedActs)
     },
     carature_frequenti: Object.entries(frequency).map(([titolo, count]) => ({ titolo, count })).sort((a, b) => b.count - a.count).slice(0, 8),
     pagamenti: paymentSplit,
     ranking_negozi: Object.values(byStore).sort((a, b) => b.fatturato - a.fatturato),
     ranking_operatori: Object.values(byOperator).sort((a, b) => b.fatturato - a.fatturato)
+  };
+}
+
+async function oroActiveIntelligence(user = {}) {
+  const data = await dashboardKpis(user);
+  const insights = [...(data.insights || [])];
+  const gold = Number(data.kpi?.grammi_mensili?.Oro || 0);
+  const silver = Number(data.kpi?.grammi_mensili?.Argento || 0);
+  const platinum = Number(data.kpi?.grammi_mensili?.Platino || 0);
+  if (gold > silver * 3 && gold > 0) {
+    insights.push({
+      title: "Trend metalli",
+      level: "business",
+      text: "Il peso dell'oro acquistato supera nettamente gli altri metalli: monitorare quotazioni e timing fusione."
+    });
+  }
+  if (platinum > 0) {
+    insights.push({
+      title: "Platino in giacenza",
+      level: "operativo",
+      text: "Presente platino acquistato: tenere separato per titolo e pianificare raffineria dedicata."
+    });
+  }
+  return {
+    generated_at: new Date().toISOString(),
+    insights,
+    suggerimenti: [
+      "Controllare giornalmente documenti scaduti e upload mancanti.",
+      "Verificare limite contanti prima del completamento pratica.",
+      "Pianificare fusioni degli atti fondibili per ridurre immobilizzo di giacenza."
+    ]
   };
 }
 
@@ -2447,6 +2586,57 @@ async function scanAntifraud(user = {}) {
       tipo_alert: "iban_condiviso",
       livello: "alto",
       descrizione: `IBAN ${row.iban} usato da ${row.clients} clienti diversi.`
+    })) created += 1;
+  }
+  const multiStoreClients = await pool.query(`
+    SELECT codice_fiscale, COUNT(DISTINCT store)::int AS stores, COUNT(*)::int AS acts, MAX(id) AS atto_id
+    FROM ${actsTable}
+    WHERE data_atto >= CURRENT_DATE - INTERVAL '30 days'
+      AND COALESCE(status, '') NOT ILIKE 'Bozza'
+      AND codice_fiscale IS NOT NULL
+    GROUP BY codice_fiscale
+    HAVING COUNT(DISTINCT store) > 1
+    LIMIT 50
+  `);
+  for (const row of multiStoreClients.rows) {
+    if (await createAntifraudAlert({
+      atto_id: row.atto_id,
+      tipo_alert: "vendite_multi_negozio",
+      livello: "alto",
+      descrizione: `Cliente con ${row.acts} atti distribuiti su ${row.stores} negozi negli ultimi 30 giorni.`
+    })) created += 1;
+  }
+  const inconsistentFiscalCodes = await pool.query(`
+    SELECT codice_fiscale, COUNT(DISTINCT LOWER(COALESCE(cliente_nome, '') || '|' || COALESCE(cliente_cognome, '')))::int AS variants, MAX(id) AS atto_id
+    FROM ${actsTable}
+    WHERE codice_fiscale IS NOT NULL AND codice_fiscale <> ''
+    GROUP BY codice_fiscale
+    HAVING COUNT(DISTINCT LOWER(COALESCE(cliente_nome, '') || '|' || COALESCE(cliente_cognome, ''))) > 1
+    LIMIT 50
+  `);
+  for (const row of inconsistentFiscalCodes.rows) {
+    if (await createAntifraudAlert({
+      atto_id: row.atto_id,
+      tipo_alert: "codice_fiscale_dati_diversi",
+      livello: "critico",
+      descrizione: `Codice fiscale associato a ${row.variants} varianti anagrafiche diverse.`
+    })) created += 1;
+  }
+  const frequentUpdates = await pool.query(`
+    SELECT route, COUNT(*)::int AS updates, MAX(created_at) AS last_update
+    FROM audit_logs
+    WHERE method IN ('PUT', 'PATCH')
+      AND route LIKE '/api/atti/%'
+      AND created_at >= NOW() - INTERVAL '7 days'
+    GROUP BY route
+    HAVING COUNT(*) >= 3
+    LIMIT 50
+  `).catch(() => ({ rows: [] }));
+  for (const row of frequentUpdates.rows) {
+    if (await createAntifraudAlert({
+      tipo_alert: "atto_modificato_piu_volte",
+      livello: "medio",
+      descrizione: `Atto ${row.route.replace("/api/atti/", "")} modificato ${row.updates} volte negli ultimi 7 giorni.`
     })) created += 1;
   }
   return { ok: true, created };
@@ -2754,6 +2944,7 @@ async function saveAct(input, user) {
       nullIfEmpty(act.operatoreId)
     ]
   );
+  await saveDocumentIntegrityLog(act, result.rows[0].id, user);
   if (!isDraftLikeStatus(act.status)) await saveAmlAlert({ check: amlCheck, act, user, attoId: result.rows[0].id });
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
   if (client?.id) {
@@ -2846,6 +3037,7 @@ async function updateAct(identifier, input, user) {
     throw err;
   }
   if (!result.rowCount) return null;
+  await saveDocumentIntegrityLog(act, result.rows[0].id, user);
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
   if (client?.id) {
     const withClient = await pool.query(
@@ -3121,6 +3313,7 @@ app.get("/api/auth/me", authenticate, (request, response) => {
 });
 
 app.use("/api", authenticate);
+app.use("/api", auditApiRequest);
 
 app.get("/api/antiriciclaggio/contanti-check", async (request, response, next) => {
   try {
@@ -3133,6 +3326,14 @@ app.get("/api/antiriciclaggio/contanti-check", async (request, response, next) =
 app.get("/api/dashboard", async (request, response, next) => {
   try {
     response.json(await dashboardKpis(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/intelligence/insights", async (request, response, next) => {
+  try {
+    response.json(await oroActiveIntelligence(request.user));
   } catch (error) {
     next(error);
   }
@@ -3598,6 +3799,49 @@ app.get("/api/fusioni/riepilogo", async (request, response, next) => {
         }))
       }))
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/fusioni/lotti", async (request, response, next) => {
+  try {
+    if (!["founder", "supervisore", "responsabile"].includes(normalizeRole(request.user?.ruolo))) {
+      return response.status(403).json({ error: "Non autorizzato" });
+    }
+    const identifiers = Array.isArray(request.body.atti) ? request.body.atti : String(request.body.atti || "").split(",");
+    const acts = [];
+    for (const identifier of identifiers.map((item) => String(item).trim()).filter(Boolean)) {
+      const row = await findExisting(identifier);
+      if (row && canAccessAct(row, request.user)) acts.push(rowToAct(row));
+    }
+    if (!acts.length) return response.status(400).json({ error: "Nessun atto selezionato per il lotto fusione" });
+    const store = acts[0].store || request.body.negozio || "";
+    const storeRow = await storeByCodeOrName(store);
+    const lots = acts.flatMap(materialLotsFromAct);
+    const pesoTotale = lots.reduce((total, lot) => total + Number(lot.weight || 0), 0);
+    const valoreTeorico = lots.reduce((total, lot) => total + Number(lot.weight || 0) * quoteForMetal(lot.act, lot.metal) / 1000 * titlePurity(lot.metal, lot.title), 0);
+    const lottoCode = `FUS-${storeCodeFromName(store)}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-5)}`;
+    const result = await pool.query(
+      `INSERT INTO fusion_lots
+        (lotto_code, negozio_id, negozio, raffineria, peso_totale, peso_netto, valore_teorico, stato, data_invio, payload, created_by)
+       VALUES ($1::text,$2::bigint,$3::text,$4::text,$5::numeric,$6::numeric,$7::numeric,$8::text,$9::date,$10::jsonb,$11::bigint)
+       RETURNING *`,
+      [
+        lottoCode,
+        storeRow?.id || null,
+        store,
+        request.body.raffineria || "",
+        pesoTotale,
+        numberFrom(request.body.peso_netto || request.body.pesoNetto || pesoTotale),
+        valoreTeorico,
+        request.body.stato || "aperto",
+        dateOrNull(request.body.data_invio || request.body.dataInvio) || new Date().toISOString().slice(0, 10),
+        sanitizeForPostgres({ atti: acts.map((act) => act.id), riepilogo: stockSummaryFromActs(acts) }),
+        request.user.id
+      ]
+    );
+    response.status(201).json(result.rows[0]);
   } catch (error) {
     next(error);
   }

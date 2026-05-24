@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260523-7";
+const STATIC_CACHE = "oroactive-static-v20260524-enterprise-1";
 const STATIC_ASSETS = [
   "/index.html",
   "/styles.css?v=20260523-25",
-  "/app.js?v=20260523-34",
+  "/app.js?v=20260524-enterprise-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

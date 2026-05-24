@@ -44,6 +44,8 @@ const state = {
   backups: [],
   clockTimer: null,
   bullionChartLoaded: false,
+  pendingSync: JSON.parse(localStorage.getItem("oroactive-pending-sync") || "[]"),
+  syncingPending: false,
   tutorial: {
     active: false,
     index: 0,
@@ -197,6 +199,7 @@ const apiBase = "/api";
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
+const API_RETRY_ATTEMPTS = 3;
 const QUALITY_FLAG_POINTS = 1;
 const ROLE_LEVELS = [
   { role: "aiuto_commesso", label: "Commesso OroActive", points: 1000 },
@@ -366,31 +369,66 @@ function queryString(params = {}) {
   return search.toString();
 }
 
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function shouldRetryApi(error, responseStatus) {
+  if (responseStatus && responseStatus < 500 && responseStatus !== 429) return false;
+  return error?.name === "AbortError" || !navigator.onLine || !responseStatus || responseStatus >= 500 || responseStatus === 429;
+}
+
+function sanitizeForSave(value) {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  if (Array.isArray(value)) return value.map((item) => sanitizeForSave(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeForSave(item)]));
+  }
+  return value;
+}
+
 async function apiRequest(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs || 18000);
-  try {
-    const response = await fetch(`${apiBase}${path}`, {
-      headers,
-      ...options,
-      signal: options.signal || controller.signal
-    });
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      if (response.status === 401 && !path.startsWith("/auth/login")) {
-        showLogin();
+  const attempts = Math.max(1, Number(options.retries ?? API_RETRY_ATTEMPTS));
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs || 18000);
+    try {
+      const response = await fetch(`${apiBase}${path}`, {
+        headers,
+        ...options,
+        signal: options.signal || controller.signal
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        if (response.status === 401 && !path.startsWith("/auth/login")) {
+          showLogin();
+        }
+        const error = new Error(body.error || "Errore comunicazione server");
+        error.status = response.status;
+        if (attempt < attempts && shouldRetryApi(error, response.status)) {
+          await wait(350 * attempt);
+          continue;
+        }
+        throw error;
       }
-      throw new Error(body.error || "Errore comunicazione server");
+      return response.status === 204 ? null : response.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts && shouldRetryApi(error, error.status)) {
+        await wait(350 * attempt);
+        continue;
+      }
+      if (error.name === "AbortError") throw new Error("Connessione lenta: salvataggio in ritardo, riprovo automaticamente.");
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
     }
-    return response.json();
-  } catch (error) {
-    if (error.name === "AbortError") throw new Error("Connessione lenta: riprova tra qualche secondo.");
-    throw error;
-  } finally {
-    window.clearTimeout(timeout);
   }
+  throw lastError || new Error("Errore comunicazione server");
 }
 
 function mergeActsIntoCache(acts = []) {
@@ -507,6 +545,51 @@ async function syncActsFromServer() {
   }
 }
 
+function persistPendingSync() {
+  localStorage.setItem("oroactive-pending-sync", JSON.stringify(state.pendingSync.slice(0, 30)));
+}
+
+function queuePendingActSave(act, method, identifier) {
+  const pending = {
+    id: `pending-${Date.now()}`,
+    method,
+    identifier,
+    act: sanitizeForSave(act),
+    createdAt: new Date().toISOString()
+  };
+  state.pendingSync = state.pendingSync.filter((item) => item.identifier !== identifier && item.act?.practiceNumber !== act.practiceNumber);
+  state.pendingSync.unshift(pending);
+  persistPendingSync();
+  return { ...act, id: act.id || pending.id, _pendingSync: true };
+}
+
+async function flushPendingSync() {
+  if (state.syncingPending || !state.authToken || !state.pendingSync.length || !navigator.onLine) return;
+  state.syncingPending = true;
+  try {
+    const remaining = [];
+    for (const item of state.pendingSync) {
+      try {
+        const identifier = item.act.id || item.identifier || item.act.practiceNumber;
+        const path = item.method === "PUT" ? `/atti/${encodeURIComponent(identifier)}` : "/atti";
+        const saved = await apiRequest(path, {
+          method: item.method,
+          retries: 1,
+          timeoutMs: 30000,
+          body: JSON.stringify(sanitizeForSave(item.act))
+        });
+        mergeActsIntoCache([saved]);
+      } catch {
+        remaining.push(item);
+      }
+    }
+    state.pendingSync = remaining;
+    persistPendingSync();
+  } finally {
+    state.syncingPending = false;
+  }
+}
+
 async function saveActRecord(act, method = "POST") {
   if (state.saving) throw new Error("Salvataggio già in corso.");
   state.saving = true;
@@ -518,13 +601,19 @@ async function saveActRecord(act, method = "POST") {
   showLoading("Salvataggio in corso...");
   let saved;
   try {
+    const payload = sanitizeForSave(act);
     saved = await apiRequest(path, {
       method,
       timeoutMs: 60000,
-      body: JSON.stringify(act)
+      body: JSON.stringify(payload)
     });
   } catch (error) {
-    throw error;
+    if (!navigator.onLine || /Connessione lenta|Failed to fetch|NetworkError/i.test(error.message || "")) {
+      saved = queuePendingActSave(act, method, identifier);
+      showToast("Connessione lenta: atto salvato temporaneamente e sincronizzato appena possibile.", "warning");
+    } else {
+      throw error;
+    }
   } finally {
     hideLoading();
     state.saving = false;
@@ -538,6 +627,7 @@ async function saveActRecord(act, method = "POST") {
   );
   if (index >= 0) demoActs[index] = { ...demoActs[index], ...saved };
   else demoActs.unshift(saved);
+  if (!saved._pendingSync) showToast("Salvataggio completato", "success");
   return saved;
 }
 
@@ -567,11 +657,15 @@ async function getActRecord(identifier) {
   }
 }
 
-function showToast(message) {
+function showToast(message, type = "") {
   toast.textContent = message;
+  toast.classList.remove("success", "error", "warning");
+  if (type) toast.classList.add(type);
   toast.classList.add("show");
   window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2400);
+  showToast.timer = window.setTimeout(() => {
+    toast.classList.remove("show", "success", "error", "warning");
+  }, 2600);
 }
 
 function showLogin() {
@@ -1223,7 +1317,13 @@ async function startAuthenticatedApp() {
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   if (isAdmin()) loadUsers();
   maybeShowLevelUnlockMessage();
-  if (!state.syncTimer) state.syncTimer = window.setInterval(syncActsFromServer, 30000);
+  await flushPendingSync();
+  if (!state.syncTimer) {
+    state.syncTimer = window.setInterval(async () => {
+      await flushPendingSync();
+      await syncActsFromServer();
+    }, 30000);
+  }
 }
 
 async function restoreSession() {
@@ -2182,6 +2282,14 @@ function renderDashboard() {
   const data = state.dashboard || {};
   const kpi = data.kpi || {};
   dashboardGrid.innerHTML = [
+    metricCard("Totale oro oggi", `${Number(kpi.grammi_giornalieri?.Oro || 0).toFixed(2)} gr`),
+    metricCard("Totale argento oggi", `${Number(kpi.grammi_giornalieri?.Argento || 0).toFixed(2)} gr`),
+    metricCard("Totale platino oggi", `${Number(kpi.grammi_giornalieri?.Platino || 0).toFixed(2)} gr`),
+    metricCard("Contanti erogati", formatEuro(kpi.contanti_erogati || 0)),
+    metricCard("Bonifici", formatEuro(kpi.bonifici || 0)),
+    metricCard("Utile giornaliero stimato", formatEuro(kpi.utile_giornaliero || 0)),
+    metricCard("Utile settimanale stimato", formatEuro(kpi.utile_settimanale || 0)),
+    metricCard("Utile mensile stimato", formatEuro(kpi.utile_mensile || 0)),
     metricCard("Fatturato giornaliero", formatEuro(kpi.fatturato_giornaliero || 0)),
     metricCard("Fatturato mensile", formatEuro(kpi.fatturato_mensile || 0)),
     metricCard("Atti giornalieri", kpi.numero_atti_giornalieri || 0),
@@ -2201,6 +2309,9 @@ function renderDashboard() {
   dashboardPanels.innerHTML = `
     <section class="dashboard-panel"><h3>Ranking negozi</h3>${ranking(data.ranking_negozi, "negozio")}</section>
     <section class="dashboard-panel"><h3>Ranking operatori</h3>${ranking(data.ranking_operatori, "operatore")}</section>
+    <section class="dashboard-panel"><h3>Alert operativi</h3>${(data.alerts || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong><em>${escapeHtml(item.detail || "")}</em></div>`).join("") || '<div class="empty-state">Nessun alert operativo.</div>'}</section>
+    <section class="dashboard-panel"><h3>OroActive Intelligence</h3>${(data.insights || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.title)}</span><strong>${escapeHtml(item.level || "info")}</strong><em>${escapeHtml(item.text)}</em></div>`).join("") || '<div class="empty-state">Nessun insight disponibile.</div>'}</section>
+    <section class="dashboard-panel"><h3>Fusioni</h3>${Object.entries(data.fusioni || {}).map(([key, value]) => `<div class="dashboard-rank-row"><span>${escapeHtml(key)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join("") || '<div class="empty-state">Nessuna fusione registrata.</div>'}</section>
     <section class="dashboard-panel"><h3>Carature frequenti</h3>${(data.carature_frequenti || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.titolo)}</span><strong>${item.count}</strong></div>`).join("") || '<div class="empty-state">Nessun dato disponibile.</div>'}</section>
     <section class="dashboard-panel"><h3>Pagamenti</h3>${Object.entries(data.pagamenti || {}).map(([key, value]) => `<div class="dashboard-rank-row"><span>${escapeHtml(key)}</span><strong>${escapeHtml(formatEuro(value))}</strong></div>`).join("") || '<div class="empty-state">Nessun dato disponibile.</div>'}</section>
   `;
@@ -4039,6 +4150,19 @@ function materialLotsForAct(act) {
   });
 }
 
+function titlePurity(metal, title = "") {
+  const clean = String(title || "").toLowerCase().replace(",", ".").trim();
+  const kt = clean.match(/(\d+(?:\.\d+)?)\s*kt/);
+  if (kt) return Number(kt[1]) / 24;
+  const numeric = clean.match(/\d+(?:\.\d+)?/);
+  if (numeric) {
+    const value = Number(numeric[0]);
+    if (value > 24) return value / 1000;
+    if (metal === "Oro") return value / 24;
+  }
+  return 1;
+}
+
 function fusionLots(acts) {
   return acts.flatMap(materialLotsForAct);
 }
@@ -4209,6 +4333,52 @@ async function confirmActFusion(practiceNumber) {
   }
 }
 
+async function confirmSelectedFusion(store) {
+  const selected = [...document.querySelectorAll(`[data-select-fusion-act]:checked`)]
+    .map((input) => input.dataset.selectFusionAct)
+    .filter(Boolean);
+  const unique = [...new Set(selected)];
+  if (!unique.length) {
+    showToast("Seleziona almeno un atto da mandare in fusione.");
+    return;
+  }
+  const acts = unique.map((practiceNumber) => demoActs.find((act) => act.practiceNumber === practiceNumber)).filter(Boolean);
+  const summary = fusionSummaryText(acts);
+  const proceed = window.confirm(`Vuoi creare un lotto fusione per ${acts.length} atti di ${store}? ${summary}`);
+  if (!proceed) return;
+  try {
+    showLoading("Creazione lotto fusione...");
+    const today = localDateKey();
+    const ddtNumber = ddtNumberForFusionBatch(store, today);
+    const lot = await apiRequest("/fusioni/lotti", {
+      method: "POST",
+      body: JSON.stringify({ atti: unique, negozio: store, data_invio: today })
+    }).catch(() => null);
+    for (const act of acts) {
+      const updatedAct = {
+        ...act,
+        fusion: {
+          ...(act.fusion || {}),
+          fused: true,
+          date: today,
+          ddtNumber,
+          lotId: lot?.lotto_code || fusionDdtCode(store, today, ddtNumber),
+          refinery: act.fusion?.refinery || "",
+          theoreticalValue: materialLotsForAct(act).reduce((total, lot) => total + Number(lot.weight || 0) * Number(act.quotazione || 0) / 1000 * titlePurity(lot.metal, lot.title), 0)
+        }
+      };
+      await saveActRecord(updatedAct, "PUT");
+    }
+    await loadFusionScreenData({ force: true, silent: true });
+    renderFusionGroups();
+    showToast("Lotto fusione creato e giacenza aggiornata.", "success");
+  } catch (error) {
+    showToast(error.message || "Lotto fusione non creato.", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
 function fusionActRows(acts, options = {}) {
   if (!acts.length) return '<div class="empty-state">Nessun atto presente.</div>';
   const today = localDateKey();
@@ -4217,7 +4387,7 @@ function fusionActRows(acts, options = {}) {
       <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Data acquisto</span><span>Fondibile dal</span><span>Materiale</span><span>Azioni</span></div>
       ${acts.flatMap((act) => materialLotsForAct(act).map((material) => `
         <div class="table-row">
-          <span>${escapeHtml(act.practiceNumber)}</span>
+          <span>${isActFused(act) ? "" : `<input type="checkbox" data-select-fusion-act="${escapeHtml(act.practiceNumber)}" aria-label="Seleziona ${escapeHtml(act.practiceNumber)}"> `}${escapeHtml(act.practiceNumber)}</span>
           <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
           <span>${escapeHtml(act.date)}</span>
           <em class="${(options.ready || act.fusionDate <= today) ? "done" : ""}">${escapeHtml(act.fusionDate || addDays(act.date, 10))}</em>
@@ -4299,6 +4469,10 @@ function renderFusionGroups() {
               <span>Raggruppata per materiale e negozio</span>
             </div>
             ${stockByTitleMarkup(stockActs)}
+            <div class="fusion-batch-actions">
+              <button class="primary-button" type="button" data-fuse-selected-store="${escapeHtml(store)}">Crea lotto fusione da selezionati</button>
+              <span>Seleziona piu atti per generare un lotto unico separato per materiale e caratura.</span>
+            </div>
             ${fusionActRows(orderedStoreActs)}
           </div>
           <div class="fusion-history">
@@ -5460,6 +5634,70 @@ async function handleCustomerCopyAction(action) {
   }
 }
 
+async function sha256Hex(text) {
+  const bytes = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function currentLocationSafe() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    const timeout = window.setTimeout(() => resolve(null), 1800);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        window.clearTimeout(timeout);
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+      },
+      () => {
+        window.clearTimeout(timeout);
+        resolve(null);
+      },
+      { enableHighAccuracy: false, timeout: 1500, maximumAge: 60000 }
+    );
+  });
+}
+
+async function attachLegalSignatureMetadata(act) {
+  const timestamp = new Date().toISOString();
+  const signedPayload = sanitizeForSave({
+    practiceNumber: act.practiceNumber,
+    status: act.status,
+    customer: {
+      name: act.name,
+      surname: act.surname,
+      fiscalCode: act.fiscalCode
+    },
+    sale: {
+      amount: act.amount,
+      materials: act.materials,
+      items: act.items
+    },
+    signatures: act.signatureImages?.map(Boolean)
+  });
+  const hash = await sha256Hex(JSON.stringify(signedPayload));
+  return {
+    ...act,
+    legalSignature: {
+      timestamp,
+      documentHashSha256: hash,
+      integrity: "SHA256",
+      antiTamper: true,
+      signedBy: displayUsername(state.currentUser),
+      operatorId: state.currentUser?.id || null,
+      location: await currentLocationSafe(),
+      auditTrail: [
+        ...(act.legalSignature?.auditTrail || []),
+        { action: "save", status: act.status, timestamp, operator: displayUsername(state.currentUser) }
+      ]
+    }
+  };
+}
+
 async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   await refreshAmlCashCheck({ force: true });
   if (normalizeWorkflowStatus(status) !== "Bozza" && notifyCashPaymentLimitIfNeeded({ force: true })) return false;
@@ -5481,17 +5719,18 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
       || act.practiceNumber === state.editingPracticeNumber
     ))
     : null;
-  const archivedAct = currentActSnapshot(status);
+  let archivedAct = currentActSnapshot(status);
   if (originalAct) {
     archivedAct.operatorId = originalAct.operatorId ?? archivedAct.operatorId;
     archivedAct.operatorUsername = originalAct.operatorUsername || archivedAct.operatorUsername;
     archivedAct.operatorName = originalAct.operatorName || archivedAct.operatorName;
   }
+  archivedAct = await attachLegalSignatureMetadata(archivedAct);
   archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   } catch (error) {
-    showToast("Errore nel salvataggio dell'atto. Controllare i campi compilati.");
+    showToast("Errore nel salvataggio dell'atto. Controllare i campi compilati.", "error");
     return false;
   }
   state.editingDirty = false;
@@ -5506,7 +5745,7 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
     }
   }
   if (wasEditing && options.destination === "menu") mainMenuScreen.hidden = false;
-  showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`);
+  showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`, "success");
   return true;
 }
 
@@ -5992,6 +6231,11 @@ document.getElementById("archiveGroups").addEventListener("click", (event) => {
 });
 
 document.getElementById("fusionGroups").addEventListener("click", (event) => {
+  const fuseSelectedButton = event.target.closest("[data-fuse-selected-store]");
+  if (fuseSelectedButton) {
+    confirmSelectedFusion(fuseSelectedButton.dataset.fuseSelectedStore);
+    return;
+  }
   const requestDeleteButton = event.target.closest("[data-request-delete-act]");
   if (requestDeleteButton) {
     requestActDeletion(requestDeleteButton.dataset.requestDeleteAct);
@@ -6165,6 +6409,10 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
     markPracticeDirty();
     updateSignatureState();
   });
+});
+
+window.addEventListener("online", () => {
+  flushPendingSync();
 });
 
 document.addEventListener("change", async (event) => {

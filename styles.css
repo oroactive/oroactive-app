@@ -2186,6 +2186,23 @@ input.document-expired {
   background: #fff;
 }
 
+.fusion-batch-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #ffd0ad;
+  border-radius: 8px;
+  background: #fff8f1;
+}
+
+.fusion-batch-actions span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .fusion-material.gold {
   background: #fff2e8;
   border-color: #ffc39e;
@@ -2791,6 +2808,21 @@ button.quality-review-badge {
 .toast.show {
   transform: translateY(0);
   opacity: 1;
+}
+
+.toast.success {
+  background: #18864b;
+  color: #fff;
+}
+
+.toast.warning {
+  background: #ffb020;
+  color: #111;
+}
+
+.toast.error {
+  background: #c9302c;
+  color: #fff;
 }
 
 .tutorial-overlay {
