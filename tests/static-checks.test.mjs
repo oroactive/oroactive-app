@@ -64,8 +64,29 @@ test("sezione corsi e certificazioni interne presenti", async () => {
   assert.match(app, /apiRequest\("\/corsi"/);
   assert.match(server, /app\.get\("\/api\/corsi"/);
   assert.match(server, /app\.post\("\/api\/corsi\/esami"/);
+  assert.match(server, /app\.delete\("\/api\/corsi\/:id"/);
+  assert.match(server, /app\.delete\("\/api\/corsi\/materiali\/:id"/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS course_certificates/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS course_badges/);
+});
+
+test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () => {
+  const [app, server, schema] = await Promise.all([
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql")
+  ]);
+
+  assert.match(app, /data-save-crm-client/);
+  assert.match(app, /data-delete-crm-client/);
+  assert.match(app, /data-view-backup/);
+  assert.match(app, /data-delete-backup/);
+  assert.match(server, /app\.put\("\/api\/crm\/clienti\/:id"/);
+  assert.match(server, /app\.delete\("\/api\/crm\/clienti\/:id"/);
+  assert.match(server, /app\.get\("\/api\/backups\/:id"/);
+  assert.match(server, /app\.delete\("\/api\/backups\/:id"/);
+  assert.match(schema, /ALTER TABLE clienti ADD COLUMN IF NOT EXISTS archiviato/);
+  assert.match(schema, /ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS metadata/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {

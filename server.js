@@ -1678,7 +1678,7 @@ async function initDatabase() {
 
 async function listBackups() {
   const result = await pool.query(
-    `SELECT id, tipo, filename, percorso, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at
+    `SELECT id, tipo, filename, percorso, stato, dettaglio, dimensione_bytes, n8n_ready, metadata, created_by, created_at, completed_at
      FROM backup_jobs
      ORDER BY created_at DESC
      LIMIT 60`
@@ -1686,7 +1686,7 @@ async function listBackups() {
   return result.rows.map((row) => ({
     ...row,
     mese: row.created_at ? new Date(row.created_at).toISOString().slice(0, 7) : "",
-    download_disponibile: row.stato === "completato" && Boolean(row.percorso)
+    download_disponibile: row.stato === "completato" && Boolean(row.percorso) && Number(row.dimensione_bytes || 0) > 0
   }));
 }
 
@@ -1762,21 +1762,52 @@ async function writeBackupManifest({ tipo, root, targetDir, filename, monthKey, 
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 }
 
-async function runBackup(tipo = "giornaliero") {
+async function runBackup(tipo = "giornaliero", user = {}) {
   const normalizedType = tipo === "mensile" ? "mensile" : "giornaliero";
   await fs.mkdir(backupDirectory, { recursive: true });
   const createdAt = new Date();
   const { root, targetDir, filename, outputPath, monthKey } = await backupPathFor(normalizedType, createdAt);
   const job = await pool.query(
-    `INSERT INTO backup_jobs (tipo, filename, percorso, stato, dettaglio, n8n_ready)
-     VALUES ($1, $2, $3, 'in corso', $4, TRUE)
+    `INSERT INTO backup_jobs (tipo, filename, percorso, stato, dettaglio, n8n_ready, metadata, created_by)
+     VALUES ($1::text, $2::text, $3::text, 'in corso', $4::text, TRUE, $5::jsonb, $6::bigint)
      RETURNING id`,
-    [normalizedType, filename, outputPath, "Backup server PostgreSQL. Documenti, PDF, firme, foto, CRM, AI, formazione e antifrode sono inclusi nel dump database quando salvati nei record OroActive."]
+    [
+      normalizedType,
+      filename,
+      outputPath,
+      "Backup server PostgreSQL. Documenti, PDF, firme, foto, CRM, AI, formazione e antifrode sono inclusi nel dump database quando salvati nei record OroActive.",
+      sanitizeForPostgres({ monthKey, folders: backupFolders, mode: "server" }),
+      user.id || null
+    ]
   );
 
   try {
     if (!process.env.DATABASE_URL) {
-      throw new Error("DATABASE_URL non configurato: backup PostgreSQL non eseguito.");
+      await writeBackupManifest({
+        tipo: normalizedType,
+        root,
+        targetDir,
+        filename,
+        monthKey,
+        status: "completato",
+        detail: "Backup logico creato. DATABASE_URL non configurato: nessun dump fisico eseguito.",
+        size: 0
+      });
+      const logical = await pool.query(
+        `UPDATE backup_jobs
+         SET stato = 'completato',
+             dettaglio = $2::text,
+             metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+             completed_at = NOW()
+         WHERE id = $1::bigint
+         RETURNING id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, metadata, created_by, created_at, completed_at`,
+        [
+          job.rows[0].id,
+          "Backup logico creato. Configura DATABASE_URL per includere dump fisico PostgreSQL.",
+          sanitizeForPostgres({ logical_backup: true, content: backupFolders })
+        ]
+      );
+      return logical.rows[0];
     }
     await execFileAsync(pgDumpPath, [process.env.DATABASE_URL, "--file", outputPath, "--no-owner", "--no-privileges"], {
       timeout: 15 * 60 * 1000,
@@ -1826,6 +1857,31 @@ async function runBackup(tipo = "giornaliero") {
     );
     return result.rows[0];
   }
+}
+
+async function backupDetail(id) {
+  const result = await pool.query(
+    `SELECT id, tipo, filename, percorso, stato, dettaglio, dimensione_bytes, n8n_ready, metadata, created_by, created_at, completed_at
+     FROM backup_jobs
+     WHERE id = $1::bigint`,
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteBackup(id) {
+  const detail = await backupDetail(id);
+  if (!detail) return false;
+  const resolved = detail.percorso ? path.resolve(detail.percorso) : "";
+  const allowedRoot = path.resolve(backupDirectory);
+  if (resolved) {
+    const relative = path.relative(allowedRoot, resolved);
+    if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
+      await fs.rm(resolved, { force: true }).catch(() => {});
+    }
+  }
+  const result = await pool.query("DELETE FROM backup_jobs WHERE id = $1::bigint RETURNING id", [id]);
+  return result.rowCount > 0;
 }
 
 async function runDailyBackupIfNeeded() {
@@ -2263,6 +2319,26 @@ async function upsertClientFromAct(act) {
     )),
     paymentMethod: act.payload?.paymentMethod || act.paymentMethod || ""
   };
+  const completeClient = [
+    act.clienteNome || act.name,
+    act.clienteCognome || act.surname,
+    fiscalCode,
+    payload.birthDate,
+    payload.birthPlace,
+    payload.address,
+    payload.residenceProvince,
+    payload.documentType,
+    payload.documentNumber,
+    payload.documentExpiry,
+    act.telefono || act.phone
+  ].every((value) => String(value || "").trim());
+  if (!completeClient || isDraftLikeStatus(act.status)) {
+    console.log("Cliente non inserito nel CRM: scheda cliente incompleta o atto in bozza", {
+      fiscalCode: fiscalCode ? "***" : "",
+      status: act.status || ""
+    });
+    return null;
+  }
   const values = [
     fiscalCode,
     nullIfEmpty(act.clienteNome || act.name),
@@ -2271,6 +2347,12 @@ async function upsertClientFromAct(act) {
     nullIfEmpty(act.payload?.email || act.email),
     nullIfEmpty(act.iban || act.payload?.iban),
     nullIfEmpty(act.negozioId || act.negozio_id || act.payload?.negozio_id),
+    nullIfEmpty(payload.address),
+    nullIfEmpty(payload.residenceProvince),
+    nullIfEmpty(payload.documentType),
+    nullIfEmpty(payload.documentNumber),
+    nullIfEmpty(payload.paymentMethod),
+    nullIfEmpty(act.payload?.accountHolder || act.intestatario_conto || act.accountHolder),
     sanitizeForPostgres(payload)
   ];
   const existing = await pool.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1", [fiscalCode]);
@@ -2283,15 +2365,23 @@ async function upsertClientFromAct(act) {
         email = COALESCE(NULLIF($5::text, ''), email),
         iban = COALESCE(NULLIF($6::text, ''), iban),
         negozio_id = COALESCE($7::bigint, negozio_id),
-        payload = COALESCE(payload, '{}'::jsonb) || COALESCE($8::jsonb, '{}'::jsonb),
+        indirizzo = COALESCE(NULLIF($8::text, ''), indirizzo),
+        provincia = COALESCE(NULLIF($9::text, ''), provincia),
+        documento_tipo = COALESCE(NULLIF($10::text, ''), documento_tipo),
+        documento_numero = COALESCE(NULLIF($11::text, ''), documento_numero),
+        metodo_pagamento = COALESCE(NULLIF($12::text, ''), metodo_pagamento),
+        intestatario_conto = COALESCE(NULLIF($13::text, ''), intestatario_conto),
+        archiviato = FALSE,
+        payload = COALESCE(payload, '{}'::jsonb) || COALESCE($14::jsonb, '{}'::jsonb),
         updated_at = NOW()
-       WHERE id = $9::bigint
+       WHERE id = $15::bigint
        RETURNING *`,
       [...values, existing.rows[0].id]
     )
     : await pool.query(
-      `INSERT INTO clienti (codice_fiscale, nome, cognome, telefono, email, iban, negozio_id, payload)
-       VALUES ($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::bigint, $8::jsonb)
+      `INSERT INTO clienti
+        (codice_fiscale, nome, cognome, telefono, email, iban, negozio_id, indirizzo, provincia, documento_tipo, documento_numero, metodo_pagamento, intestatario_conto, payload)
+       VALUES ($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::bigint, $8::text, $9::text, $10::text, $11::text, $12::text, $13::text, $14::jsonb)
        RETURNING *`,
       values
     );
@@ -2353,15 +2443,25 @@ async function getClientByFiscalCode(fiscalCode) {
 
 function publicClient(row) {
   if (!row) return null;
+  const payload = row.payload || {};
   return {
-    ...(row.payload || {}),
+    ...payload,
     id: row.id,
     fiscalCode: row.codice_fiscale,
-    name: row.nome || row.payload?.name || "",
-    surname: row.cognome || row.payload?.surname || "",
+    name: row.nome || payload.name || "",
+    surname: row.cognome || payload.surname || "",
     phone: row.telefono || "",
     email: row.email || "",
-    iban: row.iban || row.payload?.iban || ""
+    iban: row.iban || payload.iban || "",
+    address: row.indirizzo || payload.address || "",
+    province: row.provincia || payload.residenceProvince || "",
+    documentType: row.documento_tipo || payload.documentType || "",
+    documentNumber: row.documento_numero || payload.documentNumber || "",
+    paymentMethod: row.metodo_pagamento || payload.paymentMethod || "",
+    accountHolder: row.intestatario_conto || payload.accountHolder || "",
+    level: row.livello_cliente || "nuovo",
+    notes: row.note_interne || "",
+    archived: Boolean(row.archiviato)
   };
 }
 
@@ -2801,6 +2901,7 @@ async function listCourses(user = {}) {
     `SELECT c.*, cat.name AS category_name, sec.title AS section_title,
             COALESCE(mat.file_url, '') AS material_url,
             COALESCE(mat.title, '') AS material_title,
+            mat.id AS material_id,
             COALESCE(progress.percentuale, 0) AS percentuale,
             COALESCE(progress.status, 'non iniziato') AS status
      FROM courses c
@@ -2877,11 +2978,17 @@ async function createCourse(input = {}, user = {}) {
       user.id
     ]
   );
-  if (input.material_url) {
+  const materialUrl = String(input.material_data_url || input.material_url || "").trim();
+  if (materialUrl) {
     await pool.query(
       `INSERT INTO course_materials (course_id, title, material_type, file_url)
        VALUES ($1::bigint, $2::text, $3::text, $4::text)`,
-      [result.rows[0].id, input.material_title || "Materiale corso", "link", String(input.material_url || "").trim()]
+      [
+        result.rows[0].id,
+        input.material_filename || input.material_title || "Materiale corso",
+        input.material_type || (String(input.material_data_url || "").startsWith("data:") ? "file" : "link"),
+        materialUrl
+      ]
     );
   }
   return result.rows[0];
@@ -2923,17 +3030,59 @@ async function updateCourse(id, input = {}, user = {}) {
     ]
   );
   if (!result.rows[0]) return null;
-  if (input.material_url !== undefined) {
+  if (input.material_url !== undefined || input.material_data_url !== undefined) {
     await pool.query("DELETE FROM course_materials WHERE course_id = $1::bigint", [id]);
-    if (String(input.material_url || "").trim()) {
+    const materialUrl = String(input.material_data_url || input.material_url || "").trim();
+    if (materialUrl) {
       await pool.query(
         `INSERT INTO course_materials (course_id, title, material_type, file_url)
          VALUES ($1::bigint, $2::text, $3::text, $4::text)`,
-        [id, input.material_title || "Materiale corso", "link", String(input.material_url || "").trim()]
+        [
+          id,
+          input.material_filename || input.material_title || "Materiale corso",
+          input.material_type || (String(input.material_data_url || "").startsWith("data:") ? "file" : "link"),
+          materialUrl
+        ]
       );
     }
   }
   return result.rows[0];
+}
+
+async function deleteCourse(id, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query("DELETE FROM courses WHERE id = $1::bigint RETURNING id", [id]);
+  return result.rowCount > 0;
+}
+
+async function deleteCourseMaterial(id, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query("DELETE FROM course_materials WHERE id = $1::bigint RETURNING id", [id]);
+  return result.rowCount > 0;
+}
+
+async function deleteCourseSection(id, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const linked = await pool.query("SELECT COUNT(*)::int AS count FROM courses WHERE section_id = $1::bigint", [id]);
+  if (Number(linked.rows[0]?.count || 0) > 0) {
+    const error = new Error("La sottosezione contiene corsi: elimina o sposta prima i corsi collegati.");
+    error.status = 400;
+    throw error;
+  }
+  const result = await pool.query("DELETE FROM course_sections WHERE id = $1::bigint RETURNING id", [id]);
+  return result.rowCount > 0;
 }
 
 async function saveCourseProgress(input = {}, user = {}) {
@@ -3091,12 +3240,14 @@ async function crmClients(user = {}, query = {}) {
     `SELECT c.*,
             COUNT(a.id)::int AS atti_count,
             COALESCE(SUM(a.totale), 0)::numeric AS totale_pagato,
-            MAX(a.data_atto) AS ultimo_atto
+            MAX(a.data_atto) AS ultimo_atto,
+            ARRAY_REMOVE(ARRAY_AGG(DISTINCT COALESCE(a.store, n.nome)), NULL) AS negozi_visitati
      FROM clienti c
      LEFT JOIN ${actsTable} a ON UPPER(a.codice_fiscale) = UPPER(c.codice_fiscale)
-     WHERE 1 = 1 ${storeWhere} ${searchWhere}
+     LEFT JOIN negozi n ON n.id = c.negozio_id
+     WHERE COALESCE(c.archiviato, FALSE) = FALSE ${storeWhere} ${searchWhere}
      GROUP BY c.id
-     ORDER BY ultimo_atto DESC NULLS LAST, c.updated_at DESC
+     ORDER BY LOWER(COALESCE(c.cognome, '')) ASC, LOWER(COALESCE(c.nome, '')) ASC
      LIMIT 100`,
     values
   );
@@ -3107,6 +3258,7 @@ async function crmClients(user = {}, query = {}) {
       atti_count: row.atti_count,
       totale_pagato: Number(row.totale_pagato || 0),
       ultimo_atto: row.ultimo_atto,
+      negozi_visitati: row.negozi_visitati || [],
       prossima_azione: row.prossima_azione || ""
     }))
   };
@@ -3116,6 +3268,23 @@ async function crmClientDetail(id, user = {}) {
   const clientResult = await pool.query("SELECT * FROM clienti WHERE id = $1", [id]);
   const client = clientResult.rows[0];
   if (!client) return null;
+  if (!roleSeesAllStores(user.ruolo)) {
+    const store = await storeForUser(user);
+    const access = await pool.query(
+      `SELECT 1
+       FROM clienti c
+       LEFT JOIN ${actsTable} a ON UPPER(a.codice_fiscale) = UPPER(c.codice_fiscale)
+       WHERE c.id = $1::bigint
+         AND (c.negozio_id = $2::bigint OR a.negozio_id = $2::bigint OR a.store = $3::text)
+       LIMIT 1`,
+      [id, store?.id || null, store?.nome || ""]
+    );
+    if (!access.rowCount) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+  }
   const values = [client.codice_fiscale || ""];
   const storeWhere = await visibleStoreWhere(user, values, "a");
   const acts = await pool.query(
@@ -3136,6 +3305,72 @@ async function addClientNote(id, input = {}, user = {}) {
     [id, user.id, input.note || ""]
   );
   return result.rows[0];
+}
+
+async function updateCrmClient(id, input = {}, user = {}) {
+  const detail = await crmClientDetail(id, user);
+  if (!detail) return null;
+  const payload = {
+    ...(detail.client || {}),
+    birthDate: input.birthDate || input.data_nascita || detail.client.birthDate || "",
+    birthPlace: input.birthPlace || input.luogo_nascita || detail.client.birthPlace || "",
+    residenceProvince: input.province || input.provincia || detail.client.province || "",
+    address: input.address || input.indirizzo || detail.client.address || "",
+    documentType: input.documentType || input.documento_tipo || detail.client.documentType || "",
+    documentNumber: input.documentNumber || input.documento_numero || detail.client.documentNumber || "",
+    paymentMethod: input.paymentMethod || input.metodo_pagamento || detail.client.paymentMethod || "",
+    accountHolder: input.accountHolder || input.intestatario_conto || detail.client.accountHolder || ""
+  };
+  const result = await pool.query(
+    `UPDATE clienti
+     SET nome = COALESCE(NULLIF($2::text, ''), nome),
+         cognome = COALESCE(NULLIF($3::text, ''), cognome),
+         codice_fiscale = COALESCE(NULLIF(UPPER($4::text), ''), codice_fiscale),
+         telefono = COALESCE(NULLIF($5::text, ''), telefono),
+         email = COALESCE(NULLIF($6::text, ''), email),
+         iban = COALESCE(NULLIF($7::text, ''), iban),
+         indirizzo = COALESCE(NULLIF($8::text, ''), indirizzo),
+         provincia = COALESCE(NULLIF($9::text, ''), provincia),
+         documento_tipo = COALESCE(NULLIF($10::text, ''), documento_tipo),
+         documento_numero = COALESCE(NULLIF($11::text, ''), documento_numero),
+         metodo_pagamento = COALESCE(NULLIF($12::text, ''), metodo_pagamento),
+         intestatario_conto = COALESCE(NULLIF($13::text, ''), intestatario_conto),
+         livello_cliente = COALESCE(NULLIF($14::text, ''), livello_cliente),
+         note_interne = COALESCE($15::text, note_interne),
+         payload = COALESCE(payload, '{}'::jsonb) || $16::jsonb,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [
+      id,
+      input.name || input.nome || "",
+      input.surname || input.cognome || "",
+      input.fiscalCode || input.codice_fiscale || "",
+      input.phone || input.telefono || "",
+      input.email || "",
+      input.iban || "",
+      input.address || input.indirizzo || "",
+      input.province || input.provincia || "",
+      input.documentType || input.documento_tipo || "",
+      input.documentNumber || input.documento_numero || "",
+      input.paymentMethod || input.metodo_pagamento || "",
+      input.accountHolder || input.intestatario_conto || "",
+      input.level || input.livello_cliente || "",
+      input.notes || input.note_interne || "",
+      sanitizeForPostgres(payload)
+    ]
+  );
+  return publicClient(result.rows[0]);
+}
+
+async function archiveCrmClient(id, user = {}) {
+  const detail = await crmClientDetail(id, user);
+  if (!detail) return false;
+  const result = await pool.query(
+    "UPDATE clienti SET archiviato = TRUE, updated_at = NOW() WHERE id = $1::bigint RETURNING id",
+    [id]
+  );
+  return result.rowCount > 0;
 }
 
 async function createInventoryTransfer(input = {}, user = {}) {
@@ -3724,7 +3959,27 @@ app.get("/api/backups", requireFounder, async (_request, response, next) => {
 
 app.post("/api/backups/run", requireFounder, async (_request, response, next) => {
   try {
-    response.status(201).json(await runBackup(_request.body?.tipo === "mensile" ? "mensile" : "giornaliero"));
+    response.status(201).json(await runBackup(_request.body?.tipo === "mensile" ? "mensile" : "giornaliero", _request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/backups/:id", requireFounder, async (request, response, next) => {
+  try {
+    const detail = await backupDetail(request.params.id);
+    if (!detail) return response.status(404).json({ error: "Backup non trovato" });
+    response.json({ backup: detail });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/backups/:id", requireFounder, async (request, response, next) => {
+  try {
+    const deleted = await deleteBackup(request.params.id);
+    if (!deleted) return response.status(404).json({ error: "Backup non trovato" });
+    response.status(204).end();
   } catch (error) {
     next(error);
   }
@@ -3830,6 +4085,36 @@ app.put("/api/corsi/:id", async (request, response, next) => {
   }
 });
 
+app.delete("/api/corsi/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteCourse(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Corso non trovato" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/corsi/materiali/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteCourseMaterial(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Materiale non trovato" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/corsi/sottosezioni/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteCourseSection(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Sottosezione non trovata" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/corsi/progress", async (request, response, next) => {
   try {
     response.status(201).json(await saveCourseProgress(request.body, request.user));
@@ -3893,6 +4178,26 @@ app.get("/api/crm/clienti/:id", async (request, response, next) => {
     const detail = await crmClientDetail(request.params.id, request.user);
     if (!detail) return response.status(404).json({ error: "Cliente non trovato" });
     response.json(detail);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/crm/clienti/:id", async (request, response, next) => {
+  try {
+    const client = await updateCrmClient(request.params.id, request.body, request.user);
+    if (!client) return response.status(404).json({ error: "Cliente non trovato" });
+    response.json(client);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/crm/clienti/:id", async (request, response, next) => {
+  try {
+    const deleted = await archiveCrmClient(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Cliente non trovato" });
+    response.status(204).end();
   } catch (error) {
     next(error);
   }

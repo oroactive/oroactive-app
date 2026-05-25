@@ -125,6 +125,7 @@ const courseSearch = document.getElementById("courseSearch");
 const courseCategoryFilter = document.getElementById("courseCategoryFilter");
 const trainingCourseReset = document.getElementById("trainingCourseReset");
 const trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
+const trainingCourseFile = document.getElementById("trainingCourseFile");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
@@ -2439,21 +2440,47 @@ function renderBackups() {
     return;
   }
   backupsList.innerHTML = `
-    <div class="table-row head"><span>Mese</span><span>Data backup</span><span>Tipo</span><span>Stato</span><span>Dimensione</span><span>Azioni</span></div>
+    <div class="table-row head"><span>Data/ora</span><span>Tipo</span><span>Stato</span><span>Dimensione</span><span>Dettaglio</span><span>Azioni</span></div>
     ${state.backups.map((backup) => `
       <div class="table-row">
-        <span>${escapeHtml(backup.mese || "Dato non inserito")}</span>
         <span>${escapeHtml(backup.created_at ? new Date(backup.created_at).toLocaleString("it-IT") : "Dato non inserito")}</span>
         <span>${escapeHtml(backup.tipo || "automatico")}</span>
         <em class="${backup.stato === "completato" ? "done" : backup.stato === "errore" ? "warning" : ""}">${escapeHtml(backup.stato || "in corso")}</em>
         <span>${Number(backup.dimensione_bytes || 0) ? `${(Number(backup.dimensione_bytes) / 1024 / 1024).toFixed(2)} MB` : "Dato non inserito"}</span>
+        <span>${escapeHtml(String(backup.dettaglio || "").slice(0, 80) || "Dato non inserito")}</span>
         <div class="row-actions">
+          <button type="button" data-view-backup="${escapeHtml(String(backup.id))}">Visualizza dati interni</button>
           ${backup.download_disponibile ? `<button type="button" data-download-backup="${escapeHtml(String(backup.id))}">Download</button>` : ""}
-          ${backup.stato === "errore" ? `<button type="button" data-backup-error="${escapeHtml(backup.dettaglio || "Errore non specificato")}">Log errore</button>` : ""}
+          <button class="danger-button" type="button" data-delete-backup="${escapeHtml(String(backup.id))}">Elimina backup</button>
         </div>
       </div>
     `).join("")}
   `;
+}
+
+async function viewBackup(id) {
+  const data = await apiRequest(`/backups/${encodeURIComponent(id)}`);
+  const backup = data.backup || {};
+  previewTitle.textContent = "Dati interni backup";
+  previewBody.innerHTML = `
+    <section class="customer-copy-options">
+      <h3>Backup ${escapeHtml(String(backup.id || ""))}</h3>
+      <p>Creato il: ${escapeHtml(backup.created_at ? new Date(backup.created_at).toLocaleString("it-IT") : "Dato non inserito")}</p>
+      <p>Tipo: ${escapeHtml(backup.tipo || "Dato non inserito")} · Stato: ${escapeHtml(backup.stato || "Dato non inserito")}</p>
+      <p>Dimensione: ${Number(backup.dimensione_bytes || 0) ? `${(Number(backup.dimensione_bytes) / 1024 / 1024).toFixed(2)} MB` : "Dato non inserito"}</p>
+      <p>Dettaglio: ${escapeHtml(backup.dettaglio || "Dato non inserito")}</p>
+      <pre class="backup-detail-json">${escapeHtml(JSON.stringify(backup.metadata || {}, null, 2))}</pre>
+    </section>
+  `;
+  previewModal.hidden = false;
+}
+
+async function deleteBackup(id) {
+  if (!isFounder() || !id) return;
+  if (!window.confirm("Sei sicuro di voler eliminare questo backup?")) return;
+  await apiRequest(`/backups/${encodeURIComponent(id)}`, { method: "DELETE" });
+  await loadBackups();
+  showToast("Backup eliminato correttamente", "success");
 }
 
 async function loadBackups() {
@@ -2696,7 +2723,6 @@ function resetTrainingCourseFormValues() {
   if (!trainingCourseForm) return;
   trainingCourseForm.reset();
   document.getElementById("trainingCourseId").value = "";
-  document.getElementById("trainingCourseOrder").value = "0";
   document.getElementById("trainingCourseActive").checked = true;
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Crea corso";
 }
@@ -2784,6 +2810,9 @@ function renderCourseCard(course) {
         <button type="button" data-course-progress="${escapeHtml(String(course.id))}">Aggiorna avanzamento</button>
         ${canEvaluate ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Segna esame superato</button>` : ""}
         ${canManage ? `<button type="button" data-edit-course="${escapeHtml(String(course.id))}">Modifica</button>` : ""}
+        ${canManage ? `<button class="danger-button" type="button" data-delete-course="${escapeHtml(String(course.id))}">Elimina corso</button>` : ""}
+        ${canManage && course.material_id ? `<button type="button" data-delete-course-material="${escapeHtml(String(course.material_id))}">Elimina materiale</button>` : ""}
+        ${canManage && course.section_id ? `<button type="button" data-delete-course-section="${escapeHtml(String(course.section_id))}">Elimina sottosezione</button>` : ""}
       </div>
     </article>
   `;
@@ -2804,6 +2833,8 @@ async function createTrainingCourse(event) {
   event.preventDefault();
   if (!canManageCoursesUi()) return;
   const id = document.getElementById("trainingCourseId")?.value;
+  const selectedFile = trainingCourseFile?.files?.[0];
+  const materialDataUrl = selectedFile ? await fileToDataUrl(selectedFile) : "";
   await apiRequest(id ? `/corsi/${encodeURIComponent(id)}` : "/corsi", {
     method: id ? "PUT" : "POST",
     body: JSON.stringify({
@@ -2812,13 +2843,15 @@ async function createTrainingCourse(event) {
       section: document.getElementById("trainingCourseSection").value.trim(),
       description: document.getElementById("trainingCourseDescription").value.trim(),
       material_url: document.getElementById("trainingCourseMaterial").value.trim(),
-      order_index: Number(document.getElementById("trainingCourseOrder").value || 0),
+      material_data_url: materialDataUrl,
+      material_filename: selectedFile?.name || "",
+      material_type: selectedFile?.type || "",
       active: document.getElementById("trainingCourseActive").checked
     })
   });
   resetTrainingCourseFormValues();
   await loadTraining();
-  showToast(id ? "Corso aggiornato." : "Corso creato.");
+  showToast(id ? "Corso aggiornato correttamente" : "Corso creato.");
 }
 
 async function updateCourseProgress(courseId) {
@@ -2854,9 +2887,32 @@ function editCourse(courseId) {
   document.getElementById("trainingCourseSection").value = course.section_title || "";
   document.getElementById("trainingCourseDescription").value = course.description || "";
   document.getElementById("trainingCourseMaterial").value = course.material_url || "";
-  document.getElementById("trainingCourseOrder").value = String(course.order_index || 0);
   document.getElementById("trainingCourseActive").checked = course.active !== false;
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva modifiche";
+}
+
+async function deleteCourse(courseId) {
+  if (!canManageCoursesUi()) return;
+  if (!window.confirm("Sei sicuro di voler eliminare questo elemento?")) return;
+  await apiRequest(`/corsi/${encodeURIComponent(courseId)}`, { method: "DELETE" });
+  await loadTraining();
+  showToast("Corso eliminato correttamente.");
+}
+
+async function deleteCourseMaterial(materialId) {
+  if (!canManageCoursesUi()) return;
+  if (!window.confirm("Sei sicuro di voler eliminare questo elemento?")) return;
+  await apiRequest(`/corsi/materiali/${encodeURIComponent(materialId)}`, { method: "DELETE" });
+  await loadTraining();
+  showToast("Materiale eliminato correttamente.");
+}
+
+async function deleteCourseSection(sectionId) {
+  if (!canManageCoursesUi()) return;
+  if (!window.confirm("Sei sicuro di voler eliminare questo elemento?")) return;
+  await apiRequest(`/corsi/sottosezioni/${encodeURIComponent(sectionId)}`, { method: "DELETE" });
+  await loadTraining();
+  showToast("Sottosezione eliminata correttamente.");
 }
 
 async function downloadCourseCertificate(certificateId) {
@@ -2885,13 +2941,13 @@ function renderCrmClients() {
     return;
   }
   crmList.innerHTML = `
-    <div class="table-row head"><span>Cliente</span><span>Codice fiscale</span><span>Telefono</span><span>Livello</span><span>Storico</span><span>Azioni</span></div>
+    <div class="table-row head"><span>Cliente</span><span>Negozi</span><span>Codice fiscale</span><span>Telefono</span><span>Storico</span><span>Azioni</span></div>
     ${state.crmClients.map((client) => `
       <div class="table-row">
         <strong>${escapeHtml(`${client.name || ""} ${client.surname || ""}`.trim() || "Dato non inserito")}</strong>
+        <span>${escapeHtml((client.negozi_visitati || []).join(", ") || "Dato non inserito")}</span>
         <span>${escapeHtml(client.fiscalCode || "")}</span>
         <span>${escapeHtml(client.phone || "")}</span>
-        <em>${escapeHtml(client.livello_cliente || "nuovo")}</em>
         <span>${Number(client.atti_count || 0)} atti · ${escapeHtml(formatEuro(client.totale_pagato || 0))}</span>
         <button type="button" data-open-crm-client="${client.id}">Apri</button>
       </div>
@@ -2911,18 +2967,70 @@ async function openCrmClient(id) {
   const client = detail.client || {};
   previewTitle.textContent = "Scheda CRM cliente";
   previewBody.innerHTML = `
-    <section class="customer-copy-options">
+    <section class="customer-copy-options crm-edit-panel" data-crm-edit="${escapeHtml(String(client.id))}">
       <h3>${escapeHtml(`${client.name || ""} ${client.surname || ""}`.trim() || "Cliente")}</h3>
-      <p>Codice fiscale: ${escapeHtml(client.fiscalCode || "Dato non inserito")}</p>
-      <p>Telefono: ${escapeHtml(client.phone || "Dato non inserito")} · Email: ${escapeHtml(client.email || "Dato non inserito")}</p>
-      <p>IBAN: ${escapeHtml(client.iban || "Dato non inserito")}</p>
+      <div class="crm-edit-grid">
+        <label>Nome <input id="crmEditName" value="${escapeHtml(client.name || "")}"></label>
+        <label>Cognome <input id="crmEditSurname" value="${escapeHtml(client.surname || "")}"></label>
+        <label>Codice fiscale <input id="crmEditFiscalCode" value="${escapeHtml(client.fiscalCode || "")}"></label>
+        <label>Telefono <input id="crmEditPhone" value="${escapeHtml(client.phone || "")}"></label>
+        <label>Email <input id="crmEditEmail" value="${escapeHtml(client.email || "")}"></label>
+        <label>Indirizzo <input id="crmEditAddress" value="${escapeHtml(client.address || "")}"></label>
+        <label>Provincia <input id="crmEditProvince" value="${escapeHtml(client.province || "")}"></label>
+        <label>Documento <input id="crmEditDocumentType" value="${escapeHtml(client.documentType || "")}"></label>
+        <label>Numero documento <input id="crmEditDocumentNumber" value="${escapeHtml(client.documentNumber || "")}"></label>
+        <label>IBAN <input id="crmEditIban" value="${escapeHtml(client.iban || "")}"></label>
+        <label>Intestatario conto <input id="crmEditAccountHolder" value="${escapeHtml(client.accountHolder || "")}"></label>
+        <label>Livello cliente
+          <select id="crmEditLevel">
+            ${["nuovo", "ricorrente", "VIP", "attenzione", "bloccato"].map((level) => `<option ${String(client.level || client.livello_cliente || "nuovo") === level ? "selected" : ""}>${level}</option>`).join("")}
+          </select>
+        </label>
+        <label>Note operative <textarea id="crmEditNotes" rows="4">${escapeHtml(client.notes || "")}</textarea></label>
+      </div>
       <h4>Storico atti</h4>
       ${(detail.acts || []).map((act) => `<p>${escapeHtml(act.practiceNumber)} · ${escapeHtml(act.date)} · ${escapeHtml(formatEuro(act.amount || 0))}</p>`).join("") || "<p>Nessun atto collegato.</p>"}
       <h4>Note interne</h4>
       ${(detail.notes || []).map((note) => `<p>${escapeHtml(note.note)}</p>`).join("") || "<p>Nessuna nota.</p>"}
+      <div class="preview-action-stack">
+        <button class="primary-button" type="button" data-save-crm-client="${escapeHtml(String(client.id))}">Salva modifiche</button>
+        <button class="danger-button" type="button" data-delete-crm-client="${escapeHtml(String(client.id))}">Elimina cliente</button>
+      </div>
     </section>
   `;
   previewModal.hidden = false;
+}
+
+async function saveCrmClient(id) {
+  await apiRequest(`/crm/clienti/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      name: document.getElementById("crmEditName")?.value.trim(),
+      surname: document.getElementById("crmEditSurname")?.value.trim(),
+      fiscalCode: document.getElementById("crmEditFiscalCode")?.value.trim(),
+      phone: document.getElementById("crmEditPhone")?.value.trim(),
+      email: document.getElementById("crmEditEmail")?.value.trim(),
+      address: document.getElementById("crmEditAddress")?.value.trim(),
+      province: document.getElementById("crmEditProvince")?.value.trim(),
+      documentType: document.getElementById("crmEditDocumentType")?.value.trim(),
+      documentNumber: document.getElementById("crmEditDocumentNumber")?.value.trim(),
+      iban: document.getElementById("crmEditIban")?.value.trim(),
+      accountHolder: document.getElementById("crmEditAccountHolder")?.value.trim(),
+      level: document.getElementById("crmEditLevel")?.value,
+      notes: document.getElementById("crmEditNotes")?.value.trim()
+    })
+  });
+  previewModal.hidden = true;
+  await loadCrmClients();
+  showToast("Cliente aggiornato correttamente", "success");
+}
+
+async function deleteCrmClient(id) {
+  if (!window.confirm("Sei sicuro di voler eliminare questo cliente dal CRM?")) return;
+  await apiRequest(`/crm/clienti/${encodeURIComponent(id)}`, { method: "DELETE" });
+  previewModal.hidden = true;
+  await loadCrmClients();
+  showToast("Cliente eliminato dal CRM.", "success");
 }
 
 function actOperatorKey(act) {
@@ -6167,11 +6275,17 @@ trainingList?.addEventListener("click", async (event) => {
   const progress = event.target.closest("[data-course-progress]");
   const exam = event.target.closest("[data-course-exam]");
   const edit = event.target.closest("[data-edit-course]");
+  const deleteCourseButton = event.target.closest("[data-delete-course]");
+  const deleteMaterialButton = event.target.closest("[data-delete-course-material]");
+  const deleteSectionButton = event.target.closest("[data-delete-course-section]");
   const certificate = event.target.closest("[data-download-certificate]");
   try {
     if (progress) await updateCourseProgress(progress.dataset.courseProgress);
     if (exam) await markCourseExamPassed(exam.dataset.courseExam);
     if (edit) editCourse(edit.dataset.editCourse);
+    if (deleteCourseButton) await deleteCourse(deleteCourseButton.dataset.deleteCourse);
+    if (deleteMaterialButton) await deleteCourseMaterial(deleteMaterialButton.dataset.deleteCourseMaterial);
+    if (deleteSectionButton) await deleteCourseSection(deleteSectionButton.dataset.deleteCourseSection);
     if (certificate) await downloadCourseCertificate(certificate.dataset.downloadCertificate);
   } catch (error) {
     showToast(error.message || "Operazione corso non riuscita.");
@@ -6185,13 +6299,25 @@ crmList?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-open-crm-client]");
   if (button) openCrmClient(button.dataset.openCrmClient);
 });
+previewBody?.addEventListener("click", async (event) => {
+  const saveClient = event.target.closest("[data-save-crm-client]");
+  const deleteClient = event.target.closest("[data-delete-crm-client]");
+  try {
+    if (saveClient) await saveCrmClient(saveClient.dataset.saveCrmClient);
+    if (deleteClient) await deleteCrmClient(deleteClient.dataset.deleteCrmClient);
+  } catch (error) {
+    showToast(error.message || "Operazione CRM non riuscita.");
+  }
+});
 document.getElementById("runBackupNow")?.addEventListener("click", () => runBackupNow("giornaliero"));
 document.getElementById("runMonthlyBackupNow")?.addEventListener("click", () => runBackupNow("mensile"));
 backupsList?.addEventListener("click", (event) => {
   const download = event.target.closest("[data-download-backup]");
-  const error = event.target.closest("[data-backup-error]");
+  const view = event.target.closest("[data-view-backup]");
+  const deleteButton = event.target.closest("[data-delete-backup]");
   if (download) downloadBackup(download.dataset.downloadBackup);
-  if (error) window.alert(error.dataset.backupError || "Errore non specificato");
+  if (view) viewBackup(view.dataset.viewBackup);
+  if (deleteButton) deleteBackup(deleteButton.dataset.deleteBackup);
 });
 document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
   refreshBullionVaultPrices({ notify: true });

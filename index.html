@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260525-corsi-1">
+  <link rel="stylesheet" href="styles.css?v=20260525-corsi-crm-backup-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -678,18 +678,11 @@
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
           <div>
-            <p class="eyebrow">Founder</p>
+            <p class="eyebrow">Sicurezza dati</p>
             <h2>Backup</h2>
-            <p class="muted">Backup giornalieri automatici di database, documenti, PDF, firme e foto salvati nel gestionale. Predisposto per integrazione futura n8n.</p>
+            <p class="muted">Crea, controlla e gestisci backup lato server. Se il dump fisico non è configurato viene creato un backup logico tracciato.</p>
           </div>
-          <button class="primary-button" type="button" id="runBackupNow">Esegui backup ora</button>
-        </div>
-        <div class="backup-status-card">
-          <strong>Protezione dati OroActive</strong>
-          <span>Il service worker non memorizza dati sensibili: atti, clienti, documenti, PDF e API restano sempre esclusi dalla cache PWA.</span>
-        </div>
-        <div class="user-form-actions">
-          <button class="ghost-button" type="button" id="runMonthlyBackupNow">Esegui backup mensile completo</button>
+          <button class="primary-button" type="button" id="runBackupNow">Crea nuovo backup</button>
         </div>
         <div class="archive-table users-table" id="backupsList" aria-live="polite"></div>
       </section>
@@ -787,8 +780,8 @@
           </label>
           <label>Sottosezione <input id="trainingCourseSection" placeholder="Esempio: Oro base, Antiriciclaggio, Cliente"></label>
           <label>Descrizione <textarea id="trainingCourseDescription" rows="4"></textarea></label>
-          <label>Materiale o link video <input id="trainingCourseMaterial" placeholder="Link PDF, video corso o nota materiale"></label>
-          <label>Ordinamento <input id="trainingCourseOrder" type="number" min="0" value="0"></label>
+          <label>Materiale o link video <input id="trainingCourseMaterial" placeholder="Link PDF o video esterno https"></label>
+          <label>Carica file corso <input id="trainingCourseFile" type="file" accept=".pdf,.mp4,.mov,.txt,.doc,.docx,application/pdf,video/mp4,video/quicktime,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
           <label class="inline-check"><input id="trainingCourseActive" type="checkbox" checked> Corso attivo</label>
           <div class="user-form-actions">
             <button class="primary-button" type="submit" id="trainingCourseSaveButton">Crea corso</button>
@@ -976,6 +969,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260525-corsi-1"></script>
+  <script src="app.js?v=20260525-corsi-crm-backup-1"></script>
 </body>
 </html>

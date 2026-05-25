@@ -492,7 +492,7 @@ textarea {
   min-width: 180px;
   padding: 14px 18px;
   border-radius: 14px;
-  background: #111;
+  background: var(--orange);
   color: #fff;
   text-align: center;
 }
@@ -506,7 +506,7 @@ textarea {
 
 .course-summary strong {
   display: block;
-  color: var(--orange);
+  color: #fff;
   font-size: 28px;
   margin-top: 4px;
 }
@@ -534,9 +534,20 @@ textarea {
 }
 
 .course-tabs button.active {
-  background: #111;
-  color: var(--orange);
+  background: #ff6a00;
+  color: #fff;
   border-color: var(--orange);
+}
+
+#trainingCourseSaveButton {
+  background: #ff6a00;
+  color: #fff;
+  border-color: #ff6a00;
+}
+
+#trainingCourseSaveButton:hover {
+  background: #d95a00;
+  border-color: #d95a00;
 }
 
 .course-editor {
@@ -613,6 +624,32 @@ textarea {
 .badge-card {
   grid-template-columns: 1fr auto;
   align-items: center;
+}
+
+.crm-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.crm-edit-grid textarea {
+  width: 100%;
+}
+
+.crm-edit-grid label:last-child {
+  grid-column: 1 / -1;
+}
+
+.backup-detail-json {
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111;
+  color: #fff;
+  white-space: pre-wrap;
 }
 
 .knowledge-status {
@@ -4205,6 +4242,10 @@ button.quality-review-badge {
 
   .course-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crm-edit-grid {
+    grid-template-columns: 1fr;
   }
 
   .quote-strip-grid {

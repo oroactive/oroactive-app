@@ -1,0 +1,12 @@
+ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS created_by BIGINT;
+
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS indirizzo TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS provincia TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS documento_tipo TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS documento_numero TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS metodo_pagamento TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS intestatario_conto TEXT;
+ALTER TABLE clienti ADD COLUMN IF NOT EXISTS archiviato BOOLEAN DEFAULT FALSE;
+
+CREATE INDEX IF NOT EXISTS clienti_archiviato_idx ON clienti (archiviato);
