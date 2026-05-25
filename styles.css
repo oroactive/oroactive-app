@@ -41,10 +41,6 @@ body {
   touch-action: manipulation;
 }
 
-body.capacitor-native {
-  background: #000;
-}
-
 input,
 select,
 textarea,
@@ -4072,5 +4068,521 @@ button.quality-review-badge {
 
   .install-hint button {
     grid-row: auto;
+  }
+}
+
+/* OroActive premium web dashboard */
+.main-menu-screen {
+  place-items: stretch;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 106, 0, 0.18), transparent 30%),
+    radial-gradient(circle at 82% 16%, rgba(212, 175, 55, 0.12), transparent 28%),
+    linear-gradient(135deg, #050505 0%, #0b0b0b 56%, #120904 100%);
+  color: #fff;
+}
+
+.main-menu-screen .dark-footer {
+  position: static;
+  width: min(1500px, calc(100vw - 44px));
+  margin: 0 auto;
+  padding: 0 0 28px;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.main-command-shell {
+  width: min(1500px, 100%);
+  min-height: calc(100vh - 58px);
+  margin: 0 auto;
+  padding: max(28px, env(safe-area-inset-top)) 22px 20px;
+  display: grid;
+  grid-template-columns: minmax(228px, 286px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.main-lux-sidebar,
+.main-hero-card,
+.lux-kpi-card,
+.lux-panel {
+  border: 1px solid rgba(255, 106, 0, 0.22);
+  background: linear-gradient(145deg, rgba(17, 17, 17, 0.92), rgba(8, 8, 8, 0.82));
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+}
+
+.main-lux-sidebar {
+  position: sticky;
+  top: 22px;
+  height: calc(100vh - 86px);
+  min-height: 680px;
+  border-radius: 20px;
+  padding: 22px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 22px;
+}
+
+.main-lux-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.main-lux-brand img {
+  width: 64px;
+  height: 64px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ff6a00;
+  box-shadow: 0 0 0 4px rgba(255, 106, 0, 0.12);
+}
+
+.main-lux-brand strong,
+.main-lux-user strong {
+  display: block;
+  color: #fff;
+  font-size: 21px;
+  line-height: 1;
+}
+
+.main-lux-brand span,
+.main-lux-user span,
+.main-lux-user small {
+  display: block;
+  margin-top: 5px;
+  color: #d4af37;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.main-lux-nav {
+  align-content: start;
+  justify-items: stretch;
+  gap: 9px;
+}
+
+.main-menu-screen .main-lux-nav button {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 0 13px;
+  background: transparent;
+  color: #b8b8b8;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-align: left;
+  transform: none;
+}
+
+.main-menu-screen .main-lux-nav button span,
+.sidebar-menu .nav-item span {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  background: rgba(255, 106, 0, 0.12);
+  color: #ff6a00;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.main-menu-screen .main-lux-nav button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 106, 0, 0.46);
+  background: rgba(255, 106, 0, 0.12);
+  color: #fff;
+}
+
+.main-lux-user {
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.main-lux-user small {
+  color: #b8b8b8;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.main-dashboard-area {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 22px;
+  padding-right: 86px;
+}
+
+.main-hero-card {
+  min-height: 238px;
+  border-radius: 20px;
+  padding: clamp(24px, 4vw, 42px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
+  gap: 26px;
+  overflow: hidden;
+  position: relative;
+}
+
+.main-hero-card::after {
+  content: "";
+  position: absolute;
+  right: -90px;
+  top: -120px;
+  width: 310px;
+  height: 310px;
+  border: 1px solid rgba(255, 106, 0, 0.26);
+  border-radius: 50%;
+  box-shadow: inset 0 0 80px rgba(255, 106, 0, 0.08);
+}
+
+.hero-copy,
+.hero-status-grid {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-copy .eyebrow {
+  color: #ff6a00;
+  margin-bottom: 12px;
+}
+
+.hero-copy h1 {
+  margin: 0;
+  color: #fff;
+  font-family: "Courier New", Courier, monospace;
+  font-size: clamp(34px, 4.4vw, 64px);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.hero-copy p:not(.eyebrow) {
+  max-width: 650px;
+  margin: 18px 0 0;
+  color: #b8b8b8;
+  font-size: clamp(16px, 1.5vw, 21px);
+  line-height: 1.45;
+}
+
+.hero-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-content: end;
+}
+
+.hero-status-grid div {
+  min-height: 88px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.hero-status-grid span,
+.lux-kpi-card span,
+.lux-panel-heading span {
+  display: block;
+  color: #b8b8b8;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.hero-status-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1.12;
+}
+
+#mainMenuClock {
+  color: #ff6a00;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 24px;
+  letter-spacing: 0.5px;
+}
+
+.lux-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.lux-kpi-card {
+  min-height: 154px;
+  border-radius: 20px;
+  padding: 18px;
+  display: grid;
+  align-content: space-between;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lux-kpi-card:hover,
+.lux-panel:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 106, 0, 0.5);
+  box-shadow: 0 30px 84px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 106, 0, 0.08);
+}
+
+.lux-kpi-card strong {
+  color: #fff;
+  font-family: "Courier New", Courier, monospace;
+  font-size: clamp(25px, 2.4vw, 36px);
+  line-height: 1;
+}
+
+.lux-kpi-card em {
+  color: rgba(212, 175, 55, 0.86);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.main-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 16px;
+}
+
+.lux-panel {
+  border-radius: 20px;
+  padding: 20px;
+}
+
+.formation-panel {
+  grid-column: 1 / -1;
+}
+
+.lux-panel-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.lux-panel-heading strong {
+  color: #fff;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 22px;
+}
+
+.quick-actions,
+.formation-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  justify-items: stretch;
+}
+
+.formation-links {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.main-menu-screen .quick-actions button,
+.main-menu-screen .formation-links button {
+  width: 100%;
+  min-height: 60px;
+  border: 1px solid rgba(255, 106, 0, 0.32);
+  border-radius: 16px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, rgba(255, 106, 0, 0.14), rgba(255, 255, 255, 0.03));
+  color: #fff;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: left;
+  letter-spacing: 0;
+  transform: none;
+}
+
+.main-menu-screen .quick-actions button:hover,
+.main-menu-screen .formation-links button:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(255, 106, 0, 0.24), rgba(212, 175, 55, 0.08));
+  color: #fff;
+}
+
+.alert-list {
+  display: grid;
+  gap: 10px;
+}
+
+.alert-list p,
+.menu-alert-row {
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #b8b8b8;
+  font-weight: 800;
+}
+
+.menu-alert-row strong,
+.menu-alert-row span {
+  display: block;
+}
+
+.menu-alert-row strong {
+  color: #ff6a00;
+  margin-bottom: 4px;
+}
+
+.main-user-menu {
+  top: max(28px, env(safe-area-inset-top));
+  right: max(26px, env(safe-area-inset-right));
+}
+
+.main-user-button {
+  border-color: rgba(255, 106, 0, 0.38);
+  border-radius: 14px;
+  background: rgba(17, 17, 17, 0.88);
+  color: #ff6a00;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+}
+
+.main-user-dropdown {
+  border-radius: 14px;
+  background: rgba(17, 17, 17, 0.96);
+}
+
+.sidebar-menu {
+  display: grid;
+  gap: 8px;
+  margin-top: -16px;
+}
+
+.sidebar-menu .nav-item {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 0 12px;
+  background: transparent;
+  color: #b8b8b8;
+  font-family: "Courier New", Courier, monospace;
+  font-weight: 800;
+  text-align: left;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-menu .nav-item:hover,
+.sidebar-menu .nav-item.active {
+  transform: translateY(-1px);
+  border-color: rgba(255, 106, 0, 0.44);
+  background: rgba(255, 106, 0, 0.12);
+  color: #fff;
+}
+
+@media (max-width: 1280px) {
+  .main-dashboard-area {
+    padding-right: 0;
+  }
+
+  .lux-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .main-command-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .main-lux-sidebar {
+    position: static;
+    height: auto;
+    min-height: auto;
+  }
+
+  .main-lux-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .main-hero-card,
+  .main-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .main-command-shell {
+    padding: max(74px, env(safe-area-inset-top)) 14px 18px;
+    gap: 16px;
+  }
+
+  .main-menu-screen .dark-footer {
+    width: calc(100vw - 28px);
+    font-size: 12px;
+  }
+
+  .main-user-menu {
+    top: max(14px, env(safe-area-inset-top));
+    right: 14px;
+  }
+
+  .main-user-button {
+    max-width: 206px;
+    min-height: 40px;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .main-lux-sidebar,
+  .main-hero-card,
+  .lux-kpi-card,
+  .lux-panel {
+    border-radius: 16px;
+  }
+
+  .main-lux-brand img {
+    width: 54px;
+    height: 54px;
+  }
+
+  .main-lux-nav,
+  .lux-kpi-grid,
+  .quick-actions,
+  .formation-links,
+  .hero-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-copy h1 {
+    font-size: 34px;
+  }
+
+  .hero-status-grid div {
+    min-height: 74px;
+  }
+
+  .main-menu-screen .quick-actions button,
+  .main-menu-screen .formation-links button {
+    min-height: 56px;
+  }
+
+  .sidebar-menu .nav-item {
+    min-height: 44px;
   }
 }

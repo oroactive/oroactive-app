@@ -8,7 +8,7 @@ const state = {
   captureFiles: new Map(),
   lastSearchResults: [],
   editingPracticeNumber: null,
-  authToken: localStorage.getItem("oroactive-auth-token") || "",
+  authToken: "",
   currentUser: null,
   syncTimer: null,
   actsCache: new Map(),
@@ -44,7 +44,7 @@ const state = {
   backups: [],
   clockTimer: null,
   bullionChartLoaded: false,
-  pendingSync: JSON.parse(localStorage.getItem("oroactive-pending-sync") || "[]"),
+  pendingSync: [],
   syncingPending: false,
   sessionTimeoutTimer: null,
   tutorial: {
@@ -117,7 +117,6 @@ const trainingList = document.getElementById("trainingList");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
-const nativeBridge = () => window.OroActiveNative || null;
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -197,16 +196,9 @@ const documentLabels = {
   Patente: "patente",
   Passaporto: "passaporto"
 };
-const isCapacitorRuntime = window.location.protocol === "capacitor:"
-  || window.location.protocol === "ionic:"
-  || Boolean(window.Capacitor?.isNativePlatform?.());
-const API_BASE_URL = (
-  window.OROACTIVE_API_BASE_URL
-  || window.OROACTIVE_API_BASE
-  || (isCapacitorRuntime ? "https://app.oroactive.it" : window.location.origin)
-).replace(/\/+$/, "").replace(/\/api$/i, "");
-const apiBase = `${API_BASE_URL}/api`;
-console.log("API_BASE_URL", API_BASE_URL);
+const oroactiveConfig = window.OroActiveConfig || {};
+const API_BASE_URL = oroactiveConfig.apiBaseUrl || window.location.origin.replace(/\/+$/, "").replace(/\/api$/i, "");
+const apiBase = oroactiveConfig.apiBase || `${API_BASE_URL}/api`;
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
@@ -344,7 +336,6 @@ function isAppleTouchDevice() {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
-  if (nativeBridge()?.isNative?.()) return;
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js").catch(() => {
       // La PWA resta utilizzabile anche senza service worker.
@@ -353,22 +344,28 @@ function registerServiceWorker() {
 }
 
 async function loadStoredAuthToken() {
-  const token = await nativeBridge()?.getPreference?.("oroactive-auth-token").catch(() => "") || localStorage.getItem("oroactive-auth-token") || "";
+  const token = await loadDeviceStorage("oroactive-auth-token");
   state.authToken = token;
   return token;
 }
 
 async function saveStoredAuthToken(token) {
   state.authToken = token || "";
-  if (token) localStorage.setItem("oroactive-auth-token", token);
-  else localStorage.removeItem("oroactive-auth-token");
-  await nativeBridge()?.setPreference?.("oroactive-auth-token", token || "").catch(() => {});
+  await saveDeviceStorage("oroactive-auth-token", token || "");
 }
 
 async function clearStoredAuthToken() {
   state.authToken = "";
-  localStorage.removeItem("oroactive-auth-token");
-  await nativeBridge()?.removePreference?.("oroactive-auth-token").catch(() => {});
+  await saveDeviceStorage("oroactive-auth-token", "");
+}
+
+async function loadDeviceStorage(key) {
+  return localStorage.getItem(key) || "";
+}
+
+async function saveDeviceStorage(key, value) {
+  if (value) localStorage.setItem(key, value);
+  else localStorage.removeItem(key);
 }
 
 function maybeShowInstallHint() {
@@ -390,6 +387,94 @@ function startMainMenuClock() {
   updateMainMenuClock();
   if (state.clockTimer) return;
   state.clockTimer = window.setInterval(updateMainMenuClock, 1000);
+}
+
+function menuElement(id) {
+  return document.getElementById(id);
+}
+
+function setMenuText(id, value) {
+  const element = menuElement(id);
+  if (element) element.textContent = value;
+}
+
+function formatGramValue(value) {
+  return `${new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Number(value || 0))} g`;
+}
+
+function actDateKey(act = {}) {
+  const raw = act.date || act.data_atto || act.dataAtto || act.created_at || act.createdAt || "";
+  return String(raw).slice(0, 10);
+}
+
+function visibleMenuActs() {
+  if (userSeesAllStores()) return demoActs;
+  const storeName = state.currentUser?.negozio || "";
+  return demoActs.filter((act) => !storeName || act.store === storeName || act.negozio === storeName);
+}
+
+function menuWeightTotals(acts = []) {
+  return acts.reduce((totals, act) => {
+    if (Array.isArray(act.materials) && act.materials.length) {
+      act.materials.forEach((row) => {
+        const metal = String(row.metal || row.metallo || "").toLowerCase();
+        const weight = Number(row.weight || row.peso || row.grammi || 0);
+        if (metal.includes("oro")) totals.oro += weight;
+        if (metal.includes("argento")) totals.argento += weight;
+      });
+      return totals;
+    }
+    const fallbackWeight = Number(act.weight || act.peso_oro || 0);
+    if (fallbackWeight) totals.oro += fallbackWeight;
+    return totals;
+  }, { oro: 0, argento: 0 });
+}
+
+function renderMainMenuDashboard() {
+  if (!mainMenuScreen || mainMenuScreen.hidden || !state.currentUser) return;
+  const username = displayUsername(state.currentUser) || "Utente";
+  const role = roleLabel(state.currentUser.ruolo) || "Ruolo";
+  const store = userSeesAllStores() ? "Tutti i negozi" : (state.currentUser.negozio || "Negozio");
+  const acts = visibleMenuActs();
+  const today = localDateKey();
+  const todayActs = acts.filter((act) => actDateKey(act) === today);
+  const weights = menuWeightTotals(acts);
+  const cashToday = todayActs
+    .filter((act) => String(act.paymentMethod || act.metodo_pagamento || "").toLowerCase().includes("contanti"))
+    .reduce((sum, act) => sum + Number(act.amount || act.totale || 0), 0);
+  const dailyProfit = Number(state.dashboard?.kpi?.utile_giornaliero || 0);
+  const openAlerts = (state.antifraudAlerts || []).filter((alert) => {
+    const status = String(alert.stato || alert.status || "nuovo").toLowerCase();
+    return status !== "risolto" && status !== "falso positivo";
+  });
+
+  setMenuText("mainMenuUserName", username);
+  setMenuText("mainMenuUserRole", role);
+  setMenuText("heroUserName", username);
+  setMenuText("heroUserRole", role);
+  setMenuText("heroUserStore", store);
+  setMenuText("menuKpiProfit", formatEuro(dailyProfit));
+  setMenuText("menuKpiGold", formatGramValue(weights.oro));
+  setMenuText("menuKpiSilver", formatGramValue(weights.argento));
+  setMenuText("menuKpiCash", formatEuro(cashToday));
+  setMenuText("menuKpiActs", String(todayActs.length));
+  setMenuText("menuKpiAlerts", String(openAlerts.length));
+
+  const alertsPanel = menuElement("mainOperationalAlerts");
+  if (!alertsPanel) return;
+  if (!openAlerts.length) {
+    alertsPanel.innerHTML = "<p>Nessun alert critico al momento.</p>";
+    return;
+  }
+  alertsPanel.innerHTML = openAlerts.slice(0, 4).map((alert) => `
+    <div class="menu-alert-row">
+      <strong>${escapeHtml(alert.tipo_alert || alert.tipo || "Alert operativo")}</strong>
+      <span>${escapeHtml(alert.descrizione || alert.description || "Verifica richiesta.")}</span>
+    </div>
+  `).join("");
 }
 
 function resetSessionTimeout() {
@@ -595,12 +680,11 @@ async function syncActsFromServer() {
 
 function persistPendingSync() {
   const value = JSON.stringify(state.pendingSync.slice(0, 30));
-  localStorage.setItem("oroactive-pending-sync", value);
-  nativeBridge()?.setPreference?.("oroactive-pending-sync", value).catch(() => {});
+  saveDeviceStorage("oroactive-pending-sync", value).catch(() => {});
 }
 
 async function loadPendingSyncQueue() {
-  const value = await nativeBridge()?.getPreference?.("oroactive-pending-sync").catch(() => "") || localStorage.getItem("oroactive-pending-sync") || "[]";
+  const value = await loadDeviceStorage("oroactive-pending-sync") || "[]";
   try {
     state.pendingSync = JSON.parse(value);
   } catch {
@@ -688,8 +772,6 @@ async function saveActRecord(act, method = "POST") {
   else demoActs.unshift(saved);
   if (!saved._pendingSync) {
     showToast("Salvataggio completato", "success");
-    nativeBridge()?.notify?.("OroActive", "Salvataggio completato").catch(() => {});
-    nativeBridge()?.haptic?.("MEDIUM").catch(() => {});
   }
   return saved;
 }
@@ -1358,6 +1440,7 @@ function applyRolePermissions() {
   const qualityPanel = document.getElementById("qualityReviewPanel");
   if (qualityPanel) qualityPanel.hidden = !canReviewActs();
   configureUserFormPermissions();
+  renderMainMenuDashboard();
 }
 
 async function startAuthenticatedApp() {
@@ -1412,18 +1495,22 @@ async function restoreSession() {
 async function handleLogin(event) {
   event.preventDefault();
   loginMessage.textContent = "";
-  console.log("LOGIN API URL:", `${apiBase}/auth/login`);
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value;
   try {
-    const data = await apiRequest("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({
-        username: document.getElementById("loginUsername").value.trim(),
-        password: document.getElementById("loginPassword").value
-      })
-    });
+    const body = JSON.stringify({ username, password });
+    let data;
+    try {
+      data = await apiRequest("/auth/login", { method: "POST", body, retries: 1 });
+    } catch (error) {
+      if (error.status === 404 || error.status === 405) {
+        data = await apiRequest("/login", { method: "POST", body, retries: 1 });
+      } else {
+        throw error;
+      }
+    }
     state.currentUser = data.user;
     await saveStoredAuthToken(data.token);
-    await nativeBridge()?.haptic?.("MEDIUM").catch(() => {});
     loginForm.reset();
     await startAuthenticatedApp();
   } catch (error) {
@@ -1493,8 +1580,8 @@ async function registerFaceId() {
       body: JSON.stringify({ credentialId })
     });
     state.currentUser = data.user;
-    localStorage.setItem("oroactive-faceid-username", displayUsername(state.currentUser));
-    localStorage.setItem("oroactive-faceid-credential", credentialId);
+    await saveDeviceStorage("oroactive-faceid-username", displayUsername(state.currentUser));
+    await saveDeviceStorage("oroactive-faceid-credential", credentialId);
     showToast("Face ID registrato su questo dispositivo.");
   } catch (error) {
     showToast(error.message || "Registrazione Face ID non completata.");
@@ -1506,8 +1593,8 @@ async function loginWithFaceId() {
     loginMessage.textContent = "Face ID richiede HTTPS e un dispositivo compatibile.";
     return;
   }
-  const username = document.getElementById("loginUsername").value.trim() || localStorage.getItem("oroactive-faceid-username") || "";
-  const storedCredential = localStorage.getItem("oroactive-faceid-credential") || "";
+  const username = document.getElementById("loginUsername").value.trim() || await loadDeviceStorage("oroactive-faceid-username") || "";
+  const storedCredential = await loadDeviceStorage("oroactive-faceid-credential") || "";
   if (!username || !storedCredential) {
     loginMessage.textContent = "Prima accedi con password e registra il Face ID su questo dispositivo.";
     return;
@@ -1532,8 +1619,8 @@ async function loginWithFaceId() {
     });
     state.currentUser = data.user;
     await saveStoredAuthToken(data.token);
-    localStorage.setItem("oroactive-faceid-username", username);
-    localStorage.setItem("oroactive-faceid-credential", credentialId);
+    await saveDeviceStorage("oroactive-faceid-username", username);
+    await saveDeviceStorage("oroactive-faceid-credential", credentialId);
     await startAuthenticatedApp();
   } catch (error) {
     loginMessage.textContent = error.status === 401
@@ -1715,6 +1802,7 @@ function openBrandMenu() {
 function showMainMenuFromSplash() {
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = false;
+  renderMainMenuDashboard();
   maybeStartFirstRunTutorial();
 }
 
@@ -5383,6 +5471,31 @@ function imageFileToOptimizedDataUrl(file) {
   });
 }
 
+function optimizeImageDataUrl(dataUrl, options = {}) {
+  return new Promise((resolve) => {
+    if (!String(dataUrl || "").startsWith("data:image/")) {
+      resolve(dataUrl || "");
+      return;
+    }
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = options.maxSide || 1200;
+      const quality = options.quality || 0.74;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    image.onerror = () => resolve(dataUrl || "");
+    image.src = dataUrl;
+  });
+}
+
 function revokeCaptureUrl(file) {
   if (file?.url && String(file.url).startsWith("blob:")) URL.revokeObjectURL(file.url);
 }
@@ -5719,9 +5832,6 @@ async function sha256Hex(text) {
 
 function currentLocationSafe() {
   return new Promise((resolve) => {
-    nativeBridge()?.nativePosition?.().then((position) => {
-      if (position) resolve(position);
-    }).catch(() => {});
     if (!navigator.geolocation) return resolve(null);
     const timeout = window.setTimeout(() => resolve(null), 1800);
     navigator.geolocation.getCurrentPosition(
@@ -6499,36 +6609,6 @@ window.addEventListener("online", () => {
   window.addEventListener(eventName, resetSessionTimeout, { passive: true });
 });
 
-async function captureNativePhotoForCard(card, key) {
-  const bridge = nativeBridge();
-  if (!bridge?.isNative?.() || !bridge.nativeCameraDataUrl) return false;
-  try {
-    await bridge.haptic?.("LIGHT").catch(() => {});
-    const dataUrl = await bridge.nativeCameraDataUrl();
-    if (!dataUrl) return false;
-    const previous = state.captureFiles.get(key);
-    revokeCaptureUrl(previous);
-    state.captureFiles.set(key, {
-      name: `OroActive-${key}.jpg`,
-      type: "image/jpeg",
-      url: dataUrl,
-      dataUrl
-    });
-    state.uploadedCaptures.add(key);
-    state.attachments = state.uploadedCaptures.size;
-    card.classList.add("loaded");
-    card.querySelector("em").textContent = "Foto acquisita";
-    markPracticeDirty();
-    updateAttachmentState();
-    updateChecklistState();
-    if (state.captureGroup && !previewModal.hidden) openCaptureGroupModal(state.captureGroup);
-    return true;
-  } catch (error) {
-    if (!/cancel/i.test(error.message || "")) showToast("Fotocamera nativa non disponibile, usa il caricamento manuale.");
-    return false;
-  }
-}
-
 document.addEventListener("change", async (event) => {
   if (!event.target.matches(".capture-card input")) return;
   const card = event.target.closest(".capture-card");
@@ -6562,19 +6642,6 @@ document.addEventListener("change", async (event) => {
 });
 
 document.addEventListener("click", async (event) => {
-  const captureCard = event.target.closest(".capture-card");
-  if (captureCard && !event.target.closest(".capture-actions") && !event.target.matches("input")) {
-    const key = captureCard.dataset.captureKey;
-    if (key && nativeBridge()?.isNative?.()) {
-      event.preventDefault();
-      event.stopPropagation();
-      const handled = await captureNativePhotoForCard(captureCard, key);
-      if (handled) return;
-      captureCard.querySelector("input")?.click();
-      return;
-    }
-  }
-
   const captureGroup = event.target.closest("[data-capture-group]");
   if (captureGroup && !event.target.closest(".capture-card") && !event.target.closest(".capture-actions")) {
     openCaptureGroupModal(captureGroup.dataset.captureGroup);
