@@ -356,8 +356,8 @@ function registerServiceWorker() {
   });
 }
 
-async function refreshApp() {
-  showToast("Aggiornamento app in corso...", "warning");
+async function refreshApp(options = {}) {
+  if (!options.silent) showToast("Aggiornamento app in corso...", "warning");
   try {
     if ("serviceWorker" in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();
@@ -373,6 +373,19 @@ async function refreshApp() {
   } finally {
     window.location.reload();
   }
+}
+
+function triggerLogoRefresh() {
+  if (mainMenuLogoRefresh?.classList) {
+    mainMenuLogoRefresh.classList.add("logo-refresh-clicked");
+  }
+  showToast("Aggiornamento app in corso...", "warning");
+  window.setTimeout(() => {
+    mainMenuLogoRefresh?.classList?.remove("logo-refresh-clicked");
+  }, 220);
+  window.setTimeout(() => {
+    refreshApp({ silent: true });
+  }, 280);
 }
 
 async function loadStoredAuthToken() {
@@ -6275,11 +6288,11 @@ document.getElementById("usersList").addEventListener("change", (event) => {
   select.value = "";
 });
 document.getElementById("userRole").addEventListener("change", configureUserFormPermissions);
-mainMenuLogoRefresh?.addEventListener("click", refreshApp);
+mainMenuLogoRefresh?.addEventListener("click", triggerLogoRefresh);
 mainMenuLogoRefresh?.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
-  refreshApp();
+  triggerLogoRefresh();
 });
 assistantForm?.addEventListener("submit", askAssistant);
 knowledgeForm?.addEventListener("submit", uploadKnowledgeBook);
