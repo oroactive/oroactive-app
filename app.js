@@ -78,6 +78,7 @@ const mainMenuScreen = document.getElementById("mainMenuScreen");
 const mainUserMenuButton = document.getElementById("mainUserMenuButton");
 const mainUserDropdown = document.getElementById("mainUserDropdown");
 const mainMenuClock = document.getElementById("mainMenuClock");
+const mainMenuLogoRefresh = document.getElementById("mainMenuLogoRefresh");
 const installHint = document.getElementById("installHint");
 const quoteDashboard = document.getElementById("quoteDashboard");
 const bullionVaultChart = document.getElementById("bullionVaultChart");
@@ -353,6 +354,25 @@ function registerServiceWorker() {
       // La PWA resta utilizzabile anche senza service worker.
     });
   });
+}
+
+async function refreshApp() {
+  showToast("Aggiornamento app in corso...", "warning");
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.update().catch(() => null)));
+    }
+    if (window.caches?.keys) {
+      const keys = await window.caches.keys();
+      const staticCacheKeys = keys.filter((key) => /oroactive|static|asset|pwa/i.test(key));
+      await Promise.all(staticCacheKeys.map((key) => window.caches.delete(key).catch(() => false)));
+    }
+  } catch {
+    // Anche se l'aggiornamento cache fallisce, il reload mantiene la sessione e ricarica l'app.
+  } finally {
+    window.location.reload();
+  }
 }
 
 async function loadStoredAuthToken() {
@@ -1847,6 +1867,8 @@ function resetUserForm() {
   form.reset();
   document.getElementById("userId").value = "";
   document.getElementById("userPassword").required = true;
+  const userActive = document.getElementById("userActive");
+  if (userActive) userActive.value = "true";
   document.getElementById("saveUserButton").textContent = "Salva Utente";
   configureUserFormPermissions();
 }
@@ -1892,7 +1914,10 @@ function renderUsers(users) {
         <span>${escapeHtml(displayUsername(user))}</span>
         <em>${escapeHtml(roleLabel(user.ruolo))}</em>
         <span>${escapeHtml(userSeesAllStores(user) ? "Tutti" : user.negozio)}</span>
-        <span class="presence ${user.online ? "online" : "offline"}">${user.online ? "Online" : "Offline"}</span>
+        <span>
+          <em class="${user.attivo === false ? "status-draft" : "status-completed"}">${user.attivo === false ? "Non attivo" : "Attivo"}</em>
+          <small class="presence ${user.online ? "online" : "offline"}">${user.online ? "Online" : "Offline"}</small>
+        </span>
         ${scoreBarMarkup(user)}
         <div class="row-actions">
           <select data-user-action="${escapeHtml(String(user.id))}" aria-label="Azioni utente">
@@ -1926,8 +1951,12 @@ async function saveUser(event) {
     nome: document.getElementById("userName").value.trim(),
     cognome: document.getElementById("userSurname").value.trim(),
     username: document.getElementById("userUsername").value.trim(),
+    email: document.getElementById("userEmail")?.value.trim(),
     ruolo: normalizeRole(document.getElementById("userRole").value),
-    negozio: document.getElementById("userStore").value
+    negozio: document.getElementById("userStore").value,
+    telefono: document.getElementById("userPhone")?.value.trim(),
+    note: document.getElementById("userNotes")?.value.trim(),
+    attivo: document.getElementById("userActive")?.value !== "false"
   };
   const password = document.getElementById("userPassword").value;
   if (password) payload.password = password;
@@ -1939,7 +1968,7 @@ async function saveUser(event) {
     });
     resetUserForm();
     await loadUsers();
-    showToast(id ? "Utente aggiornato." : "Utente creato.");
+    showToast(id ? "Utente aggiornato correttamente" : "Utente creato.");
   } catch (error) {
     showToast(error.message || "Utente non salvato.");
   }
@@ -1952,6 +1981,14 @@ function editUser(id) {
   document.getElementById("userName").value = user.nome || "";
   document.getElementById("userSurname").value = user.cognome || "";
   document.getElementById("userUsername").value = user.username || "";
+  const userEmail = document.getElementById("userEmail");
+  if (userEmail) userEmail.value = user.email || "";
+  const userPhone = document.getElementById("userPhone");
+  if (userPhone) userPhone.value = user.telefono || "";
+  const userNotes = document.getElementById("userNotes");
+  if (userNotes) userNotes.value = user.note || "";
+  const userActive = document.getElementById("userActive");
+  if (userActive) userActive.value = user.attivo === false ? "false" : "true";
   document.getElementById("userRole").value = normalizeRole(user.ruolo);
   document.getElementById("userStore").value = userSeesAllStores(user) ? "Tutti" : user.negozio || "Busto Arsizio";
   const password = document.getElementById("userPassword");
@@ -5147,12 +5184,6 @@ function renderQuoteDashboard() {
       </article>
     `;
   });
-  rows.push(`
-    <article>
-      <span>Diamanti</span>
-      <strong>Quotazione diamanti da configurare</strong>
-    </article>
-  `);
   quoteDashboard.innerHTML = rows.join("");
 }
 
@@ -5852,9 +5883,15 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
       ${internalWeight}
   ` : internalWeight;
   const customerOnly = scope === "customer";
+  const customerLogo = customerOnly ? `
+      <div class="customer-copy-logo">
+        <img src="oroactive-logo.png" alt="OroActive">
+      </div>
+  ` : "";
 
   const mainCopy = `
     <section class="print-copy ${scope === "company" ? "company-copy" : "customer-copy"}">
+      ${customerLogo}
       <h1>Atto di vendita OroActive - ${title}</h1>
       <div class="print-meta">
         <div class="print-field"><span>Atto n.</span>${escapeHtml(fieldValue("#practiceNumber"))}</div>
@@ -6238,6 +6275,12 @@ document.getElementById("usersList").addEventListener("change", (event) => {
   select.value = "";
 });
 document.getElementById("userRole").addEventListener("change", configureUserFormPermissions);
+mainMenuLogoRefresh?.addEventListener("click", refreshApp);
+mainMenuLogoRefresh?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  refreshApp();
+});
 assistantForm?.addEventListener("submit", askAssistant);
 knowledgeForm?.addEventListener("submit", uploadKnowledgeBook);
 reindexKnowledge?.addEventListener("click", reindexKnowledgeBase);

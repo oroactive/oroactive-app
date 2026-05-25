@@ -51,7 +51,7 @@
       </div>
     </div>
     <div class="main-menu-inner">
-      <img class="main-menu-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
+      <img class="main-menu-logo" id="mainMenuLogoRefresh" src="oroactive-logo.png" alt="OroActive Compro Oro" role="button" tabindex="0" aria-label="Aggiorna app OroActive">
       <nav class="main-menu-actions">
         <div class="main-menu-group">
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="salesSubmenu" aria-expanded="false">Atti di vendita</button>
@@ -626,7 +626,7 @@
           <div>
             <p class="eyebrow">Mercati</p>
             <h2>Quotazione</h2>
-            <p class="muted">Quotazioni e andamento di oro, argento, platino e diamanti.</p>
+            <p class="muted">Quotazioni e andamento di oro, argento e platino.</p>
           </div>
           <button class="primary-button" type="button" id="refreshQuoteDashboard">Aggiorna quotazioni</button>
         </div>
@@ -638,7 +638,6 @@
             <article><span>Oro</span><strong>Dato non inserito</strong></article>
             <article><span>Argento</span><strong>Dato non inserito</strong></article>
             <article><span>Platino</span><strong>Dato non inserito</strong></article>
-            <article><span>Diamanti</span><strong>Da configurare</strong></article>
           </div>
           <div class="quote-chart-panel">
             <div id="bullionVaultChart" class="bullionvault-chart"></div>
@@ -905,6 +904,8 @@
             <label>Nome <input id="userName" required></label>
             <label>Cognome <input id="userSurname" required></label>
             <label>Nome utente <input id="userUsername" autocomplete="username"></label>
+            <label>Email <input id="userEmail" type="email" autocomplete="email"></label>
+            <label>Telefono <input id="userPhone" type="tel" autocomplete="tel"></label>
             <label>Password <input id="userPassword" type="password" autocomplete="new-password" placeholder="Minimo 8 caratteri" required></label>
             <label>Ruolo
               <select id="userRole">
@@ -922,6 +923,13 @@
                 <option>Legnano</option>
               </select>
             </label>
+            <label>Stato
+              <select id="userActive">
+                <option value="true">Attivo</option>
+                <option value="false">Non attivo</option>
+              </select>
+            </label>
+            <label>Note <textarea id="userNotes" rows="3" placeholder="Note operative interne"></textarea></label>
             <div class="user-form-actions">
               <button type="submit" id="saveUserButton">Salva Utente</button>
               <button class="ghost-button" type="button" id="resetUserForm">Nuovo utente</button>

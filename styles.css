@@ -306,6 +306,15 @@ textarea {
   object-fit: cover;
   border: 2px solid var(--gold);
   box-shadow: 0 16px 52px rgba(255, 115, 28, 0.22);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.main-menu-logo:hover,
+.main-menu-logo:focus-visible {
+  transform: scale(1.03);
+  box-shadow: 0 20px 58px rgba(255, 115, 28, 0.3);
+  outline: 0;
 }
 
 .main-menu-actions {
@@ -2650,6 +2659,18 @@ input.document-expired {
   background: var(--gold);
   border-color: var(--gold-dark);
   color: #0b0b0a;
+}
+
+.customer-copy-logo {
+  text-align: center;
+  margin: 0 0 16px;
+}
+
+.customer-copy-logo img {
+  width: 120px;
+  max-width: 120px;
+  height: auto;
+  object-fit: contain;
 }
 
 .archive-export-table {

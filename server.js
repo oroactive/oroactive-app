@@ -180,6 +180,9 @@ function publicUser(row) {
     cognome: row.cognome,
     username: row.username,
     email: row.email,
+    telefono: row.telefono || "",
+    note: row.note || "",
+    attivo: row.attivo !== false,
     ruolo: normalizeRole(row.ruolo),
     negozio_id: row.negozio_id || null,
     negozio: roleSeesAllStores(row.ruolo) ? "Tutti" : row.negozio,
@@ -237,7 +240,7 @@ function signUserToken(user) {
 
 async function findUserById(id) {
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen FROM utenti WHERE id = $1",
+    "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen FROM utenti WHERE id = $1::bigint",
     [id]
   );
   return result.rows[0] || null;
@@ -3685,11 +3688,11 @@ async function createUser(input, actor) {
     ? "Tutti"
     : store?.nome || (actorRole === "responsabile" ? actor.negozio : input.negozio) || "Busto Arsizio";
   const username = String(input.username || "").trim();
-  const generatedEmail = `${username || `utente-${Date.now()}`}@oroactive.local`;
+  const generatedEmail = String(input.email || "").trim() || `${username || `utente-${Date.now()}`}@oroactive.local`;
   const result = await pool.query(
-    `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio, negozio_id)
-     VALUES ($1, $2, NULLIF($3, ''), LOWER($4), $5, $6, $7, $8)
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
+    `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio, negozio_id, telefono, note, attivo)
+     VALUES ($1::text, $2::text, NULLIF($3::text, ''), LOWER($4::text), $5::text, $6::text, $7::text, $8::bigint, $9::text, $10::text, $11::boolean)
+     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
     [
       input.nome || "",
       input.cognome || "",
@@ -3698,14 +3701,17 @@ async function createUser(input, actor) {
       passwordHash,
       finalRole,
       finalStore,
-      store?.id || null
+      store?.id || null,
+      input.telefono || input.phone || "",
+      input.note || input.notes || "",
+      input.attivo !== false
     ]
   );
   return publicUser(result.rows[0]);
 }
 
 async function findUserRawById(id) {
-  const result = await pool.query("SELECT * FROM utenti WHERE id = $1", [id]);
+  const result = await pool.query("SELECT * FROM utenti WHERE id = $1::bigint", [id]);
   return result.rows[0] || null;
 }
 
@@ -3713,6 +3719,7 @@ function assertCanManageTarget(actor, target, requestedRole = target?.ruolo) {
   const actorRole = normalizeRole(actor?.ruolo);
   const targetRole = normalizeRole(target?.ruolo);
   if (targetRole === "founder") {
+    if (actorRole === "founder" && normalizeRole(requestedRole) === "founder") return;
     const error = new Error("Il Founder non puo essere modificato o revocato");
     error.status = 403;
     throw error;
@@ -3737,7 +3744,7 @@ async function updateUser(id, input, actor) {
   assertCanManageTarget(actor, target, input.ruolo || target.ruolo);
   const fields = [];
   const values = [];
-  const allowed = ["nome", "cognome", "username", "ruolo", "negozio"];
+  const allowed = ["nome", "cognome", "username", "email", "ruolo", "negozio", "telefono", "note", "attivo"];
   let selectedStore = null;
   if (input.negozio !== undefined || input.negozio_id !== undefined) {
     selectedStore = normalizeRole(actor?.ruolo) === "responsabile"
@@ -3751,25 +3758,32 @@ async function updateUser(id, input, actor) {
     if (field === "negozio") {
       value = roleSeesAllStores(input.ruolo || target.ruolo) ? "Tutti" : selectedStore?.nome || value;
     }
-    values.push(field === "username" && !value ? null : value);
-    fields.push(`${field} = $${values.length}`);
+    if (field === "email") value = String(value || "").trim() || target.email;
+    if (field === "username" && !value) value = null;
+    if (field === "attivo") {
+      values.push(value !== false && value !== "false");
+      fields.push(`${field} = $${values.length}::boolean`);
+      return;
+    }
+    values.push(value === undefined ? null : value);
+    fields.push(`${field} = ${field === "email" ? `LOWER($${values.length}::text)` : `$${values.length}::text`}`);
   });
   if (input.negozio !== undefined || input.negozio_id !== undefined || input.ruolo !== undefined) {
     const finalRole = normalizeRole(input.ruolo || target.ruolo);
     values.push(roleSeesAllStores(finalRole) ? null : selectedStore?.id || target.negozio_id || null);
-    fields.push(`negozio_id = $${values.length}`);
+    fields.push(`negozio_id = $${values.length}::bigint`);
   }
 
   if (input.password) {
     values.push(await bcrypt.hash(String(input.password), 12));
-    fields.push(`password_hash = $${values.length}`);
+    fields.push(`password_hash = $${values.length}::text`);
   }
 
   if (!fields.length) return findUserById(id);
   values.push(id);
   const result = await pool.query(
-    `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
+    `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}::bigint
+     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
     values
   );
   return result.rowCount ? publicUser(result.rows[0]) : null;
@@ -3778,7 +3792,7 @@ async function updateUser(id, input, actor) {
 async function listUsers(options = {}) {
   const where = options.includeFounder ? "" : "WHERE ruolo <> 'founder'";
   const result = await pool.query(
-    `SELECT id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen FROM utenti ${where} ORDER BY data_creazione DESC`
+    `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen FROM utenti ${where} ORDER BY data_creazione DESC`
   );
   return result.rows.map(publicUser);
 }
@@ -3800,7 +3814,7 @@ async function listUsersForActor(actor) {
     where += " AND (negozio_id = $2 OR negozio = $3)";
   }
   const result = await pool.query(
-    `SELECT id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen
+    `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen
      FROM utenti ${where}
      ORDER BY data_creazione DESC`,
     values
@@ -3822,7 +3836,7 @@ async function deleteUser(id, actor) {
     throw error;
   }
   assertCanManageTarget(actor, target);
-  const result = await pool.query("DELETE FROM utenti WHERE id = $1 RETURNING id", [id]);
+  const result = await pool.query("DELETE FROM utenti WHERE id = $1::bigint RETURNING id", [id]);
   return result.rowCount > 0;
 }
 
@@ -3842,6 +3856,11 @@ async function loginUser(identifier, password) {
     error.status = 401;
     throw error;
   }
+  if (user.attivo === false) {
+    const error = new Error("Utente non attivo");
+    error.status = 403;
+    throw error;
+  }
   await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
   user.last_seen = new Date();
   const safeUser = publicUser(user);
@@ -3857,7 +3876,7 @@ async function registerFaceId(user, credentialId) {
   }
   const result = await pool.query(
     `UPDATE utenti SET face_id_credential = $2 WHERE id = $1
-     RETURNING id, nome, cognome, username, email, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
+     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
     [user.id, credential]
   );
   return publicUser(result.rows[0]);
@@ -4421,6 +4440,16 @@ app.put("/api/utenti/:id", requireAdmin, async (request, response, next) => {
   }
 });
 
+app.patch("/api/utenti/:id", requireAdmin, async (request, response, next) => {
+  try {
+    const user = await updateUser(request.params.id, request.body, request.user);
+    if (!user) return response.status(404).json({ error: "Utente non trovato" });
+    response.json(user);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.delete("/api/utenti/:id", requireAdmin, async (request, response, next) => {
   try {
     const deleted = await deleteUser(request.params.id, request.user);
@@ -4614,8 +4643,22 @@ function attachmentLabelForPdf(key = "") {
   return "Allegato fotografico";
 }
 
-function drawPdfHeader(doc, act, title) {
+function drawPdfHeader(doc, act, title, options = {}) {
   const logoPath = path.join(__dirname, "oroactive-logo.png");
+  if (options.centerLogo) {
+    try {
+      doc.image(logoPath, 252, 28, { width: 90, height: 90, fit: [90, 90] });
+    } catch {
+      // Il PDF resta valido anche se il logo non è disponibile.
+    }
+    doc.fillColor("#f47a20").fontSize(9).font("Helvetica-Bold").text("GESTIONALE OROACTIVE", 42, 124, { width: 511, align: "center" });
+    doc.fillColor("#111").fontSize(18).font("Helvetica-Bold").text(title, 42, 139, { width: 511, align: "center" });
+    doc.fillColor("#555").fontSize(9).font("Helvetica").text(`Atto n. ${act.practiceNumber || "Dato non inserito"} | ${act.date || ""} ${act.time || ""}`, 42, 164, { width: 511, align: "center" });
+    doc.save().opacity(0.045).fillColor("#f47a20").fontSize(54).font("Helvetica-Bold").rotate(-30, { origin: [300, 410] }).text("OROACTIVE", 120, 410);
+    doc.restore();
+    doc.moveTo(42, 186).lineTo(553, 186).strokeColor("#f4c6a6").stroke();
+    return;
+  }
   try {
     doc.image(logoPath, 42, 30, { width: 52, height: 52, fit: [52, 52] });
   } catch {
@@ -4740,8 +4783,8 @@ function drawActMainPdfPage(doc, act, title) {
 
 function drawCustomerPdfPage(doc, act, title) {
   doc.addPage();
-  drawPdfHeader(doc, act, title);
-  let y = 122;
+  drawPdfHeader(doc, act, title, { centerLogo: true });
+  let y = 204;
   y = drawPdfSectionTitle(doc, "Sezione cliente", y);
   y = drawPdfFields(doc, [
     { label: "Nome", value: act.name },

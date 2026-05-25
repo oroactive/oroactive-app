@@ -89,6 +89,29 @@ test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () =>
   assert.match(schema, /ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS metadata/);
 });
 
+test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
+  const [index, app, server, schema] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql")
+  ]);
+
+  assert.doesNotMatch(index, /Quotazioni e andamento di oro, argento, platino e diamanti/);
+  assert.doesNotMatch(index, /<span>Diamanti<\/span><strong>Da configurare<\/strong>/);
+  assert.doesNotMatch(app, /Quotazione diamanti da configurare/);
+  assert.match(index, /id="mainMenuLogoRefresh"/);
+  assert.match(app, /async function refreshApp/);
+  assert.match(app, /registration\.update/);
+  assert.match(app, /customer-copy-logo/);
+  assert.match(stylesCss(await file("styles.css")), /customer-copy-logo/);
+  assert.match(index, /id="userEmail"/);
+  assert.match(index, /id="userPhone"/);
+  assert.match(index, /id="userActive"/);
+  assert.match(server, /telefono, note, attivo/);
+  assert.match(schema, /ALTER TABLE utenti ADD COLUMN IF NOT EXISTS telefono/);
+});
+
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
   const [pkg, index, app, server] = await Promise.all([
     file("package.json"),
@@ -104,3 +127,7 @@ test("app ripulita da dipendenze e bridge Capacitor", async () => {
   assert.doesNotMatch(combined, /capacitor:\/\/localhost/);
   assert.doesNotMatch(pkg, /ios:prepare|ios:sync|ios:open|ios:add/);
 });
+
+function stylesCss(content) {
+  return content;
+}

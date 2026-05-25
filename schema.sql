@@ -162,6 +162,9 @@ CREATE TABLE IF NOT EXISTS utenti (
   ruolo TEXT NOT NULL CHECK (ruolo IN ('founder', 'supervisore', 'responsabile', 'commesso', 'aiuto_commesso')),
   negozio TEXT NOT NULL DEFAULT 'Busto Arsizio',
   face_id_credential TEXT,
+  telefono TEXT,
+  note TEXT,
+  attivo BOOLEAN DEFAULT TRUE,
   data_creazione TIMESTAMPTZ DEFAULT NOW(),
   last_seen TIMESTAMPTZ
 );
@@ -175,6 +178,9 @@ ALTER TABLE utenti ADD COLUMN IF NOT EXISTS ruolo TEXT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS negozio TEXT DEFAULT 'Busto Arsizio';
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS negozio_id BIGINT;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS face_id_credential TEXT;
+ALTER TABLE utenti ADD COLUMN IF NOT EXISTS telefono TEXT;
+ALTER TABLE utenti ADD COLUMN IF NOT EXISTS note TEXT;
+ALTER TABLE utenti ADD COLUMN IF NOT EXISTS attivo BOOLEAN DEFAULT TRUE;
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS data_creazione TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE utenti ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
 
