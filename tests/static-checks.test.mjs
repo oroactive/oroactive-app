@@ -102,9 +102,13 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.doesNotMatch(app, /Quotazione diamanti da configurare/);
   assert.match(index, /id="mainMenuLogoRefresh"/);
   assert.match(app, /async function refreshApp/);
+  assert.match(app, /function triggerLogoRefresh/);
+  assert.match(app, /logo-refresh-clicked/);
   assert.match(app, /registration\.update/);
   assert.match(app, /customer-copy-logo/);
-  assert.match(stylesCss(await file("styles.css")), /customer-copy-logo/);
+  const styles = await file("styles.css");
+  assert.match(styles, /customer-copy-logo/);
+  assert.match(styles, /logo-refresh-clicked/);
   assert.match(index, /id="userEmail"/);
   assert.match(index, /id="userPhone"/);
   assert.match(index, /id="userActive"/);
@@ -127,7 +131,3 @@ test("app ripulita da dipendenze e bridge Capacitor", async () => {
   assert.doesNotMatch(combined, /capacitor:\/\/localhost/);
   assert.doesNotMatch(pkg, /ios:prepare|ios:sync|ios:open|ios:add/);
 });
-
-function stylesCss(content) {
-  return content;
-}

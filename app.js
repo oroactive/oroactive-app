@@ -1,6 +1,6 @@
 const state = {
   step: 0,
-  signatures: [false, false, false],
+  signatures: [false, false, false, false],
   attachments: 0,
   cededItems: 1,
   annualProgressive: 184,
@@ -60,6 +60,14 @@ const state = {
     pendingFirstRun: false
   }
 };
+
+const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
+const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
+
+function normalizeSignatureArray(value, fallback = false) {
+  const source = Array.isArray(value) ? value : [];
+  return SIGNATURE_LABELS.map((_, index) => Boolean(source[index] ?? fallback));
+}
 
 const screens = document.querySelectorAll(".screen");
 const navItems = document.querySelectorAll(".nav-item");
@@ -3920,7 +3928,7 @@ function buildArchivedActFallback(act) {
       ${escapeHtml(key)} - ${escapeHtml(missing)}
     </div>
   `).join("");
-  const signatures = ["Firma vendita", "Firma dichiarazioni", "Firma privacy"].map((label) => `
+  const signatures = SIGNATURE_LABELS.map((label) => `
     <div class="print-signature">
       <span>${label}</span>
       ${escapeHtml(missing)}
@@ -4347,7 +4355,7 @@ async function loadActForEdit(practiceNumber) {
   setFieldValue("#saleTotal", act.amount);
   setFieldValue(".textarea-label textarea", act.operatorNotes);
   setQualityReview(act.qualityReview || null);
-  state.loadedSignatureImages = Array.isArray(act.signatureImages) ? act.signatureImages : [];
+  state.loadedSignatureImages = SIGNATURE_LABELS.map((_, index) => Array.isArray(act.signatureImages) ? act.signatureImages[index] || "" : "");
 
   const cededItemsTable = document.getElementById("cededItemsTable");
   const items = Array.isArray(act.items) && act.items.length ? act.items : [{ description: "", metal: act.materials?.[0]?.metal || "Oro", title: "18 kt" }];
@@ -4355,7 +4363,7 @@ async function loadActForEdit(practiceNumber) {
   items.forEach((item) => cededItemsTable.insertAdjacentHTML("beforeend", cededItemRowMarkup(item)));
 
   document.getElementById("printWeightCustomer").checked = Boolean(act.printWeightCustomer);
-  state.signatures = Array.isArray(act.signatures) ? act.signatures : [true, true, true];
+  state.signatures = normalizeSignatureArray(act.signatures, true);
   restoreCaptureStateFromAct(act);
   state.step = 0;
 
@@ -4429,7 +4437,8 @@ async function resetCurrentPractice(options = {}) {
   cededItemsTable.querySelectorAll(".ceded-item-row").forEach((row) => row.remove());
   cededItemsTable.insertAdjacentHTML("beforeend", defaultCededItemRow());
 
-  state.signatures = [false, false, false];
+  state.signatures = normalizeSignatureArray([], false);
+  state.loadedSignatureImages = SIGNATURE_LABELS.map(() => "");
   document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
     canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
   });
@@ -4443,7 +4452,7 @@ async function resetCurrentPractice(options = {}) {
   state.editingOriginalStatus = "";
   state.editingDirty = false;
   state.suppressDirtyTracking = false;
-  state.loadedSignatureImages = [];
+  state.loadedSignatureImages = SIGNATURE_LABELS.map(() => "");
   state.fiscalCodeEditedManually = false;
   state.captureGroup = null;
   state.lastActCaptureAttachments = [];
@@ -4958,10 +4967,10 @@ function renderStep() {
 function updateSignatureState() {
   const signed = state.signatures.filter(Boolean).length;
   const status = document.getElementById("signatureStatus");
-  status.textContent = signed === 3 ? "Firme complete" : `${3 - signed} firme mancanti`;
-  status.classList.toggle("success", signed === 3);
-  status.classList.toggle("warning", signed !== 3);
-  document.getElementById("summarySignatures").textContent = signed === 3 ? "3 di 3 complete" : `${signed} di 3 complete`;
+  status.textContent = signed === REQUIRED_SIGNATURES ? "Firme complete" : `${REQUIRED_SIGNATURES - signed} firme mancanti`;
+  status.classList.toggle("success", signed === REQUIRED_SIGNATURES);
+  status.classList.toggle("warning", signed !== REQUIRED_SIGNATURES);
+  document.getElementById("summarySignatures").textContent = signed === REQUIRED_SIGNATURES ? `${REQUIRED_SIGNATURES} di ${REQUIRED_SIGNATURES} complete` : `${signed} di ${REQUIRED_SIGNATURES} complete`;
   updateChecklistState();
 }
 
@@ -5447,7 +5456,7 @@ function missingSaleFields() {
 }
 
 function missingSignatureFields() {
-  return state.signatures.every(Boolean) ? [] : ["Tre firme cliente"];
+  return state.signatures.every(Boolean) ? [] : ["Tre firme cliente e firma operatore"];
 }
 
 function missingDocumentFields() {
@@ -5845,12 +5854,12 @@ function buildWeightBlock(label) {
 
 function signatureRows() {
   return [...document.querySelectorAll("canvas[data-signature]")].map((canvas, index) => {
-    const labels = ["Firma vendita", "Firma dichiarazioni", "Firma privacy"];
-    const image = state.signatures[index] ? canvasToOptimizedDataUrl(canvas) : "";
+    const label = SIGNATURE_LABELS[index] || `Firma ${index + 1}`;
+    const image = state.signatures[index] ? (state.loadedSignatureImages[index] || canvasToOptimizedDataUrl(canvas)) : "";
     return `
       <div class="print-signature">
-        <span>${labels[index]}</span>
-        ${image ? `<img src="${image}" alt="${labels[index]}">` : "Firma non acquisita"}
+        <span>${label}</span>
+        ${image ? `<img src="${image}" alt="${label}">` : "Firma non acquisita"}
       </div>
     `;
   }).join("");
@@ -5947,9 +5956,9 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
       ${customerOnly ? "" : `
         <h2>Dichiarazioni</h2>
         <p class="print-legal">Gli oggetti venduti sopra descritti sono usati e/o in cattivo stato di conservazione. Autorizzo la loro ulteriore alterazione per poter eseguire il test di verifica del metallo, determinarne il titolo e calcolarne il prezzo. Dichiaro inoltre che gli stessi sopra indicati oggetti non sono di illecita provenienza, di essere in possesso di tutti i diritti atti alla vendita degli stessi e di accettare e consentire il trattamento dei propri dati personali (Legge 196/03). La presente vale quale ricevuta e saldo per la somma riportata alla voce prezzo complessivo. Il venditore si obbliga fin da ora a restituire il ricavato della vendita qualora, a seguito di controlli di verifica, risulti che gli oggetti consegnati non siano corrispondenti nel valore e nella qualità a quelli dichiarati al momento della vendita e/o risultino di non essere di metallo prezioso. Dichiaro infine di aver letto attentamente quanto sopra riportato e che ai sensi e per gli effetti degli art. 1341 e 1342 del c.c. approvo incondizionatamente.</p>
-        <h2>Firme</h2>
-        <div class="print-signatures">${signatureRows()}</div>
       `}
+      <h2>Firme</h2>
+      <div class="print-signatures">${signatureRows()}</div>
     </section>
   `;
 

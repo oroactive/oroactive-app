@@ -4760,17 +4760,21 @@ function drawActMainPdfPage(doc, act, title) {
   ], y, 2);
 
   y = ensurePdfSpace(doc, y, 135);
-  y = drawPdfSectionTitle(doc, "6. Firme cliente", y);
+  y = drawPdfSectionTitle(doc, "6. Firme cliente e operatore", y);
   const signatures = (act.signatureImages || []).filter(Boolean);
   if (signatures.length) {
     signatures.forEach((signature, index) => {
-      const x = 42 + index * 172;
+      const column = index % 2;
+      const row = Math.floor(index / 2);
+      const x = 42 + column * 258;
+      const boxY = y + row * 86;
       const buffer = dataUrlToBuffer(signature);
-      doc.roundedRect(x, y, 154, 72, 4).strokeColor("#e6d6c8").stroke();
-      doc.fillColor("#777").font("Helvetica-Bold").fontSize(7).text(`Firma ${index + 1}`, x + 7, y + 6);
-      if (buffer) drawPdfImage(doc, buffer, x + 8, y + 18, { fit: [138, 48], align: "center", valign: "center" });
+      const label = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"][index] || `Firma ${index + 1}`;
+      doc.roundedRect(x, boxY, 236, 72, 4).strokeColor("#e6d6c8").stroke();
+      doc.fillColor("#777").font("Helvetica-Bold").fontSize(7).text(label, x + 7, boxY + 6);
+      if (buffer) drawPdfImage(doc, buffer, x + 8, boxY + 18, { fit: [220, 48], align: "center", valign: "center" });
     });
-    y += 86;
+    y += Math.ceil(signatures.length / 2) * 86;
   } else {
     doc.fillColor("#111").font("Helvetica").fontSize(9).text("Firme non disponibili nell'archivio digitale.", 42, y, { width: 511 });
     y += 28;
@@ -4818,6 +4822,25 @@ function drawCustomerPdfPage(doc, act, title) {
     { label: "Totale corrisposto", value: pdfFormatEuro(act.amount) },
     ...(act.materialAmounts || []).map((row) => ({ label: `Totale corrisposto ${row.metal}`, value: pdfFormatEuro(row.amount) }))
   ], y, 2);
+
+  y = ensurePdfSpace(doc, y, 135);
+  y = drawPdfSectionTitle(doc, "Firme", y);
+  const signatures = (act.signatureImages || []).filter(Boolean);
+  if (signatures.length) {
+    signatures.forEach((signature, index) => {
+      const column = index % 2;
+      const row = Math.floor(index / 2);
+      const x = 42 + column * 258;
+      const boxY = y + row * 86;
+      const buffer = dataUrlToBuffer(signature);
+      const label = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"][index] || `Firma ${index + 1}`;
+      doc.roundedRect(x, boxY, 236, 72, 4).strokeColor("#e6d6c8").stroke();
+      doc.fillColor("#777").font("Helvetica-Bold").fontSize(7).text(label, x + 7, boxY + 6);
+      if (buffer) drawPdfImage(doc, buffer, x + 8, boxY + 18, { fit: [220, 48], align: "center", valign: "center" });
+    });
+  } else {
+    doc.fillColor("#111").font("Helvetica").fontSize(9).text("Firme non disponibili nell'archivio digitale.", 42, y, { width: 511 });
+  }
 }
 
 function drawActAttachmentPdfPages(doc, act, title) {

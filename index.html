@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260525-corsi-crm-backup-1">
+  <link rel="stylesheet" href="styles.css?v=20260525-logo-firma-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -51,7 +51,9 @@
       </div>
     </div>
     <div class="main-menu-inner">
-      <img class="main-menu-logo" id="mainMenuLogoRefresh" src="oroactive-logo.png" alt="OroActive Compro Oro" role="button" tabindex="0" aria-label="Aggiorna app OroActive">
+      <button class="main-menu-logo-button" id="mainMenuLogoRefresh" type="button" aria-label="Aggiorna app OroActive">
+        <img class="main-menu-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
+      </button>
       <nav class="main-menu-actions">
         <div class="main-menu-group">
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="salesSubmenu" aria-expanded="false">Atti di vendita</button>
@@ -358,7 +360,7 @@
                   <p class="eyebrow">Step 3</p>
                   <h2>Firma cliente</h2>
                 </div>
-                <span class="status-pill warning" id="signatureStatus">3 firme richieste</span>
+                <span class="status-pill warning" id="signatureStatus">4 firme richieste</span>
               </div>
 
               <section class="legal-text" aria-label="Testo dichiarazioni cliente">
@@ -388,6 +390,15 @@
                     <span>Consenso trattamento dati</span>
                   </div>
                   <canvas width="520" height="160" data-signature="2"></canvas>
+                  <button type="button" class="clear-signature">Cancella</button>
+                </div>
+                <div class="signature-section-label">Firma operatore</div>
+                <div class="signature-box operator-signature-box">
+                  <div>
+                    <strong>Firma operatore</strong>
+                    <span>Autenticazione atto di vendita</span>
+                  </div>
+                  <canvas width="520" height="160" data-signature="3"></canvas>
                   <button type="button" class="clear-signature">Cancella</button>
                 </div>
               </div>
@@ -977,6 +988,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260525-corsi-crm-backup-1"></script>
+  <script src="app.js?v=20260525-logo-firma-1"></script>
 </body>
 </html>
