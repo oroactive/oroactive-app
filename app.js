@@ -8,7 +8,7 @@ const state = {
   captureFiles: new Map(),
   lastSearchResults: [],
   editingPracticeNumber: null,
-  authToken: "",
+  authToken: localStorage.getItem("oroactive-auth-token") || "",
   currentUser: null,
   syncTimer: null,
   actsCache: new Map(),
@@ -44,9 +44,8 @@ const state = {
   backups: [],
   clockTimer: null,
   bullionChartLoaded: false,
-  pendingSync: [],
+  pendingSync: JSON.parse(localStorage.getItem("oroactive-pending-sync") || "[]"),
   syncingPending: false,
-  sessionTimeoutTimer: null,
   tutorial: {
     active: false,
     index: 0,
@@ -196,9 +195,7 @@ const documentLabels = {
   Patente: "patente",
   Passaporto: "passaporto"
 };
-const oroactiveConfig = window.OroActiveConfig || {};
-const API_BASE_URL = oroactiveConfig.apiBaseUrl || window.location.origin.replace(/\/+$/, "").replace(/\/api$/i, "");
-const apiBase = oroactiveConfig.apiBase || `${API_BASE_URL}/api`;
+const apiBase = "/api";
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
@@ -343,31 +340,6 @@ function registerServiceWorker() {
   });
 }
 
-async function loadStoredAuthToken() {
-  const token = await loadDeviceStorage("oroactive-auth-token");
-  state.authToken = token;
-  return token;
-}
-
-async function saveStoredAuthToken(token) {
-  state.authToken = token || "";
-  await saveDeviceStorage("oroactive-auth-token", token || "");
-}
-
-async function clearStoredAuthToken() {
-  state.authToken = "";
-  await saveDeviceStorage("oroactive-auth-token", "");
-}
-
-async function loadDeviceStorage(key) {
-  return localStorage.getItem(key) || "";
-}
-
-async function saveDeviceStorage(key, value) {
-  if (value) localStorage.setItem(key, value);
-  else localStorage.removeItem(key);
-}
-
 function maybeShowInstallHint() {
   if (!installHint || localStorage.getItem("oroactive-install-hint-dismissed")) return;
   if (isStandalonePwa() || !isAppleTouchDevice()) return;
@@ -389,15 +361,6 @@ function startMainMenuClock() {
   state.clockTimer = window.setInterval(updateMainMenuClock, 1000);
 }
 
-function resetSessionTimeout() {
-  if (!state.authToken) return;
-  window.clearTimeout(state.sessionTimeoutTimer);
-  state.sessionTimeoutTimer = window.setTimeout(() => {
-    showToast("Sessione scaduta per inattività. Effettua nuovamente l'accesso.", "warning");
-    showLogin();
-  }, 30 * 60 * 1000);
-}
-
 function queryString(params = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -413,12 +376,6 @@ function wait(ms) {
 function shouldRetryApi(error, responseStatus) {
   if (responseStatus && responseStatus < 500 && responseStatus !== 429) return false;
   return error?.name === "AbortError" || !navigator.onLine || !responseStatus || responseStatus >= 500 || responseStatus === 429;
-}
-
-function serverConnectionError() {
-  const error = new Error("Connessione al server OroActive non riuscita");
-  error.isConnectionError = true;
-  return error;
 }
 
 function sanitizeForSave(value) {
@@ -465,15 +422,13 @@ async function apiRequest(path, options = {}) {
         await wait(350 * attempt);
         continue;
       }
-      if (error.name === "AbortError" || error instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(error.message || "")) {
-        throw serverConnectionError();
-      }
+      if (error.name === "AbortError") throw new Error("Connessione lenta: salvataggio in ritardo, riprovo automaticamente.");
       throw error;
     } finally {
       window.clearTimeout(timeout);
     }
   }
-  throw lastError || serverConnectionError();
+  throw lastError || new Error("Errore comunicazione server");
 }
 
 function mergeActsIntoCache(acts = []) {
@@ -591,17 +546,7 @@ async function syncActsFromServer() {
 }
 
 function persistPendingSync() {
-  const value = JSON.stringify(state.pendingSync.slice(0, 30));
-  saveDeviceStorage("oroactive-pending-sync", value).catch(() => {});
-}
-
-async function loadPendingSyncQueue() {
-  const value = await loadDeviceStorage("oroactive-pending-sync") || "[]";
-  try {
-    state.pendingSync = JSON.parse(value);
-  } catch {
-    state.pendingSync = [];
-  }
+  localStorage.setItem("oroactive-pending-sync", JSON.stringify(state.pendingSync.slice(0, 30)));
 }
 
 function queuePendingActSave(act, method, identifier) {
@@ -638,8 +583,8 @@ async function flushPendingSync() {
         remaining.push(item);
       }
     }
-  state.pendingSync = remaining;
-  persistPendingSync();
+    state.pendingSync = remaining;
+    persistPendingSync();
   } finally {
     state.syncingPending = false;
   }
@@ -682,9 +627,7 @@ async function saveActRecord(act, method = "POST") {
   );
   if (index >= 0) demoActs[index] = { ...demoActs[index], ...saved };
   else demoActs.unshift(saved);
-  if (!saved._pendingSync) {
-    showToast("Salvataggio completato", "success");
-  }
+  if (!saved._pendingSync) showToast("Salvataggio completato", "success");
   return saved;
 }
 
@@ -726,10 +669,11 @@ function showToast(message, type = "") {
 }
 
 function showLogin() {
-  clearStoredAuthToken();
+  state.authToken = "";
   state.currentUser = null;
   state.actsCache.clear();
   demoActs.splice(0, demoActs.length);
+  localStorage.removeItem("oroactive-auth-token");
   loginScreen.hidden = false;
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = true;
@@ -738,8 +682,6 @@ function showLogin() {
   appShell.hidden = true;
   if (state.syncTimer) window.clearInterval(state.syncTimer);
   state.syncTimer = null;
-  window.clearTimeout(state.sessionTimeoutTimer);
-  state.sessionTimeoutTimer = null;
 }
 
 function showAuthenticatedShell() {
@@ -1356,12 +1298,10 @@ function applyRolePermissions() {
 
 async function startAuthenticatedApp() {
   showAuthenticatedShell();
-  resetSessionTimeout();
   state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
   applyRolePermissions();
   startMainMenuClock();
   maybeShowInstallHint();
-  await loadPendingSyncQueue();
   await loadAvailableStores();
   renderStep();
   await setPracticeMeta();
@@ -1387,7 +1327,6 @@ async function startAuthenticatedApp() {
 }
 
 async function restoreSession() {
-  await loadStoredAuthToken();
   if (!state.authToken) {
     showLogin();
     return false;
@@ -1406,32 +1345,21 @@ async function restoreSession() {
 async function handleLogin(event) {
   event.preventDefault();
   loginMessage.textContent = "";
-  const username = document.getElementById("loginUsername").value.trim();
-  const password = document.getElementById("loginPassword").value;
   try {
-    const body = JSON.stringify({ username, password });
-    let data;
-    try {
-      data = await apiRequest("/auth/login", { method: "POST", body, retries: 1 });
-    } catch (error) {
-      if (error.status === 404 || error.status === 405) {
-        data = await apiRequest("/login", { method: "POST", body, retries: 1 });
-      } else {
-        throw error;
-      }
-    }
+    const data = await apiRequest("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({
+        username: document.getElementById("loginUsername").value.trim(),
+        password: document.getElementById("loginPassword").value
+      })
+    });
+    state.authToken = data.token;
     state.currentUser = data.user;
-    await saveStoredAuthToken(data.token);
+    localStorage.setItem("oroactive-auth-token", data.token);
     loginForm.reset();
     await startAuthenticatedApp();
   } catch (error) {
-    loginMessage.textContent = error.status === 401
-      ? "Credenziali non valide"
-      : error.isConnectionError
-        ? "Connessione al server OroActive non riuscita"
-        : error.status
-          ? `Errore ${error.status}: ${error.message || "Accesso non riuscito."}`
-          : error.message || "Accesso non riuscito.";
+    loginMessage.textContent = error.message || "Accesso non riuscito.";
   }
 }
 
@@ -1491,8 +1419,8 @@ async function registerFaceId() {
       body: JSON.stringify({ credentialId })
     });
     state.currentUser = data.user;
-    await saveDeviceStorage("oroactive-faceid-username", displayUsername(state.currentUser));
-    await saveDeviceStorage("oroactive-faceid-credential", credentialId);
+    localStorage.setItem("oroactive-faceid-username", displayUsername(state.currentUser));
+    localStorage.setItem("oroactive-faceid-credential", credentialId);
     showToast("Face ID registrato su questo dispositivo.");
   } catch (error) {
     showToast(error.message || "Registrazione Face ID non completata.");
@@ -1504,8 +1432,8 @@ async function loginWithFaceId() {
     loginMessage.textContent = "Face ID richiede HTTPS e un dispositivo compatibile.";
     return;
   }
-  const username = document.getElementById("loginUsername").value.trim() || await loadDeviceStorage("oroactive-faceid-username") || "";
-  const storedCredential = await loadDeviceStorage("oroactive-faceid-credential") || "";
+  const username = document.getElementById("loginUsername").value.trim() || localStorage.getItem("oroactive-faceid-username") || "";
+  const storedCredential = localStorage.getItem("oroactive-faceid-credential") || "";
   if (!username || !storedCredential) {
     loginMessage.textContent = "Prima accedi con password e registra il Face ID su questo dispositivo.";
     return;
@@ -1528,17 +1456,14 @@ async function loginWithFaceId() {
       method: "POST",
       body: JSON.stringify({ username, credentialId })
     });
+    state.authToken = data.token;
     state.currentUser = data.user;
-    await saveStoredAuthToken(data.token);
-    await saveDeviceStorage("oroactive-faceid-username", username);
-    await saveDeviceStorage("oroactive-faceid-credential", credentialId);
+    localStorage.setItem("oroactive-auth-token", data.token);
+    localStorage.setItem("oroactive-faceid-username", username);
+    localStorage.setItem("oroactive-faceid-credential", credentialId);
     await startAuthenticatedApp();
   } catch (error) {
-    loginMessage.textContent = error.status === 401
-      ? "Credenziali non valide"
-      : error.isConnectionError
-        ? "Connessione al server OroActive non riuscita"
-        : error.message || "Accesso Face ID non riuscito.";
+    loginMessage.textContent = error.message || "Accesso Face ID non riuscito.";
   }
 }
 
@@ -5381,31 +5306,6 @@ function imageFileToOptimizedDataUrl(file) {
   });
 }
 
-function optimizeImageDataUrl(dataUrl, options = {}) {
-  return new Promise((resolve) => {
-    if (!String(dataUrl || "").startsWith("data:image/")) {
-      resolve(dataUrl || "");
-      return;
-    }
-    const image = new Image();
-    image.onload = () => {
-      const maxSide = options.maxSide || 1200;
-      const quality = options.quality || 0.74;
-      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(image.width * scale));
-      canvas.height = Math.max(1, Math.round(image.height * scale));
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
-    };
-    image.onerror = () => resolve(dataUrl || "");
-    image.src = dataUrl;
-  });
-}
-
 function revokeCaptureUrl(file) {
   if (file?.url && String(file.url).startsWith("blob:")) URL.revokeObjectURL(file.url);
 }
@@ -6515,10 +6415,6 @@ window.addEventListener("online", () => {
   flushPendingSync();
 });
 
-["click", "keydown", "touchstart", "pointerdown"].forEach((eventName) => {
-  window.addEventListener(eventName, resetSessionTimeout, { passive: true });
-});
-
 document.addEventListener("change", async (event) => {
   if (!event.target.matches(".capture-card input")) return;
   const card = event.target.closest(".capture-card");
@@ -6551,7 +6447,7 @@ document.addEventListener("change", async (event) => {
   if (state.captureGroup && !previewModal.hidden) openCaptureGroupModal(state.captureGroup);
 });
 
-document.addEventListener("click", async (event) => {
+document.addEventListener("click", (event) => {
   const captureGroup = event.target.closest("[data-capture-group]");
   if (captureGroup && !event.target.closest(".capture-card") && !event.target.closest(".capture-actions")) {
     openCaptureGroupModal(captureGroup.dataset.captureGroup);
