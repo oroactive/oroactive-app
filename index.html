@@ -41,6 +41,7 @@
   </section>
 
   <section class="main-menu-screen" id="mainMenuScreen" hidden aria-label="Menu principale OroActive">
+    <div class="main-menu-clock" id="mainMenuClock" aria-live="off">--:--:--</div>
     <div class="main-user-menu">
       <button class="main-user-button" id="mainUserMenuButton" type="button" aria-expanded="false" aria-controls="mainUserDropdown">Utente</button>
       <div class="main-user-dropdown" id="mainUserDropdown" hidden>
@@ -49,97 +50,38 @@
         <button type="button" data-user-logout>Logout</button>
       </div>
     </div>
-    <div class="main-command-shell">
-      <aside class="main-lux-sidebar" aria-label="Menu principale">
-        <div class="main-lux-brand">
-          <img src="oroactive-logo.png" alt="OroActive Compro Oro">
-          <div>
-            <strong>OroActive</strong>
-            <span>Control</span>
+    <div class="main-menu-inner">
+      <img class="main-menu-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
+      <nav class="main-menu-actions">
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="salesSubmenu" aria-expanded="false">Atti di vendita</button>
+          <div class="main-menu-submenu" id="salesSubmenu" hidden>
+            <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
+            <button type="button" data-section="practice">Nuovo atto di vendita</button>
+            <button type="button" data-section="archive">Elenco</button>
+            <button type="button" data-section="fusion">Giacenza</button>
           </div>
         </div>
-        <nav class="main-menu-actions main-lux-nav">
-          <button type="button" data-section="dashboard"><span>D</span>Dashboard</button>
-          <button type="button" data-section="practice"><span>A</span>Atti di vendita</button>
-          <button type="button" data-section="crm"><span>C</span>Clienti</button>
-          <button type="button" data-section="fusion"><span>G</span>Giacenza</button>
-          <button type="button" data-section="fusion"><span>F</span>Fusioni</button>
-          <button type="button" data-section="quotazione"><span>Q</span>Quotazioni</button>
-          <button type="button" data-section="training"><span>T</span>Formazione</button>
-          <button class="control-only" type="button" data-section="antifraud"><span>AI</span>Antifrode AI</button>
-          <button class="control-only" type="button" data-section="dashboard"><span>R</span>Report</button>
-          <button type="button" data-section="profile"><span>I</span>Impostazioni</button>
-        </nav>
-        <div class="main-lux-user">
-          <span>Accesso</span>
-          <strong id="mainMenuUserName">Utente</strong>
-          <small id="mainMenuUserRole">Ruolo</small>
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="toolsSubmenu" aria-expanded="false">Strumenti</button>
+          <div class="main-menu-submenu" id="toolsSubmenu" hidden>
+            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button class="founder-only" type="button" data-section="backups">Backup</button>
+            <button type="button" data-section="crm">CRM Clienti</button>
+            <button class="founder-only" type="button" data-section="stores">Negozi</button>
+            <button type="button" data-section="quotazione">Quotazione</button>
+          </div>
         </div>
-      </aside>
-
-      <div class="main-dashboard-area">
-        <section class="main-hero-card">
-          <div class="hero-copy">
-            <p class="eyebrow">Founder dashboard</p>
-            <h1>OroActive Control Center</h1>
-            <p>Gestione intelligente compro oro, clienti, giacenze e performance.</p>
+        <div class="main-menu-group">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="trainingSubmenu" aria-expanded="false">Formazione</button>
+          <div class="main-menu-submenu" id="trainingSubmenu" hidden>
+            <button type="button" data-section="assistant">Assistente IA OroActive</button>
+            <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+            <button type="button" data-section="training">Formazione Staff</button>
+            <button type="button" data-start-tutorial>Tutorial</button>
           </div>
-          <div class="hero-status-grid">
-            <div><span>Utente</span><strong id="heroUserName">Utente</strong></div>
-            <div><span>Ruolo</span><strong id="heroUserRole">Ruolo</strong></div>
-            <div><span>Negozio</span><strong id="heroUserStore">Negozio</strong></div>
-            <div><span>Ora live</span><strong id="mainMenuClock" aria-live="off">--:--:--</strong></div>
-          </div>
-        </section>
-
-        <section class="lux-kpi-grid" aria-label="Indicatori OroActive">
-          <article class="lux-kpi-card"><span>Utile oggi</span><strong id="menuKpiProfit">€ 0,00</strong><em>Stima operativa</em></article>
-          <article class="lux-kpi-card"><span>Oro totale</span><strong id="menuKpiGold">0,00 g</strong><em>Giacenza visibile</em></article>
-          <article class="lux-kpi-card"><span>Argento totale</span><strong id="menuKpiSilver">0,00 g</strong><em>Giacenza visibile</em></article>
-          <article class="lux-kpi-card"><span>Contanti erogati</span><strong id="menuKpiCash">€ 0,00</strong><em>Periodo corrente</em></article>
-          <article class="lux-kpi-card"><span>Atti oggi</span><strong id="menuKpiActs">0</strong><em>Pratiche registrate</em></article>
-          <article class="lux-kpi-card"><span>Alert antifrode</span><strong id="menuKpiAlerts">0</strong><em>Da verificare</em></article>
-        </section>
-
-        <section class="main-dashboard-grid">
-          <article class="lux-panel">
-            <div class="lux-panel-heading">
-              <span>Azioni rapide</span>
-              <strong>Operativita</strong>
-            </div>
-            <div class="quick-actions main-menu-actions">
-              <button type="button" data-section="practice">Nuovo atto di vendita</button>
-              <button type="button" data-section="archive">Apri elenco atti</button>
-              <button type="button" data-section="fusion">Vai a giacenza</button>
-              <button type="button" data-section="fusion">Crea lotto fusione</button>
-              <button type="button" data-section="assistant">Apri assistente IA</button>
-              <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza</button>
-            </div>
-          </article>
-
-          <article class="lux-panel">
-            <div class="lux-panel-heading">
-              <span>Alert operativi</span>
-              <strong>Controllo</strong>
-            </div>
-            <div class="alert-list" id="mainOperationalAlerts">
-              <p>Nessun alert critico al momento.</p>
-            </div>
-          </article>
-
-          <article class="lux-panel formation-panel">
-            <div class="lux-panel-heading">
-              <span>Formazione OroActive</span>
-              <strong>Crescita</strong>
-            </div>
-            <div class="formation-links main-menu-actions">
-              <button type="button" data-section="assistant">Assistente IA</button>
-              <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza</button>
-              <button type="button" data-start-tutorial>Tutorial</button>
-            </div>
-          </article>
-        </section>
-      </div>
+        </div>
+      </nav>
     </div>
     <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
   </section>
@@ -180,19 +122,6 @@
           </div>
         </div>
       </div>
-      <nav class="sidebar-menu" aria-label="Sezioni OroActive">
-        <button class="nav-item control-only" type="button" data-section="dashboard"><span>D</span>Dashboard</button>
-        <button class="nav-item" type="button" data-section="practice"><span>A</span>Atti di vendita</button>
-        <button class="nav-item" type="button" data-section="crm"><span>C</span>Clienti</button>
-        <button class="nav-item" type="button" data-section="fusion"><span>G</span>Giacenza</button>
-        <button class="nav-item" type="button" data-section="fusion"><span>F</span>Fusioni</button>
-        <button class="nav-item" type="button" data-section="quotazione"><span>Q</span>Quotazioni</button>
-        <button class="nav-item" type="button" data-section="training"><span>T</span>Formazione</button>
-        <button class="nav-item control-only" type="button" data-section="antifraud"><span>AI</span>Antifrode AI</button>
-        <button class="nav-item control-only" type="button" data-section="dashboard"><span>R</span>Report</button>
-        <button class="nav-item" type="button" data-section="profile"><span>I</span>Impostazioni</button>
-      </nav>
-
       <div class="operator">
         <span>Accesso</span>
         <strong id="operatorStoreName">Negozio Busto Arsizio</strong>

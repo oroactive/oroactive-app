@@ -23,8 +23,13 @@ const port = Number(process.env.PORT || 3000);
 const actsTable = "atti_vendita";
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
-const jwtSecret = process.env.JWT_SECRET || "cambia-questa-chiave-jwt-oroactive";
+const isProduction = process.env.NODE_ENV === "production";
+const jwtSecret = process.env.JWT_SECRET || (isProduction ? "" : "oroactive-dev-jwt-secret-change-me");
+if (!jwtSecret) {
+  throw new Error("JWT_SECRET obbligatorio: configura una chiave lunga e casuale nelle variabili ambiente.");
+}
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
+const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
@@ -77,8 +82,6 @@ const knowledgeCategories = [
 const app = express();
 const allowedCorsOrigins = new Set([
   "https://app.oroactive.it",
-  "capacitor://localhost",
-  "ionic://localhost",
   "http://localhost",
   "http://localhost:3000",
   "http://localhost:4173",
@@ -98,7 +101,7 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.use(express.json({ limit: "250mb" }));
+app.use(express.json({ limit: jsonBodyLimit }));
 const apiRateBuckets = new Map();
 
 function apiRateLimit(request, response, next) {
@@ -1855,7 +1858,10 @@ async function bootstrapStores() {
 async function bootstrapAdminUser() {
   const username = process.env.ADMIN_USERNAME || "Elite";
   const email = process.env.ADMIN_EMAIL || "elite@oroactive.it";
-  const password = process.env.ADMIN_PASSWORD || "Snoopdoggydogg.8";
+  const password = process.env.ADMIN_PASSWORD || (isProduction ? "" : "oroactive-dev-admin-password");
+  if (!password) {
+    throw new Error("ADMIN_PASSWORD obbligatoria: configura la password Founder nelle variabili ambiente.");
+  }
   const passwordHash = await bcrypt.hash(password, 12);
   const existing = await pool.query(
     "SELECT id FROM utenti WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2) LIMIT 1",
@@ -3258,9 +3264,14 @@ async function deleteUser(id, actor) {
 }
 
 async function loginUser(identifier, password) {
+  const loginIdentifier = String(identifier || "").trim();
   const result = await pool.query(
-    "SELECT * FROM utenti WHERE LOWER(username) = LOWER($1)",
-    [identifier || ""]
+    `SELECT *
+     FROM utenti
+     WHERE LOWER(username) = LOWER($1::text)
+        OR LOWER(email) = LOWER($1::text)
+     LIMIT 1`,
+    [loginIdentifier]
   );
   const user = result.rows[0];
   if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash))) {

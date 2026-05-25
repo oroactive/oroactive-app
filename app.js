@@ -389,94 +389,6 @@ function startMainMenuClock() {
   state.clockTimer = window.setInterval(updateMainMenuClock, 1000);
 }
 
-function menuElement(id) {
-  return document.getElementById(id);
-}
-
-function setMenuText(id, value) {
-  const element = menuElement(id);
-  if (element) element.textContent = value;
-}
-
-function formatGramValue(value) {
-  return `${new Intl.NumberFormat("it-IT", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(Number(value || 0))} g`;
-}
-
-function actDateKey(act = {}) {
-  const raw = act.date || act.data_atto || act.dataAtto || act.created_at || act.createdAt || "";
-  return String(raw).slice(0, 10);
-}
-
-function visibleMenuActs() {
-  if (userSeesAllStores()) return demoActs;
-  const storeName = state.currentUser?.negozio || "";
-  return demoActs.filter((act) => !storeName || act.store === storeName || act.negozio === storeName);
-}
-
-function menuWeightTotals(acts = []) {
-  return acts.reduce((totals, act) => {
-    if (Array.isArray(act.materials) && act.materials.length) {
-      act.materials.forEach((row) => {
-        const metal = String(row.metal || row.metallo || "").toLowerCase();
-        const weight = Number(row.weight || row.peso || row.grammi || 0);
-        if (metal.includes("oro")) totals.oro += weight;
-        if (metal.includes("argento")) totals.argento += weight;
-      });
-      return totals;
-    }
-    const fallbackWeight = Number(act.weight || act.peso_oro || 0);
-    if (fallbackWeight) totals.oro += fallbackWeight;
-    return totals;
-  }, { oro: 0, argento: 0 });
-}
-
-function renderMainMenuDashboard() {
-  if (!mainMenuScreen || mainMenuScreen.hidden || !state.currentUser) return;
-  const username = displayUsername(state.currentUser) || "Utente";
-  const role = roleLabel(state.currentUser.ruolo) || "Ruolo";
-  const store = userSeesAllStores() ? "Tutti i negozi" : (state.currentUser.negozio || "Negozio");
-  const acts = visibleMenuActs();
-  const today = localDateKey();
-  const todayActs = acts.filter((act) => actDateKey(act) === today);
-  const weights = menuWeightTotals(acts);
-  const cashToday = todayActs
-    .filter((act) => String(act.paymentMethod || act.metodo_pagamento || "").toLowerCase().includes("contanti"))
-    .reduce((sum, act) => sum + Number(act.amount || act.totale || 0), 0);
-  const dailyProfit = Number(state.dashboard?.kpi?.utile_giornaliero || 0);
-  const openAlerts = (state.antifraudAlerts || []).filter((alert) => {
-    const status = String(alert.stato || alert.status || "nuovo").toLowerCase();
-    return status !== "risolto" && status !== "falso positivo";
-  });
-
-  setMenuText("mainMenuUserName", username);
-  setMenuText("mainMenuUserRole", role);
-  setMenuText("heroUserName", username);
-  setMenuText("heroUserRole", role);
-  setMenuText("heroUserStore", store);
-  setMenuText("menuKpiProfit", formatEuro(dailyProfit));
-  setMenuText("menuKpiGold", formatGramValue(weights.oro));
-  setMenuText("menuKpiSilver", formatGramValue(weights.argento));
-  setMenuText("menuKpiCash", formatEuro(cashToday));
-  setMenuText("menuKpiActs", String(todayActs.length));
-  setMenuText("menuKpiAlerts", String(openAlerts.length));
-
-  const alertsPanel = menuElement("mainOperationalAlerts");
-  if (!alertsPanel) return;
-  if (!openAlerts.length) {
-    alertsPanel.innerHTML = "<p>Nessun alert critico al momento.</p>";
-    return;
-  }
-  alertsPanel.innerHTML = openAlerts.slice(0, 4).map((alert) => `
-    <div class="menu-alert-row">
-      <strong>${escapeHtml(alert.tipo_alert || alert.tipo || "Alert operativo")}</strong>
-      <span>${escapeHtml(alert.descrizione || alert.description || "Verifica richiesta.")}</span>
-    </div>
-  `).join("");
-}
-
 function resetSessionTimeout() {
   if (!state.authToken) return;
   window.clearTimeout(state.sessionTimeoutTimer);
@@ -1440,7 +1352,6 @@ function applyRolePermissions() {
   const qualityPanel = document.getElementById("qualityReviewPanel");
   if (qualityPanel) qualityPanel.hidden = !canReviewActs();
   configureUserFormPermissions();
-  renderMainMenuDashboard();
 }
 
 async function startAuthenticatedApp() {
@@ -1802,7 +1713,6 @@ function openBrandMenu() {
 function showMainMenuFromSplash() {
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = false;
-  renderMainMenuDashboard();
   maybeStartFirstRunTutorial();
 }
 

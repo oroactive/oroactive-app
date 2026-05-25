@@ -7,27 +7,12 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "ios:prepare": "node scripts/prepare-ios-web.mjs",
-    "ios:add": "npm run ios:prepare && npx cap add ios",
-    "ios:sync": "npm run ios:prepare && npx cap sync ios",
-    "ios:open": "npx cap open ios"
+    "test": "node --test tests/*.test.mjs"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "@capacitor/app": "^7.0.0",
-    "@capacitor/camera": "^7.0.0",
-    "@capacitor/cli": "^7.0.0",
-    "@capacitor/core": "^7.0.0",
-    "@capacitor/filesystem": "^7.0.0",
-    "@capacitor/geolocation": "^7.0.0",
-    "@capacitor/haptics": "^7.0.0",
-    "@capacitor/ios": "^7.0.0",
-    "@capacitor/local-notifications": "^7.0.0",
-    "@capacitor/preferences": "^7.0.0",
-    "@capacitor/splash-screen": "^7.0.0",
-    "@capacitor/status-bar": "^7.0.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
