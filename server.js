@@ -23,8 +23,21 @@ const port = Number(process.env.PORT || 3000);
 const actsTable = "atti_vendita";
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
-const jwtSecret = process.env.JWT_SECRET || "cambia-questa-chiave-jwt-oroactive";
+const isProduction = process.env.NODE_ENV === "production";
+const runtimeStatus = {
+  databaseReady: false,
+  databaseError: "",
+  startedAt: new Date().toISOString()
+};
+const missingJwtSecretMessage = "JWT_SECRET obbligatorio: configura una chiave lunga e casuale nelle variabili ambiente.";
+const jwtSecret = process.env.JWT_SECRET || (isProduction
+  ? crypto.createHash("sha256").update(`oroactive:${process.env.DATABASE_URL || "database"}:${process.env.ADMIN_USERNAME || "Elite"}`).digest("hex")
+  : "oroactive-dev-jwt-secret-change-me");
+if (!process.env.JWT_SECRET && isProduction) {
+  console.error(`${missingJwtSecretMessage} Uso fallback temporaneo per evitare blocco avvio.`);
+}
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
+const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
@@ -75,8 +88,28 @@ const knowledgeCategories = [
 ];
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: "250mb" }));
+const allowedCorsOrigins = new Set([
+  "https://app.oroactive.it",
+  "http://localhost",
+  "http://localhost:3000",
+  "http://localhost:4173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:4173"
+]);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedCorsOrigins.has(origin)) return callback(null, true);
+    if (/^https:\/\/app\.oroactive\.it$/i.test(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false,
+  maxAge: 86400
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+app.use(express.json({ limit: jsonBodyLimit }));
 const apiRateBuckets = new Map();
 
 function apiRateLimit(request, response, next) {
@@ -1011,6 +1044,7 @@ function publicKnowledgeNote(row = {}, user = null) {
     category: row.category,
     content: row.content,
     source: row.source,
+    store_experience: row.store_experience,
     author_id: row.author_id,
     author_role: row.author_role,
     status: row.status,
@@ -1099,14 +1133,15 @@ async function createKnowledgeNote(input = {}, user) {
   const status = isFounderRole && requestedStatus === "approvata" ? "approvata" : "in revisione";
   const result = await pool.query(
     `INSERT INTO ai_knowledge_notes
-      (title, category, content, source, author_id, author_role, status, approved_by, approved_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 = 'approvata' THEN NOW() ELSE NULL END)
+      (title, category, content, source, store_experience, author_id, author_role, status, approved_by, approved_at)
+     VALUES ($1::text, $2::text, $3::text, $4::text, $5::text, $6::bigint, $7::text, $8::text, $9::bigint, CASE WHEN $8::text = 'approvata' THEN NOW() ELSE NULL END)
      RETURNING *`,
     [
       title,
       normalizeKnowledgeCategory(input.category),
       content,
       String(input.source || "").trim(),
+      String(input.store_experience || "").trim(),
       user.id,
       normalizeRole(user.ruolo),
       status,
@@ -1119,7 +1154,7 @@ async function createKnowledgeNote(input = {}, user) {
 }
 
 async function updateKnowledgeNote(id, input = {}, user) {
-  const existing = await pool.query("SELECT * FROM ai_knowledge_notes WHERE id = $1", [id]);
+  const existing = await pool.query("SELECT * FROM ai_knowledge_notes WHERE id = $1::bigint", [id]);
   const note = existing.rows[0];
   if (!note) return null;
   const role = normalizeRole(user?.ruolo);
@@ -1136,15 +1171,16 @@ async function updateKnowledgeNote(id, input = {}, user) {
   }
   const result = await pool.query(
     `UPDATE ai_knowledge_notes
-     SET title = COALESCE(NULLIF($2, ''), title),
-         category = COALESCE(NULLIF($3, ''), category),
-         content = COALESCE(NULLIF($4, ''), content),
-         source = COALESCE($5, source),
-         status = CASE WHEN $6 = 'founder' THEN $7 ELSE 'in revisione' END,
-         approved_by = CASE WHEN $6 = 'founder' AND $7 = 'approvata' THEN $8 ELSE NULL END,
-         approved_at = CASE WHEN $6 = 'founder' AND $7 = 'approvata' THEN NOW() ELSE NULL END,
+     SET title = COALESCE(NULLIF($2::text, ''), title),
+         category = COALESCE(NULLIF($3::text, ''), category),
+         content = COALESCE(NULLIF($4::text, ''), content),
+         source = COALESCE($5::text, source),
+         store_experience = COALESCE($6::text, store_experience),
+         status = CASE WHEN $7::text = 'founder' THEN $8::text ELSE 'in revisione' END,
+         approved_by = CASE WHEN $7::text = 'founder' AND $8::text = 'approvata' THEN $9::bigint ELSE NULL END,
+         approved_at = CASE WHEN $7::text = 'founder' AND $8::text = 'approvata' THEN NOW() ELSE NULL END,
          updated_at = NOW()
-     WHERE id = $1
+     WHERE id = $1::bigint
      RETURNING *`,
     [
       id,
@@ -1152,6 +1188,7 @@ async function updateKnowledgeNote(id, input = {}, user) {
       normalizeKnowledgeCategory(input.category),
       String(input.content || "").trim(),
       String(input.source || "").trim(),
+      String(input.store_experience || "").trim(),
       role,
       normalizeKnowledgeStatus(input.status || note.status),
       user.id
@@ -1253,13 +1290,37 @@ async function searchAiChunksBySource(question = "", sourceType = "book", limit 
      LIMIT $3`,
     [text, `%${text.slice(0, 120)}%`, limit]
   );
-  return fullTextResult.rows;
+  if (fullTextResult.rows.length) return fullTextResult.rows;
+  const terms = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/i)
+    .filter((term) => term.length >= 4)
+    .slice(0, 8);
+  if (!terms.length) return [];
+  const fallback = await pool.query(
+    `SELECT c.id, c.title, c.content, c.chunk_index, d.titolo, d.autore, d.metadata, 0 AS score
+     FROM ai_document_chunks c
+     JOIN ai_documents d ON d.id = c.document_id
+     WHERE (${sourceCondition})
+       AND EXISTS (
+         SELECT 1 FROM unnest($1::text[]) term
+         WHERE LOWER(c.content) LIKE '%' || term || '%'
+       )
+     ORDER BY c.created_at DESC
+     LIMIT $2::integer`,
+    [terms, limit]
+  );
+  return fallback.rows;
 }
 
 async function searchAiChunks(question = "") {
-  const bookChunks = await searchAiChunksBySource(question, "book", 6);
-  const noteChunks = await searchAiChunksBySource(question, "note", Math.max(4, 10 - bookChunks.length));
-  return [...bookChunks, ...noteChunks].slice(0, 10);
+  const [bookChunks, noteChunks] = await Promise.all([
+    searchAiChunksBySource(question, "book", 6),
+    searchAiChunksBySource(question, "note", 6)
+  ]);
+  return [...bookChunks.slice(0, 6), ...noteChunks.slice(0, 6)].slice(0, 10);
 }
 
 async function askOroActiveAssistant(question = "", options = {}) {
@@ -1302,9 +1363,10 @@ async function askOroActiveAssistant(question = "", options = {}) {
       input: `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Usa prima il libro "La bilancia d'oro" di Christian Dinato, poi le procedure/conoscenze OroActive approvate.
+Le conoscenze OroActive approvate possono essere piu recenti e operative del libro: se sono piu dettagliate, integrale alla risposta senza ignorarle.
 Se il contesto della knowledge base e sufficiente, rispondi usando solo i passaggi forniti.
 Se il contesto non contiene abbastanza informazioni, devi scrivere esattamente: "Questa informazione non è presente nella knowledge base OroActive."
-Solo dopo quella frase puoi aggiungere una sezione "In integrazione generale..." con conoscenza generale, senza inventare fonti.
+Solo dopo quella frase puoi aggiungere una sezione "In integrazione generale..." con conoscenza generale. Non hai accesso a internet in tempo reale da questo endpoint, quindi non inventare fonti web aggiornate.
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
 Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : "Assistente operativo."}
@@ -1833,12 +1895,21 @@ async function bootstrapStores() {
 async function bootstrapAdminUser() {
   const username = process.env.ADMIN_USERNAME || "Elite";
   const email = process.env.ADMIN_EMAIL || "elite@oroactive.it";
-  const password = process.env.ADMIN_PASSWORD || "Snoopdoggydogg.8";
-  const passwordHash = await bcrypt.hash(password, 12);
   const existing = await pool.query(
-    "SELECT id FROM utenti WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2) LIMIT 1",
+    "SELECT id FROM utenti WHERE LOWER(username) = LOWER($1::text) OR LOWER(email) = LOWER($2::text) LIMIT 1",
     [username, email]
   );
+  const password = process.env.ADMIN_PASSWORD || (isProduction ? "" : "oroactive-dev-admin-password");
+  if (!password) {
+    const message = "ADMIN_PASSWORD obbligatoria: configura la password Founder nelle variabili ambiente.";
+    if (existing.rowCount) {
+      console.error(`${message} Founder già presente: mantengo credenziali esistenti.`);
+      return;
+    }
+    console.error(`${message} Founder non creato automaticamente.`);
+    return;
+  }
+  const passwordHash = await bcrypt.hash(password, 12);
 
   if (existing.rowCount) {
     await pool.query(
@@ -2680,40 +2751,325 @@ async function updateAntifraudAlert(id, input = {}, user = {}) {
   return result.rows[0] || null;
 }
 
-async function listTraining(user = {}) {
-  const courses = await pool.query(`
-    SELECT c.*, COALESCE(r.score, 0) AS score, COALESCE(r.completed, FALSE) AS completed, r.completed_at
-    FROM training_courses c
-    LEFT JOIN training_results r ON r.course_id = c.id AND r.user_id = $1
-    WHERE c.active = TRUE
-    ORDER BY c.created_at DESC
-  `, [user.id]);
-  return { courses: courses.rows };
+function canManageCourses(user = {}) {
+  return normalizeRole(user.ruolo) === "founder";
 }
 
-async function createTrainingCourse(input = {}, user = {}) {
-  if (!["founder"].includes(normalizeRole(user.ruolo))) {
+function canEvaluateCourses(user = {}) {
+  return ["founder", "responsabile"].includes(normalizeRole(user.ruolo));
+}
+
+function courseCode(prefix = "OA") {
+  return `${prefix}-${crypto.randomBytes(5).toString("hex").toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+}
+
+async function ensureCourseCategory(name = "Oro") {
+  const result = await pool.query(
+    `INSERT INTO course_categories (name)
+     VALUES ($1::text)
+     ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
+     RETURNING *`,
+    [String(name || "Oro").trim() || "Oro"]
+  );
+  return result.rows[0];
+}
+
+async function ensureCourseSection(categoryId, title = "Generale") {
+  const normalizedTitle = String(title || "Generale").trim() || "Generale";
+  const result = await pool.query(
+    `INSERT INTO course_sections (category_id, title)
+     VALUES ($1::bigint, $2::text)
+     ON CONFLICT (category_id, title) DO UPDATE SET updated_at = NOW()
+     RETURNING *`,
+    [categoryId, normalizedTitle]
+  );
+  return result.rows[0];
+}
+
+async function listCourses(user = {}) {
+  const userId = user.id || null;
+  const role = normalizeRole(user.ruolo);
+  const categories = await pool.query("SELECT * FROM course_categories WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
+  const sections = await pool.query(
+    `SELECT s.*, c.name AS category_name
+     FROM course_sections s
+     LEFT JOIN course_categories c ON c.id = s.category_id
+     WHERE s.active = TRUE
+     ORDER BY c.sort_order ASC, s.sort_order ASC, s.title ASC`
+  );
+  const courses = await pool.query(
+    `SELECT c.*, cat.name AS category_name, sec.title AS section_title,
+            COALESCE(mat.file_url, '') AS material_url,
+            COALESCE(mat.title, '') AS material_title,
+            COALESCE(progress.percentuale, 0) AS percentuale,
+            COALESCE(progress.status, 'non iniziato') AS status
+     FROM courses c
+     LEFT JOIN course_categories cat ON cat.id = c.category_id
+     LEFT JOIN course_sections sec ON sec.id = c.section_id
+     LEFT JOIN LATERAL (
+       SELECT title, file_url
+       FROM course_materials
+       WHERE course_id = c.id
+       ORDER BY sort_order ASC, id ASC
+       LIMIT 1
+     ) mat ON TRUE
+     LEFT JOIN user_course_progress progress ON progress.course_id = c.id AND progress.user_id = $1::bigint
+     WHERE ($2::text = 'founder' OR c.active = TRUE)
+     ORDER BY cat.sort_order ASC, c.order_index ASC, c.created_at DESC`,
+    [userId, role]
+  );
+  const progress = await pool.query(
+    "SELECT * FROM user_course_progress WHERE user_id = $1::bigint ORDER BY updated_at DESC",
+    [userId]
+  );
+  const certificates = await pool.query(
+    `SELECT cert.*, c.title AS course_title, cat.name AS category_name
+     FROM course_certificates cert
+     JOIN courses c ON c.id = cert.course_id
+     LEFT JOIN course_categories cat ON cat.id = c.category_id
+     WHERE cert.user_id = $1::bigint AND cert.status = 'valido'
+     ORDER BY cert.issued_at DESC`,
+    [userId]
+  );
+  const badges = await pool.query(
+    `SELECT badge.*, c.title AS course_title
+     FROM course_badges badge
+     LEFT JOIN courses c ON c.id = badge.course_id
+     WHERE badge.user_id = $1::bigint
+     ORDER BY badge.assigned_at DESC`,
+    [userId]
+  );
+  return {
+    categories: categories.rows,
+    sections: sections.rows,
+    courses: courses.rows,
+    progress: progress.rows,
+    certificates: certificates.rows,
+    badges: badges.rows
+  };
+}
+
+async function createCourse(input = {}, user = {}) {
+  if (!canManageCourses(user)) {
     const error = new Error("Non autorizzato");
     error.status = 403;
     throw error;
   }
+  const title = String(input.title || "").trim();
+  if (!title) {
+    const error = new Error("Titolo corso obbligatorio.");
+    error.status = 400;
+    throw error;
+  }
+  const category = await ensureCourseCategory(input.category || "Oro");
+  const section = await ensureCourseSection(category.id, input.section || "Generale");
   const result = await pool.query(
-    `INSERT INTO training_courses (title, category, description, created_by)
-     VALUES ($1,$2,$3,$4)
+    `INSERT INTO courses (category_id, section_id, title, description, active, order_index, created_by)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::boolean, $6::integer, $7::bigint)
      RETURNING *`,
-    [input.title || "", input.category || "procedure OroActive", input.description || "", user.id]
+    [
+      category.id,
+      section.id,
+      title,
+      String(input.description || "").trim(),
+      input.active !== false,
+      Number(input.order_index || 0),
+      user.id
+    ]
+  );
+  if (input.material_url) {
+    await pool.query(
+      `INSERT INTO course_materials (course_id, title, material_type, file_url)
+       VALUES ($1::bigint, $2::text, $3::text, $4::text)`,
+      [result.rows[0].id, input.material_title || "Materiale corso", "link", String(input.material_url || "").trim()]
+    );
+  }
+  return result.rows[0];
+}
+
+async function updateCourse(id, input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const title = String(input.title || "").trim();
+  if (!title) {
+    const error = new Error("Titolo corso obbligatorio.");
+    error.status = 400;
+    throw error;
+  }
+  const category = await ensureCourseCategory(input.category || "Oro");
+  const section = await ensureCourseSection(category.id, input.section || "Generale");
+  const result = await pool.query(
+    `UPDATE courses
+     SET category_id = $2::bigint,
+         section_id = $3::bigint,
+         title = $4::text,
+         description = $5::text,
+         active = $6::boolean,
+         order_index = $7::integer,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [
+      id,
+      category.id,
+      section.id,
+      title,
+      String(input.description || "").trim(),
+      input.active !== false,
+      Number(input.order_index || 0)
+    ]
+  );
+  if (!result.rows[0]) return null;
+  if (input.material_url !== undefined) {
+    await pool.query("DELETE FROM course_materials WHERE course_id = $1::bigint", [id]);
+    if (String(input.material_url || "").trim()) {
+      await pool.query(
+        `INSERT INTO course_materials (course_id, title, material_type, file_url)
+         VALUES ($1::bigint, $2::text, $3::text, $4::text)`,
+        [id, input.material_title || "Materiale corso", "link", String(input.material_url || "").trim()]
+      );
+    }
+  }
+  return result.rows[0];
+}
+
+async function saveCourseProgress(input = {}, user = {}) {
+  const courseId = input.course_id || input.courseId;
+  const percent = Math.max(0, Math.min(100, Number(input.percentuale ?? input.progress ?? 0)));
+  const status = String(input.status || (percent >= 100 ? "completato" : percent > 0 ? "in corso" : "non iniziato"));
+  const result = await pool.query(
+    `INSERT INTO user_course_progress
+      (course_id, user_id, percentuale, materials_completed, status, started_at, last_access_at, completed_at)
+     VALUES ($1::bigint, $2::bigint, $3::numeric, $4::integer, $5::text, NOW(), NOW(), CASE WHEN $3::numeric >= 100 THEN NOW() ELSE NULL END)
+     ON CONFLICT (course_id, user_id)
+     DO UPDATE SET percentuale = EXCLUDED.percentuale,
+                   materials_completed = EXCLUDED.materials_completed,
+                   status = EXCLUDED.status,
+                   last_access_at = NOW(),
+                   completed_at = CASE WHEN EXCLUDED.percentuale >= 100 THEN NOW() ELSE user_course_progress.completed_at END,
+                   updated_at = NOW()
+     RETURNING *`,
+    [courseId, user.id, percent, Number(input.materials_completed || 0), status]
   );
   return result.rows[0];
 }
 
-async function saveTrainingResult(input = {}, user = {}) {
-  const result = await pool.query(
-    `INSERT INTO training_results (user_id, course_id, score, completed, completed_at, payload)
-     VALUES ($1,$2,$3,$4,CASE WHEN $4 THEN NOW() ELSE NULL END,$5)
+async function evaluateCourseExam(input = {}, user = {}) {
+  if (!canEvaluateCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const targetUserId = input.user_id || user.id;
+  const courseId = input.course_id || input.courseId;
+  const examType = String(input.exam_type || "presenza").toLowerCase() === "live" ? "live" : "presenza";
+  const esito = String(input.esito || "non_svolto").toLowerCase() === "superato" ? "superato" : String(input.esito || "non_svolto").toLowerCase() === "non_superato" ? "non_superato" : "non_svolto";
+  const exam = await pool.query(
+    `INSERT INTO course_exam_sessions (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint, NOW(), $6::text)
      RETURNING *`,
-    [user.id, input.course_id, numberFrom(input.score), Boolean(input.completed), input.payload || {}]
+    [courseId, targetUserId, examType, esito, user.id, String(input.note || "")]
   );
-  return result.rows[0];
+  if (esito === "superato") {
+    await pool.query(
+      `INSERT INTO user_course_progress
+        (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
+       VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
+       ON CONFLICT (course_id, user_id)
+       DO UPDATE SET percentuale = 100, status = 'certificato', last_access_at = NOW(), completed_at = NOW(), updated_at = NOW()`,
+      [courseId, targetUserId]
+    );
+    const certificateCode = courseCode("CERT-OA");
+    const badgeCode = courseCode("BADGE-OA");
+    await pool.query(
+      `INSERT INTO course_certificates (course_id, user_id, certificate_code, issued_by)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint)
+       ON CONFLICT (certificate_code) DO NOTHING`,
+      [courseId, targetUserId, certificateCode, user.id]
+    );
+    const course = await pool.query(
+      `SELECT c.title, cat.name AS category_name
+       FROM courses c
+       LEFT JOIN course_categories cat ON cat.id = c.category_id
+       WHERE c.id = $1::bigint`,
+      [courseId]
+    );
+    const badgeName = `Operatore OroActive - ${course.rows[0]?.title || "Corso certificato"}`;
+    await pool.query(
+      `INSERT INTO course_badges (course_id, user_id, badge_name, badge_code, assigned_by)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
+       ON CONFLICT (badge_code) DO NOTHING`,
+      [courseId, targetUserId, badgeName, badgeCode, user.id]
+    );
+  }
+  return exam.rows[0];
+}
+
+async function getCourseCertificate(id, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const values = [id];
+  let where = "cert.id = $1::bigint";
+  if (!["founder", "responsabile"].includes(role)) {
+    values.push(user.id);
+    where += ` AND cert.user_id = $${values.length}::bigint`;
+  }
+  const result = await pool.query(
+    `SELECT cert.*, c.title AS course_title, cat.name AS category_name,
+            u.nome, u.cognome, u.username
+     FROM course_certificates cert
+     JOIN courses c ON c.id = cert.course_id
+     LEFT JOIN course_categories cat ON cat.id = c.category_id
+     LEFT JOIN utenti u ON u.id = cert.user_id
+     WHERE ${where}
+     LIMIT 1`,
+    values
+  );
+  return result.rows[0] || null;
+}
+
+function writeCourseCertificatePdf(certificate, response) {
+  const doc = new PDFDocument({ size: "A4", margin: 50 });
+  response.setHeader("Content-Type", "application/pdf");
+  response.setHeader("Content-Disposition", `attachment; filename=\"certificazione-oroactive-${certificate.id}.pdf\"`);
+  doc.pipe(response);
+  doc.rect(0, 0, 595, 842).fill("#fbf7f0");
+  doc.fillColor("#111").font("Helvetica-Bold").fontSize(24).text("Certificazione interna OroActive", 50, 90, { align: "center" });
+  doc.moveDown(2);
+  doc.font("Helvetica").fontSize(13).fillColor("#333").text("Si certifica che", { align: "center" });
+  doc.moveDown();
+  doc.font("Helvetica-Bold").fontSize(22).fillColor("#000").text(`${certificate.nome || ""} ${certificate.cognome || certificate.username || ""}`.trim() || "Utente OroActive", { align: "center" });
+  doc.moveDown();
+  doc.font("Helvetica").fontSize(13).fillColor("#333").text("ha superato la prova finale del corso", { align: "center" });
+  doc.moveDown();
+  doc.font("Helvetica-Bold").fontSize(18).fillColor("#c45a1a").text(certificate.course_title || "Corso OroActive", { align: "center" });
+  doc.moveDown();
+  doc.font("Helvetica").fontSize(12).fillColor("#333").text(`Categoria: ${certificate.category_name || "Formazione OroActive"}`, { align: "center" });
+  doc.text(`Data completamento: ${new Date(certificate.issued_at).toLocaleDateString("it-IT")}`, { align: "center" });
+  doc.text(`Codice certificazione: ${certificate.certificate_code || ""}`, { align: "center" });
+  doc.moveDown(4);
+  doc.font("Helvetica-Bold").fontSize(14).fillColor("#111").text("OroActive", { align: "center" });
+  doc.font("Helvetica").fontSize(11).text("Certificazione interna valida per formazione aziendale", { align: "center" });
+  doc.end();
+}
+
+async function listTraining(user = {}) {
+  return listCourses(user);
+}
+
+async function createTrainingCourse(input = {}, user = {}) {
+  return createCourse(input, user);
+}
+
+async function saveTrainingResult(input = {}, user = {}) {
+  return saveCourseProgress({
+    course_id: input.course_id,
+    percentuale: input.completed ? 100 : numberFrom(input.score),
+    status: input.completed ? "completato" : "in corso",
+    materials_completed: input.payload?.materials_completed || 0
+  }, user);
 }
 
 async function crmClients(user = {}, query = {}) {
@@ -3236,9 +3592,14 @@ async function deleteUser(id, actor) {
 }
 
 async function loginUser(identifier, password) {
+  const loginIdentifier = String(identifier || "").trim();
   const result = await pool.query(
-    "SELECT * FROM utenti WHERE LOWER(username) = LOWER($1)",
-    [identifier || ""]
+    `SELECT *
+     FROM utenti
+     WHERE LOWER(username) = LOWER($1::text)
+        OR LOWER(email) = LOWER($1::text)
+     LIMIT 1`,
+    [loginIdentifier]
   );
   const user = result.rows[0];
   if (!user || !(await bcrypt.compare(String(password || ""), user.password_hash))) {
@@ -3285,10 +3646,24 @@ async function loginWithFaceId(identifier, credentialId) {
 }
 
 app.get("/api/health", (_request, response) => {
-  response.json({ ok: true, service: "oroactive-gestionale" });
+  response.json({
+    ok: true,
+    service: "oroactive-gestionale",
+    database: runtimeStatus.databaseReady ? "ready" : "initializing_or_unavailable",
+    database_error: runtimeStatus.databaseError || null,
+    started_at: runtimeStatus.startedAt
+  });
 });
 
 app.post("/api/auth/login", async (request, response, next) => {
+  try {
+    response.json(await loginUser(request.body.username, request.body.password));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/login", async (request, response, next) => {
   try {
     response.json(await loginUser(request.body.username, request.body.password));
   } catch (error) {
@@ -3424,6 +3799,58 @@ app.put("/api/antifrode/:id", async (request, response, next) => {
     const alert = await updateAntifraudAlert(request.params.id, request.body, request.user);
     if (!alert) return response.status(404).json({ error: "Alert non trovato" });
     response.json(alert);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/corsi", async (request, response, next) => {
+  try {
+    response.json(await listCourses(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/corsi", async (request, response, next) => {
+  try {
+    response.status(201).json(await createCourse(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/corsi/:id", async (request, response, next) => {
+  try {
+    const course = await updateCourse(request.params.id, request.body, request.user);
+    if (!course) return response.status(404).json({ error: "Corso non trovato" });
+    response.json(course);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/corsi/progress", async (request, response, next) => {
+  try {
+    response.status(201).json(await saveCourseProgress(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/corsi/esami", async (request, response, next) => {
+  try {
+    response.status(201).json(await evaluateCourseExam(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/corsi/certificati/:id/pdf", async (request, response, next) => {
+  try {
+    const certificate = await getCourseCertificate(request.params.id, request.user);
+    if (!certificate) return response.status(404).json({ error: "Certificazione non trovata" });
+    writeCourseCertificatePdf(certificate, response);
   } catch (error) {
     next(error);
   }
@@ -4178,14 +4605,21 @@ app.use((error, _request, response, _next) => {
   response.status(error.status || 500).json({ error: message });
 });
 
+app.listen(port, () => {
+  console.log(`OroActive gestionale in ascolto sulla porta ${port}`);
+});
+
 initDatabase()
   .then(() => {
+    runtimeStatus.databaseReady = true;
+    runtimeStatus.databaseError = "";
     scheduleBackups();
-    app.listen(port, () => {
-      console.log(`OroActive gestionale in ascolto sulla porta ${port}`);
-    });
   })
   .catch((error) => {
+    runtimeStatus.databaseReady = false;
+    runtimeStatus.databaseError = error?.message || "Errore inizializzazione database";
     console.error("Errore inizializzazione database", error);
-    process.exit(1);
+    if (process.env.REQUIRE_DATABASE_ON_START === "true") {
+      process.exit(1);
+    }
   });

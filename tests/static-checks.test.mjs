@@ -48,6 +48,26 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /\/pdf\//);
 });
 
+test("sezione corsi e certificazioni interne presenti", async () => {
+  const [index, app, server, schema] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql")
+  ]);
+
+  assert.match(index, /data-section="training">Corsi/);
+  assert.match(index, /Catalogo corsi/);
+  assert.match(index, /I miei corsi/);
+  assert.match(index, /Certificazioni/);
+  assert.match(index, /Badge/);
+  assert.match(app, /apiRequest\("\/corsi"/);
+  assert.match(server, /app\.get\("\/api\/corsi"/);
+  assert.match(server, /app\.post\("\/api\/corsi\/esami"/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS course_certificates/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS course_badges/);
+});
+
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
   const [pkg, index, app, server] = await Promise.all([
     file("package.json"),

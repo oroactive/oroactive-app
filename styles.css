@@ -20,6 +20,7 @@
 html,
 body {
   min-height: 100%;
+  overscroll-behavior-y: none;
 }
 
 html {
@@ -32,6 +33,19 @@ body {
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f7eee7;
   color: var(--ink);
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  -webkit-tap-highlight-color: rgba(255, 115, 28, 0.18);
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea,
+button {
+  font-size: max(16px, 1rem);
 }
 
 .login-screen {
@@ -453,6 +467,152 @@ textarea {
   margin: 12px 0 0;
   color: var(--orange-dark);
   font-weight: 900;
+}
+
+.course-hero,
+.course-toolbar,
+.course-editor,
+.course-card {
+  background: #fffaf4;
+  border: 1px solid rgba(255, 106, 0, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(35, 20, 8, 0.08);
+}
+
+.course-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px;
+  margin-bottom: 18px;
+}
+
+.course-summary {
+  min-width: 180px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: #111;
+  color: #fff;
+  text-align: center;
+}
+
+.course-summary span,
+.course-card small {
+  display: block;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.course-summary strong {
+  display: block;
+  color: var(--orange);
+  font-size: 28px;
+  margin-top: 4px;
+}
+
+.course-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.course-tabs button,
+.course-card button,
+.course-toolbar select,
+.course-toolbar input {
+  min-height: 48px;
+}
+
+.course-tabs button {
+  border: 1px solid rgba(255, 106, 0, 0.25);
+  background: #fff;
+  border-radius: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.course-tabs button.active {
+  background: #111;
+  color: var(--orange);
+  border-color: var(--orange);
+}
+
+.course-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.course-editor textarea,
+.course-editor .user-form-actions {
+  grid-column: 1 / -1;
+}
+
+.course-toolbar {
+  display: grid;
+  grid-template-columns: 1fr minmax(180px, 260px);
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+.course-content {
+  display: grid;
+  gap: 14px;
+}
+
+.course-card {
+  display: grid;
+  grid-template-columns: 1fr minmax(190px, 260px);
+  gap: 18px;
+  padding: 18px;
+}
+
+.course-card h3 {
+  margin: 8px 0;
+  font-size: 22px;
+}
+
+.course-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 106, 0, 0.12);
+  color: #ba4e10;
+  font-weight: 900;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.course-progress-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.course-progress {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.course-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ff6a00, #d4af37);
+}
+
+.badge-card {
+  grid-template-columns: 1fr auto;
+  align-items: center;
 }
 
 .knowledge-status {
@@ -4032,6 +4192,21 @@ button.quality-review-badge {
 }
 
 @media (max-width: 900px) {
+  .course-hero,
+  .course-card,
+  .course-toolbar,
+  .course-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .course-hero {
+    display: grid;
+  }
+
+  .course-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .quote-strip-grid {
     grid-template-columns: 1fr;
   }

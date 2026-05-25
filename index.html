@@ -15,7 +15,8 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260523-25">
+  <link rel="stylesheet" href="styles.css?v=20260525-corsi-1">
+  <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -76,7 +77,7 @@
           <div class="main-menu-submenu" id="trainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
             <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-            <button type="button" data-section="training">Formazione Staff</button>
+            <button type="button" data-section="training">Corsi</button>
             <button type="button" data-start-tutorial>Tutorial</button>
           </div>
         </div>
@@ -116,12 +117,11 @@
           <div class="brand-submenu" id="brandTrainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
             <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-            <button type="button" data-section="training">Formazione Staff</button>
+            <button type="button" data-section="training">Corsi</button>
             <button type="button" data-start-tutorial>Tutorial</button>
           </div>
         </div>
       </div>
-
       <div class="operator">
         <span>Accesso</span>
         <strong id="operatorStoreName">Negozio Busto Arsizio</strong>
@@ -754,20 +754,61 @@
 
       <section id="training" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
-        <div class="settings-grid">
+        <div class="course-hero">
           <div>
-            <p class="eyebrow">Formazione Staff</p>
-            <h2>Corsi e quiz operatori</h2>
-            <p class="muted">Corsi interni, quiz, test finale e storico risultati dello staff.</p>
+            <p class="eyebrow">Formazione OroActive</p>
+            <h2>Corsi</h2>
+            <p class="muted">Catalogo corsi, area personale, certificazioni interne e badge operativi.</p>
           </div>
-          <form class="settings-list founder-only" id="trainingCourseForm">
-            <label>Titolo corso <input id="trainingCourseTitle"></label>
-            <label>Categoria <input id="trainingCourseCategory" placeholder="oro, antiriciclaggio, procedure OroActive"></label>
-            <label>Descrizione <textarea id="trainingCourseDescription" rows="5"></textarea></label>
-            <button class="primary-button" type="submit">Crea corso</button>
-          </form>
+          <div class="course-summary" id="courseSummary">
+            <span>Completamento medio</span>
+            <strong>0%</strong>
+          </div>
         </div>
-        <div class="knowledge-notes-list" id="trainingList"></div>
+        <div class="course-tabs" role="tablist" aria-label="Sezioni corsi OroActive">
+          <button class="active" type="button" data-course-tab="catalog">Catalogo corsi</button>
+          <button type="button" data-course-tab="mine">I miei corsi</button>
+          <button type="button" data-course-tab="certifications">Certificazioni</button>
+          <button type="button" data-course-tab="badges">Badge</button>
+        </div>
+        <form class="course-editor founder-only" id="trainingCourseForm">
+          <input type="hidden" id="trainingCourseId">
+          <label>Titolo corso <input id="trainingCourseTitle" required></label>
+          <label>Categoria
+            <select id="trainingCourseCategory">
+              <option>Oro</option>
+              <option>Argento</option>
+              <option>Platino</option>
+              <option>Diamanti</option>
+              <option>Procedure Operative</option>
+              <option>Normative</option>
+              <option>Coaching Aziendale</option>
+            </select>
+          </label>
+          <label>Sottosezione <input id="trainingCourseSection" placeholder="Esempio: Oro base, Antiriciclaggio, Cliente"></label>
+          <label>Descrizione <textarea id="trainingCourseDescription" rows="4"></textarea></label>
+          <label>Materiale o link video <input id="trainingCourseMaterial" placeholder="Link PDF, video corso o nota materiale"></label>
+          <label>Ordinamento <input id="trainingCourseOrder" type="number" min="0" value="0"></label>
+          <label class="inline-check"><input id="trainingCourseActive" type="checkbox" checked> Corso attivo</label>
+          <div class="user-form-actions">
+            <button class="primary-button" type="submit" id="trainingCourseSaveButton">Crea corso</button>
+            <button class="ghost-button" type="button" id="trainingCourseReset">Nuovo corso</button>
+          </div>
+        </form>
+        <div class="course-toolbar">
+          <input class="search" id="courseSearch" placeholder="Cerca corso">
+          <select id="courseCategoryFilter">
+            <option value="">Tutte le categorie</option>
+            <option>Oro</option>
+            <option>Argento</option>
+            <option>Platino</option>
+            <option>Diamanti</option>
+            <option>Procedure Operative</option>
+            <option>Normative</option>
+            <option>Coaching Aziendale</option>
+          </select>
+        </div>
+        <div class="course-content" id="trainingList"></div>
       </section>
 
       <section id="crm" class="screen">
@@ -814,6 +855,7 @@
               </select>
             </label>
             <label>Fonte <input id="knowledgeNoteSource" placeholder="Libro, procedura interna, esperienza negozio"></label>
+            <label>Esperienza negozio <input id="knowledgeNoteExperience" placeholder="Esempio: caso reale Busto Arsizio, procedura banco"></label>
             <label>Autore <input id="knowledgeNoteAuthor" readonly></label>
             <label>Ruolo autore <input id="knowledgeNoteRole" readonly></label>
             <label>Contenuto
@@ -934,6 +976,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260524-enterprise-1"></script>
+  <script src="app.js?v=20260525-corsi-1"></script>
 </body>
 </html>

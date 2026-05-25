@@ -8,7 +8,7 @@ const state = {
   captureFiles: new Map(),
   lastSearchResults: [],
   editingPracticeNumber: null,
-  authToken: localStorage.getItem("oroactive-auth-token") || "",
+  authToken: "",
   currentUser: null,
   syncTimer: null,
   actsCache: new Map(),
@@ -39,13 +39,20 @@ const state = {
   dashboard: null,
   antifraudAlerts: [],
   trainingCourses: [],
+  courseCategories: [],
+  courseSections: [],
+  courseProgress: [],
+  courseCertificates: [],
+  courseBadges: [],
+  courseActiveTab: "catalog",
   crmClients: [],
   crmSearchTimer: null,
   backups: [],
   clockTimer: null,
   bullionChartLoaded: false,
-  pendingSync: JSON.parse(localStorage.getItem("oroactive-pending-sync") || "[]"),
+  pendingSync: [],
   syncingPending: false,
+  sessionTimeoutTimer: null,
   tutorial: {
     active: false,
     index: 0,
@@ -113,6 +120,11 @@ const storesList = document.getElementById("storesList");
 const antifraudList = document.getElementById("antifraudList");
 const trainingCourseForm = document.getElementById("trainingCourseForm");
 const trainingList = document.getElementById("trainingList");
+const courseSummary = document.getElementById("courseSummary");
+const courseSearch = document.getElementById("courseSearch");
+const courseCategoryFilter = document.getElementById("courseCategoryFilter");
+const trainingCourseReset = document.getElementById("trainingCourseReset");
+const trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
@@ -195,7 +207,9 @@ const documentLabels = {
   Patente: "patente",
   Passaporto: "passaporto"
 };
-const apiBase = "/api";
+const oroactiveConfig = window.OroActiveConfig || {};
+const API_BASE_URL = oroactiveConfig.apiBaseUrl || window.location.origin.replace(/\/+$/, "").replace(/\/api$/i, "");
+const apiBase = oroactiveConfig.apiBase || `${API_BASE_URL}/api`;
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
@@ -340,6 +354,31 @@ function registerServiceWorker() {
   });
 }
 
+async function loadStoredAuthToken() {
+  const token = await loadDeviceStorage("oroactive-auth-token");
+  state.authToken = token;
+  return token;
+}
+
+async function saveStoredAuthToken(token) {
+  state.authToken = token || "";
+  await saveDeviceStorage("oroactive-auth-token", token || "");
+}
+
+async function clearStoredAuthToken() {
+  state.authToken = "";
+  await saveDeviceStorage("oroactive-auth-token", "");
+}
+
+async function loadDeviceStorage(key) {
+  return localStorage.getItem(key) || "";
+}
+
+async function saveDeviceStorage(key, value) {
+  if (value) localStorage.setItem(key, value);
+  else localStorage.removeItem(key);
+}
+
 function maybeShowInstallHint() {
   if (!installHint || localStorage.getItem("oroactive-install-hint-dismissed")) return;
   if (isStandalonePwa() || !isAppleTouchDevice()) return;
@@ -348,17 +387,33 @@ function maybeShowInstallHint() {
 
 function updateMainMenuClock() {
   if (!mainMenuClock) return;
-  mainMenuClock.textContent = new Intl.DateTimeFormat("it-IT", {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(now);
+  const time = new Intl.DateTimeFormat("it-IT", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
-  }).format(new Date());
+  }).format(now);
+  mainMenuClock.textContent = `${date} - ${time}`;
 }
 
 function startMainMenuClock() {
   updateMainMenuClock();
   if (state.clockTimer) return;
   state.clockTimer = window.setInterval(updateMainMenuClock, 1000);
+}
+
+function resetSessionTimeout() {
+  if (!state.authToken) return;
+  window.clearTimeout(state.sessionTimeoutTimer);
+  state.sessionTimeoutTimer = window.setTimeout(() => {
+    showToast("Sessione scaduta per inattività. Effettua nuovamente l'accesso.", "warning");
+    showLogin();
+  }, 30 * 60 * 1000);
 }
 
 function queryString(params = {}) {
@@ -376,6 +431,12 @@ function wait(ms) {
 function shouldRetryApi(error, responseStatus) {
   if (responseStatus && responseStatus < 500 && responseStatus !== 429) return false;
   return error?.name === "AbortError" || !navigator.onLine || !responseStatus || responseStatus >= 500 || responseStatus === 429;
+}
+
+function serverConnectionError() {
+  const error = new Error("Connessione al server OroActive non riuscita");
+  error.isConnectionError = true;
+  return error;
 }
 
 function sanitizeForSave(value) {
@@ -422,13 +483,15 @@ async function apiRequest(path, options = {}) {
         await wait(350 * attempt);
         continue;
       }
-      if (error.name === "AbortError") throw new Error("Connessione lenta: salvataggio in ritardo, riprovo automaticamente.");
+      if (error.name === "AbortError" || error instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(error.message || "")) {
+        throw serverConnectionError();
+      }
       throw error;
     } finally {
       window.clearTimeout(timeout);
     }
   }
-  throw lastError || new Error("Errore comunicazione server");
+  throw lastError || serverConnectionError();
 }
 
 function mergeActsIntoCache(acts = []) {
@@ -546,7 +609,17 @@ async function syncActsFromServer() {
 }
 
 function persistPendingSync() {
-  localStorage.setItem("oroactive-pending-sync", JSON.stringify(state.pendingSync.slice(0, 30)));
+  const value = JSON.stringify(state.pendingSync.slice(0, 30));
+  saveDeviceStorage("oroactive-pending-sync", value).catch(() => {});
+}
+
+async function loadPendingSyncQueue() {
+  const value = await loadDeviceStorage("oroactive-pending-sync") || "[]";
+  try {
+    state.pendingSync = JSON.parse(value);
+  } catch {
+    state.pendingSync = [];
+  }
 }
 
 function queuePendingActSave(act, method, identifier) {
@@ -583,8 +656,8 @@ async function flushPendingSync() {
         remaining.push(item);
       }
     }
-    state.pendingSync = remaining;
-    persistPendingSync();
+  state.pendingSync = remaining;
+  persistPendingSync();
   } finally {
     state.syncingPending = false;
   }
@@ -627,7 +700,9 @@ async function saveActRecord(act, method = "POST") {
   );
   if (index >= 0) demoActs[index] = { ...demoActs[index], ...saved };
   else demoActs.unshift(saved);
-  if (!saved._pendingSync) showToast("Salvataggio completato", "success");
+  if (!saved._pendingSync) {
+    showToast("Salvataggio completato", "success");
+  }
   return saved;
 }
 
@@ -669,11 +744,10 @@ function showToast(message, type = "") {
 }
 
 function showLogin() {
-  state.authToken = "";
+  clearStoredAuthToken();
   state.currentUser = null;
   state.actsCache.clear();
   demoActs.splice(0, demoActs.length);
-  localStorage.removeItem("oroactive-auth-token");
   loginScreen.hidden = false;
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = true;
@@ -682,6 +756,8 @@ function showLogin() {
   appShell.hidden = true;
   if (state.syncTimer) window.clearInterval(state.syncTimer);
   state.syncTimer = null;
+  window.clearTimeout(state.sessionTimeoutTimer);
+  state.sessionTimeoutTimer = null;
 }
 
 function showAuthenticatedShell() {
@@ -716,6 +792,14 @@ function roleLabel(role) {
 function displayUsername(user = {}) {
   if (user.username) return user.username;
   return user.nome || "";
+}
+
+function canManageCoursesUi() {
+  return normalizeRole(state.currentUser?.ruolo) === "founder";
+}
+
+function canEvaluateCoursesUi() {
+  return ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
 function tutorialStorageKey(user = state.currentUser) {
@@ -1298,10 +1382,12 @@ function applyRolePermissions() {
 
 async function startAuthenticatedApp() {
   showAuthenticatedShell();
+  resetSessionTimeout();
   state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
   applyRolePermissions();
   startMainMenuClock();
   maybeShowInstallHint();
+  await loadPendingSyncQueue();
   await loadAvailableStores();
   renderStep();
   await setPracticeMeta();
@@ -1327,6 +1413,7 @@ async function startAuthenticatedApp() {
 }
 
 async function restoreSession() {
+  await loadStoredAuthToken();
   if (!state.authToken) {
     showLogin();
     return false;
@@ -1345,21 +1432,32 @@ async function restoreSession() {
 async function handleLogin(event) {
   event.preventDefault();
   loginMessage.textContent = "";
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value;
   try {
-    const data = await apiRequest("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({
-        username: document.getElementById("loginUsername").value.trim(),
-        password: document.getElementById("loginPassword").value
-      })
-    });
-    state.authToken = data.token;
+    const body = JSON.stringify({ username, password });
+    let data;
+    try {
+      data = await apiRequest("/auth/login", { method: "POST", body, retries: 1 });
+    } catch (error) {
+      if (error.status === 404 || error.status === 405) {
+        data = await apiRequest("/login", { method: "POST", body, retries: 1 });
+      } else {
+        throw error;
+      }
+    }
     state.currentUser = data.user;
-    localStorage.setItem("oroactive-auth-token", data.token);
+    await saveStoredAuthToken(data.token);
     loginForm.reset();
     await startAuthenticatedApp();
   } catch (error) {
-    loginMessage.textContent = error.message || "Accesso non riuscito.";
+    loginMessage.textContent = error.status === 401
+      ? "Credenziali non valide"
+      : error.isConnectionError
+        ? "Connessione al server OroActive non riuscita"
+        : error.status
+          ? `Errore ${error.status}: ${error.message || "Accesso non riuscito."}`
+          : error.message || "Accesso non riuscito.";
   }
 }
 
@@ -1419,8 +1517,8 @@ async function registerFaceId() {
       body: JSON.stringify({ credentialId })
     });
     state.currentUser = data.user;
-    localStorage.setItem("oroactive-faceid-username", displayUsername(state.currentUser));
-    localStorage.setItem("oroactive-faceid-credential", credentialId);
+    await saveDeviceStorage("oroactive-faceid-username", displayUsername(state.currentUser));
+    await saveDeviceStorage("oroactive-faceid-credential", credentialId);
     showToast("Face ID registrato su questo dispositivo.");
   } catch (error) {
     showToast(error.message || "Registrazione Face ID non completata.");
@@ -1432,8 +1530,8 @@ async function loginWithFaceId() {
     loginMessage.textContent = "Face ID richiede HTTPS e un dispositivo compatibile.";
     return;
   }
-  const username = document.getElementById("loginUsername").value.trim() || localStorage.getItem("oroactive-faceid-username") || "";
-  const storedCredential = localStorage.getItem("oroactive-faceid-credential") || "";
+  const username = document.getElementById("loginUsername").value.trim() || await loadDeviceStorage("oroactive-faceid-username") || "";
+  const storedCredential = await loadDeviceStorage("oroactive-faceid-credential") || "";
   if (!username || !storedCredential) {
     loginMessage.textContent = "Prima accedi con password e registra il Face ID su questo dispositivo.";
     return;
@@ -1456,14 +1554,17 @@ async function loginWithFaceId() {
       method: "POST",
       body: JSON.stringify({ username, credentialId })
     });
-    state.authToken = data.token;
     state.currentUser = data.user;
-    localStorage.setItem("oroactive-auth-token", data.token);
-    localStorage.setItem("oroactive-faceid-username", username);
-    localStorage.setItem("oroactive-faceid-credential", credentialId);
+    await saveStoredAuthToken(data.token);
+    await saveDeviceStorage("oroactive-faceid-username", username);
+    await saveDeviceStorage("oroactive-faceid-credential", credentialId);
     await startAuthenticatedApp();
   } catch (error) {
-    loginMessage.textContent = error.message || "Accesso Face ID non riuscito.";
+    loginMessage.textContent = error.status === 401
+      ? "Credenziali non valide"
+      : error.isConnectionError
+        ? "Connessione al server OroActive non riuscita"
+        : error.message || "Accesso Face ID non riuscito.";
   }
 }
 
@@ -2064,6 +2165,8 @@ function resetKnowledgeNoteFormValues() {
   document.getElementById("knowledgeNoteId").value = "";
   document.getElementById("knowledgeNoteAuthor").value = displayUsername(state.currentUser || {});
   document.getElementById("knowledgeNoteRole").value = roleLabel(state.currentUser?.ruolo || "");
+  const experience = document.getElementById("knowledgeNoteExperience");
+  if (experience) experience.value = "";
   const saveButton = document.getElementById("saveKnowledgeNoteButton");
   if (saveButton) {
     saveButton.textContent = "Salva conoscenza";
@@ -2083,7 +2186,7 @@ function renderKnowledgeNotes() {
       <div>
         <strong>${escapeHtml(note.title || "Conoscenza OroActive")}</strong>
         <span>${escapeHtml(note.category || "Procedure operative")} · ${escapeHtml(knowledgeStatusLabel(note.status))}</span>
-        <small>${escapeHtml(note.source || "Fonte non indicata")} · ${escapeHtml(new Date(note.created_at).toLocaleDateString("it-IT"))}</small>
+        <small>${escapeHtml(note.source || "Fonte non indicata")} · ${escapeHtml(note.store_experience || "Esperienza negozio non indicata")} · ${escapeHtml(new Date(note.created_at).toLocaleDateString("it-IT"))}</small>
       </div>
       <p>${escapeHtml(String(note.content || "").slice(0, 220))}${String(note.content || "").length > 220 ? "..." : ""}</p>
       <div class="row-actions">
@@ -2116,6 +2219,7 @@ async function saveKnowledgeNote(event) {
     title: document.getElementById("knowledgeNoteTitle")?.value.trim(),
     category: document.getElementById("knowledgeNoteCategory")?.value,
     source: document.getElementById("knowledgeNoteSource")?.value.trim(),
+    store_experience: document.getElementById("knowledgeNoteExperience")?.value.trim(),
     content: document.getElementById("knowledgeNoteContent")?.value.trim(),
     status: isFounder() ? "approvata" : "in revisione"
   };
@@ -2151,6 +2255,8 @@ function editKnowledgeNote(id) {
   document.getElementById("knowledgeNoteTitle").value = note.title || "";
   document.getElementById("knowledgeNoteCategory").value = note.category || "Procedure operative";
   document.getElementById("knowledgeNoteSource").value = note.source || "";
+  const experience = document.getElementById("knowledgeNoteExperience");
+  if (experience) experience.value = note.store_experience || "";
   document.getElementById("knowledgeNoteContent").value = note.content || "";
   document.getElementById("knowledgeNoteAuthor").value = displayUsername(state.currentUser || {});
   document.getElementById("knowledgeNoteRole").value = roleLabel(state.currentUser?.ruolo || "");
@@ -2582,42 +2688,194 @@ async function scanAntifraud() {
   }
 }
 
+function courseProgressFor(courseId) {
+  return state.courseProgress.find((item) => String(item.course_id) === String(courseId)) || {};
+}
+
+function resetTrainingCourseFormValues() {
+  if (!trainingCourseForm) return;
+  trainingCourseForm.reset();
+  document.getElementById("trainingCourseId").value = "";
+  document.getElementById("trainingCourseOrder").value = "0";
+  document.getElementById("trainingCourseActive").checked = true;
+  if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Crea corso";
+}
+
+function renderCourseSummary() {
+  if (!courseSummary) return;
+  const progresses = state.courseProgress || [];
+  const average = progresses.length
+    ? Math.round(progresses.reduce((sum, item) => sum + Number(item.percentuale || 0), 0) / progresses.length)
+    : 0;
+  courseSummary.innerHTML = `<span>Completamento medio</span><strong>${average}%</strong>`;
+}
+
 function renderTraining() {
   if (!trainingList) return;
-  if (!state.trainingCourses.length) {
-    trainingList.innerHTML = '<div class="empty-state">Nessun corso attivo.</div>';
+  renderCourseSummary();
+  document.querySelectorAll("[data-course-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.courseTab === state.courseActiveTab);
+  });
+
+  const search = String(courseSearch?.value || "").trim().toLowerCase();
+  const category = String(courseCategoryFilter?.value || "").trim();
+  const visibleCourses = state.trainingCourses.filter((course) => {
+    const matchesSearch = !search || [course.title, course.description, course.section_title, course.category_name]
+      .some((value) => String(value || "").toLowerCase().includes(search));
+    const matchesCategory = !category || String(course.category_name || course.category || "") === category;
+    return matchesSearch && matchesCategory;
+  });
+
+  if (state.courseActiveTab === "mine") {
+    const mine = visibleCourses.filter((course) => Number(courseProgressFor(course.id).percentuale || 0) > 0 || courseProgressFor(course.id).status);
+    trainingList.innerHTML = mine.length ? mine.map(renderCourseCard).join("") : '<div class="empty-state">Non hai ancora iniziato corsi.</div>';
     return;
   }
-  trainingList.innerHTML = state.trainingCourses.map((course) => `
-    <article class="knowledge-note-row">
-      <div><strong>${escapeHtml(course.title)}</strong><span>${escapeHtml(course.category || "Formazione")}</span></div>
-      <p>${escapeHtml(course.description || "")}</p>
-      <div class="score-bar"><span style="width:${course.completed ? 100 : Math.min(100, Number(course.score || 0))}%"></span></div>
-      <small>Punteggio: ${Number(course.score || 0)} · ${course.completed ? "Completato" : "Da completare"}</small>
+
+  if (state.courseActiveTab === "certifications") {
+    trainingList.innerHTML = state.courseCertificates.length ? state.courseCertificates.map((certificate) => `
+      <article class="course-card">
+        <div>
+          <span class="course-pill">Certificazione</span>
+          <h3>${escapeHtml(certificate.course_title || certificate.title || "Corso OroActive")}</h3>
+          <p>${escapeHtml(certificate.category_name || "Formazione OroActive")} · ${escapeHtml(certificate.certificate_code || "")}</p>
+        </div>
+        <button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(certificate.id))}">Scarica PDF</button>
+      </article>
+    `).join("") : '<div class="empty-state">Nessuna certificazione ottenuta.</div>';
+    return;
+  }
+
+  if (state.courseActiveTab === "badges") {
+    trainingList.innerHTML = state.courseBadges.length ? state.courseBadges.map((badge) => `
+      <article class="course-card badge-card">
+        <div>
+          <span class="course-pill">Badge</span>
+          <h3>${escapeHtml(badge.badge_name || "Badge OroActive")}</h3>
+          <p>${escapeHtml(badge.course_title || "Corso collegato")} · ${escapeHtml(badge.badge_code || "")}</p>
+        </div>
+        <strong>${escapeHtml(badge.status || "valido")}</strong>
+      </article>
+    `).join("") : '<div class="empty-state">Nessun badge ottenuto.</div>';
+    return;
+  }
+
+  trainingList.innerHTML = visibleCourses.length ? visibleCourses.map(renderCourseCard).join("") : '<div class="empty-state">Nessun corso attivo.</div>';
+}
+
+function renderCourseCard(course) {
+  const progress = courseProgressFor(course.id);
+  const percent = Math.max(0, Math.min(100, Number(progress.percentuale || course.percentuale || 0)));
+  const status = progress.status || course.status || "non iniziato";
+  const canManage = canManageCoursesUi();
+  const canEvaluate = canEvaluateCoursesUi();
+  return `
+    <article class="course-card">
+      <div class="course-card-main">
+        <span class="course-pill">${escapeHtml(course.category_name || course.category || "Formazione")}</span>
+        <h3>${escapeHtml(course.title)}</h3>
+        <p>${escapeHtml(course.description || "")}</p>
+        <small>${escapeHtml(course.section_title || "Sottosezione generale")} · Stato: ${escapeHtml(status)}</small>
+        ${course.material_url ? `<a href="${escapeHtml(course.material_url)}" target="_blank" rel="noopener">Apri materiale corso</a>` : ""}
+      </div>
+      <div class="course-progress-panel">
+        <div class="course-progress"><span style="width:${percent}%"></span></div>
+        <strong>${percent}%</strong>
+        <button type="button" data-course-progress="${escapeHtml(String(course.id))}">Aggiorna avanzamento</button>
+        ${canEvaluate ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Segna esame superato</button>` : ""}
+        ${canManage ? `<button type="button" data-edit-course="${escapeHtml(String(course.id))}">Modifica</button>` : ""}
+      </div>
     </article>
-  `).join("");
+  `;
 }
 
 async function loadTraining() {
-  const data = await apiRequest("/training");
+  const data = await apiRequest("/corsi");
   state.trainingCourses = data.courses || [];
+  state.courseCategories = data.categories || [];
+  state.courseSections = data.sections || [];
+  state.courseProgress = data.progress || [];
+  state.courseCertificates = data.certificates || [];
+  state.courseBadges = data.badges || [];
   renderTraining();
 }
 
 async function createTrainingCourse(event) {
   event.preventDefault();
-  if (!isFounder()) return;
-  await apiRequest("/training/courses", {
-    method: "POST",
+  if (!canManageCoursesUi()) return;
+  const id = document.getElementById("trainingCourseId")?.value;
+  await apiRequest(id ? `/corsi/${encodeURIComponent(id)}` : "/corsi", {
+    method: id ? "PUT" : "POST",
     body: JSON.stringify({
       title: document.getElementById("trainingCourseTitle").value.trim(),
       category: document.getElementById("trainingCourseCategory").value.trim(),
-      description: document.getElementById("trainingCourseDescription").value.trim()
+      section: document.getElementById("trainingCourseSection").value.trim(),
+      description: document.getElementById("trainingCourseDescription").value.trim(),
+      material_url: document.getElementById("trainingCourseMaterial").value.trim(),
+      order_index: Number(document.getElementById("trainingCourseOrder").value || 0),
+      active: document.getElementById("trainingCourseActive").checked
     })
   });
-  trainingCourseForm.reset();
+  resetTrainingCourseFormValues();
   await loadTraining();
-  showToast("Corso creato.");
+  showToast(id ? "Corso aggiornato." : "Corso creato.");
+}
+
+async function updateCourseProgress(courseId) {
+  const current = courseProgressFor(courseId);
+  const value = window.prompt("Percentuale completamento corso", String(current.percentuale || 25));
+  if (value === null) return;
+  const percent = Math.max(0, Math.min(100, Number(value || 0)));
+  await apiRequest("/corsi/progress", {
+    method: "POST",
+    body: JSON.stringify({ course_id: courseId, percentuale: percent, status: percent >= 100 ? "completato" : "in corso" })
+  });
+  await loadTraining();
+  showToast("Avanzamento corso aggiornato.");
+}
+
+async function markCourseExamPassed(courseId) {
+  if (!canEvaluateCoursesUi()) return;
+  const examType = window.confirm("Esame svolto in live? Premi OK per live, Annulla per presenza.") ? "live" : "presenza";
+  await apiRequest("/corsi/esami", {
+    method: "POST",
+    body: JSON.stringify({ course_id: courseId, user_id: state.currentUser?.id, exam_type: examType, esito: "superato" })
+  });
+  await loadTraining();
+  showToast("Esame superato, certificazione e badge assegnati.");
+}
+
+function editCourse(courseId) {
+  const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
+  if (!course) return;
+  document.getElementById("trainingCourseId").value = course.id;
+  document.getElementById("trainingCourseTitle").value = course.title || "";
+  document.getElementById("trainingCourseCategory").value = course.category_name || course.category || "Oro";
+  document.getElementById("trainingCourseSection").value = course.section_title || "";
+  document.getElementById("trainingCourseDescription").value = course.description || "";
+  document.getElementById("trainingCourseMaterial").value = course.material_url || "";
+  document.getElementById("trainingCourseOrder").value = String(course.order_index || 0);
+  document.getElementById("trainingCourseActive").checked = course.active !== false;
+  if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva modifiche";
+}
+
+async function downloadCourseCertificate(certificateId) {
+  const response = await fetch(`${apiBase}/corsi/certificati/${encodeURIComponent(certificateId)}/pdf`, {
+    headers: state.authToken ? { Authorization: `Bearer ${state.authToken}` } : {}
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "Certificazione non scaricabile.");
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `certificazione-oroactive-${certificateId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function renderCrmClients() {
@@ -5306,6 +5564,31 @@ function imageFileToOptimizedDataUrl(file) {
   });
 }
 
+function optimizeImageDataUrl(dataUrl, options = {}) {
+  return new Promise((resolve) => {
+    if (!String(dataUrl || "").startsWith("data:image/")) {
+      resolve(dataUrl || "");
+      return;
+    }
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = options.maxSide || 1200;
+      const quality = options.quality || 0.74;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    image.onerror = () => resolve(dataUrl || "");
+    image.src = dataUrl;
+  });
+}
+
 function revokeCaptureUrl(file) {
   if (file?.url && String(file.url).startsWith("blob:")) URL.revokeObjectURL(file.url);
 }
@@ -5871,6 +6154,29 @@ antifraudList?.addEventListener("change", async (event) => {
   await loadAntifraud();
 });
 trainingCourseForm?.addEventListener("submit", createTrainingCourse);
+trainingCourseReset?.addEventListener("click", resetTrainingCourseFormValues);
+courseSearch?.addEventListener("input", renderTraining);
+courseCategoryFilter?.addEventListener("change", renderTraining);
+document.querySelectorAll("[data-course-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    state.courseActiveTab = button.dataset.courseTab || "catalog";
+    renderTraining();
+  });
+});
+trainingList?.addEventListener("click", async (event) => {
+  const progress = event.target.closest("[data-course-progress]");
+  const exam = event.target.closest("[data-course-exam]");
+  const edit = event.target.closest("[data-edit-course]");
+  const certificate = event.target.closest("[data-download-certificate]");
+  try {
+    if (progress) await updateCourseProgress(progress.dataset.courseProgress);
+    if (exam) await markCourseExamPassed(exam.dataset.courseExam);
+    if (edit) editCourse(edit.dataset.editCourse);
+    if (certificate) await downloadCourseCertificate(certificate.dataset.downloadCertificate);
+  } catch (error) {
+    showToast(error.message || "Operazione corso non riuscita.");
+  }
+});
 crmSearch?.addEventListener("input", () => {
   window.clearTimeout(state.crmSearchTimer);
   state.crmSearchTimer = window.setTimeout(loadCrmClients, 350);
@@ -6415,6 +6721,10 @@ window.addEventListener("online", () => {
   flushPendingSync();
 });
 
+["click", "keydown", "touchstart", "pointerdown"].forEach((eventName) => {
+  window.addEventListener(eventName, resetSessionTimeout, { passive: true });
+});
+
 document.addEventListener("change", async (event) => {
   if (!event.target.matches(".capture-card input")) return;
   const card = event.target.closest(".capture-card");
@@ -6447,7 +6757,7 @@ document.addEventListener("change", async (event) => {
   if (state.captureGroup && !previewModal.hidden) openCaptureGroupModal(state.captureGroup);
 });
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const captureGroup = event.target.closest("[data-capture-group]");
   if (captureGroup && !event.target.closest(".capture-card") && !event.target.closest(".capture-actions")) {
     openCaptureGroupModal(captureGroup.dataset.captureGroup);
