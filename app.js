@@ -39,6 +39,7 @@ const state = {
   dashboard: null,
   antifraudAlerts: [],
   trainingCourses: [],
+  courseFaculties: [],
   courseCategories: [],
   courseSections: [],
   courseProgress: [],
@@ -135,6 +136,7 @@ const courseCategoryFilter = document.getElementById("courseCategoryFilter");
 const trainingCourseReset = document.getElementById("trainingCourseReset");
 const trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
 const trainingCourseFile = document.getElementById("trainingCourseFile");
+const trainingCourseFormPanel = document.getElementById("trainingCourseForm");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
@@ -2777,11 +2779,25 @@ function courseProgressFor(courseId) {
   return state.courseProgress.find((item) => String(item.course_id) === String(courseId)) || {};
 }
 
+function operatorAcademyLevel() {
+  const completed = (state.courseProgress || []).filter((item) => ["completato", "certificato"].includes(String(item.status || "").toLowerCase())).length;
+  const badges = state.courseBadges.length;
+  const certificates = state.courseCertificates.length;
+  const score = completed * 2 + badges * 3 + certificates * 4;
+  if (score >= 40) return "Master OroActive";
+  if (score >= 28) return "Responsabile";
+  if (score >= 18) return "Esperto";
+  if (score >= 10) return "Senior";
+  if (score >= 4) return "Operatore";
+  return "Junior";
+}
+
 function resetTrainingCourseFormValues() {
   if (!trainingCourseForm) return;
   trainingCourseForm.reset();
   document.getElementById("trainingCourseId").value = "";
   document.getElementById("trainingCourseActive").checked = true;
+  document.getElementById("trainingCourseCertification").checked = true;
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Crea corso";
 }
 
@@ -2791,12 +2807,15 @@ function renderCourseSummary() {
   const average = progresses.length
     ? Math.round(progresses.reduce((sum, item) => sum + Number(item.percentuale || 0), 0) / progresses.length)
     : 0;
-  courseSummary.innerHTML = `<span>Completamento medio</span><strong>${average}%</strong>`;
+  courseSummary.innerHTML = `<span>Livello ${escapeHtml(operatorAcademyLevel())}</span><strong>${average}%</strong><small>Completamento medio</small>`;
 }
 
 function renderTraining() {
   if (!trainingList) return;
   renderCourseSummary();
+  if (trainingCourseForm) {
+    trainingCourseForm.hidden = !(state.courseActiveTab === "management" && canManageCoursesUi());
+  }
   document.querySelectorAll("[data-course-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.courseTab === state.courseActiveTab);
   });
@@ -2804,7 +2823,7 @@ function renderTraining() {
   const search = String(courseSearch?.value || "").trim().toLowerCase();
   const category = String(courseCategoryFilter?.value || "").trim();
   const visibleCourses = state.trainingCourses.filter((course) => {
-    const matchesSearch = !search || [course.title, course.description, course.section_title, course.category_name]
+    const matchesSearch = !search || [course.title, course.description, course.section_title, course.category_name, course.faculty_name, course.level, course.teacher]
       .some((value) => String(value || "").toLowerCase().includes(search));
     const matchesCategory = !category || String(course.category_name || course.category || "") === category;
     return matchesSearch && matchesCategory;
@@ -2813,6 +2832,64 @@ function renderTraining() {
   if (state.courseActiveTab === "mine") {
     const mine = visibleCourses.filter((course) => Number(courseProgressFor(course.id).percentuale || 0) > 0 || courseProgressFor(course.id).status);
     trainingList.innerHTML = mine.length ? mine.map(renderCourseCard).join("") : '<div class="empty-state">Non hai ancora iniziato corsi.</div>';
+    return;
+  }
+
+  if (state.courseActiveTab === "history") {
+    const rows = (state.courseProgress || []).map((progress) => {
+      const course = state.trainingCourses.find((item) => String(item.id) === String(progress.course_id)) || {};
+      return `
+        <article class="course-card badge-card">
+          <div>
+            <span class="course-pill">Storico formazione</span>
+            <h3>${escapeHtml(course.title || "Corso OroActive")}</h3>
+            <p>${escapeHtml(progress.status || "non iniziato")} · ${Number(progress.percentuale || 0)}% · Ultimo accesso ${progress.last_access_at ? new Date(progress.last_access_at).toLocaleDateString("it-IT") : "Dato non inserito"}</p>
+          </div>
+          <strong>${escapeHtml(course.faculty_name || "Academy")}</strong>
+        </article>
+      `;
+    });
+    trainingList.innerHTML = rows.length ? rows.join("") : '<div class="empty-state">Nessuno storico formazione disponibile.</div>';
+    return;
+  }
+
+  if (state.courseActiveTab === "management") {
+    if (!canManageCoursesUi()) {
+      trainingList.innerHTML = '<div class="empty-state">Gestione Academy riservata al Founder.</div>';
+      return;
+    }
+    const facultyOptions = (state.courseFaculties || []).map((faculty) => `<option>${escapeHtml(faculty.name)}</option>`).join("");
+    const facultySelect = document.getElementById("trainingCourseFaculty");
+    if (facultySelect && facultyOptions) facultySelect.innerHTML = facultyOptions;
+    const facultyRows = (state.courseFaculties || []).map((faculty) => `
+      <article class="course-card badge-card">
+        <div>
+          <span class="course-pill">Facoltà</span>
+          <h3>${escapeHtml(faculty.name)}</h3>
+          <p>${escapeHtml(faculty.description || "Facoltà OroActive Academy")}</p>
+        </div>
+        <div class="course-progress-panel">
+          <strong>${state.trainingCourses.filter((course) => course.faculty_name === faculty.name).length} corsi</strong>
+          <button type="button" data-edit-academy-faculty="${escapeHtml(String(faculty.id))}">Modifica facoltà</button>
+          <button class="danger-button" type="button" data-delete-academy-faculty="${escapeHtml(String(faculty.id))}">Elimina facoltà</button>
+        </div>
+      </article>
+    `);
+    trainingList.innerHTML = `
+      <article class="course-card academy-course-card">
+        <div>
+          <span class="course-pill">Gestione Academy</span>
+          <h3>Crea facoltà</h3>
+          <p>Le facoltà ordinano corsi, moduli, lezioni e certificazioni come una piccola università interna.</p>
+          <div class="academy-faculty-form">
+            <input id="academyFacultyName" placeholder="Nome facoltà">
+            <input id="academyFacultyDescription" placeholder="Descrizione facoltà">
+            <button class="primary-button" type="button" data-create-academy-faculty>Crea facoltà</button>
+          </div>
+        </div>
+      </article>
+      ${facultyRows.join("") || '<div class="empty-state">Nessuna facoltà configurata.</div>'}
+    `;
     return;
   }
 
@@ -2853,19 +2930,39 @@ function renderCourseCard(course) {
   const status = progress.status || course.status || "non iniziato";
   const canManage = canManageCoursesUi();
   const canEvaluate = canEvaluateCoursesUi();
+  const lessonId = course.lesson_id && Number(course.lesson_id) > 0 ? String(course.lesson_id) : "";
+  const videoUrl = course.academy_video_url || course.video_url || "";
+  const pdfUrl = course.academy_pdf_url || course.pdf_url || "";
+  const moduleTitle = course.academy_module_title || course.module_title || course.section_title || "Modulo introduttivo";
+  const lessonTitle = course.academy_lesson_title || course.lesson_title || "Lezione principale";
   return `
-    <article class="course-card">
+    <article class="course-card academy-course-card">
       <div class="course-card-main">
-        <span class="course-pill">${escapeHtml(course.category_name || course.category || "Formazione")}</span>
+        <span class="course-pill">${escapeHtml(course.faculty_name || "OroActive Academy")}</span>
         <h3>${escapeHtml(course.title)}</h3>
         <p>${escapeHtml(course.description || "")}</p>
-        <small>${escapeHtml(course.section_title || "Sottosezione generale")} · Stato: ${escapeHtml(status)}</small>
-        ${course.material_url ? `<a href="${escapeHtml(course.material_url)}" target="_blank" rel="noopener">Apri materiale corso</a>` : ""}
+        <div class="academy-course-meta">
+          <span>${escapeHtml(course.category_name || course.category || "Formazione")}</span>
+          <span>Livello ${escapeHtml(course.level || "Base")}</span>
+          <span>Durata ${escapeHtml(course.duration_label || (course.duration_minutes ? `${course.duration_minutes} min` : "Da definire"))}</span>
+          <span>Docente ${escapeHtml(course.teacher || "OroActive")}</span>
+        </div>
+        <small>${escapeHtml(moduleTitle)} · ${escapeHtml(lessonTitle)} · Stato: ${escapeHtml(status)}</small>
+        <div class="academy-materials">
+          ${videoUrl ? `<a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener">Guarda video lezione</a>` : ""}
+          ${pdfUrl ? `<a href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener" download>Scarica PDF lezione</a>` : ""}
+          ${course.material_url ? `<a href="${escapeHtml(course.material_url)}" target="_blank" rel="noopener">Apri materiale didattico</a>` : ""}
+        </div>
+        <label class="academy-note-label">Appunti personali
+          <textarea data-academy-note="${escapeHtml(String(course.id))}" data-academy-lesson="${escapeHtml(lessonId)}" rows="3" placeholder="Scrivi appunti sulla lezione">${escapeHtml(course.user_note || "")}</textarea>
+        </label>
       </div>
       <div class="course-progress-panel">
         <div class="course-progress"><span style="width:${percent}%"></span></div>
         <strong>${percent}%</strong>
-        <button type="button" data-course-progress="${escapeHtml(String(course.id))}">Aggiorna avanzamento</button>
+        <button type="button" data-course-progress="${escapeHtml(String(course.id))}">Segna lezione completata</button>
+        <button type="button" data-save-academy-note="${escapeHtml(String(course.id))}" data-academy-lesson="${escapeHtml(lessonId)}">Salva appunti</button>
+        <button type="button" data-course-ai="${escapeHtml(String(course.id))}">Chiedi all'AI</button>
         ${canEvaluate ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Segna esame superato</button>` : ""}
         ${canManage ? `<button type="button" data-edit-course="${escapeHtml(String(course.id))}">Modifica</button>` : ""}
         ${canManage ? `<button class="danger-button" type="button" data-delete-course="${escapeHtml(String(course.id))}">Elimina corso</button>` : ""}
@@ -2878,6 +2975,7 @@ function renderCourseCard(course) {
 
 async function loadTraining() {
   const data = await apiRequest("/corsi");
+  state.courseFaculties = data.faculties || [];
   state.trainingCourses = data.courses || [];
   state.courseCategories = data.categories || [];
   state.courseSections = data.sections || [];
@@ -2897,14 +2995,24 @@ async function createTrainingCourse(event) {
     method: id ? "PUT" : "POST",
     body: JSON.stringify({
       title: document.getElementById("trainingCourseTitle").value.trim(),
+      faculty: document.getElementById("trainingCourseFaculty").value.trim(),
       category: document.getElementById("trainingCourseCategory").value.trim(),
       section: document.getElementById("trainingCourseSection").value.trim(),
+      level: document.getElementById("trainingCourseLevel").value.trim(),
+      duration_label: document.getElementById("trainingCourseDuration").value.trim(),
+      teacher: document.getElementById("trainingCourseTeacher").value.trim(),
+      thumbnail_url: document.getElementById("trainingCourseThumbnail").value.trim(),
+      module_title: document.getElementById("trainingCourseModule").value.trim(),
+      lesson_title: document.getElementById("trainingCourseLesson").value.trim(),
       description: document.getElementById("trainingCourseDescription").value.trim(),
+      video_url: document.getElementById("trainingCourseVideo").value.trim(),
+      pdf_url: document.getElementById("trainingCoursePdf").value.trim(),
       material_url: document.getElementById("trainingCourseMaterial").value.trim(),
       material_data_url: materialDataUrl,
       material_filename: selectedFile?.name || "",
       material_type: selectedFile?.type || "",
-      active: document.getElementById("trainingCourseActive").checked
+      active: document.getElementById("trainingCourseActive").checked,
+      final_certification: document.getElementById("trainingCourseCertification").checked
     })
   });
   resetTrainingCourseFormValues();
@@ -2941,12 +3049,44 @@ function editCourse(courseId) {
   if (!course) return;
   document.getElementById("trainingCourseId").value = course.id;
   document.getElementById("trainingCourseTitle").value = course.title || "";
+  document.getElementById("trainingCourseFaculty").value = course.faculty_name || "Facoltà Metalli Preziosi";
   document.getElementById("trainingCourseCategory").value = course.category_name || course.category || "Oro";
   document.getElementById("trainingCourseSection").value = course.section_title || "";
+  document.getElementById("trainingCourseLevel").value = course.level || "Base";
+  document.getElementById("trainingCourseDuration").value = course.duration_label || "";
+  document.getElementById("trainingCourseTeacher").value = course.teacher || "";
+  document.getElementById("trainingCourseThumbnail").value = course.thumbnail_url || "";
+  document.getElementById("trainingCourseModule").value = course.academy_module_title || course.module_title || "";
+  document.getElementById("trainingCourseLesson").value = course.academy_lesson_title || course.lesson_title || "";
   document.getElementById("trainingCourseDescription").value = course.description || "";
+  document.getElementById("trainingCourseVideo").value = course.academy_video_url || course.video_url || "";
+  document.getElementById("trainingCoursePdf").value = course.academy_pdf_url || course.pdf_url || "";
   document.getElementById("trainingCourseMaterial").value = course.material_url || "";
   document.getElementById("trainingCourseActive").checked = course.active !== false;
+  document.getElementById("trainingCourseCertification").checked = course.final_certification !== false;
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva modifiche";
+}
+
+async function saveAcademyNote(courseId, lessonId = "") {
+  const textarea = document.querySelector(`[data-academy-note="${cssEscape(courseId)}"]`);
+  await apiRequest("/academy/notes", {
+    method: "POST",
+    body: JSON.stringify({
+      course_id: courseId,
+      lesson_id: lessonId || null,
+      note: textarea?.value || ""
+    })
+  });
+  await loadTraining();
+  showToast("Appunti salvati.");
+}
+
+function askCourseAi(courseId) {
+  const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
+  if (!course) return;
+  setScreen("assistant");
+  assistantQuestion.value = `Aiutami a studiare questa lezione OroActive Academy:\nCorso: ${course.title}\nFacoltà: ${course.faculty_name || "OroActive Academy"}\nModulo: ${course.academy_module_title || course.module_title || ""}\nLezione: ${course.academy_lesson_title || course.lesson_title || ""}\n\nRiassumi i punti chiave e preparami 5 domande di ripasso.`;
+  assistantQuestion.focus();
 }
 
 async function deleteCourse(courseId) {
@@ -2971,6 +3111,46 @@ async function deleteCourseSection(sectionId) {
   await apiRequest(`/corsi/sottosezioni/${encodeURIComponent(sectionId)}`, { method: "DELETE" });
   await loadTraining();
   showToast("Sottosezione eliminata correttamente.");
+}
+
+async function createAcademyFaculty() {
+  if (!canManageCoursesUi()) return;
+  const name = document.getElementById("academyFacultyName")?.value.trim();
+  const description = document.getElementById("academyFacultyDescription")?.value.trim();
+  if (!name) {
+    showToast("Inserisci il nome della facoltà.");
+    return;
+  }
+  await apiRequest("/academy/facolta", {
+    method: "POST",
+    body: JSON.stringify({ name, description })
+  });
+  await loadTraining();
+  showToast("Facoltà creata correttamente.");
+}
+
+async function editAcademyFaculty(facultyId) {
+  if (!canManageCoursesUi()) return;
+  const faculty = state.courseFaculties.find((item) => String(item.id) === String(facultyId));
+  if (!faculty) return;
+  const name = window.prompt("Nome facoltà", faculty.name || "");
+  if (name === null) return;
+  const description = window.prompt("Descrizione facoltà", faculty.description || "");
+  if (description === null) return;
+  await apiRequest(`/academy/facolta/${encodeURIComponent(facultyId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ name, description, active: true })
+  });
+  await loadTraining();
+  showToast("Facoltà aggiornata correttamente.");
+}
+
+async function deleteAcademyFaculty(facultyId) {
+  if (!canManageCoursesUi()) return;
+  if (!window.confirm("Sei sicuro di voler eliminare questo elemento?")) return;
+  await apiRequest(`/academy/facolta/${encodeURIComponent(facultyId)}`, { method: "DELETE" });
+  await loadTraining();
+  showToast("Facoltà eliminata correttamente.");
 }
 
 async function downloadCourseCertificate(certificateId) {
@@ -6344,6 +6524,11 @@ trainingList?.addEventListener("click", async (event) => {
   const deleteMaterialButton = event.target.closest("[data-delete-course-material]");
   const deleteSectionButton = event.target.closest("[data-delete-course-section]");
   const certificate = event.target.closest("[data-download-certificate]");
+  const noteButton = event.target.closest("[data-save-academy-note]");
+  const aiButton = event.target.closest("[data-course-ai]");
+  const createFaculty = event.target.closest("[data-create-academy-faculty]");
+  const editFaculty = event.target.closest("[data-edit-academy-faculty]");
+  const deleteFaculty = event.target.closest("[data-delete-academy-faculty]");
   try {
     if (progress) await updateCourseProgress(progress.dataset.courseProgress);
     if (exam) await markCourseExamPassed(exam.dataset.courseExam);
@@ -6352,6 +6537,11 @@ trainingList?.addEventListener("click", async (event) => {
     if (deleteMaterialButton) await deleteCourseMaterial(deleteMaterialButton.dataset.deleteCourseMaterial);
     if (deleteSectionButton) await deleteCourseSection(deleteSectionButton.dataset.deleteCourseSection);
     if (certificate) await downloadCourseCertificate(certificate.dataset.downloadCertificate);
+    if (noteButton) await saveAcademyNote(noteButton.dataset.saveAcademyNote, noteButton.dataset.academyLesson);
+    if (aiButton) askCourseAi(aiButton.dataset.courseAi);
+    if (createFaculty) await createAcademyFaculty();
+    if (editFaculty) await editAcademyFaculty(editFaculty.dataset.editAcademyFaculty);
+    if (deleteFaculty) await deleteAcademyFaculty(deleteFaculty.dataset.deleteAcademyFaculty);
   } catch (error) {
     showToast(error.message || "Operazione corso non riuscita.");
   }
@@ -6523,7 +6713,7 @@ steps.forEach((step) => {
 
 document.getElementById("nextStep").addEventListener("click", async () => {
   if (state.step === 2 && state.signatures.some((signed) => !signed)) {
-    showToast("Prima di procedere servono tutte e tre le firme del cliente.");
+    showToast("Prima di procedere servono le tre firme cliente e la firma operatore.");
     return;
   }
   if (state.step < 4) {

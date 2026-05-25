@@ -79,7 +79,7 @@
           <div class="main-menu-submenu" id="trainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
             <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-            <button type="button" data-section="training">Corsi</button>
+            <button type="button" data-section="training">OroActive Academy</button>
             <button type="button" data-start-tutorial>Tutorial</button>
           </div>
         </div>
@@ -119,7 +119,7 @@
           <div class="brand-submenu" id="brandTrainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
             <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-            <button type="button" data-section="training">Corsi</button>
+            <button type="button" data-section="training">OroActive Academy</button>
             <button type="button" data-start-tutorial>Tutorial</button>
           </div>
         </div>
@@ -759,24 +759,34 @@
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="course-hero">
           <div>
-            <p class="eyebrow">Formazione OroActive</p>
-            <h2>Corsi</h2>
-            <p class="muted">Catalogo corsi, area personale, certificazioni interne e badge operativi.</p>
+            <p class="eyebrow">Università aziendale interna</p>
+            <h2>OroActive Academy</h2>
+            <p class="muted">Facoltà, corsi, moduli, lezioni, materiali, certificazioni e livelli operatore.</p>
           </div>
           <div class="course-summary" id="courseSummary">
             <span>Completamento medio</span>
             <strong>0%</strong>
           </div>
         </div>
-        <div class="course-tabs" role="tablist" aria-label="Sezioni corsi OroActive">
-          <button class="active" type="button" data-course-tab="catalog">Catalogo corsi</button>
+        <div class="course-tabs" role="tablist" aria-label="Sezioni OroActive Academy">
+          <button class="active" type="button" data-course-tab="catalog">Catalogo Academy</button>
           <button type="button" data-course-tab="mine">I miei corsi</button>
           <button type="button" data-course-tab="certifications">Certificazioni</button>
           <button type="button" data-course-tab="badges">Badge</button>
+          <button type="button" data-course-tab="history">Storico formazione</button>
+          <button class="founder-only" type="button" data-course-tab="management">Gestione Academy</button>
         </div>
         <form class="course-editor founder-only" id="trainingCourseForm">
           <input type="hidden" id="trainingCourseId">
           <label>Titolo corso <input id="trainingCourseTitle" required></label>
+          <label>Facoltà
+            <select id="trainingCourseFaculty">
+              <option>Facoltà Metalli Preziosi</option>
+              <option>Facoltà Gemmologia</option>
+              <option>Facoltà Operativa</option>
+              <option>Facoltà Business</option>
+            </select>
+          </label>
           <label>Categoria
             <select id="trainingCourseCategory">
               <option>Oro</option>
@@ -789,10 +799,26 @@
             </select>
           </label>
           <label>Sottosezione <input id="trainingCourseSection" placeholder="Esempio: Oro base, Antiriciclaggio, Cliente"></label>
+          <label>Livello
+            <select id="trainingCourseLevel">
+              <option>Base</option>
+              <option>Intermedio</option>
+              <option>Avanzato</option>
+              <option>Master</option>
+            </select>
+          </label>
+          <label>Durata stimata <input id="trainingCourseDuration" placeholder="Esempio: 2h 35m"></label>
+          <label>Docente / formatore <input id="trainingCourseTeacher" placeholder="Nome formatore"></label>
+          <label>Thumbnail corso <input id="trainingCourseThumbnail" placeholder="Link immagine opzionale"></label>
+          <label>Modulo <input id="trainingCourseModule" placeholder="Esempio: Introduzione all'oro 18KT"></label>
+          <label>Lezione <input id="trainingCourseLesson" placeholder="Titolo lezione principale"></label>
           <label>Descrizione <textarea id="trainingCourseDescription" rows="4"></textarea></label>
-          <label>Materiale o link video <input id="trainingCourseMaterial" placeholder="Link PDF o video esterno https"></label>
+          <label>Video lezione <input id="trainingCourseVideo" placeholder="Upload o link YouTube/Vimeo/Bunny/Cloudflare"></label>
+          <label>PDF lezione <input id="trainingCoursePdf" placeholder="Link PDF scaricabile"></label>
+          <label>Materiale o link video <input id="trainingCourseMaterial" placeholder="Link PDF, video o materiale esterno https"></label>
           <label>Carica file corso <input id="trainingCourseFile" type="file" accept=".pdf,.mp4,.mov,.txt,.doc,.docx,application/pdf,video/mp4,video/quicktime,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
           <label class="inline-check"><input id="trainingCourseActive" type="checkbox" checked> Corso attivo</label>
+          <label class="inline-check"><input id="trainingCourseCertification" type="checkbox" checked> Certificazione finale disponibile</label>
           <div class="user-form-actions">
             <button class="primary-button" type="submit" id="trainingCourseSaveButton">Crea corso</button>
             <button class="ghost-button" type="button" id="trainingCourseReset">Nuovo corso</button>

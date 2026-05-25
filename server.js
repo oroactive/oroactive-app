@@ -2866,6 +2866,28 @@ function courseCode(prefix = "OA") {
   return `${prefix}-${crypto.randomBytes(5).toString("hex").toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 }
 
+function durationMinutesFromLabel(value = "") {
+  const text = String(value || "").trim().toLowerCase();
+  if (!text) return 0;
+  const hours = Number((text.match(/(\d+(?:[.,]\d+)?)\s*h/) || [])[1]?.replace(",", ".") || 0);
+  const minutes = Number((text.match(/(\d+)\s*m/) || [])[1] || 0);
+  if (hours || minutes) return Math.round(hours * 60 + minutes);
+  const numeric = Number(text.replace(",", "."));
+  return Number.isFinite(numeric) ? Math.round(numeric) : 0;
+}
+
+async function ensureAcademyFaculty(name = "Facoltà Metalli Preziosi") {
+  const normalized = String(name || "Facoltà Metalli Preziosi").trim() || "Facoltà Metalli Preziosi";
+  const result = await pool.query(
+    `INSERT INTO academy_faculties (name)
+     VALUES ($1::text)
+     ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
+     RETURNING *`,
+    [normalized]
+  );
+  return result.rows[0];
+}
+
 async function ensureCourseCategory(name = "Oro") {
   const result = await pool.query(
     `INSERT INTO course_categories (name)
@@ -2889,9 +2911,123 @@ async function ensureCourseSection(categoryId, title = "Generale") {
   return result.rows[0];
 }
 
+async function syncAcademyStructure(course, input = {}, user = {}) {
+  if (!course?.id) return;
+  const faculty = await ensureAcademyFaculty(input.faculty || input.faculty_name || "Facoltà Metalli Preziosi");
+  const academyCourseResult = await pool.query(
+    `INSERT INTO academy_courses
+      (course_id, faculty_id, title, description, level, duration_minutes, teacher, thumbnail_url, final_certification, active, created_by)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::text, $6::integer, $7::text, $8::text, $9::boolean, $10::boolean, $11::bigint)
+     ON CONFLICT (course_id)
+     DO UPDATE SET faculty_id = EXCLUDED.faculty_id,
+                   title = EXCLUDED.title,
+                   description = EXCLUDED.description,
+                   level = EXCLUDED.level,
+                   duration_minutes = EXCLUDED.duration_minutes,
+                   teacher = EXCLUDED.teacher,
+                   thumbnail_url = EXCLUDED.thumbnail_url,
+                   final_certification = EXCLUDED.final_certification,
+                   active = EXCLUDED.active,
+                   updated_at = NOW()
+     RETURNING *`,
+    [
+      course.id,
+      faculty.id,
+      course.title || input.title || "",
+      course.description || input.description || "",
+      course.level || input.level || "Base",
+      Number(course.duration_minutes || durationMinutesFromLabel(input.duration_label || input.duration || "")),
+      course.teacher || input.teacher || "",
+      course.thumbnail_url || input.thumbnail_url || "",
+      course.final_certification !== false,
+      course.active !== false,
+      user.id || null
+    ]
+  );
+  const academyCourse = academyCourseResult.rows[0];
+  const moduleTitle = String(input.module_title || input.module || course.module_title || "Modulo introduttivo").trim() || "Modulo introduttivo";
+  let moduleRow = (await pool.query(
+    "SELECT * FROM academy_modules WHERE course_id = $1::bigint ORDER BY sort_order ASC, id ASC LIMIT 1",
+    [course.id]
+  )).rows[0];
+  if (moduleRow) {
+    moduleRow = (await pool.query(
+      `UPDATE academy_modules
+       SET academy_course_id = $2::bigint,
+           title = $3::text,
+           description = $4::text,
+           active = TRUE,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [moduleRow.id, academyCourse.id, moduleTitle, course.description || input.description || ""]
+    )).rows[0];
+  } else {
+    moduleRow = (await pool.query(
+      `INSERT INTO academy_modules (academy_course_id, course_id, title, description)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::text)
+       RETURNING *`,
+      [academyCourse.id, course.id, moduleTitle, course.description || input.description || ""]
+    )).rows[0];
+  }
+  const lessonTitle = String(input.lesson_title || input.lesson || course.lesson_title || "Lezione principale").trim() || "Lezione principale";
+  const lessonPayload = [
+    moduleRow?.id || null,
+    course.id,
+    lessonTitle,
+    course.description || input.description || "",
+    course.video_url || input.video_url || "",
+    course.pdf_url || input.pdf_url || "",
+    Number(course.duration_minutes || durationMinutesFromLabel(input.duration_label || input.duration || ""))
+  ];
+  let lessonRow = (await pool.query(
+    "SELECT * FROM academy_lessons WHERE course_id = $1::bigint ORDER BY sort_order ASC, id ASC LIMIT 1",
+    [course.id]
+  )).rows[0];
+  if (lessonRow) {
+    lessonRow = (await pool.query(
+      `UPDATE academy_lessons
+       SET academy_module_id = $2::bigint,
+           title = $3::text,
+           description = $4::text,
+           video_url = $5::text,
+           pdf_url = $6::text,
+           duration_minutes = $7::integer,
+           active = TRUE,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [lessonRow.id, ...lessonPayload.filter((_, index) => index !== 1)]
+    )).rows[0];
+  } else {
+    lessonRow = (await pool.query(
+      `INSERT INTO academy_lessons (academy_module_id, course_id, title, description, video_url, pdf_url, duration_minutes)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::text, $6::text, $7::integer)
+       RETURNING *`,
+      lessonPayload
+    )).rows[0];
+  }
+  const materialUrl = String(input.material_data_url || input.material_url || input.pdf_url || input.video_url || "").trim();
+  if (lessonRow?.id && materialUrl) {
+    await pool.query("DELETE FROM academy_materials WHERE course_id = $1::bigint", [course.id]);
+    await pool.query(
+      `INSERT INTO academy_materials (academy_lesson_id, course_id, title, material_type, file_url)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::text)`,
+      [
+        lessonRow.id,
+        course.id,
+        input.material_filename || input.material_title || "Materiale Academy",
+        input.material_type || "link",
+        materialUrl
+      ]
+    );
+  }
+}
+
 async function listCourses(user = {}) {
   const userId = user.id || null;
   const role = normalizeRole(user.ruolo);
+  const faculties = await pool.query("SELECT * FROM academy_faculties WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
   const categories = await pool.query("SELECT * FROM course_categories WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
   const sections = await pool.query(
     `SELECT s.*, c.name AS category_name
@@ -2901,23 +3037,46 @@ async function listCourses(user = {}) {
      ORDER BY c.sort_order ASC, s.sort_order ASC, s.title ASC`
   );
   const courses = await pool.query(
-    `SELECT c.*, cat.name AS category_name, sec.title AS section_title,
+    `SELECT c.*, cat.name AS category_name, sec.title AS section_title, faculty.name AS faculty_name,
             COALESCE(mat.file_url, '') AS material_url,
             COALESCE(mat.title, '') AS material_title,
             mat.id AS material_id,
+            COALESCE(mat.material_type, '') AS material_type,
+            COALESCE(lesson.id, 0) AS lesson_id,
+            COALESCE(lesson.title, c.lesson_title, '') AS academy_lesson_title,
+            COALESCE(lesson.video_url, c.video_url, '') AS academy_video_url,
+            COALESCE(lesson.pdf_url, c.pdf_url, '') AS academy_pdf_url,
+            COALESCE(module.title, c.module_title, '') AS academy_module_title,
+            COALESCE(notes.note, '') AS user_note,
             COALESCE(progress.percentuale, 0) AS percentuale,
             COALESCE(progress.status, 'non iniziato') AS status
      FROM courses c
      LEFT JOIN course_categories cat ON cat.id = c.category_id
      LEFT JOIN course_sections sec ON sec.id = c.section_id
+     LEFT JOIN academy_faculties faculty ON faculty.id = c.faculty_id
      LEFT JOIN LATERAL (
-       SELECT title, file_url
+       SELECT id, title
+       FROM academy_modules
+       WHERE course_id = c.id
+       ORDER BY sort_order ASC, id ASC
+       LIMIT 1
+     ) module ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT id, title, video_url, pdf_url
+       FROM academy_lessons
+       WHERE course_id = c.id
+       ORDER BY sort_order ASC, id ASC
+       LIMIT 1
+     ) lesson ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT id, title, material_type, file_url
        FROM course_materials
        WHERE course_id = c.id
        ORDER BY sort_order ASC, id ASC
        LIMIT 1
      ) mat ON TRUE
      LEFT JOIN user_course_progress progress ON progress.course_id = c.id AND progress.user_id = $1::bigint
+     LEFT JOIN academy_user_notes notes ON notes.course_id = c.id AND notes.user_id = $1::bigint
      WHERE ($2::text = 'founder' OR c.active = TRUE)
      ORDER BY cat.sort_order ASC, c.order_index ASC, c.created_at DESC`,
     [userId, role]
@@ -2944,6 +3103,7 @@ async function listCourses(user = {}) {
     [userId]
   );
   return {
+    faculties: faculties.rows,
     categories: categories.rows,
     sections: sections.rows,
     courses: courses.rows,
@@ -2965,17 +3125,31 @@ async function createCourse(input = {}, user = {}) {
     error.status = 400;
     throw error;
   }
+  const faculty = await ensureAcademyFaculty(input.faculty || input.faculty_name || "Facoltà Metalli Preziosi");
   const category = await ensureCourseCategory(input.category || "Oro");
   const section = await ensureCourseSection(category.id, input.section || "Generale");
+  const durationLabel = String(input.duration_label || input.duration || "").trim();
   const result = await pool.query(
-    `INSERT INTO courses (category_id, section_id, title, description, active, order_index, created_by)
-     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::boolean, $6::integer, $7::bigint)
+    `INSERT INTO courses
+      (category_id, section_id, faculty_id, title, description, level, duration_minutes, duration_label, teacher, thumbnail_url, final_certification, module_title, lesson_title, video_url, pdf_url, active, order_index, created_by)
+     VALUES ($1::bigint, $2::bigint, $3::bigint, $4::text, $5::text, $6::text, $7::integer, $8::text, $9::text, $10::text, $11::boolean, $12::text, $13::text, $14::text, $15::text, $16::boolean, $17::integer, $18::bigint)
      RETURNING *`,
     [
       category.id,
       section.id,
+      faculty.id,
       title,
       String(input.description || "").trim(),
+      input.level || "Base",
+      durationMinutesFromLabel(durationLabel),
+      durationLabel,
+      input.teacher || "",
+      input.thumbnail_url || "",
+      input.final_certification !== false,
+      input.module_title || input.module || input.section || "Modulo introduttivo",
+      input.lesson_title || input.lesson || "Lezione principale",
+      input.video_url || "",
+      input.pdf_url || "",
       input.active !== false,
       Number(input.order_index || 0),
       user.id
@@ -2994,6 +3168,7 @@ async function createCourse(input = {}, user = {}) {
       ]
     );
   }
+  await syncAcademyStructure(result.rows[0], input, user);
   return result.rows[0];
 }
 
@@ -3009,16 +3184,29 @@ async function updateCourse(id, input = {}, user = {}) {
     error.status = 400;
     throw error;
   }
+  const faculty = await ensureAcademyFaculty(input.faculty || input.faculty_name || "Facoltà Metalli Preziosi");
   const category = await ensureCourseCategory(input.category || "Oro");
   const section = await ensureCourseSection(category.id, input.section || "Generale");
+  const durationLabel = String(input.duration_label || input.duration || "").trim();
   const result = await pool.query(
     `UPDATE courses
      SET category_id = $2::bigint,
          section_id = $3::bigint,
-         title = $4::text,
-         description = $5::text,
-         active = $6::boolean,
-         order_index = $7::integer,
+         faculty_id = $4::bigint,
+         title = $5::text,
+         description = $6::text,
+         level = $7::text,
+         duration_minutes = $8::integer,
+         duration_label = $9::text,
+         teacher = $10::text,
+         thumbnail_url = $11::text,
+         final_certification = $12::boolean,
+         module_title = $13::text,
+         lesson_title = $14::text,
+         video_url = $15::text,
+         pdf_url = $16::text,
+         active = $17::boolean,
+         order_index = $18::integer,
          updated_at = NOW()
      WHERE id = $1::bigint
      RETURNING *`,
@@ -3026,13 +3214,25 @@ async function updateCourse(id, input = {}, user = {}) {
       id,
       category.id,
       section.id,
+      faculty.id,
       title,
       String(input.description || "").trim(),
+      input.level || "Base",
+      durationMinutesFromLabel(durationLabel),
+      durationLabel,
+      input.teacher || "",
+      input.thumbnail_url || "",
+      input.final_certification !== false,
+      input.module_title || input.module || input.section || "Modulo introduttivo",
+      input.lesson_title || input.lesson || "Lezione principale",
+      input.video_url || "",
+      input.pdf_url || "",
       input.active !== false,
       Number(input.order_index || 0)
     ]
   );
   if (!result.rows[0]) return null;
+  await syncAcademyStructure(result.rows[0], input, user);
   if (input.material_url !== undefined || input.material_data_url !== undefined) {
     await pool.query("DELETE FROM course_materials WHERE course_id = $1::bigint", [id]);
     const materialUrl = String(input.material_data_url || input.material_url || "").trim();
@@ -3049,6 +3249,26 @@ async function updateCourse(id, input = {}, user = {}) {
       );
     }
   }
+  return result.rows[0];
+}
+
+async function saveAcademyNote(input = {}, user = {}) {
+  const courseId = input.course_id || input.courseId;
+  let lessonId = input.lesson_id || input.lessonId || null;
+  if (!lessonId) {
+    lessonId = (await pool.query(
+      "SELECT id FROM academy_lessons WHERE course_id = $1::bigint ORDER BY sort_order ASC, id ASC LIMIT 1",
+      [courseId]
+    )).rows[0]?.id || null;
+  }
+  const result = await pool.query(
+    `INSERT INTO academy_user_notes (course_id, lesson_id, user_id, note)
+     VALUES ($1::bigint, $2::bigint, $3::bigint, $4::text)
+     ON CONFLICT (course_id, lesson_id, user_id)
+     DO UPDATE SET note = EXCLUDED.note, updated_at = NOW()
+     RETURNING *`,
+    [courseId, lessonId, user.id, String(input.note || "")]
+  );
   return result.rows[0];
 }
 
@@ -3085,6 +3305,68 @@ async function deleteCourseSection(id, user = {}) {
     throw error;
   }
   const result = await pool.query("DELETE FROM course_sections WHERE id = $1::bigint RETURNING id", [id]);
+  return result.rowCount > 0;
+}
+
+async function createAcademyFaculty(input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const name = String(input.name || input.nome || "").trim();
+  if (!name) {
+    const error = new Error("Nome facoltà obbligatorio.");
+    error.status = 400;
+    throw error;
+  }
+  const result = await pool.query(
+    `INSERT INTO academy_faculties (name, description, active)
+     VALUES ($1::text, $2::text, TRUE)
+     ON CONFLICT (name)
+     DO UPDATE SET description = EXCLUDED.description,
+                   active = TRUE,
+                   updated_at = NOW()
+     RETURNING *`,
+    [name, String(input.description || "").trim()]
+  );
+  return result.rows[0];
+}
+
+async function updateAcademyFaculty(id, input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `UPDATE academy_faculties
+     SET name = COALESCE(NULLIF($2::text, ''), name),
+         description = $3::text,
+         active = COALESCE($4::boolean, active),
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [id, String(input.name || input.nome || "").trim(), String(input.description || "").trim(), input.active ?? input.attivo ?? null]
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteAcademyFaculty(id, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const linked = await pool.query("SELECT COUNT(*)::int AS count FROM courses WHERE faculty_id = $1::bigint", [id]);
+  if (Number(linked.rows[0]?.count || 0) > 0) {
+    const result = await pool.query(
+      "UPDATE academy_faculties SET active = FALSE, updated_at = NOW() WHERE id = $1::bigint RETURNING id",
+      [id]
+    );
+    return result.rowCount > 0;
+  }
+  const result = await pool.query("DELETE FROM academy_faculties WHERE id = $1::bigint RETURNING id", [id]);
   return result.rowCount > 0;
 }
 
@@ -3169,12 +3451,21 @@ async function getCourseCertificate(id, user = {}) {
     where += ` AND cert.user_id = $${values.length}::bigint`;
   }
   const result = await pool.query(
-    `SELECT cert.*, c.title AS course_title, cat.name AS category_name,
+    `SELECT cert.*, c.title AS course_title, c.level, c.duration_label, faculty.name AS faculty_name, cat.name AS category_name,
+            exam.exam_type, exam.evaluated_at,
             u.nome, u.cognome, u.username
      FROM course_certificates cert
      JOIN courses c ON c.id = cert.course_id
+     LEFT JOIN academy_faculties faculty ON faculty.id = c.faculty_id
      LEFT JOIN course_categories cat ON cat.id = c.category_id
      LEFT JOIN utenti u ON u.id = cert.user_id
+     LEFT JOIN LATERAL (
+       SELECT exam_type, evaluated_at
+       FROM course_exam_sessions
+       WHERE course_id = cert.course_id AND user_id = cert.user_id AND esito = 'superato'
+       ORDER BY evaluated_at DESC NULLS LAST, id DESC
+       LIMIT 1
+     ) exam ON TRUE
      WHERE ${where}
      LIMIT 1`,
     values
@@ -3199,7 +3490,11 @@ function writeCourseCertificatePdf(certificate, response) {
   doc.font("Helvetica-Bold").fontSize(18).fillColor("#c45a1a").text(certificate.course_title || "Corso OroActive", { align: "center" });
   doc.moveDown();
   doc.font("Helvetica").fontSize(12).fillColor("#333").text(`Categoria: ${certificate.category_name || "Formazione OroActive"}`, { align: "center" });
+  doc.text(`Facoltà: ${certificate.faculty_name || "OroActive Academy"}`, { align: "center" });
+  doc.text(`Livello corso: ${certificate.level || "Base"}`, { align: "center" });
   doc.text(`Data completamento: ${new Date(certificate.issued_at).toLocaleDateString("it-IT")}`, { align: "center" });
+  if (certificate.evaluated_at) doc.text(`Data superamento esame: ${new Date(certificate.evaluated_at).toLocaleDateString("it-IT")}`, { align: "center" });
+  doc.text(`Modalità esame: ${certificate.exam_type || "presenza/live"}`, { align: "center" });
   doc.text(`Codice certificazione: ${certificate.certificate_code || ""}`, { align: "center" });
   doc.moveDown(4);
   doc.font("Helvetica-Bold").fontSize(14).fillColor("#111").text("OroActive", { align: "center" });
@@ -4086,6 +4381,34 @@ app.get("/api/corsi", async (request, response, next) => {
   }
 });
 
+app.post("/api/academy/facolta", async (request, response, next) => {
+  try {
+    response.status(201).json(await createAcademyFaculty(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/facolta/:id", async (request, response, next) => {
+  try {
+    const faculty = await updateAcademyFaculty(request.params.id, request.body, request.user);
+    if (!faculty) return response.status(404).json({ error: "Facoltà non trovata" });
+    response.json(faculty);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/academy/facolta/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteAcademyFaculty(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Facoltà non trovata" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/corsi", async (request, response, next) => {
   try {
     response.status(201).json(await createCourse(request.body, request.user));
@@ -4137,6 +4460,14 @@ app.delete("/api/corsi/sottosezioni/:id", async (request, response, next) => {
 app.post("/api/corsi/progress", async (request, response, next) => {
   try {
     response.status(201).json(await saveCourseProgress(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/notes", async (request, response, next) => {
+  try {
+    response.status(201).json(await saveAcademyNote(request.body, request.user));
   } catch (error) {
     next(error);
   }

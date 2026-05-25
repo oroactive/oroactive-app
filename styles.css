@@ -541,7 +541,7 @@ textarea {
 
 .course-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin: 12px 0 16px;
 }
@@ -614,6 +614,55 @@ textarea {
 .course-card h3 {
   margin: 8px 0;
   font-size: 22px;
+}
+
+.academy-course-card {
+  align-items: start;
+}
+
+.academy-course-meta,
+.academy-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.academy-course-meta span,
+.academy-materials a {
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: #fff0e6;
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.academy-materials a {
+  text-decoration: none;
+  background: #111;
+  color: #fff;
+}
+
+.academy-note-label {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--soft-ink);
+  font-weight: 900;
+}
+
+.academy-note-label textarea {
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+}
+
+.academy-faculty-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .course-pill {
@@ -4293,6 +4342,10 @@ button.quality-review-badge {
 
   .course-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .academy-faculty-form {
+    grid-template-columns: 1fr;
   }
 
   .crm-edit-grid {
