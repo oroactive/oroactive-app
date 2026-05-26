@@ -74,6 +74,15 @@ test("sezione OroActive Academy e certificazioni interne presenti", async () => 
   assert.match(server, /app\.post\("\/api\/academy\/facolta"/);
   assert.match(server, /app\.put\("\/api\/academy\/facolta\/:id"/);
   assert.match(server, /app\.delete\("\/api\/academy\/facolta\/:id"/);
+  assert.match(server, /app\.get\("\/api\/academy\/faculties"/);
+  assert.match(server, /app\.get\("\/api\/academy\/courses"/);
+  assert.match(server, /app\.post\("\/api\/academy\/modules"/);
+  assert.match(server, /app\.post\("\/api\/academy\/lessons"/);
+  assert.match(server, /app\.post\("\/api\/academy\/materials"/);
+  assert.match(server, /app\.post\("\/api\/academy\/progress\/complete-lesson"/);
+  assert.match(server, /app\.get\("\/api\/academy\/my-certificates"/);
+  assert.match(server, /app\.get\("\/api\/academy\/my-badges"/);
+  assert.match(server, /app\.get\("\/api\/academy\/my-level"/);
   assert.match(server, /app\.post\("\/api\/corsi\/esami"/);
   assert.match(server, /app\.delete\("\/api\/corsi\/:id"/);
   assert.match(server, /app\.delete\("\/api\/corsi\/materiali\/:id"/);
@@ -127,18 +136,81 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(schema, /ALTER TABLE utenti ADD COLUMN IF NOT EXISTS telefono/);
 });
 
+test("salvataggio atti mostra errori specifici e non generici", async () => {
+  const [app, server] = await Promise.all([
+    file("app.js"),
+    file("server.js")
+  ]);
+
+  assert.match(server, /friendlyDatabaseError/);
+  assert.match(server, /Numero atto già presente/);
+  assert.match(server, /Formato data non valido/);
+  assert.match(server, /Errore database durante il salvataggio dell'atto/);
+  assert.equal(app.includes('showToast("Errore nel salvataggio dell\\\'atto. Controllare i campi compilati."'), false);
+  assert.match(app, /showToast\(error\.message \|\| "Errore nel salvataggio dell'atto\."/);
+});
+
+test("sezione utenti usa endpoint e messaggi propri", async () => {
+  const [app, server, schema] = await Promise.all([
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql")
+  ]);
+  const saveUserStart = app.indexOf("async function saveUser");
+  const saveUserEnd = app.indexOf("function editUser", saveUserStart);
+  const saveUserBlock = app.slice(saveUserStart, saveUserEnd);
+  const createUserStart = server.indexOf("async function createUser");
+  const updateUserEnd = server.indexOf("async function listUsers", createUserStart);
+  const userBackendBlock = server.slice(createUserStart, updateUserEnd);
+
+  assert.match(server, /app\.get\(\["\/api\/utenti", "\/api\/users"\]/);
+  assert.match(server, /app\.get\(\["\/api\/utenti\/:id", "\/api\/users\/:id"\]/);
+  assert.match(server, /app\.post\(\["\/api\/utenti", "\/api\/users"\]/);
+  assert.match(server, /app\.put\(\["\/api\/utenti\/:id", "\/api\/users\/:id"\]/);
+  assert.match(server, /app\.patch\(\["\/api\/utenti\/:id", "\/api\/users\/:id"\]/);
+  assert.match(server, /app\.delete\(\["\/api\/utenti\/:id", "\/api\/users\/:id"\]/);
+  assert.match(server, /Email\/username già presente/);
+  assert.match(server, /Nome utente obbligatorio/);
+  assert.match(server, /Ruolo utente obbligatorio/);
+  assert.match(server, /Negozio assegnato non valido/);
+  assert.doesNotMatch(userBackendBlock, /practiceNumber|Numero atto/);
+  assert.match(app, /Utente creato correttamente/);
+  assert.match(app, /Utente aggiornato correttamente/);
+  assert.match(app, /userSaveErrorMessage/);
+  assert.doesNotMatch(saveUserBlock, /Numero atto|numerazione della pratica/);
+  assert.match(saveUserBlock, /saveButton\.disabled = true/);
+  assert.match(schema, /ALTER TABLE utenti ADD COLUMN IF NOT EXISTS updated_at/);
+});
+
+test("errori database sono separati per modulo", async () => {
+  const server = await file("server.js");
+  const friendlyStart = server.indexOf("function friendlyDatabaseError");
+  const friendlyEnd = server.indexOf("app.use((error", friendlyStart);
+  const friendlyBlock = server.slice(friendlyStart, friendlyEnd);
+
+  assert.match(friendlyBlock, /utenti\|users/);
+  assert.match(friendlyBlock, /Email\/username già presente/);
+  assert.match(friendlyBlock, /api.*atti/);
+  assert.match(friendlyBlock, /api.*acts/);
+  assert.match(friendlyBlock, /Numero atto già presente/);
+  assert.match(friendlyBlock, /Errore database durante il salvataggio CRM/);
+  assert.match(friendlyBlock, /Errore database durante il backup/);
+  assert.match(friendlyBlock, /Errore database durante il salvataggio Academy/);
+});
+
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
-  const [pkg, index, app, server] = await Promise.all([
+  const [pkg, lock, index, app, server] = await Promise.all([
     file("package.json"),
+    file("package-lock.json"),
     file("index.html"),
     file("app.js"),
     file("server.js")
   ]);
-  const combined = `${pkg}\n${index}\n${app}\n${server}`;
+  const combined = `${pkg}\n${lock}\n${index}\n${app}\n${server}`;
 
   assert.doesNotMatch(combined, /@capacitor/i);
   assert.doesNotMatch(combined, /capacitor-native/i);
   assert.doesNotMatch(combined, /OroActiveNative/);
   assert.doesNotMatch(combined, /capacitor:\/\/localhost/);
-  assert.doesNotMatch(pkg, /ios:prepare|ios:sync|ios:open|ios:add/);
+  assert.doesNotMatch(combined, /ios:prepare|ios:sync|ios:open|ios:add/);
 });

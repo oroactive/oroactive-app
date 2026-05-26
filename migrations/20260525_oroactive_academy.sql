@@ -71,10 +71,20 @@ CREATE TABLE IF NOT EXISTS academy_materials (
   title TEXT,
   material_type TEXT DEFAULT 'link',
   file_url TEXT,
+  external_url TEXT,
+  mime_type TEXT,
+  size_bytes BIGINT DEFAULT 0,
+  uploaded_by BIGINT,
   allow_download BOOLEAN DEFAULT TRUE,
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS external_url TEXT;
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS mime_type TEXT;
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS size_bytes BIGINT DEFAULT 0;
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS uploaded_by BIGINT;
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS academy_user_progress (
   id BIGSERIAL PRIMARY KEY,

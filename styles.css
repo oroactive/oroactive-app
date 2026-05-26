@@ -2620,6 +2620,24 @@ input.document-expired {
   grid-template-columns: 1fr 1.05fr 0.75fr 0.75fr 0.62fr 1.15fr 0.7fr;
 }
 
+.users-table .table-row strong,
+.users-table .table-row span {
+  display: grid;
+  gap: 4px;
+}
+
+.users-table .table-row small {
+  color: var(--soft-ink);
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+#saveUserButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .stats-table .table-row {
   grid-template-columns: 0.9fr 0.85fr 0.75fr 0.85fr 0.85fr 0.5fr 0.75fr 0.85fr 0.85fr;
 }
@@ -3842,6 +3860,7 @@ button.quality-review-badge {
   .search-table .table-row,
   .acts-table .table-row,
   .fusion-table .table-row,
+  .users-table .table-row,
   .stats-table .table-row {
     grid-template-columns: 1fr;
   }

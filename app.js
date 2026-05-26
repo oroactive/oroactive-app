@@ -27,6 +27,7 @@ const state = {
   lastActCaptureAttachments: [],
   loadedSignatureImages: [],
   saving: false,
+  savingUser: false,
   clientLookupTimer: null,
   fiscalCodeEditedManually: false,
   captureGroup: null,
@@ -838,7 +839,15 @@ function roleLabel(role) {
 
 function displayUsername(user = {}) {
   if (user.username) return user.username;
+  if (user.email) return user.email;
   return user.nome || "";
+}
+
+function formatDateTime(value) {
+  if (!value) return "Dato non inserito";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Dato non inserito";
+  return date.toLocaleString("it-IT");
 }
 
 function canManageCoursesUi() {
@@ -1703,9 +1712,7 @@ async function handleScreenDataLoad(id) {
 function renderProfileCard() {
   if (!profileCard || !state.currentUser) return;
   const user = state.currentUser;
-  const createdAt = user.data_creazione
-    ? new Date(user.data_creazione).toLocaleString("it-IT")
-    : "Dato non inserito";
+  const createdAt = formatDateTime(user.data_creazione);
   profileCard.innerHTML = `
     <div class="profile-row"><span>Nome</span><strong>${escapeHtml(user.nome || displayUsername(user) || "Dato non inserito")}</strong></div>
     <div class="profile-row"><span>Cognome</span><strong>${escapeHtml(user.cognome || "Dato non inserito")}</strong></div>
@@ -1940,16 +1947,25 @@ function renderUsers(users) {
   }
 
   container.innerHTML = `
-    <div class="table-row head"><span>Utente</span><span>Accesso</span><span>Ruolo</span><span>Negozio</span><span>Stato</span><span>Punteggio</span><span>Azioni</span></div>
+    <div class="table-row head"><span>Utente</span><span>Accesso</span><span>Ruolo</span><span>Negozio</span><span>Stato e date</span><span>Punteggio</span><span>Azioni</span></div>
     ${users.map((user) => `
       <div class="table-row">
-        <strong>${escapeHtml(user.nome)} ${escapeHtml(user.cognome)}</strong>
-        <span>${escapeHtml(displayUsername(user))}</span>
+        <strong>
+          ${escapeHtml(user.nome || "Nome non inserito")} ${escapeHtml(user.cognome || "")}
+          ${user.telefono ? `<small>Tel. ${escapeHtml(user.telefono)}</small>` : ""}
+          ${user.note ? `<small>Note: ${escapeHtml(user.note)}</small>` : ""}
+        </strong>
+        <span>
+          ${escapeHtml(displayUsername(user))}
+          ${user.email && user.email !== displayUsername(user) ? `<small>${escapeHtml(user.email)}</small>` : ""}
+        </span>
         <em>${escapeHtml(roleLabel(user.ruolo))}</em>
         <span>${escapeHtml(userSeesAllStores(user) ? "Tutti" : user.negozio)}</span>
         <span>
           <em class="${user.attivo === false ? "status-draft" : "status-completed"}">${user.attivo === false ? "Non attivo" : "Attivo"}</em>
           <small class="presence ${user.online ? "online" : "offline"}">${user.online ? "Online" : "Offline"}</small>
+          <small>Creato: ${escapeHtml(formatDateTime(user.data_creazione))}</small>
+          <small>Aggiornato: ${escapeHtml(formatDateTime(user.updated_at))}</small>
         </span>
         ${scoreBarMarkup(user)}
         <div class="row-actions">
@@ -1957,12 +1973,23 @@ function renderUsers(users) {
             <option value="">Azioni</option>
             <option value="stats">Statistiche</option>
             <option value="edit">Modifica</option>
-            <option value="delete">Elimina</option>
+            <option value="delete">Disattiva</option>
           </select>
         </div>
       </div>
     `).join("")}
   `;
+}
+
+function userSaveErrorMessage(error, isEditing) {
+  const raw = String(error?.message || "").trim();
+  const prefix = isEditing ? "Impossibile aggiornare l'utente" : "Impossibile salvare l'utente";
+  if (!raw) return `${prefix}.`;
+  if (/numero atto|numerazione della pratica/i.test(raw)) {
+    return `${prefix}: errore di validazione account.`;
+  }
+  if (/^impossibile\s+(salvare|aggiornare)\s+l'utente/i.test(raw)) return raw;
+  return `${prefix}: ${raw}`;
 }
 
 async function loadUsers() {
@@ -1979,7 +2006,10 @@ async function loadUsers() {
 async function saveUser(event) {
   event.preventDefault();
   if (!isAdmin()) return;
+  if (state.savingUser) return;
   const id = document.getElementById("userId").value;
+  const isEditing = Boolean(id);
+  const saveButton = document.getElementById("saveUserButton");
   const payload = {
     nome: document.getElementById("userName").value.trim(),
     cognome: document.getElementById("userSurname").value.trim(),
@@ -1995,15 +2025,26 @@ async function saveUser(event) {
   if (password) payload.password = password;
 
   try {
-    await apiRequest(id ? `/utenti/${encodeURIComponent(id)}` : "/utenti", {
-      method: id ? "PUT" : "POST",
+    state.savingUser = true;
+    if (saveButton) {
+      saveButton.disabled = true;
+      saveButton.textContent = isEditing ? "Aggiornamento..." : "Creazione...";
+    }
+    await apiRequest(isEditing ? `/utenti/${encodeURIComponent(id)}` : "/utenti", {
+      method: isEditing ? "PUT" : "POST",
       body: JSON.stringify(payload)
     });
     resetUserForm();
     await loadUsers();
-    showToast(id ? "Utente aggiornato correttamente" : "Utente creato.");
+    showToast(isEditing ? "Utente aggiornato correttamente" : "Utente creato correttamente", "success");
   } catch (error) {
-    showToast(error.message || "Utente non salvato.");
+    showToast(userSaveErrorMessage(error, isEditing), "error");
+  } finally {
+    state.savingUser = false;
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = document.getElementById("userId").value ? "Salva Modifiche" : "Salva Utente";
+    }
   }
 }
 
@@ -2035,14 +2076,14 @@ function editUser(id) {
 async function deleteUser(id) {
   const user = (state.users || []).find((item) => String(item.id) === String(id));
   if (!user) return;
-  const confirmed = window.confirm(`Vuoi eliminare definitivamente l'utente ${displayUsername(user)}?`);
+  const confirmed = window.confirm(`Vuoi disattivare l'utente ${displayUsername(user)}?`);
   if (!confirmed) return;
   try {
     await apiRequest(`/utenti/${encodeURIComponent(id)}`, { method: "DELETE" });
     await loadUsers();
-    showToast("Utente eliminato.");
+    showToast("Utente disattivato correttamente.", "success");
   } catch (error) {
-    showToast(error.message || "Utente non eliminato.");
+    showToast(error.message || "Utente non disattivato.");
   }
 }
 

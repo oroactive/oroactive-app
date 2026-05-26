@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.env
+*.zip
+backups
+OroActive-WebApp-Backend-Coolify*
+OroActive-WebApp-Pulita*
+OroActive-Enterprise-*
+OroActive-Gestionale-aggiornato*
+OroActive-Gestionale-iPad*
+*.HEIC
+*.jpg
+!oroactive-logo.png

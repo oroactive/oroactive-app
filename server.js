@@ -189,6 +189,7 @@ function publicUser(row) {
     negozio: roleSeesAllStores(row.ruolo) ? "Tutti" : row.negozio,
     hasFaceId: Boolean(row.face_id_credential),
     data_creazione: row.data_creazione,
+    updated_at: row.updated_at || row.data_aggiornamento || null,
     last_seen: row.last_seen,
     online,
     stato_connessione: online ? "Online" : "Offline"
@@ -241,7 +242,7 @@ function signUserToken(user) {
 
 async function findUserById(id) {
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen FROM utenti WHERE id = $1::bigint",
+    "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti WHERE id = $1::bigint",
     [id]
   );
   return result.rows[0] || null;
@@ -2133,7 +2134,8 @@ async function bootstrapAdminUser() {
         email = LOWER($5),
         password_hash = $6,
         ruolo = 'founder',
-        negozio = $7
+        negozio = $7,
+        updated_at = NOW()
        WHERE id = $1`,
       [
         existing.rows[0].id,
@@ -5083,6 +5085,31 @@ async function deleteAct(identifier, user) {
 }
 
 async function createUser(input, actor) {
+  const firstName = String(input.nome || input.name || "").trim();
+  const surname = String(input.cognome || input.surname || "").trim();
+  const username = String(input.username || input.email || "").trim();
+  const email = String(input.email || "").trim();
+  const role = normalizeRole(input.ruolo || input.role || "");
+  if (!firstName) {
+    const error = new Error("Nome utente obbligatorio");
+    error.status = 400;
+    throw error;
+  }
+  if (!surname) {
+    const error = new Error("Cognome utente obbligatorio");
+    error.status = 400;
+    throw error;
+  }
+  if (!username && !email) {
+    const error = new Error("Email/username obbligatorio");
+    error.status = 400;
+    throw error;
+  }
+  if (!input.ruolo && !input.role) {
+    const error = new Error("Ruolo utente obbligatorio");
+    error.status = 400;
+    throw error;
+  }
   const password = String(input.password || "");
   if (password.length < 8) {
     const error = new Error("La password deve avere almeno 8 caratteri");
@@ -5091,35 +5118,55 @@ async function createUser(input, actor) {
   }
   const actorRole = normalizeRole(actor?.ruolo);
   const passwordHash = await bcrypt.hash(password, 12);
-  const role = normalizeRole(input.ruolo);
   const allowedRoles = managedRolesForActor(actor);
-  const finalRole = allowedRoles.includes(role) ? role : allowedRoles.at(-1) || "commesso";
+  if (!allowedRoles.includes(role)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const finalRole = role;
   const actorStore = actorRole === "responsabile" ? await storeForUser(actor) : null;
   const store = roleSeesAllStores(finalRole)
     ? null
     : actorRole === "responsabile"
       ? actorStore
       : await storeByCodeOrName(input.negozio || input.negozio_id || "Busto Arsizio");
+  if (!roleSeesAllStores(finalRole) && !store) {
+    const error = new Error("Negozio assegnato non valido");
+    error.status = 400;
+    throw error;
+  }
   const finalStore = roleSeesAllStores(finalRole)
     ? "Tutti"
-    : store?.nome || (actorRole === "responsabile" ? actor.negozio : input.negozio) || "Busto Arsizio";
-  const username = String(input.username || "").trim();
-  const generatedEmail = String(input.email || "").trim() || `${username || `utente-${Date.now()}`}@oroactive.local`;
+    : store.nome;
+  const finalEmail = email || `${username}@oroactive.local`;
+  const duplicate = await pool.query(
+    `SELECT id FROM utenti
+     WHERE LOWER(email) = LOWER($1::text)
+        OR ($2::text <> '' AND LOWER(username) = LOWER($2::text))
+     LIMIT 1`,
+    [finalEmail, username]
+  );
+  if (duplicate.rowCount) {
+    const error = new Error("Email/username già presente");
+    error.status = 409;
+    throw error;
+  }
   const result = await pool.query(
     `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio, negozio_id, telefono, note, attivo)
      VALUES ($1::text, $2::text, NULLIF($3::text, ''), LOWER($4::text), $5::text, $6::text, $7::text, $8::bigint, $9::text, $10::text, $11::boolean)
-     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
+     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen`,
     [
-      input.nome || "",
-      input.cognome || "",
+      firstName,
+      surname,
       username,
-      generatedEmail,
+      finalEmail,
       passwordHash,
       finalRole,
       finalStore,
       store?.id || null,
-      input.telefono || input.phone || "",
-      input.note || input.notes || "",
+      input.telefono || input.phone || null,
+      input.note || input.notes || null,
       input.attivo !== false
     ]
   );
@@ -5157,15 +5204,68 @@ function assertCanManageTarget(actor, target, requestedRole = target?.ruolo) {
 async function updateUser(id, input, actor) {
   const target = await findUserRawById(id);
   if (!target) return null;
-  assertCanManageTarget(actor, target, input.ruolo || target.ruolo);
+  assertCanManageTarget(actor, target, input.ruolo || input.role || target.ruolo);
+  if ((input.nome !== undefined || input.name !== undefined) && !String(input.nome || input.name || "").trim()) {
+    const error = new Error("Nome utente obbligatorio");
+    error.status = 400;
+    throw error;
+  }
+  if ((input.cognome !== undefined || input.surname !== undefined) && !String(input.cognome || input.surname || "").trim()) {
+    const error = new Error("Cognome utente obbligatorio");
+    error.status = 400;
+    throw error;
+  }
+  if ((input.ruolo !== undefined || input.role !== undefined) && !String(input.ruolo || input.role || "").trim()) {
+    const error = new Error("Ruolo utente obbligatorio");
+    error.status = 400;
+    throw error;
+  }
+  if ((input.ruolo !== undefined || input.role !== undefined) && !managedRolesForActor(actor).includes(normalizeRole(input.ruolo || input.role))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  if ((input.email !== undefined || input.username !== undefined) && !String(input.email || input.username || target.email || target.username || "").trim()) {
+    const error = new Error("Email/username obbligatorio");
+    error.status = 400;
+    throw error;
+  }
   const fields = [];
   const values = [];
   const allowed = ["nome", "cognome", "username", "email", "ruolo", "negozio", "telefono", "note", "attivo"];
+  if (input.name !== undefined && input.nome === undefined) input.nome = input.name;
+  if (input.surname !== undefined && input.cognome === undefined) input.cognome = input.surname;
+  if (input.role !== undefined && input.ruolo === undefined) input.ruolo = input.role;
   let selectedStore = null;
   if (input.negozio !== undefined || input.negozio_id !== undefined) {
     selectedStore = normalizeRole(actor?.ruolo) === "responsabile"
       ? await storeForUser(actor)
       : await storeByCodeOrName(input.negozio_id || input.negozio);
+    const finalRole = normalizeRole(input.ruolo || target.ruolo);
+    if (!roleSeesAllStores(finalRole) && !selectedStore) {
+      const error = new Error("Negozio assegnato non valido");
+      error.status = 400;
+      throw error;
+    }
+  }
+  const nextEmail = input.email !== undefined ? String(input.email || "").trim() || target.email : target.email;
+  const nextUsername = input.username !== undefined ? String(input.username || "").trim() : target.username;
+  if (input.email !== undefined || input.username !== undefined) {
+    const duplicate = await pool.query(
+      `SELECT id FROM utenti
+       WHERE id <> $1::bigint
+         AND (
+           LOWER(email) = LOWER($2::text)
+           OR ($3::text <> '' AND LOWER(username) = LOWER($3::text))
+         )
+       LIMIT 1`,
+      [id, nextEmail, nextUsername || ""]
+    );
+    if (duplicate.rowCount) {
+      const error = new Error("Email/username già presente");
+      error.status = 409;
+      throw error;
+    }
   }
   allowed.forEach((field) => {
     if (input[field] === undefined) return;
@@ -5196,10 +5296,11 @@ async function updateUser(id, input, actor) {
   }
 
   if (!fields.length) return findUserById(id);
+  fields.push("updated_at = NOW()");
   values.push(id);
   const result = await pool.query(
     `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}::bigint
-     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
+     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen`,
     values
   );
   return result.rowCount ? publicUser(result.rows[0]) : null;
@@ -5208,7 +5309,7 @@ async function updateUser(id, input, actor) {
 async function listUsers(options = {}) {
   const where = options.includeFounder ? "" : "WHERE ruolo <> 'founder'";
   const result = await pool.query(
-    `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen FROM utenti ${where} ORDER BY data_creazione DESC`
+    `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti ${where} ORDER BY data_creazione DESC`
   );
   return result.rows.map(publicUser);
 }
@@ -5230,7 +5331,7 @@ async function listUsersForActor(actor) {
     where += " AND (negozio_id = $2 OR negozio = $3)";
   }
   const result = await pool.query(
-    `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen
+    `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen
      FROM utenti ${where}
      ORDER BY data_creazione DESC`,
     values
@@ -5238,21 +5339,39 @@ async function listUsersForActor(actor) {
   return result.rows.map(publicUser);
 }
 
+async function getUserForActor(id, actor) {
+  const target = await findUserRawById(id);
+  if (!target) return null;
+  const actorRole = normalizeRole(actor?.ruolo);
+  const targetRole = normalizeRole(target.ruolo);
+  if (actorRole === "founder") return publicUser(target);
+  if (actorRole === "supervisore" && targetRole !== "founder") return publicUser(target);
+  if (actorRole === "responsabile") {
+    const sameStore = !actor?.negozio_id
+      ? String(target.negozio || "") === String(actor?.negozio || "")
+      : String(target.negozio_id || "") === String(actor.negozio_id);
+    if (sameStore && managedRolesForActor(actor).includes(targetRole)) return publicUser(target);
+  }
+  const error = new Error("Non autorizzato");
+  error.status = 403;
+  throw error;
+}
+
 async function deleteUser(id, actor) {
   if (String(actor.id) === String(id)) {
-    const error = new Error("Non puoi eliminare il tuo stesso accesso");
+    const error = new Error("Non puoi disattivare il tuo stesso accesso");
     error.status = 400;
     throw error;
   }
   const target = await findUserRawById(id);
   if (!target) return false;
   if (normalizeRole(target.ruolo) === "founder") {
-    const error = new Error("Il Founder non puo essere eliminato");
+    const error = new Error("Il Founder non puo essere disattivato");
     error.status = 403;
     throw error;
   }
   assertCanManageTarget(actor, target);
-  const result = await pool.query("DELETE FROM utenti WHERE id = $1::bigint RETURNING id", [id]);
+  const result = await pool.query("UPDATE utenti SET attivo = FALSE, updated_at = NOW() WHERE id = $1::bigint RETURNING id", [id]);
   return result.rowCount > 0;
 }
 
@@ -5291,8 +5410,8 @@ async function registerFaceId(user, credentialId) {
     throw error;
   }
   const result = await pool.query(
-    `UPDATE utenti SET face_id_credential = $2 WHERE id = $1
-     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, last_seen`,
+    `UPDATE utenti SET face_id_credential = $2, updated_at = NOW() WHERE id = $1
+     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen`,
     [user.id, credential]
   );
   return publicUser(result.rows[0]);
@@ -6268,7 +6387,7 @@ app.post("/api/auth/faceid/register", async (request, response, next) => {
   }
 });
 
-app.get("/api/utenti", requireAdmin, async (_request, response, next) => {
+app.get(["/api/utenti", "/api/users"], requireAdmin, async (_request, response, next) => {
   try {
     response.json(await listUsersForActor(_request.user));
   } catch (error) {
@@ -6276,7 +6395,17 @@ app.get("/api/utenti", requireAdmin, async (_request, response, next) => {
   }
 });
 
-app.post("/api/utenti", requireAdmin, async (request, response, next) => {
+app.get(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, response, next) => {
+  try {
+    const user = await getUserForActor(request.params.id, request.user);
+    if (!user) return response.status(404).json({ error: "Utente non trovato" });
+    response.json(user);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post(["/api/utenti", "/api/users"], requireAdmin, async (request, response, next) => {
   try {
     response.status(201).json(await createUser(request.body, request.user));
   } catch (error) {
@@ -6284,7 +6413,7 @@ app.post("/api/utenti", requireAdmin, async (request, response, next) => {
   }
 });
 
-app.put("/api/utenti/:id", requireAdmin, async (request, response, next) => {
+app.put(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, response, next) => {
   try {
     const user = await updateUser(request.params.id, request.body, request.user);
     if (!user) return response.status(404).json({ error: "Utente non trovato" });
@@ -6294,7 +6423,7 @@ app.put("/api/utenti/:id", requireAdmin, async (request, response, next) => {
   }
 });
 
-app.patch("/api/utenti/:id", requireAdmin, async (request, response, next) => {
+app.patch(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, response, next) => {
   try {
     const user = await updateUser(request.params.id, request.body, request.user);
     if (!user) return response.status(404).json({ error: "Utente non trovato" });
@@ -6304,7 +6433,7 @@ app.patch("/api/utenti/:id", requireAdmin, async (request, response, next) => {
   }
 });
 
-app.delete("/api/utenti/:id", requireAdmin, async (request, response, next) => {
+app.delete(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, response, next) => {
   try {
     const deleted = await deleteUser(request.params.id, request.user);
     if (!deleted) return response.status(404).json({ error: "Utente non trovato" });
@@ -6822,15 +6951,38 @@ app.use(express.static(__dirname, { extensions: ["html"] }));
 app.get("*", (_request, response) => response.sendFile(path.join(__dirname, "index.html")));
 
 function friendlyDatabaseError(error, request) {
-  if (error.code === "23505") return "Numero atto già presente: controlla la numerazione della pratica.";
-  if (error.code === "22P02") return "Formato dato non valido: controlla ID atto, negozio o valori numerici.";
+  const url = request?.originalUrl || "";
+  const constraint = String(error.constraint || "");
+  if (error.code === "23505") {
+    if (/\/api\/(utenti|users)/.test(url) || /utenti_(email|username)|utenti.*unique/i.test(constraint)) {
+      return "Email/username già presente";
+    }
+    if (/\/api\/(crm|clienti)/.test(url) || /clienti/i.test(constraint)) {
+      return "Impossibile salvare il CRM: codice fiscale già presente.";
+    }
+    if (/\/api\/atti|\/api\/acts/.test(url) || /atti_vendita|practice_number/i.test(constraint)) {
+      return "Numero atto già presente: controlla la numerazione della pratica.";
+    }
+    return "Dato già presente: controlla i valori inseriti.";
+  }
+  if (error.code === "22P02") {
+    if (/\/api\/(utenti|users)/.test(url)) return "Formato dato utente non valido.";
+    return "Formato dato non valido: controlla ID atto, negozio o valori numerici.";
+  }
   if (error.code === "22007" || error.code === "22008") return "Formato data non valido: controlla data atto, scadenza documento e data compilazione.";
-  if (error.code === "23502") return "Campo obbligatorio mancante nel salvataggio.";
+  if (error.code === "23502") {
+    if (/\/api\/(utenti|users)/.test(url)) return "Campo utente obbligatorio mancante.";
+    return "Campo obbligatorio mancante nel salvataggio.";
+  }
   if (error.code === "42703") return "Schema database non aggiornato: manca una colonna richiesta.";
   if (error.code === "42P01") return "Schema database non aggiornato: manca una tabella richiesta.";
   if (error.code === "42804" || error.code === "42P18") return "Tipo dato non valido nel salvataggio: controlla importi, date e identificativi.";
-  if (request?.originalUrl?.includes("/api/atti")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
-  if (request?.originalUrl?.includes("/api/academy")) return "Errore database durante il salvataggio Academy.";
+  if (/\/api\/(utenti|users)/.test(url)) return "Errore database durante il salvataggio dell'utente.";
+  if (url.includes("/api/atti") || url.includes("/api/acts")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
+  if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Errore database durante il salvataggio Academy.";
+  if (url.includes("/api/crm")) return "Errore database durante il salvataggio CRM.";
+  if (url.includes("/api/backups")) return "Errore database durante il backup.";
+  if (url.includes("/api/quotes") || url.includes("/api/quotazioni")) return "Errore database durante il salvataggio quotazioni.";
   return "Errore database: operazione non completata.";
 }
 
