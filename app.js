@@ -796,6 +796,9 @@ function showToast(message, type = "") {
 function showLogin() {
   clearStoredAuthToken();
   state.currentUser = null;
+  if (mainUserMenuButton) mainUserMenuButton.textContent = "Account OroActive";
+  if (loggedUserName) loggedUserName.textContent = "";
+  if (sessionUsername) sessionUsername.textContent = "";
   state.actsCache.clear();
   demoActs.splice(0, demoActs.length);
   loginScreen.hidden = false;
@@ -849,6 +852,11 @@ function displayMenuUserName(user = {}) {
   const firstName = String(user.nome || "").trim().split(/\s+/)[0];
   if (firstName) return firstName;
   return displayUsername(user) || "Account OroActive";
+}
+
+function displayUserFullName(user = {}) {
+  const fullName = [user.nome, user.cognome].filter(Boolean).join(" ").trim();
+  return fullName || displayUsername(user) || "Account OroActive";
 }
 
 function formatDateTime(value) {
@@ -1454,14 +1462,14 @@ function applyRolePermissions() {
   }
 
   if (loggedUserName && state.currentUser) {
-    loggedUserName.textContent = `${displayUsername(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
+    loggedUserName.textContent = `${displayUserFullName(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
   }
   const operatorStoreName = document.getElementById("operatorStoreName");
   if (operatorStoreName && state.currentUser && userSeesAllStores()) {
     operatorStoreName.textContent = "Negozio Tutti";
   }
   if (sessionUsername && state.currentUser) {
-    sessionUsername.textContent = displayUsername(state.currentUser);
+    sessionUsername.textContent = displayMenuUserName(state.currentUser);
   }
   if (mainUserMenuButton && state.currentUser) {
     mainUserMenuButton.textContent = `${displayMenuUserName(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
@@ -1743,7 +1751,7 @@ function renderProfileCard() {
   const user = state.currentUser;
   const createdAt = formatDateTime(user.data_creazione);
   profileCard.innerHTML = `
-    <div class="profile-row"><span>Nome</span><strong>${escapeHtml(user.nome || displayUsername(user) || "Dato non inserito")}</strong></div>
+    <div class="profile-row"><span>Nome</span><strong>${escapeHtml(displayUserFullName(user))}</strong></div>
     <div class="profile-row"><span>Cognome</span><strong>${escapeHtml(user.cognome || "Dato non inserito")}</strong></div>
     <div class="profile-row"><span>Username / email</span><strong>${escapeHtml(user.username || user.email || "Dato non inserito")}</strong></div>
     <div class="profile-row"><span>Ruolo</span><strong>${escapeHtml(roleLabel(user.ruolo))}</strong></div>
@@ -2053,7 +2061,7 @@ async function showUserActivity(id) {
     const data = await apiRequest(`/utenti/${encodeURIComponent(id)}/activity`);
     const activities = data.activities || [];
     state.userActivities.set(String(id), activities);
-    previewTitle.textContent = `Attività - ${[user.nome, user.cognome].filter(Boolean).join(" ") || displayUsername(user)}`;
+    previewTitle.textContent = `Attività - ${displayUserFullName(user)}`;
     previewBody.innerHTML = activities.length
       ? `<div class="activity-list">${activities.map((activity) => `
           <article class="activity-row">
@@ -2150,7 +2158,7 @@ async function deleteUser(id) {
     showToast("Sezione non disponibile per il tuo ruolo.");
     return;
   }
-  const confirmed = window.confirm(`Vuoi disattivare l'utente ${displayUsername(user)}?`);
+  const confirmed = window.confirm(`Vuoi disattivare l'utente ${displayUserFullName(user)}?`);
   if (!confirmed) return;
   try {
     await apiRequest(`/utenti/${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -2349,7 +2357,7 @@ function resetKnowledgeNoteFormValues() {
   if (!knowledgeNoteForm) return;
   knowledgeNoteForm.reset();
   document.getElementById("knowledgeNoteId").value = "";
-  document.getElementById("knowledgeNoteAuthor").value = displayUsername(state.currentUser || {});
+  document.getElementById("knowledgeNoteAuthor").value = displayUserFullName(state.currentUser || {});
   document.getElementById("knowledgeNoteRole").value = roleLabel(state.currentUser?.ruolo || "");
   const experience = document.getElementById("knowledgeNoteExperience");
   if (experience) experience.value = "";
@@ -2444,7 +2452,7 @@ function editKnowledgeNote(id) {
   const experience = document.getElementById("knowledgeNoteExperience");
   if (experience) experience.value = note.store_experience || "";
   document.getElementById("knowledgeNoteContent").value = note.content || "";
-  document.getElementById("knowledgeNoteAuthor").value = displayUsername(state.currentUser || {});
+  document.getElementById("knowledgeNoteAuthor").value = displayUserFullName(state.currentUser || {});
   document.getElementById("knowledgeNoteRole").value = roleLabel(state.currentUser?.ruolo || "");
   const saveButton = document.getElementById("saveKnowledgeNoteButton");
   if (saveButton) {
@@ -3460,7 +3468,7 @@ function teamFlagsForResponsible() {
 }
 
 function scoreTargetForUser(user) {
-  return ROLE_LEVELS.find((level) => level.role === normalizeRole(user?.ruolo)) || ROLE_LEVELS[0];
+  return ROLE_LEVELS.find((level) => level.role === normalizeRole(user?.ruolo)) || null;
 }
 
 function scoreDetailsForUser(user) {
@@ -3490,6 +3498,13 @@ function scoreDetailsForUser(user) {
 function scoreProgress(user) {
   const score = scoreDetailsForUser(user);
   const target = scoreTargetForUser(user);
+  if (!target) {
+    return {
+      ...score,
+      target: null,
+      percent: 0
+    };
+  }
   const percent = Math.min(100, Math.max(0, (score.points / Math.max(target.points, 1)) * 100));
   return {
     ...score,
@@ -3500,6 +3515,9 @@ function scoreProgress(user) {
 
 function scoreBarMarkup(user) {
   const score = scoreProgress(user);
+  if (!score.target) {
+    return `<span class="user-score-cell muted">${normalizeRole(user?.ruolo) === "founder" ? "Fondatore OroActive" : "Nessun obiettivo previsto"}</span>`;
+  }
   const unlockText = `${score.points}/${score.target.points} punti`;
   const levelText = score.points >= score.target.points
     ? `${score.target.label} raggiunto`
@@ -3528,6 +3546,7 @@ function showLevelMessageForUser(user, options = {}) {
   if (!message) return false;
 
   const score = scoreProgress(user);
+  if (!score.target) return false;
   if (!options.previewOnly && score.points < score.target.points) return false;
 
   if (!options.previewOnly) {
@@ -3618,10 +3637,10 @@ async function showUserStatistics(id) {
   if (!user) return;
   await loadSavedActs();
   const rows = computeStatsRows(user);
-  previewTitle.textContent = `Statistiche ${displayUsername(user)}`;
+  previewTitle.textContent = `Statistiche ${displayUserFullName(user)}`;
   previewBody.innerHTML = `
     <section class="stats-preview">
-      <h3>${escapeHtml(displayUsername(user))}</h3>
+      <h3>${escapeHtml(displayUserFullName(user))}</h3>
       <p>Statistiche acquisto oggetti preziosi suddivise per negozio e operatore.</p>
       ${rows.length ? `
         <div class="archive-table stats-table">
@@ -3869,7 +3888,7 @@ function actCompanyMainPage(act, heading) {
         <div class="print-field"><span>Metodo pagamento</span>${escapeHtml(act.paymentMethod || missing)}</div>
         <div class="print-field"><span>Totale corrisposto</span>${escapeHtml(formatEuro(Number(act.amount || 0)))}</div>
         ${materialAmountsBlockFromRows(act.materialAmounts || [])}
-        <div class="print-field"><span>Operatore</span>${escapeHtml(act.operatorUsername || act.operatorName || missing)}</div>
+        <div class="print-field"><span>Operatore</span>${escapeHtml(act.operatorName || act.operatorUsername || missing)}</div>
       </div>
 
       <h2>Oggetti preziosi</h2>
@@ -4120,7 +4139,7 @@ function renderArchiveGroups() {
                       </span>
                       <em class="${statusClass(act.status)}">${escapeHtml(workflowStatusListLabel(act.status))}</em>
                       <strong>${escapeHtml(formatEuro(Number(act.amount || 0)))}</strong>
-                      <span>${escapeHtml(act.operatorUsername || act.operatorName || "Dato non inserito")}</span>
+                      <span>${escapeHtml(act.operatorName || act.operatorUsername || "Dato non inserito")}</span>
                       ${archiveRowActionsMarkup(act)}
                     </div>
                   `).join("")}
@@ -4408,7 +4427,7 @@ async function requestActDeletion(practiceNumber) {
     ...act,
     deletionRequest: {
       status: "pending",
-      requestedBy: displayUsername(state.currentUser),
+      requestedBy: displayUserFullName(state.currentUser),
       requestedByRole: roleLabel(state.currentUser?.ruolo),
       requestedAt: new Date().toISOString()
     }
@@ -5111,7 +5130,7 @@ async function confirmActFusion(practiceNumber) {
       time: new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }),
       legalFusionDate: legalDate,
       ddtNumber: ddtNumberForFusionBatch(act.store, today),
-      fusedBy: displayUsername(state.currentUser)
+      fusedBy: displayUserFullName(state.currentUser)
     }
   };
 
@@ -6511,12 +6530,12 @@ async function attachLegalSignatureMetadata(act) {
       documentHashSha256: hash,
       integrity: "SHA256",
       antiTamper: true,
-      signedBy: displayUsername(state.currentUser),
+      signedBy: displayUserFullName(state.currentUser),
       operatorId: state.currentUser?.id || null,
       location: await currentLocationSafe(),
       auditTrail: [
         ...(act.legalSignature?.auditTrail || []),
-        { action: "save", status: act.status, timestamp, operator: displayUsername(state.currentUser) }
+        { action: "save", status: act.status, timestamp, operator: displayUserFullName(state.currentUser) }
       ]
     }
   };

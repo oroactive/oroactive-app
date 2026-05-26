@@ -151,7 +151,8 @@ test("salvataggio atti mostra errori specifici e non generici", async () => {
 });
 
 test("sezione utenti usa endpoint e messaggi propri", async () => {
-  const [app, server, schema] = await Promise.all([
+  const [index, app, server, schema] = await Promise.all([
+    file("index.html"),
     file("app.js"),
     file("server.js"),
     file("schema.sql")
@@ -183,6 +184,13 @@ test("sezione utenti usa endpoint e messaggi propri", async () => {
   assert.match(app, /data-user-activity/);
   assert.match(app, /Nessuna attività registrata/);
   assert.match(app, /displayMenuUserName/);
+  assert.match(app, /displayUserFullName/);
+  assert.match(app, /loggedUserName\.textContent = `\$\{displayUserFullName/);
+  assert.match(app, /sessionUsername\.textContent = displayMenuUserName/);
+  assert.match(index, />Account OroActive<\/button>/);
+  assert.doesNotMatch(index, /id="mainUserMenuButton"[^>]*>Utente<\/button>/);
+  assert.match(app, /return ROLE_LEVELS\.find\(\(level\) => level\.role === normalizeRole\(user\?\.ruolo\)\) \|\| null/);
+  assert.match(app, /Fondatore OroActive/);
   assert.match(app, /userSaveErrorMessage/);
   assert.doesNotMatch(saveUserBlock, /Numero atto|numerazione della pratica/);
   assert.match(saveUserBlock, /saveButton\.disabled = true/);
