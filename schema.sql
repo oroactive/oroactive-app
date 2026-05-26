@@ -16,6 +16,10 @@ CREATE TABLE IF NOT EXISTS atti_vendita (
   payment_method TEXT,
   status TEXT DEFAULT 'Archiviata',
   payload JSONB DEFAULT '{}'::jsonb,
+  completed_at TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ,
+  abandoned_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -42,11 +46,39 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS numero_atto_negozio INTEGER;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS operatore_id BIGINT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS iban TEXT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS abandoned_at TIMESTAMPTZ;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
-CREATE UNIQUE INDEX IF NOT EXISTS atti_vendita_practice_number_unique
-  ON atti_vendita (practice_number);
+UPDATE atti_vendita
+SET completed_at = COALESCE(completed_at, updated_at, created_at, NOW())
+WHERE completed_at IS NULL
+  AND COALESCE(status, '') ILIKE 'Completato';
+
+UPDATE atti_vendita
+SET archived_at = COALESCE(archived_at, updated_at, created_at, NOW())
+WHERE archived_at IS NULL
+  AND COALESCE(status, '') ILIKE 'Archiviata';
+
+UPDATE atti_vendita
+SET deleted_at = COALESCE(deleted_at, updated_at, created_at, NOW())
+WHERE deleted_at IS NULL
+  AND COALESCE(status, '') ILIKE 'Deleted';
+
+DROP INDEX IF EXISTS atti_vendita_practice_number_unique;
+ALTER TABLE atti_vendita DROP CONSTRAINT IF EXISTS atti_vendita_practice_number_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS atti_vendita_practice_number_active_unique
+  ON atti_vendita (practice_number)
+  WHERE practice_number IS NOT NULL
+    AND deleted_at IS NULL
+    AND (
+      COALESCE(status, '') ILIKE 'Completato'
+      OR (COALESCE(status, '') ILIKE 'Archiviata' AND completed_at IS NOT NULL)
+    );
 
 CREATE INDEX IF NOT EXISTS atti_vendita_store_year_number_idx
   ON atti_vendita (store_code, act_year, act_number);
@@ -68,6 +100,14 @@ CREATE INDEX IF NOT EXISTS atti_vendita_store_code_idx
 
 CREATE INDEX IF NOT EXISTS atti_vendita_status_idx
   ON atti_vendita (status);
+
+CREATE INDEX IF NOT EXISTS atti_vendita_completed_real_idx
+  ON atti_vendita (store_code, act_year, act_number)
+  WHERE deleted_at IS NULL
+    AND (
+      COALESCE(status, '') ILIKE 'Completato'
+      OR (COALESCE(status, '') ILIKE 'Archiviata' AND completed_at IS NOT NULL)
+    );
 
 CREATE INDEX IF NOT EXISTS atti_vendita_cliente_id_idx
   ON atti_vendita (cliente_id);
@@ -651,10 +691,20 @@ CREATE TABLE IF NOT EXISTS academy_materials (
   title TEXT,
   material_type TEXT DEFAULT 'link',
   file_url TEXT,
+  external_url TEXT,
+  mime_type TEXT,
+  size_bytes BIGINT DEFAULT 0,
+  uploaded_by BIGINT,
   allow_download BOOLEAN DEFAULT TRUE,
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS external_url TEXT;
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS mime_type TEXT;
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS size_bytes BIGINT DEFAULT 0;
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS uploaded_by BIGINT;
+ALTER TABLE academy_materials ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS academy_user_progress (
   id BIGSERIAL PRIMARY KEY,

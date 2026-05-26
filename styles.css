@@ -644,6 +644,15 @@ textarea {
   color: #fff;
 }
 
+.academy-video-player {
+  width: 100%;
+  max-height: 320px;
+  margin: 14px 0 6px;
+  border: 1px solid rgba(244, 122, 32, 0.25);
+  border-radius: 14px;
+  background: #050505;
+}
+
 .academy-note-label {
   display: grid;
   gap: 6px;

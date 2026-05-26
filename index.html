@@ -68,7 +68,7 @@
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="toolsSubmenu" aria-expanded="false">Strumenti</button>
           <div class="main-menu-submenu" id="toolsSubmenu" hidden>
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
-            <button class="founder-only" type="button" data-section="backups">Backup</button>
+            <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
             <button type="button" data-section="quotazione">Quotazione</button>
@@ -110,7 +110,7 @@
           <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandToolsSubmenu" aria-expanded="false">Strumenti</button>
           <div class="brand-submenu" id="brandToolsSubmenu" hidden>
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
-            <button class="founder-only" type="button" data-section="backups">Backup</button>
+            <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
             <button type="button" data-section="quotazione">Quotazione</button>
@@ -684,7 +684,7 @@
         <div class="archive-table users-table" id="storesList" aria-live="polite"></div>
       </section>
 
-      <section id="backups" class="screen founder-only">
+      <section id="backups" class="screen backup-manager-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
           <div>
@@ -810,13 +810,16 @@
           <label>Durata stimata <input id="trainingCourseDuration" placeholder="Esempio: 2h 35m"></label>
           <label>Docente / formatore <input id="trainingCourseTeacher" placeholder="Nome formatore"></label>
           <label>Thumbnail corso <input id="trainingCourseThumbnail" placeholder="Link immagine opzionale"></label>
+          <label>Carica immagine corso <input id="trainingCourseThumbnailFile" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"></label>
           <label>Modulo <input id="trainingCourseModule" placeholder="Esempio: Introduzione all'oro 18KT"></label>
           <label>Lezione <input id="trainingCourseLesson" placeholder="Titolo lezione principale"></label>
           <label>Descrizione <textarea id="trainingCourseDescription" rows="4"></textarea></label>
-          <label>Video lezione <input id="trainingCourseVideo" placeholder="Upload o link YouTube/Vimeo/Bunny/Cloudflare"></label>
+          <label>Video lezione <input id="trainingCourseVideo" placeholder="Link YouTube/Vimeo/Bunny/Cloudflare o video esterno"></label>
+          <label>Carica video lezione <input id="trainingCourseVideoFile" type="file" accept=".mp4,.mov,video/mp4,video/quicktime"></label>
           <label>PDF lezione <input id="trainingCoursePdf" placeholder="Link PDF scaricabile"></label>
+          <label>Carica PDF lezione <input id="trainingCoursePdfFile" type="file" accept=".pdf,application/pdf"></label>
           <label>Materiale o link video <input id="trainingCourseMaterial" placeholder="Link PDF, video o materiale esterno https"></label>
-          <label>Carica file corso <input id="trainingCourseFile" type="file" accept=".pdf,.mp4,.mov,.txt,.doc,.docx,application/pdf,video/mp4,video/quicktime,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
+          <label>Carica materiale corso <input id="trainingCourseFile" type="file" accept=".pdf,.mp4,.mov,.txt,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,application/pdf,video/mp4,video/quicktime,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/jpeg,image/png,image/webp"></label>
           <label class="inline-check"><input id="trainingCourseActive" type="checkbox" checked> Corso attivo</label>
           <label class="inline-check"><input id="trainingCourseCertification" type="checkbox" checked> Certificazione finale disponibile</label>
           <div class="user-form-actions">

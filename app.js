@@ -136,6 +136,9 @@ const courseCategoryFilter = document.getElementById("courseCategoryFilter");
 const trainingCourseReset = document.getElementById("trainingCourseReset");
 const trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
 const trainingCourseFile = document.getElementById("trainingCourseFile");
+const trainingCourseThumbnailFile = document.getElementById("trainingCourseThumbnailFile");
+const trainingCourseVideoFile = document.getElementById("trainingCourseVideoFile");
+const trainingCoursePdfFile = document.getElementById("trainingCoursePdfFile");
 const trainingCourseFormPanel = document.getElementById("trainingCourseForm");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
@@ -1369,12 +1372,19 @@ function currentUserStoreCode() {
   return storeCodeFromName(state.currentUser?.negozio || "Busto Arsizio");
 }
 
+function canManageBackupsUi() {
+  return ["founder", "responsabile"].includes(userRole());
+}
+
 function applyRolePermissions() {
   document.querySelectorAll(".admin-only").forEach((element) => {
     element.hidden = !isAdmin();
   });
   document.querySelectorAll(".founder-only").forEach((element) => {
     element.hidden = !isFounder();
+  });
+  document.querySelectorAll(".backup-manager-only").forEach((element) => {
+    element.hidden = !canManageBackupsUi();
   });
   document.querySelectorAll(".knowledge-editor-only").forEach((element) => {
     element.hidden = !canManageKnowledgeUi();
@@ -1638,8 +1648,8 @@ function setScreen(id) {
     showToast("Sezione riservata al Founder.");
     return;
   }
-  if (id === "backups" && !isFounder()) {
-    showToast("Sezione riservata al Founder.");
+  if (id === "backups" && !canManageBackupsUi()) {
+    showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
   closeMainMenuDropdowns();
@@ -2798,6 +2808,10 @@ function resetTrainingCourseFormValues() {
   document.getElementById("trainingCourseId").value = "";
   document.getElementById("trainingCourseActive").checked = true;
   document.getElementById("trainingCourseCertification").checked = true;
+  if (trainingCourseFile) trainingCourseFile.value = "";
+  if (trainingCourseThumbnailFile) trainingCourseThumbnailFile.value = "";
+  if (trainingCourseVideoFile) trainingCourseVideoFile.value = "";
+  if (trainingCoursePdfFile) trainingCoursePdfFile.value = "";
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Crea corso";
 }
 
@@ -2933,6 +2947,7 @@ function renderCourseCard(course) {
   const lessonId = course.lesson_id && Number(course.lesson_id) > 0 ? String(course.lesson_id) : "";
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = course.academy_pdf_url || course.pdf_url || "";
+  const isUploadedVideo = /^\/api\/academy\/materials\/file\//.test(String(videoUrl)) || /\.(mp4|mov)(\?|#|$)/i.test(String(videoUrl));
   const moduleTitle = course.academy_module_title || course.module_title || course.section_title || "Modulo introduttivo";
   const lessonTitle = course.academy_lesson_title || course.lesson_title || "Lezione principale";
   return `
@@ -2948,6 +2963,7 @@ function renderCourseCard(course) {
           <span>Docente ${escapeHtml(course.teacher || "OroActive")}</span>
         </div>
         <small>${escapeHtml(moduleTitle)} · ${escapeHtml(lessonTitle)} · Stato: ${escapeHtml(status)}</small>
+        ${isUploadedVideo ? `<video class="academy-video-player" controls playsinline preload="metadata" src="${escapeHtml(videoUrl)}"></video>` : ""}
         <div class="academy-materials">
           ${videoUrl ? `<a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener">Guarda video lezione</a>` : ""}
           ${pdfUrl ? `<a href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener" download>Scarica PDF lezione</a>` : ""}
@@ -2960,7 +2976,7 @@ function renderCourseCard(course) {
       <div class="course-progress-panel">
         <div class="course-progress"><span style="width:${percent}%"></span></div>
         <strong>${percent}%</strong>
-        <button type="button" data-course-progress="${escapeHtml(String(course.id))}">Segna lezione completata</button>
+        <button type="button" data-course-progress="${escapeHtml(String(course.id))}">${percent > 0 ? "Continua corso" : "Inizia corso"}</button>
         <button type="button" data-save-academy-note="${escapeHtml(String(course.id))}" data-academy-lesson="${escapeHtml(lessonId)}">Salva appunti</button>
         <button type="button" data-course-ai="${escapeHtml(String(course.id))}">Chiedi all'AI</button>
         ${canEvaluate ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Segna esame superato</button>` : ""}
@@ -2990,7 +3006,13 @@ async function createTrainingCourse(event) {
   if (!canManageCoursesUi()) return;
   const id = document.getElementById("trainingCourseId")?.value;
   const selectedFile = trainingCourseFile?.files?.[0];
+  const thumbnailFile = trainingCourseThumbnailFile?.files?.[0];
+  const videoFile = trainingCourseVideoFile?.files?.[0];
+  const pdfFile = trainingCoursePdfFile?.files?.[0];
   const materialDataUrl = selectedFile ? await fileToDataUrl(selectedFile) : "";
+  const thumbnailDataUrl = thumbnailFile ? await fileToDataUrl(thumbnailFile) : "";
+  const videoDataUrl = videoFile ? await fileToDataUrl(videoFile) : "";
+  const pdfDataUrl = pdfFile ? await fileToDataUrl(pdfFile) : "";
   await apiRequest(id ? `/corsi/${encodeURIComponent(id)}` : "/corsi", {
     method: id ? "PUT" : "POST",
     body: JSON.stringify({
@@ -3008,9 +3030,19 @@ async function createTrainingCourse(event) {
       video_url: document.getElementById("trainingCourseVideo").value.trim(),
       pdf_url: document.getElementById("trainingCoursePdf").value.trim(),
       material_url: document.getElementById("trainingCourseMaterial").value.trim(),
+      thumbnail_data_url: thumbnailDataUrl,
+      thumbnail_filename: thumbnailFile?.name || "",
+      thumbnail_mime_type: thumbnailFile?.type || "",
+      video_data_url: videoDataUrl,
+      video_filename: videoFile?.name || "",
+      video_mime_type: videoFile?.type || "",
+      pdf_data_url: pdfDataUrl,
+      pdf_filename: pdfFile?.name || "",
+      pdf_mime_type: pdfFile?.type || "",
       material_data_url: materialDataUrl,
       material_filename: selectedFile?.name || "",
       material_type: selectedFile?.type || "",
+      material_mime_type: selectedFile?.type || "",
       active: document.getElementById("trainingCourseActive").checked,
       final_certification: document.getElementById("trainingCourseCertification").checked
     })

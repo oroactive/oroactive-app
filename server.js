@@ -42,6 +42,7 @@ const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
 const backupDirectory = process.env.BACKUP_DIR || path.join(__dirname, "backups");
+const academyUploadDirectory = process.env.ACADEMY_UPLOAD_DIR || path.join(__dirname, "private_uploads", "academy");
 const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const backupIntervalMs = 24 * 60 * 60 * 1000;
 const backupFolders = ["atti", "documenti", "preziosi", "contabili", "pdf", "firme", "utenti", "giacenza", "fusioni", "knowledge-base", "formazione", "antifrode", "crm"];
@@ -278,6 +279,13 @@ function requireFounder(request, response, next) {
   next();
 }
 
+function requireBackupManager(request, response, next) {
+  if (!["founder", "responsabile"].includes(normalizeRole(request.user?.ruolo))) {
+    return response.status(403).json({ error: "Non autorizzato" });
+  }
+  next();
+}
+
 function canManageKnowledge(user) {
   return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
@@ -429,10 +437,24 @@ function redactedActPayloadForLog(act = {}) {
 function normalizeWorkflowStatus(status = "Archiviata") {
   if (typeof status !== "string") return "Archiviata";
   const normalized = status.trim().toLowerCase();
-  if (normalized === "completato" || normalized === "completata") return "Completato";
-  if (normalized === "bozza") return "Bozza";
-  if (normalized === "archiviato" || normalized === "archiviata") return "Archiviata";
+  if (["completed", "complete", "completato", "completata"].includes(normalized)) return "Completato";
+  if (["draft", "bozza", "in bozza"].includes(normalized)) return "Bozza";
+  if (["archived", "archiviato", "archiviata"].includes(normalized)) return "Archiviata";
+  if (["deleted", "eliminato", "eliminata", "cancellato", "cancellata"].includes(normalized)) return "Deleted";
+  if (["abandoned", "abbandonato", "abbandonata"].includes(normalized)) return "Abandoned";
   return "Archiviata";
+}
+
+function realCompletedStatusSql(alias = "") {
+  const prefix = alias ? `${alias}.` : "";
+  return `(COALESCE(${prefix}status, '') ILIKE 'Completato'
+      OR (COALESCE(${prefix}status, '') ILIKE 'Archiviata' AND ${prefix}completed_at IS NOT NULL))
+    AND ${prefix}deleted_at IS NULL
+    AND COALESCE(${prefix}completed_at, ${prefix}updated_at, ${prefix}created_at) IS NOT NULL`;
+}
+
+function visibleRealActStatusSql(alias = "") {
+  return realCompletedStatusSql(alias);
 }
 
 function normalizeFiscalCode(value = "") {
@@ -568,7 +590,9 @@ const assistantAiSchema = {
         "La bilancia d'oro + Procedura OroActive approvata",
         "Procedura OroActive approvata",
         "La bilancia d'oro + integrazione generale",
-        "Integrazione generale"
+        "Integrazione generale",
+        "Risposta integrata con ricerca web",
+        "Fonti interne non sufficienti, risposta basata su ricerca esterna"
       ]
     },
     dal_libro: { type: "boolean" },
@@ -1319,11 +1343,117 @@ async function searchAiChunksBySource(question = "", sourceType = "book", limit 
 }
 
 async function searchAiChunks(question = "") {
-  const [bookChunks, noteChunks] = await Promise.all([
+  const [bookChunks, noteChunks, academyChunks] = await Promise.all([
     searchAiChunksBySource(question, "book", 6),
-    searchAiChunksBySource(question, "note", 6)
+    searchAiChunksBySource(question, "note", 6),
+    searchAcademyKnowledgeChunks(question, 4)
   ]);
-  return [...bookChunks.slice(0, 6), ...noteChunks.slice(0, 6)].slice(0, 10);
+  return [...bookChunks.slice(0, 5), ...noteChunks.slice(0, 4), ...academyChunks.slice(0, 3)].slice(0, 10);
+}
+
+async function searchAcademyKnowledgeChunks(question = "", limit = 4) {
+  const text = String(question || "").trim();
+  if (!text) return [];
+  const terms = text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/i)
+    .filter((term) => term.length >= 4)
+    .slice(0, 8);
+  if (!terms.length) return [];
+  const result = await pool.query(
+    `SELECT c.id, c.title, COALESCE(c.description, '') AS course_description,
+            COALESCE(l.title, '') AS lesson_title,
+            COALESCE(l.description, '') AS lesson_description,
+            COALESCE(m.title, '') AS material_title,
+            COALESCE(m.external_url, m.file_url, '') AS material_url
+     FROM courses c
+     LEFT JOIN academy_lessons l ON l.course_id = c.id
+     LEFT JOIN academy_materials m ON m.course_id = c.id
+     WHERE c.active = TRUE
+       AND EXISTS (
+         SELECT 1 FROM unnest($1::text[]) term
+         WHERE LOWER(COALESCE(c.title, '') || ' ' || COALESCE(c.description, '') || ' ' || COALESCE(l.title, '') || ' ' || COALESCE(l.description, '') || ' ' || COALESCE(m.title, '')) LIKE '%' || term || '%'
+       )
+     ORDER BY c.updated_at DESC NULLS LAST, c.created_at DESC
+     LIMIT $2::integer`,
+    [terms, limit]
+  );
+  return result.rows.map((row, index) => ({
+    id: `academy-${row.id}-${index}`,
+    title: row.title,
+    titolo: row.title,
+    autore: "OroActive Academy",
+    chunk_index: index,
+    metadata: { sourceType: "academy", materialUrl: row.material_url },
+    score: 0,
+    content: [
+      row.title,
+      row.course_description,
+      row.lesson_title,
+      row.lesson_description,
+      row.material_title,
+      row.material_url
+    ].filter(Boolean).join("\n")
+  }));
+}
+
+function sanitizeQuestionForWebSearch(question = "") {
+  return String(question || "")
+    .replace(/[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]/gi, "[codice fiscale]")
+    .replace(/\b\d{2,}\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
+}
+
+async function webSearchFallback(question = "") {
+  const query = sanitizeQuestionForWebSearch(question);
+  if (!query) return { available: false, results: [] };
+
+  try {
+    if (process.env.BRAVE_SEARCH_API_KEY) {
+      const url = new URL("https://api.search.brave.com/res/v1/web/search");
+      url.searchParams.set("q", query);
+      url.searchParams.set("count", "5");
+      url.searchParams.set("country", "IT");
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY
+        }
+      });
+      if (!response.ok) throw new Error(`Brave Search HTTP ${response.status}`);
+      const payload = await response.json();
+      const results = (payload.web?.results || []).slice(0, 5).map((item) => ({
+        title: item.title || "",
+        url: item.url || "",
+        snippet: item.description || ""
+      }));
+      return { available: true, provider: "Brave Search", results };
+    }
+
+    if (process.env.WEB_SEARCH_ENDPOINT) {
+      const url = new URL(process.env.WEB_SEARCH_ENDPOINT);
+      url.searchParams.set("q", query);
+      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      if (!response.ok) throw new Error(`Web search HTTP ${response.status}`);
+      const payload = await response.json();
+      const rawResults = Array.isArray(payload.results) ? payload.results : Array.isArray(payload.items) ? payload.items : [];
+      const results = rawResults.slice(0, 5).map((item) => ({
+        title: item.title || item.name || "",
+        url: item.url || item.link || "",
+        snippet: item.snippet || item.description || item.summary || ""
+      }));
+      return { available: true, provider: "Web Search", results };
+    }
+  } catch (error) {
+    console.error("AI WEB FALLBACK ERROR", error.message || error);
+    return { available: true, error: error.message || "Ricerca web non riuscita", results: [] };
+  }
+
+  return { available: false, results: [] };
 }
 
 async function askOroActiveAssistant(question = "", options = {}) {
@@ -1336,17 +1466,23 @@ async function askOroActiveAssistant(question = "", options = {}) {
 
   const chunks = limitAssistantContext(await searchAiChunks(domanda));
   const hasContext = chunks.length > 0;
-  const hasBookContext = chunks.some((chunk) => chunk.metadata?.sourceType !== "note");
+  const hasBookContext = chunks.some((chunk) => !["note", "academy"].includes(chunk.metadata?.sourceType));
   const hasApprovedKnowledge = chunks.some((chunk) => chunk.metadata?.sourceType === "note");
+  const hasAcademyContext = chunks.some((chunk) => chunk.metadata?.sourceType === "academy");
+  const shouldUseWeb = chunks.length < 3 || options.allowWeb === true;
+  const web = shouldUseWeb ? await webSearchFallback(domanda) : { available: false, results: [] };
   const mode = options.mode === "quiz" ? "quiz" : "chat";
   const context = chunks.map((chunk, index) => (
-    `[Fonte ${index + 1}: ${chunk.metadata?.sourceType === "note" ? "Procedura OroActive approvata" : "La bilancia d'oro"} - ${chunk.titolo || "Knowledge base"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
+    `[Fonte ${index + 1}: ${chunk.metadata?.sourceType === "note" ? "Procedura OroActive approvata" : chunk.metadata?.sourceType === "academy" ? "Materiale OroActive Academy" : "La bilancia d'oro"} - ${chunk.titolo || "Knowledge base"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
+  )).join("\n\n---\n\n");
+  const webContext = (web.results || []).map((item, index) => (
+    `[Web ${index + 1}: ${item.title || "Fonte web"}]\n${item.snippet || ""}\n${item.url || ""}`
   )).join("\n\n---\n\n");
 
   if (!openai) {
     return {
       risposta: "Questa informazione non è presente nella knowledge base OroActive.",
-      fonte: hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
+      fonte: web.available && web.results?.length ? "Fonti interne non sufficienti, risposta basata su ricerca esterna" : hasAcademyContext ? "Procedura OroActive approvata" : hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
       dal_libro: false,
       citazioni: [],
       risultati: chunks.map((chunk) => ({
@@ -1368,14 +1504,18 @@ Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Usa prima il libro "La bilancia d'oro" di Christian Dinato, poi le procedure/conoscenze OroActive approvate.
 Le conoscenze OroActive approvate possono essere piu recenti e operative del libro: se sono piu dettagliate, integrale alla risposta senza ignorarle.
 Se il contesto della knowledge base e sufficiente, rispondi usando solo i passaggi forniti.
-Se il contesto non contiene abbastanza informazioni, devi scrivere esattamente: "Questa informazione non è presente nella knowledge base OroActive."
-Solo dopo quella frase puoi aggiungere una sezione "In integrazione generale..." con conoscenza generale. Non hai accesso a internet in tempo reale da questo endpoint, quindi non inventare fonti web aggiornate.
+Se il contesto interno e parziale o assente e sono presenti risultati web, integra con la sezione "Risposta integrata con ricerca web" citando solo i risultati web forniti.
+Se il contesto non contiene abbastanza informazioni e non sono presenti risultati web, devi scrivere esattamente: "Non ho trovato una risposta sufficiente nelle fonti interne e la ricerca Internet non è disponibile."
+Non inventare fonti web aggiornate: usa soltanto i risultati web forniti nel contesto.
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
 Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : "Assistente operativo."}
 
 CONTESTO KNOWLEDGE BASE:
 ${hasContext ? context : "Nessun passaggio trovato per questa domanda."}
+
+CONTESTO RICERCA WEB:
+${webContext || (web.available ? "Ricerca web disponibile ma senza risultati utili." : "Ricerca Internet non configurata sul backend.")}
 
 DOMANDA:
 ${domanda}`,
@@ -1392,7 +1532,7 @@ ${domanda}`,
     const parsed = parseOpenAiJson(result);
     return {
       risposta: parsed.risposta || "",
-      fonte: parsed.fonte || (hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale"),
+      fonte: parsed.fonte || (web.available && web.results?.length ? "Risposta integrata con ricerca web" : hasAcademyContext ? "Procedura OroActive approvata" : hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale"),
       dal_libro: Boolean(parsed.dal_libro && hasBookContext),
       citazioni: Array.isArray(parsed.citazioni) ? parsed.citazioni : [],
       risultati: chunks.map((chunk) => ({
@@ -1400,12 +1540,15 @@ ${domanda}`,
         autore: chunk.autore,
         chunk_index: chunk.chunk_index,
         score: Number(chunk.score || 0)
-      }))
+      })),
+      web: { available: Boolean(web.available), provider: web.provider || "", results: web.results || [] }
     };
   } catch (error) {
     return {
-      risposta: "Questa informazione non è presente nella knowledge base OroActive.",
-      fonte: hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
+      risposta: web.available && web.results?.length
+        ? "Ho trovato risultati web, ma l'AI non ha completato la risposta. Riprova tra poco."
+        : "Non ho trovato una risposta sufficiente nelle fonti interne e la ricerca Internet non è disponibile.",
+      fonte: web.available && web.results?.length ? "Fonti interne non sufficienti, risposta basata su ricerca esterna" : hasAcademyContext ? "Procedura OroActive approvata" : hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
       dal_libro: false,
       citazioni: [],
       risultati: chunks.map((chunk) => ({
@@ -1505,7 +1648,7 @@ function isCashPaymentMethod(method = "") {
 
 function isDraftLikeStatus(status = "") {
   const normalized = normalizeWorkflowStatus(status).toLowerCase();
-  return normalized === "bozza" || normalized === "annullata";
+  return ["bozza", "annullata", "deleted", "abandoned"].includes(normalized);
 }
 
 function amlMessage(ok) {
@@ -1522,8 +1665,7 @@ async function cashAntiMoneyLaunderingCheck(input = {}) {
   const actId = input.atto_id || input.actId || input.id || "";
   const where = [
     "LOWER(COALESCE(payment_method, '')) LIKE '%contanti%'",
-    "COALESCE(status, '') NOT ILIKE 'Bozza'",
-    "COALESCE(status, '') NOT ILIKE 'Annullata'",
+    realCompletedStatusSql(),
     "data_atto BETWEEN ($1::date - INTERVAL '7 days') AND $1::date"
   ];
   const values = [dateOrNull(actDate) || new Date().toISOString().slice(0, 10)];
@@ -1914,10 +2056,7 @@ async function runMonthlyBackupIfNeeded() {
 }
 
 function scheduleBackups() {
-  runDailyBackupIfNeeded();
-  runMonthlyBackupIfNeeded();
-  setInterval(runDailyBackupIfNeeded, backupIntervalMs);
-  setInterval(runMonthlyBackupIfNeeded, backupIntervalMs);
+  console.log("Backup automatici disabilitati: i backup partono solo dal pulsante manuale autorizzato.");
 }
 
 async function bootstrapStores() {
@@ -2127,9 +2266,16 @@ async function visibleStoreWhere(user = {}, values = [], alias = "a") {
   return ` AND (${alias}.negozio_id = $${values.length - 1}::bigint OR ${alias}.store = $${values.length}::text)`;
 }
 
-function buildActsQuery({ store, field, q, fusionEligible } = {}, user = null) {
+function buildActsQuery({ store, field, q, fusionEligible, includeDrafts } = {}, user = null) {
   const where = [];
   const values = [];
+  const shouldIncludeDrafts = includeDrafts === true || includeDrafts === "true";
+
+  if (shouldIncludeDrafts) {
+    where.push("deleted_at IS NULL AND COALESCE(status, '') NOT ILIKE 'Deleted' AND COALESCE(status, '') NOT ILIKE 'Abandoned'");
+  } else {
+    where.push(visibleRealActStatusSql());
+  }
 
   const effectiveStore = roleSeesAllStores(user?.ruolo) ? store : user?.negozio;
   if (effectiveStore && effectiveStore !== "Tutti") {
@@ -2211,9 +2357,21 @@ async function listActs(query = {}, user = null) {
 
 async function nextActNumber(storeCode, year) {
   const result = await pool.query(
-    `SELECT COALESCE(MAX(COALESCE(numero_atto_negozio, act_number)), 0) + 1 AS next_number
-     FROM ${actsTable}
-     WHERE COALESCE(codice_negozio, store_code) = $1::text AND act_year = $2::integer`,
+    `WITH used_numbers AS (
+       SELECT DISTINCT COALESCE(numero_atto_negozio, act_number)::integer AS number
+       FROM ${actsTable}
+       WHERE COALESCE(codice_negozio, store_code) = $1::text
+         AND act_year = $2::integer
+         AND ${realCompletedStatusSql()}
+         AND COALESCE(numero_atto_negozio, act_number) IS NOT NULL
+     ),
+     candidates AS (
+       SELECT generate_series(1, COALESCE((SELECT MAX(number) FROM used_numbers), 0) + 1) AS number
+     )
+     SELECT MIN(c.number)::integer AS next_number
+     FROM candidates c
+     LEFT JOIN used_numbers u ON u.number = c.number
+     WHERE u.number IS NULL`,
     [storeCode, year]
   );
   return Number(result.rows[0].next_number);
@@ -2397,6 +2555,7 @@ async function getClientByFiscalCode(fiscalCode) {
   const latestActResult = await pool.query(
     `SELECT * FROM ${actsTable}
      WHERE UPPER(codice_fiscale) = $1::text
+       AND ${realCompletedStatusSql()}
      ORDER BY updated_at DESC, id DESC
      LIMIT 1`,
     [normalized]
@@ -2522,8 +2681,7 @@ async function dashboardKpis(user = {}) {
     `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome
      FROM ${actsTable} a
      LEFT JOIN utenti u ON u.id = a.operatore_id
-     WHERE COALESCE(a.status, '') NOT ILIKE 'Bozza'
-       AND COALESCE(a.status, '') NOT ILIKE 'Annullata'
+     WHERE ${realCompletedStatusSql("a")}
        ${storeWhere}
      ORDER BY a.data_atto DESC NULLS LAST
      LIMIT 1000`,
@@ -2681,7 +2839,7 @@ async function scanAntifraud(user = {}) {
   const storeWhere = await visibleStoreWhere(user, values, "a");
   const actsResult = await pool.query(
     `SELECT * FROM ${actsTable} a
-     WHERE COALESCE(a.status, '') NOT ILIKE 'Bozza'
+     WHERE ${realCompletedStatusSql("a")}
        ${storeWhere}
      ORDER BY a.updated_at DESC
      LIMIT 500`,
@@ -2732,7 +2890,7 @@ async function scanAntifraud(user = {}) {
     SELECT cliente_id, codice_fiscale, COUNT(*)::int AS count, MAX(id) AS atto_id
     FROM ${actsTable}
     WHERE data_atto >= CURRENT_DATE - INTERVAL '7 days'
-      AND COALESCE(status, '') NOT ILIKE 'Bozza'
+      AND ${realCompletedStatusSql()}
       AND codice_fiscale IS NOT NULL
     GROUP BY cliente_id, codice_fiscale
     HAVING COUNT(*) >= 3
@@ -2751,6 +2909,7 @@ async function scanAntifraud(user = {}) {
     SELECT iban, COUNT(DISTINCT codice_fiscale)::int AS clients
     FROM ${actsTable}
     WHERE iban IS NOT NULL AND iban <> ''
+      AND ${realCompletedStatusSql()}
     GROUP BY iban
     HAVING COUNT(DISTINCT codice_fiscale) > 1
     LIMIT 50
@@ -2766,7 +2925,7 @@ async function scanAntifraud(user = {}) {
     SELECT codice_fiscale, COUNT(DISTINCT store)::int AS stores, COUNT(*)::int AS acts, MAX(id) AS atto_id
     FROM ${actsTable}
     WHERE data_atto >= CURRENT_DATE - INTERVAL '30 days'
-      AND COALESCE(status, '') NOT ILIKE 'Bozza'
+      AND ${realCompletedStatusSql()}
       AND codice_fiscale IS NOT NULL
     GROUP BY codice_fiscale
     HAVING COUNT(DISTINCT store) > 1
@@ -2784,6 +2943,7 @@ async function scanAntifraud(user = {}) {
     SELECT codice_fiscale, COUNT(DISTINCT LOWER(COALESCE(cliente_nome, '') || '|' || COALESCE(cliente_cognome, '')))::int AS variants, MAX(id) AS atto_id
     FROM ${actsTable}
     WHERE codice_fiscale IS NOT NULL AND codice_fiscale <> ''
+      AND ${realCompletedStatusSql()}
     GROUP BY codice_fiscale
     HAVING COUNT(DISTINCT LOWER(COALESCE(cliente_nome, '') || '|' || COALESCE(cliente_cognome, ''))) > 1
     LIMIT 50
@@ -3129,6 +3289,13 @@ async function createCourse(input = {}, user = {}) {
   const category = await ensureCourseCategory(input.category || "Oro");
   const section = await ensureCourseSection(category.id, input.section || "Generale");
   const durationLabel = String(input.duration_label || input.duration || "").trim();
+  const media = await courseMediaUrlsFromInput(input, user);
+  const enrichedInput = {
+    ...input,
+    thumbnail_url: media.thumbnailUrl,
+    video_url: media.videoUrl,
+    pdf_url: media.pdfUrl
+  };
   const result = await pool.query(
     `INSERT INTO courses
       (category_id, section_id, faculty_id, title, description, level, duration_minutes, duration_label, teacher, thumbnail_url, final_certification, module_title, lesson_title, video_url, pdf_url, active, order_index, created_by)
@@ -3144,12 +3311,12 @@ async function createCourse(input = {}, user = {}) {
       durationMinutesFromLabel(durationLabel),
       durationLabel,
       input.teacher || "",
-      input.thumbnail_url || "",
+      enrichedInput.thumbnail_url || "",
       input.final_certification !== false,
       input.module_title || input.module || input.section || "Modulo introduttivo",
       input.lesson_title || input.lesson || "Lezione principale",
-      input.video_url || "",
-      input.pdf_url || "",
+      enrichedInput.video_url || "",
+      enrichedInput.pdf_url || "",
       input.active !== false,
       Number(input.order_index || 0),
       user.id
@@ -3157,18 +3324,28 @@ async function createCourse(input = {}, user = {}) {
   );
   const materialUrl = String(input.material_data_url || input.material_url || "").trim();
   if (materialUrl) {
+    const file = input.material_data_url
+      ? await saveAcademyMaterialFile({
+        file_data: input.material_data_url,
+        mime_type: input.material_mime_type || input.material_type,
+        filename: input.material_filename
+      }, user)
+      : null;
+    enrichedInput.material_url = file?.fileUrl || materialUrl;
+    enrichedInput.material_data_url = "";
+    enrichedInput.material_type = input.material_type || file?.mimeType || (String(input.material_data_url || "").startsWith("data:") ? "file" : "link");
     await pool.query(
       `INSERT INTO course_materials (course_id, title, material_type, file_url)
        VALUES ($1::bigint, $2::text, $3::text, $4::text)`,
       [
         result.rows[0].id,
         input.material_filename || input.material_title || "Materiale corso",
-        input.material_type || (String(input.material_data_url || "").startsWith("data:") ? "file" : "link"),
-        materialUrl
+        enrichedInput.material_type,
+        enrichedInput.material_url
       ]
     );
   }
-  await syncAcademyStructure(result.rows[0], input, user);
+  await syncAcademyStructure(result.rows[0], enrichedInput, user);
   return result.rows[0];
 }
 
@@ -3188,6 +3365,27 @@ async function updateCourse(id, input = {}, user = {}) {
   const category = await ensureCourseCategory(input.category || "Oro");
   const section = await ensureCourseSection(category.id, input.section || "Generale");
   const durationLabel = String(input.duration_label || input.duration || "").trim();
+  const existing = await academyCourseById(id);
+  const media = await courseMediaUrlsFromInput({
+    thumbnail_url: input.thumbnail_url ?? existing?.thumbnail_url ?? "",
+    video_url: input.video_url ?? existing?.video_url ?? "",
+    pdf_url: input.pdf_url ?? existing?.pdf_url ?? "",
+    thumbnail_data_url: input.thumbnail_data_url,
+    thumbnail_mime_type: input.thumbnail_mime_type,
+    thumbnail_filename: input.thumbnail_filename,
+    video_data_url: input.video_data_url,
+    video_mime_type: input.video_mime_type,
+    video_filename: input.video_filename,
+    pdf_data_url: input.pdf_data_url,
+    pdf_mime_type: input.pdf_mime_type,
+    pdf_filename: input.pdf_filename
+  }, user);
+  const enrichedInput = {
+    ...input,
+    thumbnail_url: media.thumbnailUrl,
+    video_url: media.videoUrl,
+    pdf_url: media.pdfUrl
+  };
   const result = await pool.query(
     `UPDATE courses
      SET category_id = $2::bigint,
@@ -3221,34 +3419,44 @@ async function updateCourse(id, input = {}, user = {}) {
       durationMinutesFromLabel(durationLabel),
       durationLabel,
       input.teacher || "",
-      input.thumbnail_url || "",
+      enrichedInput.thumbnail_url || "",
       input.final_certification !== false,
       input.module_title || input.module || input.section || "Modulo introduttivo",
       input.lesson_title || input.lesson || "Lezione principale",
-      input.video_url || "",
-      input.pdf_url || "",
+      enrichedInput.video_url || "",
+      enrichedInput.pdf_url || "",
       input.active !== false,
       Number(input.order_index || 0)
     ]
   );
   if (!result.rows[0]) return null;
-  await syncAcademyStructure(result.rows[0], input, user);
   if (input.material_url !== undefined || input.material_data_url !== undefined) {
     await pool.query("DELETE FROM course_materials WHERE course_id = $1::bigint", [id]);
     const materialUrl = String(input.material_data_url || input.material_url || "").trim();
     if (materialUrl) {
+      const file = input.material_data_url
+        ? await saveAcademyMaterialFile({
+          file_data: input.material_data_url,
+          mime_type: input.material_mime_type || input.material_type,
+          filename: input.material_filename
+        }, user)
+        : null;
+      enrichedInput.material_url = file?.fileUrl || materialUrl;
+      enrichedInput.material_data_url = "";
+      enrichedInput.material_type = input.material_type || file?.mimeType || (String(input.material_data_url || "").startsWith("data:") ? "file" : "link");
       await pool.query(
         `INSERT INTO course_materials (course_id, title, material_type, file_url)
          VALUES ($1::bigint, $2::text, $3::text, $4::text)`,
         [
           id,
           input.material_filename || input.material_title || "Materiale corso",
-          input.material_type || (String(input.material_data_url || "").startsWith("data:") ? "file" : "link"),
-          materialUrl
+          enrichedInput.material_type,
+          enrichedInput.material_url
         ]
       );
     }
   }
+  await syncAcademyStructure(result.rows[0], enrichedInput, user);
   return result.rows[0];
 }
 
@@ -3370,6 +3578,599 @@ async function deleteAcademyFaculty(id, user = {}) {
   return result.rowCount > 0;
 }
 
+function academyStatus(input, fallback = true) {
+  if (typeof input.active === "boolean") return input.active;
+  if (typeof input.attivo === "boolean") return input.attivo;
+  if (typeof input.stato === "string") return !["non attivo", "inattivo", "false"].includes(input.stato.toLowerCase());
+  return fallback;
+}
+
+function academyLevel(input = "Base") {
+  const level = String(input || "Base").trim();
+  return ["Base", "Intermedio", "Avanzato", "Master"].includes(level) ? level : "Base";
+}
+
+async function academyCourseById(courseId) {
+  const result = await pool.query(
+    `SELECT c.*, cat.name AS category_name, sec.title AS section_title, f.name AS faculty_name,
+            ac.id AS academy_course_id
+     FROM courses c
+     LEFT JOIN course_categories cat ON cat.id = c.category_id
+     LEFT JOIN course_sections sec ON sec.id = c.section_id
+     LEFT JOIN academy_faculties f ON f.id = c.faculty_id
+     LEFT JOIN academy_courses ac ON ac.course_id = c.id
+     WHERE c.id = $1::bigint
+     LIMIT 1`,
+    [courseId]
+  );
+  return result.rows[0] || null;
+}
+
+async function courseMediaUrlsFromInput(input = {}, user = {}) {
+  const urls = {
+    thumbnailUrl: String(input.thumbnail_url || "").trim(),
+    videoUrl: String(input.video_url || "").trim(),
+    pdfUrl: String(input.pdf_url || "").trim()
+  };
+
+  if (input.thumbnail_data_url) {
+    const file = await saveAcademyMaterialFile({
+      file_data: input.thumbnail_data_url,
+      mime_type: input.thumbnail_mime_type,
+      filename: input.thumbnail_filename
+    }, user);
+    urls.thumbnailUrl = file.fileUrl;
+  }
+  if (input.video_data_url) {
+    const file = await saveAcademyMaterialFile({
+      file_data: input.video_data_url,
+      mime_type: input.video_mime_type,
+      filename: input.video_filename
+    }, user);
+    urls.videoUrl = file.fileUrl;
+  }
+  if (input.pdf_data_url) {
+    const file = await saveAcademyMaterialFile({
+      file_data: input.pdf_data_url,
+      mime_type: input.pdf_mime_type,
+      filename: input.pdf_filename
+    }, user);
+    urls.pdfUrl = file.fileUrl;
+  }
+  return urls;
+}
+
+async function listAcademyCourses(query = {}, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const where = [];
+  const values = [];
+  if (role !== "founder") where.push("c.active = TRUE");
+  if (query.faculty_id) {
+    values.push(query.faculty_id);
+    where.push(`c.faculty_id = $${values.length}::bigint`);
+  }
+  if (query.q) {
+    values.push(`%${String(query.q).toLowerCase()}%`);
+    where.push(`(LOWER(c.title) LIKE $${values.length}::text OR LOWER(COALESCE(c.description, '')) LIKE $${values.length}::text)`);
+  }
+  const result = await pool.query(
+    `SELECT c.*, cat.name AS category_name, sec.title AS section_title, f.name AS faculty_name,
+            ac.id AS academy_course_id
+     FROM courses c
+     LEFT JOIN course_categories cat ON cat.id = c.category_id
+     LEFT JOIN course_sections sec ON sec.id = c.section_id
+     LEFT JOIN academy_faculties f ON f.id = c.faculty_id
+     LEFT JOIN academy_courses ac ON ac.course_id = c.id
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY f.sort_order ASC NULLS LAST, cat.sort_order ASC NULLS LAST, c.order_index ASC, c.created_at DESC`,
+    values
+  );
+  return result.rows;
+}
+
+async function getAcademyCourse(courseId, user = {}) {
+  const course = await academyCourseById(courseId);
+  if (!course) return null;
+  if (normalizeRole(user.ruolo) !== "founder" && course.active === false) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const modules = await listAcademyModules(courseId);
+  for (const module of modules) {
+    module.lessons = await listAcademyLessons(module.id);
+    for (const lesson of module.lessons) {
+      lesson.materials = await listAcademyMaterials(lesson.id);
+    }
+  }
+  return { ...course, modules };
+}
+
+async function createAcademyCourse(input = {}, user = {}) {
+  return createCourse({
+    title: input.title || input.titolo,
+    description: input.description || input.descrizione,
+    faculty: input.faculty || input.faculty_name || input.facolta,
+    category: input.category || input.categoria || "Oro",
+    level: academyLevel(input.level || input.livello),
+    duration_label: input.duration_label || input.durata_stimata || input.duration || "",
+    teacher: input.teacher || input.docente || input.formatore || "",
+    thumbnail_url: input.thumbnail_url || input.thumbnail || "",
+    final_certification: input.certificazione_finale ?? input.final_certification ?? true,
+    active: academyStatus(input, true),
+    section: input.section || input.sottosezione || "Generale"
+  }, user);
+}
+
+async function updateAcademyCourse(courseId, input = {}, user = {}) {
+  return updateCourse(courseId, {
+    title: input.title || input.titolo,
+    description: input.description || input.descrizione,
+    faculty: input.faculty || input.faculty_name || input.facolta,
+    category: input.category || input.categoria || "Oro",
+    level: academyLevel(input.level || input.livello),
+    duration_label: input.duration_label || input.durata_stimata || input.duration || "",
+    teacher: input.teacher || input.docente || input.formatore || "",
+    thumbnail_url: input.thumbnail_url || input.thumbnail || "",
+    final_certification: input.certificazione_finale ?? input.final_certification ?? true,
+    active: academyStatus(input, true),
+    section: input.section || input.sottosezione || "Generale"
+  }, user);
+}
+
+async function listAcademyModules(courseId) {
+  const result = await pool.query(
+    `SELECT * FROM academy_modules
+     WHERE course_id = $1::bigint AND active = TRUE
+     ORDER BY sort_order ASC, id ASC`,
+    [courseId]
+  );
+  return result.rows;
+}
+
+async function createAcademyModule(input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const courseId = input.course_id || input.courseId;
+  const title = String(input.title || input.titolo || "").trim();
+  if (!courseId || !title) {
+    const error = new Error("Corso e titolo modulo obbligatori.");
+    error.status = 400;
+    throw error;
+  }
+  const academyCourse = (await pool.query("SELECT id FROM academy_courses WHERE course_id = $1::bigint LIMIT 1", [courseId])).rows[0];
+  const result = await pool.query(
+    `INSERT INTO academy_modules (academy_course_id, course_id, title, description, active)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::boolean)
+     RETURNING *`,
+    [academyCourse?.id || null, courseId, title, String(input.description || input.descrizione || ""), academyStatus(input, true)]
+  );
+  return result.rows[0];
+}
+
+async function updateAcademyModule(id, input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `UPDATE academy_modules
+     SET title = COALESCE(NULLIF($2::text, ''), title),
+         description = $3::text,
+         active = COALESCE($4::boolean, active),
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [id, String(input.title || input.titolo || "").trim(), String(input.description || input.descrizione || ""), input.active ?? input.attivo ?? null]
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteAcademyModule(id, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query("UPDATE academy_modules SET active = FALSE, updated_at = NOW() WHERE id = $1::bigint RETURNING id", [id]);
+  return result.rowCount > 0;
+}
+
+async function listAcademyLessons(moduleId) {
+  const result = await pool.query(
+    `SELECT * FROM academy_lessons
+     WHERE academy_module_id = $1::bigint AND active = TRUE
+     ORDER BY sort_order ASC, id ASC`,
+    [moduleId]
+  );
+  return result.rows;
+}
+
+async function createAcademyLesson(input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const moduleId = input.module_id || input.moduleId;
+  const module = (await pool.query("SELECT * FROM academy_modules WHERE id = $1::bigint LIMIT 1", [moduleId])).rows[0];
+  const title = String(input.title || input.titolo || "").trim();
+  if (!module || !title) {
+    const error = new Error("Modulo e titolo lezione obbligatori.");
+    error.status = 400;
+    throw error;
+  }
+  const result = await pool.query(
+    `INSERT INTO academy_lessons (academy_module_id, course_id, title, description, video_url, pdf_url, duration_minutes, active)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::text, $6::text, $7::integer, $8::boolean)
+     RETURNING *`,
+    [
+      module.id,
+      module.course_id,
+      title,
+      String(input.description || input.descrizione || ""),
+      input.video_url || input.video || "",
+      input.pdf_url || "",
+      durationMinutesFromLabel(input.duration_label || input.durata_stimata || input.duration || ""),
+      academyStatus(input, true)
+    ]
+  );
+  return result.rows[0];
+}
+
+async function updateAcademyLesson(id, input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `UPDATE academy_lessons
+     SET title = COALESCE(NULLIF($2::text, ''), title),
+         description = $3::text,
+         video_url = $4::text,
+         pdf_url = $5::text,
+         duration_minutes = $6::integer,
+         active = COALESCE($7::boolean, active),
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [
+      id,
+      String(input.title || input.titolo || "").trim(),
+      String(input.description || input.descrizione || ""),
+      input.video_url || input.video || "",
+      input.pdf_url || "",
+      durationMinutesFromLabel(input.duration_label || input.durata_stimata || input.duration || ""),
+      input.active ?? input.attivo ?? null
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteAcademyLesson(id, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query("UPDATE academy_lessons SET active = FALSE, updated_at = NOW() WHERE id = $1::bigint RETURNING id", [id]);
+  return result.rowCount > 0;
+}
+
+function academyDataUrlToBuffer(dataUrl = "") {
+  const match = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/i);
+  if (!match) return { buffer: null, mimeType: "" };
+  return { buffer: Buffer.from(match[2], "base64"), mimeType: match[1] };
+}
+
+function academyMaterialType(input = {}) {
+  const type = String(input.tipo_materiale || input.material_type || input.type || "").toLowerCase();
+  if (["pdf", "video", "immagine", "image", "slide", "documento", "testo", "link"].includes(type)) return type;
+  const mime = String(input.mime_type || input.mimeType || "").toLowerCase();
+  if (mime.includes("pdf")) return "pdf";
+  if (mime.includes("video")) return "video";
+  if (mime.includes("image")) return "immagine";
+  if (mime.includes("word") || mime.includes("presentation") || mime.includes("powerpoint") || mime.includes("text")) return "documento";
+  return input.external_url || input.externalUrl ? "link" : "documento";
+}
+
+async function saveAcademyMaterialFile(input = {}, user = {}) {
+  const dataUrl = input.file_data || input.fileData || input.data_url || input.dataUrl || "";
+  const { buffer, mimeType } = academyDataUrlToBuffer(dataUrl);
+  if (!buffer) return { fileUrl: input.file_url || input.fileUrl || "", mimeType: input.mime_type || input.mimeType || "", size: Number(input.size || 0) };
+  const allowed = /^(application\/pdf|video\/mp4|video\/quicktime|text\/plain|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|application\/vnd\.ms-powerpoint|application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation|image\/jpeg|image\/png|image\/webp)$/i;
+  if (!allowed.test(mimeType)) {
+    const error = new Error("Formato materiale non supportato.");
+    error.status = 400;
+    throw error;
+  }
+  await fs.mkdir(academyUploadDirectory, { recursive: true });
+  const extension = {
+    "application/pdf": ".pdf",
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "text/plain": ".txt",
+    "application/msword": ".doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "application/vnd.ms-powerpoint": ".ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp"
+  }[mimeType.toLowerCase()] || ".bin";
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${extension}`;
+  const fullPath = path.join(academyUploadDirectory, filename);
+  await fs.writeFile(fullPath, buffer);
+  return {
+    fileUrl: `/api/academy/materials/file/${filename}`,
+    mimeType,
+    size: buffer.length,
+    uploadedBy: user.id
+  };
+}
+
+async function listAcademyMaterials(lessonId) {
+  const result = await pool.query(
+    `SELECT * FROM academy_materials
+     WHERE academy_lesson_id = $1::bigint
+     ORDER BY sort_order ASC, id ASC`,
+    [lessonId]
+  );
+  return result.rows;
+}
+
+async function createAcademyMaterial(input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const lessonId = input.lesson_id || input.lessonId;
+  const lesson = (await pool.query("SELECT * FROM academy_lessons WHERE id = $1::bigint LIMIT 1", [lessonId])).rows[0];
+  if (!lesson) {
+    const error = new Error("Lezione non trovata.");
+    error.status = 404;
+    throw error;
+  }
+  const file = await saveAcademyMaterialFile(input, user);
+  const result = await pool.query(
+    `INSERT INTO academy_materials
+      (academy_lesson_id, course_id, title, material_type, file_url, external_url, mime_type, size_bytes, uploaded_by)
+     VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::text,$6::text,$7::text,$8::bigint,$9::bigint)
+     RETURNING *`,
+    [
+      lesson.id,
+      lesson.course_id,
+      input.title || input.titolo || "Materiale Academy",
+      academyMaterialType(input),
+      file.fileUrl || "",
+      input.external_url || input.externalUrl || "",
+      file.mimeType || input.mime_type || input.mimeType || "",
+      file.size || Number(input.size || 0),
+      file.uploadedBy || user.id || null
+    ]
+  );
+  return result.rows[0];
+}
+
+async function updateAcademyMaterial(id, input = {}, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const current = (await pool.query("SELECT * FROM academy_materials WHERE id = $1::bigint LIMIT 1", [id])).rows[0];
+  if (!current) return null;
+  const file = await saveAcademyMaterialFile(input, user);
+  const result = await pool.query(
+    `UPDATE academy_materials
+     SET title = COALESCE(NULLIF($2::text, ''), title),
+         material_type = COALESCE(NULLIF($3::text, ''), material_type),
+         file_url = COALESCE(NULLIF($4::text, ''), file_url),
+         external_url = $5::text,
+         mime_type = COALESCE(NULLIF($6::text, ''), mime_type),
+         size_bytes = COALESCE($7::bigint, size_bytes),
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [
+      id,
+      input.title || input.titolo || "",
+      academyMaterialType(input),
+      file.fileUrl || input.file_url || input.fileUrl || "",
+      input.external_url || input.externalUrl || current.external_url || "",
+      file.mimeType || input.mime_type || input.mimeType || "",
+      file.size || null
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteAcademyMaterial(id, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query("DELETE FROM academy_materials WHERE id = $1::bigint RETURNING id", [id]);
+  return result.rowCount > 0;
+}
+
+async function canViewAcademyUser(userId, actor = {}) {
+  if (String(userId) === String(actor.id)) return true;
+  const role = normalizeRole(actor.ruolo);
+  if (["founder", "supervisore"].includes(role)) return true;
+  if (role !== "responsabile") return false;
+  const target = await findUserRawById(userId);
+  return target && String(target.negozio_id || target.negozio || "") === String(actor.negozio_id || actor.negozio || "");
+}
+
+async function getAcademyProgressForUser(userId, actor = {}) {
+  if (!(await canViewAcademyUser(userId, actor))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `SELECT p.*, c.title AS course_title, f.name AS faculty_name, c.level
+     FROM academy_user_progress p
+     JOIN courses c ON c.id = p.course_id
+     LEFT JOIN academy_faculties f ON f.id = c.faculty_id
+     WHERE p.user_id = $1::bigint
+     ORDER BY p.updated_at DESC`,
+    [userId]
+  );
+  return result.rows;
+}
+
+async function startAcademyCourse(courseId, user = {}) {
+  const result = await pool.query(
+    `INSERT INTO academy_user_progress (course_id, user_id, status, percentuale, started_at, last_access_at)
+     VALUES ($1::bigint, $2::bigint, 'in corso', 0, NOW(), NOW())
+     ON CONFLICT (course_id, user_id)
+     DO UPDATE SET status = CASE WHEN academy_user_progress.status = 'non iniziato' THEN 'in corso' ELSE academy_user_progress.status END,
+                   started_at = COALESCE(academy_user_progress.started_at, NOW()),
+                   last_access_at = NOW(),
+                   updated_at = NOW()
+     RETURNING *`,
+    [courseId, user.id]
+  );
+  return result.rows[0];
+}
+
+async function recalculateAcademyCourseProgress(courseId, userId) {
+  const totalLessons = Number((await pool.query(
+    "SELECT COUNT(*)::int AS count FROM academy_lessons WHERE course_id = $1::bigint AND active = TRUE",
+    [courseId]
+  )).rows[0]?.count || 0);
+  const completedLessons = Number((await pool.query(
+    `SELECT COUNT(*)::int AS count
+     FROM academy_user_lesson_progress
+     WHERE course_id = $1::bigint AND user_id = $2::bigint AND completed = TRUE`,
+    [courseId, userId]
+  )).rows[0]?.count || 0);
+  const percent = totalLessons ? Math.round((completedLessons / totalLessons) * 100) : 0;
+  const course = await academyCourseById(courseId);
+  const status = percent >= 100
+    ? course?.final_certification === false ? "completato" : "in attesa esame"
+    : percent > 0 ? "in corso" : "non iniziato";
+  const result = await pool.query(
+    `INSERT INTO academy_user_progress
+      (course_id, user_id, status, percentuale, started_at, last_access_at, completed_at)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::numeric, NOW(), NOW(), CASE WHEN $4::numeric >= 100 THEN NOW() ELSE NULL END)
+     ON CONFLICT (course_id, user_id)
+     DO UPDATE SET status = EXCLUDED.status,
+                   percentuale = EXCLUDED.percentuale,
+                   started_at = COALESCE(academy_user_progress.started_at, NOW()),
+                   last_access_at = NOW(),
+                   completed_at = CASE WHEN EXCLUDED.percentuale >= 100 THEN COALESCE(academy_user_progress.completed_at, NOW()) ELSE academy_user_progress.completed_at END,
+                   updated_at = NOW()
+     RETURNING *`,
+    [courseId, userId, status, percent]
+  );
+  await pool.query(
+    `INSERT INTO user_course_progress
+      (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
+     VALUES ($1::bigint, $2::bigint, $3::numeric, $4::text, NOW(), NOW(), CASE WHEN $3::numeric >= 100 THEN NOW() ELSE NULL END)
+     ON CONFLICT (course_id, user_id)
+     DO UPDATE SET percentuale = EXCLUDED.percentuale,
+                   status = EXCLUDED.status,
+                   last_access_at = NOW(),
+                   completed_at = CASE WHEN EXCLUDED.percentuale >= 100 THEN COALESCE(user_course_progress.completed_at, NOW()) ELSE user_course_progress.completed_at END,
+                   updated_at = NOW()`,
+    [courseId, userId, percent, status]
+  );
+  return result.rows[0];
+}
+
+async function completeAcademyLesson(input = {}, user = {}) {
+  const lessonId = input.lesson_id || input.lessonId;
+  const lesson = (await pool.query("SELECT * FROM academy_lessons WHERE id = $1::bigint LIMIT 1", [lessonId])).rows[0];
+  if (!lesson) {
+    const error = new Error("Lezione non trovata.");
+    error.status = 404;
+    throw error;
+  }
+  await pool.query(
+    `INSERT INTO academy_user_lesson_progress (lesson_id, course_id, user_id, completed, completed_at)
+     VALUES ($1::bigint, $2::bigint, $3::bigint, TRUE, NOW())
+     ON CONFLICT (lesson_id, user_id)
+     DO UPDATE SET completed = TRUE, completed_at = NOW(), updated_at = NOW()`,
+    [lesson.id, lesson.course_id, user.id]
+  );
+  return recalculateAcademyCourseProgress(lesson.course_id, user.id);
+}
+
+async function updateAcademyProgress(id, input = {}, user = {}) {
+  const progress = (await pool.query("SELECT * FROM academy_user_progress WHERE id = $1::bigint LIMIT 1", [id])).rows[0];
+  if (!progress || !(await canViewAcademyUser(progress.user_id, user))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `UPDATE academy_user_progress
+     SET status = COALESCE(NULLIF($2::text, ''), status),
+         percentuale = COALESCE($3::numeric, percentuale),
+         last_access_at = NOW(),
+         completed_at = CASE WHEN COALESCE($3::numeric, percentuale) >= 100 THEN COALESCE(completed_at, NOW()) ELSE completed_at END,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [id, input.status || input.stato || "", input.percentuale ?? input.progress ?? null]
+  );
+  return result.rows[0] || null;
+}
+
+async function getAcademyLessonNote(lessonId, user = {}) {
+  const result = await pool.query(
+    `SELECT * FROM academy_user_notes
+     WHERE lesson_id = $1::bigint AND user_id = $2::bigint
+     ORDER BY updated_at DESC LIMIT 1`,
+    [lessonId, user.id]
+  );
+  return result.rows[0] || null;
+}
+
+async function upsertAcademyLessonNote(lessonId, input = {}, user = {}) {
+  const lesson = (await pool.query("SELECT * FROM academy_lessons WHERE id = $1::bigint LIMIT 1", [lessonId])).rows[0];
+  if (!lesson) {
+    const error = new Error("Lezione non trovata.");
+    error.status = 404;
+    throw error;
+  }
+  const result = await pool.query(
+    `INSERT INTO academy_user_notes (course_id, lesson_id, user_id, note)
+     VALUES ($1::bigint, $2::bigint, $3::bigint, $4::text)
+     ON CONFLICT (course_id, lesson_id, user_id)
+     DO UPDATE SET note = EXCLUDED.note, updated_at = NOW()
+     RETURNING *`,
+    [lesson.course_id, lesson.id, user.id, String(input.note || "")]
+  );
+  return result.rows[0];
+}
+
+async function updateAcademyNote(id, input = {}, user = {}) {
+  const result = await pool.query(
+    `UPDATE academy_user_notes
+     SET note = $3::text, updated_at = NOW()
+     WHERE id = $1::bigint AND user_id = $2::bigint
+     RETURNING *`,
+    [id, user.id, String(input.note || "")]
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteAcademyNote(id, user = {}) {
+  const result = await pool.query("DELETE FROM academy_user_notes WHERE id = $1::bigint AND user_id = $2::bigint RETURNING id", [id, user.id]);
+  return result.rowCount > 0;
+}
+
 async function saveCourseProgress(input = {}, user = {}) {
   const courseId = input.course_id || input.courseId;
   const percent = Math.max(0, Math.min(100, Number(input.percentuale ?? input.progress ?? 0)));
@@ -3398,6 +4199,11 @@ async function evaluateCourseExam(input = {}, user = {}) {
     throw error;
   }
   const targetUserId = input.user_id || user.id;
+  if (normalizeRole(user.ruolo) === "responsabile" && !(await canViewAcademyUser(targetUserId, user))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
   const courseId = input.course_id || input.courseId;
   const examType = String(input.exam_type || "presenza").toLowerCase() === "live" ? "live" : "presenza";
   const esito = String(input.esito || "non_svolto").toLowerCase() === "superato" ? "superato" : String(input.esito || "non_svolto").toLowerCase() === "non_superato" ? "non_superato" : "non_svolto";
@@ -3407,9 +4213,22 @@ async function evaluateCourseExam(input = {}, user = {}) {
      RETURNING *`,
     [courseId, targetUserId, examType, esito, user.id, String(input.note || "")]
   );
+  await pool.query(
+    `INSERT INTO academy_exam_results (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint, NOW(), $6::text)`,
+    [courseId, targetUserId, examType, esito, user.id, String(input.note || "")]
+  );
   if (esito === "superato") {
     await pool.query(
       `INSERT INTO user_course_progress
+        (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
+       VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
+       ON CONFLICT (course_id, user_id)
+       DO UPDATE SET percentuale = 100, status = 'certificato', last_access_at = NOW(), completed_at = NOW(), updated_at = NOW()`,
+      [courseId, targetUserId]
+    );
+    await pool.query(
+      `INSERT INTO academy_user_progress
         (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
        VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
        ON CONFLICT (course_id, user_id)
@@ -3423,6 +4242,12 @@ async function evaluateCourseExam(input = {}, user = {}) {
        VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint)
        ON CONFLICT (certificate_code) DO NOTHING`,
       [courseId, targetUserId, certificateCode, user.id]
+    );
+    await pool.query(
+      `INSERT INTO academy_certificates (course_id, user_id, certificate_code, issued_by, metadata)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint, $5::jsonb)
+       ON CONFLICT (certificate_code) DO NOTHING`,
+      [courseId, targetUserId, certificateCode, user.id, sanitizeForPostgres({ exam_type: examType, evaluated_at: new Date().toISOString() })]
     );
     const course = await pool.query(
       `SELECT c.title, cat.name AS category_name
@@ -3438,8 +4263,224 @@ async function evaluateCourseExam(input = {}, user = {}) {
        ON CONFLICT (badge_code) DO NOTHING`,
       [courseId, targetUserId, badgeName, badgeCode, user.id]
     );
+    await pool.query(
+      `INSERT INTO academy_badges (course_id, user_id, badge_name, badge_code, assigned_by)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
+       ON CONFLICT (badge_code) DO NOTHING`,
+      [courseId, targetUserId, badgeName, badgeCode, user.id]
+    );
+    await recalculateAcademyOperatorLevel(targetUserId);
   }
   return exam.rows[0];
+}
+
+async function listAcademyExams(query = {}, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const values = [];
+  const where = [];
+  if (!["founder", "supervisore", "responsabile"].includes(role)) {
+    values.push(user.id);
+    where.push(`e.user_id = $${values.length}::bigint`);
+  } else if (role === "responsabile") {
+    values.push(user.negozio_id || null);
+    const storeParam = `$${values.length}::bigint`;
+    values.push(user.negozio || "");
+    where.push(`(u.negozio_id = ${storeParam} OR u.negozio = $${values.length}::text)`);
+  } else if (query.user_id) {
+    values.push(query.user_id);
+    where.push(`e.user_id = $${values.length}::bigint`);
+  }
+  const result = await pool.query(
+    `SELECT e.*, c.title AS course_title, u.nome, u.cognome, u.username
+     FROM academy_exam_results e
+     JOIN courses c ON c.id = e.course_id
+     LEFT JOIN utenti u ON u.id = e.user_id
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY e.created_at DESC`,
+    values
+  );
+  return result.rows;
+}
+
+async function updateAcademyExam(id, input = {}, user = {}) {
+  const current = (await pool.query("SELECT * FROM academy_exam_results WHERE id = $1::bigint LIMIT 1", [id])).rows[0];
+  if (!current) return null;
+  return evaluateCourseExam({
+    course_id: current.course_id,
+    user_id: current.user_id,
+    exam_type: input.exam_type || current.exam_type,
+    esito: input.esito || current.esito,
+    note: input.note || current.note || ""
+  }, user);
+}
+
+async function listAcademyCertificates(query = {}, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const values = [];
+  const where = ["cert.status = 'valido'"];
+  if (!["founder", "supervisore", "responsabile"].includes(role)) {
+    values.push(user.id);
+    where.push(`cert.user_id = $${values.length}::bigint`);
+  } else if (role === "responsabile") {
+    values.push(user.negozio_id || null);
+    const storeParam = `$${values.length}::bigint`;
+    values.push(user.negozio || "");
+    where.push(`(u.negozio_id = ${storeParam} OR u.negozio = $${values.length}::text)`);
+  } else if (query.user_id) {
+    values.push(query.user_id);
+    where.push(`cert.user_id = $${values.length}::bigint`);
+  }
+  const result = await pool.query(
+    `SELECT cert.*, c.title AS course_title, c.level, f.name AS faculty_name, u.nome, u.cognome, u.username
+     FROM academy_certificates cert
+     JOIN courses c ON c.id = cert.course_id
+     LEFT JOIN academy_faculties f ON f.id = c.faculty_id
+     LEFT JOIN utenti u ON u.id = cert.user_id
+     WHERE ${where.join(" AND ")}
+     ORDER BY cert.issued_at DESC`,
+    values
+  );
+  return result.rows;
+}
+
+async function generateAcademyCertificate(input = {}, user = {}) {
+  if (!canEvaluateCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const courseId = input.course_id || input.courseId;
+  const targetUserId = input.user_id || input.userId || user.id;
+  if (normalizeRole(user.ruolo) === "responsabile" && !(await canViewAcademyUser(targetUserId, user))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const code = input.certificate_code || courseCode("CERT-OA");
+  const result = await pool.query(
+    `INSERT INTO academy_certificates (course_id, user_id, certificate_code, issued_by, metadata)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint, $5::jsonb)
+     ON CONFLICT (certificate_code) DO UPDATE SET status = 'valido'
+     RETURNING *`,
+    [courseId, targetUserId, code, user.id, sanitizeForPostgres(input.metadata || {})]
+  );
+  await pool.query(
+    `INSERT INTO course_certificates (course_id, user_id, certificate_code, issued_by)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint)
+     ON CONFLICT (certificate_code) DO NOTHING`,
+    [courseId, targetUserId, code, user.id]
+  );
+  return result.rows[0];
+}
+
+async function listAcademyBadges(query = {}, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const values = [];
+  const where = [];
+  if (!["founder", "supervisore", "responsabile"].includes(role)) {
+    values.push(user.id);
+    where.push(`badge.user_id = $${values.length}::bigint`);
+  } else if (role === "responsabile") {
+    values.push(user.negozio_id || null);
+    const storeParam = `$${values.length}::bigint`;
+    values.push(user.negozio || "");
+    where.push(`(u.negozio_id = ${storeParam} OR u.negozio = $${values.length}::text)`);
+  } else if (query.user_id) {
+    values.push(query.user_id);
+    where.push(`badge.user_id = $${values.length}::bigint`);
+  }
+  const result = await pool.query(
+    `SELECT badge.*, c.title AS course_title, u.nome, u.cognome, u.username
+     FROM academy_badges badge
+     LEFT JOIN courses c ON c.id = badge.course_id
+     LEFT JOIN utenti u ON u.id = badge.user_id
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY badge.assigned_at DESC`,
+    values
+  );
+  return result.rows;
+}
+
+async function assignAcademyBadge(input = {}, user = {}) {
+  if (!canEvaluateCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const targetUserId = input.user_id || input.userId;
+  if (normalizeRole(user.ruolo) === "responsabile" && !(await canViewAcademyUser(targetUserId, user))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const code = input.badge_code || courseCode("BADGE-OA");
+  const result = await pool.query(
+    `INSERT INTO academy_badges (course_id, user_id, badge_name, badge_code, assigned_by)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
+     RETURNING *`,
+    [input.course_id || input.courseId || null, targetUserId, input.badge_name || input.badgeName || "Badge OroActive Academy", code, user.id]
+  );
+  await recalculateAcademyOperatorLevel(targetUserId);
+  return result.rows[0];
+}
+
+async function revokeAcademyBadge(id, user = {}) {
+  if (normalizeRole(user.ruolo) !== "founder") {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    "UPDATE academy_badges SET status = 'revocato' WHERE id = $1::bigint RETURNING *",
+    [id]
+  );
+  if (result.rows[0]?.user_id) await recalculateAcademyOperatorLevel(result.rows[0].user_id);
+  return result.rows[0] || null;
+}
+
+function academyLevelFromCounts(certifiedCourses, badges, certificates) {
+  const score = Number(certifiedCourses || 0) + Number(badges || 0) + Number(certificates || 0);
+  if (score >= 30) return "Master OroActive";
+  if (score >= 20) return "Responsabile";
+  if (score >= 12) return "Esperto";
+  if (score >= 7) return "Senior";
+  if (score >= 3) return "Operatore";
+  return "Junior";
+}
+
+async function recalculateAcademyOperatorLevel(userId) {
+  const counts = await pool.query(
+    `SELECT
+       (SELECT COUNT(*)::int FROM academy_user_progress WHERE user_id = $1::bigint AND status = 'certificato') AS certified_courses,
+       (SELECT COUNT(*)::int FROM academy_badges WHERE user_id = $1::bigint AND status = 'valido') AS badges,
+       (SELECT COUNT(*)::int FROM academy_certificates WHERE user_id = $1::bigint AND status = 'valido') AS certificates`,
+    [userId]
+  );
+  const row = counts.rows[0] || {};
+  const level = academyLevelFromCounts(row.certified_courses, row.badges, row.certificates);
+  const result = await pool.query(
+    `INSERT INTO academy_operator_levels
+      (user_id, level_name, completed_courses, badges_count, certificates_count, updated_at)
+     VALUES ($1::bigint, $2::text, $3::integer, $4::integer, $5::integer, NOW())
+     ON CONFLICT (user_id)
+     DO UPDATE SET level_name = EXCLUDED.level_name,
+                   completed_courses = EXCLUDED.completed_courses,
+                   badges_count = EXCLUDED.badges_count,
+                   certificates_count = EXCLUDED.certificates_count,
+                   updated_at = NOW()
+     RETURNING *`,
+    [userId, level, row.certified_courses || 0, row.badges || 0, row.certificates || 0]
+  );
+  return result.rows[0];
+}
+
+async function getAcademyOperatorLevel(userId, actor = {}) {
+  if (!(await canViewAcademyUser(userId, actor))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  return recalculateAcademyOperatorLevel(userId);
 }
 
 async function getCourseCertificate(id, user = {}) {
@@ -3462,6 +4503,37 @@ async function getCourseCertificate(id, user = {}) {
      LEFT JOIN LATERAL (
        SELECT exam_type, evaluated_at
        FROM course_exam_sessions
+       WHERE course_id = cert.course_id AND user_id = cert.user_id AND esito = 'superato'
+       ORDER BY evaluated_at DESC NULLS LAST, id DESC
+       LIMIT 1
+     ) exam ON TRUE
+     WHERE ${where}
+     LIMIT 1`,
+    values
+  );
+  return result.rows[0] || null;
+}
+
+async function getAcademyCertificateForPdf(id, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const values = [id];
+  let where = "cert.id = $1::bigint";
+  if (!["founder", "responsabile"].includes(role)) {
+    values.push(user.id);
+    where += ` AND cert.user_id = $${values.length}::bigint`;
+  }
+  const result = await pool.query(
+    `SELECT cert.*, c.title AS course_title, c.level, c.duration_label, faculty.name AS faculty_name, cat.name AS category_name,
+            exam.exam_type, exam.evaluated_at,
+            u.nome, u.cognome, u.username
+     FROM academy_certificates cert
+     JOIN courses c ON c.id = cert.course_id
+     LEFT JOIN academy_faculties faculty ON faculty.id = c.faculty_id
+     LEFT JOIN course_categories cat ON cat.id = c.category_id
+     LEFT JOIN utenti u ON u.id = cert.user_id
+     LEFT JOIN LATERAL (
+       SELECT exam_type, evaluated_at
+       FROM academy_exam_results
        WHERE course_id = cert.course_id AND user_id = cert.user_id AND esito = 'superato'
        ORDER BY evaluated_at DESC NULLS LAST, id DESC
        LIMIT 1
@@ -3794,19 +4866,24 @@ async function saveAct(input, user) {
   if (existing) return updateAct(existing.id, protectedInput, user);
   const act = await enrichActStore(normalizeAct(protectedInput, existing), user);
   const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing);
+  const nowIso = new Date().toISOString();
+  const completedAt = normalizeWorkflowStatus(act.status) === "Completato" ? nowIso : null;
+  const archivedAt = normalizeWorkflowStatus(act.status) === "Archiviata" ? nowIso : null;
   const result = await pool.query(
     `INSERT INTO ${actsTable} (
       cliente_nome, cliente_cognome, codice_fiscale, telefono,
       peso_oro, quotazione, totale, data_atto,
       practice_number, store, store_code, act_year, act_number,
       payment_method, status, iban, payload,
-      negozio_id, codice_negozio, numero_atto_negozio, operatore_id
+      negozio_id, codice_negozio, numero_atto_negozio, operatore_id,
+      completed_at, archived_at
     ) VALUES (
       $1::text,$2::text,$3::text,$4::text,
       $5::numeric,$6::numeric,$7::numeric,$8::date,
       $9::text,$10::text,$11::text,$12::integer,$13::integer,
       $14::text,$15::text,$16::text,$17::jsonb,
-      $18::bigint,$19::text,$20::integer,$21::bigint
+      $18::bigint,$19::text,$20::integer,$21::bigint,
+      $22::timestamptz,$23::timestamptz
     )
     RETURNING *`,
     [
@@ -3830,7 +4907,9 @@ async function saveAct(input, user) {
       nullIfEmpty(act.negozioId),
       nullIfEmpty(act.codiceNegozio),
       act.numeroAttoNegozio,
-      nullIfEmpty(act.operatoreId)
+      nullIfEmpty(act.operatoreId),
+      completedAt,
+      archivedAt
     ]
   );
   await saveDocumentIntegrityLog(act, result.rows[0].id, user);
@@ -3864,6 +4943,7 @@ async function updateAct(identifier, input, user) {
     throw error;
   }
   const act = await enrichActStore(normalizeAct(enforceActStore(input, user), existing), user);
+  const normalizedStatus = normalizeWorkflowStatus(act.status);
   const updateValues = [
     existing.id,
     nullIfEmpty(act.clienteNome),
@@ -3886,7 +4966,8 @@ async function updateAct(identifier, input, user) {
     nullIfEmpty(act.negozioId),
     nullIfEmpty(act.codiceNegozio),
     act.numeroAttoNegozio,
-    nullIfEmpty(act.operatoreId)
+    nullIfEmpty(act.operatoreId),
+    normalizedStatus
   ];
   await enforceCashAntiMoneyLaundering(act, user, existing);
   console.log("UPDATE PAYLOAD", redactedActPayloadForLog(act));
@@ -3916,6 +4997,22 @@ async function updateAct(identifier, input, user) {
         codice_negozio = $20::text,
         numero_atto_negozio = $21::integer,
         operatore_id = $22::bigint,
+        completed_at = CASE
+          WHEN $23::text = 'Completato' THEN COALESCE(completed_at, NOW())
+          ELSE completed_at
+        END,
+        archived_at = CASE
+          WHEN $23::text = 'Archiviata' THEN COALESCE(archived_at, NOW())
+          ELSE archived_at
+        END,
+        deleted_at = CASE
+          WHEN $23::text = 'Deleted' THEN COALESCE(deleted_at, NOW())
+          ELSE deleted_at
+        END,
+        abandoned_at = CASE
+          WHEN $23::text = 'Abandoned' THEN COALESCE(abandoned_at, NOW())
+          ELSE abandoned_at
+        END,
         updated_at = NOW()
        WHERE id = $1::bigint
        RETURNING *`,
@@ -3955,9 +5052,16 @@ async function deleteAct(identifier, user) {
     error.status = 403;
     throw error;
   }
-  const result = await pool.query(`DELETE FROM ${actsTable} WHERE id = $1::bigint RETURNING id`, [
-    existing.id
-  ]);
+  const result = await pool.query(
+    `UPDATE ${actsTable}
+     SET status = 'Deleted',
+         deleted_at = COALESCE(deleted_at, NOW()),
+         updated_at = NOW(),
+         payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('deletedBy', $2::bigint, 'deletedAt', NOW())
+     WHERE id = $1::bigint
+     RETURNING id`,
+    [existing.id, user?.id || null]
+  );
   return result.rowCount > 0;
 }
 
@@ -4263,7 +5367,7 @@ app.get("/api/intelligence/insights", async (request, response, next) => {
   }
 });
 
-app.get("/api/backups", requireFounder, async (_request, response, next) => {
+app.get("/api/backups", requireBackupManager, async (_request, response, next) => {
   try {
     response.json({ backups: await listBackups(), n8n_ready: true });
   } catch (error) {
@@ -4271,7 +5375,7 @@ app.get("/api/backups", requireFounder, async (_request, response, next) => {
   }
 });
 
-app.post("/api/backups/run", requireFounder, async (_request, response, next) => {
+app.post("/api/backups/run", requireBackupManager, async (_request, response, next) => {
   try {
     response.status(201).json(await runBackup(_request.body?.tipo === "mensile" ? "mensile" : "giornaliero", _request.user));
   } catch (error) {
@@ -4279,7 +5383,7 @@ app.post("/api/backups/run", requireFounder, async (_request, response, next) =>
   }
 });
 
-app.get("/api/backups/:id", requireFounder, async (request, response, next) => {
+app.get("/api/backups/:id", requireBackupManager, async (request, response, next) => {
   try {
     const detail = await backupDetail(request.params.id);
     if (!detail) return response.status(404).json({ error: "Backup non trovato" });
@@ -4289,7 +5393,7 @@ app.get("/api/backups/:id", requireFounder, async (request, response, next) => {
   }
 });
 
-app.delete("/api/backups/:id", requireFounder, async (request, response, next) => {
+app.delete("/api/backups/:id", requireBackupManager, async (request, response, next) => {
   try {
     const deleted = await deleteBackup(request.params.id);
     if (!deleted) return response.status(404).json({ error: "Backup non trovato" });
@@ -4299,7 +5403,7 @@ app.delete("/api/backups/:id", requireFounder, async (request, response, next) =
   }
 });
 
-app.get("/api/backups/:id/download", requireFounder, async (request, response, next) => {
+app.get("/api/backups/:id/download", requireBackupManager, async (request, response, next) => {
   try {
     const result = await pool.query(
       "SELECT filename, percorso, stato FROM backup_jobs WHERE id = $1",
@@ -4381,6 +5485,43 @@ app.get("/api/corsi", async (request, response, next) => {
   }
 });
 
+app.get("/api/academy/faculties", async (_request, response, next) => {
+  try {
+    const result = await pool.query("SELECT * FROM academy_faculties ORDER BY sort_order ASC, name ASC");
+    response.json({ faculties: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/faculties", async (request, response, next) => {
+  try {
+    response.status(201).json(await createAcademyFaculty(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/faculties/:id", async (request, response, next) => {
+  try {
+    const faculty = await updateAcademyFaculty(request.params.id, request.body, request.user);
+    if (!faculty) return response.status(404).json({ error: "Facoltà non trovata" });
+    response.json(faculty);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/academy/faculties/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteAcademyFaculty(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Facoltà non trovata" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/academy/facolta", async (request, response, next) => {
   try {
     response.status(201).json(await createAcademyFaculty(request.body, request.user));
@@ -4404,6 +5545,371 @@ app.delete("/api/academy/facolta/:id", async (request, response, next) => {
     const deleted = await deleteAcademyFaculty(request.params.id, request.user);
     if (!deleted) return response.status(404).json({ error: "Facoltà non trovata" });
     response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/courses", async (request, response, next) => {
+  try {
+    response.json({ courses: await listAcademyCourses(request.query, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/courses/:id", async (request, response, next) => {
+  try {
+    const course = await getAcademyCourse(request.params.id, request.user);
+    if (!course) return response.status(404).json({ error: "Corso non trovato" });
+    response.json(course);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/courses", async (request, response, next) => {
+  try {
+    response.status(201).json(await createAcademyCourse(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/courses/:id", async (request, response, next) => {
+  try {
+    const course = await updateAcademyCourse(request.params.id, request.body, request.user);
+    if (!course) return response.status(404).json({ error: "Corso non trovato" });
+    response.json(course);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/academy/courses/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteCourse(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Corso non trovato" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/courses/:courseId/modules", async (request, response, next) => {
+  try {
+    response.json({ modules: await listAcademyModules(request.params.courseId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/modules", async (request, response, next) => {
+  try {
+    response.status(201).json(await createAcademyModule(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/modules/:id", async (request, response, next) => {
+  try {
+    const module = await updateAcademyModule(request.params.id, request.body, request.user);
+    if (!module) return response.status(404).json({ error: "Modulo non trovato" });
+    response.json(module);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/academy/modules/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteAcademyModule(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Modulo non trovato" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/modules/:moduleId/lessons", async (request, response, next) => {
+  try {
+    response.json({ lessons: await listAcademyLessons(request.params.moduleId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/lessons", async (request, response, next) => {
+  try {
+    response.status(201).json(await createAcademyLesson(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/lessons/:id", async (request, response, next) => {
+  try {
+    const lesson = await updateAcademyLesson(request.params.id, request.body, request.user);
+    if (!lesson) return response.status(404).json({ error: "Lezione non trovata" });
+    response.json(lesson);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/academy/lessons/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteAcademyLesson(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Lezione non trovata" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/lessons/:lessonId/materials", async (request, response, next) => {
+  try {
+    response.json({ materials: await listAcademyMaterials(request.params.lessonId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/materials/file/:filename", async (request, response, next) => {
+  try {
+    const filename = path.basename(request.params.filename || "");
+    const filePath = path.join(academyUploadDirectory, filename);
+    const resolved = path.resolve(filePath);
+    if (!resolved.startsWith(path.resolve(academyUploadDirectory))) return response.status(403).json({ error: "Non autorizzato" });
+    await fs.access(resolved);
+    response.sendFile(resolved);
+  } catch (error) {
+    if (error.code === "ENOENT") return response.status(404).json({ error: "Materiale non trovato" });
+    next(error);
+  }
+});
+
+app.post("/api/academy/materials", async (request, response, next) => {
+  try {
+    response.status(201).json(await createAcademyMaterial(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/materials/:id", async (request, response, next) => {
+  try {
+    const material = await updateAcademyMaterial(request.params.id, request.body, request.user);
+    if (!material) return response.status(404).json({ error: "Materiale non trovato" });
+    response.json(material);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/academy/materials/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteAcademyMaterial(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Materiale non trovato" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-progress", async (request, response, next) => {
+  try {
+    response.json({ progress: await getAcademyProgressForUser(request.user.id, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/users/:userId/progress", async (request, response, next) => {
+  try {
+    response.json({ progress: await getAcademyProgressForUser(request.params.userId, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/progress/start-course", async (request, response, next) => {
+  try {
+    response.status(201).json(await startAcademyCourse(request.body.course_id || request.body.courseId, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/progress/complete-lesson", async (request, response, next) => {
+  try {
+    response.status(201).json(await completeAcademyLesson(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/progress/:id", async (request, response, next) => {
+  try {
+    const progress = await updateAcademyProgress(request.params.id, request.body, request.user);
+    if (!progress) return response.status(404).json({ error: "Avanzamento non trovato" });
+    response.json(progress);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/lessons/:lessonId/notes", async (request, response, next) => {
+  try {
+    response.json({ note: await getAcademyLessonNote(request.params.lessonId, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/lessons/:lessonId/notes", async (request, response, next) => {
+  try {
+    response.status(201).json(await upsertAcademyLessonNote(request.params.lessonId, request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/notes/:id", async (request, response, next) => {
+  try {
+    const note = await updateAcademyNote(request.params.id, request.body, request.user);
+    if (!note) return response.status(404).json({ error: "Appunto non trovato" });
+    response.json(note);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/academy/notes/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteAcademyNote(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Appunto non trovato" });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/exams", async (request, response, next) => {
+  try {
+    response.json({ exams: await listAcademyExams(request.query, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/exams", async (request, response, next) => {
+  try {
+    response.status(201).json(await evaluateCourseExam(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/exams/:id", async (request, response, next) => {
+  try {
+    const exam = await updateAcademyExam(request.params.id, request.body, request.user);
+    if (!exam) return response.status(404).json({ error: "Esame non trovato" });
+    response.json(exam);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-certificates", async (request, response, next) => {
+  try {
+    response.json({ certificates: await listAcademyCertificates({ user_id: request.user.id }, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/certificates", async (request, response, next) => {
+  try {
+    response.json({ certificates: await listAcademyCertificates(request.query, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/certificates/generate", async (request, response, next) => {
+  try {
+    response.status(201).json(await generateAcademyCertificate(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/certificates/:id/download", async (request, response, next) => {
+  try {
+    const certificate = await getAcademyCertificateForPdf(request.params.id, request.user);
+    if (!certificate) return response.status(404).json({ error: "Certificazione non trovata" });
+    writeCourseCertificatePdf(certificate, response);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-badges", async (request, response, next) => {
+  try {
+    response.json({ badges: await listAcademyBadges({ user_id: request.user.id }, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/badges", async (request, response, next) => {
+  try {
+    response.json({ badges: await listAcademyBadges(request.query, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/badges/assign", async (request, response, next) => {
+  try {
+    response.status(201).json(await assignAcademyBadge(request.body, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/academy/badges/:id/revoke", async (request, response, next) => {
+  try {
+    const badge = await revokeAcademyBadge(request.params.id, request.user);
+    if (!badge) return response.status(404).json({ error: "Badge non trovato" });
+    response.json(badge);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-level", async (request, response, next) => {
+  try {
+    response.json(await getAcademyOperatorLevel(request.user.id, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/users/:userId/level", async (request, response, next) => {
+  try {
+    response.json(await getAcademyOperatorLevel(request.params.userId, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/recalculate-level/:userId", async (request, response, next) => {
+  try {
+    if (!(await canViewAcademyUser(request.params.userId, request.user))) return response.status(403).json({ error: "Non autorizzato" });
+    response.json(await recalculateAcademyOperatorLevel(request.params.userId));
   } catch (error) {
     next(error);
   }
@@ -5298,13 +6804,26 @@ app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) =
 app.use(express.static(__dirname, { extensions: ["html"] }));
 app.get("*", (_request, response) => response.sendFile(path.join(__dirname, "index.html")));
 
-app.use((error, _request, response, _next) => {
+function friendlyDatabaseError(error, request) {
+  if (error.code === "23505") return "Numero atto già presente: controlla la numerazione della pratica.";
+  if (error.code === "22P02") return "Formato dato non valido: controlla ID atto, negozio o valori numerici.";
+  if (error.code === "22007" || error.code === "22008") return "Formato data non valido: controlla data atto, scadenza documento e data compilazione.";
+  if (error.code === "23502") return "Campo obbligatorio mancante nel salvataggio.";
+  if (error.code === "42703") return "Schema database non aggiornato: manca una colonna richiesta.";
+  if (error.code === "42P01") return "Schema database non aggiornato: manca una tabella richiesta.";
+  if (error.code === "42804" || error.code === "42P18") return "Tipo dato non valido nel salvataggio: controlla importi, date e identificativi.";
+  if (request?.originalUrl?.includes("/api/atti")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
+  if (request?.originalUrl?.includes("/api/academy")) return "Errore database durante il salvataggio Academy.";
+  return "Errore database: operazione non completata.";
+}
+
+app.use((error, request, response, _next) => {
   console.error(error);
   const isDatabaseError = Boolean(error.code || error.severity || error.routine);
   const message = isDatabaseError
-    ? "Errore nel salvataggio dell'atto. Controllare i campi compilati."
+    ? friendlyDatabaseError(error, request)
     : error.message || "Errore server";
-  response.status(error.status || 500).json({ error: message });
+  response.status(error.status || 500).json({ ok: false, error: message });
 });
 
 app.listen(port, () => {
