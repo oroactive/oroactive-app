@@ -47,6 +47,8 @@ const state = {
   courseCertificates: [],
   courseBadges: [],
   courseActiveTab: "catalog",
+  users: [],
+  userActivities: new Map(),
   crmClients: [],
   crmSearchTimer: null,
   backups: [],
@@ -843,6 +845,12 @@ function displayUsername(user = {}) {
   return user.nome || "";
 }
 
+function displayMenuUserName(user = {}) {
+  const firstName = String(user.nome || "").trim().split(/\s+/)[0];
+  if (firstName) return firstName;
+  return displayUsername(user) || "Account OroActive";
+}
+
 function formatDateTime(value) {
   if (!value) return "Dato non inserito";
   const date = new Date(value);
@@ -1349,6 +1357,10 @@ function isAdmin() {
   return ["founder", "supervisore", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
+function canViewUsersDirectory() {
+  return Boolean(state.currentUser);
+}
+
 function isFounder() {
   return normalizeRole(state.currentUser?.ruolo) === "founder";
 }
@@ -1377,6 +1389,14 @@ function managedRolesForCurrentUser() {
   return [];
 }
 
+function canEditUserRow(user = {}) {
+  return isAdmin() && user.visibility !== "minimal" && user.canEdit !== false;
+}
+
+function canDeleteUserRow(user = {}) {
+  return canEditUserRow(user) && user.canDelete !== false && String(user.id) !== String(state.currentUser?.id);
+}
+
 function currentUserStoreCode() {
   return storeCodeFromName(state.currentUser?.negozio || "Busto Arsizio");
 }
@@ -1386,6 +1406,9 @@ function canManageBackupsUi() {
 }
 
 function applyRolePermissions() {
+  document.querySelectorAll(".user-directory-only").forEach((element) => {
+    element.hidden = !canViewUsersDirectory();
+  });
   document.querySelectorAll(".admin-only").forEach((element) => {
     element.hidden = !isAdmin();
   });
@@ -1421,7 +1444,12 @@ function applyRolePermissions() {
     }
   } else {
     if (storeCode) storeCode.disabled = false;
-    if (archiveStore) archiveStore.disabled = false;
+    if (archiveStore) {
+      archiveStore.disabled = false;
+      if (archiveStore.querySelector('option[value="Tutti"]') && archiveStore.dataset.userSelected !== "true") {
+        archiveStore.value = "Tutti";
+      }
+    }
     if (fusionStore) fusionStore.disabled = false;
   }
 
@@ -1436,7 +1464,7 @@ function applyRolePermissions() {
     sessionUsername.textContent = displayUsername(state.currentUser);
   }
   if (mainUserMenuButton && state.currentUser) {
-    mainUserMenuButton.textContent = `${displayUsername(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
+    mainUserMenuButton.textContent = `${displayMenuUserName(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
   }
   const qualityPanel = document.getElementById("qualityReviewPanel");
   if (qualityPanel) qualityPanel.hidden = !canReviewActs();
@@ -1453,7 +1481,7 @@ async function startAuthenticatedApp() {
   await loadPendingSyncQueue();
   await loadAvailableStores();
   renderStep();
-  await setPracticeMeta();
+  await setPracticeMeta({ deferPracticeNumber: true });
   applyRolePermissions();
   updateSignatureState();
   updateDocumentCaptureCards();
@@ -1464,7 +1492,7 @@ async function startAuthenticatedApp() {
   renderPaymentCaptureCard();
   updateChecklistState();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
-  if (isAdmin()) loadUsers();
+  if (canViewUsersDirectory()) loadUsers();
   maybeShowLevelUnlockMessage();
   await flushPendingSync();
   if (!state.syncTimer) {
@@ -1641,8 +1669,8 @@ async function handleLogout() {
 }
 
 function setScreen(id) {
-  if (id === "users" && !isAdmin()) {
-    showToast("Non autorizzato");
+  if (id === "users" && !canViewUsersDirectory()) {
+    showToast("Sezione non disponibile per il tuo ruolo.");
     return;
   }
   if (id === "knowledgeNotes" && !canManageKnowledgeUi()) {
@@ -1707,6 +1735,7 @@ async function handleScreenDataLoad(id) {
   if (id === "profile") {
     renderProfileCard();
   }
+  if (id === "users") await loadUsers();
 }
 
 function renderProfileCard() {
@@ -1805,7 +1834,11 @@ function showMainMenuFromSplash() {
 
 async function enterSectionFromMainMenu(section) {
   mainMenuScreen.hidden = true;
-  if (section === "practice") await clearPracticeForFreshStart();
+  if (section === "practice") {
+    setScreen(section);
+    await clearPracticeForFreshStart({ deferPracticeNumber: true });
+    return;
+  }
   setScreen(section);
 }
 
@@ -1948,36 +1981,43 @@ function renderUsers(users) {
 
   container.innerHTML = `
     <div class="table-row head"><span>Utente</span><span>Accesso</span><span>Ruolo</span><span>Negozio</span><span>Stato e date</span><span>Punteggio</span><span>Azioni</span></div>
-    ${users.map((user) => `
+    ${users.map((user) => {
+    const minimal = user.visibility === "minimal";
+    const canEdit = canEditUserRow(user);
+    const canDelete = canDeleteUserRow(user);
+    const canViewActivity = user.canViewActivity !== false && !minimal;
+    const actions = [
+      canViewActivity ? `<button type="button" data-user-activity="${escapeHtml(String(user.id))}">Attività</button>` : "",
+      canEdit ? `<button type="button" data-edit-user="${escapeHtml(String(user.id))}">Modifica</button>` : "",
+      canDelete ? `<button class="danger-button" type="button" data-delete-user="${escapeHtml(String(user.id))}">Disattiva</button>` : ""
+    ].filter(Boolean);
+    return `
       <div class="table-row">
         <strong>
           ${escapeHtml(user.nome || "Nome non inserito")} ${escapeHtml(user.cognome || "")}
-          ${user.telefono ? `<small>Tel. ${escapeHtml(user.telefono)}</small>` : ""}
-          ${user.note ? `<small>Note: ${escapeHtml(user.note)}</small>` : ""}
+          ${!minimal && user.telefono ? `<small>Tel. ${escapeHtml(user.telefono)}</small>` : ""}
+          ${!minimal && user.note ? `<small>Note: ${escapeHtml(user.note)}</small>` : ""}
         </strong>
         <span>
-          ${escapeHtml(displayUsername(user))}
-          ${user.email && user.email !== displayUsername(user) ? `<small>${escapeHtml(user.email)}</small>` : ""}
+          ${minimal ? "Dati minimi" : escapeHtml(displayUsername(user))}
+          ${!minimal && user.email && user.email !== displayUsername(user) ? `<small>${escapeHtml(user.email)}</small>` : ""}
         </span>
         <em>${escapeHtml(roleLabel(user.ruolo))}</em>
         <span>${escapeHtml(userSeesAllStores(user) ? "Tutti" : user.negozio)}</span>
         <span>
           <em class="${user.attivo === false ? "status-draft" : "status-completed"}">${user.attivo === false ? "Non attivo" : "Attivo"}</em>
           <small class="presence ${user.online ? "online" : "offline"}">${user.online ? "Online" : "Offline"}</small>
+          <small>Ultima attività: ${escapeHtml(formatDateTime(user.last_seen))}</small>
           <small>Creato: ${escapeHtml(formatDateTime(user.data_creazione))}</small>
           <small>Aggiornato: ${escapeHtml(formatDateTime(user.updated_at))}</small>
         </span>
-        ${scoreBarMarkup(user)}
+        ${minimal ? '<span class="user-score-cell muted">Dati riservati</span>' : scoreBarMarkup(user)}
         <div class="row-actions">
-          <select data-user-action="${escapeHtml(String(user.id))}" aria-label="Azioni utente">
-            <option value="">Azioni</option>
-            <option value="stats">Statistiche</option>
-            <option value="edit">Modifica</option>
-            <option value="delete">Disattiva</option>
-          </select>
+          ${actions.join("") || '<span class="muted">Nessuna azione disponibile</span>'}
         </div>
       </div>
-    `).join("")}
+    `;
+  }).join("")}
   `;
 }
 
@@ -1993,13 +2033,39 @@ function userSaveErrorMessage(error, isEditing) {
 }
 
 async function loadUsers() {
-  if (!isAdmin()) return;
+  if (!canViewUsersDirectory()) return;
   try {
     const users = await apiRequest("/utenti");
     state.users = users;
     renderUsers(users);
   } catch (error) {
     showToast(error.message || "Utenti non caricati.");
+  }
+}
+
+async function showUserActivity(id) {
+  const user = (state.users || []).find((item) => String(item.id) === String(id));
+  if (!user) {
+    showToast("Utente non trovato.");
+    return;
+  }
+  try {
+    const data = await apiRequest(`/utenti/${encodeURIComponent(id)}/activity`);
+    const activities = data.activities || [];
+    state.userActivities.set(String(id), activities);
+    previewTitle.textContent = `Attività - ${[user.nome, user.cognome].filter(Boolean).join(" ") || displayUsername(user)}`;
+    previewBody.innerHTML = activities.length
+      ? `<div class="activity-list">${activities.map((activity) => `
+          <article class="activity-row">
+            <strong>${escapeHtml(activity.label || "Attività")}</strong>
+            <span>${escapeHtml(activity.description || "")}</span>
+            <small>${escapeHtml(formatDateTime(activity.created_at))}${activity.actor ? ` - ${escapeHtml(activity.actor)}` : ""}</small>
+          </article>
+        `).join("")}</div>`
+      : '<div class="empty-state">Nessuna attività registrata</div>';
+    previewModal.hidden = false;
+  } catch (error) {
+    showToast(error.message || "Attività utente non caricata.", "error");
   }
 }
 
@@ -2051,6 +2117,10 @@ async function saveUser(event) {
 function editUser(id) {
   const user = (state.users || []).find((item) => String(item.id) === String(id));
   if (!user) return;
+  if (!canEditUserRow(user)) {
+    showToast("Sezione non disponibile per il tuo ruolo.");
+    return;
+  }
   document.getElementById("userId").value = user.id;
   document.getElementById("userName").value = user.nome || "";
   document.getElementById("userSurname").value = user.cognome || "";
@@ -2076,6 +2146,10 @@ function editUser(id) {
 async function deleteUser(id) {
   const user = (state.users || []).find((item) => String(item.id) === String(id));
   if (!user) return;
+  if (!canDeleteUserRow(user)) {
+    showToast("Sezione non disponibile per il tuo ruolo.");
+    return;
+  }
   const confirmed = window.confirm(`Vuoi disattivare l'utente ${displayUsername(user)}?`);
   if (!confirmed) return;
   try {
@@ -2702,7 +2776,7 @@ function populateStoreSelectors() {
   ["archiveStoreFilter", "fusionStoreFilter"].forEach((id) => {
     const select = document.getElementById(id);
     if (!select) return;
-    const includeAll = id === "fusionStoreFilter";
+    const includeAll = id === "archiveStoreFilter" || id === "fusionStoreFilter";
     select.innerHTML = `${includeAll ? "<option>Tutti</option>" : ""}${stores.map((store) => `<option>${escapeHtml(store.nome)}</option>`).join("")}`;
     const previous = id === "archiveStoreFilter" ? currentValues.archive : currentValues.fusion;
     if (previous) select.value = previous;
@@ -3595,6 +3669,13 @@ function workflowStatusCode(status = "") {
   return "archived_incomplete";
 }
 
+function workflowStatusListLabel(status = "") {
+  const code = workflowStatusCode(status);
+  if (code === "completed" || code === "archived_completed") return "Completato";
+  if (code === "deleted") return "Eliminato";
+  return "Archiviato";
+}
+
 function isCompletedWorkflowStatus(status = "") {
   return ["completed", "archived_completed"].includes(workflowStatusCode(status));
 }
@@ -3660,31 +3741,17 @@ function deletionRequestLabel(act) {
 
 function archiveRowActionsMarkup(act) {
   const archivedIncomplete = workflowStatusCode(act.status) === "archived_incomplete";
-  const actions = [`<button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>`];
-  if (canModifyAct(act)) {
-    actions.push(`<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">${archivedIncomplete ? "Riapri" : "Modifica"}</button>`);
-    if (archivedIncomplete) {
-      actions.push(`<button class="complete-archive-button" type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Completa pratica</button>`);
-    }
-  }
-
-  if (canDeleteActDirectly(act)) {
-    actions.push(`<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>`);
-    if (act.deletionRequest?.status === "pending") {
-      actions.push(`<button class="warning-button" type="button" data-approve-delete-act="${escapeHtml(act.practiceNumber)}">Autorizza elimina</button>`);
-    }
-  } else if (canRequestActDeletion(act)) {
-    if (act.deletionRequest?.status === "pending") {
-      actions.push('<span class="request-pending">Richiesta inviata</span>');
-    } else {
-      actions.push(`<button class="warning-button" type="button" data-request-delete-act="${escapeHtml(act.practiceNumber)}">Richiedi eliminazione</button>`);
-    }
-  }
+  const canModify = canModifyAct(act);
+  const canDelete = canDeleteActDirectly(act);
+  const actions = [
+    `<button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>`,
+    `<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}" ${canModify ? "" : "disabled"}>${archivedIncomplete ? "Riapri" : "Modifica"}</button>`,
+    `<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}" ${canDelete ? "" : "disabled"}>Elimina</button>`
+  ];
 
   return `
     <div class="row-actions">
       ${actions.join("")}
-      ${deletionRequestLabel(act) ? `<small>${escapeHtml(deletionRequestLabel(act))}</small>` : ""}
     </div>
   `;
 }
@@ -3957,7 +4024,7 @@ function archiveSearchValue(act, field) {
 }
 
 function selectedArchiveStore() {
-  return document.getElementById("archiveStoreFilter")?.value || "Busto Arsizio";
+  return document.getElementById("archiveStoreFilter")?.value || "Tutti";
 }
 
 function selectedFusionStore() {
@@ -3988,7 +4055,7 @@ function archiveVisibleActs() {
   const keyword = document.getElementById("searchKeyword")?.value.trim().toLowerCase() || "";
   if (state.searchActive && keyword) return state.lastSearchResults;
   return demoActs.filter((act) => {
-    const storeMatches = act.store === selectedStore;
+    const storeMatches = selectedStore === "Tutti" || act.store === selectedStore;
     const keywordMatches = !keyword || archiveSearchValue(act, field).includes(keyword);
     return storeMatches && keywordMatches;
   });
@@ -4014,39 +4081,57 @@ function renderArchiveGroups() {
   const visiblePageActs = acts.slice(start, start + state.archivePageSize);
 
   const grouped = visiblePageActs.reduce((groups, act) => {
+    const store = act.store || "Negozio non indicato";
     const { day, monthName } = dateParts(act.date);
-    groups[monthName] ||= {};
-    groups[monthName][day] ||= [];
-    groups[monthName][day].push(act);
+    groups[store] ||= {};
+    groups[store][monthName] ||= {};
+    groups[store][monthName][day] ||= [];
+    groups[store][monthName][day].push(act);
     return groups;
   }, {});
 
-  container.innerHTML = Object.entries(grouped).map(([month, days]) => `
-    <section class="archive-month">
-      <h3>${escapeHtml(month)}</h3>
-      ${archiveTotalsMarkup(archiveTotals(Object.values(days).flat()), "Mensile")}
-      ${Object.entries(days).map(([day, dayActs]) => `
-        <div class="archive-day">
-          <h4>Giorno ${escapeHtml(day)}</h4>
-          ${archiveTotalsMarkup(archiveTotals(dayActs), "Giornaliero")}
-          <div class="archive-table acts-table">
-            <div class="table-row head"><span>Pratica</span><span>Cliente</span><span>Operatore</span><span>Data</span><span>Stato</span><span>Controllo</span><span>Azioni</span></div>
-            ${dayActs.map((act) => `
-              <div class="table-row ${canViewActQuality(act) ? `${qualityReviewClass(act.qualityReview)}-row` : ""}">
-                <span>${escapeHtml(act.practiceNumber)}</span>
-                <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
-                <span>${escapeHtml(act.operatorUsername || act.operatorName || "Dato non inserito")}</span>
-                <span>${escapeHtml(act.date)}</span>
-                <em class="${statusClass(act.status)}">${escapeHtml(normalizeWorkflowStatus(act.status))}</em>
-                ${qualityReviewCellMarkup(act)}
-                ${archiveRowActionsMarkup(act)}
+  container.innerHTML = Object.entries(grouped).map(([store, months]) => {
+    const storeActs = Object.values(months).flatMap((days) => Object.values(days).flat());
+    return `
+      <section class="archive-month archive-store-group">
+        <h3>${escapeHtml(store)}</h3>
+        ${archiveTotalsMarkup(archiveTotals(storeActs), "Negozio")}
+        ${Object.entries(months).map(([month, days]) => `
+          <div class="archive-day">
+            <h4>${escapeHtml(month)}</h4>
+            ${archiveTotalsMarkup(archiveTotals(Object.values(days).flat()), "Mensile")}
+            ${Object.entries(days).map(([day, dayActs]) => `
+              <div class="archive-day-inner">
+                <h5>Giorno ${escapeHtml(day)}</h5>
+                ${archiveTotalsMarkup(archiveTotals(dayActs), "Giornaliero")}
+                <div class="archive-table acts-table">
+                  <div class="table-row head"><span>Pratica</span><span>Negozio</span><span>Cliente</span><span>Date</span><span>Stato</span><span>Totale</span><span>Operatore</span><span>Azioni</span></div>
+                  ${dayActs.map((act) => `
+                    <div class="table-row ${canViewActQuality(act) ? `${qualityReviewClass(act.qualityReview)}-row` : ""}">
+                      <span>
+                        ${escapeHtml(act.practiceNumber)}
+                        <small>${isCompletedWorkflowStatus(act.status) ? "Completato" : "Archiviato"}</small>
+                      </span>
+                      <span>${escapeHtml(act.store || "Dato non inserito")}</span>
+                      <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
+                      <span>
+                        <small>Creazione: ${escapeHtml(formatDateTime(act.createdAt || act.date))}</small>
+                        <small>Completamento: ${escapeHtml(formatDateTime(act.completedAt))}</small>
+                      </span>
+                      <em class="${statusClass(act.status)}">${escapeHtml(workflowStatusListLabel(act.status))}</em>
+                      <strong>${escapeHtml(formatEuro(Number(act.amount || 0)))}</strong>
+                      <span>${escapeHtml(act.operatorUsername || act.operatorName || "Dato non inserito")}</span>
+                      ${archiveRowActionsMarkup(act)}
+                    </div>
+                  `).join("")}
+                </div>
               </div>
             `).join("")}
           </div>
-        </div>
-      `).join("")}
-    </section>
-  `).join("") + archivePaginationMarkup(acts.length, totalPages);
+        `).join("")}
+      </section>
+    `;
+  }).join("") + archivePaginationMarkup(acts.length, totalPages);
 }
 
 function archivePaginationMarkup(total, totalPages) {
@@ -4278,13 +4363,10 @@ async function openArchivedAct(practiceNumber) {
   }
 
   previewTitle.textContent = `Atto di vendita ${act.practiceNumber}`;
-  const archivedIncomplete = workflowStatusCode(act.status) === "archived_incomplete";
   previewBody.innerHTML = `
     <div class="readonly-actions">
-      ${canModifyAct(act) ? `<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica atto</button>` : ""}
-      ${canModifyAct(act) && archivedIncomplete ? `<button class="complete-archive-button" type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Completa pratica</button>` : ""}
-      ${canDeleteActDirectly(act) ? `<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>` : ""}
-      ${canRequestActDeletion(act) ? `<button class="warning-button" type="button" data-request-delete-act="${escapeHtml(act.practiceNumber)}">Richiedi eliminazione</button>` : ""}
+      <button type="button" data-preview-act-print="${escapeHtml(act.practiceNumber)}" data-preview-print-scope="customer">Stampa copia cliente</button>
+      <button type="button" data-preview-act-print="${escapeHtml(act.practiceNumber)}" data-preview-print-scope="company">Stampa copia aziendale</button>
     </div>
     ${act.readOnlyHtml || buildArchivedActFallback(act)}
   `;
@@ -4353,21 +4435,26 @@ async function deleteAct(practiceNumber) {
     return;
   }
 
-  const confirmed = window.confirm(`Vuoi eliminare definitivamente l'atto ${practiceNumber}?`);
+  const confirmed = window.confirm(`Sei sicuro di voler eliminare definitivamente questo atto?\n\n${practiceNumber}`);
   if (!confirmed) return;
 
   try {
     await deleteActRecord(practiceNumber);
   } catch {
-    showToast("Eliminazione non riuscita: controlla la connessione al database.");
+    showToast("Impossibile eliminare l'atto.");
     return;
   }
   state.lastSearchResults = state.lastSearchResults.filter((act) => act.practiceNumber !== practiceNumber);
+  await Promise.allSettled([
+    loadArchiveScreenData({ force: true, silent: true }),
+    loadFusionScreenData({ force: true, silent: true }),
+    loadDashboard()
+  ]);
   renderArchiveGroups();
   renderFusionGroups();
 
   if (!previewModal.hidden) previewModal.hidden = true;
-  showToast(`Atto ${practiceNumber} eliminato.`);
+  showToast(`Atto ${practiceNumber} eliminato.`, "success");
 }
 
 async function approveDeleteAct(practiceNumber) {
@@ -4741,7 +4828,7 @@ async function resetCurrentPractice(options = {}) {
   renderAmlCashAlert();
   setQualityReview(null);
 
-  await setPracticeMeta();
+  await setPracticeMeta({ deferPracticeNumber: options.deferPracticeNumber });
   applyRolePermissions();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   renderStep();
@@ -5527,10 +5614,18 @@ async function refreshBullionVaultPrices(options = {}) {
   }
 }
 
-async function setPracticeMeta() {
+async function setPracticeMeta(options = {}) {
   const now = new Date();
   document.getElementById("practiceDate").value = now.toISOString().slice(0, 10);
   document.getElementById("practiceTime").value = now.toTimeString().slice(0, 5);
+  if (options.deferPracticeNumber) {
+    document.getElementById("practiceNumber").value = "";
+    document.getElementById("sidePracticeNumber").textContent = "In assegnazione";
+    updatePracticeNumber().catch(() => {
+      showToast("Numerazione atto momentaneamente non disponibile.");
+    });
+    return;
+  }
   await updatePracticeNumber();
 }
 
@@ -6429,6 +6524,11 @@ async function attachLegalSignatureMetadata(act) {
 
 async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   await refreshAmlCashCheck({ force: true });
+  if (!fieldValue("#practiceNumber")) await updatePracticeNumber();
+  if (!fieldValue("#practiceNumber")) {
+    showToast("Numerazione atto momentaneamente non disponibile.");
+    return false;
+  }
   if (normalizeWorkflowStatus(status) !== "Bozza" && notifyCashPaymentLimitIfNeeded({ force: true })) return false;
   const review = currentQualityReview();
   if (review?.status === "negative" && !review.feedback) {
@@ -6583,8 +6683,18 @@ document.getElementById("usersList").addEventListener("click", (event) => {
     previewGoalMessage(goalButton.dataset.goalMessage);
     return;
   }
+  const activityButton = event.target.closest("[data-user-activity]");
+  if (activityButton) {
+    showUserActivity(activityButton.dataset.userActivity);
+    return;
+  }
   const button = event.target.closest("[data-edit-user]");
-  if (button) editUser(button.dataset.editUser);
+  if (button) {
+    editUser(button.dataset.editUser);
+    return;
+  }
+  const deleteButton = event.target.closest("[data-delete-user]");
+  if (deleteButton) deleteUser(deleteButton.dataset.deleteUser);
 });
 document.getElementById("usersList").addEventListener("change", (event) => {
   const select = event.target.closest("[data-user-action]");
@@ -6810,9 +6920,9 @@ brandDropdown.querySelectorAll("button").forEach((button) => {
       return;
     }
     if (button.matches("[data-start-tutorial]")) return;
-    if (button.dataset.section === "practice") await resetCurrentPractice();
     if (!button.dataset.section) return;
     setScreen(button.dataset.section);
+    if (button.dataset.section === "practice") await resetCurrentPractice({ deferPracticeNumber: true });
     closeBrandMenu();
   });
 });
@@ -6986,6 +7096,7 @@ document.getElementById("practiceDate").addEventListener("change", async () => {
 });
 
 document.getElementById("archiveStoreFilter").addEventListener("change", async () => {
+  document.getElementById("archiveStoreFilter").dataset.userSelected = "true";
   state.archivePage = 1;
   state.searchActive = false;
   state.lastSearchResults = [];
@@ -7077,7 +7188,7 @@ document.getElementById("fusionGroups").addEventListener("click", (event) => {
   openArchivedAct(openButton.dataset.openAct);
 });
 
-previewBody.addEventListener("click", (event) => {
+previewBody.addEventListener("click", async (event) => {
   const triggerCapture = event.target.closest("[data-trigger-capture-key]");
   if (triggerCapture) {
     const input = document.querySelector(`.capture-card[data-capture-key="${cssEscape(triggerCapture.dataset.triggerCaptureKey)}"] input`);
@@ -7103,6 +7214,26 @@ previewBody.addEventListener("click", (event) => {
   const customerCopyAction = event.target.closest("[data-customer-copy-action]");
   if (customerCopyAction) {
     handleCustomerCopyAction(customerCopyAction.dataset.customerCopyAction);
+    return;
+  }
+  const previewActPrint = event.target.closest("[data-preview-act-print]");
+  if (previewActPrint) {
+    const practiceNumber = previewActPrint.dataset.previewActPrint;
+    const scope = previewActPrint.dataset.previewPrintScope || "company";
+    const act = await getActRecord(practiceNumber);
+    if (!act) {
+      showToast("Impossibile aprire l'atto selezionato.", "error");
+      return;
+    }
+    try {
+      await requestPdf(
+        "/pdf/act",
+        { title: `${scope === "customer" ? "Copia cliente" : "Copia aziendale"} ${act.practiceNumber}`, scope, act },
+        `${scope === "customer" ? "copia-cliente" : "copia-aziendale"}-${act.practiceNumber || "oroactive"}.pdf`
+      );
+    } catch (error) {
+      showToast(error.message || "PDF non generato.", "error");
+    }
     return;
   }
   const requestDeleteButton = event.target.closest("[data-request-delete-act]");

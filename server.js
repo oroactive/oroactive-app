@@ -228,6 +228,127 @@ function managedRolesForActor(actor) {
   return [];
 }
 
+function usersSameStore(actor = {}, target = {}) {
+  if (actor.negozio_id && target.negozio_id) return String(actor.negozio_id) === String(target.negozio_id);
+  return String(actor.negozio || "") === String(target.negozio || "");
+}
+
+function minimalPublicUser(row) {
+  const user = publicUser(row);
+  return {
+    id: user.id,
+    nome: user.nome,
+    cognome: user.cognome,
+    ruolo: user.ruolo,
+    negozio: user.negozio,
+    attivo: user.attivo,
+    last_seen: user.last_seen,
+    online: user.online,
+    stato_connessione: user.stato_connessione,
+    visibility: "minimal",
+    canEdit: false,
+    canDelete: false,
+    canViewActivity: false
+  };
+}
+
+function canViewUserRecord(actor, target) {
+  const actorRole = normalizeRole(actor?.ruolo);
+  const targetRole = normalizeRole(target?.ruolo);
+  if (String(actor?.id) === String(target?.id)) return true;
+  if (actorRole === "founder") return true;
+  if (actorRole === "supervisore") return targetRole !== "founder";
+  if (actorRole === "responsabile") {
+    return ["commesso", "aiuto_commesso"].includes(targetRole) && usersSameStore(actor, target);
+  }
+  if (actorRole === "commesso") {
+    const lastSeen = target?.last_seen ? new Date(target.last_seen) : null;
+    const online = Boolean(lastSeen && Date.now() - lastSeen.getTime() < 2 * 60 * 1000);
+    return online && ["commesso", "aiuto_commesso"].includes(targetRole) && usersSameStore(actor, target);
+  }
+  return false;
+}
+
+function canViewUserActivity(actor, target) {
+  const actorRole = normalizeRole(actor?.ruolo);
+  const targetRole = normalizeRole(target?.ruolo);
+  if (String(actor?.id) === String(target?.id)) return true;
+  if (actorRole === "founder") return true;
+  if (actorRole === "supervisore") return targetRole !== "founder";
+  if (actorRole === "responsabile") {
+    return ["commesso", "aiuto_commesso"].includes(targetRole) && usersSameStore(actor, target);
+  }
+  return false;
+}
+
+function publicUserForActor(row, actor) {
+  const actorRole = normalizeRole(actor?.ruolo);
+  const targetRole = normalizeRole(row?.ruolo);
+  const self = String(actor?.id) === String(row?.id);
+  if (actorRole === "commesso" && !self) return minimalPublicUser(row);
+  const user = publicUser(row);
+  user.visibility = "full";
+  user.canEdit = actorRole === "founder"
+    ? true
+    : canManageAccess(actor) && managedRolesForActor(actor).includes(targetRole) && targetRole !== "founder";
+  user.canDelete = user.canEdit && !self;
+  user.canViewActivity = canViewUserActivity(actor, row);
+  return user;
+}
+
+function logUserActivity(input = {}) {
+  const userId = input.userId || input.user_id;
+  if (!userId) return Promise.resolve();
+  return pool.query(
+    `INSERT INTO user_activity_logs
+      (user_id, actor_id, activity_type, entity_type, entity_id, description, metadata, created_at)
+     VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::text,$6::text,$7::jsonb,NOW())`,
+    [
+      userId,
+      input.actorId || input.actor_id || userId,
+      input.activityType || input.activity_type || "activity",
+      input.entityType || input.entity_type || null,
+      input.entityId || input.entity_id || null,
+      input.description || "",
+      sanitizeForPostgres(input.metadata || {})
+    ]
+  ).catch((error) => console.error("USER ACTIVITY LOG ERROR", error));
+}
+
+function activityLabel(type = "") {
+  return {
+    login: "Login",
+    logout: "Logout",
+    create_act: "Creazione atto",
+    update_act: "Modifica atto",
+    complete_act: "Completamento atto",
+    archive_act: "Archiviazione atto",
+    delete_act: "Eliminazione atto",
+    print_customer_copy: "Stampa copia cliente",
+    print_company_copy: "Stampa copia aziendale",
+    create_user: "Creazione utente",
+    update_user: "Modifica utente",
+    deactivate_user: "Disattivazione utente",
+    update_crm: "Modifica cliente CRM",
+    academy_course: "Creazione/modifica corso Academy",
+    operational_error: "Errore operativo"
+  }[type] || "Attività";
+}
+
+function publicActivity(row) {
+  return {
+    id: row.id,
+    type: row.activity_type,
+    label: activityLabel(row.activity_type),
+    entityType: row.entity_type || "",
+    entityId: row.entity_id || "",
+    description: row.description || activityLabel(row.activity_type),
+    metadata: row.metadata || {},
+    created_at: row.created_at,
+    actor: [row.actor_nome, row.actor_cognome].filter(Boolean).join(" ") || row.actor_username || row.actor_email || ""
+  };
+}
+
 function signUserToken(user) {
   return jwt.sign(
     {
@@ -1825,7 +1946,15 @@ function rowToAct(row, options = {}) {
     weight: payload.weight ?? row.peso_oro,
     amount: payload.amount ?? row.totale,
     paymentMethod: row.payment_method || payload.paymentMethod || "",
-    status: normalizeWorkflowStatus(row.status || payload.status || "archived_incomplete")
+    status: normalizeWorkflowStatus(row.status || payload.status || "archived_incomplete"),
+    createdAt: row.created_at || payload.createdAt || null,
+    completedAt: row.completed_at || payload.completedAt || null,
+    archivedAt: row.archived_at || payload.archivedAt || null,
+    deletedAt: row.deleted_at || payload.deletedAt || null,
+    deletedBy: row.deleted_by || payload.deletedBy || null,
+    operatorId: row.operatore_id || payload.operatorId || payload.operatore_id || null,
+    operatorUsername: row.operator_username || payload.operatorUsername || "",
+    operatorName: [row.operator_nome, row.operator_cognome].filter(Boolean).join(" ") || payload.operatorName || ""
   };
 }
 
@@ -2363,9 +2492,11 @@ async function listActs(query = {}, user = null) {
   values.push(offset);
   const offsetParameter = `$${values.length}`;
   const result = await pool.query(
-    `SELECT * FROM ${actsTable}
+    `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome
+     FROM ${actsTable} a
+     LEFT JOIN utenti u ON u.id = a.operatore_id
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-     ORDER BY data_atto DESC NULLS LAST, act_number DESC NULLS LAST, updated_at DESC
+     ORDER BY a.data_atto DESC NULLS LAST, a.act_number DESC NULLS LAST, a.updated_at DESC
      LIMIT ${limitParameter}::integer OFFSET ${offsetParameter}::integer`,
     values
   );
@@ -4931,6 +5062,19 @@ async function saveAct(input, user) {
       archivedAt
     ]
   );
+  void logUserActivity({
+    userId: user?.id,
+    actorId: user?.id,
+    activityType: ["completed", "archived_completed"].includes(statusCode)
+      ? "complete_act"
+      : statusCode === "archived_incomplete"
+        ? "archive_act"
+        : "create_act",
+    entityType: "atto",
+    entityId: result.rows[0].id,
+    description: `Atto ${act.practiceNumber} salvato`,
+    metadata: { practiceNumber: act.practiceNumber, status: statusCode, store: act.store }
+  });
   await saveDocumentIntegrityLog(act, result.rows[0].id, user);
   if (!isDraftLikeStatus(act.status)) await saveAmlAlert({ check: amlCheck, act, user, attoId: result.rows[0].id });
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
@@ -5042,6 +5186,19 @@ async function updateAct(identifier, input, user) {
     throw err;
   }
   if (!result.rowCount) return null;
+  void logUserActivity({
+    userId: user?.id,
+    actorId: user?.id,
+    activityType: ["completed", "archived_completed"].includes(normalizedStatus)
+      ? "complete_act"
+      : normalizedStatus === "archived_incomplete"
+        ? "archive_act"
+        : "update_act",
+    entityType: "atto",
+    entityId: result.rows[0].id,
+    description: `Atto ${act.practiceNumber} aggiornato`,
+    metadata: { practiceNumber: act.practiceNumber, status: normalizedStatus, store: act.store }
+  });
   await saveDocumentIntegrityLog(act, result.rows[0].id, user);
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
   if (client?.id) {
@@ -5075,12 +5232,24 @@ async function deleteAct(identifier, user) {
     `UPDATE ${actsTable}
      SET status = 'deleted',
          deleted_at = COALESCE(deleted_at, NOW()),
+         deleted_by = $2::bigint,
          updated_at = NOW(),
          payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('deletedBy', $2::bigint, 'deletedAt', NOW())
      WHERE id = $1::bigint
      RETURNING id`,
     [existing.id, user?.id || null]
   );
+  if (result.rowCount) {
+    void logUserActivity({
+      userId: user?.id,
+      actorId: user?.id,
+      activityType: "delete_act",
+      entityType: "atto",
+      entityId: existing.id,
+      description: `Atto ${existing.practice_number} eliminato`,
+      metadata: { practiceNumber: existing.practice_number, store: existing.store }
+    });
+  }
   return result.rowCount > 0;
 }
 
@@ -5170,6 +5339,15 @@ async function createUser(input, actor) {
       input.attivo !== false
     ]
   );
+  void logUserActivity({
+    userId: result.rows[0].id,
+    actorId: actor?.id,
+    activityType: "create_user",
+    entityType: "utente",
+    entityId: result.rows[0].id,
+    description: "Utente creato",
+    metadata: { role: finalRole, store: finalStore }
+  });
   return publicUser(result.rows[0]);
 }
 
@@ -5303,6 +5481,17 @@ async function updateUser(id, input, actor) {
      RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen`,
     values
   );
+  if (result.rowCount) {
+    void logUserActivity({
+      userId: result.rows[0].id,
+      actorId: actor?.id,
+      activityType: "update_user",
+      entityType: "utente",
+      entityId: result.rows[0].id,
+      description: "Utente aggiornato",
+      metadata: { changedFields: fields.map((field) => field.split(" = ")[0]) }
+    });
+  }
   return result.rowCount ? publicUser(result.rows[0]) : null;
 }
 
@@ -5316,45 +5505,81 @@ async function listUsers(options = {}) {
 
 async function listUsersForActor(actor) {
   const actorRole = normalizeRole(actor?.ruolo);
-  if (actorRole === "founder") return listUsers({ includeFounder: true });
-  if (actorRole === "supervisore") return listUsers();
-  const roles = managedRolesForActor(actor);
-  if (!roles.length) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
+  if (actorRole === "founder") {
+    const result = await pool.query(
+      "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti ORDER BY data_creazione DESC"
+    );
+    return result.rows.map((row) => publicUserForActor(row, actor));
   }
-  const values = [roles];
-  let where = "WHERE ruolo = ANY($1)";
-  if (actorRole === "responsabile" && !roleSeesAllStores(actor.ruolo)) {
-    values.push(actor.negozio_id || null, actor.negozio || "");
-    where += " AND (negozio_id = $2 OR negozio = $3)";
+  if (actorRole === "supervisore") {
+    const result = await pool.query(
+      "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti WHERE ruolo <> 'founder' ORDER BY data_creazione DESC"
+    );
+    return result.rows.map((row) => publicUserForActor(row, actor));
+  }
+  if (actorRole === "responsabile") {
+    const result = await pool.query(
+      `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen
+       FROM utenti
+       WHERE ruolo = ANY($1::text[])
+         AND (negozio_id = $2::bigint OR negozio = $3::text)
+       ORDER BY data_creazione DESC`,
+      [["commesso", "aiuto_commesso"], actor.negozio_id || null, actor.negozio || ""]
+    );
+    return result.rows.map((row) => publicUserForActor(row, actor));
+  }
+  if (actorRole === "commesso") {
+    const result = await pool.query(
+      `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen
+       FROM utenti
+       WHERE id = $1::bigint
+          OR (
+            ruolo = ANY($2::text[])
+            AND (negozio_id = $3::bigint OR negozio = $4::text)
+            AND last_seen >= NOW() - INTERVAL '2 minutes'
+          )
+       ORDER BY (id = $1::bigint) DESC, last_seen DESC NULLS LAST, data_creazione DESC`,
+      [actor.id, ["commesso", "aiuto_commesso"], actor.negozio_id || null, actor.negozio || ""]
+    );
+    return result.rows.map((row) => publicUserForActor(row, actor));
   }
   const result = await pool.query(
     `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen
-     FROM utenti ${where}
+     FROM utenti
+     WHERE id = $1::bigint
      ORDER BY data_creazione DESC`,
-    values
+    [actor.id]
   );
-  return result.rows.map(publicUser);
+  return result.rows.map((row) => publicUserForActor(row, actor));
 }
 
 async function getUserForActor(id, actor) {
   const target = await findUserRawById(id);
   if (!target) return null;
-  const actorRole = normalizeRole(actor?.ruolo);
-  const targetRole = normalizeRole(target.ruolo);
-  if (actorRole === "founder") return publicUser(target);
-  if (actorRole === "supervisore" && targetRole !== "founder") return publicUser(target);
-  if (actorRole === "responsabile") {
-    const sameStore = !actor?.negozio_id
-      ? String(target.negozio || "") === String(actor?.negozio || "")
-      : String(target.negozio_id || "") === String(actor.negozio_id);
-    if (sameStore && managedRolesForActor(actor).includes(targetRole)) return publicUser(target);
-  }
+  if (canViewUserRecord(actor, target)) return publicUserForActor(target, actor);
   const error = new Error("Non autorizzato");
   error.status = 403;
   throw error;
+}
+
+async function listUserActivitiesForActor(id, actor) {
+  const target = await findUserRawById(id);
+  if (!target) return null;
+  if (!canViewUserActivity(actor, target)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `SELECT l.*, a.nome AS actor_nome, a.cognome AS actor_cognome, a.username AS actor_username, a.email AS actor_email
+     FROM user_activity_logs l
+     LEFT JOIN utenti a ON a.id = l.actor_id
+     WHERE l.user_id = $1::bigint
+     ORDER BY l.created_at DESC
+     LIMIT 100`,
+    [id]
+  );
+  return result.rows.map(publicActivity);
 }
 
 async function deleteUser(id, actor) {
@@ -5372,6 +5597,16 @@ async function deleteUser(id, actor) {
   }
   assertCanManageTarget(actor, target);
   const result = await pool.query("UPDATE utenti SET attivo = FALSE, updated_at = NOW() WHERE id = $1::bigint RETURNING id", [id]);
+  if (result.rowCount) {
+    void logUserActivity({
+      userId: id,
+      actorId: actor?.id,
+      activityType: "deactivate_user",
+      entityType: "utente",
+      entityId: id,
+      description: "Utente disattivato"
+    });
+  }
   return result.rowCount > 0;
 }
 
@@ -5399,6 +5634,14 @@ async function loginUser(identifier, password) {
   await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
   user.last_seen = new Date();
   const safeUser = publicUser(user);
+  void logUserActivity({
+    userId: user.id,
+    actorId: user.id,
+    activityType: "login",
+    entityType: "sessione",
+    entityId: user.id,
+    description: "Login effettuato"
+  });
   return { token: signUserToken(safeUser), user: safeUser };
 }
 
@@ -5431,7 +5674,22 @@ async function loginWithFaceId(identifier, credentialId) {
   await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
   user.last_seen = new Date();
   const safeUser = publicUser(user);
+  void logUserActivity({
+    userId: user.id,
+    actorId: user.id,
+    activityType: "login",
+    entityType: "sessione",
+    entityId: user.id,
+    description: "Login Face ID effettuato"
+  });
   return { token: signUserToken(safeUser), user: safeUser };
+}
+
+async function userFromAuthorizationHeader(header = "") {
+  const [, token] = String(header || "").match(/^Bearer\s+(.+)$/i) || [];
+  if (!token) return null;
+  const decoded = jwt.verify(token, jwtSecret);
+  return findUserById(decoded.sub);
 }
 
 app.get("/api/health", (_request, response) => {
@@ -5468,7 +5726,22 @@ app.post("/api/auth/faceid/login", async (request, response, next) => {
   }
 });
 
-app.post("/api/auth/logout", (_request, response) => {
+app.post("/api/auth/logout", async (request, response) => {
+  try {
+    const user = await userFromAuthorizationHeader(request.headers.authorization);
+    if (user?.id) {
+      void logUserActivity({
+        userId: user.id,
+        actorId: user.id,
+        activityType: "logout",
+        entityType: "sessione",
+        entityId: user.id,
+        description: "Logout effettuato"
+      });
+    }
+  } catch {
+    // Il logout deve sempre pulire la sessione locale anche se il token non e piu valido.
+  }
   response.json({ ok: true });
 });
 
@@ -6387,7 +6660,7 @@ app.post("/api/auth/faceid/register", async (request, response, next) => {
   }
 });
 
-app.get(["/api/utenti", "/api/users"], requireAdmin, async (_request, response, next) => {
+app.get(["/api/utenti", "/api/users"], async (_request, response, next) => {
   try {
     response.json(await listUsersForActor(_request.user));
   } catch (error) {
@@ -6395,7 +6668,17 @@ app.get(["/api/utenti", "/api/users"], requireAdmin, async (_request, response, 
   }
 });
 
-app.get(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, response, next) => {
+app.get(["/api/utenti/:id/activity", "/api/users/:id/activity"], async (request, response, next) => {
+  try {
+    const activities = await listUserActivitiesForActor(request.params.id, request.user);
+    if (!activities) return response.status(404).json({ error: "Utente non trovato" });
+    response.json({ activities });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get(["/api/utenti/:id", "/api/users/:id"], async (request, response, next) => {
   try {
     const user = await getUserForActor(request.params.id, request.user);
     if (!user) return response.status(404).json({ error: "Utente non trovato" });
@@ -6876,6 +7159,17 @@ function buildPdfForActs(response, { title = "Atto di vendita OroActive", subtit
 
 app.post("/api/pdf/act", async (request, response, next) => {
   try {
+    const scope = request.body.scope || "company";
+    const act = request.body.act || {};
+    void logUserActivity({
+      userId: request.user?.id,
+      actorId: request.user?.id,
+      activityType: scope === "customer" ? "print_customer_copy" : "print_company_copy",
+      entityType: "atto",
+      entityId: act.id || act.practiceNumber || null,
+      description: scope === "customer" ? "Stampa copia cliente" : "Stampa copia aziendale",
+      metadata: { practiceNumber: act.practiceNumber || "", scope }
+    });
     buildPdfForActs(response, { title: request.body.title || "Atto di vendita OroActive", scope: request.body.scope || "company", acts: [request.body.act || {}] });
   } catch (error) {
     next(error);

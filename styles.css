@@ -2605,7 +2605,7 @@ input.document-expired {
 }
 
 .acts-table .table-row {
-  grid-template-columns: 1fr 1fr 0.85fr 0.7fr 0.72fr 0.78fr 0.7fr;
+  grid-template-columns: 0.95fr 0.8fr 1fr 1fr 0.72fr 0.72fr 0.85fr 0.9fr;
 }
 
 .acts-table .quality-positive-row {
@@ -2617,7 +2617,7 @@ input.document-expired {
 }
 
 .users-table .table-row {
-  grid-template-columns: 1fr 1.05fr 0.75fr 0.75fr 0.62fr 1.15fr 0.7fr;
+  grid-template-columns: 1fr 1.05fr 0.75fr 0.75fr 0.9fr 1.05fr 0.9fr;
 }
 
 .users-table .table-row strong,
@@ -2636,6 +2636,26 @@ input.document-expired {
 #saveUserButton:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.activity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.activity-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 5px;
+  background: #fff;
+}
+
+.activity-row strong,
+.activity-row span,
+.activity-row small {
+  overflow-wrap: anywhere;
 }
 
 .stats-table .table-row {
@@ -3063,6 +3083,11 @@ button.quality-review-badge {
 
 .row-actions button {
   flex: 1 1 90px;
+}
+
+.row-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .danger-button {

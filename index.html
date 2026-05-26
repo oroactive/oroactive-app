@@ -46,7 +46,7 @@
       <button class="main-user-button" id="mainUserMenuButton" type="button" aria-expanded="false" aria-controls="mainUserDropdown">Utente</button>
       <div class="main-user-dropdown" id="mainUserDropdown" hidden>
         <button type="button" data-user-profile>Dati utente</button>
-        <button class="admin-only" type="button" data-user-users>Utenti</button>
+        <button class="user-directory-only" type="button" data-user-users>Utenti</button>
         <button type="button" data-user-logout>Logout</button>
       </div>
     </div>
@@ -931,15 +931,15 @@
         </div>
       </section>
 
-      <section id="users" class="screen admin-only">
+      <section id="users" class="screen user-directory-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="settings-grid">
           <div>
-            <p class="eyebrow">Amministrazione</p>
-            <h2>Utenti e negozi</h2>
-            <p class="muted">Gestisci accessi, ruoli e negozi assegnati.</p>
+            <p class="eyebrow">Utenti</p>
+            <h2>Utenti e attività</h2>
+            <p class="muted">Visualizza utenti, presenza e attività in base al tuo ruolo.</p>
           </div>
-          <form class="settings-list" id="userForm">
+          <form class="settings-list admin-only" id="userForm">
             <input type="hidden" id="userId">
             <label>Nome <input id="userName" required></label>
             <label>Cognome <input id="userSurname" required></label>

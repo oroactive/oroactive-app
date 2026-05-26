@@ -164,7 +164,11 @@ test("sezione utenti usa endpoint e messaggi propri", async () => {
   const userBackendBlock = server.slice(createUserStart, updateUserEnd);
 
   assert.match(server, /app\.get\(\["\/api\/utenti", "\/api\/users"\]/);
+  assert.match(server, /listUsersForActor/);
+  assert.match(server, /minimalPublicUser/);
+  assert.match(server, /last_seen >= NOW\(\) - INTERVAL '2 minutes'/);
   assert.match(server, /app\.get\(\["\/api\/utenti\/:id", "\/api\/users\/:id"\]/);
+  assert.match(server, /app\.get\(\["\/api\/utenti\/:id\/activity", "\/api\/users\/:id\/activity"\]/);
   assert.match(server, /app\.post\(\["\/api\/utenti", "\/api\/users"\]/);
   assert.match(server, /app\.put\(\["\/api\/utenti\/:id", "\/api\/users\/:id"\]/);
   assert.match(server, /app\.patch\(\["\/api\/utenti\/:id", "\/api\/users\/:id"\]/);
@@ -176,10 +180,56 @@ test("sezione utenti usa endpoint e messaggi propri", async () => {
   assert.doesNotMatch(userBackendBlock, /practiceNumber|Numero atto/);
   assert.match(app, /Utente creato correttamente/);
   assert.match(app, /Utente aggiornato correttamente/);
+  assert.match(app, /data-user-activity/);
+  assert.match(app, /Nessuna attività registrata/);
+  assert.match(app, /displayMenuUserName/);
   assert.match(app, /userSaveErrorMessage/);
   assert.doesNotMatch(saveUserBlock, /Numero atto|numerazione della pratica/);
   assert.match(saveUserBlock, /saveButton\.disabled = true/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS user_activity_logs/);
   assert.match(schema, /ALTER TABLE utenti ADD COLUMN IF NOT EXISTS updated_at/);
+});
+
+test("elenco atti ha solo apri modifica riapri elimina e query operative escludono eliminati", async () => {
+  const [app, server, schema] = await Promise.all([
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql")
+  ]);
+  const actionsStart = app.indexOf("function archiveRowActionsMarkup");
+  const actionsEnd = app.indexOf("function dateParts", actionsStart);
+  const actionsBlock = app.slice(actionsStart, actionsEnd);
+  const archiveRenderStart = app.indexOf("function renderArchiveGroups");
+  const archiveRenderEnd = app.indexOf("function archivePaginationMarkup", archiveRenderStart);
+  const archiveRenderBlock = app.slice(archiveRenderStart, archiveRenderEnd);
+
+  assert.match(actionsBlock, /data-open-act/);
+  assert.match(actionsBlock, /data-edit-act/);
+  assert.match(actionsBlock, /data-delete-act/);
+  assert.doesNotMatch(actionsBlock, /Completa pratica|approve-delete|request-delete/);
+  assert.match(archiveRenderBlock, /Pratica<\/span><span>Negozio<\/span><span>Cliente<\/span><span>Date<\/span><span>Stato<\/span><span>Totale<\/span><span>Operatore<\/span><span>Azioni/);
+  assert.match(archiveRenderBlock, /workflowStatusListLabel/);
+  assert.match(app, /Sei sicuro di voler eliminare definitivamente questo atto/);
+  assert.match(app, /loadDashboard\(\)/);
+  assert.match(server, /deleted_by = \$2::bigint/);
+  assert.match(server, /realCompletedStatusSql\("a"\)/);
+  assert.match(server, /visibleRealActStatusSql/);
+  assert.match(schema, /ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS deleted_by/);
+});
+
+test("nuovo atto si apre senza attendere la numerazione remota", async () => {
+  const app = await file("app.js");
+  const enterStart = app.indexOf("async function enterSectionFromMainMenu");
+  const enterEnd = app.indexOf("async function clearPracticeForFreshStart", enterStart);
+  const enterBlock = app.slice(enterStart, enterEnd);
+  const metaStart = app.indexOf("async function setPracticeMeta");
+  const metaEnd = app.indexOf("async function updatePracticeNumber", metaStart);
+  const metaBlock = app.slice(metaStart, metaEnd);
+
+  assert.match(enterBlock, /setScreen\(section\);[\s\S]*clearPracticeForFreshStart\(\{ deferPracticeNumber: true \}\)/);
+  assert.match(metaBlock, /deferPracticeNumber/);
+  assert.match(metaBlock, /In assegnazione/);
+  assert.match(app, /if \(!fieldValue\("#practiceNumber"\)\) await updatePracticeNumber\(\)/);
 });
 
 test("errori database sono separati per modulo", async () => {

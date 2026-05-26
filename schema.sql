@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS atti_vendita (
   completed_at TIMESTAMPTZ,
   archived_at TIMESTAMPTZ,
   deleted_at TIMESTAMPTZ,
+  deleted_by BIGINT,
   abandoned_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -49,6 +50,7 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS payload JSONB DEFAULT '{}'::js
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS deleted_by BIGINT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS abandoned_at TIMESTAMPTZ;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
@@ -299,6 +301,24 @@ CREATE INDEX IF NOT EXISTS audit_logs_user_created_idx
 
 CREATE INDEX IF NOT EXISTS audit_logs_route_created_idx
   ON audit_logs (route, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_activity_logs (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT,
+  actor_id BIGINT,
+  activity_type TEXT NOT NULL,
+  entity_type TEXT,
+  entity_id TEXT,
+  description TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS user_activity_logs_user_created_idx
+  ON user_activity_logs (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS user_activity_logs_actor_created_idx
+  ON user_activity_logs (actor_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS fusion_lots (
   id BIGSERIAL PRIMARY KEY,
