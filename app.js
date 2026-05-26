@@ -4383,8 +4383,8 @@ async function saveQualityReview() {
     if (isAdmin()) await loadUsers();
     showToast(review.status === "positive" ? "Controllo qualità positivo salvato." : "Controllo qualità negativo salvato.");
     return true;
-  } catch {
-    showToast("Controllo qualità non salvato: controlla la connessione al database.");
+  } catch (error) {
+    showToast(error.message || "Controllo qualità non salvato: controlla la connessione al database.", "error");
     return false;
   }
 }
@@ -6360,7 +6360,7 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   } catch (error) {
-    showToast("Errore nel salvataggio dell'atto. Controllare i campi compilati.", "error");
+    showToast(error.message || "Errore nel salvataggio dell'atto.", "error");
     return false;
   }
   state.editingDirty = false;
