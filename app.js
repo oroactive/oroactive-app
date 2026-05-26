@@ -3534,17 +3534,36 @@ async function showUserStatistics(id) {
 function normalizeWorkflowStatus(status = "Archiviata") {
   if (typeof status !== "string") return "Archiviata";
   const normalized = status.trim().toLowerCase();
-  if (normalized === "completato" || normalized === "completata") return "Completato";
-  if (normalized === "bozza") return "Bozza";
-  if (normalized === "archiviato" || normalized === "archiviata") return "Archiviata";
+  if (["completed", "completato", "completata"].includes(normalized)) return "Completato";
+  if (["archived_completed", "archiviato completato", "archiviata completata"].includes(normalized)) return "Archiviato completato";
+  if (["draft", "bozza"].includes(normalized)) return "Bozza";
+  if (["archived_incomplete", "archived", "archiviato", "archiviata", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "Archiviato incompleto";
+  if (["deleted", "eliminato", "eliminata"].includes(normalized)) return "Eliminato";
+  if (["abandoned", "abbandonato", "abbandonata"].includes(normalized)) return "Abbandonato";
   return "Archiviata";
 }
 
+function workflowStatusCode(status = "") {
+  const label = normalizeWorkflowStatus(status);
+  if (label === "Completato") return "completed";
+  if (label === "Archiviato completato") return "archived_completed";
+  if (label === "Bozza") return "draft";
+  if (label === "Archiviato incompleto" || label === "Archiviata") return "archived_incomplete";
+  if (label === "Eliminato") return "deleted";
+  if (label === "Abbandonato") return "abandoned";
+  return "archived_incomplete";
+}
+
+function isCompletedWorkflowStatus(status = "") {
+  return ["completed", "archived_completed"].includes(workflowStatusCode(status));
+}
+
 function statusClass(status = "") {
-  const normalized = normalizeWorkflowStatus(status).toLowerCase();
-  if (normalized === "completato" || normalized === "completata") return "status-completed";
-  if (normalized === "bozza") return "status-draft";
-  if (normalized === "archiviato" || normalized === "archiviata") return "status-archived";
+  const normalized = workflowStatusCode(status);
+  if (normalized === "completed" || normalized === "archived_completed") return "status-completed";
+  if (normalized === "draft") return "status-draft";
+  if (normalized === "archived_incomplete") return "status-archived";
+  if (normalized === "deleted" || normalized === "abandoned") return "status-deleted";
   return "";
 }
 
@@ -3599,9 +3618,13 @@ function deletionRequestLabel(act) {
 }
 
 function archiveRowActionsMarkup(act) {
+  const archivedIncomplete = workflowStatusCode(act.status) === "archived_incomplete";
   const actions = [`<button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>`];
   if (canModifyAct(act)) {
-    actions.push(`<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>`);
+    actions.push(`<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">${archivedIncomplete ? "Riapri" : "Modifica"}</button>`);
+    if (archivedIncomplete) {
+      actions.push(`<button class="primary-button" type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Completa pratica</button>`);
+    }
   }
 
   if (canDeleteActDirectly(act)) {
@@ -3634,8 +3657,9 @@ function dateParts(date) {
 }
 
 function archiveTotals(acts) {
-  const weight = acts.reduce((sum, act) => sum + actWeightAmount(act), 0);
-  const spent = acts.reduce((sum, act) => sum + actSpentAmount(act), 0);
+  const completedActs = acts.filter((act) => isCompletedWorkflowStatus(act.status));
+  const weight = completedActs.reduce((sum, act) => sum + actWeightAmount(act), 0);
+  const spent = completedActs.reduce((sum, act) => sum + actSpentAmount(act), 0);
   return {
     weight,
     spent,
@@ -3873,7 +3897,7 @@ function currentActSnapshot(status = "Archiviata") {
     signatures: [...state.signatures],
     signatureImages: signatureImages(),
     captures,
-    status: normalizeWorkflowStatus(status)
+    status: workflowStatusCode(status)
   };
 }
 
@@ -4398,7 +4422,7 @@ async function saveQualityReview() {
 
   const updatedAct = currentActSnapshot(existing.status || "Archiviata");
   updatedAct.id = existing.id;
-  updatedAct.status = normalizeWorkflowStatus(existing.status || updatedAct.status);
+  updatedAct.status = workflowStatusCode(existing.status || updatedAct.status);
   updatedAct.operatorId = existing.operatorId ?? updatedAct.operatorId;
   updatedAct.operatorUsername = existing.operatorUsername || updatedAct.operatorUsername;
   updatedAct.operatorName = existing.operatorName || updatedAct.operatorName;
@@ -6368,7 +6392,18 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
     showToast("Inserisci il feedback scritto per il controllo qualità negativo.");
     return false;
   }
-  const isCompletion = status === "Completato";
+  const requestedStatus = workflowStatusCode(status);
+  const hasCompleteData = validatePrintScope("company").length === 0;
+  const targetStatus = requestedStatus === "completed"
+    ? "completed"
+    : requestedStatus === "archived_completed"
+      ? "archived_completed"
+      : requestedStatus === "draft"
+        ? "draft"
+        : hasCompleteData
+          ? "archived_completed"
+          : "archived_incomplete";
+  const isCompletion = ["completed", "archived_completed"].includes(targetStatus);
   const missing = isCompletion ? validatePrintScope("company") : [];
   if (isCompletion && missing.length && !options.skipValidation) {
     showToast(validationMessage(missing, "la copia aziendale"));
@@ -6381,7 +6416,7 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
       || act.practiceNumber === state.editingPracticeNumber
     ))
     : null;
-  let archivedAct = currentActSnapshot(status);
+  let archivedAct = currentActSnapshot(targetStatus);
   if (originalAct) {
     archivedAct.operatorId = originalAct.operatorId ?? archivedAct.operatorId;
     archivedAct.operatorUsername = originalAct.operatorUsername || archivedAct.operatorUsername;
@@ -6407,7 +6442,16 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
     }
   }
   if (wasEditing && options.destination === "menu") mainMenuScreen.hidden = false;
-  showToast(wasEditing ? "Atto di vendita modificato e salvato." : `Atto di vendita ${status.toLowerCase()} e salvato.`, "success");
+  const successMessage = targetStatus === "archived_incomplete"
+    ? "Atto archiviato. Puoi riaprirlo e completarlo dall'elenco."
+    : targetStatus === "archived_completed"
+      ? "Atto completato e archiviato correttamente."
+      : targetStatus === "completed"
+        ? "Atto completato correttamente."
+        : wasEditing
+          ? "Atto di vendita modificato e salvato."
+          : "Atto di vendita salvato.";
+  showToast(wasEditing && targetStatus !== "archived_incomplete" ? "Atto di vendita modificato e salvato." : successMessage, "success");
   return true;
 }
 
@@ -6461,7 +6505,7 @@ async function completeCurrentPractice() {
         return false;
       }
     }
-    return archiveCurrentPractice("Completato");
+    return archiveCurrentPractice("completed");
   }
 
   const preview = missing.slice(0, 8).join(", ");
@@ -6471,7 +6515,7 @@ async function completeCurrentPractice() {
   );
 
   if (shouldArchive) {
-    await archiveCurrentPractice("Archiviata");
+    await archiveCurrentPractice("archived_incomplete");
     showToast("Atto di vendita archiviato. Potrai completarlo da Elenco.");
     return true;
   }

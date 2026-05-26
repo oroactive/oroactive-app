@@ -2886,6 +2886,12 @@ input.document-expired {
   border: 1px solid rgba(255, 115, 28, 0.32);
 }
 
+.table-row em.status-deleted,
+.archive-export-row em.status-deleted {
+  background: #f2f2f2;
+  color: #777;
+}
+
 .table-row em.quality-review-badge {
   justify-self: start;
   font-weight: 950;

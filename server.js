@@ -434,27 +434,42 @@ function redactedActPayloadForLog(act = {}) {
   };
 }
 
-function normalizeWorkflowStatus(status = "Archiviata") {
-  if (typeof status !== "string") return "Archiviata";
+function normalizeWorkflowStatus(status = "archived_incomplete") {
+  if (typeof status !== "string") return "archived_incomplete";
   const normalized = status.trim().toLowerCase();
-  if (["completed", "complete", "completato", "completata"].includes(normalized)) return "Completato";
-  if (["draft", "bozza", "in bozza"].includes(normalized)) return "Bozza";
-  if (["archived", "archiviato", "archiviata"].includes(normalized)) return "Archiviata";
-  if (["deleted", "eliminato", "eliminata", "cancellato", "cancellata"].includes(normalized)) return "Deleted";
-  if (["abandoned", "abbandonato", "abbandonata"].includes(normalized)) return "Abandoned";
-  return "Archiviata";
+  if (["completed", "complete", "completato", "completata"].includes(normalized)) return "completed";
+  if (["archived_completed", "archiviato completato", "archiviata completata"].includes(normalized)) return "archived_completed";
+  if (["draft", "bozza", "in bozza"].includes(normalized)) return "draft";
+  if (["archived_incomplete", "archived", "archiviato", "archiviata", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "archived_incomplete";
+  if (["deleted", "eliminato", "eliminata", "cancellato", "cancellata"].includes(normalized)) return "deleted";
+  if (["abandoned", "abbandonato", "abbandonata"].includes(normalized)) return "abandoned";
+  return "archived_incomplete";
 }
 
 function realCompletedStatusSql(alias = "") {
   const prefix = alias ? `${alias}.` : "";
-  return `(COALESCE(${prefix}status, '') ILIKE 'Completato'
+  return `(COALESCE(${prefix}status, '') ILIKE 'completed'
+      OR COALESCE(${prefix}status, '') ILIKE 'Completato'
+      OR COALESCE(${prefix}status, '') ILIKE 'archived_completed'
       OR (COALESCE(${prefix}status, '') ILIKE 'Archiviata' AND ${prefix}completed_at IS NOT NULL))
     AND ${prefix}deleted_at IS NULL
-    AND COALESCE(${prefix}completed_at, ${prefix}updated_at, ${prefix}created_at) IS NOT NULL`;
+    AND ${prefix}completed_at IS NOT NULL`;
 }
 
 function visibleRealActStatusSql(alias = "") {
-  return realCompletedStatusSql(alias);
+  const prefix = alias ? `${alias}.` : "";
+  return `${prefix}deleted_at IS NULL
+    AND COALESCE(${prefix}status, '') NOT ILIKE 'draft'
+    AND COALESCE(${prefix}status, '') NOT ILIKE 'Bozza'
+    AND COALESCE(${prefix}status, '') NOT ILIKE 'deleted'
+    AND COALESCE(${prefix}status, '') NOT ILIKE 'Deleted'
+    AND COALESCE(${prefix}status, '') NOT ILIKE 'abandoned'
+    AND COALESCE(${prefix}status, '') NOT ILIKE 'Abandoned'
+    AND (
+      ${realCompletedStatusSql(alias)}
+      OR COALESCE(${prefix}status, '') ILIKE 'archived_incomplete'
+      OR (COALESCE(${prefix}status, '') ILIKE 'Archiviata' AND ${prefix}completed_at IS NULL)
+    )`;
 }
 
 function normalizeFiscalCode(value = "") {
@@ -462,7 +477,7 @@ function normalizeFiscalCode(value = "") {
 }
 
 function isCompletedAct(rowOrAct = {}) {
-  return normalizeWorkflowStatus(rowOrAct.status || rowOrAct.payload?.status) === "Completato";
+  return ["completed", "archived_completed"].includes(normalizeWorkflowStatus(rowOrAct.status || rowOrAct.payload?.status));
 }
 
 function isValidIban(value = "") {
@@ -1607,7 +1622,7 @@ function normalizeAct(input = {}, existing = null) {
   const oroWeight = materialWeight(payload, "Oro") || numberFrom(input.peso_oro ?? existing?.peso_oro);
   const totale = numberFrom(input.amount ?? input.totale ?? existing?.totale);
   const paymentMethod = input.paymentMethod || existing?.payment_method || "";
-  const normalizedStatus = normalizeWorkflowStatus(input.status || existing?.status || "Archiviata");
+  const normalizedStatus = normalizeWorkflowStatus(input.status || existing?.status || "archived_incomplete");
   if (String(paymentMethod).toLowerCase().includes("contanti") && totale > 500 && !isDraftLikeStatus(normalizedStatus)) {
     const error = new Error("Il pagamento in contanti non puo superare 500 euro. Seleziona Bonifico o Assegno come pagamento a norma di legge.");
     error.status = 400;
@@ -1648,7 +1663,7 @@ function isCashPaymentMethod(method = "") {
 
 function isDraftLikeStatus(status = "") {
   const normalized = normalizeWorkflowStatus(status).toLowerCase();
-  return ["bozza", "annullata", "deleted", "abandoned"].includes(normalized);
+  return ["draft", "annullata", "deleted", "abandoned"].includes(normalized);
 }
 
 function amlMessage(ok) {
@@ -1809,7 +1824,7 @@ function rowToAct(row, options = {}) {
     weight: payload.weight ?? row.peso_oro,
     amount: payload.amount ?? row.totale,
     paymentMethod: row.payment_method || payload.paymentMethod || "",
-    status: normalizeWorkflowStatus(row.status || payload.status || "Archiviata")
+    status: normalizeWorkflowStatus(row.status || payload.status || "archived_incomplete")
   };
 }
 
@@ -2272,7 +2287,7 @@ function buildActsQuery({ store, field, q, fusionEligible, includeDrafts } = {},
   const shouldIncludeDrafts = includeDrafts === true || includeDrafts === "true";
 
   if (shouldIncludeDrafts) {
-    where.push("deleted_at IS NULL AND COALESCE(status, '') NOT ILIKE 'Deleted' AND COALESCE(status, '') NOT ILIKE 'Abandoned'");
+    where.push("deleted_at IS NULL AND COALESCE(status, '') NOT ILIKE 'deleted' AND COALESCE(status, '') NOT ILIKE 'Deleted' AND COALESCE(status, '') NOT ILIKE 'abandoned' AND COALESCE(status, '') NOT ILIKE 'Abandoned'");
   } else {
     where.push(visibleRealActStatusSql());
   }
@@ -2362,7 +2377,7 @@ async function nextActNumber(storeCode, year) {
        FROM ${actsTable}
        WHERE COALESCE(codice_negozio, store_code) = $1::text
          AND act_year = $2::integer
-         AND ${realCompletedStatusSql()}
+         AND ${visibleRealActStatusSql()}
          AND COALESCE(numero_atto_negozio, act_number) IS NOT NULL
      ),
      candidates AS (
@@ -2729,7 +2744,7 @@ async function dashboardKpis(user = {}) {
     return groups;
   }, {});
   const estimatedMargin = (rows) => sum(rows, (act) => act.amount) * 0.08;
-  const incomplete = acts.filter((act) => normalizeWorkflowStatus(act.status) !== "Completato").length;
+  const incomplete = acts.filter((act) => !["completed", "archived_completed"].includes(normalizeWorkflowStatus(act.status))).length;
   const expiredDocuments = acts.filter((act) => act.documentExpiry && new Date(act.documentExpiry) < new Date()).length;
   const missingUploads = acts.filter((act) => !Array.isArray(act.captureAttachments) || act.captureAttachments.length < 2).length;
   const fusedActs = acts.filter((act) => act.fusion?.fused);
@@ -4807,6 +4822,7 @@ function quoteForMetal(act = {}, metal = "Oro") {
 
 async function stockActs(query = {}, user = null) {
   const { where, values } = buildActsQuery({ store: query.negozio_id || query.store || query.negozio }, user);
+  where.push(realCompletedStatusSql());
   where.push("COALESCE((payload->'fusion'->>'fused')::boolean, false) = false");
   const result = await pool.query(
     `SELECT * FROM ${actsTable}
@@ -4867,8 +4883,9 @@ async function saveAct(input, user) {
   const act = await enrichActStore(normalizeAct(protectedInput, existing), user);
   const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing);
   const nowIso = new Date().toISOString();
-  const completedAt = normalizeWorkflowStatus(act.status) === "Completato" ? nowIso : null;
-  const archivedAt = normalizeWorkflowStatus(act.status) === "Archiviata" ? nowIso : null;
+  const statusCode = normalizeWorkflowStatus(act.status);
+  const completedAt = ["completed", "archived_completed"].includes(statusCode) ? nowIso : null;
+  const archivedAt = ["archived_incomplete", "archived_completed"].includes(statusCode) ? nowIso : null;
   const result = await pool.query(
     `INSERT INTO ${actsTable} (
       cliente_nome, cliente_cognome, codice_fiscale, telefono,
@@ -4998,19 +5015,19 @@ async function updateAct(identifier, input, user) {
         numero_atto_negozio = $21::integer,
         operatore_id = $22::bigint,
         completed_at = CASE
-          WHEN $23::text = 'Completato' THEN COALESCE(completed_at, NOW())
+          WHEN $23::text IN ('completed', 'archived_completed') THEN COALESCE(completed_at, NOW())
           ELSE completed_at
         END,
         archived_at = CASE
-          WHEN $23::text = 'Archiviata' THEN COALESCE(archived_at, NOW())
+          WHEN $23::text IN ('archived_incomplete', 'archived_completed') THEN COALESCE(archived_at, NOW())
           ELSE archived_at
         END,
         deleted_at = CASE
-          WHEN $23::text = 'Deleted' THEN COALESCE(deleted_at, NOW())
+          WHEN $23::text = 'deleted' THEN COALESCE(deleted_at, NOW())
           ELSE deleted_at
         END,
         abandoned_at = CASE
-          WHEN $23::text = 'Abandoned' THEN COALESCE(abandoned_at, NOW())
+          WHEN $23::text = 'abandoned' THEN COALESCE(abandoned_at, NOW())
           ELSE abandoned_at
         END,
         updated_at = NOW()
@@ -5054,7 +5071,7 @@ async function deleteAct(identifier, user) {
   }
   const result = await pool.query(
     `UPDATE ${actsTable}
-     SET status = 'Deleted',
+     SET status = 'deleted',
          deleted_at = COALESCE(deleted_at, NOW()),
          updated_at = NOW(),
          payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('deletedBy', $2::bigint, 'deletedAt', NOW())

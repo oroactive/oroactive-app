@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS atti_vendita (
   act_year INTEGER,
   act_number INTEGER,
   payment_method TEXT,
-  status TEXT DEFAULT 'Archiviata',
+  status TEXT DEFAULT 'archived_incomplete',
   payload JSONB DEFAULT '{}'::jsonb,
   completed_at TIMESTAMPTZ,
   archived_at TIMESTAMPTZ,
@@ -38,7 +38,7 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS store_code TEXT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS act_year INTEGER;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS act_number INTEGER;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS payment_method TEXT;
-ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Archiviata';
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'archived_incomplete';
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS cliente_id BIGINT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS negozio_id BIGINT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS codice_negozio TEXT;
@@ -56,19 +56,25 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT
 UPDATE atti_vendita
 SET completed_at = COALESCE(completed_at, updated_at, created_at, NOW())
 WHERE completed_at IS NULL
-  AND COALESCE(status, '') ILIKE 'Completato';
+  AND (COALESCE(status, '') ILIKE 'Completato' OR COALESCE(status, '') ILIKE 'completed');
 
 UPDATE atti_vendita
 SET archived_at = COALESCE(archived_at, updated_at, created_at, NOW())
 WHERE archived_at IS NULL
-  AND COALESCE(status, '') ILIKE 'Archiviata';
+  AND (
+    COALESCE(status, '') ILIKE 'Archiviata'
+    OR COALESCE(status, '') ILIKE 'archived_incomplete'
+    OR COALESCE(status, '') ILIKE 'archived_completed'
+  );
 
 UPDATE atti_vendita
 SET deleted_at = COALESCE(deleted_at, updated_at, created_at, NOW())
 WHERE deleted_at IS NULL
-  AND COALESCE(status, '') ILIKE 'Deleted';
+  AND (COALESCE(status, '') ILIKE 'Deleted' OR COALESCE(status, '') ILIKE 'deleted');
 
 DROP INDEX IF EXISTS atti_vendita_practice_number_unique;
+DROP INDEX IF EXISTS atti_vendita_practice_number_active_unique;
+DROP INDEX IF EXISTS atti_vendita_completed_real_idx;
 ALTER TABLE atti_vendita DROP CONSTRAINT IF EXISTS atti_vendita_practice_number_key;
 
 CREATE UNIQUE INDEX IF NOT EXISTS atti_vendita_practice_number_active_unique
@@ -76,8 +82,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS atti_vendita_practice_number_active_unique
   WHERE practice_number IS NOT NULL
     AND deleted_at IS NULL
     AND (
-      COALESCE(status, '') ILIKE 'Completato'
-      OR (COALESCE(status, '') ILIKE 'Archiviata' AND completed_at IS NOT NULL)
+      COALESCE(status, '') ILIKE 'completed'
+      OR COALESCE(status, '') ILIKE 'Completato'
+      OR COALESCE(status, '') ILIKE 'archived_completed'
+      OR COALESCE(status, '') ILIKE 'archived_incomplete'
+      OR COALESCE(status, '') ILIKE 'Archiviata'
     );
 
 CREATE INDEX IF NOT EXISTS atti_vendita_store_year_number_idx
@@ -105,7 +114,9 @@ CREATE INDEX IF NOT EXISTS atti_vendita_completed_real_idx
   ON atti_vendita (store_code, act_year, act_number)
   WHERE deleted_at IS NULL
     AND (
-      COALESCE(status, '') ILIKE 'Completato'
+      COALESCE(status, '') ILIKE 'completed'
+      OR COALESCE(status, '') ILIKE 'Completato'
+      OR COALESCE(status, '') ILIKE 'archived_completed'
       OR (COALESCE(status, '') ILIKE 'Archiviata' AND completed_at IS NOT NULL)
     );
 
