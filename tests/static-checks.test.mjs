@@ -225,6 +225,71 @@ test("elenco atti ha solo apri modifica riapri elimina e query operative escludo
   assert.match(schema, /ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS deleted_by/);
 });
 
+test("antifrode non mostra atti eliminati e sincronizza gli alert collegati", async () => {
+  const server = await file("server.js");
+  const listStart = server.indexOf("async function listAntifraudAlerts");
+  const listEnd = server.indexOf("async function updateAntifraudAlert", listStart);
+  const listBlock = server.slice(listStart, listEnd);
+  const deleteStart = server.indexOf("async function deleteAct");
+  const deleteEnd = server.indexOf("async function createUser", deleteStart);
+  const deleteBlock = server.slice(deleteStart, deleteEnd);
+  const scanStart = server.indexOf("async function scanAntifraud");
+  const scanEnd = server.indexOf("async function listAntifraudAlerts", scanStart);
+  const scanBlock = server.slice(scanStart, scanEnd);
+
+  assert.match(listBlock, /LEFT JOIN \$\{actsTable\} a ON a\.id = af\.atto_id/);
+  assert.match(listBlock, /af\.atto_id IS NULL OR/);
+  assert.match(listBlock, /a\.deleted_at IS NULL/);
+  assert.match(listBlock, /COALESCE\(a\.status, ''\) NOT ILIKE 'deleted'/);
+  assert.match(deleteBlock, /UPDATE antifrode_alerts/);
+  assert.match(deleteBlock, /stato = 'atto_eliminato'/);
+  assert.match(scanBlock, /FROM antiriciclaggio_alerts ar/);
+  assert.match(scanBlock, /LEFT JOIN \$\{actsTable\} a ON a\.id = ar\.atto_id/);
+  assert.match(scanBlock, /normalizeWorkflowStatus\(existing\.status\) === "deleted"/);
+});
+
+test("feedback AI approvato sparisce dalla coda e si puo eliminare", async () => {
+  const [app, server, schema, migration] = await Promise.all([
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260526_ai_feedback_review_workflow.sql")
+  ]);
+  const feedbackListStart = server.indexOf("async function listAiFeedback");
+  const feedbackListEnd = server.indexOf("async function createAiFeedback", feedbackListStart);
+  const feedbackListBlock = server.slice(feedbackListStart, feedbackListEnd);
+  const feedbackToKnowledgeStart = server.indexOf("async function feedbackToKnowledge");
+  const feedbackToKnowledgeEnd = server.indexOf("async function searchAiChunksBySource", feedbackToKnowledgeStart);
+  const feedbackToKnowledgeBlock = server.slice(feedbackToKnowledgeStart, feedbackToKnowledgeEnd);
+  const notesStart = app.indexOf("function renderKnowledgeNotes");
+  const notesEnd = app.indexOf("async function loadKnowledgeNotes", notesStart);
+  const notesBlock = app.slice(notesStart, notesEnd);
+
+  assert.match(feedbackListBlock, /COALESCE\(status, 'da_valutare'\) = 'da_valutare'/);
+  assert.match(feedbackToKnowledgeBlock, /SET status = 'approvato'/);
+  assert.match(feedbackToKnowledgeBlock, /knowledge_note_id = \$2::bigint/);
+  assert.match(server, /async function deleteAiFeedback/);
+  assert.match(server, /app\.delete\("\/api\/ai\/feedback\/:id"/);
+  assert.match(app, /data-delete-ai-feedback/);
+  assert.match(app, /async function deleteAiFeedback/);
+  assert.doesNotMatch(notesBlock, /data-reject-knowledge|>Rifiuta</);
+  assert.match(schema, /ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'da_valutare'/);
+  assert.match(migration, /ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'da_valutare'/);
+});
+
+test("strumenti contiene collegamento verificabile al sito OroActive", async () => {
+  const [index, app] = await Promise.all([
+    file("index.html"),
+    file("app.js")
+  ]);
+
+  assert.equal((index.match(/data-open-oroactive-website/g) || []).length, 2);
+  assert.match(index, /Sito web OroActive/);
+  assert.match(app, /const OROACTIVE_WEBSITE_URL = "https:\/\/oroactive\.com\/"/);
+  assert.match(app, /function openOroActiveWebsite/);
+  assert.match(app, /window\.open\(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer"\)/);
+});
+
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
   const app = await file("app.js");
   const enterStart = app.indexOf("async function enterSectionFromMainMenu");

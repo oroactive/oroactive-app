@@ -1400,14 +1400,20 @@ async function deleteKnowledgeNote(id, user) {
 }
 
 async function listAiFeedback() {
-  const result = await pool.query("SELECT * FROM ai_feedback ORDER BY created_at DESC LIMIT 200");
+  const result = await pool.query(
+    `SELECT *
+     FROM ai_feedback
+     WHERE COALESCE(status, 'da_valutare') = 'da_valutare'
+     ORDER BY created_at DESC
+     LIMIT 200`
+  );
   return { feedback: result.rows };
 }
 
 async function createAiFeedback(input = {}, user) {
   const result = await pool.query(
-    `INSERT INTO ai_feedback (user_id, question, answer, feedback_type, comment)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO ai_feedback (user_id, question, answer, feedback_type, comment, status)
+     VALUES ($1, $2, $3, $4, $5, 'da_valutare')
      RETURNING *`,
     [
       user.id,
@@ -1421,17 +1427,65 @@ async function createAiFeedback(input = {}, user) {
 }
 
 async function feedbackToKnowledge(id, input = {}, user) {
-  const feedbackResult = await pool.query("SELECT * FROM ai_feedback WHERE id = $1", [id]);
+  const feedbackResult = await pool.query(
+    `UPDATE ai_feedback
+     SET status = 'in_lavorazione',
+         reviewed_by = $2::bigint,
+         reviewed_at = NOW()
+     WHERE id = $1
+       AND COALESCE(status, 'da_valutare') = 'da_valutare'
+     RETURNING *`,
+    [id, user.id]
+  );
   const feedback = feedbackResult.rows[0];
   if (!feedback) return null;
   const content = String(input.content || `Domanda operatore:\n${feedback.question}\n\nRisposta AI:\n${feedback.answer}\n\nFeedback:\n${feedback.comment || feedback.feedback_type}`).trim();
-  return createKnowledgeNote({
-    title: input.title || `Miglioramento AI #${feedback.id}`,
-    category: input.category || "Formazione operatori",
-    source: input.source || "Feedback Assistente IA OroActive",
-    content,
-    status: "approvata"
-  }, user);
+  try {
+    const note = await createKnowledgeNote({
+      title: input.title || `Miglioramento AI #${feedback.id}`,
+      category: input.category || "Formazione operatori",
+      source: input.source || "Feedback Assistente IA OroActive",
+      content,
+      status: "approvata"
+    }, user);
+    await pool.query(
+      `UPDATE ai_feedback
+       SET status = 'approvato',
+           knowledge_note_id = $2::bigint,
+           reviewed_by = $3::bigint,
+           reviewed_at = NOW()
+       WHERE id = $1`,
+      [id, note.id, user.id]
+    );
+    return note;
+  } catch (error) {
+    await pool.query(
+      `UPDATE ai_feedback
+       SET status = 'da_valutare',
+           reviewed_by = NULL,
+           reviewed_at = NULL
+       WHERE id = $1
+         AND status = 'in_lavorazione'`,
+      [id]
+    ).catch((restoreError) => {
+      console.error("AI FEEDBACK RESTORE ERROR", restoreError);
+    });
+    throw error;
+  }
+}
+
+async function deleteAiFeedback(id, user) {
+  const result = await pool.query(
+    `UPDATE ai_feedback
+     SET status = 'eliminato',
+         reviewed_by = $2::bigint,
+         reviewed_at = NOW()
+     WHERE id = $1
+       AND COALESCE(status, 'da_valutare') = 'da_valutare'
+     RETURNING id`,
+    [id, user.id]
+  );
+  return result.rowCount > 0;
 }
 
 async function searchAiChunksBySource(question = "", sourceType = "book", limit = 6) {
@@ -3024,7 +3078,19 @@ async function scanAntifraud(user = {}) {
       })) created += 1;
     }
   }
-  const cashResult = await pool.query("SELECT * FROM antiriciclaggio_alerts WHERE superamento > 0 ORDER BY created_at DESC LIMIT 100");
+  const cashResult = await pool.query(
+    `SELECT ar.*
+     FROM antiriciclaggio_alerts ar
+     LEFT JOIN ${actsTable} a ON a.id = ar.atto_id
+     WHERE ar.superamento > 0
+       AND (ar.atto_id IS NULL OR (
+         a.id IS NOT NULL
+         AND a.deleted_at IS NULL
+         AND COALESCE(a.status, '') NOT ILIKE 'deleted'
+       ))
+     ORDER BY ar.created_at DESC
+     LIMIT 100`
+  );
   for (const alert of cashResult.rows) {
     if (await createAntifraudAlert({
       cliente_id: alert.cliente_id,
@@ -3115,10 +3181,19 @@ async function scanAntifraud(user = {}) {
     LIMIT 50
   `).catch(() => ({ rows: [] }));
   for (const row of frequentUpdates.rows) {
+    let identifier = String(row.route || "").replace("/api/atti/", "");
+    try {
+      identifier = decodeURIComponent(identifier);
+    } catch {
+      // Keep the raw route fragment if an old audit row contains malformed escaping.
+    }
+    const existing = await findExisting(identifier).catch(() => null);
+    if (!existing || normalizeWorkflowStatus(existing.status) === "deleted" || existing.deleted_at) continue;
     if (await createAntifraudAlert({
+      atto_id: existing.id,
       tipo_alert: "atto_modificato_piu_volte",
       livello: "medio",
-      descrizione: `Atto ${row.route.replace("/api/atti/", "")} modificato ${row.updates} volte negli ultimi 7 giorni.`
+      descrizione: `Atto ${identifier} modificato ${row.updates} volte negli ultimi 7 giorni.`
     })) created += 1;
   }
   return { ok: true, created };
@@ -3136,7 +3211,12 @@ async function listAntifraudAlerts(user = {}) {
     `SELECT af.*, a.practice_number, a.store, a.cliente_nome, a.cliente_cognome
      FROM antifrode_alerts af
      LEFT JOIN ${actsTable} a ON a.id = af.atto_id
-     WHERE 1 = 1 ${storeWhere}
+     WHERE (af.atto_id IS NULL OR (
+       a.id IS NOT NULL
+       AND a.deleted_at IS NULL
+       AND COALESCE(a.status, '') NOT ILIKE 'deleted'
+     ))
+       ${storeWhere}
      ORDER BY af.created_at DESC
      LIMIT 200`,
     values
@@ -5240,6 +5320,17 @@ async function deleteAct(identifier, user) {
     [existing.id, user?.id || null]
   );
   if (result.rowCount) {
+    await pool.query(
+      `UPDATE antifrode_alerts
+       SET stato = 'atto_eliminato',
+           reviewed_by = $2::bigint,
+           reviewed_at = NOW()
+       WHERE atto_id = $1::bigint
+         AND stato IN ('nuovo', 'in verifica')`,
+      [existing.id, user?.id || null]
+    ).catch((error) => {
+      console.error("ANTIFRAUD DELETE SYNC ERROR", error);
+    });
     void logUserActivity({
       userId: user?.id,
       actorId: user?.id,
@@ -6647,6 +6738,16 @@ app.post("/api/ai/feedback/:id/to-knowledge", requireFounder, async (request, re
     const note = await feedbackToKnowledge(request.params.id, request.body, request.user);
     if (!note) return response.status(404).json({ error: "Feedback non trovato" });
     response.status(201).json(note);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/ai/feedback/:id", requireFounder, async (request, response, next) => {
+  try {
+    const deleted = await deleteAiFeedback(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Feedback non trovato" });
+    response.json({ ok: true });
   } catch (error) {
     next(error);
   }

@@ -67,6 +67,7 @@ const state = {
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
+const OROACTIVE_WEBSITE_URL = "https://oroactive.com/";
 
 function normalizeSignatureArray(value, fallback = false) {
   const source = Array.isArray(value) ? value : [];
@@ -1834,6 +1835,10 @@ function openBrandMenu() {
   brandMenuButton.setAttribute("aria-expanded", "true");
 }
 
+function openOroActiveWebsite() {
+  window.open(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer");
+}
+
 function showMainMenuFromSplash() {
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = false;
@@ -2386,7 +2391,6 @@ function renderKnowledgeNotes() {
       <div class="row-actions">
         ${note.can_edit ? `<button type="button" data-edit-knowledge="${escapeHtml(String(note.id))}">Modifica</button>` : ""}
         ${isFounder() && note.status !== "approvata" ? `<button class="primary-button" type="button" data-approve-knowledge="${escapeHtml(String(note.id))}">Approva</button>` : ""}
-        ${isFounder() && note.status !== "rifiutata" ? `<button type="button" data-reject-knowledge="${escapeHtml(String(note.id))}">Rifiuta</button>` : ""}
         ${note.can_delete ? `<button class="danger-button" type="button" data-delete-knowledge="${escapeHtml(String(note.id))}">Elimina</button>` : ""}
       </div>
     </article>
@@ -2430,6 +2434,7 @@ async function saveKnowledgeNote(event) {
     });
     resetKnowledgeNoteFormValues();
     await loadKnowledgeNotes();
+    if (isEditing) knowledgeNotesList?.scrollIntoView({ behavior: "smooth", block: "start" });
     showToast(isEditing
       ? "Conoscenza aggiornata con successo"
       : isFounder()
@@ -2460,6 +2465,7 @@ function editKnowledgeNote(id) {
     saveButton.classList.remove("primary-button");
     saveButton.classList.add("success-button", "knowledge-save-editing");
   }
+  knowledgeNoteForm?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function approveKnowledgeNote(id) {
@@ -2518,7 +2524,8 @@ function renderAiFeedback() {
       <p><b>Domanda:</b> ${escapeHtml(String(item.question || "").slice(0, 180))}</p>
       <p><b>Commento:</b> ${escapeHtml(item.comment || "Nessun commento")}</p>
       <div class="row-actions">
-        <button type="button" data-feedback-to-knowledge="${escapeHtml(String(item.id))}">Trasforma in conoscenza approvata</button>
+        <button class="primary-button" type="button" data-feedback-to-knowledge="${escapeHtml(String(item.id))}">Trasforma in conoscenza approvata</button>
+        <button class="danger-button" type="button" data-delete-ai-feedback="${escapeHtml(String(item.id))}">Elimina feedback</button>
       </div>
     </article>
   `).join("");
@@ -2570,6 +2577,19 @@ async function feedbackToKnowledge(id) {
     showToast("Feedback trasformato in conoscenza approvata.");
   } catch (error) {
     showToast(error.message || "Feedback non trasformato.");
+  }
+}
+
+async function deleteAiFeedback(id) {
+  if (!isFounder()) return;
+  const confirmed = window.confirm("Vuoi eliminare questo feedback dell'assistente?");
+  if (!confirmed) return;
+  try {
+    await apiRequest(`/ai/feedback/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await loadAiFeedback();
+    showToast("Feedback eliminato.");
+  } catch (error) {
+    showToast(error.message || "Feedback non eliminato.");
   }
 }
 
@@ -6837,16 +6857,16 @@ knowledgeStatus?.addEventListener("click", (event) => {
 knowledgeNotesList?.addEventListener("click", (event) => {
   const edit = event.target.closest("[data-edit-knowledge]");
   const approve = event.target.closest("[data-approve-knowledge]");
-  const reject = event.target.closest("[data-reject-knowledge]");
   const remove = event.target.closest("[data-delete-knowledge]");
   if (edit) editKnowledgeNote(edit.dataset.editKnowledge);
   if (approve) approveKnowledgeNote(approve.dataset.approveKnowledge);
-  if (reject) rejectKnowledgeNote(reject.dataset.rejectKnowledge);
   if (remove) deleteKnowledgeNote(remove.dataset.deleteKnowledge);
 });
 aiFeedbackList?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-feedback-to-knowledge]");
-  if (button) feedbackToKnowledge(button.dataset.feedbackToKnowledge);
+  const approve = event.target.closest("[data-feedback-to-knowledge]");
+  const remove = event.target.closest("[data-delete-ai-feedback]");
+  if (approve) feedbackToKnowledge(approve.dataset.feedbackToKnowledge);
+  if (remove) deleteAiFeedback(remove.dataset.deleteAiFeedback);
 });
 assistantChat?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-ai-feedback]");
@@ -6867,6 +6887,11 @@ document.querySelectorAll(".main-menu-actions button").forEach((button) => {
     event.stopPropagation();
     if (button.dataset.mainMenuToggle) {
       toggleMainMenuDropdown(button.dataset.mainMenuToggle);
+      return;
+    }
+    if (button.matches("[data-open-oroactive-website]")) {
+      openOroActiveWebsite();
+      closeMainMenuDropdowns();
       return;
     }
     if (button.matches("[data-start-tutorial]")) return;
@@ -6936,6 +6961,11 @@ brandDropdown.querySelectorAll("button").forEach((button) => {
     event.stopPropagation();
     if (button.dataset.brandSubmenuToggle) {
       toggleBrandSubmenu(button.dataset.brandSubmenuToggle);
+      return;
+    }
+    if (button.matches("[data-open-oroactive-website]")) {
+      openOroActiveWebsite();
+      closeBrandMenu();
       return;
     }
     if (button.matches("[data-start-tutorial]")) return;

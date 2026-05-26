@@ -449,6 +449,10 @@ CREATE TABLE IF NOT EXISTS ai_feedback (
   answer TEXT,
   feedback_type TEXT,
   comment TEXT,
+  status TEXT DEFAULT 'da_valutare',
+  knowledge_note_id BIGINT,
+  reviewed_by BIGINT,
+  reviewed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -457,6 +461,10 @@ ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS question TEXT;
 ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS answer TEXT;
 ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS feedback_type TEXT;
 ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS comment TEXT;
+ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'da_valutare';
+ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS knowledge_note_id BIGINT;
+ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS reviewed_by BIGINT;
+ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 ALTER TABLE ai_feedback ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS ai_feedback_user_idx
@@ -464,6 +472,9 @@ CREATE INDEX IF NOT EXISTS ai_feedback_user_idx
 
 CREATE INDEX IF NOT EXISTS ai_feedback_type_idx
   ON ai_feedback (feedback_type);
+
+CREATE INDEX IF NOT EXISTS ai_feedback_status_idx
+  ON ai_feedback (status);
 
 CREATE TABLE IF NOT EXISTS antiriciclaggio_alerts (
   id BIGSERIAL PRIMARY KEY,
