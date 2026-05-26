@@ -2892,6 +2892,17 @@ input.document-expired {
   color: #777;
 }
 
+.complete-archive-button {
+  background: #ff7a00;
+  color: #0b0b0d;
+  border: 1px solid rgba(255, 122, 0, 0.45);
+  box-shadow: 0 10px 24px rgba(255, 122, 0, 0.24);
+}
+
+.complete-archive-button:hover {
+  background: #ff8f24;
+}
+
 .table-row em.quality-review-badge {
   justify-self: start;
   font-weight: 950;

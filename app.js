@@ -3623,7 +3623,7 @@ function archiveRowActionsMarkup(act) {
   if (canModifyAct(act)) {
     actions.push(`<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">${archivedIncomplete ? "Riapri" : "Modifica"}</button>`);
     if (archivedIncomplete) {
-      actions.push(`<button class="primary-button" type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Completa pratica</button>`);
+      actions.push(`<button class="complete-archive-button" type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Completa pratica</button>`);
     }
   }
 
@@ -4237,9 +4237,11 @@ async function openArchivedAct(practiceNumber) {
   }
 
   previewTitle.textContent = `Atto di vendita ${act.practiceNumber}`;
+  const archivedIncomplete = workflowStatusCode(act.status) === "archived_incomplete";
   previewBody.innerHTML = `
     <div class="readonly-actions">
       ${canModifyAct(act) ? `<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica atto</button>` : ""}
+      ${canModifyAct(act) && archivedIncomplete ? `<button class="complete-archive-button" type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Completa pratica</button>` : ""}
       ${canDeleteActDirectly(act) ? `<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>` : ""}
       ${canRequestActDeletion(act) ? `<button class="warning-button" type="button" data-request-delete-act="${escapeHtml(act.practiceNumber)}">Richiedi eliminazione</button>` : ""}
     </div>
