@@ -74,6 +74,8 @@ const state = {
   sessionTimeoutTimer: null,
   tutorial: {
     active: false,
+    source: "",
+    id: "",
     index: 0,
     steps: [],
     pendingFirstRun: false
@@ -156,6 +158,358 @@ const AURUM_MENU_POSITIONS = [
   { x: -246, y: -36 },
   { x: -108, y: -72 }
 ];
+const AURUM_SECTION_MAP = {
+  practice: "nuovo_atto_vendita",
+  archive: "elenco_atti",
+  fusion: "giacenza",
+  crm: "crm_clienti",
+  users: "utenti",
+  training: "academy",
+  backups: "backup",
+  quotazione: "quotazioni",
+  dashboard: "dashboard",
+  assistant: "assistente_ai",
+  knowledgeNotes: "assistente_ai",
+  antifraud: "elenco_atti"
+};
+const OROACTIVE_APP_GUIDE = {
+  nuovo_atto_vendita: {
+    title: "Nuovo Atto di Vendita",
+    description: "Sezione per compilare, controllare, stampare, archiviare o completare un atto di vendita.",
+    fields: ["nome", "cognome", "codice fiscale", "documento", "scadenza documento", "residenza", "provincia", "oggetti preziosi", "metallo", "titolo/caratura", "peso", "metodo pagamento", "IBAN", "contabile", "firma cliente", "controllo qualità"],
+    actions: ["salva bozza", "chiudi e archivia", "completa pratica", "stampa copia cliente", "stampa copia aziendale", "elimina atto"],
+    steps: ["Compila la scheda cliente", "Verifica documento e residenza", "Inserisci oggetti preziosi, metallo, titolo e peso", "Seleziona metodo pagamento e totale", "Carica documenti, foto preziosi e contabile se richiesta", "Fai firmare cliente e operatore", "Controlla riepilogo e checklist", "Stampa le copie necessarie", "Completa pratica oppure chiudi e archivia"],
+    checks: ["documento valido", "codice fiscale coerente", "firme acquisite", "allegati presenti", "pagamento compilato", "limite contanti verificato"],
+    commonErrors: ["documento scaduto", "firme mancanti", "contabile assente per pagamento tracciabile", "IBAN non valido", "totale non indicato"],
+    permissions: ["commesso", "aiuto_commesso", "responsabile", "supervisore", "founder"]
+  },
+  elenco_atti: {
+    title: "Elenco Atti",
+    description: "Archivio operativo degli atti validi, divisi per negozio, stato e ricerca.",
+    fields: ["numero pratica", "negozio", "cliente", "data creazione", "stato", "totale", "operatore"],
+    actions: ["apri anteprima", "modifica o riapri", "elimina", "esporta PDF giornaliero", "esporta PDF mensile"],
+    steps: ["Filtra per negozio se autorizzato", "Cerca numero pratica o cliente", "Usa Apri per sola lettura", "Usa Modifica/Riapri per lavorare sull'atto", "Elimina solo se hai permesso e conferma"],
+    checks: ["non completare dall'elenco", "non duplicare numerazione", "atti eliminati esclusi dai flussi operativi"],
+    commonErrors: ["atto non trovato", "permesso insufficiente", "ricerca troppo generica"],
+    permissions: ["commesso", "responsabile", "supervisore", "founder"]
+  },
+  giacenza: {
+    title: "Giacenza",
+    description: "Vista dei preziosi collegati ad atti completati e non eliminati, per metallo, titolo e negozio.",
+    fields: ["negozio", "metallo", "titolo/caratura", "grammi", "atto collegato", "stato fusione"],
+    actions: ["filtra negozio", "controlla materiale", "prepara fusione"],
+    steps: ["Scegli negozio o tutti i negozi", "Controlla grammi per metallo e titolo", "Verifica che l'atto collegato sia completato", "Usa i dati per pianificare fusioni coerenti"],
+    checks: ["atti eliminati esclusi", "titolo corretto", "grammi coerenti", "nessun materiale già fuso"],
+    commonErrors: ["conteggi fantasma da atti eliminati", "caratura non coerente", "negozio errato"],
+    permissions: ["responsabile", "supervisore", "founder"]
+  },
+  fusioni: {
+    title: "Fusioni",
+    description: "Gestione lotti e materiale da fondere partendo da giacenza valida.",
+    fields: ["lotto fusione", "metallo", "caratura", "grammi", "raffineria", "storico"],
+    actions: ["seleziona materiale", "genera lotto", "crea PDF fusione", "consulta storico raffineria"],
+    steps: ["Verifica la giacenza valida", "Separa materiale per metallo e caratura", "Seleziona gli atti/materiali da includere", "Genera il lotto", "Stampa o salva PDF fusione", "Aggiorna storico raffineria"],
+    checks: ["solo atti completati", "nessun atto eliminato", "nessun materiale già stornato"],
+    commonErrors: ["materiale duplicato", "caratura mista", "lotto incompleto"],
+    permissions: ["responsabile", "supervisore", "founder"]
+  },
+  crm_clienti: {
+    title: "CRM Clienti",
+    description: "Storico clienti, note operative, documenti, pagamenti e negozi visitati.",
+    fields: ["cliente", "codice fiscale", "telefono", "note", "storico atti", "pagamenti", "prossima azione"],
+    actions: ["cerca cliente", "apri dettaglio", "modifica cliente", "aggiungi nota", "elimina cliente se autorizzato"],
+    steps: ["Cerca cliente per nome o codice fiscale", "Apri la scheda", "Aggiorna note e prossima azione", "Controlla storico pagamenti e negozi", "Salva modifiche"],
+    checks: ["dati coerenti", "note utili e non superflue", "codice fiscale non duplicato"],
+    commonErrors: ["cliente non trovato", "codice fiscale mancante", "note non salvate"],
+    permissions: ["commesso", "responsabile", "supervisore", "founder"]
+  },
+  utenti: {
+    title: "Utenti",
+    description: "Gestione utenti, ruoli, negozi assegnati, stato online/offline e attività.",
+    fields: ["nome", "cognome", "username", "ruolo", "negozio", "telefono", "note", "stato attivo"],
+    actions: ["crea utente", "modifica utente", "disattiva utente", "apri attività", "controlla stato online"],
+    steps: ["Controlla il ruolo del tuo account", "Crea o seleziona utente", "Imposta ruolo e negozio", "Salva", "Controlla attività se autorizzato"],
+    checks: ["username univoco", "ruolo coerente", "negozio valido", "permessi rispettati"],
+    commonErrors: ["username già presente", "ruolo mancante", "negozio non valido", "non autorizzato"],
+    permissions: ["responsabile", "supervisore", "founder"]
+  },
+  academy: {
+    title: "OroActive Academy",
+    description: "Catalogo corsi, avanzamento, certificazioni, badge e gestione formazione.",
+    fields: ["catalogo corsi", "i miei corsi", "certificazioni", "badge", "storico formazione", "materiali"],
+    actions: ["apri corso", "completa corso", "sostieni esame", "crea/modifica corso", "carica materiali"],
+    steps: ["Apri catalogo Academy", "Scegli corso o facoltà", "Completa lezioni e materiali", "Sostieni verifica se prevista", "Controlla badge e certificazioni"],
+    checks: ["materiali validi", "corso attivo", "permesso gestione Academy"],
+    commonErrors: ["file non valido", "corso non trovato", "permesso insufficiente"],
+    permissions: ["commesso", "responsabile", "supervisore", "founder"]
+  },
+  backup: {
+    title: "Backup",
+    description: "Backup manuali verificabili con manifest, checksum, download e test restore.",
+    fields: ["codice backup", "stato", "verifica integrità", "test restore", "dimensione", "manifest"],
+    actions: ["crea nuovo backup", "verifica backup", "scarica backup", "test restore", "elimina backup"],
+    steps: ["Clicca Crea nuovo backup", "Attendi stato completato", "Verifica integrità", "Scarica se sei Founder", "Avvia test restore solo da Founder se serve", "Elimina solo se autorizzato"],
+    checks: ["database.dump presente", "manifest presente", "checksum coerente", "file non pubblico"],
+    commonErrors: ["pg_dump non disponibile", "checksum non corrispondente", "backup non trovato"],
+    permissions: ["responsabile", "founder"]
+  },
+  quotazioni: {
+    title: "Quotazioni",
+    description: "Prezzi e grafici di oro, argento e platino.",
+    fields: ["oro", "argento", "platino", "grafico", "fonte quotazione"],
+    actions: ["aggiorna quotazioni", "apri grafico esterno"],
+    steps: ["Apri Quotazioni", "Clicca Aggiorna quotazioni", "Controlla metallo e valore", "Usa dati aggiornati nelle valutazioni"],
+    checks: ["fonte disponibile", "dato aggiornato", "connessione attiva"],
+    commonErrors: ["quotazione non disponibile", "grafico non incorporabile"],
+    permissions: ["commesso", "responsabile", "supervisore", "founder"]
+  },
+  dashboard: {
+    title: "Dashboard",
+    description: "KPI, fatturato, grammi acquistati, pagamenti, ranking e controlli direzionali.",
+    fields: ["fatturato", "grammi", "pagamenti", "ranking negozi", "operatori", "periodo"],
+    actions: ["consulta KPI", "analizza negozi", "controlla performance"],
+    steps: ["Apri Dashboard", "Controlla periodo e negozio", "Leggi KPI principali", "Approfondisci ranking e operatori", "Verifica dati anomali"],
+    checks: ["solo atti completati e non eliminati", "periodo corretto", "negozio corretto"],
+    commonErrors: ["dati non aggiornati", "filtri errati", "conteggi da atti eliminati"],
+    permissions: ["responsabile", "supervisore", "founder"]
+  },
+  assistente_ai: {
+    title: "Assistente IA OroActive",
+    description: "Chat AI, knowledge base, feedback e formazione operativa.",
+    fields: ["domanda", "modalità", "knowledge base", "feedback", "conoscenze approvate"],
+    actions: ["invia domanda", "approva conoscenza", "elimina feedback", "carica libro", "rigenera embeddings"],
+    steps: ["Scrivi domanda precisa", "Controlla risposta e fonte", "Lascia feedback se utile", "Trasforma feedback in conoscenza solo se approvata", "Aggiorna knowledge base da Founder"],
+    checks: ["non inviare dati sensibili non necessari", "fonte coerente", "risposta non generica"],
+    commonErrors: ["AI non configurata", "knowledge base vuota", "file non valido"],
+    permissions: ["commesso", "responsabile", "supervisore", "founder"]
+  }
+};
+const AURUM_FIELD_HELP = {
+  codice_fiscale: {
+    labels: ["codice fiscale", "cf"],
+    text: "Il codice fiscale identifica il cliente e collega la pratica allo storico CRM. Inseriscilo senza spazi; se il cliente è già presente, OroActive può recuperare l'anagrafica."
+  },
+  documento: {
+    labels: ["documento", "tipo documento", "numero documento"],
+    text: "Il documento serve a identificare il cliente. Compila tipo, numero, data rilascio e scadenza, poi allega fronte e retro quando richiesto."
+  },
+  scadenza_documento: {
+    labels: ["scadenza documento", "data scadenza"],
+    text: "La scadenza documento indica fino a quando il documento è valido. Se è scaduto, chiedi un documento valido prima di completare la pratica."
+  },
+  cittadinanza: {
+    labels: ["cittadinanza", "nazionalità", "nazionalita"],
+    text: "La cittadinanza completa l'anagrafica del cliente e aiuta a mantenere coerenti i dati dell'atto e del CRM."
+  },
+  residenza: {
+    labels: ["residenza", "indirizzo"],
+    text: "La residenza è l'indirizzo del cliente. Usa formato chiaro: via, numero civico e città, così la pratica resta leggibile e coerente."
+  },
+  provincia: {
+    labels: ["provincia", "provincia residenza"],
+    text: "La provincia è la sigla collegata al luogo o all'indirizzo del cliente. Serve per completare correttamente l'anagrafica."
+  },
+  oggetti_preziosi: {
+    labels: ["oggetti preziosi", "oggetti ceduti", "preziosi"],
+    text: "Qui descrivi i preziosi ceduti dal cliente. Ogni oggetto deve avere descrizione, metallo e titolo/caratura corretti."
+  },
+  metallo: {
+    labels: ["metallo", "oro", "argento", "platino"],
+    text: "Il metallo indica il materiale dell'oggetto: oro, argento o platino. È essenziale per calcolare valore, giacenza e fusione."
+  },
+  titolo_caratura: {
+    labels: ["titolo", "caratura", "18kt", "18 kt"],
+    text: "Il titolo/caratura indica la purezza del metallo. 18kt significa 18 parti di oro puro su 24, circa il 75%."
+  },
+  peso: {
+    labels: ["peso", "grammi", "grammo"],
+    text: "Il peso indica quanti grammi di materiale vengono acquistati. Deve essere coerente con metallo e titolo perché alimenta giacenza e fusioni."
+  },
+  metodo_pagamento: {
+    labels: ["metodo pagamento", "pagamento"],
+    text: "Il metodo pagamento indica come viene corrisposto il totale: bonifico, contanti nei limiti di legge o assegno. Controlla sempre limite contanti e contabile quando serve."
+  },
+  iban: {
+    labels: ["iban"],
+    text: "L'IBAN va compilato quando il pagamento richiede un conto di destinazione, ad esempio bonifico. Inseriscilo completo e senza dati superflui nelle note."
+  },
+  contabile: {
+    labels: ["contabile", "ricevuta", "prova pagamento"],
+    text: "Nel campo Contabile carichi la prova del pagamento tracciabile, ad esempio ricevuta bonifico o assegno."
+  },
+  firma_cliente: {
+    labels: ["firma cliente", "firme", "firma"],
+    text: "Le firme confermano vendita, dichiarazioni, privacy e operatore. Devono essere acquisite prima di completare correttamente l'atto."
+  },
+  controllo_qualita: {
+    labels: ["controllo qualità", "controllo qualita", "quality"],
+    text: "Il controllo qualità consente ai ruoli autorizzati di validare o segnalare problemi sull'atto, soprattutto prima o dopo completamento."
+  },
+  stato_atto: {
+    labels: ["stato atto", "stato pratica"],
+    text: "Lo stato indica se l'atto è archiviato, completato o eliminato. Gli atti eliminati non devono apparire nei flussi operativi."
+  },
+  giacenza: {
+    labels: ["giacenza"],
+    text: "La giacenza mostra i preziosi derivati da atti completati e non eliminati, separati per negozio, metallo e caratura."
+  },
+  lotto_fusione: {
+    labels: ["lotto fusione", "fusione", "lotto"],
+    text: "Il lotto fusione raggruppa materiale da fondere. Prima di generarlo, controlla caratura, grammi, negozio e atti collegati."
+  },
+  badge: {
+    labels: ["badge"],
+    text: "I badge sono riconoscimenti interni Academy collegati a formazione, completamenti o competenze operative."
+  },
+  certificazione: {
+    labels: ["certificazione", "certificazioni"],
+    text: "Le certificazioni attestano il completamento di percorsi o verifiche Academy e aiutano a monitorare la crescita operativa."
+  }
+};
+const AURUM_HELP_TARGETS = [
+  { key: "codice_fiscale", selector: '[name="cf"]' },
+  { key: "documento", selector: "#documentType, [name='numeroDocumento']" },
+  { key: "scadenza_documento", selector: '[name="scadenzaDocumento"]' },
+  { key: "cittadinanza", selector: '[name="cittadinanza"]' },
+  { key: "residenza", selector: '[name="indirizzo"]' },
+  { key: "provincia", selector: "#residenceProvince, #birthProvince" },
+  { key: "oggetti_preziosi", selector: "#cededItemsTable" },
+  { key: "peso", selector: "#totalWeightFields" },
+  { key: "metodo_pagamento", selector: "#paymentMethod" },
+  { key: "iban", selector: "#paymentIban" },
+  { key: "contabile", selector: "#paymentCaptureSection" },
+  { key: "firma_cliente", selector: ".signature-grid" },
+  { key: "controllo_qualita", selector: "#qualityReviewPanel" },
+  { key: "stato_atto", selector: "#archiveGroups" },
+  { key: "giacenza", selector: "#fusionGroups" },
+  { key: "badge", selector: "#courseSummary" },
+  { key: "certificazione", selector: "#courseSummary" }
+];
+const AURUM_TUTORIAL_TO_GUIDE = {
+  tutorial_compila_atto: "nuovo_atto_vendita",
+  tutorial_stampa_copia_cliente: "nuovo_atto_vendita",
+  tutorial_stampa_copia_aziendale: "nuovo_atto_vendita",
+  tutorial_elenco_atti: "elenco_atti",
+  tutorial_giacenza: "giacenza",
+  tutorial_fusioni: "fusioni",
+  tutorial_crm: "crm_clienti",
+  tutorial_academy: "academy",
+  tutorial_backup: "backup",
+  tutorial_utenti: "utenti"
+};
+const AURUM_LIVE_TUTORIALS = {
+  tutorial_compila_atto: {
+    title: "Compilazione atto di vendita",
+    intro: "Ti guido passo passo nella compilazione dell'atto di vendita.",
+    steps: [
+      { title: "Apri Nuovo Atto", text: "La pratica si compila dalla sezione Atto di Vendita. Controlla negozio, numero provvisorio, data e ora.", screen: "practice", practiceStep: 0, selector: ".practice-meta" },
+      { title: "Dati cliente", text: "Compila nome, cognome e codice fiscale. Se il cliente esiste già, l'app può recuperare i dati CRM.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="codice_fiscale"]' },
+      { title: "Documento", text: "Inserisci tipo, numero, rilascio e scadenza documento. Se è scaduto, chiedi un documento valido.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="documento"]' },
+      { title: "Residenza", text: "Completa indirizzo e provincia di residenza in modo leggibile e coerente.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="residenza"]' },
+      { title: "Oggetti preziosi", text: "Aggiungi descrizione, metallo e titolo/caratura per ogni oggetto ceduto.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="oggetti_preziosi"]' },
+      { title: "Pagamento", text: "Scegli metodo pagamento, inserisci totale e IBAN/contabile quando richiesti.", screen: "practice", practiceStep: 1, selector: '[data-aurum-help="metodo_pagamento"]' },
+      { title: "Documenti e foto", text: "Carica documento, tessera sanitaria, foto preziosi e contabile se prevista.", screen: "practice", practiceStep: 3, selector: ".capture-grid" },
+      { title: "Firme", text: "Fai firmare cliente e operatore nelle aree previste prima di completare.", screen: "practice", practiceStep: 2, selector: '[data-aurum-help="firma_cliente"]' },
+      { title: "Controllo e chiusura", text: "Nel riepilogo controlla checklist, stampa copie e poi completa o archivia.", screen: "practice", practiceStep: 4, selector: ".print-box" }
+    ]
+  },
+  tutorial_stampa_copia_cliente: {
+    title: "Stampa copia cliente",
+    intro: "Ti mostro come stampare o salvare la copia cliente.",
+    steps: [
+      { title: "Apri l'atto", text: "Apri l'atto da Elenco o resta nel riepilogo se lo stai compilando.", screen: "archive", selector: "#archiveGroups" },
+      { title: "Controlla dati", text: "Verifica cliente, vendita, oggetti, pagamento e firme prima della stampa.", screen: "practice", practiceStep: 4, selector: ".summary-grid" },
+      { title: "Copia cliente", text: "Clicca Stampa Copia cliente o apri l'anteprima copia cliente.", screen: "practice", practiceStep: 4, selector: "#printCustomerCopySummary" },
+      { title: "Anteprima", text: "Controlla l'anteprima: deve contenere solo i dati previsti per il cliente.", screen: "practice", practiceStep: 4, selector: ".print-box" },
+      { title: "Stampa o PDF", text: "Se l'anteprima è corretta, stampa o salva PDF dal browser/dispositivo.", screen: "practice", practiceStep: 4, selector: ".print-box" }
+    ]
+  },
+  tutorial_stampa_copia_aziendale: {
+    title: "Stampa copia aziendale",
+    intro: "Ti mostro come stampare o salvare la copia aziendale interna.",
+    steps: [
+      { title: "Apri o completa riepilogo", text: "La copia aziendale si controlla dal riepilogo dell'atto o dall'anteprima dell'atto archiviato.", screen: "practice", practiceStep: 4, selector: ".summary-grid" },
+      { title: "Controlla dati interni", text: "Verifica cliente, vendita, pagamento, allegati, foto preziosi e note operative.", screen: "practice", practiceStep: 4, selector: ".summary-grid" },
+      { title: "Copia aziendale", text: "Clicca Stampa Copia aziendale o apri l'anteprima copia aziendale.", screen: "practice", practiceStep: 4, selector: "#printCompanyCopySummary" },
+      { title: "Anteprima interna", text: "La copia aziendale può includere contenuti interni che non vanno confusi con la copia cliente.", screen: "practice", practiceStep: 4, selector: ".print-box" },
+      { title: "Stampa o PDF", text: "Se l'anteprima è corretta, stampa o salva PDF per archivio aziendale.", screen: "practice", practiceStep: 4, selector: ".print-box" }
+    ]
+  },
+  tutorial_elenco_atti: {
+    title: "Sezione Elenco Atti",
+    intro: "Ti spiego come usare l'elenco senza modificare per errore una pratica.",
+    steps: [
+      { title: "Filtro negozio", text: "Se autorizzato, scegli il negozio; altrimenti vedi solo ciò che il ruolo permette.", screen: "archive", selector: "#archiveStoreFilter" },
+      { title: "Ricerca", text: "Cerca per cliente, numero pratica o parola chiave quando l'elenco è lungo.", screen: "archive", selector: "#searchKeyword" },
+      { title: "Apri", text: "Apri mostra l'anteprima sola lettura dell'atto.", screen: "archive", selector: "#archiveGroups" },
+      { title: "Modifica/Riapri", text: "Modifica o Riapri carica l'atto nella sezione Atto di Vendita senza duplicarlo.", screen: "archive", selector: "#archiveGroups" },
+      { title: "Elimina", text: "Elimina rimuove l'atto dai flussi operativi solo dopo conferma e permessi corretti.", screen: "archive", selector: "#archiveGroups" }
+    ]
+  },
+  tutorial_giacenza: {
+    title: "Sezione Giacenza",
+    intro: "Ti guido nella lettura della giacenza per metallo, titolo e negozio.",
+    steps: [
+      { title: "Filtro negozio", text: "Scegli il negozio o Tutti se il tuo ruolo lo consente.", screen: "fusion", selector: "#fusionStoreFilter" },
+      { title: "Metallo e titolo", text: "Leggi grammi separati per metallo e caratura/titolo.", screen: "fusion", selector: "#fusionGroups" },
+      { title: "Atti validi", text: "La giacenza deve includere solo atti completati e non eliminati.", screen: "fusion", selector: "#fusionGroups" },
+      { title: "Preparazione fusione", text: "Usa questi dati per preparare lotti coerenti e senza duplicazioni.", screen: "fusion", selector: "#fusionGroups" }
+    ]
+  },
+  tutorial_fusioni: {
+    title: "Sezione Fusioni",
+    intro: "Ti spiego come ragionare sui lotti fusione partendo dalla giacenza valida.",
+    steps: [
+      { title: "Controlla giacenza", text: "Prima di fondere verifica metallo, caratura, grammi e negozio.", screen: "fusion", selector: "#fusionGroups" },
+      { title: "Separa materiale", text: "Non mischiare carature o materiali diversi nello stesso controllo operativo.", screen: "fusion", selector: "#fusionGroups" },
+      { title: "Genera lotto", text: "Crea il lotto solo quando gli atti sono completati, non eliminati e non già stornati.", screen: "fusion", selector: "#fusionGroups" },
+      { title: "PDF e storico", text: "Salva PDF fusione e aggiorna lo storico raffineria quando previsto.", screen: "fusion", selector: "#fusionGroups" }
+    ]
+  },
+  tutorial_crm: {
+    title: "Sezione CRM",
+    intro: "Ti guido nella gestione dello storico cliente.",
+    steps: [
+      { title: "Cerca cliente", text: "Usa ricerca per nome, telefono o codice fiscale senza inserire dati superflui.", screen: "crm", selector: "#crmSearch" },
+      { title: "Apri dettaglio", text: "Controlla storico atti, pagamenti, note e negozi visitati.", screen: "crm", selector: "#crmList" },
+      { title: "Modifica cliente", text: "Aggiorna solo dati utili e verificati.", screen: "crm", selector: "#crmList" },
+      { title: "Note operative", text: "Scrivi note brevi e professionali, utili per la prossima interazione.", screen: "crm", selector: "#crmList" }
+    ]
+  },
+  tutorial_academy: {
+    title: "OroActive Academy",
+    intro: "Ti spiego catalogo, corsi, badge e certificazioni.",
+    steps: [
+      { title: "Catalogo", text: "Apri il catalogo e scegli corso o facoltà.", screen: "training", selector: "#trainingList" },
+      { title: "I miei corsi", text: "Controlla avanzamento e materiali da completare.", screen: "training", selector: "#courseSummary" },
+      { title: "Certificazioni", text: "Le certificazioni confermano percorsi o esami completati.", screen: "training", selector: "#courseSummary" },
+      { title: "Badge", text: "I badge mostrano competenze e traguardi interni.", screen: "training", selector: "#courseSummary" },
+      { title: "Gestione Academy", text: "Solo ruoli autorizzati possono creare o modificare corsi e materiali.", screen: "training", selector: "#trainingCourseForm" }
+    ]
+  },
+  tutorial_backup: {
+    title: "Sezione Backup",
+    intro: "Ti guido nel backup manuale e verificabile.",
+    steps: [
+      { title: "Crea backup", text: "Clicca Crea nuovo backup e attendi il completamento.", screen: "backups", selector: "#runBackupNow" },
+      { title: "Verifica integrità", text: "Dopo la creazione, usa Verifica per controllare checksum e manifest.", screen: "backups", selector: "#backupsList" },
+      { title: "Download", text: "Il download passa da endpoint autenticato ed è riservato ai ruoli previsti.", screen: "backups", selector: "#backupsList" },
+      { title: "Test restore", text: "Solo Founder può avviare test restore su ambiente sicuro.", screen: "backups", selector: "#backupsList" },
+      { title: "Elimina", text: "Elimina solo quando sei certo che il backup non serva più.", screen: "backups", selector: "#backupsList" }
+    ]
+  },
+  tutorial_utenti: {
+    title: "Sezione Utenti",
+    intro: "Ti spiego ruoli, permessi, stato online e attività.",
+    steps: [
+      { title: "Lista utenti", text: "Vedi solo gli utenti consentiti dal tuo ruolo.", screen: "users", selector: "#usersList" },
+      { title: "Ruoli", text: "Imposta ruolo corretto: Founder, Supervisore, Responsabile, Commesso o Aiuto commesso.", screen: "users", selector: "#userRole" },
+      { title: "Negozio", text: "Associa il negozio quando il ruolo non vede tutti i punti vendita.", screen: "users", selector: "#userStore" },
+      { title: "Attività", text: "Apri Attività per vedere login, modifiche, stampe e operazioni disponibili.", screen: "users", selector: "#usersList" },
+      { title: "Salva", text: "Salva e controlla che l'elenco si aggiorni senza errori di altre sezioni.", screen: "users", selector: "#userForm" }
+    ]
+  }
+};
 
 function normalizeSignatureArray(value, fallback = false) {
   const source = Array.isArray(value) ? value : [];
@@ -219,6 +573,7 @@ const aurumChatMessages = document.getElementById("aurumChatMessages");
 const aurumChatForm = document.getElementById("aurumChatForm");
 const aurumQuestion = document.getElementById("aurumQuestion");
 const aurumAskButton = document.getElementById("aurumAskButton");
+const aurumTutorToolbar = document.getElementById("aurumTutorToolbar");
 const aurumConsentPanel = document.getElementById("aurumConsentPanel");
 const aurumRememberYes = document.getElementById("aurumRememberYes");
 const aurumRememberNo = document.getElementById("aurumRememberNo");
@@ -1137,12 +1492,18 @@ function renderTutorialStep() {
     finishTutorial();
     return;
   }
-  step.action?.();
+  if (state.tutorial.source === "aurum") {
+    runAurumTutorialStepAction(step);
+    ensureAurumHelpAttributes();
+  } else {
+    step.action?.();
+  }
   tutorialTitle.textContent = step.title;
   tutorialText.textContent = step.text;
   tutorialCount.textContent = `Passo ${state.tutorial.index + 1} di ${state.tutorial.steps.length}`;
   tutorialBack.disabled = state.tutorial.index === 0;
   tutorialNext.textContent = state.tutorial.index === state.tutorial.steps.length - 1 ? "Fine tutorial" : "Avanti";
+  tutorialSkip.textContent = state.tutorial.source === "aurum" ? "Chiudi tutorial" : "Salta tutorial";
   tutorialOverlay.hidden = false;
   window.setTimeout(() => applyTutorialHighlight(step.selector), 120);
 }
@@ -1155,13 +1516,21 @@ function markTutorialSeen() {
 
 function finishTutorial(options = {}) {
   const shouldRemember = state.tutorial.firstRun || options.remember;
+  const source = state.tutorial.source || "";
   if (shouldRemember) markTutorialSeen();
   state.tutorial.active = false;
   state.tutorial.index = 0;
   state.tutorial.steps = [];
   state.tutorial.firstRun = false;
+  state.tutorial.source = "";
+  state.tutorial.id = "";
   tutorialOverlay.hidden = true;
   clearTutorialHighlight();
+  tutorialSkip.textContent = "Salta tutorial";
+  if (source === "aurum" && options.completed) {
+    state.aurumMessages.push({ role: "assistant", content: "Tutorial completato." });
+    renderAurumMessages();
+  }
 }
 
 function startTutorial(options = {}) {
@@ -1170,6 +1539,8 @@ function startTutorial(options = {}) {
   state.tutorial.index = 0;
   state.tutorial.steps = buildTutorialSteps();
   state.tutorial.firstRun = Boolean(options.firstRun);
+  state.tutorial.source = "app";
+  state.tutorial.id = "tutorial_generale";
   renderTutorialStep();
 }
 
@@ -1624,6 +1995,7 @@ async function startAuthenticatedApp() {
   renderPaymentCaptureCard();
   updateChecklistState();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
+  ensureAurumHelpAttributes();
   if (canViewUsersDirectory()) loadUsers();
   await loadAurumMemories();
   if (["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) await loadAurumSupportRequests();
@@ -2399,6 +2771,208 @@ async function askAssistant(event) {
   }
 }
 
+function ensureAurumHelpAttributes() {
+  AURUM_HELP_TARGETS.forEach(({ key, selector }) => {
+    document.querySelectorAll(selector).forEach((element) => {
+      element.dataset.aurumHelp = key;
+    });
+  });
+}
+
+function aurumNormalize(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function aurumSectionKey(section = state.aurumCurrentSection) {
+  return AURUM_SECTION_MAP[section] || section || "nuovo_atto_vendita";
+}
+
+function currentAurumGuide(section = state.aurumCurrentSection) {
+  return OROACTIVE_APP_GUIDE[aurumSectionKey(section)] || OROACTIVE_APP_GUIDE.nuovo_atto_vendita;
+}
+
+function currentAurumSubSection() {
+  if (aurumSectionKey() === "nuovo_atto_vendita") {
+    return document.querySelector(".form-step.active-step h2")?.textContent?.trim() || "";
+  }
+  return document.querySelector(".screen.active-screen h2")?.textContent?.trim() || "";
+}
+
+function elementIsVisible(element) {
+  if (!element || element.hidden) return false;
+  const rect = element.getBoundingClientRect();
+  return Boolean(rect.width || rect.height);
+}
+
+function visibleAurumFields() {
+  const fields = new Set(currentAurumGuide().fields || []);
+  document.querySelectorAll(".screen.active-screen [data-aurum-help], .main-menu-screen:not([hidden]) [data-aurum-help]").forEach((element) => {
+    if (!elementIsVisible(element)) return;
+    const help = AURUM_FIELD_HELP[element.dataset.aurumHelp];
+    if (help?.labels?.[0]) fields.add(help.labels[0]);
+  });
+  return [...fields].slice(0, 24);
+}
+
+function visibleAurumActions() {
+  const actions = new Set(currentAurumGuide().actions || []);
+  document.querySelectorAll(".screen.active-screen button, .main-menu-screen:not([hidden]) button").forEach((button) => {
+    if (!elementIsVisible(button)) return;
+    const text = button.textContent?.replace(/\s+/g, " ").trim();
+    if (text && text.length <= 60) actions.add(text);
+  });
+  return [...actions].slice(0, 24);
+}
+
+function aurumRoleAdvice() {
+  const role = normalizeRole(state.currentUser?.ruolo);
+  if (role === "founder") return "Hai accesso direzionale: posso includere dashboard, utenti, backup, audit e performance.";
+  if (role === "responsabile") return "Adatto la guida a controllo operatori, giacenza, corsi team e flussi negozio.";
+  if (role === "aiuto_commesso") return "Ti guido con passaggi più semplici e segnalo quando serve un responsabile.";
+  return "Mi concentro su operatività corretta, compilazione atti e procedure quotidiane.";
+}
+
+function formatAurumGuideResponse(guideKey, tutorialId = "") {
+  const guide = OROACTIVE_APP_GUIDE[guideKey] || currentAurumGuide();
+  const tutorial = AURUM_LIVE_TUTORIALS[tutorialId];
+  const steps = tutorial?.steps?.map((step) => step.text) || guide.steps || [];
+  return [
+    `${tutorial?.title || guide.title}`,
+    "",
+    `Obiettivo: ${guide.description}`,
+    `Prerequisiti: permesso coerente con il ruolo, dati verificati e sezione corretta aperta.`,
+    "",
+    "Passaggi:",
+    ...steps.map((step, index) => `${index + 1}. ${step}`),
+    "",
+    `Controlli da fare: ${(guide.checks || []).join(", ")}.`,
+    `Errori da evitare: ${(guide.commonErrors || []).join(", ")}.`,
+    `Alla fine: salva, stampa o completa solo dopo aver verificato i controlli obbligatori.`,
+    "",
+    aurumRoleAdvice()
+  ].join("\n");
+}
+
+function aurumFieldByQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  const activeKey = document.activeElement?.closest?.("[data-aurum-help]")?.dataset?.aurumHelp || "";
+  if (/questo campo|campo selezionato|campo attuale/.test(normalized) && activeKey) return activeKey;
+  return Object.entries(AURUM_FIELD_HELP).find(([, help]) => (
+    help.labels.some((label) => normalized.includes(aurumNormalize(label)))
+  ))?.[0] || "";
+}
+
+function explainAurumField(fieldKey = "") {
+  const help = AURUM_FIELD_HELP[fieldKey];
+  if (!help) return "";
+  const label = help.labels[0] || "campo";
+  return `Campo: ${label}\n\n${help.text}\n\nDove controllarlo: ${currentAurumGuide().title}. Se il campo non è visibile, apri la sezione corretta o il passaggio relativo.`;
+}
+
+function inferAurumTutorialId(question = "") {
+  const normalized = aurumNormalize(question);
+  if (/(copia cliente|stampa cliente|stampare.*cliente|pdf cliente)/.test(normalized)) return "tutorial_stampa_copia_cliente";
+  if (/(copia aziendale|stampa aziendale|stampare.*aziendale|pdf aziendale)/.test(normalized)) return "tutorial_stampa_copia_aziendale";
+  if (/(elenco|archivio|lista atti|atti creati)/.test(normalized)) return "tutorial_elenco_atti";
+  if (/(giacenza|grammi|materiale in giacenza)/.test(normalized)) return "tutorial_giacenza";
+  if (/(fusione|fusioni|lotto|raffineria)/.test(normalized)) return "tutorial_fusioni";
+  if (/(crm|cliente crm|storico cliente|modifico un cliente)/.test(normalized)) return "tutorial_crm";
+  if (/(academy|corso|corsi|badge|certificazione|formazione)/.test(normalized)) return "tutorial_academy";
+  if (/(backup|restore|scarica backup|verifica backup)/.test(normalized)) return "tutorial_backup";
+  if (/(utenti|utente|ruoli|permessi|online|offline|attivita utente)/.test(normalized)) return "tutorial_utenti";
+  if (/(atto di vendita|compil.*atto|nuovo atto|archiviare|completa pratica|cosa devo controllare)/.test(normalized)) return "tutorial_compila_atto";
+  if (/(guidami|passo passo|tutorial operativo|cosa devo fare ora|spiegami questa sezione|come funziona questa sezione)/.test(normalized)) {
+    return {
+      nuovo_atto_vendita: "tutorial_compila_atto",
+      elenco_atti: "tutorial_elenco_atti",
+      giacenza: "tutorial_giacenza",
+      fusioni: "tutorial_fusioni",
+      crm_clienti: "tutorial_crm",
+      academy: "tutorial_academy",
+      backup: "tutorial_backup",
+      utenti: "tutorial_utenti"
+    }[aurumSectionKey()] || "";
+  }
+  return "";
+}
+
+function aurumTutorialAllowed(tutorialId = "") {
+  const guide = OROACTIVE_APP_GUIDE[AURUM_TUTORIAL_TO_GUIDE[tutorialId]];
+  if (!guide) return true;
+  return (guide.permissions || []).includes(normalizeRole(state.currentUser?.ruolo));
+}
+
+function runAurumTutorialStepAction(step = {}) {
+  if (step.screen) {
+    if (mainMenuScreen) mainMenuScreen.hidden = true;
+    setScreen(step.screen);
+  }
+  if (Number.isInteger(step.practiceStep)) {
+    state.step = step.practiceStep;
+    renderStep();
+  }
+}
+
+function buildAurumTutorialSteps(tutorialId = "") {
+  const tutorial = AURUM_LIVE_TUTORIALS[tutorialId];
+  if (!tutorial) return [];
+  return tutorial.steps.map((step) => ({ ...step, aurum: true }));
+}
+
+function startAurumTutorial(tutorialId = "") {
+  if (!shouldShowAurumMascot()) return false;
+  const tutorial = AURUM_LIVE_TUTORIALS[tutorialId];
+  if (!tutorial) return false;
+  if (!aurumTutorialAllowed(tutorialId)) {
+    state.aurumMessages.push({
+      role: "assistant",
+      content: "Potresti non avere il permesso per questa procedura. Puoi chiedere a un responsabile o al founder."
+    });
+    renderAurumMessages();
+    return true;
+  }
+  ensureAurumHelpAttributes();
+  state.tutorial.active = true;
+  state.tutorial.source = "aurum";
+  state.tutorial.id = tutorialId;
+  state.tutorial.index = 0;
+  state.tutorial.steps = buildAurumTutorialSteps(tutorialId);
+  state.tutorial.firstRun = false;
+  state.aurumMessages.push({ role: "assistant", content: `${tutorial.intro}\n\nAvvio la Guida passo passo: usa Avanti, Indietro o Chiudi tutorial.` });
+  renderAurumMessages();
+  renderTutorialStep();
+  return true;
+}
+
+function handleAurumTutorRequest(question = "") {
+  const fieldKey = aurumFieldByQuestion(question);
+  if (fieldKey) {
+    const answer = explainAurumField(fieldKey);
+    state.aurumMessages.push({ role: "assistant", content: answer });
+    const target = document.querySelector(`[data-aurum-help="${cssEscape(fieldKey)}"]`);
+    if (target) applyTutorialHighlight(`[data-aurum-help="${cssEscape(fieldKey)}"]`);
+    renderAurumMessages();
+    return true;
+  }
+  if (/(questo campo|a cosa serve.*campo|spiegami.*campo)/.test(aurumNormalize(question))) {
+    state.aurumMessages.push({ role: "assistant", content: "Seleziona o tocca un campo visibile e poi chiedimi di spiegarlo. Posso spiegare codice fiscale, documento, residenza, metallo, titolo, peso, pagamento, contabile, firme, giacenza, fusioni, badge e certificazioni." });
+    renderAurumMessages();
+    return true;
+  }
+  const tutorialId = inferAurumTutorialId(question);
+  if (!tutorialId) return false;
+  const guideKey = AURUM_TUTORIAL_TO_GUIDE[tutorialId] || aurumSectionKey();
+  state.aurumMessages.push({ role: "assistant", content: formatAurumGuideResponse(guideKey, tutorialId) });
+  renderAurumMessages();
+  startAurumTutorial(tutorialId);
+  return true;
+}
+
 function stopAurumTips() {
   window.clearTimeout(state.aurumTipTimer);
   window.clearTimeout(state.aurumTipHideTimer);
@@ -2749,17 +3323,37 @@ async function requestAurumSupport(requestedRole = "responsabile") {
 }
 
 function aurumContextPayload(question) {
+  const guide = currentAurumGuide();
+  const tutorialId = inferAurumTutorialId(question);
   return {
     domanda: question,
     message: question,
-    mode: "chat",
-    interface: "aurum_interactive_mascot",
-    section: state.aurumCurrentSection,
+    mode: tutorialId ? "tutorial_operativo" : "chat",
+    interface: "aurum_operational_tutor",
+    section: aurumSectionKey(),
     userId: state.currentUser?.id || null,
     context: {
+      currentSection: aurumSectionKey(),
+      currentSubSection: currentAurumSubSection(),
+      userRole: state.currentUser?.ruolo || "",
       role: state.currentUser?.ruolo || "",
+      storeName: state.currentUser?.negozio || "",
       store: state.currentUser?.negozio || "",
       userName: aurumUserLabel(),
+      visibleFields: visibleAurumFields(),
+      availableActions: visibleAurumActions(),
+      appGuide: {
+        title: guide.title,
+        description: guide.description,
+        fields: guide.fields,
+        actions: guide.actions,
+        steps: guide.steps,
+        checks: guide.checks,
+        commonErrors: guide.commonErrors,
+        permissions: guide.permissions
+      },
+      tutorialRequested: Boolean(tutorialId),
+      tutorialId,
       availableMemories: (state.aurumMemories || []).map((memory) => memory.memory_text).filter(Boolean).slice(0, 8)
     }
   };
@@ -2780,6 +3374,10 @@ async function askAurum(event) {
 
   if (handleAurumMoodReply(question)) {
     renderAurumMessages();
+    return;
+  }
+
+  if (handleAurumTutorRequest(question)) {
     return;
   }
 
@@ -7400,6 +7998,23 @@ aurumTipClose?.addEventListener("click", () => {
   if (aurumTipBubble) aurumTipBubble.hidden = true;
 });
 aurumChatForm?.addEventListener("submit", askAurum);
+aurumTutorToolbar?.addEventListener("click", (event) => {
+  const tutorialButton = event.target.closest("[data-aurum-tutorial]");
+  if (tutorialButton) {
+    const tutorialId = tutorialButton.dataset.aurumTutorial;
+    state.aurumMessages.push({ role: "assistant", content: formatAurumGuideResponse(AURUM_TUTORIAL_TO_GUIDE[tutorialId], tutorialId) });
+    renderAurumMessages();
+    startAurumTutorial(tutorialId);
+    return;
+  }
+  if (event.target.closest("[data-aurum-field-help]")) {
+    const activeKey = document.activeElement?.closest?.("[data-aurum-help]")?.dataset?.aurumHelp || "";
+    const fallbackKey = AURUM_HELP_TARGETS.find(({ selector }) => document.querySelector(selector))?.key || "";
+    const answer = explainAurumField(activeKey || fallbackKey);
+    state.aurumMessages.push({ role: "assistant", content: answer || "Seleziona un campo e poi chiedimi di spiegarlo." });
+    renderAurumMessages();
+  }
+});
 aurumRememberYes?.addEventListener("click", saveAurumMemory);
 aurumRememberNo?.addEventListener("click", () => {
   showAurumMemoryConsent(null);
@@ -7620,8 +8235,9 @@ document.querySelectorAll("[data-start-tutorial]").forEach((button) => {
 tutorialNext.addEventListener("click", () => {
   if (!state.tutorial.active) return;
   if (state.tutorial.index >= state.tutorial.steps.length - 1) {
-    finishTutorial({ remember: true });
-    showToast("Tutorial completato. Puoi iniziare la compilazione dell'atto.");
+    const isAurumTutorial = state.tutorial.source === "aurum";
+    finishTutorial({ remember: !isAurumTutorial, completed: true });
+    showToast(isAurumTutorial ? "Tutorial Aurum completato." : "Tutorial completato. Puoi iniziare la compilazione dell'atto.");
     return;
   }
   state.tutorial.index += 1;
@@ -7635,8 +8251,9 @@ tutorialBack.addEventListener("click", () => {
 });
 
 tutorialSkip.addEventListener("click", () => {
-  finishTutorial({ remember: true });
-  showToast("Tutorial chiuso. Puoi riaprirlo dal menu quando vuoi.");
+  const isAurumTutorial = state.tutorial.source === "aurum";
+  finishTutorial({ remember: !isAurumTutorial });
+  showToast(isAurumTutorial ? "Guida Aurum chiusa." : "Tutorial chiuso. Puoi riaprirlo dal menu quando vuoi.");
 });
 
 document.querySelectorAll("[data-return-menu]").forEach((button) => {

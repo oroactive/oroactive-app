@@ -1830,15 +1830,30 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const hasAcademyContext = chunks.some((chunk) => chunk.metadata?.sourceType === "academy");
   const shouldUseWeb = chunks.length < 3 || options.allowWeb === true;
   const web = shouldUseWeb ? await webSearchFallback(domanda) : { available: false, results: [] };
-  const mode = options.mode === "quiz" ? "quiz" : "chat";
+  const mode = options.mode === "quiz" ? "quiz" : options.mode === "tutorial_operativo" ? "tutorial_operativo" : "chat";
   const aurumContext = sanitizeForPostgres(options.context || {});
   const aurumMemories = Array.isArray(aurumContext.availableMemories)
     ? aurumContext.availableMemories.map((item) => String(item || "").slice(0, 240)).filter(Boolean).slice(0, 8)
     : [];
+  const aurumGuide = aurumContext.appGuide && typeof aurumContext.appGuide === "object" ? aurumContext.appGuide : {};
+  const aurumFields = Array.isArray(aurumContext.visibleFields) ? aurumContext.visibleFields.slice(0, 24).join(", ") : "";
+  const aurumActions = Array.isArray(aurumContext.availableActions) ? aurumContext.availableActions.slice(0, 24).join(", ") : "";
+  const aurumGuideText = [
+    aurumGuide.title ? `Guida sezione: ${String(aurumGuide.title).slice(0, 120)}` : "",
+    aurumGuide.description ? `Descrizione: ${String(aurumGuide.description).slice(0, 500)}` : "",
+    Array.isArray(aurumGuide.fields) ? `Campi noti: ${aurumGuide.fields.slice(0, 30).join(", ")}` : "",
+    Array.isArray(aurumGuide.actions) ? `Azioni note: ${aurumGuide.actions.slice(0, 30).join(", ")}` : "",
+    Array.isArray(aurumGuide.steps) ? `Procedura: ${aurumGuide.steps.slice(0, 12).map((step, index) => `${index + 1}. ${step}`).join(" ")}` : "",
+    Array.isArray(aurumGuide.commonErrors) ? `Errori comuni: ${aurumGuide.commonErrors.slice(0, 12).join(", ")}` : ""
+  ].filter(Boolean).join("\n");
   const aurumSectionContext = [
-    options.section ? `Sezione app: ${String(options.section).slice(0, 80)}` : "",
-    aurumContext.role ? `Ruolo utente: ${String(aurumContext.role).slice(0, 80)}` : "",
-    aurumContext.store ? `Negozio: ${String(aurumContext.store).slice(0, 120)}` : "",
+    options.section || aurumContext.currentSection ? `Sezione app: ${String(options.section || aurumContext.currentSection).slice(0, 80)}` : "",
+    aurumContext.currentSubSection ? `Sottosezione: ${String(aurumContext.currentSubSection).slice(0, 120)}` : "",
+    aurumContext.userRole || aurumContext.role ? `Ruolo utente: ${String(aurumContext.userRole || aurumContext.role).slice(0, 80)}` : "",
+    aurumContext.storeName || aurumContext.store ? `Negozio: ${String(aurumContext.storeName || aurumContext.store).slice(0, 120)}` : "",
+    aurumFields ? `Campi visibili: ${aurumFields}` : "",
+    aurumActions ? `Azioni visibili: ${aurumActions}` : "",
+    aurumGuideText,
     aurumMemories.length ? `Memorie consensuali utente: ${aurumMemories.join(" | ")}` : ""
   ].filter(Boolean).join("\n");
   const context = chunks.map((chunk, index) => (
@@ -1868,7 +1883,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const client = openai;
     const result = await client.responses.create({
       model: openaiModel,
-      input: `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.
+      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.`}
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Usa prima il libro "La bilancia d'oro" di Christian Dinato, poi le procedure/conoscenze OroActive approvate.
 Le conoscenze OroActive approvate possono essere piu recenti e operative del libro: se sono piu dettagliate, integrale alla risposta senza ignorarle.
@@ -1878,7 +1893,7 @@ Se il contesto non contiene abbastanza informazioni e non sono presenti risultat
 Non inventare fonti web aggiornate: usa soltanto i risultati web forniti nel contesto.
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
-Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : "Assistente operativo."}
+Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : "Assistente operativo."}
 
 CONTESTO APP AURUM:
 ${aurumSectionContext || "Nessun contesto app fornito."}
