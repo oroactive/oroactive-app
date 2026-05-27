@@ -348,8 +348,8 @@ test("mascotte Aurum e prototipo AI sono dietro feature flag", async () => {
   ]);
 
   assert.match(index, /id="aurumMascotRoot"/);
-  assert.match(index, /aria-label="Aurum bassottino assistente OroActive"/);
-  assert.match(index, /bassottino dorato AI OroActive/);
+  assert.match(index, /aria-label="Aurum volpe dorata assistente OroActive"/);
+  assert.match(index, /volpe dorata AI OroActive/);
   assert.match(index, /Aurum — Assistente OroActive/);
   assert.match(index, /id="aurumFounderTestPanel"/);
   assert.match(index, /Test Mascotte AI/);
@@ -361,8 +361,8 @@ test("mascotte Aurum e prototipo AI sono dietro feature flag", async () => {
   assert.match(app, /interface: "aurum_mascot_test"/);
   assert.match(app, /setAurumMascotTestActive/);
   assert.match(styles, /\.aurum-mascot-root/);
-  assert.match(styles, /\.aurum-dachshund/);
-  assert.match(styles, /\.aurum-dog-body/);
+  assert.match(styles, /\.aurum-fox/);
+  assert.match(styles, /\.aurum-fox-body/);
   assert.match(styles, /@keyframes aurum-breath/);
   assert.match(styles, /@keyframes aurum-blink/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
