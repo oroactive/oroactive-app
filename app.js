@@ -27,6 +27,9 @@ const state = {
   aurumShieldTimer: null,
   aurumShieldSettings: null,
   aurumShieldAlerts: [],
+  guidedQualityCheck: null,
+  guidedQualityTimer: null,
+  guidedQualityLoading: false,
   bullionVaultPrices: {},
   lastActCaptureAttachments: [],
   loadedSignatureImages: [],
@@ -652,6 +655,11 @@ const aurumShieldFactors = document.getElementById("aurumShieldFactors");
 const aurumShieldRecommendations = document.getElementById("aurumShieldRecommendations");
 const aurumShieldSettingsForm = document.getElementById("aurumShieldSettingsForm");
 const aurumShieldAlertsList = document.getElementById("aurumShieldAlertsList");
+const guidedQualityPanel = document.getElementById("guidedQualityPanel");
+const guidedQualityStatusText = document.getElementById("guidedQualityStatusText");
+const guidedQualityScore = document.getElementById("guidedQualityScore");
+const guidedQualityList = document.getElementById("guidedQualityList");
+const guidedQualityActions = document.getElementById("guidedQualityActions");
 const storeForm = document.getElementById("storeForm");
 const storesList = document.getElementById("storesList");
 const antifraudList = document.getElementById("antifraudList");
@@ -4260,6 +4268,7 @@ function scheduleAurumShieldEvaluation() {
   state.aurumShieldTimer = window.setTimeout(() => {
     evaluateAurumShield({ silent: true });
   }, 800);
+  scheduleQualityCheckValidation();
 }
 
 async function confirmAurumShieldBeforeFinalSave(shield) {
@@ -4271,6 +4280,147 @@ async function confirmAurumShieldBeforeFinalSave(shield) {
   }
   const preview = (shield.factors || []).slice(0, 4).map((factor) => `- ${factor.message}`).join("\n");
   return window.confirm(`Aurum Shield ha rilevato rischio ${level}.\n\n${preview}\n\nVerifica i punti indicati prima di completare. Vuoi confermare comunque?`);
+}
+
+function guidedQualityMeta(status = "non_completabile") {
+  return {
+    completabile: { label: "COMPLETABILE", className: "quality-ok", icon: "✅" },
+    attenzione: { label: "COMPLETABILE CON ATTENZIONE", className: "quality-warning", icon: "⚠️" },
+    non_completabile: { label: "NON COMPLETABILE", className: "quality-error", icon: "❌" }
+  }[status] || { label: "NON COMPLETABILE", className: "quality-error", icon: "❌" };
+}
+
+function guidedQualityIcon(status = "") {
+  return status === "ok" ? "✅" : status === "warning" ? "⚠️" : "❌";
+}
+
+function qualityCheckDraftData(status = "completed") {
+  return {
+    ...currentActSnapshot(status),
+    amlCashCheck: state.amlCashCheck,
+    aurumShield: state.aurumShield
+  };
+}
+
+function renderGuidedQualityCheck(quality = state.guidedQualityCheck) {
+  if (!guidedQualityPanel || !guidedQualityList) return;
+  const status = quality?.quality_status || quality?.status || "non_completabile";
+  const meta = guidedQualityMeta(status);
+  guidedQualityPanel.classList.remove("quality-ok", "quality-warning", "quality-error");
+  guidedQualityPanel.classList.add(meta.className);
+  if (guidedQualityStatusText) {
+    guidedQualityStatusText.textContent = quality?.summary || "Controllo in attesa dei dati pratica.";
+  }
+  if (guidedQualityScore) {
+    guidedQualityScore.textContent = `${Number(quality?.score || 0)}%`;
+  }
+  const checks = Array.isArray(quality?.checks) ? quality.checks : [];
+  if (!checks.length) {
+    guidedQualityList.innerHTML = '<p class="muted">Compila l\'atto per visualizzare i controlli automatici prima di completare, archiviare o stampare.</p>';
+  } else {
+    guidedQualityList.innerHTML = checks.map((check) => `
+      <article class="guided-quality-check ${escapeHtml(check.status || "error")}">
+        <div>
+          <strong>${guidedQualityIcon(check.status)} ${escapeHtml(check.label || "Controllo pratica")}</strong>
+          <span>${escapeHtml(check.message || "")}</span>
+          ${check.status !== "ok" && check.action ? `<small>Azione: ${escapeHtml(check.action)}</small>` : ""}
+        </div>
+        ${check.status !== "ok" && check.target ? `<button class="ghost-button" type="button" data-quality-target="${escapeHtml(check.target)}">Vai al campo</button>` : ""}
+      </article>
+    `).join("");
+  }
+  const actions = Array.isArray(quality?.required_actions) ? quality.required_actions : [];
+  if (guidedQualityActions) {
+    guidedQualityActions.hidden = !actions.length;
+    guidedQualityActions.innerHTML = actions.length
+      ? `<strong>Azioni richieste</strong><ol>${actions.slice(0, 8).map((action) => `<li>${escapeHtml(action)}</li>`).join("")}</ol>`
+      : "";
+  }
+}
+
+async function validateQualityChecklist(options = {}) {
+  if (!state.authToken || !guidedQualityPanel) return null;
+  state.guidedQualityLoading = true;
+  try {
+    const data = await apiRequest("/quality-check/validate", {
+      method: "POST",
+      timeoutMs: 18000,
+      body: JSON.stringify({
+        atto_id: options.saleDeedId || state.editingActId || "",
+        draft_data: options.draftData || qualityCheckDraftData(options.status || "completed")
+      })
+    });
+    state.guidedQualityCheck = data;
+    if (data?.aurum_shield) {
+      state.aurumShield = data.aurum_shield;
+      renderAurumShieldCard();
+    }
+    renderGuidedQualityCheck(data);
+    return data;
+  } catch (error) {
+    if (!options.silent) showToast(error.message || "Controllo qualità non disponibile.", "warning");
+    return null;
+  } finally {
+    state.guidedQualityLoading = false;
+  }
+}
+
+function scheduleQualityCheckValidation() {
+  if (!state.authToken || !guidedQualityPanel) return;
+  window.clearTimeout(state.guidedQualityTimer);
+  state.guidedQualityTimer = window.setTimeout(() => {
+    validateQualityChecklist({ silent: true, status: "completed" });
+  }, 900);
+}
+
+function qualityTargetStep(target = "") {
+  if (/signature|firma/i.test(target)) return 2;
+  if (/capture|document|paymentCapture|preziosi-|codice-fiscale|foto/i.test(target)) return 3;
+  if (/payment|saleTotal|iban/i.test(target)) return 1;
+  if (/aurumShield|qualityReview|guidedQuality/i.test(target)) return 4;
+  return 0;
+}
+
+function focusQualityTarget(target = "") {
+  if (!target) return;
+  state.step = qualityTargetStep(target);
+  renderStep();
+  window.setTimeout(() => {
+    const element = document.querySelector(target);
+    if (!element) {
+      showToast("Campo collegato non visibile in questa sezione.");
+      return;
+    }
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.classList.add("quality-target-highlight");
+    if (typeof element.focus === "function") element.focus({ preventScroll: true });
+    window.setTimeout(() => element.classList.remove("quality-target-highlight"), 2200);
+  }, 120);
+}
+
+function showAurumQualityGuidance(quality) {
+  if (!shouldShowAurumMascot()) return;
+  const firstAction = quality?.required_actions?.[0] || quality?.blocking_errors?.[0] || quality?.warnings?.[0];
+  if (firstAction) showAurumTip(`Aurum ha controllato la pratica: ${firstAction}`);
+}
+
+async function ensureGuidedQualityAllows(action = "complete", options = {}) {
+  const quality = await validateQualityChecklist({ status: options.status || "completed", silent: false, draftData: options.draftData });
+  if (!quality) return false;
+  const status = quality.quality_status || quality.status;
+  if (status === "non_completabile") {
+    showToast("Non puoi completare questa pratica. Risolvi prima i controlli obbligatori evidenziati.", "error");
+    showAurumQualityGuidance(quality);
+    return false;
+  }
+  if (status === "attenzione") {
+    showAurumQualityGuidance(quality);
+    const preview = (quality.warnings || []).slice(0, 5).join("\n- ");
+    const label = action === "print" ? "stampare" : action === "archive" ? "archiviare" : "completare";
+    return window.confirm(`Controllo Qualità: pratica completabile con attenzione.\n\n- ${preview}\n\nVuoi ${label} comunque dopo aver verificato i punti indicati?`);
+  }
+  if (shouldShowAurumMascot()) showAurumTip("La pratica è pronta. Hai completato tutti i controlli principali.");
+  return true;
 }
 
 function renderAurumShieldSettings(settings = {}) {
@@ -6387,6 +6537,7 @@ async function saveQualityReview() {
     await saveActRecord(updatedAct, "PUT");
     await syncActsFromServer();
     if (isAdmin()) await loadUsers();
+    scheduleQualityCheckValidation();
     showToast(review.status === "positive" ? "Controllo qualità positivo salvato." : "Controllo qualità negativo salvato.");
     return true;
   } catch (error) {
@@ -6584,7 +6735,9 @@ async function loadActForEdit(practiceNumber) {
   renderStep();
   setScreen("practice");
   state.aurumShield = act.aurumShield || null;
+  state.guidedQualityCheck = act.qualityCheck || null;
   renderAurumShieldCard();
+  renderGuidedQualityCheck();
   scheduleAurumShieldEvaluation();
   previewModal.hidden = true;
   state.editingDirty = false;
@@ -6650,8 +6803,11 @@ async function resetCurrentPractice(options = {}) {
   window.clearTimeout(state.amlCashCheckTimer);
   state.aurumShield = null;
   window.clearTimeout(state.aurumShieldTimer);
+  state.guidedQualityCheck = null;
+  window.clearTimeout(state.guidedQualityTimer);
   renderAmlCashAlert();
   renderAurumShieldCard();
+  renderGuidedQualityCheck();
   setQualityReview(null);
 
   await setPracticeMeta({ deferPracticeNumber: options.deferPracticeNumber });
@@ -6667,6 +6823,7 @@ async function resetCurrentPractice(options = {}) {
   updateIbanVisibility();
   updateAttachmentState();
   updateChecklistState();
+  scheduleQualityCheckValidation();
 }
 
 async function deleteCurrentPractice() {
@@ -7154,6 +7311,7 @@ function renderStep() {
   const isFinalStep = state.step === 4;
   nextStepButton.textContent = isFinalStep ? "Completa pratica" : "Avanti";
   nextStepButton.classList.toggle("complete-practice-button", isFinalStep);
+  if (isFinalStep) scheduleQualityCheckValidation();
 }
 
 function updateSignatureState() {
@@ -8173,8 +8331,9 @@ function preparePrintPacket() {
   ].join("");
 }
 
-function printBothCopies() {
+async function printBothCopies() {
   if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
+  if (!(await ensureGuidedQualityAllows("print", { status: "completed" }))) return;
   const missing = validatePrintScope("company");
   if (missing.length) {
     showToast(validationMessage(missing, "le copie cliente e aziendale"));
@@ -8184,8 +8343,9 @@ function printBothCopies() {
   window.print();
 }
 
-function printCustomerCopy() {
+async function printCustomerCopy() {
   if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
+  if (!(await ensureGuidedQualityAllows("print", { status: "completed" }))) return;
   const missing = validatePrintScope("customer");
   if (missing.length) {
     showToast(validationMessage(missing, "la copia cliente"));
@@ -8203,6 +8363,7 @@ function printCustomerCopy() {
 
 async function printCompanyCopy() {
   if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
+  if (!(await ensureGuidedQualityAllows("print", { status: "completed" }))) return;
   const missing = validatePrintScope("company");
   if (missing.length) {
     showToast(validationMessage(missing, "la copia aziendale"));
@@ -8219,9 +8380,10 @@ async function printCompanyCopy() {
   }
 }
 
-function showPrintPreview(scope) {
+async function showPrintPreview(scope) {
   renderPaymentCaptureCard();
   if (notifyCashPaymentLimitIfNeeded({ force: true })) return;
+  if (!(await ensureGuidedQualityAllows("print", { status: "completed" }))) return;
   const isCompany = scope === "company";
   const missing = validatePrintScope(scope);
   if (missing.length) {
@@ -8239,7 +8401,8 @@ function showPrintPreview(scope) {
   previewModal.hidden = false;
 }
 
-function showCustomerCopyOptions() {
+async function showCustomerCopyOptions() {
+  if (!(await ensureGuidedQualityAllows("print", { status: "completed" }))) return;
   const act = currentActSnapshot("Archiviata");
   const previewHtml = buildPrintCopy("Copia cliente", "", "customer", shouldPrintWeightOnCustomerCopy());
   previewTitle.textContent = "Anteprima copia cliente";
@@ -8374,6 +8537,12 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
           : "archived_incomplete";
   const isCompletion = ["completed", "archived_completed"].includes(targetStatus);
   const missing = isCompletion ? validatePrintScope("company") : [];
+  if (requestedStatus !== "draft" && !options.skipQualityCheck) {
+    const allowed = await ensureGuidedQualityAllows(isCompletion ? "complete" : "archive", {
+      status: isCompletion ? targetStatus : "archived_completed"
+    });
+    if (!allowed) return false;
+  }
   if (isCompletion && missing.length && !options.skipValidation) {
     showToast(validationMessage(missing, "la copia aziendale"));
     return false;
@@ -8460,6 +8629,7 @@ async function runAiActCheck(act) {
 }
 
 async function completeCurrentPractice() {
+  if (!(await ensureGuidedQualityAllows("complete", { status: "completed" }))) return false;
   const missing = validatePrintScope("company");
   if (!missing.length) {
     const act = currentActSnapshot("Completato");
@@ -8477,19 +8647,7 @@ async function completeCurrentPractice() {
         return false;
       }
     }
-    return archiveCurrentPractice("completed");
-  }
-
-  const preview = missing.slice(0, 8).join(", ");
-  const suffix = missing.length > 8 ? ` e altri ${missing.length - 8} elementi` : "";
-  const shouldArchive = window.confirm(
-    `La pratica non puo essere completata. Mancano: ${preview}${suffix}. Vuoi archiviare l'atto di vendita per completarlo successivamente?`
-  );
-
-  if (shouldArchive) {
-    await archiveCurrentPractice("archived_incomplete");
-    showToast("Atto di vendita archiviato. Potrai completarlo da Elenco.");
-    return true;
+    return archiveCurrentPractice("completed", { skipQualityCheck: true });
   }
 
   showToast(validationMessage(missing, "la pratica"));
@@ -8903,6 +9061,10 @@ document.getElementById("previousStep").addEventListener("click", () => {
 
 document.getElementById("deleteCurrentPractice").addEventListener("click", deleteCurrentPractice);
 document.getElementById("saveQualityReview").addEventListener("click", saveQualityReview);
+guidedQualityList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-quality-target]");
+  if (button) focusQualityTarget(button.dataset.qualityTarget);
+});
 
 document.getElementById("printCustomerCopySummary").addEventListener("click", printCustomerCopy);
 document.getElementById("printCompanyCopySummary").addEventListener("click", printCompanyCopy);
@@ -9393,9 +9555,9 @@ document.addEventListener("click", async (event) => {
 });
 
 document.querySelectorAll("[data-preview-copy]").forEach((button) => {
-  button.addEventListener("click", () => {
-    if (button.dataset.previewCopy === "customer") showCustomerCopyOptions();
-    else showPrintPreview(button.dataset.previewCopy);
+  button.addEventListener("click", async () => {
+    if (button.dataset.previewCopy === "customer") await showCustomerCopyOptions();
+    else await showPrintPreview(button.dataset.previewCopy);
   });
 });
 

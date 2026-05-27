@@ -2398,7 +2398,15 @@ function rowToAct(row, options = {}) {
         factors: Array.isArray(shieldFactors) ? shieldFactors : [],
         updated_at: row.shield_updated_at || row.aurum_shield_updated_at || null
       }
-      : payload.aurumShield || null
+      : payload.aurumShield || null,
+    qualityCheck: row.quality_check_status
+      ? {
+        status: row.quality_check_status,
+        score: Number(row.quality_check_score || 0),
+        summary: row.quality_check_summary || "",
+        updated_at: row.quality_check_updated_at || null
+      }
+      : payload.qualityCheck || null
   };
 }
 
@@ -4048,6 +4056,15 @@ function normalizeAurumShieldAct(input = {}, saleDeedRow = null) {
     accountHolder: input.accountHolder || input.intestatario_conto || payload.accountHolder || base.accountHolder || "",
     name: input.name || input.cliente_nome || base.name || "",
     surname: input.surname || input.cliente_cognome || base.surname || "",
+    birthDate: dateOrNull(input.birthDate || input.nascita || payload.birthDate || base.birthDate || ""),
+    birthPlace: input.birthPlace || input.luogo || payload.birthPlace || base.birthPlace || "",
+    birthProvince: input.birthProvince || input.provinciaNascita || payload.birthProvince || base.birthProvince || "",
+    phone: input.phone || input.telefono || payload.phone || base.phone || "",
+    email: input.email || payload.email || base.email || "",
+    address: input.address || input.indirizzo || payload.address || base.address || "",
+    residenceProvince: input.residenceProvince || input.provinciaResidenza || payload.residenceProvince || base.residenceProvince || "",
+    documentType: input.documentType || input.tipoDocumento || payload.documentType || base.documentType || "",
+    profession: input.profession || input.professione || payload.profession || base.profession || "",
     date: dateOrNull(input.date || input.data_atto || base.date) || new Date().toISOString().slice(0, 10),
     store: input.store || base.store || "",
     storeCode: input.storeCode || input.codice_negozio || base.storeCode || "",
@@ -4427,6 +4444,343 @@ async function persistAurumShieldForAct(saleDeedRow, user = {}) {
     id: result.rows[0]?.id || null,
     updated_at: result.rows[0]?.updated_at || null
   };
+}
+
+function qualityStatusSummary(status = "non_completabile") {
+  return {
+    completabile: "Pratica pronta per il completamento.",
+    attenzione: "Pratica completabile, ma sono presenti elementi da verificare.",
+    non_completabile: "Pratica non completabile. Correggi i punti indicati."
+  }[status] || "Pratica non completabile. Correggi i punti indicati.";
+}
+
+function qualityCheckFromLists(checks = []) {
+  const blockingErrors = checks
+    .filter((check) => check.status === "error")
+    .map((check) => check.message || check.label)
+    .filter(Boolean);
+  const warnings = checks
+    .filter((check) => check.status === "warning")
+    .map((check) => check.message || check.label)
+    .filter(Boolean);
+  const requiredActions = checks
+    .filter((check) => check.status === "error")
+    .map((check) => check.action || check.message || check.label)
+    .filter(Boolean);
+  const status = blockingErrors.length ? "non_completabile" : warnings.length ? "attenzione" : "completabile";
+  const okCount = checks.filter((check) => check.status === "ok").length;
+  const score = checks.length ? Math.round((okCount / checks.length) * 100) : 0;
+  return { status, score, blockingErrors, warnings, requiredActions };
+}
+
+function qualitySignedCount(act = {}) {
+  const signatures = Array.isArray(act.signatures) ? act.signatures : [];
+  const signatureImages = Array.isArray(act.signatureImages) ? act.signatureImages : [];
+  return Math.max(signatures.filter(Boolean).length, signatureImages.filter(Boolean).length);
+}
+
+function qualityHasCapture(act = {}, pattern) {
+  return aurumShieldHasCapture(act, pattern);
+}
+
+async function validateQualityChecklist(input = {}, user = {}) {
+  const saleDeedId = input.atto_id || input.sale_deed_id || input.saleDeedId || input.id || "";
+  let saleDeedRow = null;
+  if (saleDeedId) {
+    saleDeedRow = await findExisting(saleDeedId);
+    if (saleDeedRow && !canAccessAct(saleDeedRow, user)) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+  }
+
+  const draft = input.draft_data || input.draftData || input.atto || input;
+  const act = normalizeAurumShieldAct(draft, saleDeedRow);
+  const checks = [];
+  const addCheck = (id, label, status, message, action, target = "") => {
+    checks.push({ id, label, status, message: message || label, action: action || message || label, target });
+  };
+  const addRequired = (id, label, value, target = "") => {
+    const ok = String(value ?? "").trim().length > 0;
+    addCheck(id, label, ok ? "ok" : "error", ok ? `${label}: presente.` : `${label}: dato obbligatorio mancante.`, ok ? "" : `Completa ${label.toLowerCase()}.`, target);
+  };
+
+  addRequired("cliente_nome", "Nome cliente", act.name, '[name="nome"]');
+  addRequired("cliente_cognome", "Cognome cliente", act.surname, '[name="cognome"]');
+  addRequired("cliente_data_nascita", "Data nascita", act.birthDate, '[name="nascita"]');
+  addRequired("cliente_luogo_nascita", "Luogo nascita", act.birthPlace, '[name="luogo"]');
+  addRequired("cliente_provincia_nascita", "Provincia nascita", act.birthProvince, '[name="provinciaNascita"]');
+  addRequired("cliente_residenza", "Indirizzo residenza", act.address, '[name="indirizzo"]');
+  addRequired("cliente_provincia_residenza", "Provincia residenza", act.residenceProvince, '[name="provinciaResidenza"]');
+  if (!act.fiscalCode) {
+    addCheck("cliente_codice_fiscale", "Codice fiscale presente", "error", "Codice fiscale obbligatorio.", "Inserisci il codice fiscale del cliente.", '[name="cf"]');
+  } else if (!isValidItalianFiscalCode(act.fiscalCode)) {
+    addCheck("cliente_codice_fiscale", "Codice fiscale valido", "error", "Codice fiscale non valido.", "Controlla e correggi il codice fiscale.", '[name="cf"]');
+  } else {
+    addCheck("cliente_codice_fiscale", "Codice fiscale presente", "ok", "Codice fiscale presente e valido.", "", '[name="cf"]');
+  }
+
+  addRequired("documento_tipo", "Tipo documento", act.documentType, '[name="tipoDocumento"]');
+  addRequired("documento_numero", "Numero documento", act.documentNumber, '[name="numeroDocumento"]');
+  if (!act.documentExpiry) {
+    addCheck("documento_scadenza", "Scadenza documento", "error", "Scadenza documento obbligatoria.", "Inserisci la data di scadenza del documento.", '[name="scadenzaDocumento"]');
+  } else {
+    const expiry = new Date(act.documentExpiry);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!Number.isNaN(expiry.getTime()) && expiry < today) {
+      addCheck("documento_non_scaduto", "Documento valido", "error", "Documento scaduto.", "Richiedi e registra un documento valido.", '[name="scadenzaDocumento"]');
+    } else if (!Number.isNaN(expiry.getTime()) && daysBetween(today, expiry) <= 30) {
+      addCheck("documento_non_scaduto", "Documento valido", "warning", "Documento vicino alla scadenza.", "Verifica attentamente la validità del documento.", '[name="scadenzaDocumento"]');
+    } else {
+      addCheck("documento_non_scaduto", "Documento valido", "ok", "Documento non scaduto.", "", '[name="scadenzaDocumento"]');
+    }
+  }
+  addCheck(
+    "documento_foto",
+    "Foto documento fronte/retro",
+    qualityHasCapture(act, /^documento-fronte/) && qualityHasCapture(act, /^documento-retro/) ? "ok" : "error",
+    qualityHasCapture(act, /^documento-fronte/) && qualityHasCapture(act, /^documento-retro/)
+      ? "Foto documento complete."
+      : "Foto fronte/retro documento mancanti.",
+    "Carica fronte e retro del documento.",
+    ".capture-grid"
+  );
+  addCheck(
+    "tessera_sanitaria_foto",
+    "Foto codice fiscale/tessera sanitaria",
+    qualityHasCapture(act, /^codice-fiscale-fronte/) && qualityHasCapture(act, /^codice-fiscale-retro/) ? "ok" : "error",
+    qualityHasCapture(act, /^codice-fiscale-fronte/) && qualityHasCapture(act, /^codice-fiscale-retro/)
+      ? "Foto tessera sanitaria complete."
+      : "Foto fronte/retro codice fiscale o tessera sanitaria mancanti.",
+    "Carica fronte e retro della tessera sanitaria.",
+    ".capture-grid"
+  );
+
+  const items = Array.isArray(act.items) ? act.items : [];
+  if (!items.length) {
+    addCheck("preziosi_presenti", "Oggetti preziosi inseriti", "error", "Nessun oggetto prezioso inserito.", "Inserisci almeno un oggetto prezioso.", "#cededItemsTable");
+  } else {
+    addCheck("preziosi_presenti", "Oggetti preziosi inseriti", "ok", "Oggetti preziosi presenti.", "", "#cededItemsTable");
+    items.forEach((item, index) => {
+      const rowNumber = index + 1;
+      addCheck(
+        `prezioso_descrizione_${rowNumber}`,
+        `Descrizione oggetto riga ${rowNumber}`,
+        item.description ? "ok" : "error",
+        item.description ? "Descrizione oggetto presente." : `Descrizione oggetto mancante alla riga ${rowNumber}.`,
+        `Completa descrizione oggetto alla riga ${rowNumber}.`,
+        "#cededItemsTable"
+      );
+      addCheck(
+        `prezioso_metallo_${rowNumber}`,
+        `Metallo riga ${rowNumber}`,
+        item.metal ? "ok" : "error",
+        item.metal ? "Metallo indicato." : `Metallo mancante alla riga ${rowNumber}.`,
+        `Seleziona il metallo alla riga ${rowNumber}.`,
+        "#cededItemsTable"
+      );
+      addCheck(
+        `prezioso_titolo_${rowNumber}`,
+        `Titolo/caratura riga ${rowNumber}`,
+        item.title || item.titolo || item.caratura ? "ok" : "error",
+        item.title || item.titolo || item.caratura ? "Titolo/caratura indicato." : `Titolo/caratura mancante alla riga ${rowNumber}.`,
+        `Seleziona titolo o caratura alla riga ${rowNumber}.`,
+        "#cededItemsTable"
+      );
+    });
+  }
+  const lots = materialLotsFromAct(act);
+  const totalWeight = lots.reduce((sum, lot) => sum + Number(lot.weight || 0), 0) || numberFrom(act.weight);
+  addCheck(
+    "preziosi_peso",
+    "Peso preziosi maggiore di zero",
+    totalWeight > 0 ? "ok" : "error",
+    totalWeight > 0 ? "Peso preziosi registrato." : "Peso preziosi mancante o pari a zero.",
+    "Inserisci il peso dei preziosi.",
+    "#totalWeightFields"
+  );
+  addCheck(
+    "preziosi_foto",
+    "Foto preziosi",
+    qualityHasCapture(act, /^preziosi-/) ? "ok" : "error",
+    qualityHasCapture(act, /^preziosi-/) ? "Foto preziosi presenti." : "Foto preziosi mancanti.",
+    "Carica le foto dei preziosi.",
+    ".capture-grid"
+  );
+
+  const amount = numberFrom(act.amount);
+  const paymentMethod = String(act.paymentMethod || "").trim();
+  addRequired("pagamento_metodo", "Metodo pagamento", paymentMethod, "#paymentMethod");
+  addCheck(
+    "pagamento_importo",
+    "Importo pagamento",
+    amount > 0 ? "ok" : "error",
+    amount > 0 ? "Importo pagamento presente." : "Importo pagamento mancante o pari a zero.",
+    "Inserisci il totale corrisposto.",
+    "#saleTotal"
+  );
+  if (paymentMethod.toLowerCase().includes("bonifico")) {
+    if (!act.iban) {
+      addCheck("pagamento_iban", "IBAN bonifico", "error", "IBAN obbligatorio per bonifico.", "Inserisci IBAN valido.", "#paymentIban");
+    } else if (!isValidIban(act.iban)) {
+      addCheck("pagamento_iban", "IBAN bonifico", "error", "IBAN non valido.", "Correggi il formato IBAN.", "#paymentIban");
+    } else {
+      addCheck("pagamento_iban", "IBAN bonifico", "ok", "IBAN presente e valido.", "", "#paymentIban");
+    }
+    addCheck(
+      "pagamento_contabile_bonifico",
+      "Contabile bonifico",
+      qualityHasCapture(act, /^pagamento-bonifico/) ? "ok" : "error",
+      qualityHasCapture(act, /^pagamento-bonifico/) ? "Contabile bonifico presente." : "Contabile bonifico mancante.",
+      "Carica la contabile del bonifico.",
+      "#paymentCaptureSection"
+    );
+  }
+  if (paymentMethod.toLowerCase().includes("assegno")) {
+    addCheck(
+      "pagamento_contabile_assegno",
+      "Foto/contabile assegno",
+      qualityHasCapture(act, /^pagamento-assegno/) ? "ok" : "error",
+      qualityHasCapture(act, /^pagamento-assegno/) ? "Foto/contabile assegno presente." : "Foto o contabile assegno mancante.",
+      "Carica foto o contabile dell'assegno.",
+      "#paymentCaptureSection"
+    );
+  }
+  if (isCashPaymentMethod(paymentMethod) && amount > 0) {
+    const cashCheck = await cashAntiMoneyLaunderingCheck({
+      fiscalCode: act.fiscalCode,
+      amount,
+      date: act.date,
+      id: act.id || saleDeedId
+    });
+    if (cashCheck.ok === false) {
+      addCheck("pagamento_contanti_limite", "Limite contanti ultimi 7 giorni", "error", cashCheck.messaggio || "Limite contanti superato.", "Usa un metodo tracciabile o chiedi verifica responsabile.", "#paymentMethod");
+    } else if (Number(cashCheck.totale_previsto || 0) >= Number(cashCheck.limite || 500) * 0.8) {
+      addCheck("pagamento_contanti_limite", "Limite contanti ultimi 7 giorni", "warning", "Contanti vicino al limite degli ultimi 7 giorni.", "Verifica storico contanti del cliente.", "#paymentMethod");
+    } else {
+      addCheck("pagamento_contanti_limite", "Limite contanti ultimi 7 giorni", "ok", "Controllo contanti entro limite.", "", "#paymentMethod");
+    }
+  }
+
+  const signedCount = qualitySignedCount(act);
+  addCheck(
+    "firme_complete",
+    "Firme complete",
+    signedCount >= 4 ? "ok" : "error",
+    signedCount >= 4 ? "Firme complete." : "Mancano firma vendita, dichiarazioni, privacy o firma operatore.",
+    "Completa tutte le firme obbligatorie.",
+    ".signature-grid"
+  );
+
+  const shield = await calculateAurumShieldRisk({ sale_deed_id: saleDeedId, draft_data: { ...act, status: "completed" } }, user).catch(() => null);
+  if (shield) {
+    if (shield.risk_level === "critico" && shield.block_critical_practices && !["founder", "responsabile"].includes(normalizeRole(user.ruolo))) {
+      addCheck("aurum_shield", "Aurum Shield", "error", "Aurum Shield rileva rischio critico.", "Richiedi autorizzazione a Responsabile o Founder.", "#aurumShieldCard");
+    } else if (["alto", "critico"].includes(shield.risk_level)) {
+      addCheck("aurum_shield", "Aurum Shield", "warning", `${shield.summary}.`, "Verifica i fattori rischio prima di completare.", "#aurumShieldCard");
+    } else if (shield.risk_level === "medio") {
+      addCheck("aurum_shield", "Aurum Shield", "warning", "Risk score medio: pratica da controllare.", "Controlla i suggerimenti Aurum Shield.", "#aurumShieldCard");
+    } else {
+      addCheck("aurum_shield", "Aurum Shield", "ok", "Risk score basso.", "", "#aurumShieldCard");
+    }
+  } else {
+    addCheck("aurum_shield", "Aurum Shield", "warning", "Risk score non disponibile al momento.", "Riprova il controllo prima del completamento.", "#aurumShieldCard");
+  }
+
+  const reviewStatus = String(act.qualityReview?.status || "").toLowerCase();
+  if (reviewStatus === "negative") {
+    addCheck(
+      "controllo_qualita_operatore",
+      "Controllo qualità operatore",
+      act.qualityReview?.feedback ? "error" : "error",
+      act.qualityReview?.feedback
+        ? "Controllo qualità negativo: pratica da risolvere o autorizzare."
+        : "Controllo qualità negativo senza feedback.",
+      act.qualityReview?.feedback
+        ? "Risolvi il controllo qualità negativo prima di completare."
+        : "Inserisci feedback e risolvi il controllo qualità negativo.",
+      "#qualityReviewPanel"
+    );
+  } else if (reviewStatus === "positive") {
+    addCheck("controllo_qualita_operatore", "Controllo qualità operatore", "ok", "Controllo qualità positivo.", "", "#qualityReviewPanel");
+  } else {
+    addCheck("controllo_qualita_operatore", "Controllo qualità operatore", "warning", "Controllo qualità interno non ancora registrato.", "Se previsto dal ruolo, registra controllo positivo prima dell'archiviazione finale.", "#qualityReviewPanel");
+  }
+
+  const result = qualityCheckFromLists(checks);
+  return {
+    ok: true,
+    quality_status: result.status,
+    status: result.status,
+    summary: qualityStatusSummary(result.status),
+    score: result.score,
+    checks,
+    blocking_errors: result.blockingErrors,
+    warnings: result.warnings,
+    required_actions: result.requiredActions,
+    aurum_shield: shield
+  };
+}
+
+async function assertQualityAllowsFinalSave(input = {}, user = {}) {
+  const quality = await validateQualityChecklist(input, user);
+  if (quality.quality_status === "non_completabile") {
+    const error = new Error(`Pratica non completabile: ${(quality.blocking_errors || []).slice(0, 3).join("; ") || "controlli obbligatori mancanti"}`);
+    error.status = 400;
+    error.quality = quality;
+    throw error;
+  }
+  return quality;
+}
+
+async function saveQualityCheckResult(input = {}, user = {}) {
+  const saleDeedId = input.atto_id || input.sale_deed_id || input.saleDeedId || input.id || "";
+  const row = saleDeedId ? await findExisting(saleDeedId) : null;
+  if (!row) {
+    const error = new Error("Atto non trovato");
+    error.status = 404;
+    throw error;
+  }
+  if (!canAccessAct(row, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const quality = await validateQualityChecklist({ sale_deed_id: row.id, draft_data: input.draft_data || input.draftData || rowToAct(row) }, user);
+  const result = await pool.query(
+    `INSERT INTO quality_checks
+      (sale_deed_id, checked_by, status, score, checks, blocking_errors, warnings, required_actions, feedback, updated_at)
+     VALUES ($1::bigint,$2::bigint,$3::text,$4::integer,$5::jsonb,$6::jsonb,$7::jsonb,$8::jsonb,$9::text,NOW())
+     RETURNING *`,
+    [
+      row.id,
+      user?.id || null,
+      quality.quality_status,
+      quality.score,
+      sanitizeForPostgres(quality.checks || []),
+      sanitizeForPostgres(quality.blocking_errors || []),
+      sanitizeForPostgres(quality.warnings || []),
+      sanitizeForPostgres(quality.required_actions || []),
+      input.feedback || ""
+    ]
+  );
+  await pool.query(
+    `UPDATE ${actsTable}
+     SET quality_check_status = $2::text,
+         quality_check_score = $3::integer,
+         quality_check_summary = $4::text,
+         quality_check_updated_at = NOW()
+     WHERE id = $1::bigint`,
+    [row.id, quality.quality_status, quality.score, quality.summary]
+  );
+  return { ...quality, quality_check: result.rows[0] || null };
+}
+
+async function persistQualityCheckForAct(saleDeedRow, user = {}) {
+  if (!saleDeedRow?.id || saleDeedRow.deleted_at || normalizeWorkflowStatus(saleDeedRow.status) === "deleted") return null;
+  return saveQualityCheckResult({ sale_deed_id: saleDeedRow.id, draft_data: rowToAct(saleDeedRow) }, user);
 }
 
 async function rowWithAurumShield(id) {
@@ -6508,6 +6862,9 @@ async function saveAct(input, user) {
   const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing);
   const nowIso = new Date().toISOString();
   const statusCode = normalizeWorkflowStatus(act.status);
+  if (["completed", "archived_completed"].includes(statusCode)) {
+    await assertQualityAllowsFinalSave({ draft_data: { ...act.payload, status: statusCode } }, user);
+  }
   const completedAt = ["completed", "archived_completed"].includes(statusCode) ? nowIso : null;
   const archivedAt = ["archived_incomplete", "archived_completed"].includes(statusCode) ? nowIso : null;
   const result = await pool.query(
@@ -6586,7 +6943,13 @@ async function saveAct(input, user) {
     console.error("AURUM SHIELD SAVE ERROR", error);
     return null;
   });
-  return { ...finalAct, aurumShield: shield || finalAct.aurumShield };
+  const quality = ["completed", "archived_completed"].includes(normalizeWorkflowStatus(finalRow.status))
+    ? await persistQualityCheckForAct(finalRow, user).catch((error) => {
+      console.error("QUALITY CHECK SAVE ERROR", error);
+      return null;
+    })
+    : null;
+  return { ...finalAct, aurumShield: shield || finalAct.aurumShield, qualityCheck: quality || finalAct.qualityCheck };
 }
 
 async function updateAct(identifier, input, user) {
@@ -6604,6 +6967,9 @@ async function updateAct(identifier, input, user) {
   }
   const act = await enrichActStore(normalizeAct(enforceActStore(input, user), existing), user);
   const normalizedStatus = normalizeWorkflowStatus(act.status);
+  if (["completed", "archived_completed"].includes(normalizedStatus)) {
+    await assertQualityAllowsFinalSave({ sale_deed_id: existing.id, draft_data: { ...act.payload, status: normalizedStatus } }, user);
+  }
   const updateValues = [
     existing.id,
     nullIfEmpty(act.clienteNome),
@@ -6715,7 +7081,13 @@ async function updateAct(identifier, input, user) {
     console.error("AURUM SHIELD UPDATE ERROR", error);
     return null;
   });
-  return { ...finalAct, aurumShield: shield || finalAct.aurumShield };
+  const quality = ["completed", "archived_completed"].includes(normalizeWorkflowStatus(finalRow.status))
+    ? await persistQualityCheckForAct(finalRow, user).catch((error) => {
+      console.error("QUALITY CHECK UPDATE ERROR", error);
+      return null;
+    })
+    : null;
+  return { ...finalAct, aurumShield: shield || finalAct.aurumShield, qualityCheck: quality || finalAct.qualityCheck };
 }
 
 async function deleteAct(identifier, user) {
@@ -7476,6 +7848,22 @@ app.post("/api/aurum-shield/evaluate", async (request, response, next) => {
   try {
     const shield = await calculateAurumShieldRisk(request.body || {}, request.user);
     response.json(shield);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quality-check/validate", async (request, response, next) => {
+  try {
+    response.json(await validateQualityChecklist(request.body || {}, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quality-check/save", async (request, response, next) => {
+  try {
+    response.status(201).json(await saveQualityCheckResult(request.body || {}, request.user));
   } catch (error) {
     next(error);
   }

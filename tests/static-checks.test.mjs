@@ -515,6 +515,61 @@ test("Aurum Shield calcola risk score e integra atti dashboard antifrode CRM", a
   assert.match(styles, /\.aurum-shield-badge\.risk-critical/);
 });
 
+test("controllo qualità guidato blocca completamento e stampe finali", async () => {
+  const [index, app, server, schema, migration, styles] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260527_guided_quality_check.sql"),
+    file("styles.css")
+  ]);
+
+  assert.match(index, /id="guidedQualityPanel"/);
+  assert.match(index, /Controllo Qualità Guidato/);
+  assert.match(index, /id="guidedQualityList"/);
+  assert.match(styles, /\.guided-quality-panel/);
+  assert.match(styles, /\.quality-target-highlight/);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS quality_checks/);
+  assert.match(schema, /ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS quality_check_status/);
+  assert.match(schema, /idx_quality_checks_sale_deed_id/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS quality_checks/);
+  assert.match(migration, /idx_quality_checks_status/);
+
+  assert.match(server, /async function validateQualityChecklist/);
+  assert.match(server, /async function assertQualityAllowsFinalSave/);
+  assert.match(server, /async function saveQualityCheckResult/);
+  assert.match(server, /app\.post\("\/api\/quality-check\/validate"/);
+  assert.match(server, /app\.post\("\/api\/quality-check\/save"/);
+  assert.match(server, /Pratica non completabile/);
+  assert.match(server, /quality_check_status = \$2::text/);
+  assert.match(server, /persistQualityCheckForAct/);
+
+  assert.match(app, /function renderGuidedQualityCheck/);
+  assert.match(app, /async function validateQualityChecklist/);
+  assert.match(app, /async function ensureGuidedQualityAllows/);
+  assert.match(app, /apiRequest\("\/quality-check\/validate"/);
+  assert.match(app, /data-quality-target/);
+  assert.match(app, /focusQualityTarget/);
+  assert.match(app, /showAurumTip\(`Aurum ha controllato la pratica:/);
+  assert.match(app, /ensureGuidedQualityAllows\("complete"/);
+  assert.match(app, /ensureGuidedQualityAllows\(isCompletion \? "complete" : "archive"/);
+  assert.match(app, /ensureGuidedQualityAllows\("print"/);
+
+  const archiveStart = app.indexOf("async function archiveCurrentPractice");
+  const archiveEnd = app.indexOf("function compactActForAi", archiveStart);
+  const archiveBlock = app.slice(archiveStart, archiveEnd);
+  assert.match(archiveBlock, /requestedStatus !== "draft"/);
+  assert.match(archiveBlock, /ensureGuidedQualityAllows/);
+
+  const completeStart = app.indexOf("async function completeCurrentPractice");
+  const completeEnd = app.indexOf("navItems.forEach", completeStart);
+  const completeBlock = app.slice(completeStart, completeEnd);
+  assert.match(completeBlock, /ensureGuidedQualityAllows\("complete"/);
+  assert.doesNotMatch(completeBlock, /archiviato\. Potrai completarlo da Elenco/);
+});
+
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
   const app = await file("app.js");
   const enterStart = app.indexOf("async function enterSectionFromMainMenu");

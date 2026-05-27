@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260527-aurum-shield-1">
+  <link rel="stylesheet" href="styles.css?v=20260527-guided-quality-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -530,6 +530,21 @@
                   <strong id="summaryAttachments">0 di 6 caricati</strong>
                 </div>
               </div>
+
+              <section class="guided-quality-panel" id="guidedQualityPanel" aria-live="polite">
+                <div class="guided-quality-heading">
+                  <div>
+                    <p class="eyebrow">Controllo Qualità Pratica</p>
+                    <h3>Controllo Qualità Guidato</h3>
+                    <span id="guidedQualityStatusText">Controllo in attesa dei dati pratica.</span>
+                  </div>
+                  <strong class="guided-quality-score" id="guidedQualityScore">0%</strong>
+                </div>
+                <div class="guided-quality-list" id="guidedQualityList">
+                  <p class="muted">Compila l'atto per visualizzare i controlli automatici prima di completare, archiviare o stampare.</p>
+                </div>
+                <div class="guided-quality-actions" id="guidedQualityActions" hidden></div>
+              </section>
 
             </div>
 
@@ -1195,6 +1210,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260527-aurum-shield-1"></script>
+  <script src="app.js?v=20260527-guided-quality-1"></script>
 </body>
 </html>
