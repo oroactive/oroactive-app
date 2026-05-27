@@ -347,6 +347,8 @@ function activityLabel(type = "") {
     deactivate_user: "Disattivazione utente",
     update_crm: "Modifica cliente CRM",
     academy_course: "Creazione/modifica corso Academy",
+    aurum_memory_saved: "Memoria Aurum salvata",
+    aurum_support_request: "Richiesta supporto Aurum",
     operational_error: "Errore operativo"
   }[type] || "Attività";
 }
@@ -1504,6 +1506,156 @@ async function deleteAiFeedback(id, user) {
   return result.rowCount > 0;
 }
 
+function publicAurumMemory(row = {}) {
+  return {
+    id: row.id,
+    memory_text: row.memory_text || "",
+    memory_type: row.memory_type || "work_preference",
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+function normalizeAurumMemoryType(value = "") {
+  const type = String(value || "").trim().toLowerCase();
+  return ["work_preference", "training_preference", "operational_note", "communication_preference"].includes(type)
+    ? type
+    : "work_preference";
+}
+
+function assertAurumMemoryIsAllowed(text = "") {
+  const value = String(text || "").toLowerCase();
+  if (/(codice fiscale|documento|tessera sanitaria|diagnosi|malattia|salute|terapia|password|iban)/i.test(value)) {
+    const error = new Error("Memoria non salvata: contiene dati personali o sensibili.");
+    error.status = 400;
+    throw error;
+  }
+}
+
+async function listAurumMemories(user = {}) {
+  const result = await pool.query(
+    `SELECT id, memory_text, memory_type, created_at, updated_at
+     FROM aurum_user_memories
+     WHERE user_id = $1::bigint
+       AND deleted_at IS NULL
+     ORDER BY updated_at DESC, created_at DESC
+     LIMIT 100`,
+    [user.id]
+  );
+  return result.rows.map(publicAurumMemory);
+}
+
+async function createAurumMemory(input = {}, user = {}) {
+  const text = String(input.memory_text || input.text || "").trim().slice(0, 1000);
+  if (!text) {
+    const error = new Error("Memoria Aurum vuota.");
+    error.status = 400;
+    throw error;
+  }
+  assertAurumMemoryIsAllowed(text);
+  const result = await pool.query(
+    `INSERT INTO aurum_user_memories (user_id, memory_text, memory_type)
+     VALUES ($1::bigint, $2::text, $3::text)
+     RETURNING id, memory_text, memory_type, created_at, updated_at`,
+    [user.id, text, normalizeAurumMemoryType(input.memory_type)]
+  );
+  logUserActivity({
+    userId: user.id,
+    actorId: user.id,
+    activityType: "aurum_memory_saved",
+    entityType: "aurum_memory",
+    entityId: result.rows[0]?.id,
+    description: "Memoria Aurum salvata con consenso esplicito"
+  });
+  return publicAurumMemory(result.rows[0]);
+}
+
+async function deleteAurumMemory(id, user = {}) {
+  const result = await pool.query(
+    `UPDATE aurum_user_memories
+     SET deleted_at = NOW(), updated_at = NOW()
+     WHERE id = $1::uuid
+       AND user_id = $2::bigint
+       AND deleted_at IS NULL
+     RETURNING id`,
+    [id, user.id]
+  );
+  return result.rowCount > 0;
+}
+
+function publicAurumSupportRequest(row = {}) {
+  return {
+    id: row.id,
+    requested_role: row.requested_role,
+    message: row.message || "",
+    status: row.status || "open",
+    created_at: row.created_at,
+    resolved_at: row.resolved_at,
+    user_id: row.user_id,
+    user_name: [row.nome, row.cognome].filter(Boolean).join(" ") || row.username || row.email || "Utente OroActive",
+    store: row.negozio || ""
+  };
+}
+
+function normalizeAurumRequestedRole(value = "") {
+  const role = normalizeRole(value);
+  return role === "founder" ? "founder" : "responsabile";
+}
+
+async function listAurumSupportRequests(user = {}) {
+  const role = normalizeRole(user.ruolo);
+  if (!["founder", "responsabile"].includes(role)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const params = [];
+  let visibility = "";
+  if (role === "responsabile") {
+    params.push(user.negozio_id || null, user.negozio || "", user.id);
+    visibility = `AND r.requested_role = 'responsabile'
+      AND (u.negozio_id = $1::bigint OR u.negozio = $2::text OR r.user_id = $3::bigint)`;
+  }
+  const result = await pool.query(
+    `SELECT r.*, u.nome, u.cognome, u.username, u.email, u.negozio, u.negozio_id
+     FROM aurum_support_requests r
+     LEFT JOIN utenti u ON u.id = r.user_id
+     WHERE r.status IN ('open', 'in_progress')
+       ${visibility}
+     ORDER BY r.created_at DESC
+     LIMIT 200`,
+    params
+  );
+  return result.rows.map(publicAurumSupportRequest);
+}
+
+async function createAurumSupportRequest(input = {}, user = {}) {
+  const requestedRole = normalizeAurumRequestedRole(input.requested_role || input.requestedRole);
+  const message = String(input.message || "Richiesta supporto da Aurum").trim().slice(0, 2000);
+  const result = await pool.query(
+    `INSERT INTO aurum_support_requests (user_id, requested_role, message, status)
+     VALUES ($1::bigint, $2::text, $3::text, 'open')
+     RETURNING *`,
+    [user.id, requestedRole, message]
+  );
+  logUserActivity({
+    userId: user.id,
+    actorId: user.id,
+    activityType: "aurum_support_request",
+    entityType: "aurum_support_request",
+    entityId: result.rows[0]?.id,
+    description: `Richiesta supporto Aurum verso ${requestedRole}`
+  });
+  return publicAurumSupportRequest({
+    ...result.rows[0],
+    nome: user.nome,
+    cognome: user.cognome,
+    username: user.username,
+    email: user.email,
+    negozio: user.negozio
+  });
+}
+
 async function searchAiChunksBySource(question = "", sourceType = "book", limit = 6) {
   const text = String(question || "").trim();
   if (!text) return [];
@@ -1679,6 +1831,16 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const shouldUseWeb = chunks.length < 3 || options.allowWeb === true;
   const web = shouldUseWeb ? await webSearchFallback(domanda) : { available: false, results: [] };
   const mode = options.mode === "quiz" ? "quiz" : "chat";
+  const aurumContext = sanitizeForPostgres(options.context || {});
+  const aurumMemories = Array.isArray(aurumContext.availableMemories)
+    ? aurumContext.availableMemories.map((item) => String(item || "").slice(0, 240)).filter(Boolean).slice(0, 8)
+    : [];
+  const aurumSectionContext = [
+    options.section ? `Sezione app: ${String(options.section).slice(0, 80)}` : "",
+    aurumContext.role ? `Ruolo utente: ${String(aurumContext.role).slice(0, 80)}` : "",
+    aurumContext.store ? `Negozio: ${String(aurumContext.store).slice(0, 120)}` : "",
+    aurumMemories.length ? `Memorie consensuali utente: ${aurumMemories.join(" | ")}` : ""
+  ].filter(Boolean).join("\n");
   const context = chunks.map((chunk, index) => (
     `[Fonte ${index + 1}: ${chunk.metadata?.sourceType === "note" ? "Procedura OroActive approvata" : chunk.metadata?.sourceType === "academy" ? "Materiale OroActive Academy" : "La bilancia d'oro"} - ${chunk.titolo || "Knowledge base"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
   )).join("\n\n---\n\n");
@@ -1717,6 +1879,9 @@ Non inventare fonti web aggiornate: usa soltanto i risultati web forniti nel con
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
 Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : "Assistente operativo."}
+
+CONTESTO APP AURUM:
+${aurumSectionContext || "Nessun contesto app fornito."}
 
 CONTESTO KNOWLEDGE BASE:
 ${hasContext ? context : "Nessun passaggio trovato per questa domanda."}
@@ -6951,7 +7116,12 @@ app.post("/api/ai/controlla-atto", async (request, response, next) => {
 
 app.post("/api/ai/assistente", async (request, response, next) => {
   try {
-    response.json(await askOroActiveAssistant(request.body.domanda || request.body.question || "", { mode: request.body.mode }));
+    response.json(await askOroActiveAssistant(request.body.domanda || request.body.message || request.body.question || "", {
+      mode: request.body.mode,
+      section: request.body.section || "",
+      context: sanitizeForPostgres(request.body.context || {}),
+      interface: request.body.interface || ""
+    }));
   } catch (error) {
     if (!error.status) error.status = 502;
     if (!error.message) error.message = "Assistente IA non disponibile.";
@@ -7098,6 +7268,48 @@ app.delete("/api/ai/feedback/:id", requireFounder, async (request, response, nex
     const deleted = await deleteAiFeedback(request.params.id, request.user);
     if (!deleted) return response.status(404).json({ error: "Feedback non trovato" });
     response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum/memories", async (request, response, next) => {
+  try {
+    response.json({ memories: await listAurumMemories(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/aurum/memories", async (request, response, next) => {
+  try {
+    response.status(201).json({ memory: await createAurumMemory(request.body, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/aurum/memories/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteAurumMemory(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Memoria Aurum non trovata" });
+    response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum/support-requests", async (request, response, next) => {
+  try {
+    response.json({ requests: await listAurumSupportRequests(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/aurum/support-requests", async (request, response, next) => {
+  try {
+    response.status(201).json({ request: await createAurumSupportRequest(request.body, request.user) });
   } catch (error) {
     next(error);
   }
@@ -7723,6 +7935,7 @@ function friendlyDatabaseError(error, request) {
   if (error.code === "42P01") return "Schema database non aggiornato: manca una tabella richiesta.";
   if (error.code === "42804" || error.code === "42P18") return "Tipo dato non valido nel salvataggio: controlla importi, date e identificativi.";
   if (/\/api\/(utenti|users)/.test(url)) return "Errore database durante il salvataggio dell'utente.";
+  if (url.includes("/api/aurum")) return "Errore database durante il salvataggio Aurum.";
   if (url.includes("/api/atti") || url.includes("/api/acts")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Errore database durante il salvataggio Academy.";
   if (url.includes("/api/crm")) return "Errore database durante il salvataggio CRM.";

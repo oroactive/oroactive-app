@@ -447,12 +447,18 @@ textarea {
   justify-items: end;
   gap: 12px;
   pointer-events: none;
+  transform: translate3d(var(--aurum-x, 0), var(--aurum-y, 0), 0);
+  transition: transform 9s ease-in-out;
 }
 
 .aurum-mascot-root[hidden],
 .aurum-chat-panel[hidden],
 .aurum-tip[hidden] {
   display: none;
+}
+
+.aurum-mascot-root.aurum-roaming {
+  will-change: transform;
 }
 
 .aurum-mascot-button {
@@ -484,11 +490,16 @@ textarea {
   animation: aurum-click 0.2s ease;
 }
 
+.aurum-mascot-button.aurum-look-logo .aurum-owl {
+  transform: rotate(-9deg) scale(1.03);
+}
+
 .aurum-owl {
   display: block;
   width: 100%;
   height: 100%;
   filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.28));
+  transition: transform 0.32s ease;
 }
 
 .aurum-body {
@@ -506,6 +517,17 @@ textarea {
 .aurum-wing {
   fill: #6d3207;
   opacity: 0.86;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: aurum-wing-soft 4.8s ease-in-out infinite;
+}
+
+.aurum-wing-left {
+  animation-delay: 0s;
+}
+
+.aurum-wing-right {
+  animation-delay: 0.18s;
 }
 
 .aurum-eye {
@@ -630,6 +652,58 @@ textarea {
   background: rgba(255, 255, 255, 0.94);
 }
 
+.aurum-consent-panel,
+.aurum-support-actions,
+.aurum-memory-details {
+  border: 1px solid rgba(255, 181, 72, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 10px;
+}
+
+.aurum-consent-panel[hidden],
+.aurum-support-actions[hidden] {
+  display: none;
+}
+
+.aurum-inline-actions,
+.aurum-support-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.aurum-memory-details summary {
+  cursor: pointer;
+  color: #ffd696;
+  font-weight: 800;
+}
+
+.aurum-settings-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.aurum-admin-list {
+  display: grid;
+  gap: 8px;
+}
+
+.aurum-list-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(255, 181, 72, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.aurum-list-row span,
+.aurum-list-row small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 @keyframes aurum-breath {
   0%,
   100% {
@@ -664,11 +738,25 @@ textarea {
   }
 }
 
+@keyframes aurum-wing-soft {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+
+  50% {
+    transform: rotate(-4deg) translateY(-1px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .aurum-mascot-button,
-  .aurum-eye {
+  .aurum-eye,
+  .aurum-wing,
+  .aurum-mascot-root {
     animation: none;
     will-change: auto;
+    transition: none;
   }
 }
 

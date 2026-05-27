@@ -340,30 +340,59 @@ test("strumenti contiene collegamento verificabile al sito OroActive", async () 
   assert.match(app, /window\.open\(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer"\)/);
 });
 
-test("mascotte Aurum ufficiale usa il gufo dorato e l'AI esistente", async () => {
-  const [index, app, styles] = await Promise.all([
+test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async () => {
+  const [index, app, styles, server, schema, migration] = await Promise.all([
     file("index.html"),
     file("app.js"),
-    file("styles.css")
+    file("styles.css"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260527_aurum_interaction_memory.sql")
   ]);
 
   assert.match(index, /id="aurumMascotRoot"/);
-  assert.match(index, /aria-label="Aurum gufo dorato assistente OroActive"/);
+  assert.match(index, /aria-label="Aurum Assistente OroActive"/);
   assert.match(index, /gufo dorato AI OroActive/);
   assert.match(index, /Aurum — Assistente OroActive/);
   assert.match(index, /Mascotte AI ufficiale/);
+  assert.match(index, /id="aurumManagementPanel"/);
+  assert.match(index, /Gestione Aurum/);
+  assert.match(index, /id="aurumConsentPanel"/);
+  assert.match(index, /id="aurumUserMemoryToggle"/);
+  assert.match(index, /Sì, ricordalo/);
+  assert.doesNotMatch(index, /<section class="main-menu-screen"[\s\S]*id="aurumMascotRoot"[\s\S]*<\/section>\s*<div class="app-shell">/);
   assert.doesNotMatch(index, /id="aurumFounderTestPanel"|Test Mascotte AI|Funzione sperimentale/);
   assert.doesNotMatch(app, /ENABLE_AURUM_MASCOT_TEST|AURUM_MASCOT_STORAGE_KEY|setAurumMascotTestActive/);
+  assert.match(app, /const ENABLE_AURUM_MASCOT = true/);
+  assert.match(app, /AURUM_SECTION_TIPS/);
+  assert.match(app, /AURUM_DEFAULT_SETTINGS/);
+  assert.match(app, /function maybeShowAurumDailyGreeting/);
+  assert.match(app, /aurum_greeting_/);
+  assert.match(app, /function classifyAurumMood/);
+  assert.match(app, /function requestAurumSupport/);
+  assert.match(app, /function saveAurumMemory/);
   assert.match(app, /function updateAurumMascotVisibility/);
-  assert.match(app, /return Boolean\(state\.currentUser\)/);
   assert.match(app, /function askAurum/);
   assert.match(app, /apiRequest\("\/ai\/assistente"/);
-  assert.match(app, /interface: "aurum_official_mascot"/);
+  assert.match(app, /interface: "aurum_interactive_mascot"/);
+  assert.match(app, /apiRequest\("\/aurum\/memories"/);
+  assert.match(app, /apiRequest\("\/aurum\/support-requests"/);
+  assert.match(server, /app\.get\("\/api\/aurum\/memories"/);
+  assert.match(server, /app\.post\("\/api\/aurum\/memories"/);
+  assert.match(server, /app\.post\("\/api\/aurum\/support-requests"/);
+  assert.match(server, /Memoria non salvata: contiene dati personali o sensibili/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_support_requests/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_user_memories/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS aurum_support_requests/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS aurum_user_memories/);
   assert.match(styles, /\.aurum-mascot-root/);
+  assert.match(styles, /\.aurum-mascot-root\.aurum-roaming/);
   assert.match(styles, /\.aurum-owl/);
   assert.match(styles, /\.aurum-body/);
+  assert.match(styles, /\.aurum-wing-left/);
   assert.match(styles, /@keyframes aurum-breath/);
   assert.match(styles, /@keyframes aurum-blink/);
+  assert.match(styles, /@keyframes aurum-wing-soft/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
 });
 
