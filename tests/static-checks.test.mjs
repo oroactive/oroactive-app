@@ -466,6 +466,55 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(styles, /prefers-reduced-motion: reduce/);
 });
 
+test("Aurum Shield calcola risk score e integra atti dashboard antifrode CRM", async () => {
+  const [index, app, server, schema, migration, styles] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260527_aurum_shield_risk_scoring.sql"),
+    file("styles.css")
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_shield_scores/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_shield_alerts/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_shield_settings/);
+  assert.match(schema, /ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS aurum_shield_score/);
+  assert.match(migration, /cash_limit_amount/);
+  assert.match(migration, /idx_aurum_shield_alerts_status/);
+
+  assert.match(server, /defaultAurumShieldSettings/);
+  assert.match(server, /function calculateAurumShieldRisk/);
+  assert.match(server, /function persistAurumShieldForAct/);
+  assert.match(server, /function dashboardAurumShieldStats/);
+  assert.match(server, /app\.post\("\/api\/aurum-shield\/evaluate"/);
+  assert.match(server, /app\.get\("\/api\/aurum-shield\/settings"/);
+  assert.match(server, /app\.put\("\/api\/aurum-shield\/settings", requireFounder/);
+  assert.match(server, /app\.get\("\/api\/aurum-shield\/sale-deed\/:id"/);
+  assert.match(server, /app\.get\("\/api\/aurum-shield\/client\/:id"/);
+  assert.match(server, /app\.get\("\/api\/aurum-shield\/alerts"/);
+  assert.match(server, /app\.put\("\/api\/aurum-shield\/alerts\/:id\/review"/);
+  assert.match(server, /status = 'atto_eliminato'/);
+  assert.match(server, /cash_over_limit/);
+  assert.match(server, /Math\.max\(score, 85\)/);
+  assert.match(server, /LEFT JOIN LATERAL \(/);
+
+  assert.match(index, /id="aurumShieldCard"/);
+  assert.match(index, /id="aurumShieldSettingsForm"/);
+  assert.match(index, /data-section="aurumShield"/);
+  assert.match(app, /function scheduleAurumShieldEvaluation/);
+  assert.match(app, /function confirmAurumShieldBeforeFinalSave/);
+  assert.match(app, /apiRequest\("\/aurum-shield\/evaluate"/);
+  assert.match(app, /apiRequest\("\/aurum-shield\/alerts"/);
+  assert.match(app, /apiRequest\("\/aurum-shield\/settings"/);
+  assert.match(app, /aurumShieldBadgeMarkup\(act\.aurumShield\)/);
+  assert.match(app, /detail\.aurum_shield/);
+  assert.match(app, /Shield medio/);
+  assert.match(app, /showAurumTip\("Questa pratica merita un controllo in più/);
+  assert.match(styles, /\.aurum-shield-card/);
+  assert.match(styles, /\.aurum-shield-badge\.risk-critical/);
+});
+
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
   const app = await file("app.js");
   const enterStart = app.indexOf("async function enterSectionFromMainMenu");

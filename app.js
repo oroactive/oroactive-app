@@ -23,6 +23,10 @@ const state = {
   amlCashCheck: null,
   amlCashCheckTimer: null,
   amlCashCheckLoading: false,
+  aurumShield: null,
+  aurumShieldTimer: null,
+  aurumShieldSettings: null,
+  aurumShieldAlerts: [],
   bullionVaultPrices: {},
   lastActCaptureAttachments: [],
   loadedSignatureImages: [],
@@ -641,6 +645,13 @@ const aiFeedbackList = document.getElementById("aiFeedbackList");
 const resetKnowledgeNoteButton = document.getElementById("resetKnowledgeNoteForm");
 const dashboardGrid = document.getElementById("dashboardGrid");
 const dashboardPanels = document.getElementById("dashboardPanels");
+const aurumShieldCard = document.getElementById("aurumShieldCard");
+const aurumShieldScore = document.getElementById("aurumShieldScore");
+const aurumShieldLevel = document.getElementById("aurumShieldLevel");
+const aurumShieldFactors = document.getElementById("aurumShieldFactors");
+const aurumShieldRecommendations = document.getElementById("aurumShieldRecommendations");
+const aurumShieldSettingsForm = document.getElementById("aurumShieldSettingsForm");
+const aurumShieldAlertsList = document.getElementById("aurumShieldAlertsList");
 const storeForm = document.getElementById("storeForm");
 const storesList = document.getElementById("storesList");
 const antifraudList = document.getElementById("antifraudList");
@@ -2238,6 +2249,10 @@ function setScreen(id) {
     showToast("Gestione Aurum riservata al Founder.");
     return;
   }
+  if (id === "aurumShield" && !isFounder()) {
+    showToast("Aurum Shield è riservato al Founder.");
+    return;
+  }
   if (id === "backups" && !canManageBackupsUi()) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
@@ -2275,6 +2290,7 @@ async function handleScreenDataLoad(id) {
   if (id === "backups") await loadBackups();
   if (id === "stores") await loadStores();
   if (id === "antifraud") await loadAntifraud();
+  if (id === "aurumShield") await loadAurumShieldAdmin();
   if (id === "training") await loadTraining();
   if (id === "crm") await loadCrmClients();
   if (id === "assistant") {
@@ -4089,6 +4105,7 @@ function renderDashboard() {
   if (!dashboardGrid || !dashboardPanels) return;
   const data = state.dashboard || {};
   const kpi = data.kpi || {};
+  const shield = data.aurum_shield || {};
   dashboardGrid.innerHTML = [
     metricCard("Totale oro oggi", `${Number(kpi.grammi_giornalieri?.Oro || 0).toFixed(2)} gr`),
     metricCard("Totale argento oggi", `${Number(kpi.grammi_giornalieri?.Argento || 0).toFixed(2)} gr`),
@@ -4103,6 +4120,9 @@ function renderDashboard() {
     metricCard("Atti giornalieri", kpi.numero_atti_giornalieri || 0),
     metricCard("Atti mensili", kpi.numero_atti_mensili || 0),
     metricCard("Media margine", kpi.media_margine ? `${Number(kpi.media_margine).toFixed(2)}%` : "Dato non disponibile"),
+    metricCard("Shield alto rischio oggi", shield.high_today || 0),
+    metricCard("Shield critici", shield.critical_open || 0),
+    metricCard("Shield score medio", `${Number(shield.average_score || 0)}/100`),
     metricCard("Oro mensile", `${Number(kpi.grammi_mensili?.Oro || 0).toFixed(2)} gr`),
     metricCard("Argento mensile", `${Number(kpi.grammi_mensili?.Argento || 0).toFixed(2)} gr`),
     metricCard("Platino mensile", `${Number(kpi.grammi_mensili?.Platino || 0).toFixed(2)} gr`)
@@ -4118,6 +4138,11 @@ function renderDashboard() {
     <section class="dashboard-panel"><h3>Ranking negozi</h3>${ranking(data.ranking_negozi, "negozio")}</section>
     <section class="dashboard-panel"><h3>Ranking operatori</h3>${ranking(data.ranking_operatori, "operatore")}</section>
     <section class="dashboard-panel"><h3>Alert operativi</h3>${(data.alerts || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(String(item.value))}</strong><em>${escapeHtml(item.detail || "")}</em></div>`).join("") || '<div class="empty-state">Nessun alert operativo.</div>'}</section>
+    <section class="dashboard-panel"><h3>Aurum Shield</h3>
+      <div class="dashboard-rank-row"><span>Alert aperti</span><strong>${escapeHtml(String(shield.open_alerts || 0))}</strong><em>Pratiche da verificare</em></div>
+      <div class="dashboard-rank-row"><span>Negozio con piu alert</span><strong>${escapeHtml(shield.top_store?.store || "Nessun dato")}</strong><em>${escapeHtml(String(shield.top_store?.alerts || 0))} alert</em></div>
+      <div class="dashboard-rank-row"><span>Operatore con piu alert</span><strong>${escapeHtml(shield.top_operator?.operator || "Nessun dato")}</strong><em>${escapeHtml(String(shield.top_operator?.alerts || 0))} alert</em></div>
+    </section>
     <section class="dashboard-panel"><h3>OroActive Intelligence</h3>${(data.insights || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.title)}</span><strong>${escapeHtml(item.level || "info")}</strong><em>${escapeHtml(item.text)}</em></div>`).join("") || '<div class="empty-state">Nessun insight disponibile.</div>'}</section>
     <section class="dashboard-panel"><h3>Fusioni</h3>${Object.entries(data.fusioni || {}).map(([key, value]) => `<div class="dashboard-rank-row"><span>${escapeHtml(key)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join("") || '<div class="empty-state">Nessuna fusione registrata.</div>'}</section>
     <section class="dashboard-panel"><h3>Carature frequenti</h3>${(data.carature_frequenti || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.titolo)}</span><strong>${item.count}</strong></div>`).join("") || '<div class="empty-state">Nessun dato disponibile.</div>'}</section>
@@ -4132,6 +4157,197 @@ async function loadDashboard() {
   } catch (error) {
     if (dashboardGrid) dashboardGrid.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Dashboard non caricata.")}</div>`;
   }
+}
+
+function aurumShieldLevelMeta(level = "basso") {
+  return {
+    basso: { label: "Pratica sicura", className: "risk-low" },
+    medio: { label: "Pratica da controllare", className: "risk-medium" },
+    alto: { label: "Attenzione operativa", className: "risk-high" },
+    critico: { label: "Alto rischio — richiede verifica", className: "risk-critical" }
+  }[String(level || "").toLowerCase()] || { label: "Pratica da controllare", className: "risk-medium" };
+}
+
+function aurumShieldBadgeMarkup(shield) {
+  if (!shield || shield.score === undefined || shield.score === null) return '<span class="aurum-shield-badge risk-unknown">Shield n/d</span>';
+  const meta = aurumShieldLevelMeta(shield.risk_level || shield.riskLevel);
+  return `<span class="aurum-shield-badge ${meta.className}">Shield ${Number(shield.score || 0)}/100</span>`;
+}
+
+function renderAurumShieldCard() {
+  if (!aurumShieldCard) return;
+  const shield = state.aurumShield || { score: 0, risk_level: "basso", summary: "Pratica sicura", factors: [], recommendations: [] };
+  const meta = aurumShieldLevelMeta(shield.risk_level);
+  aurumShieldCard.classList.remove("risk-low", "risk-medium", "risk-high", "risk-critical", "risk-loading");
+  aurumShieldCard.classList.add(meta.className);
+  if (aurumShieldScore) aurumShieldScore.textContent = `${Number(shield.score || 0)}/100`;
+  if (aurumShieldLevel) aurumShieldLevel.textContent = shield.summary || meta.label;
+  if (aurumShieldFactors) {
+    const factors = Array.isArray(shield.factors) ? shield.factors : [];
+    aurumShieldFactors.innerHTML = factors.length
+      ? factors.slice(0, 5).map((factor) => `<li>${escapeHtml(factor.message || "")}</li>`).join("")
+      : "<li>Nessun fattore di rischio rilevato.</li>";
+  }
+  if (aurumShieldRecommendations) {
+    const recommendations = Array.isArray(shield.recommendations) ? shield.recommendations : [];
+    aurumShieldRecommendations.innerHTML = recommendations.length
+      ? `<strong>Raccomandazioni</strong>${recommendations.slice(0, 4).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}`
+      : "";
+  }
+}
+
+function currentAurumShieldDraftData(status = "draft") {
+  const storeSelect = document.getElementById("storeCode");
+  const materials = weightRows()
+    .filter((row) => Number(row.value || 0) > 0)
+    .map((row) => ({ metal: row.metal, title: row.title, weight: row.value }));
+  const totalWeight = materials.reduce((sum, row) => sum + Number(row.weight || 0), 0);
+  return {
+    id: state.editingActId || null,
+    practiceNumber: fieldValue("#practiceNumber"),
+    date: fieldValue("#practiceDate"),
+    store: storeSelect?.selectedOptions[0]?.textContent || "",
+    storeCode: storeSelect?.value || "",
+    name: fieldValue('[name="nome"]'),
+    surname: fieldValue('[name="cognome"]'),
+    fiscalCode: fieldValue('[name="cf"]'),
+    documentType: fieldValue('[name="tipoDocumento"]'),
+    documentNumber: fieldValue('[name="numeroDocumento"]'),
+    documentExpiry: fieldValue('[name="scadenzaDocumento"]'),
+    paymentMethod: fieldValue("#paymentMethod"),
+    amount: fieldValue("#saleTotal"),
+    iban: paymentRequiresIban() ? fieldValue("#paymentIban") : "",
+    accountHolder: fieldValue("#paymentAccountHolder"),
+    items: collectCededItems(),
+    materials,
+    weight: totalWeight.toFixed(2),
+    captures: [...state.uploadedCaptures],
+    signatures: [...state.signatures],
+    qualityReview: currentQualityReview(),
+    operatorId: state.currentUser?.id || null,
+    status
+  };
+}
+
+async function evaluateAurumShield(options = {}) {
+  if (!state.authToken || !aurumShieldCard) return null;
+  if (options.loading) aurumShieldCard.classList.add("risk-loading");
+  try {
+    const data = await apiRequest("/aurum-shield/evaluate", {
+      method: "POST",
+      timeoutMs: 16000,
+      body: JSON.stringify({
+        sale_deed_id: options.saleDeedId || state.editingActId || "",
+        draft_data: options.draftData || currentAurumShieldDraftData(options.status || "draft")
+      })
+    });
+    state.aurumShield = data;
+    renderAurumShieldCard();
+    if (["alto", "critico"].includes(String(data.risk_level || "")) && shouldShowAurumMascot()) {
+      showAurumTip("Questa pratica merita un controllo in più. Ho rilevato alcuni segnali da verificare.");
+    }
+    return data;
+  } catch (error) {
+    if (!options.silent) showToast(error.message || "Aurum Shield non disponibile.", "warning");
+    return null;
+  } finally {
+    aurumShieldCard.classList.remove("risk-loading");
+  }
+}
+
+function scheduleAurumShieldEvaluation() {
+  window.clearTimeout(state.aurumShieldTimer);
+  state.aurumShieldTimer = window.setTimeout(() => {
+    evaluateAurumShield({ silent: true });
+  }, 800);
+}
+
+async function confirmAurumShieldBeforeFinalSave(shield) {
+  if (!shield || Number(shield.score || 0) <= 60) return true;
+  const level = String(shield.risk_level || "");
+  if (level === "critico" && shield.block_critical_practices && !["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) {
+    showToast("Aurum Shield ha rilevato rischio critico: richiedi verifica a Responsabile o Founder.", "warning");
+    return false;
+  }
+  const preview = (shield.factors || []).slice(0, 4).map((factor) => `- ${factor.message}`).join("\n");
+  return window.confirm(`Aurum Shield ha rilevato rischio ${level}.\n\n${preview}\n\nVerifica i punti indicati prima di completare. Vuoi confermare comunque?`);
+}
+
+function renderAurumShieldSettings(settings = {}) {
+  document.getElementById("shieldCashLimit").value = settings.cash_limit_amount ?? 500;
+  document.getElementById("shieldCashWindowDays").value = settings.cash_window_days ?? 7;
+  document.getElementById("shieldFrequentSalesLimit").value = settings.frequent_sales_limit ?? 3;
+  document.getElementById("shieldDocumentExpiryDays").value = settings.document_expiry_warning_days ?? 30;
+  document.getElementById("shieldBlockCritical").checked = Boolean(settings.block_critical_practices);
+  document.getElementById("shieldDashboardAlerts").checked = settings.dashboard_alerts_enabled !== false;
+  document.getElementById("shieldAiExplanation").checked = Boolean(settings.ai_explanation_enabled);
+  document.getElementById("shieldFactorWeights").value = JSON.stringify(settings.factor_weights || {}, null, 2);
+}
+
+function renderAurumShieldAlerts() {
+  if (!aurumShieldAlertsList) return;
+  const alerts = state.aurumShieldAlerts || [];
+  if (!alerts.length) {
+    aurumShieldAlertsList.innerHTML = '<div class="empty-state">Nessun alert Aurum Shield aperto.</div>';
+    return;
+  }
+  aurumShieldAlertsList.innerHTML = `
+    <div class="table-row head"><span>Rischio</span><span>Atto</span><span>Cliente</span><span>Negozio</span><span>Stato</span><span>Azioni</span></div>
+    ${alerts.map((alert) => `
+      <div class="table-row">
+        <strong>${escapeHtml(alert.severity || alert.risk_level || "medio")}</strong>
+        <span>${escapeHtml(alert.practice_number || "")}</span>
+        <span>${escapeHtml([alert.cliente_nome, alert.cliente_cognome].filter(Boolean).join(" ") || "Dato non inserito")}</span>
+        <span>${escapeHtml(alert.store || "")}</span>
+        <em>${escapeHtml(alert.status || "open")}</em>
+        <select data-shield-alert-status="${escapeHtml(String(alert.id))}">
+          <option value="">Aggiorna</option>
+          <option value="in verifica">In verifica</option>
+          <option value="risolto">Risolto</option>
+          <option value="falso positivo">Falso positivo</option>
+        </select>
+        <small>${escapeHtml(alert.description || "")}</small>
+      </div>
+    `).join("")}
+  `;
+}
+
+async function loadAurumShieldAdmin() {
+  const [settingsData, alertsData] = await Promise.all([
+    apiRequest("/aurum-shield/settings"),
+    apiRequest("/aurum-shield/alerts")
+  ]);
+  state.aurumShieldSettings = settingsData.settings || {};
+  state.aurumShieldAlerts = alertsData.alerts || [];
+  renderAurumShieldSettings(state.aurumShieldSettings);
+  renderAurumShieldAlerts();
+}
+
+async function saveAurumShieldSettings(event) {
+  event.preventDefault();
+  let weights = {};
+  try {
+    weights = JSON.parse(document.getElementById("shieldFactorWeights").value || "{}");
+  } catch {
+    showToast("Pesi fattori rischio non validi: controlla il JSON.", "error");
+    return;
+  }
+  const data = await apiRequest("/aurum-shield/settings", {
+    method: "PUT",
+    body: JSON.stringify({
+      cash_limit_amount: Number(document.getElementById("shieldCashLimit").value || 500),
+      cash_window_days: Number(document.getElementById("shieldCashWindowDays").value || 7),
+      frequent_sales_limit: Number(document.getElementById("shieldFrequentSalesLimit").value || 3),
+      document_expiry_warning_days: Number(document.getElementById("shieldDocumentExpiryDays").value || 30),
+      block_critical_practices: document.getElementById("shieldBlockCritical").checked,
+      dashboard_alerts_enabled: document.getElementById("shieldDashboardAlerts").checked,
+      ai_explanation_enabled: document.getElementById("shieldAiExplanation").checked,
+      factor_weights: weights
+    })
+  });
+  state.aurumShieldSettings = data.settings || {};
+  renderAurumShieldSettings(state.aurumShieldSettings);
+  showToast("Configurazione Aurum Shield salvata.", "success");
 }
 
 function renderBackups() {
@@ -4442,18 +4658,18 @@ function renderAntifraud() {
     <div class="table-row head"><span>Livello</span><span>Tipo</span><span>Atto</span><span>Cliente</span><span>Stato</span><span>Azioni</span></div>
     ${state.antifraudAlerts.map((alert) => `
       <div class="table-row">
-        <strong>${escapeHtml(alert.livello || "medio")}</strong>
-        <span>${escapeHtml(alert.tipo_alert || "")}</span>
+        <strong>${escapeHtml(alert.livello || alert.severity || "medio")}</strong>
+        <span>${escapeHtml(alert.tipo_alert || alert.title || "")}</span>
         <span>${escapeHtml(alert.practice_number || "")}</span>
         <span>${escapeHtml([alert.cliente_nome, alert.cliente_cognome].filter(Boolean).join(" ") || "Dato non inserito")}</span>
-        <em>${escapeHtml(alert.stato || "nuovo")}</em>
-        <select data-antifraud-status="${alert.id}">
+        <em>${escapeHtml(alert.stato || alert.status || "nuovo")}</em>
+        <select ${alert.source === "aurum_shield" ? `data-shield-alert-status="${escapeHtml(String(alert.id))}"` : `data-antifraud-status="${escapeHtml(String(alert.id))}"`}>
           <option value="">Aggiorna</option>
           <option value="in verifica">In verifica</option>
           <option value="risolto">Risolto</option>
           <option value="falso positivo">Falso positivo</option>
         </select>
-        <small>${escapeHtml(alert.descrizione || "")}</small>
+        <small>${escapeHtml(alert.descrizione || alert.description || "")}</small>
       </div>
     `).join("")}
   `;
@@ -4461,8 +4677,12 @@ function renderAntifraud() {
 
 async function loadAntifraud() {
   try {
-    const data = await apiRequest("/antifrode");
-    state.antifraudAlerts = data.alerts || [];
+    const [data, shield] = await Promise.all([
+      apiRequest("/antifrode"),
+      apiRequest("/aurum-shield/alerts").catch(() => ({ alerts: [] }))
+    ]);
+    const shieldAlerts = (shield.alerts || []).map((alert) => ({ ...alert, source: "aurum_shield" }));
+    state.antifraudAlerts = [...(data.alerts || []), ...shieldAlerts];
     renderAntifraud();
   } catch (error) {
     if (antifraudList) antifraudList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Antifrode non caricato.")}</div>`;
@@ -4915,7 +5135,7 @@ function renderCrmClients() {
         <span>${escapeHtml((client.negozi_visitati || []).join(", ") || "Dato non inserito")}</span>
         <span>${escapeHtml(client.fiscalCode || "")}</span>
         <span>${escapeHtml(client.phone || "")}</span>
-        <span>${Number(client.atti_count || 0)} atti · ${escapeHtml(formatEuro(client.totale_pagato || 0))}</span>
+        <span>${Number(client.atti_count || 0)} atti · ${escapeHtml(formatEuro(client.totale_pagato || 0))}<small>Shield medio ${Number(client.aurum_shield_average_score || 0)}/100</small></span>
         <button type="button" data-open-crm-client="${client.id}">Apri</button>
       </div>
     `).join("")}
@@ -4957,6 +5177,13 @@ async function openCrmClient(id) {
       </div>
       <h4>Storico atti</h4>
       ${(detail.acts || []).map((act) => `<p>${escapeHtml(act.practiceNumber)} · ${escapeHtml(act.date)} · ${escapeHtml(formatEuro(act.amount || 0))}</p>`).join("") || "<p>Nessun atto collegato.</p>"}
+      <h4>Aurum Shield</h4>
+      <div class="aurum-shield-crm">
+        <p>Score medio storico: <strong>${Number(detail.aurum_shield?.average_score || 0)}/100</strong></p>
+        <p>Ultimo score: <strong>${Number(detail.aurum_shield?.latest_score?.score || 0)}/100</strong></p>
+        <p>Alert aperti: <strong>${Number(detail.aurum_shield?.open_alerts?.length || 0)}</strong></p>
+        ${(detail.aurum_shield?.history || []).slice(0, 5).map((row) => `<p>${escapeHtml(row.practice_number || "")} · ${escapeHtml(row.risk_level || "")} · ${Number(row.score || 0)}/100</p>`).join("") || "<p>Nessuno storico rischio registrato.</p>"}
+      </div>
       <h4>Note interne</h4>
       ${(detail.notes || []).map((note) => `<p>${escapeHtml(note.note)}</p>`).join("") || "<p>Nessuna nota.</p>"}
       <div class="preview-action-stack">
@@ -5711,7 +5938,7 @@ function renderArchiveGroups() {
                         <small>Creazione: ${escapeHtml(formatDateTime(act.createdAt || act.date))}</small>
                         <small>Completamento: ${escapeHtml(formatDateTime(act.completedAt))}</small>
                       </span>
-                      <em class="${statusClass(act.status)}">${escapeHtml(workflowStatusListLabel(act.status))}</em>
+                      <em class="${statusClass(act.status)}">${escapeHtml(workflowStatusListLabel(act.status))}${aurumShieldBadgeMarkup(act.aurumShield)}</em>
                       <strong>${escapeHtml(formatEuro(Number(act.amount || 0)))}</strong>
                       <span>${escapeHtml(act.operatorName || act.operatorUsername || "Dato non inserito")}</span>
                       ${archiveRowActionsMarkup(act)}
@@ -6356,6 +6583,9 @@ async function loadActForEdit(practiceNumber) {
   document.getElementById("operatorStoreName").textContent = `Negozio ${document.getElementById("storeCode").selectedOptions[0]?.textContent || ""}`;
   renderStep();
   setScreen("practice");
+  state.aurumShield = act.aurumShield || null;
+  renderAurumShieldCard();
+  scheduleAurumShieldEvaluation();
   previewModal.hidden = true;
   state.editingDirty = false;
   state.suppressDirtyTracking = false;
@@ -6418,7 +6648,10 @@ async function resetCurrentPractice(options = {}) {
   state.cashLimitWarningShown = false;
   state.amlCashCheck = null;
   window.clearTimeout(state.amlCashCheckTimer);
+  state.aurumShield = null;
+  window.clearTimeout(state.aurumShieldTimer);
   renderAmlCashAlert();
+  renderAurumShieldCard();
   setQualityReview(null);
 
   await setPracticeMeta({ deferPracticeNumber: options.deferPracticeNumber });
@@ -8160,6 +8393,9 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   }
   archivedAct = await attachLegalSignatureMetadata(archivedAct);
   archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
+  const shield = await evaluateAurumShield({ draftData: archivedAct, status: targetStatus, silent: true, loading: true });
+  if (!(await confirmAurumShieldBeforeFinalSave(shield))) return false;
+  if (shield) archivedAct.aurumShield = shield;
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   } catch (error) {
@@ -8402,12 +8638,25 @@ storesList?.addEventListener("click", (event) => {
 document.getElementById("scanAntifraud")?.addEventListener("click", scanAntifraud);
 antifraudList?.addEventListener("change", async (event) => {
   const select = event.target.closest("[data-antifraud-status]");
-  if (!select || !select.value) return;
-  await apiRequest(`/antifrode/${select.dataset.antifraudStatus}`, {
+  const shieldSelect = event.target.closest("[data-shield-alert-status]");
+  if (!select && !shieldSelect) return;
+  const target = select || shieldSelect;
+  if (!target.value) return;
+  await apiRequest(select ? `/antifrode/${select.dataset.antifraudStatus}` : `/aurum-shield/alerts/${shieldSelect.dataset.shieldAlertStatus}/review`, {
     method: "PUT",
-    body: JSON.stringify({ stato: select.value })
+    body: JSON.stringify({ stato: target.value, status: target.value })
   });
   await loadAntifraud();
+});
+aurumShieldSettingsForm?.addEventListener("submit", saveAurumShieldSettings);
+aurumShieldAlertsList?.addEventListener("change", async (event) => {
+  const select = event.target.closest("[data-shield-alert-status]");
+  if (!select || !select.value) return;
+  await apiRequest(`/aurum-shield/alerts/${select.dataset.shieldAlertStatus}/review`, {
+    method: "PUT",
+    body: JSON.stringify({ status: select.value })
+  });
+  await loadAurumShieldAdmin();
 });
 trainingCourseForm?.addEventListener("submit", createTrainingCourse);
 trainingCourseReset?.addEventListener("click", resetTrainingCourseFormValues);
@@ -8676,6 +8925,7 @@ document.getElementById("cededItemsTable").addEventListener("input", (event) => 
   markPracticeDirty();
   updateCededItems();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
 });
 
 document.getElementById("cededItemsTable").addEventListener("change", (event) => {
@@ -8689,6 +8939,7 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
     renderPreciousCaptureCards();
     updateAttachmentState();
     updateChecklistState();
+    scheduleAurumShieldEvaluation();
   }
 });
 
@@ -8697,11 +8948,13 @@ document.getElementById("saleTotal").addEventListener("input", () => {
   updateSaleTotal();
   notifyCashPaymentLimitIfNeeded();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
 });
 
 document.getElementById("materialAmountFields").addEventListener("input", () => {
   markPracticeDirty();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
 });
 
 document.querySelector(".form-panel").addEventListener("input", (event) => {
@@ -8733,6 +8986,7 @@ document.querySelector(".form-panel").addEventListener("input", (event) => {
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
   if (event.target.matches("#saleTotal")) scheduleAmlCashCheck();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
 });
 
 document.querySelector(".form-panel").addEventListener("change", (event) => {
@@ -8762,6 +9016,7 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
   if (event.target.matches('[name="scadenzaDocumento"]')) updateDocumentExpiryWarning();
   if (event.target.matches("#saleTotal")) scheduleAmlCashCheck();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
 });
 
 document.getElementById("paymentMethod").addEventListener("change", () => {
@@ -8773,18 +9028,21 @@ document.getElementById("paymentMethod").addEventListener("change", () => {
   scheduleAmlCashCheck();
   updateAttachmentState();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
 });
 
 document.getElementById("storeCode").addEventListener("change", async () => {
   markPracticeDirty();
   await updatePracticeNumber();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
 });
 document.getElementById("practiceDate").addEventListener("change", async () => {
   markPracticeDirty();
   await updatePracticeNumber();
   scheduleAmlCashCheck();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
 });
 
 document.getElementById("archiveStoreFilter").addEventListener("change", async () => {
@@ -9016,6 +9274,7 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
     state.loadedSignatureImages[signatureIndex] = "";
     markPracticeDirty();
     updateSignatureState();
+    scheduleAurumShieldEvaluation();
   }
 
   function end() {
@@ -9037,6 +9296,7 @@ document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
     state.loadedSignatureImages[signatureIndex] = "";
     markPracticeDirty();
     updateSignatureState();
+    scheduleAurumShieldEvaluation();
   });
 });
 
@@ -9077,6 +9337,7 @@ document.addEventListener("change", async (event) => {
   card.querySelector("em").textContent = "Foto acquisita";
   updateAttachmentState();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
   if (state.captureGroup && !previewModal.hidden) openCaptureGroupModal(state.captureGroup);
 });
 
@@ -9127,6 +9388,7 @@ document.addEventListener("click", async (event) => {
   renderPreciousCaptureCards();
   updateAttachmentState();
   updateChecklistState();
+  scheduleAurumShieldEvaluation();
   showToast("Foto eliminata.");
 });
 

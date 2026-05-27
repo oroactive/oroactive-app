@@ -1930,6 +1930,121 @@ textarea {
   color: var(--green);
 }
 
+.aurum-shield-card {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--green);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.aurum-shield-card.risk-medium {
+  border-left-color: #f2b705;
+}
+
+.aurum-shield-card.risk-high {
+  border-left-color: #f47a20;
+}
+
+.aurum-shield-card.risk-critical {
+  border-left-color: #d93025;
+}
+
+.aurum-shield-card.risk-loading {
+  opacity: 0.72;
+}
+
+.aurum-shield-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.aurum-shield-heading h3 {
+  margin: 0;
+}
+
+.aurum-shield-heading strong {
+  font-size: 24px;
+  color: var(--ink);
+}
+
+.aurum-shield-level,
+.aurum-shield-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.aurum-shield-level {
+  background: #eef5f0;
+  color: var(--green);
+}
+
+.risk-medium .aurum-shield-level,
+.aurum-shield-badge.risk-medium {
+  background: #fff7db;
+  color: #8a5a00;
+}
+
+.risk-high .aurum-shield-level,
+.aurum-shield-badge.risk-high {
+  background: #fff0e6;
+  color: var(--gold-dark);
+}
+
+.risk-critical .aurum-shield-level,
+.aurum-shield-badge.risk-critical {
+  background: #ffe8e5;
+  color: #b42318;
+}
+
+.aurum-shield-badge.risk-low {
+  background: #e8f5ed;
+  color: var(--green);
+}
+
+.aurum-shield-badge.risk-unknown {
+  background: #f2f2f2;
+  color: var(--muted);
+}
+
+.aurum-shield-card ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+}
+
+.aurum-shield-recommendations {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.aurum-shield-settings textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.aurum-shield-crm {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff9f4;
+}
+
 .field-grid {
   display: grid;
   grid-template-columns: 1fr;

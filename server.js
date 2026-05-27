@@ -102,6 +102,40 @@ const knowledgeCategories = [
   "Procedure operative",
   "Formazione operatori"
 ];
+const defaultAurumShieldSettings = {
+  cash_limit_amount: 500,
+  cash_window_days: 7,
+  frequent_sales_limit: 3,
+  document_expiry_warning_days: 30,
+  block_critical_practices: false,
+  dashboard_alerts_enabled: true,
+  ai_explanation_enabled: false,
+  factor_weights: {
+    expired_document: 40,
+    document_expiring: 15,
+    duplicate_document: 35,
+    missing_fiscal_code: 25,
+    new_client: 5,
+    frequent_sales: 30,
+    multi_store_sales: 35,
+    cash_near_limit: 20,
+    cash_over_limit: 45,
+    iban_holder_mismatch: 20,
+    shared_iban: 30,
+    missing_precious_photos: 15,
+    missing_signature: 35,
+    missing_weight_or_title: 20,
+    anomalous_amount_weight: 20,
+    frequent_updates: 10,
+    negative_quality: 35,
+    missing_quality: 10,
+    missing_payment_receipt: 20,
+    previous_alerts: 25,
+    fast_completion: 15,
+    operator_anomalies: 15,
+    store_anomalies: 15
+  }
+};
 
 const app = express();
 const allowedCorsOrigins = new Set([
@@ -2330,6 +2364,9 @@ function compactActPayload(payload = {}) {
 
 function rowToAct(row, options = {}) {
   const payload = options.full === false ? compactActPayload(row.payload || {}) : (row.payload || {});
+  const shieldScore = row.shield_score ?? row.aurum_shield_score ?? null;
+  const shieldRiskLevel = row.shield_risk_level || row.aurum_shield_risk_level || "";
+  const shieldFactors = row.shield_factors || row.aurum_shield_factors || [];
   return {
     ...payload,
     id: row.id,
@@ -2352,7 +2389,16 @@ function rowToAct(row, options = {}) {
     deletedBy: row.deleted_by || payload.deletedBy || null,
     operatorId: row.operatore_id || payload.operatorId || payload.operatore_id || null,
     operatorUsername: row.operator_username || payload.operatorUsername || "",
-    operatorName: [row.operator_nome, row.operator_cognome].filter(Boolean).join(" ") || payload.operatorName || ""
+    operatorName: [row.operator_nome, row.operator_cognome].filter(Boolean).join(" ") || payload.operatorName || "",
+    aurumShield: shieldScore !== null && shieldScore !== undefined
+      ? {
+        score: Number(shieldScore || 0),
+        risk_level: shieldRiskLevel || "basso",
+        summary: row.shield_summary || row.aurum_shield_summary || "",
+        factors: Array.isArray(shieldFactors) ? shieldFactors : [],
+        updated_at: row.shield_updated_at || row.aurum_shield_updated_at || null
+      }
+      : payload.aurumShield || null
   };
 }
 
@@ -3179,9 +3225,21 @@ async function listActs(query = {}, user = null) {
   values.push(offset);
   const offsetParameter = `$${values.length}`;
   const result = await pool.query(
-    `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome
+    `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome,
+            shield.score AS shield_score,
+            shield.risk_level AS shield_risk_level,
+            shield.summary AS shield_summary,
+            shield.factors AS shield_factors,
+            shield.updated_at AS shield_updated_at
      FROM ${actsTable} a
      LEFT JOIN utenti u ON u.id = a.operatore_id
+     LEFT JOIN LATERAL (
+       SELECT score, risk_level, summary, factors, updated_at
+       FROM aurum_shield_scores
+       WHERE sale_deed_id = a.id
+       ORDER BY updated_at DESC
+       LIMIT 1
+     ) shield ON TRUE
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
      ORDER BY a.data_atto DESC NULLS LAST, a.act_number DESC NULLS LAST, a.updated_at DESC
      LIMIT ${limitParameter}::integer OFFSET ${offsetParameter}::integer`,
@@ -3581,6 +3639,14 @@ async function dashboardKpis(user = {}) {
     lowOperator ? { title: "Operatore da monitorare", level: "attenzione", text: `${lowOperator.operatore} ha media acquisto piu bassa: verificare margini e formazione.` } : null,
     openLots ? { title: "Fusioni consigliate", level: "operativo", text: `${openLots} atti risultano fondibili: pianificare invio in raffineria.` } : null
   ].filter(Boolean);
+  const aurumShield = await dashboardAurumShieldStats(user).catch(() => ({
+    high_today: 0,
+    critical_open: 0,
+    open_alerts: 0,
+    average_score: 0,
+    top_store: null,
+    top_operator: null
+  }));
   return {
     kpi: {
       fatturato_giornaliero: sum(dailyActs, (act) => act.amount),
@@ -3608,7 +3674,8 @@ async function dashboardKpis(user = {}) {
     carature_frequenti: Object.entries(frequency).map(([titolo, count]) => ({ titolo, count })).sort((a, b) => b.count - a.count).slice(0, 8),
     pagamenti: paymentSplit,
     ranking_negozi: Object.values(byStore).sort((a, b) => b.fatturato - a.fatturato),
-    ranking_operatori: Object.values(byOperator).sort((a, b) => b.fatturato - a.fatturato)
+    ranking_operatori: Object.values(byOperator).sort((a, b) => b.fatturato - a.fatturato),
+    aurum_shield: aurumShield
   };
 }
 
@@ -3873,6 +3940,704 @@ async function updateAntifraudAlert(id, input = {}, user = {}) {
     [id, input.stato || input.status || "", user.id]
   );
   return result.rows[0] || null;
+}
+
+function aurumShieldRiskLevel(score = 0) {
+  const value = Math.max(0, Math.min(100, Math.round(Number(score || 0))));
+  if (value <= 30) return "basso";
+  if (value <= 60) return "medio";
+  if (value <= 80) return "alto";
+  return "critico";
+}
+
+function aurumShieldRiskSummary(level = "basso") {
+  return {
+    basso: "Pratica sicura",
+    medio: "Pratica da controllare",
+    alto: "Attenzione operativa",
+    critico: "Alto rischio — richiede verifica"
+  }[level] || "Pratica da controllare";
+}
+
+function normalizeAurumShieldSettingValue(key, value) {
+  if (key === "factor_weights") {
+    const parsed = typeof value === "string" ? JSON.parse(value || "{}") : value;
+    return {
+      ...defaultAurumShieldSettings.factor_weights,
+      ...(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {})
+    };
+  }
+  if (["block_critical_practices", "dashboard_alerts_enabled", "ai_explanation_enabled"].includes(key)) {
+    return value === true || value === "true" || value === 1 || value === "1";
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : defaultAurumShieldSettings[key];
+}
+
+async function getAurumShieldSettings() {
+  const result = await pool.query("SELECT key, value FROM aurum_shield_settings");
+  const settings = { ...defaultAurumShieldSettings, factor_weights: { ...defaultAurumShieldSettings.factor_weights } };
+  result.rows.forEach((row) => {
+    if (!(row.key in settings)) return;
+    settings[row.key] = normalizeAurumShieldSettingValue(row.key, row.value);
+  });
+  settings.factor_weights = {
+    ...defaultAurumShieldSettings.factor_weights,
+    ...(settings.factor_weights || {})
+  };
+  return settings;
+}
+
+async function updateAurumShieldSettings(input = {}, user = {}) {
+  if (normalizeRole(user.ruolo) !== "founder") {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const merged = {
+    ...(await getAurumShieldSettings()),
+    ...Object.fromEntries(Object.entries(input).filter(([key]) => key in defaultAurumShieldSettings))
+  };
+  for (const key of Object.keys(defaultAurumShieldSettings)) {
+    const value = normalizeAurumShieldSettingValue(key, merged[key]);
+    await pool.query(
+      `INSERT INTO aurum_shield_settings (key, value, updated_by, updated_at)
+       VALUES ($1::text, $2::jsonb, $3::bigint, NOW())
+       ON CONFLICT (key)
+       DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+      [key, JSON.stringify(value), user.id || null]
+    );
+  }
+  return getAurumShieldSettings();
+}
+
+function isValidItalianFiscalCode(value = "") {
+  return /^[A-Z0-9]{16}$/.test(normalizeFiscalCode(value));
+}
+
+function cleanComparableName(value = "") {
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+}
+
+function aurumShieldCaptureKeys(act = {}) {
+  const keys = new Set();
+  (Array.isArray(act.captures) ? act.captures : []).forEach((key) => keys.add(String(key || "")));
+  (Array.isArray(act.captureAttachments) ? act.captureAttachments : []).forEach((attachment) => keys.add(String(attachment.key || "")));
+  (Array.isArray(act.payload?.captureAttachments) ? act.payload.captureAttachments : []).forEach((attachment) => keys.add(String(attachment.key || "")));
+  return keys;
+}
+
+function aurumShieldHasCapture(act, pattern) {
+  return [...aurumShieldCaptureKeys(act)].some((key) => pattern.test(key));
+}
+
+function normalizeAurumShieldAct(input = {}, saleDeedRow = null) {
+  const base = saleDeedRow ? rowToAct(saleDeedRow) : {};
+  const payload = input.payload || base.payload || {};
+  return {
+    ...base,
+    ...payload,
+    ...input,
+    id: input.id || input.sale_deed_id || input.saleDeedId || base.id || null,
+    fiscalCode: normalizeFiscalCode(input.fiscalCode || input.codice_fiscale || input.codiceFiscale || base.fiscalCode || ""),
+    documentNumber: String(input.documentNumber || input.numeroDocumento || payload.documentNumber || base.documentNumber || "").trim(),
+    documentExpiry: dateOrNull(input.documentExpiry || input.scadenzaDocumento || payload.documentExpiry || base.documentExpiry || ""),
+    paymentMethod: input.paymentMethod || input.metodo_pagamento || base.paymentMethod || "",
+    amount: numberFrom(input.amount ?? input.totale ?? base.amount),
+    iban: String(input.iban || base.iban || "").replace(/\s+/g, "").toUpperCase(),
+    accountHolder: input.accountHolder || input.intestatario_conto || payload.accountHolder || base.accountHolder || "",
+    name: input.name || input.cliente_nome || base.name || "",
+    surname: input.surname || input.cliente_cognome || base.surname || "",
+    date: dateOrNull(input.date || input.data_atto || base.date) || new Date().toISOString().slice(0, 10),
+    store: input.store || base.store || "",
+    storeCode: input.storeCode || input.codice_negozio || base.storeCode || "",
+    operatorId: input.operatorId || input.operatore_id || base.operatorId || null,
+    signatures: Array.isArray(input.signatures) ? input.signatures : Array.isArray(base.signatures) ? base.signatures : [],
+    signatureImages: Array.isArray(input.signatureImages) ? input.signatureImages : Array.isArray(base.signatureImages) ? base.signatureImages : [],
+    captureAttachments: Array.isArray(input.captureAttachments) ? input.captureAttachments : Array.isArray(base.captureAttachments) ? base.captureAttachments : [],
+    captures: Array.isArray(input.captures) ? input.captures : Array.isArray(base.captures) ? base.captures : [],
+    items: Array.isArray(input.items) ? input.items : Array.isArray(base.items) ? base.items : [],
+    materials: Array.isArray(input.materials) ? input.materials : Array.isArray(base.materials) ? base.materials : [],
+    qualityReview: input.qualityReview || base.qualityReview || null,
+    createdAt: input.createdAt || base.createdAt || null,
+    completedAt: input.completedAt || base.completedAt || null,
+    status: normalizeWorkflowStatus(input.status || base.status || "draft")
+  };
+}
+
+async function aurumShieldContext(act = {}, settings = {}) {
+  const fiscalCode = normalizeFiscalCode(act.fiscalCode || "");
+  const context = {
+    client_id: act.client_id || act.cliente_id || null,
+    client_history_count: 0,
+    frequent_sales_count: 0,
+    multi_store_count: 0,
+    cash_window_total: 0,
+    previous_alerts: 0,
+    duplicate_document_clients: 0,
+    shared_iban_clients: 0,
+    frequent_updates: 0,
+    operator_deleted_count: 0,
+    store_alert_count: 0
+  };
+  const actId = act.id || act.sale_deed_id || null;
+  const date = dateOrNull(act.date) || new Date().toISOString().slice(0, 10);
+  const windowDays = Number(settings.cash_window_days || 7);
+
+  if (fiscalCode) {
+    const client = await pool.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1", [fiscalCode]);
+    if (client.rows[0]?.id) context.client_id = client.rows[0].id;
+    const history = await pool.query(
+      `SELECT COUNT(*)::int AS count,
+              COUNT(*) FILTER (
+                WHERE data_atto BETWEEN ($2::date - ($3::integer * INTERVAL '1 day')) AND $2::date
+              )::int AS recent_count,
+              COUNT(DISTINCT store)::int FILTER (
+                WHERE data_atto BETWEEN ($2::date - ($3::integer * INTERVAL '1 day')) AND $2::date
+              ) AS stores,
+              COALESCE(SUM(totale) FILTER (
+                WHERE LOWER(COALESCE(payment_method, '')) LIKE '%contanti%'
+                  AND data_atto BETWEEN ($2::date - ($3::integer * INTERVAL '1 day')) AND $2::date
+              ), 0)::numeric AS cash_total
+       FROM ${actsTable}
+       WHERE UPPER(COALESCE(codice_fiscale, '')) = $1::text
+         AND deleted_at IS NULL
+         AND COALESCE(status, '') NOT ILIKE 'deleted'
+         AND ($4::text = '' OR id::text <> $4::text)`,
+      [fiscalCode, date, windowDays, actId ? String(actId) : ""]
+    );
+    const row = history.rows[0] || {};
+    context.client_history_count = Number(row.count || 0);
+    context.frequent_sales_count = Number(row.recent_count || 0);
+    context.multi_store_count = Number(row.stores || 0);
+    context.cash_window_total = Number(row.cash_total || 0);
+
+    const previousAlerts = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM antifrode_alerts af
+       LEFT JOIN ${actsTable} a ON a.id = af.atto_id
+       WHERE af.stato IN ('nuovo', 'in verifica')
+         AND (
+           af.cliente_id = $1::bigint
+           OR UPPER(COALESCE(a.codice_fiscale, '')) = $2::text
+         )`,
+      [context.client_id || null, fiscalCode]
+    ).catch(() => ({ rows: [{ count: 0 }] }));
+    context.previous_alerts = Number(previousAlerts.rows[0]?.count || 0);
+  }
+
+  if (act.documentNumber) {
+    const duplicateDocs = await pool.query(
+      `SELECT COUNT(DISTINCT UPPER(COALESCE(codice_fiscale, '')))::int AS clients
+       FROM ${actsTable}
+       WHERE COALESCE(payload->>'documentNumber', '') = $1::text
+         AND deleted_at IS NULL
+         AND ($2::text = '' OR UPPER(COALESCE(codice_fiscale, '')) <> $2::text)`,
+      [act.documentNumber, fiscalCode]
+    );
+    context.duplicate_document_clients = Number(duplicateDocs.rows[0]?.clients || 0);
+  }
+
+  if (act.iban) {
+    const duplicateIbans = await pool.query(
+      `SELECT COUNT(DISTINCT UPPER(COALESCE(codice_fiscale, '')))::int AS clients
+       FROM ${actsTable}
+       WHERE iban = $1::text
+         AND deleted_at IS NULL
+         AND ($2::text = '' OR UPPER(COALESCE(codice_fiscale, '')) <> $2::text)`,
+      [act.iban, fiscalCode]
+    );
+    context.shared_iban_clients = Number(duplicateIbans.rows[0]?.clients || 0);
+  }
+
+  if (actId) {
+    const updates = await pool.query(
+      `SELECT COUNT(*)::int AS updates
+       FROM audit_logs
+       WHERE method IN ('PUT', 'PATCH')
+         AND (route = $1::text OR route = $2::text OR route = $3::text OR route = $4::text)
+         AND created_at >= NOW() - INTERVAL '30 days'`,
+      [`/api/atti/${actId}`, `/api/acts/${actId}`, `/api/atti/${encodeURIComponent(String(actId))}`, `/api/acts/${encodeURIComponent(String(actId))}`]
+    ).catch(() => ({ rows: [{ updates: 0 }] }));
+    context.frequent_updates = Number(updates.rows[0]?.updates || 0);
+  }
+
+  if (act.operatorId) {
+    const deleted = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM ${actsTable}
+       WHERE operatore_id = $1::bigint
+         AND deleted_at >= NOW() - INTERVAL '30 days'`,
+      [act.operatorId]
+    ).catch(() => ({ rows: [{ count: 0 }] }));
+    context.operator_deleted_count = Number(deleted.rows[0]?.count || 0);
+  }
+
+  if (act.store) {
+    const storeAlerts = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM antifrode_alerts af
+       JOIN ${actsTable} a ON a.id = af.atto_id
+       WHERE a.store = $1::text
+         AND af.stato IN ('nuovo', 'in verifica')
+         AND af.created_at >= NOW() - INTERVAL '30 days'`,
+      [act.store]
+    ).catch(() => ({ rows: [{ count: 0 }] }));
+    context.store_alert_count = Number(storeAlerts.rows[0]?.count || 0);
+  }
+  return context;
+}
+
+async function calculateAurumShieldRisk(input = {}, user = {}) {
+  const settings = await getAurumShieldSettings();
+  const saleDeedId = input.sale_deed_id || input.saleDeedId || input.id || "";
+  let saleDeedRow = null;
+  if (saleDeedId) {
+    saleDeedRow = await findExisting(saleDeedId);
+    if (saleDeedRow && !canAccessAct(saleDeedRow, user)) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+  }
+  const act = normalizeAurumShieldAct(input.draft_data || input.draftData || input, saleDeedRow);
+  if (saleDeedRow) {
+    act.id = saleDeedRow.id;
+    act.client_id = saleDeedRow.cliente_id || null;
+    act.negozio_id = saleDeedRow.negozio_id || null;
+  }
+  const context = await aurumShieldContext(act, settings);
+  const factors = [];
+  const recommendations = new Set();
+  const weight = (type) => Number(settings.factor_weights?.[type] ?? defaultAurumShieldSettings.factor_weights[type] ?? 0);
+  const addFactor = (type, severity, message, recommendation, options = {}) => {
+    const points = Number(options.points ?? weight(type));
+    factors.push({ type, severity, points, message });
+    if (recommendation) recommendations.add(recommendation);
+  };
+
+  if (!isValidItalianFiscalCode(act.fiscalCode)) {
+    addFactor("missing_fiscal_code", "high", "Codice fiscale mancante o non valido.", "Verifica anagrafica e codice fiscale prima di completare.");
+  }
+  if (context.client_history_count === 0 && isValidItalianFiscalCode(act.fiscalCode)) {
+    addFactor("new_client", "low", "Cliente nuovo senza storico OroActive.", "Controlla con attenzione documento e dati cliente.");
+  }
+  if (context.previous_alerts > 0) {
+    addFactor("previous_alerts", "high", "Cliente con alert precedenti aperti.", "Consulta lo storico alert prima di procedere.");
+  }
+  if (context.frequent_sales_count >= Number(settings.frequent_sales_limit || 3)) {
+    addFactor("frequent_sales", "high", `Cliente con ${context.frequent_sales_count} operazioni negli ultimi ${settings.cash_window_days} giorni.`, "Verifica possibile frazionamento e storico cliente.");
+  }
+  if (context.multi_store_count > 1) {
+    addFactor("multi_store_sales", "high", "Cliente presente in più negozi in poco tempo.", "Confronta lo storico cliente tra negozi.");
+  }
+
+  const today = new Date();
+  const documentExpiry = act.documentExpiry ? new Date(act.documentExpiry) : null;
+  if (documentExpiry && !Number.isNaN(documentExpiry.getTime())) {
+    const daysToExpiry = Math.ceil((documentExpiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+    if (daysToExpiry < 0) {
+      addFactor("expired_document", "critical", "Documento scaduto.", "Richiedi documento valido prima del completamento.");
+    } else if (daysToExpiry <= Number(settings.document_expiry_warning_days || 30)) {
+      addFactor("document_expiring", "medium", "Documento vicino alla scadenza.", "Verifica validità del documento.");
+    }
+  }
+  if (act.documentNumber && context.duplicate_document_clients > 0) {
+    addFactor("duplicate_document", "high", "Numero documento già usato da altro cliente.", "Controlla documento e identità cliente.");
+  }
+  if (!aurumShieldHasCapture(act, /^documento-fronte/) || !aurumShieldHasCapture(act, /^documento-retro/)) {
+    addFactor("missing_payment_receipt", "medium", "Foto fronte/retro documento non complete.", "Completa gli allegati documento.");
+  }
+
+  const cashLimit = Number(settings.cash_limit_amount || 500);
+  const amount = numberFrom(act.amount);
+  const predictedCash = context.cash_window_total + (isCashPaymentMethod(act.paymentMethod) ? amount : 0);
+  if (isCashPaymentMethod(act.paymentMethod) && predictedCash > cashLimit) {
+    addFactor("cash_over_limit", "critical", "Pagamento contanti superiore alla soglia configurata.", "Usa pagamento tracciabile o chiedi verifica responsabile.");
+  } else if (isCashPaymentMethod(act.paymentMethod) && predictedCash >= cashLimit * 0.8) {
+    addFactor("cash_near_limit", "high", "Pagamento contanti vicino alla soglia configurata.", "Verifica limite contanti negli ultimi giorni.");
+  }
+  if (act.iban && context.shared_iban_clients > 0) {
+    addFactor("shared_iban", "high", "Stesso IBAN usato da clienti diversi.", "Verifica intestatario conto e storico pagamenti.");
+  }
+  const holder = cleanComparableName(act.accountHolder);
+  const clientName = cleanComparableName(`${act.name}${act.surname}`);
+  if (act.iban && holder && clientName && holder !== clientName && !holder.includes(clientName) && !clientName.includes(holder)) {
+    addFactor("iban_holder_mismatch", "medium", "IBAN intestato a persona diversa dal cliente.", "Controlla intestatario conto prima del pagamento.");
+  }
+  if (!isCashPaymentMethod(act.paymentMethod) && amount > 0 && !aurumShieldHasCapture(act, /^pagamento-/)) {
+    addFactor("missing_payment_receipt", "medium", "Contabile mancante per pagamento tracciabile.", "Carica la contabile del pagamento.");
+  }
+
+  if (!aurumShieldHasCapture(act, /preziosi/i)) {
+    addFactor("missing_precious_photos", "medium", "Foto preziosi mancanti.", "Carica foto chiare degli oggetti ceduti.");
+  }
+  const signatureBooleans = Array.isArray(act.signatures) ? act.signatures : [];
+  const signatureImages = Array.isArray(act.signatureImages) ? act.signatureImages : [];
+  const signedCount = Math.max(signatureBooleans.filter(Boolean).length, signatureImages.filter(Boolean).length);
+  if (signedCount < 4 && ["completed", "archived_completed"].includes(normalizeWorkflowStatus(act.status))) {
+    addFactor("missing_signature", "high", "Firme mancanti per una pratica in completamento.", "Completa tutte le firme obbligatorie.");
+  }
+  const lots = materialLotsFromAct(act);
+  const hasMissingMaterial = !lots.length || lots.some((lot) => !lot.title || Number(lot.weight || 0) <= 0);
+  if (hasMissingMaterial) {
+    addFactor("missing_weight_or_title", "medium", "Peso o titolo/caratura mancante sugli oggetti preziosi.", "Completa peso, metallo e titolo degli oggetti.");
+  }
+  const totalWeight = lots.reduce((sum, lot) => sum + Number(lot.weight || 0), 0) || numberFrom(act.weight);
+  if (amount > 0 && totalWeight > 0) {
+    const euroPerGram = amount / totalWeight;
+    if (euroPerGram > 150 || euroPerGram < 5) {
+      addFactor("anomalous_amount_weight", "medium", "Importo anomalo rispetto al peso inserito.", "Ricontrolla pesi, titolo e quotazione applicata.");
+    }
+  }
+  if (context.frequent_updates > 3) {
+    addFactor("frequent_updates", "medium", "Atto modificato più volte recentemente.", "Verifica che le modifiche siano tracciate e corrette.");
+  }
+  const qualityStatus = String(act.qualityReview?.status || "").toLowerCase();
+  if (qualityStatus === "negative") {
+    addFactor("negative_quality", "high", "Controllo qualità negativo.", "Gestisci feedback qualità prima di chiudere la pratica.");
+  } else if (!qualityStatus && ["completed", "archived_completed"].includes(normalizeWorkflowStatus(act.status))) {
+    addFactor("missing_quality", "medium", "Controllo qualità mancante.", "Completa il controllo qualità prima dell'archiviazione finale.");
+  }
+  if (act.createdAt && act.completedAt && daysBetween(act.createdAt, act.completedAt) === 0) {
+    const elapsedMs = new Date(act.completedAt).getTime() - new Date(act.createdAt).getTime();
+    if (Number.isFinite(elapsedMs) && elapsedMs > 0 && elapsedMs < 3 * 60 * 1000) {
+      addFactor("fast_completion", "medium", "Pratica completata molto velocemente.", "Assicurati che documento, firme e pagamento siano stati verificati.");
+    }
+  }
+  if (context.operator_deleted_count >= 3) {
+    addFactor("operator_anomalies", "medium", "Operatore con molte pratiche eliminate nel periodo.", "Responsabile: controllare andamento operativo dell'operatore.");
+  }
+  if (context.store_alert_count >= 5) {
+    addFactor("store_anomalies", "medium", "Negozio con anomalie ricorrenti aperte.", "Responsabile: verificare gli alert del negozio.");
+  }
+
+  let score = factors.reduce((sum, factor) => sum + Number(factor.points || 0), 0);
+  if (factors.some((factor) => factor.type === "cash_over_limit")) score = Math.max(score, 85);
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const riskLevel = aurumShieldRiskLevel(score);
+  const summary = aurumShieldRiskSummary(riskLevel);
+  const orderedFactors = factors.sort((first, second) => Number(second.points || 0) - Number(first.points || 0));
+  return {
+    ok: true,
+    score,
+    risk_level: riskLevel,
+    summary,
+    factors: orderedFactors,
+    recommendations: [...recommendations].slice(0, 8),
+    block_critical_practices: Boolean(settings.block_critical_practices),
+    ai_explanation_enabled: Boolean(settings.ai_explanation_enabled)
+  };
+}
+
+async function syncAurumShieldAlert({ saleDeedRow, shield, user = {} }) {
+  const score = Number(shield?.score || 0);
+  const shouldAlert = score >= 31;
+  if (!saleDeedRow?.id) return null;
+  if (!shouldAlert) {
+    await pool.query(
+      `UPDATE aurum_shield_alerts
+       SET status = 'resolved', reviewed_by = COALESCE($2::bigint, reviewed_by), reviewed_at = COALESCE(reviewed_at, NOW())
+       WHERE sale_deed_id = $1::bigint
+         AND alert_type = 'aurum_shield_risk'
+         AND status IN ('open', 'in_review', 'in verifica')`,
+      [saleDeedRow.id, user?.id || null]
+    );
+    return null;
+  }
+  const title = `Aurum Shield: rischio ${shield.risk_level}`;
+  const description = `${shield.summary}. ${(shield.factors || []).slice(0, 4).map((factor) => factor.message).join(" ")}`.trim();
+  const existing = await pool.query(
+    `SELECT id FROM aurum_shield_alerts
+     WHERE sale_deed_id = $1::bigint
+       AND alert_type = 'aurum_shield_risk'
+       AND status IN ('open', 'in_review', 'in verifica')
+     LIMIT 1`,
+    [saleDeedRow.id]
+  );
+  if (existing.rowCount) {
+    const result = await pool.query(
+      `UPDATE aurum_shield_alerts
+       SET severity = $2::text,
+           title = $3::text,
+           description = $4::text
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [existing.rows[0].id, shield.risk_level, title, description]
+    );
+    return result.rows[0] || null;
+  }
+  const result = await pool.query(
+    `INSERT INTO aurum_shield_alerts
+      (sale_deed_id, client_id, user_id, store_id, alert_type, severity, title, description, status)
+     VALUES ($1::bigint,$2::bigint,$3::bigint,$4::bigint,'aurum_shield_risk',$5::text,$6::text,$7::text,'open')
+     RETURNING *`,
+    [
+      saleDeedRow.id,
+      saleDeedRow.cliente_id || null,
+      saleDeedRow.operatore_id || user?.id || null,
+      saleDeedRow.negozio_id || null,
+      shield.risk_level,
+      title,
+      description
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+async function persistAurumShieldForAct(saleDeedRow, user = {}) {
+  if (!saleDeedRow?.id || saleDeedRow.deleted_at || normalizeWorkflowStatus(saleDeedRow.status) === "deleted") return null;
+  const shield = await calculateAurumShieldRisk({ sale_deed_id: saleDeedRow.id, draft_data: rowToAct(saleDeedRow) }, user);
+  const result = await pool.query(
+    `INSERT INTO aurum_shield_scores
+      (sale_deed_id, client_id, score, risk_level, summary, factors, recommendations, updated_at)
+     VALUES ($1::bigint,$2::bigint,$3::integer,$4::text,$5::text,$6::jsonb,$7::jsonb,NOW())
+     ON CONFLICT (sale_deed_id)
+     DO UPDATE SET client_id = EXCLUDED.client_id,
+                   score = EXCLUDED.score,
+                   risk_level = EXCLUDED.risk_level,
+                   summary = EXCLUDED.summary,
+                   factors = EXCLUDED.factors,
+                   recommendations = EXCLUDED.recommendations,
+                   updated_at = NOW()
+     RETURNING *`,
+    [
+      saleDeedRow.id,
+      saleDeedRow.cliente_id || null,
+      shield.score,
+      shield.risk_level,
+      shield.summary,
+      sanitizeForPostgres(shield.factors || []),
+      sanitizeForPostgres(shield.recommendations || [])
+    ]
+  );
+  await pool.query(
+    `UPDATE ${actsTable}
+     SET aurum_shield_score = $2::integer,
+         aurum_shield_risk_level = $3::text,
+         aurum_shield_summary = $4::text,
+         aurum_shield_factors = $5::jsonb,
+         aurum_shield_updated_at = NOW()
+     WHERE id = $1::bigint`,
+    [saleDeedRow.id, shield.score, shield.risk_level, shield.summary, sanitizeForPostgres(shield.factors || [])]
+  );
+  await syncAurumShieldAlert({ saleDeedRow, shield, user });
+  return {
+    ...shield,
+    id: result.rows[0]?.id || null,
+    updated_at: result.rows[0]?.updated_at || null
+  };
+}
+
+async function rowWithAurumShield(id) {
+  const result = await pool.query(
+    `SELECT a.*, s.score AS shield_score, s.risk_level AS shield_risk_level,
+            s.summary AS shield_summary, s.factors AS shield_factors,
+            s.updated_at AS shield_updated_at,
+            u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome
+     FROM ${actsTable} a
+     LEFT JOIN utenti u ON u.id = a.operatore_id
+     LEFT JOIN LATERAL (
+       SELECT score, risk_level, summary, factors, updated_at
+       FROM aurum_shield_scores
+       WHERE sale_deed_id = a.id
+       ORDER BY updated_at DESC
+       LIMIT 1
+     ) s ON TRUE
+     WHERE a.id = $1::bigint
+     LIMIT 1`,
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+async function getAurumShieldForSaleDeed(identifier, user = {}) {
+  const row = await findExisting(identifier);
+  if (!row) return null;
+  if (!canAccessAct(row, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const withShield = await rowWithAurumShield(row.id);
+  let act = rowToAct(withShield || row);
+  if (!act.aurumShield) {
+    const shield = await persistAurumShieldForAct(row, user).catch(() => null);
+    act = { ...act, aurumShield: shield };
+  }
+  return { act, shield: act.aurumShield };
+}
+
+async function getAurumShieldForClient(id, user = {}) {
+  const clientResult = await pool.query("SELECT * FROM clienti WHERE id = $1::bigint", [id]);
+  const client = clientResult.rows[0];
+  if (!client) return null;
+  if (!roleSeesAllStores(user.ruolo)) {
+    const store = await storeForUser(user);
+    const access = await pool.query(
+      `SELECT 1
+       FROM clienti c
+       LEFT JOIN ${actsTable} a ON UPPER(a.codice_fiscale) = UPPER(c.codice_fiscale)
+       WHERE c.id = $1::bigint
+         AND (c.negozio_id = $2::bigint OR a.negozio_id = $2::bigint OR a.store = $3::text)
+       LIMIT 1`,
+      [id, store?.id || null, store?.nome || ""]
+    );
+    if (!access.rowCount) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+  }
+  const values = [id];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  const scores = await pool.query(
+    `SELECT s.*, a.practice_number, a.data_atto, a.store
+     FROM aurum_shield_scores s
+     JOIN ${actsTable} a ON a.id = s.sale_deed_id
+     WHERE s.client_id = $1::bigint
+       AND a.deleted_at IS NULL
+       AND COALESCE(a.status, '') NOT ILIKE 'deleted'
+       ${storeWhere}
+     ORDER BY s.updated_at DESC
+     LIMIT 100`,
+    values
+  );
+  const alerts = await pool.query(
+    `SELECT al.*, a.practice_number, a.store
+     FROM aurum_shield_alerts al
+     LEFT JOIN ${actsTable} a ON a.id = al.sale_deed_id
+     WHERE al.client_id = $1::bigint
+       AND al.status IN ('open', 'in_review', 'in verifica')
+       AND (a.id IS NULL OR (a.deleted_at IS NULL AND COALESCE(a.status, '') NOT ILIKE 'deleted'))
+       ${storeWhere}
+     ORDER BY al.created_at DESC
+     LIMIT 50`,
+    values
+  ).catch(() => ({ rows: [] }));
+  const scoreValues = scores.rows.map((row) => Number(row.score || 0));
+  return {
+    average_score: scoreValues.length ? Math.round(scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length) : 0,
+    latest_score: scores.rows[0] || null,
+    open_alerts: alerts.rows,
+    history: scores.rows
+  };
+}
+
+async function listAurumShieldAlerts(user = {}, query = {}) {
+  if (!canViewControlSections(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const values = [];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  const where = [
+    "(a.id IS NULL OR (a.deleted_at IS NULL AND COALESCE(a.status, '') NOT ILIKE 'deleted'))",
+    "al.status <> 'deleted'"
+  ];
+  if (query.status) {
+    values.push(query.status);
+    where.push(`al.status = $${values.length}::text`);
+  }
+  if (query.severity) {
+    values.push(query.severity);
+    where.push(`al.severity = $${values.length}::text`);
+  }
+  const result = await pool.query(
+    `SELECT al.*, a.practice_number, a.store, a.cliente_nome, a.cliente_cognome,
+            s.score, s.risk_level, s.factors
+     FROM aurum_shield_alerts al
+     LEFT JOIN ${actsTable} a ON a.id = al.sale_deed_id
+     LEFT JOIN aurum_shield_scores s ON s.sale_deed_id = al.sale_deed_id
+     WHERE ${where.join(" AND ")}
+       ${storeWhere}
+     ORDER BY al.created_at DESC
+     LIMIT 200`,
+    values
+  );
+  return result.rows;
+}
+
+async function reviewAurumShieldAlert(id, input = {}, user = {}) {
+  if (!canViewControlSections(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const statusMap = {
+    "in verifica": "in_review",
+    "in_review": "in_review",
+    "risolto": "resolved",
+    "resolved": "resolved",
+    "falso positivo": "false_positive",
+    "false_positive": "false_positive"
+  };
+  const status = statusMap[String(input.status || input.stato || "in_review").toLowerCase()] || "in_review";
+  const result = await pool.query(
+    `UPDATE aurum_shield_alerts
+     SET status = $2::text,
+         reviewed_by = $3::bigint,
+         reviewed_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [id, status, user.id || null]
+  );
+  return result.rows[0] || null;
+}
+
+async function dashboardAurumShieldStats(user = {}) {
+  const values = [];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  const result = await pool.query(
+    `SELECT
+       COUNT(DISTINCT s.sale_deed_id) FILTER (WHERE s.risk_level IN ('alto', 'critico') AND a.data_atto = CURRENT_DATE)::int AS high_today,
+       COUNT(DISTINCT s.sale_deed_id) FILTER (WHERE s.risk_level = 'critico')::int AS critical_open,
+       COUNT(DISTINCT al.id) FILTER (WHERE al.status IN ('open', 'in_review', 'in verifica'))::int AS open_alerts,
+       ROUND(COALESCE(AVG(s.score), 0))::int AS average_score
+     FROM aurum_shield_scores s
+     JOIN ${actsTable} a ON a.id = s.sale_deed_id
+     LEFT JOIN aurum_shield_alerts al ON al.sale_deed_id = a.id AND al.status IN ('open', 'in_review', 'in verifica')
+     WHERE a.deleted_at IS NULL
+       AND COALESCE(a.status, '') NOT ILIKE 'deleted'
+       ${storeWhere}`,
+    values
+  );
+  const stores = await pool.query(
+    `SELECT COALESCE(a.store, 'Dato non inserito') AS store, COUNT(*)::int AS alerts
+     FROM aurum_shield_alerts al
+     JOIN ${actsTable} a ON a.id = al.sale_deed_id
+     WHERE al.status IN ('open', 'in_review', 'in verifica')
+       AND a.deleted_at IS NULL
+       AND COALESCE(a.status, '') NOT ILIKE 'deleted'
+       ${storeWhere}
+     GROUP BY COALESCE(a.store, 'Dato non inserito')
+     ORDER BY alerts DESC
+     LIMIT 1`,
+    values
+  ).catch(() => ({ rows: [] }));
+  const operators = await pool.query(
+    `SELECT COALESCE(u.username, a.payload->>'operatorUsername', 'Dato non inserito') AS operator, COUNT(*)::int AS alerts
+     FROM aurum_shield_alerts al
+     JOIN ${actsTable} a ON a.id = al.sale_deed_id
+     LEFT JOIN utenti u ON u.id = a.operatore_id
+     WHERE al.status IN ('open', 'in_review', 'in verifica')
+       AND a.deleted_at IS NULL
+       AND COALESCE(a.status, '') NOT ILIKE 'deleted'
+       ${storeWhere}
+     GROUP BY COALESCE(u.username, a.payload->>'operatorUsername', 'Dato non inserito')
+     ORDER BY alerts DESC
+     LIMIT 1`,
+    values
+  ).catch(() => ({ rows: [] }));
+  return {
+    high_today: Number(result.rows[0]?.high_today || 0),
+    critical_open: Number(result.rows[0]?.critical_open || 0),
+    open_alerts: Number(result.rows[0]?.open_alerts || 0),
+    average_score: Number(result.rows[0]?.average_score || 0),
+    top_store: stores.rows[0] || null,
+    top_operator: operators.rows[0] || null
+  };
 }
 
 function canManageCourses(user = {}) {
@@ -5472,9 +6237,14 @@ async function crmClients(user = {}, query = {}) {
             COUNT(a.id)::int AS atti_count,
             COALESCE(SUM(a.totale), 0)::numeric AS totale_pagato,
             MAX(a.data_atto) AS ultimo_atto,
-            ARRAY_REMOVE(ARRAY_AGG(DISTINCT COALESCE(a.store, n.nome)), NULL) AS negozi_visitati
+            ARRAY_REMOVE(ARRAY_AGG(DISTINCT COALESCE(a.store, n.nome)), NULL) AS negozi_visitati,
+            ROUND(COALESCE(AVG(s.score), 0))::int AS aurum_shield_average_score,
+            MAX(s.score) AS aurum_shield_max_score
      FROM clienti c
      LEFT JOIN ${actsTable} a ON UPPER(a.codice_fiscale) = UPPER(c.codice_fiscale)
+       AND a.deleted_at IS NULL
+       AND COALESCE(a.status, '') NOT ILIKE 'deleted'
+     LEFT JOIN aurum_shield_scores s ON s.sale_deed_id = a.id
      LEFT JOIN negozi n ON n.id = c.negozio_id
      WHERE COALESCE(c.archiviato, FALSE) = FALSE ${storeWhere} ${searchWhere}
      GROUP BY c.id
@@ -5490,7 +6260,9 @@ async function crmClients(user = {}, query = {}) {
       totale_pagato: Number(row.totale_pagato || 0),
       ultimo_atto: row.ultimo_atto,
       negozi_visitati: row.negozi_visitati || [],
-      prossima_azione: row.prossima_azione || ""
+      prossima_azione: row.prossima_azione || "",
+      aurum_shield_average_score: Number(row.aurum_shield_average_score || 0),
+      aurum_shield_max_score: Number(row.aurum_shield_max_score || 0)
     }))
   };
 }
@@ -5525,7 +6297,13 @@ async function crmClientDetail(id, user = {}) {
     values
   );
   const notes = await pool.query("SELECT * FROM client_notes WHERE cliente_id = $1 ORDER BY created_at DESC LIMIT 50", [id]);
-  return { client: publicClient(client), acts: acts.rows.map((row) => rowToAct(row, { full: false })), notes: notes.rows };
+  const shield = await getAurumShieldForClient(id, user).catch(() => ({
+    average_score: 0,
+    latest_score: null,
+    open_alerts: [],
+    history: []
+  }));
+  return { client: publicClient(client), acts: acts.rows.map((row) => rowToAct(row, { full: false })), notes: notes.rows, aurum_shield: shield };
 }
 
 async function addClientNote(id, input = {}, user = {}) {
@@ -5791,6 +6569,7 @@ async function saveAct(input, user) {
   await saveDocumentIntegrityLog(act, result.rows[0].id, user);
   if (!isDraftLikeStatus(act.status)) await saveAmlAlert({ check: amlCheck, act, user, attoId: result.rows[0].id });
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
+  let finalRow = result.rows[0];
   if (client?.id) {
     const withClient = await pool.query(
       `UPDATE ${actsTable}
@@ -5800,9 +6579,14 @@ async function saveAct(input, user) {
        RETURNING *`,
       [result.rows[0].id, client.id, client.iban || act.iban || ""]
     );
-    return rowToAct(withClient.rows[0], { full: false });
+    finalRow = withClient.rows[0] || finalRow;
   }
-  return rowToAct(result.rows[0], { full: false });
+  const finalAct = rowToAct(finalRow, { full: false });
+  const shield = await persistAurumShieldForAct(finalRow, user).catch((error) => {
+    console.error("AURUM SHIELD SAVE ERROR", error);
+    return null;
+  });
+  return { ...finalAct, aurumShield: shield || finalAct.aurumShield };
 }
 
 async function updateAct(identifier, input, user) {
@@ -5914,6 +6698,7 @@ async function updateAct(identifier, input, user) {
   });
   await saveDocumentIntegrityLog(act, result.rows[0].id, user);
   const client = await upsertClientFromAct({ ...act, payload: act.payload });
+  let finalRow = result.rows[0];
   if (client?.id) {
     const withClient = await pool.query(
       `UPDATE ${actsTable}
@@ -5923,9 +6708,14 @@ async function updateAct(identifier, input, user) {
        RETURNING *`,
       [result.rows[0].id, client.id, client.iban || act.iban || ""]
     );
-    return rowToAct(withClient.rows[0], { full: false });
+    finalRow = withClient.rows[0] || finalRow;
   }
-  return rowToAct(result.rows[0], { full: false });
+  const finalAct = rowToAct(finalRow, { full: false });
+  const shield = await persistAurumShieldForAct(finalRow, user).catch((error) => {
+    console.error("AURUM SHIELD UPDATE ERROR", error);
+    return null;
+  });
+  return { ...finalAct, aurumShield: shield || finalAct.aurumShield };
 }
 
 async function deleteAct(identifier, user) {
@@ -5963,6 +6753,17 @@ async function deleteAct(identifier, user) {
       [existing.id, user?.id || null]
     ).catch((error) => {
       console.error("ANTIFRAUD DELETE SYNC ERROR", error);
+    });
+    await pool.query(
+      `UPDATE aurum_shield_alerts
+       SET status = 'atto_eliminato',
+           reviewed_by = $2::bigint,
+           reviewed_at = NOW()
+       WHERE sale_deed_id = $1::bigint
+         AND status IN ('open', 'in_review', 'in verifica')`,
+      [existing.id, user?.id || null]
+    ).catch((error) => {
+      console.error("AURUM SHIELD DELETE SYNC ERROR", error);
     });
     void logUserActivity({
       userId: user?.id,
@@ -6649,6 +7450,79 @@ app.put("/api/antifrode/:id", async (request, response, next) => {
   try {
     const alert = await updateAntifraudAlert(request.params.id, request.body, request.user);
     if (!alert) return response.status(404).json({ error: "Alert non trovato" });
+    response.json(alert);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-shield/settings", async (_request, response, next) => {
+  try {
+    response.json({ settings: await getAurumShieldSettings() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/aurum-shield/settings", requireFounder, async (request, response, next) => {
+  try {
+    response.json({ settings: await updateAurumShieldSettings(request.body, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/aurum-shield/evaluate", async (request, response, next) => {
+  try {
+    const shield = await calculateAurumShieldRisk(request.body || {}, request.user);
+    response.json(shield);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-shield/sale-deed/:id", async (request, response, next) => {
+  try {
+    const detail = await getAurumShieldForSaleDeed(request.params.id, request.user);
+    if (!detail) return response.status(404).json({ error: "Atto non trovato" });
+    response.json(detail);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-shield/client/:id", async (request, response, next) => {
+  try {
+    const detail = await getAurumShieldForClient(request.params.id, request.user);
+    if (!detail) return response.status(404).json({ error: "Cliente non trovato" });
+    response.json({ aurum_shield: detail });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-shield/alerts", async (request, response, next) => {
+  try {
+    response.json({ alerts: await listAurumShieldAlerts(request.user, request.query) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/aurum-shield/alerts/:id/review", async (request, response, next) => {
+  try {
+    const alert = await reviewAurumShieldAlert(request.params.id, request.body, request.user);
+    if (!alert) return response.status(404).json({ error: "Alert Aurum Shield non trovato" });
+    response.json(alert);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/aurum-shield/alerts/:id/resolve", async (request, response, next) => {
+  try {
+    const alert = await reviewAurumShieldAlert(request.params.id, { status: "resolved" }, request.user);
+    if (!alert) return response.status(404).json({ error: "Alert Aurum Shield non trovato" });
     response.json(alert);
   } catch (error) {
     next(error);
@@ -8059,7 +8933,8 @@ app.get(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
     const row = await findExisting(request.params.id);
     if (row && !canAccessAct(row, request.user)) return response.status(403).json({ error: "Atto non accessibile" });
-    const act = row ? rowToAct(row) : null;
+    const withShield = row ? await rowWithAurumShield(row.id) : null;
+    const act = row ? rowToAct(withShield || row) : null;
     if (!act) return response.status(404).json({ error: "Atto non trovato" });
     response.json(act);
   } catch (error) {

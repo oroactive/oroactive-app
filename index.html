@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260527-aurum-chat-reset-1">
+  <link rel="stylesheet" href="styles.css?v=20260527-aurum-shield-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -68,6 +68,7 @@
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="toolsSubmenu" aria-expanded="false">Strumenti</button>
           <div class="main-menu-submenu" id="toolsSubmenu" hidden>
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
             <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
@@ -112,6 +113,7 @@
           <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandToolsSubmenu" aria-expanded="false">Strumenti</button>
           <div class="brand-submenu" id="brandToolsSubmenu" hidden>
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
+            <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
             <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
@@ -186,6 +188,20 @@
                   <label>Ora compilazione <input id="practiceTime" type="time"></label>
                 </div>
               </div>
+              <section class="aurum-shield-card risk-low" id="aurumShieldCard" aria-live="polite">
+                <div class="aurum-shield-heading">
+                  <div>
+                    <p class="eyebrow">Aurum Shield</p>
+                    <h3>Risk score pratica</h3>
+                  </div>
+                  <strong id="aurumShieldScore">0/100</strong>
+                </div>
+                <span class="aurum-shield-level" id="aurumShieldLevel">Pratica sicura</span>
+                <ul id="aurumShieldFactors">
+                  <li>Nessun fattore di rischio rilevato.</li>
+                </ul>
+                <div class="aurum-shield-recommendations" id="aurumShieldRecommendations"></div>
+              </section>
 
               <div class="field-grid two">
                 <label>Nome <input name="nome"></label>
@@ -714,6 +730,31 @@
         <div class="archive-table users-table" id="antifraudList" aria-live="polite"></div>
       </section>
 
+      <section id="aurumShield" class="screen founder-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Compliance intelligente</p>
+            <h2>Aurum Shield</h2>
+            <p class="muted">Configura soglie, pesi e alert del risk score sugli atti di vendita.</p>
+          </div>
+        </div>
+        <form class="settings-list aurum-shield-settings" id="aurumShieldSettingsForm">
+          <label>Soglia contanti operazione <input id="shieldCashLimit" type="number" min="0" step="10"></label>
+          <label>Finestra giorni controllo contanti <input id="shieldCashWindowDays" type="number" min="1" step="1"></label>
+          <label>Vendite ravvicinate massime <input id="shieldFrequentSalesLimit" type="number" min="1" step="1"></label>
+          <label>Giorni avviso scadenza documento <input id="shieldDocumentExpiryDays" type="number" min="1" step="1"></label>
+          <label class="inline-check"><input id="shieldBlockCritical" type="checkbox"> Blocca pratiche critiche senza autorizzazione</label>
+          <label class="inline-check"><input id="shieldDashboardAlerts" type="checkbox"> Mostra alert in dashboard</label>
+          <label class="inline-check"><input id="shieldAiExplanation" type="checkbox"> Abilita spiegazione AI anonimizzata</label>
+          <label>Pesi fattori rischio
+            <textarea id="shieldFactorWeights" rows="8"></textarea>
+          </label>
+          <button class="primary-button" type="submit">Salva configurazione Aurum Shield</button>
+        </form>
+        <div class="archive-table users-table" id="aurumShieldAlertsList" aria-live="polite"></div>
+      </section>
+
       <section id="assistant" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="assistant-layout">
@@ -1154,6 +1195,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260527-aurum-chat-reset-1"></script>
+  <script src="app.js?v=20260527-aurum-shield-1"></script>
 </body>
 </html>
