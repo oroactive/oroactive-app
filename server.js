@@ -1,3 +1,4 @@
+import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
@@ -15,7 +16,7 @@ import pg from "pg";
 
 dotenv.config();
 
-const { Pool } = pg;
+const { Pool, Client } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const execFileAsync = promisify(execFile);
@@ -41,11 +42,25 @@ const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
-const backupDirectory = process.env.BACKUP_DIR || path.join(__dirname, "backups");
+const backupDirectory = process.env.BACKUP_DIR || "/data/oroactive/backups";
 const academyUploadDirectory = process.env.ACADEMY_UPLOAD_DIR || path.join(__dirname, "private_uploads", "academy");
 const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
+const pgRestorePath = process.env.PG_RESTORE_PATH || "pg_restore";
 const backupIntervalMs = 24 * 60 * 60 * 1000;
 const backupFolders = ["atti", "documenti", "preziosi", "contabili", "pdf", "firme", "utenti", "giacenza", "fusioni", "knowledge-base", "formazione", "antifrode", "crm"];
+const backupFileSources = [
+  { source: "uploads", target: "files/uploads", section: "uploads" },
+  { source: "public/uploads", target: "files/public_uploads", section: "public uploads" },
+  { source: "documents", target: "documents", section: "documenti identita" },
+  { source: "pdf", target: "pdf", section: "pdf" },
+  { source: "firme", target: "signatures/firme", section: "firme" },
+  { source: "signatures", target: "signatures", section: "signatures" },
+  { source: "preziosi", target: "photos/preziosi", section: "foto preziosi" },
+  { source: "contabili", target: "receipts/contabili", section: "contabili" },
+  { source: "storage", target: "files/storage", section: "storage" },
+  { source: "private_uploads/academy", target: "academy/uploads", section: "academy uploads" },
+  { source: "knowledge-base", target: "ai/knowledge-base", section: "AI knowledge base" }
+];
 const bullionVaultMarkets = {
   Oro: { securityId: "AUXZU", source: "Zurigo" },
   Argento: { securityId: "AGXZU", source: "Zurigo" },
@@ -2021,238 +2036,527 @@ async function initDatabase() {
   await bootstrapAdminUser();
 }
 
-async function listBackups() {
-  const result = await pool.query(
-    `SELECT id, tipo, filename, percorso, stato, dettaglio, dimensione_bytes, n8n_ready, metadata, created_by, created_at, completed_at
-     FROM backup_jobs
-     ORDER BY created_at DESC
-     LIMIT 60`
-  );
-  return result.rows.map((row) => ({
+function backupTimestamp(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}_${pad(date.getMonth() + 1)}_${pad(date.getDate())}_${pad(date.getHours())}_${pad(date.getMinutes())}_${pad(date.getSeconds())}`;
+}
+
+function backupCode(date = new Date()) {
+  const stamp = backupTimestamp(date).replace(/_/g, "");
+  return `OA-${stamp}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+function backupStatusLabel(status = "") {
+  return {
+    pending: "pending",
+    running: "running",
+    completed: "completed",
+    failed: "failed",
+    deleted: "deleted"
+  }[String(status || "").toLowerCase()] || "pending";
+}
+
+function isMissingExecutable(error) {
+  return error?.code === "ENOENT" || /not found|no such file/i.test(String(error?.message || ""));
+}
+
+function backupToolUnavailableMessage(tool) {
+  return `${tool} non disponibile nel container. Installare PostgreSQL client tools o usare immagine con ${tool}.`;
+}
+
+function databaseInfoFromUrl(databaseUrl = process.env.DATABASE_URL, overrideDatabase = null) {
+  if (!databaseUrl) return null;
+  const parsed = new URL(databaseUrl);
+  const databaseName = overrideDatabase || decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+  return {
+    host: parsed.hostname,
+    port: parsed.port || "5432",
+    database: databaseName,
+    user: decodeURIComponent(parsed.username || ""),
+    password: decodeURIComponent(parsed.password || ""),
+    sslmode: parsed.searchParams.get("sslmode") || (process.env.DATABASE_SSL === "true" ? "require" : ""),
+    originalDatabase: decodeURIComponent(parsed.pathname.replace(/^\//, "")),
+    masked: `${parsed.protocol}//${parsed.username ? `${parsed.username}:***@` : ""}${parsed.host}/${databaseName || ""}`
+  };
+}
+
+function postgresToolEnv(databaseName = null) {
+  const info = databaseInfoFromUrl(process.env.DATABASE_URL, databaseName);
+  if (!info) return null;
+  return {
+    ...process.env,
+    PGHOST: info.host,
+    PGPORT: info.port,
+    PGDATABASE: info.database,
+    PGUSER: info.user,
+    PGPASSWORD: info.password,
+    ...(info.sslmode ? { PGSSLMODE: info.sslmode } : {})
+  };
+}
+
+function quoteIdentifier(value = "") {
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+async function sha256File(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+}
+
+async function directoryStats(root) {
+  const stats = { files: 0, bytes: 0 };
+  async function walk(current) {
+    const entries = await fs.readdir(current, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.isFile()) {
+        const fileStats = await fs.stat(fullPath);
+        stats.files += 1;
+        stats.bytes += fileStats.size;
+      }
+    }
+  }
+  await walk(root);
+  return stats;
+}
+
+async function addBackupLog(backupId, level, message, metadata = {}) {
+  await pool.query(
+    `INSERT INTO backup_logs (backup_id, level, message, metadata)
+     VALUES ($1::uuid, $2::text, $3::text, $4::jsonb)`,
+    [backupId, level, message, sanitizeForPostgres(metadata)]
+  ).catch((error) => console.error("BACKUP LOG ERROR", error.message || error));
+}
+
+async function createPostgresBackup(outputPath, backupId = null) {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL non configurato: impossibile creare backup PostgreSQL reale.");
+  }
+  const env = postgresToolEnv();
+  try {
+    await execFileAsync(pgDumpPath, ["-Fc", "-f", outputPath, "--no-owner", "--no-privileges"], {
+      env,
+      timeout: 20 * 60 * 1000,
+      maxBuffer: 1024 * 1024
+    });
+  } catch (error) {
+    if (isMissingExecutable(error)) throw new Error(backupToolUnavailableMessage("pg_dump"));
+    throw new Error(`Backup fallito: ${String(error?.stderr || error?.message || "pg_dump non riuscito").slice(0, 500)}`);
+  }
+  const stats = await fs.stat(outputPath);
+  if (!stats.size) throw new Error("Backup fallito: database.dump vuoto.");
+  if (backupId) await addBackupLog(backupId, "info", "database.dump creato con pg_dump -Fc", { size: stats.size });
+  return { path: outputPath, size: stats.size };
+}
+
+async function copyBackupFileSources(targetDir, backupId) {
+  const skipped = [];
+  for (const item of backupFileSources) {
+    const sourcePath = path.join(__dirname, item.source);
+    const targetPath = path.join(targetDir, item.target);
+    const resolvedSource = path.resolve(sourcePath);
+    if (path.resolve(backupDirectory) && resolvedSource.startsWith(path.resolve(backupDirectory))) continue;
+    try {
+      await fs.access(sourcePath);
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      await fs.cp(sourcePath, targetPath, { recursive: true, force: true, errorOnExist: false });
+      await addBackupLog(backupId, "info", `Cartella inclusa: ${item.source}`, { section: item.section });
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        skipped.push(item.source);
+        await addBackupLog(backupId, "warning", `Cartella non presente, saltata: ${item.source}`, { section: item.section });
+      } else {
+        throw error;
+      }
+    }
+  }
+  return skipped;
+}
+
+async function writeVerifiableManifest(targetDir, manifest) {
+  const manifestPath = path.join(targetDir, "manifest.json");
+  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  return manifestPath;
+}
+
+async function createTarGz(sourceDir, archivePath) {
+  await execFileAsync("tar", ["-czf", archivePath, "-C", path.dirname(sourceDir), path.basename(sourceDir)], {
+    timeout: 15 * 60 * 1000,
+    maxBuffer: 1024 * 1024
+  });
+  const stats = await fs.stat(archivePath);
+  if (!stats.size) throw new Error("Backup fallito: archivio tar.gz vuoto.");
+  return stats;
+}
+
+async function getAppVersion() {
+  const pkg = await fs.readFile(path.join(__dirname, "package.json"), "utf8").then(JSON.parse).catch(() => ({}));
+  return pkg.version || "unknown";
+}
+
+function publicBackup(row = {}) {
+  return {
     ...row,
-    mese: row.created_at ? new Date(row.created_at).toISOString().slice(0, 7) : "",
-    download_disponibile: row.stato === "completato" && Boolean(row.percorso) && Number(row.dimensione_bytes || 0) > 0
+    status: backupStatusLabel(row.status),
+    file_size: Number(row.file_size || 0),
+    download_disponibile: row.status === "completed" && Boolean(row.file_path) && Number(row.file_size || 0) > 0,
+    manifest: row.metadata?.manifest || null
+  };
+}
+
+async function listBackups(user = {}) {
+  const values = [];
+  const where = ["deleted_at IS NULL"];
+  if (normalizeRole(user?.ruolo) === "responsabile") {
+    values.push(user.id || null, user.negozio_id || null);
+    where.push(`(created_by = $${values.length - 1}::bigint OR store_id = $${values.length}::bigint)`);
+  }
+  const result = await pool.query(
+    `SELECT b.*, u.nome AS created_by_nome, u.cognome AS created_by_cognome, u.username AS created_by_username
+     FROM backups b
+     LEFT JOIN utenti u ON u.id = b.created_by
+     WHERE ${where.join(" AND ")}
+     ORDER BY b.created_at DESC
+     LIMIT 80`,
+    values
+  );
+  return result.rows.map((row) => publicBackup({
+    ...row,
+    created_by_name: [row.created_by_nome, row.created_by_cognome].filter(Boolean).join(" ") || row.created_by_username || ""
   }));
 }
 
-async function latestBackupToday() {
-  const result = await pool.query(
-    `SELECT id FROM backup_jobs
-     WHERE created_at::date = CURRENT_DATE
-       AND tipo = 'giornaliero'
-       AND stato = 'completato'
-     ORDER BY created_at DESC
-     LIMIT 1`
-  );
-  return result.rows[0] || null;
-}
-
-async function latestMonthlyBackup(monthKey) {
-  const result = await pool.query(
-    `SELECT id FROM backup_jobs
-     WHERE tipo = 'mensile'
-       AND filename LIKE $1
-       AND stato = 'completato'
-     ORDER BY created_at DESC
-     LIMIT 1`,
-    [`%${monthKey}%`]
-  );
-  return result.rows[0] || null;
-}
-
-async function backupPathFor(tipo, date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const monthKey = `${year}_${month}`;
-  const root = path.join(backupDirectory, `backup_${monthKey}`);
-  const targetDir = tipo === "mensile" ? root : path.join(root, "giornalieri", `${year}_${month}_${day}`);
-  await fs.mkdir(targetDir, { recursive: true });
-  await Promise.all(backupFolders.map((folder) => fs.mkdir(path.join(root, folder), { recursive: true })));
-  const filename = tipo === "mensile" ? `database_${monthKey}.sql` : `database_${year}_${month}_${day}.sql`;
-  return { root, targetDir, filename, outputPath: path.join(targetDir, filename), monthKey };
-}
-
-async function writeBackupManifest({ tipo, root, targetDir, filename, monthKey, status, detail, size }) {
-  const manifest = {
-    app: "OroActive",
-    tipo,
-    mese: monthKey,
-    filename,
-    stato: status,
-    dettaglio: detail,
-    dimensione_bytes: size || 0,
-    contenuto: [
-      "database PostgreSQL completo",
-      "atti di vendita",
-      "clienti",
-      "documenti fronte/retro",
-      "codice fiscale fronte/retro",
-      "foto preziosi",
-      "contabili",
-      "firme",
-      "PDF",
-      "utenti",
-      "giacenza",
-      "fusioni",
-      "knowledge base AI",
-      "formazione",
-      "antifrode",
-      "CRM"
-    ],
-    storage_futuro: "Predisposto per S3 / Cloudflare R2 / n8n",
-    created_at: new Date().toISOString()
-  };
-  const manifestPath = path.join(tipo === "mensile" ? root : targetDir, "manifest_backup.json");
-  await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
-}
-
-async function runBackup(tipo = "giornaliero", user = {}) {
-  const normalizedType = tipo === "mensile" ? "mensile" : "giornaliero";
-  await fs.mkdir(backupDirectory, { recursive: true });
-  const createdAt = new Date();
-  const { root, targetDir, filename, outputPath, monthKey } = await backupPathFor(normalizedType, createdAt);
-  const job = await pool.query(
-    `INSERT INTO backup_jobs (tipo, filename, percorso, stato, dettaglio, n8n_ready, metadata, created_by)
-     VALUES ($1::text, $2::text, $3::text, 'in corso', $4::text, TRUE, $5::jsonb, $6::bigint)
-     RETURNING id`,
-    [
-      normalizedType,
-      filename,
-      outputPath,
-      "Backup server PostgreSQL. Documenti, PDF, firme, foto, CRM, AI, formazione e antifrode sono inclusi nel dump database quando salvati nei record OroActive.",
-      sanitizeForPostgres({ monthKey, folders: backupFolders, mode: "server" }),
-      user.id || null
-    ]
-  );
-
-  try {
-    if (!process.env.DATABASE_URL) {
-      await writeBackupManifest({
-        tipo: normalizedType,
-        root,
-        targetDir,
-        filename,
-        monthKey,
-        status: "completato",
-        detail: "Backup logico creato. DATABASE_URL non configurato: nessun dump fisico eseguito.",
-        size: 0
-      });
-      const logical = await pool.query(
-        `UPDATE backup_jobs
-         SET stato = 'completato',
-             dettaglio = $2::text,
-             metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
-             completed_at = NOW()
-         WHERE id = $1::bigint
-         RETURNING id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, metadata, created_by, created_at, completed_at`,
-        [
-          job.rows[0].id,
-          "Backup logico creato. Configura DATABASE_URL per includere dump fisico PostgreSQL.",
-          sanitizeForPostgres({ logical_backup: true, content: backupFolders })
-        ]
-      );
-      return logical.rows[0];
-    }
-    await execFileAsync(pgDumpPath, [process.env.DATABASE_URL, "--file", outputPath, "--no-owner", "--no-privileges"], {
-      timeout: 15 * 60 * 1000,
-      maxBuffer: 1024 * 1024
-    });
-    const stats = await fs.stat(outputPath);
-    await writeBackupManifest({
-      tipo: normalizedType,
-      root,
-      targetDir,
-      filename,
-      monthKey,
-      status: "completato",
-      detail: "Backup completato e protetto lato server.",
-      size: stats.size
-    });
-    const result = await pool.query(
-      `UPDATE backup_jobs
-       SET stato = 'completato',
-           dettaglio = $2,
-           dimensione_bytes = $3,
-           completed_at = NOW()
-       WHERE id = $1
-       RETURNING id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at`,
-      [job.rows[0].id, "Backup completato. Download protetto founder e predisposizione futura S3/R2/n8n.", stats.size]
-    );
-    return result.rows[0];
-  } catch (error) {
-    await writeBackupManifest({
-      tipo: normalizedType,
-      root,
-      targetDir,
-      filename,
-      monthKey,
-      status: "errore",
-      detail: error.message || "Backup non riuscito",
-      size: 0
-    }).catch(() => {});
-    const result = await pool.query(
-      `UPDATE backup_jobs
-       SET stato = 'errore',
-           dettaglio = $2,
-           completed_at = NOW()
-       WHERE id = $1
-       RETURNING id, tipo, filename, stato, dettaglio, dimensione_bytes, n8n_ready, created_at, completed_at`,
-      [job.rows[0].id, error.message || "Backup non riuscito"]
-    );
-    return result.rows[0];
+async function backupDetail(id, user = {}) {
+  const values = [id];
+  const where = ["b.id = $1::uuid", "b.deleted_at IS NULL"];
+  if (normalizeRole(user?.ruolo) === "responsabile") {
+    values.push(user.id || null, user.negozio_id || null);
+    where.push(`(b.created_by = $${values.length - 1}::bigint OR b.store_id = $${values.length}::bigint)`);
   }
-}
-
-async function backupDetail(id) {
   const result = await pool.query(
-    `SELECT id, tipo, filename, percorso, stato, dettaglio, dimensione_bytes, n8n_ready, metadata, created_by, created_at, completed_at
-     FROM backup_jobs
-     WHERE id = $1::bigint`,
+    `SELECT b.*, u.nome AS created_by_nome, u.cognome AS created_by_cognome, u.username AS created_by_username
+     FROM backups b
+     LEFT JOIN utenti u ON u.id = b.created_by
+     WHERE ${where.join(" AND ")}
+     LIMIT 1`,
+    values
+  );
+  const backup = result.rows[0];
+  if (!backup) return null;
+  const logs = await pool.query(
+    `SELECT level, message, metadata, created_at
+     FROM backup_logs
+     WHERE backup_id = $1::uuid
+     ORDER BY created_at ASC
+     LIMIT 300`,
     [id]
   );
-  return result.rows[0] || null;
+  return publicBackup({
+    ...backup,
+    created_by_name: [backup.created_by_nome, backup.created_by_cognome].filter(Boolean).join(" ") || backup.created_by_username || "",
+    logs: logs.rows
+  });
 }
 
-async function deleteBackup(id) {
-  const detail = await backupDetail(id);
-  if (!detail) return false;
-  const resolved = detail.percorso ? path.resolve(detail.percorso) : "";
-  const allowedRoot = path.resolve(backupDirectory);
-  if (resolved) {
-    const relative = path.relative(allowedRoot, resolved);
+async function createManualBackup(user = {}) {
+  const now = new Date();
+  const code = backupCode(now);
+  const backupDirName = `backup_${backupTimestamp(now)}_${code}`;
+  const backupDir = path.join(backupDirectory, backupDirName);
+  const archivePath = path.join(backupDirectory, `backup_${code}.tar.gz`);
+  await fs.mkdir(backupDir, { recursive: true });
+  const dbInfo = databaseInfoFromUrl();
+  const created = await pool.query(
+    `INSERT INTO backups
+      (backup_code, backup_type, status, created_by, created_by_role, store_id, metadata)
+     VALUES ($1::text, 'manual_full', 'running', $2::bigint, $3::text, $4::bigint, $5::jsonb)
+     RETURNING *`,
+    [
+      code,
+      user.id || null,
+      normalizeRole(user.ruolo),
+      user.negozio_id || null,
+      sanitizeForPostgres({ backup_dir: backupDir, archive_path: archivePath, database: dbInfo ? { host: dbInfo.host, database: dbInfo.database } : null })
+    ]
+  );
+  const backupId = created.rows[0].id;
+  await addBackupLog(backupId, "info", "Backup manuale avviato", { backup_code: code });
+
+  try {
+    const databaseDumpPath = path.join(backupDir, "database.dump");
+    await createPostgresBackup(databaseDumpPath, backupId);
+    const skippedFolders = await copyBackupFileSources(backupDir, backupId);
+    await fs.mkdir(path.join(backupDir, "logs"), { recursive: true });
+    const contentStats = await directoryStats(backupDir);
+    const payloadChecksum = crypto
+      .createHash("sha256")
+      .update(JSON.stringify({ code, files: contentStats.files, bytes: contentStats.bytes }))
+      .digest("hex");
+    const manifest = {
+      backup_code: code,
+      created_at: now.toISOString(),
+      created_by: user.id || null,
+      created_by_role: normalizeRole(user.ruolo),
+      database_dump_file: "database.dump",
+      included_sections: [
+        "database PostgreSQL",
+        "atti di vendita",
+        "clienti",
+        "documenti identita",
+        "codici fiscali/tessera sanitaria",
+        "firme",
+        "PDF",
+        "foto preziosi",
+        "contabili",
+        "CRM",
+        "Academy",
+        "AI knowledge base",
+        "utenti",
+        "audit log",
+        "giacenza",
+        "fusioni"
+      ],
+      skipped_folders: skippedFolders,
+      number_of_files: contentStats.files,
+      total_size: contentStats.bytes,
+      checksum_sha256: payloadChecksum,
+      app_version: await getAppVersion(),
+      database_name: dbInfo?.database || "",
+      restore_instructions: "Usare pg_restore su un database vuoto o staging: pg_restore --no-owner --no-privileges --dbname=<database_staging> database.dump"
+    };
+    const manifestPath = await writeVerifiableManifest(backupDir, manifest);
+    const archiveStats = await createTarGz(backupDir, archivePath);
+    const archiveChecksum = await sha256File(archivePath);
+    const updatedManifest = { ...manifest, archive_file: path.basename(archivePath), archive_checksum_sha256: archiveChecksum };
+    await writeVerifiableManifest(backupDir, updatedManifest);
+    await addBackupLog(backupId, "info", "Archivio compresso creato", { archive: path.basename(archivePath), size: archiveStats.size });
+    const updated = await pool.query(
+      `UPDATE backups
+       SET status = 'completed',
+           file_path = $2::text,
+           file_size = $3::bigint,
+           checksum_sha256 = $4::text,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $5::jsonb,
+           error_message = NULL
+       WHERE id = $1::uuid
+       RETURNING *`,
+      [
+        backupId,
+        archivePath,
+        archiveStats.size,
+        archiveChecksum,
+        sanitizeForPostgres({
+          backup_dir: backupDir,
+          archive_path: archivePath,
+          manifest_path: manifestPath,
+          database_dump_path: databaseDumpPath,
+          manifest: updatedManifest
+        })
+      ]
+    );
+    await addBackupLog(backupId, "info", "Backup creato correttamente", { checksum_sha256: archiveChecksum });
+    return publicBackup(updated.rows[0]);
+  } catch (error) {
+    const message = error.message || "Backup non riuscito";
+    await addBackupLog(backupId, "error", message);
+    const failed = await pool.query(
+      `UPDATE backups
+       SET status = 'failed',
+           error_message = $2::text,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
+       WHERE id = $1::uuid
+       RETURNING *`,
+      [backupId, message, sanitizeForPostgres({ backup_dir: backupDir, archive_path: archivePath })]
+    );
+    return publicBackup(failed.rows[0]);
+  }
+}
+
+async function archiveEntries(archivePath) {
+  const { stdout } = await execFileAsync("tar", ["-tzf", archivePath], {
+    timeout: 2 * 60 * 1000,
+    maxBuffer: 5 * 1024 * 1024
+  });
+  return stdout.split(/\r?\n/).filter(Boolean);
+}
+
+async function loadBackupManifest(backup) {
+  const manifestPath = backup.metadata?.manifest_path;
+  if (manifestPath) {
+    const resolved = path.resolve(manifestPath);
+    const relative = path.relative(path.resolve(backupDirectory), resolved);
     if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
-      await fs.rm(resolved, { force: true }).catch(() => {});
+      return JSON.parse(await fs.readFile(resolved, "utf8"));
     }
   }
-  const result = await pool.query("DELETE FROM backup_jobs WHERE id = $1::bigint RETURNING id", [id]);
+  return backup.metadata?.manifest || null;
+}
+
+async function verifyBackup(id, user = {}) {
+  const backup = await backupDetail(id, user);
+  if (!backup) return null;
+  try {
+    if (backup.status !== "completed") throw new Error("Backup non completato.");
+    if (!backup.file_path) throw new Error("File backup non disponibile.");
+    const resolved = path.resolve(backup.file_path);
+    const relative = path.relative(path.resolve(backupDirectory), resolved);
+    if (!resolved || relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Percorso backup non autorizzato.");
+    const stats = await fs.stat(resolved);
+    if (!stats.size) throw new Error("Archivio backup vuoto.");
+    const checksum = await sha256File(resolved);
+    if (checksum !== backup.checksum_sha256) throw new Error("Checksum non corrispondente");
+    const manifest = await loadBackupManifest(backup);
+    if (!manifest?.backup_code) throw new Error("manifest.json non valido o mancante.");
+    const entries = await archiveEntries(resolved);
+    if (!entries.some((entry) => entry.endsWith("/database.dump"))) throw new Error("database.dump mancante nell'archivio.");
+    if (!entries.some((entry) => entry.endsWith("/manifest.json"))) throw new Error("manifest.json mancante nell'archivio.");
+    const dumpPath = backup.metadata?.database_dump_path;
+    if (dumpPath) {
+      const resolvedDump = path.resolve(dumpPath);
+      const dumpRelative = path.relative(path.resolve(backupDirectory), resolvedDump);
+      if (dumpRelative.startsWith("..") || path.isAbsolute(dumpRelative)) throw new Error("Percorso database.dump non autorizzato.");
+      const dumpStats = await fs.stat(resolvedDump);
+      if (!dumpStats.size) throw new Error("database.dump vuoto.");
+    }
+    await pool.query(
+      `UPDATE backups
+       SET verification_status = 'verified',
+           verified_at = NOW(),
+           error_message = NULL
+       WHERE id = $1::uuid`,
+      [id]
+    );
+    await addBackupLog(id, "info", "Verifica integrita completata", { checksum_sha256: checksum });
+    return backupDetail(id, user);
+  } catch (error) {
+    const message = error.message || "Verifica backup non riuscita.";
+    await pool.query(
+      `UPDATE backups
+       SET verification_status = 'failed',
+           error_message = $2::text
+       WHERE id = $1::uuid`,
+      [id, message]
+    );
+    await addBackupLog(id, "error", message);
+    return backupDetail(id, user);
+  }
+}
+
+async function createMaintenanceClient() {
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL non configurato.");
+  const parsed = new URL(process.env.DATABASE_URL);
+  parsed.pathname = "/postgres";
+  const client = new Client({
+    connectionString: parsed.toString(),
+    ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined
+  });
+  await client.connect();
+  return client;
+}
+
+async function testRestoreBackup(id, user = {}) {
+  const backup = await backupDetail(id, user);
+  if (!backup) return null;
+  const codePart = String(backup.backup_code || id).toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 34);
+  const testDatabaseName = `restore_test_${codePart}_${crypto.randomBytes(2).toString("hex")}`.slice(0, 60);
+  let maintenanceClient = null;
+  let status = "failed";
+  let resultMessage = "";
+  try {
+    if (backup.status !== "completed") throw new Error("Backup non completato.");
+    if (!backup.metadata?.database_dump_path) throw new Error("database.dump non disponibile per il test restore.");
+    await fs.access(backup.metadata.database_dump_path);
+    const env = postgresToolEnv(testDatabaseName);
+    if (!env) throw new Error("DATABASE_URL non configurato.");
+    maintenanceClient = await createMaintenanceClient();
+    const productionDb = databaseInfoFromUrl()?.originalDatabase;
+    if (!testDatabaseName || testDatabaseName === productionDb) throw new Error("Database di test non sicuro.");
+    await maintenanceClient.query(`CREATE DATABASE ${quoteIdentifier(testDatabaseName)}`);
+    try {
+      await execFileAsync(pgRestorePath, ["--no-owner", "--no-privileges", "--dbname", testDatabaseName, backup.metadata.database_dump_path], {
+        env,
+        timeout: 20 * 60 * 1000,
+        maxBuffer: 1024 * 1024
+      });
+    } catch (error) {
+      if (isMissingExecutable(error)) throw new Error(backupToolUnavailableMessage("pg_restore"));
+      throw new Error(`Test restore fallito: ${String(error?.stderr || error?.message || "pg_restore non riuscito").slice(0, 500)}`);
+    }
+    const restoredClient = new Client({
+      connectionString: (() => {
+        const parsed = new URL(process.env.DATABASE_URL);
+        parsed.pathname = `/${testDatabaseName}`;
+        return parsed.toString();
+      })(),
+      ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined
+    });
+    await restoredClient.connect();
+    const tables = ["utenti", "atti_vendita", "clienti", "audit_logs", "academy_courses", "ai_knowledge_notes", "giacenza_movimenti", "fusioni"];
+    const tableResult = await restoredClient.query(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public'
+         AND table_name = ANY($1::text[])`,
+      [tables]
+    );
+    await restoredClient.end();
+    status = tableResult.rowCount >= 3 ? "passed" : "failed";
+    resultMessage = status === "passed"
+      ? "Test restore completato con successo"
+      : "Test restore fallito: tabelle essenziali non trovate";
+  } catch (error) {
+    status = "failed";
+    resultMessage = error.message || "Test restore fallito: controllare log";
+  } finally {
+    if (maintenanceClient) {
+      await maintenanceClient.query(
+        `SELECT pg_terminate_backend(pid)
+         FROM pg_stat_activity
+         WHERE datname = $1
+           AND pid <> pg_backend_pid()`,
+        [testDatabaseName]
+      ).catch(() => {});
+      await maintenanceClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(testDatabaseName)}`).catch(() => {});
+      await maintenanceClient.end().catch(() => {});
+    }
+  }
+  await pool.query(
+    `INSERT INTO backup_restore_tests (backup_id, status, tested_by, test_database_name, result_message, metadata)
+     VALUES ($1::uuid, $2::text, $3::bigint, $4::text, $5::text, $6::jsonb)`,
+    [id, status, user.id || null, testDatabaseName, resultMessage, sanitizeForPostgres({ protected: true })]
+  );
+  await pool.query(
+    `UPDATE backups
+     SET restore_test_status = $2::text,
+         restore_tested_at = NOW(),
+         error_message = CASE WHEN $2::text = 'failed' THEN $3::text ELSE NULL END
+     WHERE id = $1::uuid`,
+    [id, status, resultMessage]
+  );
+  await addBackupLog(id, status === "passed" ? "info" : "error", resultMessage, { test_database_name: testDatabaseName });
+  return backupDetail(id, user);
+}
+
+async function deleteBackup(id, user = {}) {
+  const backup = await backupDetail(id, user);
+  if (!backup) return false;
+  const result = await pool.query(
+    `UPDATE backups
+     SET status = 'deleted',
+         deleted_at = NOW()
+     WHERE id = $1::uuid
+     RETURNING id`,
+    [id]
+  );
+  if (result.rowCount) await addBackupLog(id, "info", "Backup eliminato logicamente", { deleted_by: user.id || null });
   return result.rowCount > 0;
-}
-
-async function runDailyBackupIfNeeded() {
-  try {
-    if (await latestBackupToday()) return;
-    const result = await runBackup("giornaliero");
-    console.log(`Backup OroActive ${result.stato}: ${result.filename || "senza file"}`);
-  } catch (error) {
-    console.error("Backup automatico non riuscito", error.message || error);
-  }
-}
-
-async function runMonthlyBackupIfNeeded() {
-  try {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    const isLastDayOfMonth = tomorrow.getMonth() !== now.getMonth();
-    if (!isLastDayOfMonth && process.env.FORCE_MONTHLY_BACKUP !== "true") return;
-    const monthKey = `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, "0")}`;
-    if (await latestMonthlyBackup(monthKey)) return;
-    const result = await runBackup("mensile");
-    console.log(`Backup mensile OroActive ${result.stato}: ${result.filename || "senza file"}`);
-  } catch (error) {
-    console.error("Backup mensile non riuscito", error.message || error);
-  }
 }
 
 function scheduleBackups() {
@@ -5889,17 +6193,25 @@ app.get("/api/intelligence/insights", async (request, response, next) => {
   }
 });
 
-app.get("/api/backups", requireBackupManager, async (_request, response, next) => {
+app.get("/api/backups", requireBackupManager, async (request, response, next) => {
   try {
-    response.json({ backups: await listBackups(), n8n_ready: true });
+    response.json({ backups: await listBackups(request.user), n8n_ready: true });
   } catch (error) {
     next(error);
   }
 });
 
-app.post("/api/backups/run", requireBackupManager, async (_request, response, next) => {
+app.post("/api/backups/create", requireBackupManager, async (request, response, next) => {
   try {
-    response.status(201).json(await runBackup(_request.body?.tipo === "mensile" ? "mensile" : "giornaliero", _request.user));
+    response.status(201).json({ backup: await createManualBackup(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/backups/run", requireBackupManager, async (request, response, next) => {
+  try {
+    response.status(201).json({ backup: await createManualBackup(request.user) });
   } catch (error) {
     next(error);
   }
@@ -5907,7 +6219,7 @@ app.post("/api/backups/run", requireBackupManager, async (_request, response, ne
 
 app.get("/api/backups/:id", requireBackupManager, async (request, response, next) => {
   try {
-    const detail = await backupDetail(request.params.id);
+    const detail = await backupDetail(request.params.id, request.user);
     if (!detail) return response.status(404).json({ error: "Backup non trovato" });
     response.json({ backup: detail });
   } catch (error) {
@@ -5915,33 +6227,49 @@ app.get("/api/backups/:id", requireBackupManager, async (request, response, next
   }
 });
 
-app.delete("/api/backups/:id", requireBackupManager, async (request, response, next) => {
+app.post("/api/backups/:id/verify", requireBackupManager, async (request, response, next) => {
   try {
-    const deleted = await deleteBackup(request.params.id);
-    if (!deleted) return response.status(404).json({ error: "Backup non trovato" });
-    response.status(204).end();
+    const backup = await verifyBackup(request.params.id, request.user);
+    if (!backup) return response.status(404).json({ error: "Backup non trovato" });
+    response.json({ backup });
   } catch (error) {
     next(error);
   }
 });
 
-app.get("/api/backups/:id/download", requireBackupManager, async (request, response, next) => {
+app.post("/api/backups/:id/test-restore", requireFounder, async (request, response, next) => {
   try {
-    const result = await pool.query(
-      "SELECT filename, percorso, stato FROM backup_jobs WHERE id = $1",
-      [request.params.id]
-    );
-    const backup = result.rows[0];
-    if (!backup || backup.stato !== "completato" || !backup.percorso) {
+    const backup = await testRestoreBackup(request.params.id, request.user);
+    if (!backup) return response.status(404).json({ error: "Backup non trovato" });
+    response.json({ backup });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/backups/:id", requireFounder, async (request, response, next) => {
+  try {
+    const deleted = await deleteBackup(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Backup non trovato" });
+    response.json({ ok: true, id: request.params.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/backups/:id/download", requireFounder, async (request, response, next) => {
+  try {
+    const backup = await backupDetail(request.params.id, request.user);
+    if (!backup || backup.status !== "completed" || !backup.file_path) {
       return response.status(404).json({ error: "Backup non disponibile" });
     }
-    const resolved = path.resolve(backup.percorso);
+    const resolved = path.resolve(backup.file_path);
     const allowedRoot = path.resolve(backupDirectory);
     const relative = path.relative(allowedRoot, resolved);
     if (relative.startsWith("..") || path.isAbsolute(relative)) {
       return response.status(403).json({ error: "Non autorizzato" });
     }
-    response.download(resolved, backup.filename || path.basename(resolved));
+    response.download(resolved, path.basename(resolved));
   } catch (error) {
     next(error);
   }

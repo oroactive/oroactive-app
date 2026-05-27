@@ -91,22 +91,55 @@ test("sezione OroActive Academy e certificazioni interne presenti", async () => 
 });
 
 test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () => {
-  const [app, server, schema] = await Promise.all([
+  const [app, server, schema, migration, nixpacks, dockerfile] = await Promise.all([
     file("app.js"),
     file("server.js"),
-    file("schema.sql")
+    file("schema.sql"),
+    file("migrations/20260527_verifiable_manual_backups.sql"),
+    file("nixpacks.toml"),
+    file("Dockerfile")
   ]);
 
   assert.match(app, /data-save-crm-client/);
   assert.match(app, /data-delete-crm-client/);
   assert.match(app, /data-view-backup/);
+  assert.match(app, /data-verify-backup/);
+  assert.match(app, /data-test-restore-backup/);
+  assert.match(app, /data-download-backup/);
   assert.match(app, /data-delete-backup/);
+  assert.match(app, /apiRequest\("\/backups\/create"/);
+  assert.match(app, /async function verifyBackup/);
+  assert.match(app, /async function testRestoreBackup/);
   assert.match(server, /app\.put\("\/api\/crm\/clienti\/:id"/);
   assert.match(server, /app\.delete\("\/api\/crm\/clienti\/:id"/);
+  assert.match(server, /function backupToolUnavailableMessage/);
+  assert.match(server, /async function createPostgresBackup/);
+  assert.match(server, /backupToolUnavailableMessage\("pg_dump"\)/);
+  assert.match(server, /non disponibile nel container\. Installare PostgreSQL client tools/);
+  assert.match(server, /async function createManualBackup/);
+  assert.match(server, /async function verifyBackup/);
+  assert.match(server, /async function testRestoreBackup/);
+  assert.match(server, /app\.post\("\/api\/backups\/create"/);
+  assert.match(server, /app\.post\("\/api\/backups\/:id\/verify"/);
+  assert.match(server, /app\.post\("\/api\/backups\/:id\/test-restore", requireFounder/);
   assert.match(server, /app\.get\("\/api\/backups\/:id"/);
-  assert.match(server, /app\.delete\("\/api\/backups\/:id"/);
+  assert.match(server, /app\.get\("\/api\/backups\/:id\/download", requireFounder/);
+  assert.match(server, /app\.delete\("\/api\/backups\/:id", requireFounder/);
+  assert.match(server, /status = 'deleted'/);
+  assert.match(server, /CREATE DATABASE \$\{quoteIdentifier\(testDatabaseName\)\}/);
+  assert.match(server, /DROP DATABASE IF EXISTS \$\{quoteIdentifier\(testDatabaseName\)\}/);
+  assert.match(server, /Backup automatici disabilitati/);
+  assert.doesNotMatch(server, /runDailyBackupIfNeeded/);
+  assert.doesNotMatch(server, /runMonthlyBackupIfNeeded/);
   assert.match(schema, /ALTER TABLE clienti ADD COLUMN IF NOT EXISTS archiviato/);
-  assert.match(schema, /ALTER TABLE backup_jobs ADD COLUMN IF NOT EXISTS metadata/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS backups/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS backup_logs/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS backup_restore_tests/);
+  assert.match(schema, /idx_backups_status/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS backups/);
+  assert.match(migration, /idx_backup_logs_backup_id/);
+  assert.match(nixpacks, /postgresql_16/);
+  assert.match(dockerfile, /postgresql-client/);
 });
 
 test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {

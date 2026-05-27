@@ -15,9 +15,9 @@ services:
       ADMIN_NOME: Elite
       ADMIN_COGNOME: Founder
       ADMIN_NEGOZIO: Tutti
-      BACKUP_DIR: /app/backups
+      BACKUP_DIR: /data/oroactive/backups
     volumes:
-      - oroactive-backups:/app/backups
+      - oroactive-backups:/data/oroactive/backups
     depends_on:
       - postgres
 

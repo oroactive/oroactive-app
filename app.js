@@ -2682,36 +2682,72 @@ function renderBackups() {
     return;
   }
   backupsList.innerHTML = `
-    <div class="table-row head"><span>Data/ora</span><span>Tipo</span><span>Stato</span><span>Dimensione</span><span>Dettaglio</span><span>Azioni</span></div>
+    <div class="table-row head"><span>Codice</span><span>Data/ora</span><span>Creato da</span><span>Stato</span><span>Verifica</span><span>Restore</span><span>Dimensione</span><span>Azioni</span></div>
     ${state.backups.map((backup) => `
       <div class="table-row">
+        <strong>${escapeHtml(backup.backup_code || backup.id || "Backup")}</strong>
         <span>${escapeHtml(backup.created_at ? new Date(backup.created_at).toLocaleString("it-IT") : "Dato non inserito")}</span>
-        <span>${escapeHtml(backup.tipo || "automatico")}</span>
-        <em class="${backup.stato === "completato" ? "done" : backup.stato === "errore" ? "warning" : ""}">${escapeHtml(backup.stato || "in corso")}</em>
-        <span>${Number(backup.dimensione_bytes || 0) ? `${(Number(backup.dimensione_bytes) / 1024 / 1024).toFixed(2)} MB` : "Dato non inserito"}</span>
-        <span>${escapeHtml(String(backup.dettaglio || "").slice(0, 80) || "Dato non inserito")}</span>
+        <span>${escapeHtml(backup.created_by_name || backup.created_by_role || "Sistema")}</span>
+        ${backupStatusMarkup(backup.status)}
+        ${backupStatusMarkup(backup.verification_status || "not_verified")}
+        ${backupStatusMarkup(backup.restore_test_status || "not_tested")}
+        <span>${formatBytes(backup.file_size || backup.dimensione_bytes || 0)}</span>
         <div class="row-actions">
-          <button type="button" data-view-backup="${escapeHtml(String(backup.id))}">Visualizza dati interni</button>
-          ${backup.download_disponibile ? `<button type="button" data-download-backup="${escapeHtml(String(backup.id))}">Download</button>` : ""}
-          <button class="danger-button" type="button" data-delete-backup="${escapeHtml(String(backup.id))}">Elimina backup</button>
+          <button type="button" data-view-backup="${escapeHtml(String(backup.id))}">Visualizza</button>
+          <button type="button" data-verify-backup="${escapeHtml(String(backup.id))}">Verifica</button>
+          ${isFounder() ? `<button type="button" data-test-restore-backup="${escapeHtml(String(backup.id))}">Test restore</button>` : ""}
+          ${isFounder() && backup.download_disponibile ? `<button type="button" data-download-backup="${escapeHtml(String(backup.id))}">Download</button>` : ""}
+          ${isFounder() ? `<button class="danger-button" type="button" data-delete-backup="${escapeHtml(String(backup.id))}">Elimina</button>` : ""}
         </div>
       </div>
     `).join("")}
   `;
 }
 
+function backupStatusMarkup(status = "") {
+  const normalized = String(status || "").toLowerCase();
+  const ok = ["completed", "verified", "passed"].includes(normalized);
+  const bad = ["failed", "deleted"].includes(normalized);
+  const running = ["running", "pending"].includes(normalized);
+  const cls = ok ? "done" : bad ? "warning" : running ? "status-draft" : "";
+  return `<em class="${cls}">${escapeHtml(status || "not_verified")}</em>`;
+}
+
+function formatBytes(value = 0) {
+  const bytes = Number(value || 0);
+  if (!bytes) return "Dato non inserito";
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
 async function viewBackup(id) {
   const data = await apiRequest(`/backups/${encodeURIComponent(id)}`);
   const backup = data.backup || {};
-  previewTitle.textContent = "Dati interni backup";
+  previewTitle.textContent = "Dettaglio backup";
+  const manifest = backup.manifest || backup.metadata?.manifest || {};
+  const logs = backup.logs || [];
   previewBody.innerHTML = `
     <section class="customer-copy-options">
-      <h3>Backup ${escapeHtml(String(backup.id || ""))}</h3>
+      <h3>Backup ${escapeHtml(String(backup.backup_code || backup.id || ""))}</h3>
       <p>Creato il: ${escapeHtml(backup.created_at ? new Date(backup.created_at).toLocaleString("it-IT") : "Dato non inserito")}</p>
-      <p>Tipo: ${escapeHtml(backup.tipo || "Dato non inserito")} · Stato: ${escapeHtml(backup.stato || "Dato non inserito")}</p>
-      <p>Dimensione: ${Number(backup.dimensione_bytes || 0) ? `${(Number(backup.dimensione_bytes) / 1024 / 1024).toFixed(2)} MB` : "Dato non inserito"}</p>
-      <p>Dettaglio: ${escapeHtml(backup.dettaglio || "Dato non inserito")}</p>
-      <pre class="backup-detail-json">${escapeHtml(JSON.stringify(backup.metadata || {}, null, 2))}</pre>
+      <p>Creato da: ${escapeHtml(backup.created_by_name || backup.created_by_role || "Sistema")}</p>
+      <p>Tipo: ${escapeHtml(backup.backup_type || "manual_full")} · Stato: ${escapeHtml(backup.status || "Dato non inserito")}</p>
+      <p>Verifica: ${escapeHtml(backup.verification_status || "not_verified")} · Test restore: ${escapeHtml(backup.restore_test_status || "not_tested")}</p>
+      <p>Dimensione: ${escapeHtml(formatBytes(backup.file_size))}</p>
+      <p>Checksum SHA256: ${escapeHtml(backup.checksum_sha256 || "Dato non inserito")}</p>
+      ${backup.error_message ? `<p class="warning">Errore: ${escapeHtml(backup.error_message)}</p>` : ""}
+      <h4>Sezioni incluse</h4>
+      <p>${escapeHtml((manifest.included_sections || []).join(", ") || "Dato non inserito")}</p>
+      <h4>Manifest</h4>
+      <pre class="backup-detail-json">${escapeHtml(JSON.stringify(manifest, null, 2))}</pre>
+      <h4>Log backup</h4>
+      <div class="activity-list">${logs.length ? logs.map((log) => `
+        <article class="activity-row">
+          <strong>${escapeHtml(log.level || "info")}</strong>
+          <span>${escapeHtml(log.message || "")}</span>
+          <small>${escapeHtml(formatDateTime(log.created_at))}</small>
+        </article>
+      `).join("") : '<div class="empty-state">Nessun log registrato.</div>'}</div>
     </section>
   `;
   previewModal.hidden = false;
@@ -2719,14 +2755,14 @@ async function viewBackup(id) {
 
 async function deleteBackup(id) {
   if (!isFounder() || !id) return;
-  if (!window.confirm("Sei sicuro di voler eliminare questo backup?")) return;
+  if (!window.confirm("Vuoi eliminare questo backup dall'elenco operativo? Il file fisico resta protetto sul server.")) return;
   await apiRequest(`/backups/${encodeURIComponent(id)}`, { method: "DELETE" });
   await loadBackups();
   showToast("Backup eliminato correttamente", "success");
 }
 
 async function loadBackups() {
-  if (!isFounder()) return;
+  if (!canManageBackupsUi()) return;
   try {
     const data = await apiRequest("/backups");
     state.backups = data.backups || [];
@@ -2736,15 +2772,45 @@ async function loadBackups() {
   }
 }
 
-async function runBackupNow(tipo = "giornaliero") {
-  if (!isFounder()) return;
+async function runBackupNow() {
+  if (!canManageBackupsUi()) return;
   try {
     showLoading("Backup in corso...");
-    await apiRequest("/backups/run", { method: "POST", body: JSON.stringify({ tipo }), timeoutMs: 900000 });
+    const data = await apiRequest("/backups/create", { method: "POST", body: JSON.stringify({}), timeoutMs: 1200000 });
     await loadBackups();
-    showToast(tipo === "mensile" ? "Backup mensile registrato." : "Backup giornaliero registrato.");
+    const backup = data.backup || {};
+    showToast(backup.status === "completed" ? "Backup creato correttamente" : backup.error_message || "Backup fallito.", backup.status === "completed" ? "success" : "error");
   } catch (error) {
     showToast(error.message || "Backup non riuscito.");
+  } finally {
+    hideLoading();
+  }
+}
+
+async function verifyBackup(id) {
+  if (!canManageBackupsUi() || !id) return;
+  try {
+    showLoading("Verifica integrità backup...");
+    const data = await apiRequest(`/backups/${encodeURIComponent(id)}/verify`, { method: "POST", body: JSON.stringify({}), timeoutMs: 300000 });
+    await loadBackups();
+    showToast(data.backup?.verification_status === "verified" ? "Verifica integrità completata" : "Checksum non corrispondente", data.backup?.verification_status === "verified" ? "success" : "error");
+  } catch (error) {
+    showToast(error.message || "Verifica backup non riuscita.");
+  } finally {
+    hideLoading();
+  }
+}
+
+async function testRestoreBackup(id) {
+  if (!isFounder() || !id) return;
+  if (!window.confirm("Avviare test restore su database temporaneo sicuro? Il database di produzione non verrà modificato.")) return;
+  try {
+    showLoading("Test restore in corso...");
+    const data = await apiRequest(`/backups/${encodeURIComponent(id)}/test-restore`, { method: "POST", body: JSON.stringify({}), timeoutMs: 1200000 });
+    await loadBackups();
+    showToast(data.backup?.restore_test_status === "passed" ? "Test restore completato con successo" : "Test restore fallito: controllare log", data.backup?.restore_test_status === "passed" ? "success" : "error");
+  } catch (error) {
+    showToast(error.message || "Test restore fallito: controllare log");
   } finally {
     hideLoading();
   }
@@ -2765,7 +2831,7 @@ async function downloadBackup(id) {
     const blob = await response.blob();
     const disposition = response.headers.get("Content-Disposition") || "";
     const match = disposition.match(/filename="?([^";]+)"?/i);
-    const filename = match?.[1] || `oroactive-backup-${id}.sql`;
+    const filename = match?.[1] || `oroactive-backup-${id}.tar.gz`;
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -6861,15 +6927,18 @@ previewBody?.addEventListener("click", async (event) => {
     showToast(error.message || "Operazione CRM non riuscita.");
   }
 });
-document.getElementById("runBackupNow")?.addEventListener("click", () => runBackupNow("giornaliero"));
-document.getElementById("runMonthlyBackupNow")?.addEventListener("click", () => runBackupNow("mensile"));
+document.getElementById("runBackupNow")?.addEventListener("click", () => runBackupNow());
 backupsList?.addEventListener("click", (event) => {
   const download = event.target.closest("[data-download-backup]");
   const view = event.target.closest("[data-view-backup]");
   const deleteButton = event.target.closest("[data-delete-backup]");
+  const verify = event.target.closest("[data-verify-backup]");
+  const restore = event.target.closest("[data-test-restore-backup]");
   if (download) downloadBackup(download.dataset.downloadBackup);
   if (view) viewBackup(view.dataset.viewBackup);
   if (deleteButton) deleteBackup(deleteButton.dataset.deleteBackup);
+  if (verify) verifyBackup(verify.dataset.verifyBackup);
+  if (restore) testRestoreBackup(restore.dataset.testRestoreBackup);
 });
 document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
   refreshBullionVaultPrices({ notify: true });
