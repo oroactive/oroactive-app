@@ -341,7 +341,7 @@ test("strumenti contiene collegamento verificabile al sito OroActive", async () 
 });
 
 test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async () => {
-  const [index, app, styles, server, schema, migration, quizMigration, repliesMigration] = await Promise.all([
+  const [index, app, styles, server, schema, migration, quizMigration, repliesMigration, directMessagesMigration] = await Promise.all([
     file("index.html"),
     file("app.js"),
     file("styles.css"),
@@ -349,7 +349,8 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
     file("schema.sql"),
     file("migrations/20260527_aurum_interaction_memory.sql"),
     file("migrations/20260527_aurum_memories_messages_quiz.sql"),
-    file("migrations/20260527_aurum_message_replies.sql")
+    file("migrations/20260527_aurum_message_replies.sql"),
+    file("migrations/20260527_direct_user_messages.sql")
   ]);
 
   assert.match(index, /id="aurumMascotRoot"/);
@@ -361,6 +362,8 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(index, /Gestione Aurum/);
   assert.match(index, /data-section="aurumAdmin"/);
   assert.match(index, /id="userMessagesPanel"/);
+  assert.match(index, /id="userMessageRecipient"/);
+  assert.match(index, /id="aurumMessageRecipient"/);
   assert.match(index, /id="aurumConsentPanel"/);
   assert.match(index, /id="aurumUserMemoryToggle"/);
   assert.match(index, /id="aurumTutorToolbar"/);
@@ -386,7 +389,9 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(app, /function handleAurumTutorRequest/);
   assert.match(app, /function ensureAurumHelpAttributes/);
   assert.match(app, /tutorial_operativo/);
-  assert.match(app, /function requestAurumSupport/);
+  assert.match(app, /function sendAurumDirectMessage/);
+  assert.match(app, /function renderAurumMessageRecipients/);
+  assert.match(app, /function aurumMessageDirectionLabel/);
   assert.match(app, /function saveAurumMemory/);
   assert.match(app, /function recordAurumInteractionMemory/);
   assert.match(app, /function loadAurumAllMemories/);
@@ -397,6 +402,8 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(app, /function deleteAurumMessage/);
   assert.match(app, /data-reply-aurum-message/);
   assert.match(app, /data-delete-aurum-message/);
+  assert.match(app, /recipient_user_id: recipientId/);
+  assert.match(app, /Solo visualizzazione Founder/);
   assert.match(app, /AURUM_COMPRO_ORO_QUIZ/);
   assert.match(app, /function updateAurumMascotVisibility/);
   assert.match(app, /function askAurum/);
@@ -417,12 +424,17 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(server, /app\.delete\("\/api\/aurum\/support-requests\/:id"/);
   assert.match(server, /function replyAurumSupportRequest/);
   assert.match(server, /function deleteAurumSupportRequest/);
+  assert.match(server, /recipient_user_id/);
+  assert.match(server, /founder_observer/);
+  assert.match(server, /can_reply: isRecipient/);
   assert.match(server, /sanitizeAurumMemoryText/);
   assert.match(server, /Memoria non salvata: contiene dati personali o sensibili/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_support_requests/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_user_memories/);
   assert.match(schema, /aurum_user_memories_type_idx/);
   assert.match(schema, /response_message TEXT/);
+  assert.match(schema, /recipient_user_id BIGINT/);
+  assert.match(schema, /aurum_support_requests_recipient_idx/);
   assert.match(schema, /aurum_support_requests_deleted_idx/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS aurum_support_requests/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS aurum_user_memories/);
@@ -430,6 +442,8 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(quizMigration, /aurum_support_requests_role_idx/);
   assert.match(repliesMigration, /response_message TEXT/);
   assert.match(repliesMigration, /aurum_support_requests_deleted_idx/);
+  assert.match(directMessagesMigration, /recipient_user_id BIGINT/);
+  assert.match(directMessagesMigration, /aurum_support_requests_recipient_idx/);
   assert.match(styles, /\.aurum-mascot-root/);
   assert.match(styles, /\.aurum-list-row textarea/);
   assert.match(styles, /#aurumAskButton/);

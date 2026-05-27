@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260527-aurum-message-replies-1">
+  <link rel="stylesheet" href="styles.css?v=20260527-direct-messages-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -1016,9 +1016,18 @@
             <div>
               <p class="eyebrow">Comunicazioni riservate</p>
               <h3>Messaggi</h3>
-              <p class="muted">Messaggi inviati dagli utenti tramite Aurum verso responsabili o Founder.</p>
+              <p class="muted">Invia e ricevi messaggi diretti tra utenti. Il Founder può visualizzarli per controllo operativo, ma non risponde al posto del destinatario.</p>
             </div>
           </div>
+          <form class="settings-list user-message-form" id="userMessageForm">
+            <label>Destinatario
+              <select id="userMessageRecipient" required></select>
+            </label>
+            <label>Messaggio
+              <textarea id="userMessageText" rows="3" placeholder="Scrivi un messaggio riservato"></textarea>
+            </label>
+            <button class="primary-button" type="submit">Invia messaggio</button>
+          </form>
           <div class="aurum-admin-list" id="userMessagesList" aria-live="polite"></div>
         </section>
       </section>
@@ -1088,8 +1097,10 @@
         </div>
       </div>
       <div class="aurum-support-actions" id="aurumSupportActions" hidden>
-        <button class="small-button" type="button" id="aurumRequestResponsible">Richiedi supporto al responsabile</button>
-        <button class="ghost-button" type="button" id="aurumRequestFounder">Richiedi supporto al founder</button>
+        <label>Destinatario
+          <select id="aurumMessageRecipient"></select>
+        </label>
+        <button class="small-button" type="button" id="aurumSendDirectMessage">Invia messaggio riservato</button>
       </div>
       <form class="aurum-chat-form" id="aurumChatForm">
         <label>Domanda
@@ -1143,6 +1154,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260527-aurum-message-replies-1"></script>
+  <script src="app.js?v=20260527-direct-messages-1"></script>
 </body>
 </html>

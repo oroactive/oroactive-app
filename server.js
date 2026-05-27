@@ -1618,10 +1618,17 @@ async function deleteAurumMemory(id, user = {}) {
   return result.rowCount > 0;
 }
 
-function publicAurumSupportRequest(row = {}) {
+function publicAurumSupportRequest(row = {}, viewer = {}) {
+  const viewerId = String(viewer?.id || "");
+  const senderId = String(row.user_id || "");
+  const recipientId = String(row.recipient_user_id || "");
+  const isSender = Boolean(viewerId && senderId === viewerId);
+  const isRecipient = Boolean(viewerId && recipientId === viewerId);
+  const founderObserver = normalizeRole(viewer?.ruolo) === "founder" && !isSender && !isRecipient;
   return {
     id: row.id,
     requested_role: row.requested_role,
+    recipient_user_id: row.recipient_user_id,
     message: row.message || "",
     response_message: row.response_message || "",
     status: row.status || "open",
@@ -1630,39 +1637,42 @@ function publicAurumSupportRequest(row = {}) {
     responded_by: row.responded_by,
     resolved_at: row.resolved_at,
     user_id: row.user_id,
-    user_name: [row.nome, row.cognome].filter(Boolean).join(" ") || row.username || row.email || "Utente OroActive",
+    user_name: [row.sender_nome, row.sender_cognome].filter(Boolean).join(" ") || row.sender_username || row.sender_email || "Utente OroActive",
+    recipient_name: [row.recipient_nome, row.recipient_cognome].filter(Boolean).join(" ") || row.recipient_username || row.recipient_email || "",
     respondent_name: [row.responder_nome, row.responder_cognome].filter(Boolean).join(" ") || row.responder_username || row.responder_email || "",
-    store: row.negozio || ""
+    store: row.sender_negozio || "",
+    is_sender: isSender,
+    is_recipient: isRecipient,
+    founder_observer: founderObserver,
+    can_reply: isRecipient,
+    can_delete: isSender || isRecipient
   };
-}
-
-function normalizeAurumRequestedRole(value = "") {
-  const role = normalizeRole(value);
-  return role === "founder" ? "founder" : "responsabile";
 }
 
 async function listAurumSupportRequests(user = {}) {
   const role = normalizeRole(user.ruolo);
-  if (!["founder", "responsabile"].includes(role)) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
-  const params = [];
-  let visibility = "";
-  if (role === "responsabile") {
-    params.push(user.negozio_id || null, user.negozio || "", user.id);
-    visibility = `AND r.requested_role = 'responsabile'
-      AND (u.negozio_id = $1::bigint OR u.negozio = $2::text OR r.user_id = $3::bigint)`;
-  }
+  const params = role === "founder" ? [] : [user.id];
+  const visibility = role === "founder"
+    ? ""
+    : "AND (r.user_id = $1::bigint OR r.recipient_user_id = $1::bigint)";
   const result = await pool.query(
-    `SELECT r.*, u.nome, u.cognome, u.username, u.email, u.negozio, u.negozio_id,
+    `SELECT r.*,
+            sender.nome AS sender_nome,
+            sender.cognome AS sender_cognome,
+            sender.username AS sender_username,
+            sender.email AS sender_email,
+            sender.negozio AS sender_negozio,
+            recipient.nome AS recipient_nome,
+            recipient.cognome AS recipient_cognome,
+            recipient.username AS recipient_username,
+            recipient.email AS recipient_email,
             responder.nome AS responder_nome,
             responder.cognome AS responder_cognome,
             responder.username AS responder_username,
             responder.email AS responder_email
      FROM aurum_support_requests r
-     LEFT JOIN utenti u ON u.id = r.user_id
+     LEFT JOIN utenti sender ON sender.id = r.user_id
+     LEFT JOIN utenti recipient ON recipient.id = r.recipient_user_id
      LEFT JOIN utenti responder ON responder.id = r.responded_by
      WHERE r.status IN ('open', 'in_progress')
        AND r.deleted_at IS NULL
@@ -1671,16 +1681,10 @@ async function listAurumSupportRequests(user = {}) {
      LIMIT 200`,
     params
   );
-  return result.rows.map(publicAurumSupportRequest);
+  return result.rows.map((row) => publicAurumSupportRequest(row, user));
 }
 
 async function replyAurumSupportRequest(id, input = {}, user = {}) {
-  const role = normalizeRole(user.ruolo);
-  if (!["founder", "responsabile"].includes(role)) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
   const reply = String(input.response_message || input.reply || input.message || "").trim().slice(0, 2000);
   if (!reply) {
     const error = new Error("Risposta messaggio obbligatoria.");
@@ -1688,44 +1692,31 @@ async function replyAurumSupportRequest(id, input = {}, user = {}) {
     throw error;
   }
 
-  const baseUpdate = `
-    UPDATE aurum_support_requests r
-    SET response_message = $2::text,
-        responded_by = $3::bigint,
-        responded_at = NOW(),
-        status = 'in_progress'
-  `;
-  const returning = `
-    RETURNING r.*,
-      (SELECT nome FROM utenti WHERE id = r.user_id) AS nome,
-      (SELECT cognome FROM utenti WHERE id = r.user_id) AS cognome,
-      (SELECT username FROM utenti WHERE id = r.user_id) AS username,
-      (SELECT email FROM utenti WHERE id = r.user_id) AS email,
-      (SELECT negozio FROM utenti WHERE id = r.user_id) AS negozio,
-      (SELECT nome FROM utenti WHERE id = r.responded_by) AS responder_nome,
-      (SELECT cognome FROM utenti WHERE id = r.responded_by) AS responder_cognome,
-      (SELECT username FROM utenti WHERE id = r.responded_by) AS responder_username,
-      (SELECT email FROM utenti WHERE id = r.responded_by) AS responder_email
-  `;
-  const result = role === "founder"
-    ? await pool.query(
-        `${baseUpdate}
-         WHERE r.id = $1::uuid
-           AND r.deleted_at IS NULL
-         ${returning}`,
-        [id, reply, user.id]
-      )
-    : await pool.query(
-        `${baseUpdate}
-         FROM utenti u
-         WHERE r.id = $1::uuid
-           AND u.id = r.user_id
-           AND r.deleted_at IS NULL
-           AND r.requested_role = 'responsabile'
-           AND (u.negozio_id = $4::bigint OR u.negozio = $5::text OR r.user_id = $3::bigint)
-         ${returning}`,
-        [id, reply, user.id, user.negozio_id || null, user.negozio || ""]
-      );
+  const result = await pool.query(
+    `UPDATE aurum_support_requests r
+     SET response_message = $2::text,
+         responded_by = $3::bigint,
+         responded_at = NOW(),
+         status = 'in_progress'
+     WHERE r.id = $1::uuid
+       AND r.recipient_user_id = $3::bigint
+       AND r.deleted_at IS NULL
+     RETURNING r.*,
+       (SELECT nome FROM utenti WHERE id = r.user_id) AS sender_nome,
+       (SELECT cognome FROM utenti WHERE id = r.user_id) AS sender_cognome,
+       (SELECT username FROM utenti WHERE id = r.user_id) AS sender_username,
+       (SELECT email FROM utenti WHERE id = r.user_id) AS sender_email,
+       (SELECT negozio FROM utenti WHERE id = r.user_id) AS sender_negozio,
+       (SELECT nome FROM utenti WHERE id = r.recipient_user_id) AS recipient_nome,
+       (SELECT cognome FROM utenti WHERE id = r.recipient_user_id) AS recipient_cognome,
+       (SELECT username FROM utenti WHERE id = r.recipient_user_id) AS recipient_username,
+       (SELECT email FROM utenti WHERE id = r.recipient_user_id) AS recipient_email,
+       (SELECT nome FROM utenti WHERE id = r.responded_by) AS responder_nome,
+       (SELECT cognome FROM utenti WHERE id = r.responded_by) AS responder_cognome,
+       (SELECT username FROM utenti WHERE id = r.responded_by) AS responder_username,
+       (SELECT email FROM utenti WHERE id = r.responded_by) AS responder_email`,
+    [id, reply, user.id]
+  );
   if (!result.rows[0]) return null;
   logUserActivity({
     userId: result.rows[0].user_id,
@@ -1735,54 +1726,61 @@ async function replyAurumSupportRequest(id, input = {}, user = {}) {
     entityId: result.rows[0].id,
     description: "Risposta a messaggio riservato Aurum"
   });
-  return publicAurumSupportRequest(result.rows[0]);
+  return publicAurumSupportRequest(result.rows[0], user);
 }
 
 async function deleteAurumSupportRequest(id, user = {}) {
-  const role = normalizeRole(user.ruolo);
-  if (!["founder", "responsabile"].includes(role)) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
-  const result = role === "founder"
-    ? await pool.query(
-        `UPDATE aurum_support_requests r
-         SET status = 'dismissed',
-             deleted_at = NOW(),
-             resolved_by = $2::bigint,
-             resolved_at = NOW()
-         WHERE r.id = $1::uuid
-           AND r.deleted_at IS NULL
-         RETURNING id`,
-        [id, user.id]
-      )
-    : await pool.query(
-        `UPDATE aurum_support_requests r
-         SET status = 'dismissed',
-             deleted_at = NOW(),
-             resolved_by = $3::bigint,
-             resolved_at = NOW()
-         FROM utenti u
-         WHERE r.id = $1::uuid
-           AND u.id = r.user_id
-           AND r.deleted_at IS NULL
-           AND r.requested_role = 'responsabile'
-           AND (u.negozio_id = $2::bigint OR u.negozio = $4::text OR r.user_id = $3::bigint)
-         RETURNING r.id`,
-        [id, user.negozio_id || null, user.id, user.negozio || ""]
-      );
+  const result = await pool.query(
+    `UPDATE aurum_support_requests r
+     SET status = 'dismissed',
+         deleted_at = NOW(),
+         resolved_by = $2::bigint,
+         resolved_at = NOW()
+     WHERE r.id = $1::uuid
+       AND r.deleted_at IS NULL
+       AND (r.user_id = $2::bigint OR r.recipient_user_id = $2::bigint)
+     RETURNING id`,
+    [id, user.id]
+  );
   return result.rowCount > 0;
 }
 
 async function createAurumSupportRequest(input = {}, user = {}) {
-  const requestedRole = normalizeAurumRequestedRole(input.requested_role || input.requestedRole);
-  const message = String(input.message || "Richiesta supporto da Aurum").trim().slice(0, 2000);
+  const recipientUserId = Number(input.recipient_user_id || input.recipientUserId || input.to_user_id || input.toUserId || 0);
+  if (!Number.isInteger(recipientUserId) || recipientUserId <= 0) {
+    const error = new Error("Destinatario messaggio obbligatorio.");
+    error.status = 400;
+    throw error;
+  }
+  if (String(recipientUserId) === String(user.id)) {
+    const error = new Error("Seleziona un destinatario diverso dal tuo utente.");
+    error.status = 400;
+    throw error;
+  }
+  const recipientResult = await pool.query(
+    `SELECT id, ruolo, nome, cognome, username, email
+     FROM utenti
+     WHERE id = $1::bigint
+       AND COALESCE(attivo, true) = true`,
+    [recipientUserId]
+  );
+  const recipient = recipientResult.rows[0];
+  if (!recipient) {
+    const error = new Error("Destinatario messaggio non valido.");
+    error.status = 400;
+    throw error;
+  }
+  const message = String(input.message || "Messaggio Aurum").trim().slice(0, 2000);
+  if (!message) {
+    const error = new Error("Messaggio obbligatorio.");
+    error.status = 400;
+    throw error;
+  }
   const result = await pool.query(
-    `INSERT INTO aurum_support_requests (user_id, requested_role, message, status)
-     VALUES ($1::bigint, $2::text, $3::text, 'open')
+    `INSERT INTO aurum_support_requests (user_id, recipient_user_id, requested_role, message, status)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, 'open')
      RETURNING *`,
-    [user.id, requestedRole, message]
+    [user.id, recipientUserId, normalizeRole(recipient.ruolo), message]
   );
   logUserActivity({
     userId: user.id,
@@ -1790,16 +1788,20 @@ async function createAurumSupportRequest(input = {}, user = {}) {
     activityType: "aurum_support_request",
     entityType: "aurum_support_request",
     entityId: result.rows[0]?.id,
-    description: `Richiesta supporto Aurum verso ${requestedRole}`
+    description: `Messaggio Aurum inviato a utente ${recipientUserId}`
   });
   return publicAurumSupportRequest({
     ...result.rows[0],
-    nome: user.nome,
-    cognome: user.cognome,
-    username: user.username,
-    email: user.email,
-    negozio: user.negozio
-  });
+    sender_nome: user.nome,
+    sender_cognome: user.cognome,
+    sender_username: user.username,
+    sender_email: user.email,
+    sender_negozio: user.negozio,
+    recipient_nome: recipient.nome,
+    recipient_cognome: recipient.cognome,
+    recipient_username: recipient.username,
+    recipient_email: recipient.email
+  }, user);
 }
 
 async function searchAiChunksBySource(question = "", sourceType = "book", limit = 6) {

@@ -614,8 +614,8 @@ const aurumConsentPanel = document.getElementById("aurumConsentPanel");
 const aurumRememberYes = document.getElementById("aurumRememberYes");
 const aurumRememberNo = document.getElementById("aurumRememberNo");
 const aurumSupportActions = document.getElementById("aurumSupportActions");
-const aurumRequestResponsible = document.getElementById("aurumRequestResponsible");
-const aurumRequestFounder = document.getElementById("aurumRequestFounder");
+const aurumMessageRecipient = document.getElementById("aurumMessageRecipient");
+const aurumSendDirectMessage = document.getElementById("aurumSendDirectMessage");
 const aurumUserMemories = document.getElementById("aurumUserMemories");
 const aurumUserMemoryToggle = document.getElementById("aurumUserMemoryToggle");
 const aurumManagementPanel = document.getElementById("aurumManagementPanel");
@@ -629,6 +629,9 @@ const aurumSupportRequestsList = document.getElementById("aurumSupportRequestsLi
 const aurumMemoriesList = document.getElementById("aurumMemoriesList");
 const userMessagesPanel = document.getElementById("userMessagesPanel");
 const userMessagesList = document.getElementById("userMessagesList");
+const userMessageForm = document.getElementById("userMessageForm");
+const userMessageRecipient = document.getElementById("userMessageRecipient");
+const userMessageText = document.getElementById("userMessageText");
 const knowledgeForm = document.getElementById("knowledgeForm");
 const knowledgeStatus = document.getElementById("knowledgeStatus");
 const reindexKnowledge = document.getElementById("reindexKnowledge");
@@ -2036,7 +2039,7 @@ async function startAuthenticatedApp() {
   ensureAurumHelpAttributes();
   if (canViewUsersDirectory()) loadUsers();
   await loadAurumMemories();
-  if (["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) await loadAurumSupportRequests();
+  await loadAurumSupportRequests();
   if (isFounder()) await loadAurumAllMemories();
   maybeShowAurumDailyGreeting();
   maybeShowLevelUnlockMessage();
@@ -2278,7 +2281,7 @@ async function handleScreenDataLoad(id) {
     renderAssistantMessages();
     renderAurumManagementPanel();
     await loadAurumMemories();
-    if (["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) await loadAurumSupportRequests();
+    await loadAurumSupportRequests();
     if (isFounder()) await loadAurumAllMemories();
     if (isFounder()) await loadKnowledgeStatus();
   }
@@ -2296,7 +2299,7 @@ async function handleScreenDataLoad(id) {
   }
   if (id === "users") {
     await loadUsers();
-    if (["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) await loadAurumSupportRequests();
+    await loadAurumSupportRequests();
   }
 }
 
@@ -2566,6 +2569,7 @@ function renderUsers(users) {
   if (!container) return;
   if (!users.length) {
     container.innerHTML = '<div class="empty-state">Nessun utente registrato.</div>';
+    renderAurumMessageRecipients();
     return;
   }
 
@@ -2609,6 +2613,7 @@ function renderUsers(users) {
     `;
   }).join("")}
   `;
+  renderAurumMessageRecipients();
 }
 
 function userSaveErrorMessage(error, isEditing) {
@@ -3219,14 +3224,16 @@ function handleAurumMoodReply(question = "") {
     return true;
   }
   if (mood === "negative") {
-    state.aurumMessages.push({ role: "assistant", content: "Mi dispiace. Vuoi che ti aiuti a organizzare meglio le attivita di oggi oppure preferisci parlarne con un responsabile?" });
+    state.aurumMessages.push({ role: "assistant", content: "Mi dispiace. Vuoi che ti aiuti a organizzare meglio le attivita di oggi oppure vuoi inviare un messaggio riservato a un utente specifico?" });
     if (aurumSupportActions) aurumSupportActions.hidden = false;
+    renderAurumMessageRecipients();
     state.aurumAskedMoodToday = false;
     return true;
   }
   if (mood === "support") {
-    state.aurumMessages.push({ role: "assistant", content: "Posso aprire una richiesta interna. Scegli se preferisci coinvolgere il responsabile o il founder." });
+    state.aurumMessages.push({ role: "assistant", content: "Posso inviare un messaggio interno riservato. Seleziona il destinatario tra gli utenti disponibili." });
     if (aurumSupportActions) aurumSupportActions.hidden = false;
+    renderAurumMessageRecipients();
     state.aurumAskedMoodToday = false;
     return true;
   }
@@ -3318,6 +3325,34 @@ function renderFounderAurumMemories() {
   `).join("");
 }
 
+function availableAurumMessageRecipients() {
+  return (state.users || [])
+    .filter((user) => String(user.id || "") !== String(state.currentUser?.id || ""))
+    .filter((user) => user.attivo !== false)
+    .filter((user) => user.visibility !== "hidden");
+}
+
+function renderAurumMessageRecipients() {
+  const users = availableAurumMessageRecipients();
+  const options = users.length
+    ? `<option value="">Seleziona utente</option>${users.map((user) => `
+        <option value="${escapeHtml(String(user.id))}">${escapeHtml(displayUserFullName(user))} - ${escapeHtml(roleLabel(user.ruolo))}</option>
+      `).join("")}`
+    : '<option value="">Nessun utente disponibile</option>';
+  [aurumMessageRecipient, userMessageRecipient].forEach((select) => {
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = options;
+    if (current && users.some((user) => String(user.id) === String(current))) select.value = current;
+  });
+}
+
+function aurumMessageDirectionLabel(request = {}) {
+  if (request.is_sender) return `A: ${request.recipient_name || "utente"}`;
+  if (request.is_recipient) return `Da: ${request.user_name || "utente"}`;
+  return `Da: ${request.user_name || "utente"} · A: ${request.recipient_name || "utente"}`;
+}
+
 function renderAurumSupportRequests() {
   if (!state.aurumSupportRequests.length) {
     if (aurumSupportRequestsList) aurumSupportRequestsList.innerHTML = '<div class="empty-state">Nessun messaggio riservato aperto.</div>';
@@ -3326,18 +3361,20 @@ function renderAurumSupportRequests() {
   }
   const markup = state.aurumSupportRequests.map((request) => `
     <article class="aurum-list-row">
-      <strong>${escapeHtml(request.user_name || "Utente OroActive")}</strong>
+      <strong>${escapeHtml(aurumMessageDirectionLabel(request))}</strong>
       <span>${escapeHtml(request.message || "Richiesta supporto")}</span>
-      <small>Destinatario: ${escapeHtml(roleLabel(request.requested_role || ""))} · ${escapeHtml(request.status || "open")} · ${escapeHtml(formatDateTime(request.created_at))}</small>
+      <small>${escapeHtml(request.status || "open")} · ${escapeHtml(formatDateTime(request.created_at))}${request.founder_observer ? " · Solo visualizzazione Founder" : ""}</small>
       ${request.response_message ? `
         <span><b>Risposta:</b> ${escapeHtml(request.response_message)}</span>
         <small>Risposto da ${escapeHtml(request.respondent_name || "referente")} · ${escapeHtml(formatDateTime(request.responded_at))}</small>
       ` : ""}
-      <textarea data-aurum-message-reply="${escapeHtml(request.id || "")}" rows="2" placeholder="Scrivi una risposta riservata">${escapeHtml(request.response_message || "")}</textarea>
-      <div class="row-actions">
-        <button class="primary-button" type="button" data-reply-aurum-message="${escapeHtml(request.id || "")}">Rispondi</button>
-        <button class="danger-button" type="button" data-delete-aurum-message="${escapeHtml(request.id || "")}">Elimina</button>
-      </div>
+      ${request.can_reply ? `<textarea data-aurum-message-reply="${escapeHtml(request.id || "")}" rows="2" placeholder="Scrivi una risposta riservata">${escapeHtml(request.response_message || "")}</textarea>` : ""}
+      ${(request.can_reply || request.can_delete) ? `
+        <div class="row-actions">
+          ${request.can_reply ? `<button class="primary-button" type="button" data-reply-aurum-message="${escapeHtml(request.id || "")}">Rispondi</button>` : ""}
+          ${request.can_delete ? `<button class="danger-button" type="button" data-delete-aurum-message="${escapeHtml(request.id || "")}">Elimina</button>` : ""}
+        </div>
+      ` : ""}
     </article>
   `).join("");
   if (aurumSupportRequestsList) aurumSupportRequestsList.innerHTML = markup;
@@ -3345,8 +3382,10 @@ function renderAurumSupportRequests() {
 }
 
 function renderUserMessages(markup = "") {
-  const canViewMessages = ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+  const canViewMessages = Boolean(state.currentUser);
   if (userMessagesPanel) userMessagesPanel.hidden = !canViewMessages;
+  if (userMessageForm) userMessageForm.hidden = !canViewMessages;
+  renderAurumMessageRecipients();
   if (!userMessagesList || !canViewMessages) return;
   userMessagesList.innerHTML = markup || '<div class="empty-state">Nessun messaggio riservato ricevuto.</div>';
 }
@@ -3447,7 +3486,7 @@ async function deleteAurumMemory(id) {
 }
 
 async function loadAurumSupportRequests() {
-  if (!ENABLE_AURUM_MASCOT || !["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) return;
+  if (!ENABLE_AURUM_MASCOT || !state.currentUser) return;
   try {
     const data = await apiRequest("/aurum/support-requests");
     state.aurumSupportRequests = data.requests || [];
@@ -3502,25 +3541,42 @@ async function deleteAurumMessage(id) {
   }
 }
 
-async function requestAurumSupport(requestedRole = "responsabile") {
+async function sendAurumDirectMessage(recipientId, message, options = {}) {
   if (!state.currentUser) return;
+  const text = String(message || "").trim();
+  if (!recipientId) {
+    showToast("Seleziona il destinatario del messaggio.", "error");
+    return false;
+  }
+  if (!text) {
+    showToast("Scrivi un messaggio da inviare.", "error");
+    return false;
+  }
   try {
     const data = await apiRequest("/aurum/support-requests", {
       method: "POST",
       body: JSON.stringify({
-        requested_role: requestedRole,
-        message: state.aurumLastUserMessage || "Richiesta supporto da Aurum"
+        recipient_user_id: recipientId,
+        message: text
       })
     });
     state.aurumSupportRequests = [data.request, ...state.aurumSupportRequests].filter(Boolean);
-    recordAurumInteractionMemory("support_message", state.aurumLastUserMessage || "Richiesta supporto da Aurum", `Destinatario: ${requestedRole}`);
+    recordAurumInteractionMemory("support_message", text, `Destinatario: ${data.request?.recipient_name || recipientId}`);
     if (aurumSupportActions) aurumSupportActions.hidden = true;
-    state.aurumMessages.push({ role: "assistant", content: "Richiesta inviata. Un referente autorizzato potra prenderla in carico." });
+    if (options.fromAurum) {
+      state.aurumMessages.push({ role: "assistant", content: "Messaggio riservato inviato al destinatario selezionato." });
+    }
+    renderAurumSupportRequests();
+    showToast("Messaggio inviato correttamente.", "success");
+    return true;
   } catch (error) {
-    state.aurumMessages.push({ role: "assistant", content: error.message || "Non sono riuscito a creare la richiesta supporto." });
+    if (options.fromAurum) {
+      state.aurumMessages.push({ role: "assistant", content: error.message || "Non sono riuscito a inviare il messaggio." });
+    }
+    showToast(error.message || "Messaggio non inviato.", "error");
+    return false;
   } finally {
     renderAurumMessages();
-    renderAurumSupportRequests();
   }
 }
 
@@ -8274,8 +8330,14 @@ aurumRememberNo?.addEventListener("click", () => {
   state.aurumMessages.push({ role: "assistant", content: "Va bene, non salvo questa informazione." });
   renderAurumMessages();
 });
-aurumRequestResponsible?.addEventListener("click", () => requestAurumSupport("responsabile"));
-aurumRequestFounder?.addEventListener("click", () => requestAurumSupport("founder"));
+aurumSendDirectMessage?.addEventListener("click", () => {
+  sendAurumDirectMessage(aurumMessageRecipient?.value || "", state.aurumLastUserMessage || "Messaggio riservato da Aurum", { fromAurum: true });
+});
+userMessageForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const sent = await sendAurumDirectMessage(userMessageRecipient?.value || "", userMessageText?.value || "");
+  if (sent && userMessageText) userMessageText.value = "";
+});
 [aurumEnabledToggle, aurumMovementToggle, aurumGreetingToggle, aurumMemoryToggle].forEach((toggle) => {
   toggle?.addEventListener("change", () => saveAurumSettings({
     enabled: Boolean(aurumEnabledToggle?.checked),

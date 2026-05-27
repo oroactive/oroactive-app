@@ -793,6 +793,10 @@ textarea {
   margin-top: 18px;
 }
 
+.user-message-form {
+  margin-bottom: 12px;
+}
+
 @keyframes aurum-breath {
   0%,
   100% {
