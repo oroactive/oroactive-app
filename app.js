@@ -3180,8 +3180,21 @@ function openAurumChat() {
   updateAurumMascotVisibility();
 }
 
+function resetAurumVisibleChat() {
+  state.aurumMessages = [];
+  state.aurumLastUserMessage = "";
+  state.aurumActiveQuiz = null;
+  state.aurumSending = false;
+  showAurumMemoryConsent(null);
+  if (aurumSupportActions) aurumSupportActions.hidden = true;
+  if (aurumQuestion) aurumQuestion.value = "";
+  if (aurumAskButton) aurumAskButton.disabled = false;
+  renderAurumMessages();
+}
+
 function closeAurumChat() {
   if (aurumChatPanel) aurumChatPanel.hidden = true;
+  resetAurumVisibleChat();
 }
 
 function showAurumTip(text = "") {

@@ -395,6 +395,14 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(app, /function saveAurumMemory/);
   assert.match(app, /function recordAurumInteractionMemory/);
   assert.match(app, /function loadAurumAllMemories/);
+  assert.match(app, /function resetAurumVisibleChat/);
+  const resetAurumChatStart = app.indexOf("function resetAurumVisibleChat");
+  const resetAurumChatEnd = app.indexOf("function closeAurumChat", resetAurumChatStart);
+  const resetAurumChatBlock = app.slice(resetAurumChatStart, resetAurumChatEnd);
+  assert.match(resetAurumChatBlock, /state\.aurumMessages = \[\]/);
+  assert.match(resetAurumChatBlock, /state\.aurumLastUserMessage = ""/);
+  assert.doesNotMatch(resetAurumChatBlock, /aurumMemories\s*=/);
+  assert.doesNotMatch(resetAurumChatBlock, /aurumAllMemories\s*=/);
   assert.match(app, /function startAurumCuriosityQuiz/);
   assert.match(app, /function evaluateAurumQuizAnswer/);
   assert.match(app, /function renderUserMessages/);
