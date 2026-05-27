@@ -335,7 +335,7 @@ test("strumenti contiene collegamento verificabile al sito OroActive", async () 
 
   assert.equal((index.match(/data-open-oroactive-website/g) || []).length, 2);
   assert.match(index, /Sito web OroActive/);
-  assert.match(app, /const OROACTIVE_WEBSITE_URL = "https:\/\/oroactive\.com\/"/);
+  assert.match(app, /const OROACTIVE_WEBSITE_URL = "http:\/\/wcfme33owxz0wfkr0ysnzthy\.188\.213\.161\.151\.sslip\.io\/"/);
   assert.match(app, /function openOroActiveWebsite/);
   assert.match(app, /window\.open\(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer"\)/);
 });

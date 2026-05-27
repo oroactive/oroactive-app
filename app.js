@@ -87,7 +87,7 @@ const state = {
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
-const OROACTIVE_WEBSITE_URL = "https://oroactive.com/";
+const OROACTIVE_WEBSITE_URL = "http://wcfme33owxz0wfkr0ysnzthy.188.213.161.151.sslip.io/";
 const ENABLE_AURUM_MASCOT = true;
 const AURUM_SETTINGS_KEY = "oroactive-aurum-settings";
 const AURUM_DEFAULT_SETTINGS = {
