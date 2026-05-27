@@ -129,7 +129,10 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   const styles = await file("styles.css");
   assert.match(styles, /customer-copy-logo/);
   assert.match(styles, /logo-refresh-clicked/);
+  assert.match(styles, /logo-heartbeat/);
+  assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(index, /id="userEmail"/);
+  assert.match(index, /id="userEmailLabel" class="founder-email-only" hidden/);
   assert.match(index, /id="userPhone"/);
   assert.match(index, /id="userActive"/);
   assert.match(server, /telefono, note, attivo/);
@@ -185,7 +188,8 @@ test("sezione utenti usa endpoint e messaggi propri", async () => {
   assert.match(app, /Nessuna attività registrata/);
   assert.match(app, /displayMenuUserName/);
   assert.match(app, /displayUserFullName/);
-  assert.match(app, /if \(normalizeRole\(user\.ruolo\) === "founder"\) return "Elite"/);
+  assert.match(app, /function isFounderUser/);
+  assert.match(app, /if \(isFounderUser\(user\)\) return "Elite"/);
   assert.match(app, /loggedUserName\.textContent = `\$\{displayMenuUserName/);
   assert.match(app, /sessionUsername\.textContent = displayMenuUserName/);
   assert.match(app, /mainUserMenuButton\.textContent = displayMenuUserName\(state\.currentUser\)/);
@@ -193,8 +197,13 @@ test("sezione utenti usa endpoint e messaggi propri", async () => {
   assert.doesNotMatch(index, /Account OroActive/);
   assert.doesNotMatch(index, /id="mainUserMenuButton"[^>]*>Utente<\/button>/);
   assert.match(index, /<option value="founder">Founder<\/option>/);
+  assert.match(app, /emailLabel\.hidden = !emailAllowed/);
+  assert.match(app, /if \(role === "founder"\)[\s\S]*payload\.email/);
+  assert.match(app, /isFounderUser\(user\) && user\.email/);
   assert.match(app, /roleSelect\.disabled = editingFounder/);
   assert.match(app, /state\.currentUser = \{ \.\.\.state\.currentUser, \.\.\.savedUser \}/);
+  assert.match(server, /email: role === "founder" \? row\.email : ""/);
+  assert.match(server, /if \(!targetIsFounder\)[\s\S]*delete input\.email/);
   assert.match(server, /function canUseRequestedRoleForUpdate/);
   assert.match(server, /targetRole === "founder"[\s\S]*normalizedRequestedRole === "founder"/);
   assert.match(app, /return ROLE_LEVELS\.find\(\(level\) => level\.role === normalizeRole\(user\?\.ruolo\)\) \|\| null/);

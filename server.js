@@ -175,16 +175,17 @@ function publicUser(row) {
   if (!row) return null;
   const lastSeen = row.last_seen ? new Date(row.last_seen) : null;
   const online = Boolean(lastSeen && Date.now() - lastSeen.getTime() < 2 * 60 * 1000);
+  const role = normalizeRole(row.ruolo);
   return {
     id: row.id,
     nome: row.nome,
     cognome: row.cognome,
     username: row.username,
-    email: row.email,
+    email: role === "founder" ? row.email : "",
     telefono: row.telefono || "",
     note: row.note || "",
     attivo: row.attivo !== false,
-    ruolo: normalizeRole(row.ruolo),
+    ruolo: role,
     negozio_id: row.negozio_id || null,
     negozio: roleSeesAllStores(row.ruolo) ? "Tutti" : row.negozio,
     hasFaceId: Boolean(row.face_id_credential),
@@ -5347,9 +5348,10 @@ async function deleteAct(identifier, user) {
 async function createUser(input, actor) {
   const firstName = String(input.nome || input.name || "").trim();
   const surname = String(input.cognome || input.surname || "").trim();
-  const username = String(input.username || input.email || "").trim();
-  const email = String(input.email || "").trim();
   const role = normalizeRole(input.ruolo || input.role || "");
+  const rawEmail = String(input.email || "").trim();
+  const username = String(input.username || (role === "founder" ? rawEmail : "")).trim();
+  const email = role === "founder" ? rawEmail : "";
   if (!firstName) {
     const error = new Error("Nome utente obbligatorio");
     error.status = 400;
@@ -5357,6 +5359,11 @@ async function createUser(input, actor) {
   }
   if (!surname) {
     const error = new Error("Cognome utente obbligatorio");
+    error.status = 400;
+    throw error;
+  }
+  if (role !== "founder" && !username) {
+    const error = new Error("Nome utente obbligatorio");
     error.status = 400;
     throw error;
   }
@@ -5483,6 +5490,10 @@ function canUseRequestedRoleForUpdate(actor, target, requestedRole) {
 async function updateUser(id, input, actor) {
   const target = await findUserRawById(id);
   if (!target) return null;
+  const targetIsFounder = normalizeRole(target.ruolo) === "founder";
+  if (!targetIsFounder) {
+    delete input.email;
+  }
   const requestedRole = input.ruolo || input.role || target.ruolo;
   assertCanManageTarget(actor, target, requestedRole);
   if ((input.nome !== undefined || input.name !== undefined) && !String(input.nome || input.name || "").trim()) {

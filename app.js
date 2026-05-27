@@ -845,12 +845,16 @@ function roleLabel(role) {
 
 function displayUsername(user = {}) {
   if (user.username) return user.username;
-  if (user.email) return user.email;
+  if (isFounderUser(user) && user.email) return user.email;
   return user.nome || "";
 }
 
+function isFounderUser(user = {}) {
+  return normalizeRole(user?.ruolo) === "founder";
+}
+
 function displayMenuUserName(user = {}) {
-  if (normalizeRole(user.ruolo) === "founder") return "Elite";
+  if (isFounderUser(user)) return "Elite";
   return displayUsername(user) || [user.nome, user.cognome].filter(Boolean).join(" ").trim() || "Utente OroActive";
 }
 
@@ -1750,10 +1754,14 @@ function renderProfileCard() {
   if (!profileCard || !state.currentUser) return;
   const user = state.currentUser;
   const createdAt = formatDateTime(user.data_creazione);
+  const accessLabel = isFounderUser(user) ? "Username / email" : "Nome utente";
+  const accessValue = isFounderUser(user)
+    ? user.username || user.email || "Dato non inserito"
+    : user.username || "Dato non inserito";
   profileCard.innerHTML = `
     <div class="profile-row"><span>Nome</span><strong>${escapeHtml(displayUserFullName(user))}</strong></div>
     <div class="profile-row"><span>Cognome</span><strong>${escapeHtml(user.cognome || "Dato non inserito")}</strong></div>
-    <div class="profile-row"><span>Username / email</span><strong>${escapeHtml(user.username || user.email || "Dato non inserito")}</strong></div>
+    <div class="profile-row"><span>${escapeHtml(accessLabel)}</span><strong>${escapeHtml(accessValue)}</strong></div>
     <div class="profile-row"><span>Ruolo</span><strong>${escapeHtml(roleLabel(user.ruolo))}</strong></div>
     <div class="profile-row"><span>Negozio</span><strong>${escapeHtml(user.negozio || "Tutti")}</strong></div>
     <div class="profile-row"><span>Data creazione account</span><strong>${escapeHtml(createdAt)}</strong></div>
@@ -1961,6 +1969,8 @@ function resetUserForm() {
 function configureUserFormPermissions() {
   const roleSelect = document.getElementById("userRole");
   const storeSelect = document.getElementById("userStore");
+  const emailLabel = document.getElementById("userEmailLabel");
+  const emailInput = document.getElementById("userEmail");
   if (!roleSelect || !storeSelect) return;
   const editingUserId = document.getElementById("userId")?.value;
   const editingUser = (state.users || []).find((user) => String(user.id) === String(editingUserId));
@@ -1974,6 +1984,12 @@ function configureUserFormPermissions() {
   if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles.find((role) => role !== "founder") || "commesso";
   roleSelect.disabled = editingFounder;
   const role = normalizeRole(roleSelect.value);
+  const emailAllowed = role === "founder";
+  if (emailLabel) emailLabel.hidden = !emailAllowed;
+  if (emailInput) {
+    emailInput.disabled = !emailAllowed;
+    if (!emailAllowed) emailInput.value = "";
+  }
   if (["founder", "supervisore"].includes(role)) {
     storeSelect.value = "Tutti";
     storeSelect.disabled = true;
@@ -2018,7 +2034,7 @@ function renderUsers(users) {
         </strong>
         <span>
           ${minimal ? "Dati minimi" : escapeHtml(displayUsername(user))}
-          ${!minimal && user.email && user.email !== displayUsername(user) ? `<small>${escapeHtml(user.email)}</small>` : ""}
+          ${!minimal && isFounderUser(user) && user.email && user.email !== displayUsername(user) ? `<small>${escapeHtml(user.email)}</small>` : ""}
         </span>
         <em>${escapeHtml(roleLabel(user.ruolo))}</em>
         <span>${escapeHtml(userSeesAllStores(user) ? "Tutti" : user.negozio)}</span>
@@ -2094,17 +2110,20 @@ async function saveUser(event) {
   const id = document.getElementById("userId").value;
   const isEditing = Boolean(id);
   const saveButton = document.getElementById("saveUserButton");
+  const role = normalizeRole(document.getElementById("userRole").value);
   const payload = {
     nome: document.getElementById("userName").value.trim(),
     cognome: document.getElementById("userSurname").value.trim(),
     username: document.getElementById("userUsername").value.trim(),
-    email: document.getElementById("userEmail")?.value.trim(),
-    ruolo: normalizeRole(document.getElementById("userRole").value),
+    ruolo: role,
     negozio: document.getElementById("userStore").value,
     telefono: document.getElementById("userPhone")?.value.trim(),
     note: document.getElementById("userNotes")?.value.trim(),
     attivo: document.getElementById("userActive")?.value !== "false"
   };
+  if (role === "founder") {
+    payload.email = document.getElementById("userEmail")?.value.trim();
+  }
   const password = document.getElementById("userPassword").value;
   if (password) payload.password = password;
 
@@ -2149,7 +2168,7 @@ function editUser(id) {
   document.getElementById("userSurname").value = user.cognome || "";
   document.getElementById("userUsername").value = user.username || "";
   const userEmail = document.getElementById("userEmail");
-  if (userEmail) userEmail.value = user.email || "";
+  if (userEmail) userEmail.value = isFounderUser(user) ? user.email || "" : "";
   const userPhone = document.getElementById("userPhone");
   if (userPhone) userPhone.value = user.telefono || "";
   const userNotes = document.getElementById("userNotes");

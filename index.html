@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260527-user-label-1">
+  <link rel="stylesheet" href="styles.css?v=20260527-user-email-logo-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -946,7 +946,7 @@
             <label>Nome <input id="userName" required></label>
             <label>Cognome <input id="userSurname" required></label>
             <label>Nome utente <input id="userUsername" autocomplete="username"></label>
-            <label>Email <input id="userEmail" type="email" autocomplete="email"></label>
+            <label id="userEmailLabel" class="founder-email-only" hidden>Email <input id="userEmail" type="email" autocomplete="email"></label>
             <label>Telefono <input id="userPhone" type="tel" autocomplete="tel"></label>
             <label>Password <input id="userPassword" type="password" autocomplete="new-password" placeholder="Minimo 8 caratteri" required></label>
             <label>Ruolo
@@ -1020,6 +1020,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260527-user-label-1"></script>
+  <script src="app.js?v=20260527-user-email-logo-1"></script>
 </body>
 </html>
