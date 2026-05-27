@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260527-aurum-tutor-1">
+  <link rel="stylesheet" href="styles.css?v=20260527-aurum-messages-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -80,6 +80,7 @@
           <div class="main-menu-submenu" id="trainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
             <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+            <button class="founder-only" type="button" data-section="aurumAdmin">Gestione Aurum</button>
             <button type="button" data-section="training">OroActive Academy</button>
             <button type="button" data-start-tutorial>Tutorial</button>
           </div>
@@ -121,6 +122,7 @@
           <div class="brand-submenu" id="brandTrainingSubmenu" hidden>
             <button type="button" data-section="assistant">Assistente IA OroActive</button>
             <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
+            <button class="founder-only user-menu-button" type="button" data-section="aurumAdmin">Gestione Aurum</button>
             <button type="button" data-section="training">OroActive Academy</button>
             <button type="button" data-start-tutorial>Tutorial</button>
           </div>
@@ -754,33 +756,36 @@
             <button class="ghost-button" type="button" id="reindexKnowledge">Rigenera embeddings</button>
             <div class="knowledge-status" id="knowledgeStatus"></div>
           </section>
-
-          <section class="knowledge-card aurum-management-panel knowledge-editor-only" id="aurumManagementPanel" hidden>
-            <div>
-              <p class="eyebrow">Aurum</p>
-              <h3>Gestione Aurum</h3>
-              <p class="muted">Controlli locali della mascotte AI, memorie approvate e richieste di supporto.</p>
-            </div>
-            <div class="aurum-settings-grid">
-              <label class="inline-check"><input id="aurumEnabledToggle" type="checkbox"> Attiva mascotte</label>
-              <label class="inline-check"><input id="aurumMovementToggle" type="checkbox"> Movimento autonomo</label>
-              <label class="inline-check"><input id="aurumGreetingToggle" type="checkbox"> Saluto giornaliero</label>
-              <label class="inline-check"><input id="aurumMemoryToggle" type="checkbox"> Memoria utente con consenso</label>
-            </div>
-            <div class="user-form-actions">
-              <button class="ghost-button" type="button" id="aurumRefreshAdminData">Aggiorna richieste</button>
-              <button class="ghost-button" type="button" id="aurumResetLocalMemory">Reset saluto test</button>
-            </div>
-            <div>
-              <h4>Richieste supporto</h4>
-              <div class="aurum-admin-list" id="aurumSupportRequestsList" aria-live="polite"></div>
-            </div>
-            <div>
-              <h4>Memorie personali Aurum</h4>
-              <div class="aurum-admin-list" id="aurumMemoriesList" aria-live="polite"></div>
-            </div>
-          </section>
         </div>
+      </section>
+
+      <section id="aurumAdmin" class="screen founder-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <section class="knowledge-card aurum-management-panel" id="aurumManagementPanel" hidden>
+          <div>
+            <p class="eyebrow">Aurum</p>
+            <h2>Gestione Aurum</h2>
+            <p class="muted">Sezione riservata al Founder per controllare mascotte, memorie interne divise per utente, messaggi riservati e richieste di supporto.</p>
+          </div>
+          <div class="aurum-settings-grid">
+            <label class="inline-check"><input id="aurumEnabledToggle" type="checkbox"> Attiva mascotte</label>
+            <label class="inline-check"><input id="aurumMovementToggle" type="checkbox"> Movimento autonomo</label>
+            <label class="inline-check"><input id="aurumGreetingToggle" type="checkbox"> Saluto giornaliero</label>
+            <label class="inline-check"><input id="aurumMemoryToggle" type="checkbox"> Memoria Aurum interna</label>
+          </div>
+          <div class="user-form-actions">
+            <button class="ghost-button" type="button" id="aurumRefreshAdminData">Aggiorna Aurum</button>
+            <button class="ghost-button" type="button" id="aurumResetLocalMemory">Reset saluto test</button>
+          </div>
+          <div>
+            <h3>Messaggi riservati</h3>
+            <div class="aurum-admin-list" id="aurumSupportRequestsList" aria-live="polite"></div>
+          </div>
+          <div>
+            <h3>Memorie Aurum per utente</h3>
+            <div class="aurum-admin-list aurum-memory-groups" id="aurumMemoriesList" aria-live="polite"></div>
+          </div>
+        </section>
       </section>
 
       <section id="training" class="screen">
@@ -1006,6 +1011,16 @@
           </form>
         </div>
         <div class="archive-table users-table" id="usersList" aria-live="polite"></div>
+        <section class="knowledge-notes-panel user-messages-panel" id="userMessagesPanel" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Comunicazioni riservate</p>
+              <h3>Messaggi</h3>
+              <p class="muted">Messaggi inviati dagli utenti tramite Aurum verso responsabili o Founder.</p>
+            </div>
+          </div>
+          <div class="aurum-admin-list" id="userMessagesList" aria-live="polite"></div>
+        </section>
       </section>
       <footer class="software-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
     </main>
@@ -1062,6 +1077,7 @@
           <button type="button" data-aurum-tutorial="tutorial_backup">Spiegami Backup</button>
           <button type="button" data-aurum-tutorial="tutorial_utenti">Spiegami Utenti</button>
           <button type="button" data-aurum-field-help>Spiegami questo campo</button>
+          <button type="button" data-aurum-quiz>Quiz compro oro</button>
         </div>
       </div>
       <div class="aurum-consent-panel" id="aurumConsentPanel" hidden>
@@ -1127,6 +1143,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260527-aurum-tutor-1"></script>
+  <script src="app.js?v=20260527-aurum-messages-1"></script>
 </body>
 </html>

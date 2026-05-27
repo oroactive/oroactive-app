@@ -1512,20 +1512,41 @@ function publicAurumMemory(row = {}) {
     memory_text: row.memory_text || "",
     memory_type: row.memory_type || "work_preference",
     created_at: row.created_at,
-    updated_at: row.updated_at
+    updated_at: row.updated_at,
+    user_id: row.user_id,
+    user_name: [row.nome, row.cognome].filter(Boolean).join(" ") || row.username || row.email || "Utente OroActive",
+    store: row.negozio || ""
   };
 }
 
 function normalizeAurumMemoryType(value = "") {
   const type = String(value || "").trim().toLowerCase();
-  return ["work_preference", "training_preference", "operational_note", "communication_preference"].includes(type)
+  return [
+    "work_preference",
+    "training_preference",
+    "operational_note",
+    "communication_preference",
+    "user_question",
+    "user_feedback",
+    "quiz_answer",
+    "support_message"
+  ].includes(type)
     ? type
     : "work_preference";
 }
 
+function sanitizeAurumMemoryText(text = "") {
+  return String(text || "")
+    .replace(/\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/gi, "[codice fiscale rimosso]")
+    .replace(/\bIT\d{2}[A-Z0-9]{1,30}\b/gi, "[iban rimosso]")
+    .replace(/(password\s*[:=]?\s*)\S+/gi, "$1[rimossa]")
+    .replace(/\b\d{9,}\b/g, "[numero rimosso]")
+    .trim();
+}
+
 function assertAurumMemoryIsAllowed(text = "") {
   const value = String(text || "").toLowerCase();
-  if (/(codice fiscale|documento|tessera sanitaria|diagnosi|malattia|salute|terapia|password|iban)/i.test(value)) {
+  if (/(diagnosi|malattia|salute|terapia|dato sanitario|cartella clinica)/i.test(value)) {
     const error = new Error("Memoria non salvata: contiene dati personali o sensibili.");
     error.status = 400;
     throw error;
@@ -1534,7 +1555,7 @@ function assertAurumMemoryIsAllowed(text = "") {
 
 async function listAurumMemories(user = {}) {
   const result = await pool.query(
-    `SELECT id, memory_text, memory_type, created_at, updated_at
+    `SELECT id, user_id, memory_text, memory_type, created_at, updated_at
      FROM aurum_user_memories
      WHERE user_id = $1::bigint
        AND deleted_at IS NULL
@@ -1545,8 +1566,22 @@ async function listAurumMemories(user = {}) {
   return result.rows.map(publicAurumMemory);
 }
 
+async function listAllAurumMemories() {
+  const result = await pool.query(
+    `SELECT m.id, m.user_id, m.memory_text, m.memory_type, m.created_at, m.updated_at,
+            u.nome, u.cognome, u.username, u.email, u.negozio
+     FROM aurum_user_memories m
+     LEFT JOIN utenti u ON u.id = m.user_id
+     WHERE m.deleted_at IS NULL
+     ORDER BY u.nome NULLS LAST, u.cognome NULLS LAST, m.updated_at DESC, m.created_at DESC
+     LIMIT 500`,
+    []
+  );
+  return result.rows.map(publicAurumMemory);
+}
+
 async function createAurumMemory(input = {}, user = {}) {
-  const text = String(input.memory_text || input.text || "").trim().slice(0, 1000);
+  const text = sanitizeAurumMemoryText(input.memory_text || input.text || "").slice(0, 1000);
   if (!text) {
     const error = new Error("Memoria Aurum vuota.");
     error.status = 400;
@@ -7291,6 +7326,14 @@ app.delete("/api/ai/feedback/:id", requireFounder, async (request, response, nex
 app.get("/api/aurum/memories", async (request, response, next) => {
   try {
     response.json({ memories: await listAurumMemories(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum/memories/all", requireFounder, async (_request, response, next) => {
+  try {
+    response.json({ memories: await listAllAurumMemories() });
   } catch (error) {
     next(error);
   }

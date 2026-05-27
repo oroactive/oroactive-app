@@ -645,11 +645,29 @@ textarea {
   gap: 10px;
 }
 
+.aurum-chat-form label {
+  color: #ff8a00;
+  font-weight: 900;
+}
+
 .aurum-chat-form textarea {
   width: 100%;
   min-height: 86px;
   border-color: rgba(255, 181, 72, 0.42);
   background: rgba(255, 255, 255, 0.94);
+}
+
+#aurumAskButton {
+  border: 1px solid #fff;
+  background: #ff7a00;
+  color: #fff;
+}
+
+#aurumAskButton:hover,
+#aurumAskButton:focus-visible {
+  border-color: #fff;
+  background: #ff8f1f;
+  color: #fff;
 }
 
 .aurum-tutor-toolbar {
@@ -741,6 +759,28 @@ textarea {
 .aurum-list-row small {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.aurum-memory-groups {
+  align-content: start;
+}
+
+.aurum-memory-group {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 181, 72, 0.24);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 10px;
+}
+
+.aurum-memory-group h4 {
+  margin: 0;
+  color: #ffd696;
+}
+
+.user-messages-panel {
+  margin-top: 18px;
 }
 
 @keyframes aurum-breath {

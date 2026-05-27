@@ -341,13 +341,14 @@ test("strumenti contiene collegamento verificabile al sito OroActive", async () 
 });
 
 test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async () => {
-  const [index, app, styles, server, schema, migration] = await Promise.all([
+  const [index, app, styles, server, schema, migration, quizMigration] = await Promise.all([
     file("index.html"),
     file("app.js"),
     file("styles.css"),
     file("server.js"),
     file("schema.sql"),
-    file("migrations/20260527_aurum_interaction_memory.sql")
+    file("migrations/20260527_aurum_interaction_memory.sql"),
+    file("migrations/20260527_aurum_memories_messages_quiz.sql")
   ]);
 
   assert.match(index, /id="aurumMascotRoot"/);
@@ -357,12 +358,15 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(index, /Mascotte AI ufficiale/);
   assert.match(index, /id="aurumManagementPanel"/);
   assert.match(index, /Gestione Aurum/);
+  assert.match(index, /data-section="aurumAdmin"/);
+  assert.match(index, /id="userMessagesPanel"/);
   assert.match(index, /id="aurumConsentPanel"/);
   assert.match(index, /id="aurumUserMemoryToggle"/);
   assert.match(index, /id="aurumTutorToolbar"/);
   assert.match(index, /data-aurum-tutorial="tutorial_compila_atto"/);
   assert.match(index, /data-aurum-tutorial="tutorial_stampa_copia_aziendale"/);
   assert.match(index, /data-aurum-field-help/);
+  assert.match(index, /data-aurum-quiz/);
   assert.match(index, /Sì, ricordalo/);
   assert.doesNotMatch(index, /<section class="main-menu-screen"[\s\S]*id="aurumMascotRoot"[\s\S]*<\/section>\s*<div class="app-shell">/);
   assert.doesNotMatch(index, /id="aurumFounderTestPanel"|Test Mascotte AI|Funzione sperimentale/);
@@ -383,6 +387,12 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(app, /tutorial_operativo/);
   assert.match(app, /function requestAurumSupport/);
   assert.match(app, /function saveAurumMemory/);
+  assert.match(app, /function recordAurumInteractionMemory/);
+  assert.match(app, /function loadAurumAllMemories/);
+  assert.match(app, /function startAurumCuriosityQuiz/);
+  assert.match(app, /function evaluateAurumQuizAnswer/);
+  assert.match(app, /function renderUserMessages/);
+  assert.match(app, /AURUM_COMPRO_ORO_QUIZ/);
   assert.match(app, /function updateAurumMascotVisibility/);
   assert.match(app, /function askAurum/);
   assert.match(app, /apiRequest\("\/ai\/assistente"/);
@@ -390,18 +400,26 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(app, /visibleFields: visibleAurumFields\(\)/);
   assert.match(app, /availableActions: visibleAurumActions\(\)/);
   assert.match(app, /apiRequest\("\/aurum\/memories"/);
+  assert.match(app, /apiRequest\("\/aurum\/memories\/all"/);
   assert.match(app, /apiRequest\("\/aurum\/support-requests"/);
   assert.match(server, /Sei Aurum, assistente operativo intelligente di OroActive/);
   assert.match(server, /Tutorial operativo\. Rispondi con guida concreta/);
   assert.match(server, /app\.get\("\/api\/aurum\/memories"/);
+  assert.match(server, /app\.get\("\/api\/aurum\/memories\/all", requireFounder/);
   assert.match(server, /app\.post\("\/api\/aurum\/memories"/);
   assert.match(server, /app\.post\("\/api\/aurum\/support-requests"/);
+  assert.match(server, /sanitizeAurumMemoryText/);
   assert.match(server, /Memoria non salvata: contiene dati personali o sensibili/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_support_requests/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_user_memories/);
+  assert.match(schema, /aurum_user_memories_type_idx/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS aurum_support_requests/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS aurum_user_memories/);
+  assert.match(quizMigration, /aurum_user_memories_type_idx/);
+  assert.match(quizMigration, /aurum_support_requests_role_idx/);
   assert.match(styles, /\.aurum-mascot-root/);
+  assert.match(styles, /#aurumAskButton/);
+  assert.match(styles, /\.aurum-chat-form label/);
   assert.match(styles, /\.aurum-mascot-root\.aurum-roaming/);
   assert.match(styles, /\.aurum-owl/);
   assert.match(styles, /\.aurum-body/);

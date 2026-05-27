@@ -67,7 +67,10 @@ const state = {
   aurumLastUserMessage: "",
   aurumConsentCandidate: null,
   aurumMemories: [],
+  aurumAllMemories: [],
   aurumSupportRequests: [],
+  aurumActiveQuiz: null,
+  aurumQuizIndex: 0,
   bullionChartLoaded: false,
   pendingSync: [],
   syncingPending: false,
@@ -167,6 +170,7 @@ const AURUM_SECTION_MAP = {
   training: "academy",
   backups: "backup",
   quotazione: "quotazioni",
+  aurumAdmin: "assistente_ai",
   dashboard: "dashboard",
   assistant: "assistente_ai",
   knowledgeNotes: "assistente_ai",
@@ -510,6 +514,38 @@ const AURUM_LIVE_TUTORIALS = {
     ]
   }
 };
+const AURUM_COMPRO_ORO_QUIZ = [
+  {
+    question: "Cosa indica la dicitura 18kt su un oggetto in oro?",
+    accepted: ["75", "750", "18 parti", "18 su 24"],
+    answer: "18kt indica 18 parti di oro puro su 24, cioe circa il 75% di oro, spesso espresso come titolo 750.",
+    explanation: "E una base importante per distinguere titolo/caratura e calcolare correttamente valore e giacenza."
+  },
+  {
+    question: "Prima di completare un atto di vendita, quali controlli operativi non devono mancare?",
+    accepted: ["documento", "firme", "pagamento", "contabile", "limite contanti"],
+    answer: "Prima di completare controlla documento valido, dati cliente, oggetti preziosi, pagamento, eventuale contabile, firme e limite contanti.",
+    explanation: "Questi controlli proteggono operatore, cliente e azienda da errori o pratiche incomplete."
+  },
+  {
+    question: "Perche giacenza e fusioni devono escludere un atto eliminato?",
+    accepted: ["non esiste", "eliminato", "conteggi", "fantasma", "giacenza"],
+    answer: "Perche un atto eliminato non fa piu parte dei flussi operativi: non deve generare giacenza, fusioni, dashboard o conteggi.",
+    explanation: "Lasciarlo nei conteggi creerebbe materiale fantasma e dati economici non coerenti."
+  },
+  {
+    question: "Che cosa va caricato nel campo contabile quando il pagamento e tracciabile?",
+    accepted: ["ricevuta", "bonifico", "assegno", "prova", "pagamento"],
+    answer: "Nel campo contabile va caricata la prova del pagamento tracciabile, ad esempio ricevuta bonifico o documentazione dell'assegno.",
+    explanation: "Serve a tenere completa la pratica e a rendere verificabile il pagamento."
+  },
+  {
+    question: "Qual e la differenza operativa tra Apri e Modifica/Riapri in Elenco Atti?",
+    accepted: ["anteprima", "sola lettura", "modifica", "riapri", "atto"],
+    answer: "Apri mostra l'anteprima in sola lettura; Modifica/Riapri carica l'atto nella sezione Atto di vendita per lavorarci senza creare duplicati.",
+    explanation: "Questa distinzione evita modifiche accidentali e numerazioni duplicate."
+  }
+];
 
 function normalizeSignatureArray(value, fallback = false) {
   const source = Array.isArray(value) ? value : [];
@@ -591,6 +627,8 @@ const aurumRefreshAdminData = document.getElementById("aurumRefreshAdminData");
 const aurumResetLocalMemory = document.getElementById("aurumResetLocalMemory");
 const aurumSupportRequestsList = document.getElementById("aurumSupportRequestsList");
 const aurumMemoriesList = document.getElementById("aurumMemoriesList");
+const userMessagesPanel = document.getElementById("userMessagesPanel");
+const userMessagesList = document.getElementById("userMessagesList");
 const knowledgeForm = document.getElementById("knowledgeForm");
 const knowledgeStatus = document.getElementById("knowledgeStatus");
 const reindexKnowledge = document.getElementById("reindexKnowledge");
@@ -1999,6 +2037,7 @@ async function startAuthenticatedApp() {
   if (canViewUsersDirectory()) loadUsers();
   await loadAurumMemories();
   if (["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) await loadAurumSupportRequests();
+  if (isFounder()) await loadAurumAllMemories();
   maybeShowAurumDailyGreeting();
   maybeShowLevelUnlockMessage();
   await flushPendingSync();
@@ -2192,6 +2231,10 @@ function setScreen(id) {
     showToast("Sezione riservata al Founder.");
     return;
   }
+  if (id === "aurumAdmin" && !isFounder()) {
+    showToast("Gestione Aurum riservata al Founder.");
+    return;
+  }
   if (id === "backups" && !canManageBackupsUi()) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
@@ -2236,7 +2279,12 @@ async function handleScreenDataLoad(id) {
     renderAurumManagementPanel();
     await loadAurumMemories();
     if (["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) await loadAurumSupportRequests();
+    if (isFounder()) await loadAurumAllMemories();
     if (isFounder()) await loadKnowledgeStatus();
+  }
+  if (id === "aurumAdmin") {
+    renderAurumManagementPanel();
+    await refreshAurumAdminData();
   }
   if (id === "knowledgeNotes") {
     resetKnowledgeNoteFormValues();
@@ -2246,7 +2294,10 @@ async function handleScreenDataLoad(id) {
   if (id === "profile") {
     renderProfileCard();
   }
-  if (id === "users") await loadUsers();
+  if (id === "users") {
+    await loadUsers();
+    if (["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) await loadAurumSupportRequests();
+  }
 }
 
 function renderProfileCard() {
@@ -3204,37 +3255,96 @@ function showAurumMemoryConsent(candidate) {
   if (aurumConsentPanel) aurumConsentPanel.hidden = !candidate;
 }
 
+function aurumMemoryTypeLabel(type = "") {
+  return {
+    work_preference: "Preferenza lavoro",
+    training_preference: "Preferenza formazione",
+    operational_note: "Nota operativa",
+    communication_preference: "Preferenza comunicazione",
+    user_question: "Domanda utente",
+    user_feedback: "Feedback utente",
+    quiz_answer: "Risposta quiz",
+    support_message: "Messaggio supporto"
+  }[String(type || "").trim()] || "Memoria Aurum";
+}
+
 function renderAurumMemoryLists() {
   const memories = state.aurumMemories || [];
   const markup = memories.length ? memories.map((memory) => `
     <article class="aurum-list-row">
       <span>${escapeHtml(memory.memory_text || "")}</span>
-      <small>${escapeHtml(memory.memory_type || "work_preference")}</small>
+      <small>${escapeHtml(aurumMemoryTypeLabel(memory.memory_type))} · ${escapeHtml(formatDateTime(memory.updated_at || memory.created_at))}</small>
       <button class="ghost-button" type="button" data-delete-aurum-memory="${escapeHtml(memory.id || "")}">Elimina</button>
     </article>
   `).join("") : '<div class="empty-state">Aurum non ha memorie salvate per questo utente.</div>';
   if (aurumUserMemories) aurumUserMemories.innerHTML = markup;
-  if (aurumMemoriesList) aurumMemoriesList.innerHTML = markup;
+  renderFounderAurumMemories();
+}
+
+function renderFounderAurumMemories() {
+  if (!aurumMemoriesList) return;
+  if (!isFounder()) {
+    aurumMemoriesList.innerHTML = "";
+    return;
+  }
+  const memories = state.aurumAllMemories || [];
+  if (!memories.length) {
+    aurumMemoriesList.innerHTML = '<div class="empty-state">Nessuna memoria Aurum registrata.</div>';
+    return;
+  }
+  const groups = new Map();
+  memories.forEach((memory) => {
+    const key = String(memory.user_id || "sconosciuto");
+    if (!groups.has(key)) {
+      groups.set(key, {
+        label: memory.user_name || "Utente OroActive",
+        store: memory.store || "",
+        rows: []
+      });
+    }
+    groups.get(key).rows.push(memory);
+  });
+  aurumMemoriesList.innerHTML = [...groups.values()].map((group) => `
+    <section class="aurum-memory-group">
+      <h4>${escapeHtml(group.label)}</h4>
+      ${group.store ? `<small>${escapeHtml(group.store)}</small>` : ""}
+      ${group.rows.map((memory) => `
+        <article class="aurum-list-row">
+          <span>${escapeHtml(memory.memory_text || "")}</span>
+          <small>${escapeHtml(aurumMemoryTypeLabel(memory.memory_type))} · ${escapeHtml(formatDateTime(memory.updated_at || memory.created_at))}</small>
+        </article>
+      `).join("")}
+    </section>
+  `).join("");
 }
 
 function renderAurumSupportRequests() {
-  if (!aurumSupportRequestsList) return;
   if (!state.aurumSupportRequests.length) {
-    aurumSupportRequestsList.innerHTML = '<div class="empty-state">Nessuna richiesta supporto aperta.</div>';
+    if (aurumSupportRequestsList) aurumSupportRequestsList.innerHTML = '<div class="empty-state">Nessun messaggio riservato aperto.</div>';
+    renderUserMessages();
     return;
   }
-  aurumSupportRequestsList.innerHTML = state.aurumSupportRequests.map((request) => `
+  const markup = state.aurumSupportRequests.map((request) => `
     <article class="aurum-list-row">
       <strong>${escapeHtml(request.user_name || "Utente OroActive")}</strong>
       <span>${escapeHtml(request.message || "Richiesta supporto")}</span>
-      <small>${escapeHtml(roleLabel(request.requested_role || ""))} · ${escapeHtml(request.status || "open")} · ${escapeHtml(formatDateTime(request.created_at))}</small>
+      <small>Destinatario: ${escapeHtml(roleLabel(request.requested_role || ""))} · ${escapeHtml(request.status || "open")} · ${escapeHtml(formatDateTime(request.created_at))}</small>
     </article>
   `).join("");
+  if (aurumSupportRequestsList) aurumSupportRequestsList.innerHTML = markup;
+  renderUserMessages(markup);
+}
+
+function renderUserMessages(markup = "") {
+  const canViewMessages = ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+  if (userMessagesPanel) userMessagesPanel.hidden = !canViewMessages;
+  if (!userMessagesList || !canViewMessages) return;
+  userMessagesList.innerHTML = markup || '<div class="empty-state">Nessun messaggio riservato ricevuto.</div>';
 }
 
 function renderAurumManagementPanel() {
   const settings = loadAurumSettings();
-  const canViewPanel = ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+  const canViewPanel = isFounder();
   if (aurumManagementPanel) aurumManagementPanel.hidden = !canViewPanel;
   if (aurumEnabledToggle) aurumEnabledToggle.checked = Boolean(settings.enabled);
   if (aurumMovementToggle) aurumMovementToggle.checked = Boolean(settings.movement);
@@ -3249,6 +3359,32 @@ function renderAurumManagementPanel() {
   renderAurumSupportRequests();
 }
 
+function shouldRecordAurumMemory() {
+  return ENABLE_AURUM_MASCOT && Boolean(state.currentUser) && Boolean(loadAurumSettings().memory);
+}
+
+function recordAurumInteractionMemory(memoryType, text, context = "") {
+  if (!shouldRecordAurumMemory()) return;
+  const content = [text, context].filter(Boolean).join(" | ").trim();
+  if (content.length < 3) return;
+  apiRequest("/aurum/memories", {
+    method: "POST",
+    body: JSON.stringify({
+      memory_text: content.slice(0, 1000),
+      memory_type: memoryType,
+      automatic: true
+    })
+  }).then((data) => {
+    if (data.memory) {
+      state.aurumMemories = [data.memory, ...state.aurumMemories].filter(Boolean).slice(0, 100);
+      renderAurumMemoryLists();
+    }
+    if (isFounder()) loadAurumAllMemories();
+  }).catch(() => {
+    // La memoria non deve mai bloccare chat, quiz o operatività.
+  });
+}
+
 async function loadAurumMemories() {
   if (!ENABLE_AURUM_MASCOT || !state.currentUser) return;
   try {
@@ -3258,6 +3394,17 @@ async function loadAurumMemories() {
     state.aurumMemories = [];
   }
   renderAurumMemoryLists();
+}
+
+async function loadAurumAllMemories() {
+  if (!ENABLE_AURUM_MASCOT || !isFounder()) return;
+  try {
+    const data = await apiRequest("/aurum/memories/all");
+    state.aurumAllMemories = data.memories || [];
+  } catch {
+    state.aurumAllMemories = [];
+  }
+  renderFounderAurumMemories();
 }
 
 async function saveAurumMemory() {
@@ -3301,6 +3448,13 @@ async function loadAurumSupportRequests() {
   renderAurumSupportRequests();
 }
 
+async function refreshAurumAdminData() {
+  await Promise.all([
+    loadAurumSupportRequests(),
+    isFounder() ? loadAurumAllMemories() : Promise.resolve()
+  ]);
+}
+
 async function requestAurumSupport(requestedRole = "responsabile") {
   if (!state.currentUser) return;
   try {
@@ -3312,6 +3466,7 @@ async function requestAurumSupport(requestedRole = "responsabile") {
       })
     });
     state.aurumSupportRequests = [data.request, ...state.aurumSupportRequests].filter(Boolean);
+    recordAurumInteractionMemory("support_message", state.aurumLastUserMessage || "Richiesta supporto da Aurum", `Destinatario: ${requestedRole}`);
     if (aurumSupportActions) aurumSupportActions.hidden = true;
     state.aurumMessages.push({ role: "assistant", content: "Richiesta inviata. Un referente autorizzato potra prenderla in carico." });
   } catch (error) {
@@ -3320,6 +3475,40 @@ async function requestAurumSupport(requestedRole = "responsabile") {
     renderAurumMessages();
     renderAurumSupportRequests();
   }
+}
+
+function normalizeAurumQuizText(value = "") {
+  return aurumNormalize(value).replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function startAurumCuriosityQuiz() {
+  if (!shouldShowAurumMascot()) return;
+  const quiz = AURUM_COMPRO_ORO_QUIZ[state.aurumQuizIndex % AURUM_COMPRO_ORO_QUIZ.length];
+  state.aurumQuizIndex += 1;
+  state.aurumActiveQuiz = quiz;
+  state.aurumMessages.push({
+    role: "assistant",
+    content: `Quiz compro oro\n\n${quiz.question}\n\nRispondi liberamente: ti correggo io se serve.`
+  });
+  renderAurumMessages();
+}
+
+function evaluateAurumQuizAnswer(answer = "") {
+  const quiz = state.aurumActiveQuiz;
+  if (!quiz) return false;
+  const normalized = normalizeAurumQuizText(answer);
+  const matches = (quiz.accepted || []).filter((term) => normalized.includes(normalizeAurumQuizText(term))).length;
+  const correct = matches >= Math.min(2, Math.max(1, Math.ceil((quiz.accepted || []).length / 3)));
+  state.aurumActiveQuiz = null;
+  recordAurumInteractionMemory("quiz_answer", `Domanda quiz: ${quiz.question}`, `Risposta utente: ${answer}`);
+  state.aurumMessages.push({
+    role: "assistant",
+    content: correct
+      ? `Risposta corretta.\n\n${quiz.answer}\n\n${quiz.explanation}`
+      : `Risposta da correggere.\n\nRisposta esatta: ${quiz.answer}\n\n${quiz.explanation}`
+  });
+  renderAurumMessages();
+  return true;
 }
 
 function aurumContextPayload(question) {
@@ -3371,6 +3560,18 @@ async function askAurum(event) {
   state.aurumMessages.push({ role: "user", content: question });
   if (aurumQuestion) aurumQuestion.value = "";
   renderAurumMessages();
+
+  if (state.aurumActiveQuiz) {
+    evaluateAurumQuizAnswer(question);
+    return;
+  }
+
+  recordAurumInteractionMemory("user_question", question, `Sezione: ${aurumSectionKey()}`);
+
+  if (/(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
+    startAurumCuriosityQuiz();
+    return;
+  }
 
   if (handleAurumMoodReply(question)) {
     renderAurumMessages();
@@ -3730,6 +3931,7 @@ async function sendAssistantFeedback(messageIndex, type) {
         comment
       })
     });
+    recordAurumInteractionMemory("user_feedback", comment || `Feedback ${type}`, `Domanda: ${message.question || ""}`);
     showToast("Feedback salvato. Grazie.");
   } catch (error) {
     showToast(error.message || "Feedback non salvato.");
@@ -8013,6 +8215,10 @@ aurumTutorToolbar?.addEventListener("click", (event) => {
     const answer = explainAurumField(activeKey || fallbackKey);
     state.aurumMessages.push({ role: "assistant", content: answer || "Seleziona un campo e poi chiedimi di spiegarlo." });
     renderAurumMessages();
+    return;
+  }
+  if (event.target.closest("[data-aurum-quiz]")) {
+    startAurumCuriosityQuiz();
   }
 });
 aurumRememberYes?.addEventListener("click", saveAurumMemory);
@@ -8034,7 +8240,7 @@ aurumRequestFounder?.addEventListener("click", () => requestAurumSupport("founde
 aurumUserMemoryToggle?.addEventListener("change", () => saveAurumSettings({
   memory: Boolean(aurumUserMemoryToggle.checked)
 }));
-aurumRefreshAdminData?.addEventListener("click", loadAurumSupportRequests);
+aurumRefreshAdminData?.addEventListener("click", refreshAurumAdminData);
 aurumResetLocalMemory?.addEventListener("click", () => {
   const userKey = state.currentUser?.id || displayUsername(state.currentUser) || "utente";
   Object.keys(localStorage)

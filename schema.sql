@@ -1145,3 +1145,10 @@ ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS aurum_user_memories_user_idx
   ON aurum_user_memories (user_id, deleted_at, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS aurum_user_memories_type_idx
+  ON aurum_user_memories (memory_type, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS aurum_user_memories_founder_review_idx
+  ON aurum_user_memories (user_id, memory_type, updated_at DESC)
+  WHERE deleted_at IS NULL;
