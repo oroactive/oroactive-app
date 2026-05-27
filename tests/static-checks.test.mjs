@@ -340,7 +340,7 @@ test("strumenti contiene collegamento verificabile al sito OroActive", async () 
   assert.match(app, /window\.open\(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer"\)/);
 });
 
-test("mascotte Aurum e prototipo AI sono dietro feature flag", async () => {
+test("mascotte Aurum ufficiale usa il gufo dorato e l'AI esistente", async () => {
   const [index, app, styles] = await Promise.all([
     file("index.html"),
     file("app.js"),
@@ -348,21 +348,20 @@ test("mascotte Aurum e prototipo AI sono dietro feature flag", async () => {
   ]);
 
   assert.match(index, /id="aurumMascotRoot"/);
-  assert.match(index, /aria-label="Aurum volpe dorata assistente OroActive"/);
-  assert.match(index, /volpe dorata AI OroActive/);
+  assert.match(index, /aria-label="Aurum gufo dorato assistente OroActive"/);
+  assert.match(index, /gufo dorato AI OroActive/);
   assert.match(index, /Aurum — Assistente OroActive/);
-  assert.match(index, /id="aurumFounderTestPanel"/);
-  assert.match(index, /Test Mascotte AI/);
-  assert.match(app, /const ENABLE_AURUM_MASCOT_TEST = true/);
-  assert.match(app, /AURUM_MASCOT_STORAGE_KEY/);
+  assert.match(index, /Mascotte AI ufficiale/);
+  assert.doesNotMatch(index, /id="aurumFounderTestPanel"|Test Mascotte AI|Funzione sperimentale/);
+  assert.doesNotMatch(app, /ENABLE_AURUM_MASCOT_TEST|AURUM_MASCOT_STORAGE_KEY|setAurumMascotTestActive/);
   assert.match(app, /function updateAurumMascotVisibility/);
+  assert.match(app, /return Boolean\(state\.currentUser\)/);
   assert.match(app, /function askAurum/);
   assert.match(app, /apiRequest\("\/ai\/assistente"/);
-  assert.match(app, /interface: "aurum_mascot_test"/);
-  assert.match(app, /setAurumMascotTestActive/);
+  assert.match(app, /interface: "aurum_official_mascot"/);
   assert.match(styles, /\.aurum-mascot-root/);
-  assert.match(styles, /\.aurum-fox/);
-  assert.match(styles, /\.aurum-fox-body/);
+  assert.match(styles, /\.aurum-owl/);
+  assert.match(styles, /\.aurum-body/);
   assert.match(styles, /@keyframes aurum-breath/);
   assert.match(styles, /@keyframes aurum-blink/);
   assert.match(styles, /prefers-reduced-motion: reduce/);

@@ -484,73 +484,49 @@ textarea {
   animation: aurum-click 0.2s ease;
 }
 
-.aurum-fox {
+.aurum-owl {
   display: block;
   width: 100%;
   height: 100%;
   filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.28));
 }
 
-.aurum-fox-glow {
-  fill: rgba(255, 115, 28, 0.22);
-  filter: blur(1px);
-}
-
-.aurum-fox-body,
-.aurum-fox-head,
-.aurum-fox-snout,
-.aurum-fox-tail {
+.aurum-body {
   fill: url(#aurumGold);
   stroke: rgba(255, 243, 185, 0.78);
   stroke-width: 2;
 }
 
-.aurum-fox-chest,
-.aurum-fox-mask {
+.aurum-face {
   fill: rgba(20, 13, 7, 0.9);
-  stroke: rgba(255, 194, 85, 0.58);
-  stroke-width: 1.4;
-}
-
-.aurum-fox-ear {
-  fill: rgba(18, 12, 7, 0.9);
   stroke: rgba(255, 194, 85, 0.72);
   stroke-width: 1.4;
 }
 
-.aurum-fox-tail-tip {
-  fill: #fff1ad;
-  stroke: rgba(255, 243, 185, 0.72);
-  stroke-width: 1.4;
+.aurum-wing {
+  fill: #6d3207;
+  opacity: 0.86;
 }
 
-.aurum-fox-leg,
-.aurum-fox-paw,
-.aurum-fox-circuit {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.aurum-fox-eye {
+.aurum-eye {
   fill: url(#aurumEyeGlow);
   animation: aurum-blink 5.6s ease-in-out infinite;
   transform-origin: center;
 }
 
-.aurum-fox-eye-core,
-.aurum-fox-nose {
+.aurum-pupil {
   fill: #130a05;
 }
 
-.aurum-fox-leg,
-.aurum-fox-paw {
-  stroke: #8b4109;
-  stroke-width: 5;
+.aurum-beak {
+  fill: #ff7a00;
 }
 
-.aurum-fox-circuit {
+.aurum-circuit {
+  fill: none;
   stroke: rgba(255, 245, 208, 0.78);
+  stroke-linecap: round;
+  stroke-linejoin: round;
   stroke-width: 2;
 }
 
@@ -654,29 +630,6 @@ textarea {
   background: rgba(255, 255, 255, 0.94);
 }
 
-.aurum-test-panel {
-  align-content: start;
-}
-
-.aurum-test-preview {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 54px;
-  padding: 10px;
-  border: 1px solid rgba(255, 115, 28, 0.22);
-  border-radius: 8px;
-  background: #fff8f1;
-}
-
-.aurum-test-orb {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 42%, #fff1ad 0 18%, #ff8a1f 42%, #17130d 78%);
-  box-shadow: 0 0 18px rgba(255, 115, 28, 0.34);
-}
-
 @keyframes aurum-breath {
   0%,
   100% {
@@ -713,7 +666,7 @@ textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .aurum-mascot-button,
-  .aurum-fox-eye {
+  .aurum-eye {
     animation: none;
     will-change: auto;
   }

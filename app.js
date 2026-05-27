@@ -73,8 +73,6 @@ const state = {
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
 const OROACTIVE_WEBSITE_URL = "https://oroactive.com/";
-const ENABLE_AURUM_MASCOT_TEST = true;
-const AURUM_MASCOT_STORAGE_KEY = "oroactive-aurum-mascot-test-active";
 const AURUM_TIPS = [
   "Controlla sempre documento, firme e pagamento prima di archiviare.",
   "Ricorda il limite contanti negli ultimi 7 giorni.",
@@ -146,10 +144,6 @@ const aurumChatMessages = document.getElementById("aurumChatMessages");
 const aurumChatForm = document.getElementById("aurumChatForm");
 const aurumQuestion = document.getElementById("aurumQuestion");
 const aurumAskButton = document.getElementById("aurumAskButton");
-const aurumFounderTestPanel = document.getElementById("aurumFounderTestPanel");
-const aurumTestToggle = document.getElementById("aurumTestToggle");
-const aurumTestMessage = document.getElementById("aurumTestMessage");
-const aurumOpenChat = document.getElementById("aurumOpenChat");
 const knowledgeForm = document.getElementById("knowledgeForm");
 const knowledgeStatus = document.getElementById("knowledgeStatus");
 const reindexKnowledge = document.getElementById("reindexKnowledge");
@@ -2301,16 +2295,6 @@ async function askAssistant(event) {
   }
 }
 
-function isAurumMascotTestActive() {
-  if (!ENABLE_AURUM_MASCOT_TEST) return false;
-  return localStorage.getItem(AURUM_MASCOT_STORAGE_KEY) !== "0";
-}
-
-function syncAurumFounderControls() {
-  if (aurumFounderTestPanel) aurumFounderTestPanel.hidden = !ENABLE_AURUM_MASCOT_TEST || !isFounder();
-  if (aurumTestToggle) aurumTestToggle.checked = isAurumMascotTestActive();
-}
-
 function stopAurumTips() {
   window.clearTimeout(state.aurumTipTimer);
   window.clearTimeout(state.aurumTipHideTimer);
@@ -2320,28 +2304,18 @@ function stopAurumTips() {
 }
 
 function shouldShowAurumMascot() {
-  return Boolean(ENABLE_AURUM_MASCOT_TEST && state.currentUser && isAurumMascotTestActive());
+  return Boolean(state.currentUser);
 }
 
 function updateAurumMascotVisibility() {
   const visible = shouldShowAurumMascot();
   if (aurumMascotRoot) aurumMascotRoot.hidden = !visible;
-  syncAurumFounderControls();
   if (!visible || mainMenuScreen?.hidden) {
     stopAurumTips();
     if (aurumChatPanel) aurumChatPanel.hidden = true;
     return;
   }
   scheduleAurumTips();
-}
-
-function setAurumMascotTestActive(active, options = {}) {
-  if (!ENABLE_AURUM_MASCOT_TEST) return;
-  localStorage.setItem(AURUM_MASCOT_STORAGE_KEY, active ? "1" : "0");
-  updateAurumMascotVisibility();
-  if (options.notify) {
-    showToast(active ? "Test mascotte Aurum attivato." : "Test mascotte Aurum disattivato.");
-  }
 }
 
 function renderAurumMessages() {
@@ -2393,13 +2367,6 @@ function scheduleAurumTips() {
   }, 24000);
 }
 
-function triggerAurumTestTip() {
-  if (!isAurumMascotTestActive()) setAurumMascotTestActive(true);
-  if (mainMenuScreen) mainMenuScreen.hidden = false;
-  updateAurumMascotVisibility();
-  showAurumTip("Sono Aurum: test grafico attivo, nessuna chiamata AI automatica.");
-}
-
 async function askAurum(event) {
   event.preventDefault();
   if (state.aurumSending) return;
@@ -2416,7 +2383,7 @@ async function askAurum(event) {
   try {
     const data = await apiRequest("/ai/assistente", {
       method: "POST",
-      body: JSON.stringify({ domanda: question, mode: "chat", interface: "aurum_mascot_test" }),
+      body: JSON.stringify({ domanda: question, mode: "chat", interface: "aurum_official_mascot" }),
       timeoutMs: 60000
     });
     state.aurumMessages.push({
@@ -7026,14 +6993,6 @@ aurumTipClose?.addEventListener("click", () => {
   if (aurumTipBubble) aurumTipBubble.hidden = true;
 });
 aurumChatForm?.addEventListener("submit", askAurum);
-aurumTestToggle?.addEventListener("change", () => {
-  setAurumMascotTestActive(aurumTestToggle.checked, { notify: true });
-});
-aurumTestMessage?.addEventListener("click", triggerAurumTestTip);
-aurumOpenChat?.addEventListener("click", () => {
-  if (!isAurumMascotTestActive()) setAurumMascotTestActive(true);
-  openAurumChat();
-});
 knowledgeForm?.addEventListener("submit", uploadKnowledgeBook);
 reindexKnowledge?.addEventListener("click", reindexKnowledgeBase);
 knowledgeNoteForm?.addEventListener("submit", saveKnowledgeNote);
