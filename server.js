@@ -1623,11 +1623,15 @@ function publicAurumSupportRequest(row = {}) {
     id: row.id,
     requested_role: row.requested_role,
     message: row.message || "",
+    response_message: row.response_message || "",
     status: row.status || "open",
     created_at: row.created_at,
+    responded_at: row.responded_at,
+    responded_by: row.responded_by,
     resolved_at: row.resolved_at,
     user_id: row.user_id,
     user_name: [row.nome, row.cognome].filter(Boolean).join(" ") || row.username || row.email || "Utente OroActive",
+    respondent_name: [row.responder_nome, row.responder_cognome].filter(Boolean).join(" ") || row.responder_username || row.responder_email || "",
     store: row.negozio || ""
   };
 }
@@ -1652,16 +1656,123 @@ async function listAurumSupportRequests(user = {}) {
       AND (u.negozio_id = $1::bigint OR u.negozio = $2::text OR r.user_id = $3::bigint)`;
   }
   const result = await pool.query(
-    `SELECT r.*, u.nome, u.cognome, u.username, u.email, u.negozio, u.negozio_id
+    `SELECT r.*, u.nome, u.cognome, u.username, u.email, u.negozio, u.negozio_id,
+            responder.nome AS responder_nome,
+            responder.cognome AS responder_cognome,
+            responder.username AS responder_username,
+            responder.email AS responder_email
      FROM aurum_support_requests r
      LEFT JOIN utenti u ON u.id = r.user_id
+     LEFT JOIN utenti responder ON responder.id = r.responded_by
      WHERE r.status IN ('open', 'in_progress')
+       AND r.deleted_at IS NULL
        ${visibility}
      ORDER BY r.created_at DESC
      LIMIT 200`,
     params
   );
   return result.rows.map(publicAurumSupportRequest);
+}
+
+async function replyAurumSupportRequest(id, input = {}, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  if (!["founder", "responsabile"].includes(role)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const reply = String(input.response_message || input.reply || input.message || "").trim().slice(0, 2000);
+  if (!reply) {
+    const error = new Error("Risposta messaggio obbligatoria.");
+    error.status = 400;
+    throw error;
+  }
+
+  const baseUpdate = `
+    UPDATE aurum_support_requests r
+    SET response_message = $2::text,
+        responded_by = $3::bigint,
+        responded_at = NOW(),
+        status = 'in_progress'
+  `;
+  const returning = `
+    RETURNING r.*,
+      (SELECT nome FROM utenti WHERE id = r.user_id) AS nome,
+      (SELECT cognome FROM utenti WHERE id = r.user_id) AS cognome,
+      (SELECT username FROM utenti WHERE id = r.user_id) AS username,
+      (SELECT email FROM utenti WHERE id = r.user_id) AS email,
+      (SELECT negozio FROM utenti WHERE id = r.user_id) AS negozio,
+      (SELECT nome FROM utenti WHERE id = r.responded_by) AS responder_nome,
+      (SELECT cognome FROM utenti WHERE id = r.responded_by) AS responder_cognome,
+      (SELECT username FROM utenti WHERE id = r.responded_by) AS responder_username,
+      (SELECT email FROM utenti WHERE id = r.responded_by) AS responder_email
+  `;
+  const result = role === "founder"
+    ? await pool.query(
+        `${baseUpdate}
+         WHERE r.id = $1::uuid
+           AND r.deleted_at IS NULL
+         ${returning}`,
+        [id, reply, user.id]
+      )
+    : await pool.query(
+        `${baseUpdate}
+         FROM utenti u
+         WHERE r.id = $1::uuid
+           AND u.id = r.user_id
+           AND r.deleted_at IS NULL
+           AND r.requested_role = 'responsabile'
+           AND (u.negozio_id = $4::bigint OR u.negozio = $5::text OR r.user_id = $3::bigint)
+         ${returning}`,
+        [id, reply, user.id, user.negozio_id || null, user.negozio || ""]
+      );
+  if (!result.rows[0]) return null;
+  logUserActivity({
+    userId: result.rows[0].user_id,
+    actorId: user.id,
+    activityType: "aurum_message_replied",
+    entityType: "aurum_support_request",
+    entityId: result.rows[0].id,
+    description: "Risposta a messaggio riservato Aurum"
+  });
+  return publicAurumSupportRequest(result.rows[0]);
+}
+
+async function deleteAurumSupportRequest(id, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  if (!["founder", "responsabile"].includes(role)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = role === "founder"
+    ? await pool.query(
+        `UPDATE aurum_support_requests r
+         SET status = 'dismissed',
+             deleted_at = NOW(),
+             resolved_by = $2::bigint,
+             resolved_at = NOW()
+         WHERE r.id = $1::uuid
+           AND r.deleted_at IS NULL
+         RETURNING id`,
+        [id, user.id]
+      )
+    : await pool.query(
+        `UPDATE aurum_support_requests r
+         SET status = 'dismissed',
+             deleted_at = NOW(),
+             resolved_by = $3::bigint,
+             resolved_at = NOW()
+         FROM utenti u
+         WHERE r.id = $1::uuid
+           AND u.id = r.user_id
+           AND r.deleted_at IS NULL
+           AND r.requested_role = 'responsabile'
+           AND (u.negozio_id = $2::bigint OR u.negozio = $4::text OR r.user_id = $3::bigint)
+         RETURNING r.id`,
+        [id, user.negozio_id || null, user.id, user.negozio || ""]
+      );
+  return result.rowCount > 0;
 }
 
 async function createAurumSupportRequest(input = {}, user = {}) {
@@ -7368,6 +7479,26 @@ app.get("/api/aurum/support-requests", async (request, response, next) => {
 app.post("/api/aurum/support-requests", async (request, response, next) => {
   try {
     response.status(201).json({ request: await createAurumSupportRequest(request.body, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/api/aurum/support-requests/:id/reply", async (request, response, next) => {
+  try {
+    const message = await replyAurumSupportRequest(request.params.id, request.body, request.user);
+    if (!message) return response.status(404).json({ error: "Messaggio non trovato" });
+    response.json({ request: message });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/aurum/support-requests/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteAurumSupportRequest(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Messaggio non trovato" });
+    response.json({ ok: true });
   } catch (error) {
     next(error);
   }

@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260527-aurum-messages-1";
+const STATIC_CACHE = "oroactive-static-v20260527-aurum-message-replies-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260527-aurum-messages-1",
-  "/app.js?v=20260527-aurum-messages-1",
+  "/styles.css?v=20260527-aurum-message-replies-1",
+  "/app.js?v=20260527-aurum-message-replies-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

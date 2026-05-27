@@ -3329,6 +3329,15 @@ function renderAurumSupportRequests() {
       <strong>${escapeHtml(request.user_name || "Utente OroActive")}</strong>
       <span>${escapeHtml(request.message || "Richiesta supporto")}</span>
       <small>Destinatario: ${escapeHtml(roleLabel(request.requested_role || ""))} · ${escapeHtml(request.status || "open")} · ${escapeHtml(formatDateTime(request.created_at))}</small>
+      ${request.response_message ? `
+        <span><b>Risposta:</b> ${escapeHtml(request.response_message)}</span>
+        <small>Risposto da ${escapeHtml(request.respondent_name || "referente")} · ${escapeHtml(formatDateTime(request.responded_at))}</small>
+      ` : ""}
+      <textarea data-aurum-message-reply="${escapeHtml(request.id || "")}" rows="2" placeholder="Scrivi una risposta riservata">${escapeHtml(request.response_message || "")}</textarea>
+      <div class="row-actions">
+        <button class="primary-button" type="button" data-reply-aurum-message="${escapeHtml(request.id || "")}">Rispondi</button>
+        <button class="danger-button" type="button" data-delete-aurum-message="${escapeHtml(request.id || "")}">Elimina</button>
+      </div>
     </article>
   `).join("");
   if (aurumSupportRequestsList) aurumSupportRequestsList.innerHTML = markup;
@@ -3453,6 +3462,44 @@ async function refreshAurumAdminData() {
     loadAurumSupportRequests(),
     isFounder() ? loadAurumAllMemories() : Promise.resolve()
   ]);
+}
+
+async function replyAurumMessage(id, container) {
+  if (!id) return;
+  const row = container?.querySelector?.(`[data-aurum-message-reply="${cssEscape(id)}"]`)?.closest(".aurum-list-row")
+    || document.querySelector(`[data-aurum-message-reply="${cssEscape(id)}"]`)?.closest(".aurum-list-row");
+  const textarea = row?.querySelector(`[data-aurum-message-reply="${cssEscape(id)}"]`);
+  const reply = textarea?.value.trim() || "";
+  if (!reply) {
+    showToast("Scrivi una risposta al messaggio.", "error");
+    return;
+  }
+  try {
+    const data = await apiRequest(`/aurum/support-requests/${encodeURIComponent(id)}/reply`, {
+      method: "PATCH",
+      body: JSON.stringify({ response_message: reply })
+    });
+    state.aurumSupportRequests = state.aurumSupportRequests.map((message) => (
+      String(message.id) === String(id) ? data.request : message
+    ));
+    renderAurumSupportRequests();
+    showToast("Risposta inviata correttamente.", "success");
+  } catch (error) {
+    showToast(error.message || "Risposta non inviata.", "error");
+  }
+}
+
+async function deleteAurumMessage(id) {
+  if (!id) return;
+  if (!window.confirm("Vuoi eliminare questo messaggio riservato?")) return;
+  try {
+    await apiRequest(`/aurum/support-requests/${encodeURIComponent(id)}`, { method: "DELETE" });
+    state.aurumSupportRequests = state.aurumSupportRequests.filter((message) => String(message.id) !== String(id));
+    renderAurumSupportRequests();
+    showToast("Messaggio eliminato.", "success");
+  } catch (error) {
+    showToast(error.message || "Messaggio non eliminato.", "error");
+  }
 }
 
 async function requestAurumSupport(requestedRole = "responsabile") {
@@ -8241,6 +8288,17 @@ aurumUserMemoryToggle?.addEventListener("change", () => saveAurumSettings({
   memory: Boolean(aurumUserMemoryToggle.checked)
 }));
 aurumRefreshAdminData?.addEventListener("click", refreshAurumAdminData);
+[
+  aurumSupportRequestsList,
+  userMessagesList
+].forEach((container) => {
+  container?.addEventListener("click", (event) => {
+    const replyButton = event.target.closest("[data-reply-aurum-message]");
+    const deleteButton = event.target.closest("[data-delete-aurum-message]");
+    if (replyButton) replyAurumMessage(replyButton.dataset.replyAurumMessage, container);
+    if (deleteButton) deleteAurumMessage(deleteButton.dataset.deleteAurumMessage);
+  });
+});
 aurumResetLocalMemory?.addEventListener("click", () => {
   const userKey = state.currentUser?.id || displayUsername(state.currentUser) || "utente";
   Object.keys(localStorage)

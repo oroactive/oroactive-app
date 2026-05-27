@@ -1118,6 +1118,10 @@ ALTER TABLE aurum_support_requests ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 
 ALTER TABLE aurum_support_requests ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE aurum_support_requests ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
 ALTER TABLE aurum_support_requests ADD COLUMN IF NOT EXISTS resolved_by BIGINT;
+ALTER TABLE aurum_support_requests ADD COLUMN IF NOT EXISTS response_message TEXT;
+ALTER TABLE aurum_support_requests ADD COLUMN IF NOT EXISTS responded_at TIMESTAMPTZ;
+ALTER TABLE aurum_support_requests ADD COLUMN IF NOT EXISTS responded_by BIGINT;
+ALTER TABLE aurum_support_requests ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS aurum_support_requests_user_idx
   ON aurum_support_requests (user_id, created_at DESC);
@@ -1125,6 +1129,11 @@ CREATE INDEX IF NOT EXISTS aurum_support_requests_status_idx
   ON aurum_support_requests (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS aurum_support_requests_role_idx
   ON aurum_support_requests (requested_role, status);
+CREATE INDEX IF NOT EXISTS aurum_support_requests_deleted_idx
+  ON aurum_support_requests (deleted_at, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS aurum_support_requests_response_idx
+  ON aurum_support_requests (responded_at DESC)
+  WHERE response_message IS NOT NULL AND deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS aurum_user_memories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
