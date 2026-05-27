@@ -5470,10 +5470,21 @@ function assertCanManageTarget(actor, target, requestedRole = target?.ruolo) {
   throw error;
 }
 
+function canUseRequestedRoleForUpdate(actor, target, requestedRole) {
+  const actorRole = normalizeRole(actor?.ruolo);
+  const targetRole = normalizeRole(target?.ruolo);
+  const normalizedRequestedRole = normalizeRole(requestedRole);
+  if (targetRole === "founder") {
+    return actorRole === "founder" && normalizedRequestedRole === "founder";
+  }
+  return managedRolesForActor(actor).includes(normalizedRequestedRole);
+}
+
 async function updateUser(id, input, actor) {
   const target = await findUserRawById(id);
   if (!target) return null;
-  assertCanManageTarget(actor, target, input.ruolo || input.role || target.ruolo);
+  const requestedRole = input.ruolo || input.role || target.ruolo;
+  assertCanManageTarget(actor, target, requestedRole);
   if ((input.nome !== undefined || input.name !== undefined) && !String(input.nome || input.name || "").trim()) {
     const error = new Error("Nome utente obbligatorio");
     error.status = 400;
@@ -5489,7 +5500,7 @@ async function updateUser(id, input, actor) {
     error.status = 400;
     throw error;
   }
-  if ((input.ruolo !== undefined || input.role !== undefined) && !managedRolesForActor(actor).includes(normalizeRole(input.ruolo || input.role))) {
+  if ((input.ruolo !== undefined || input.role !== undefined) && !canUseRequestedRoleForUpdate(actor, target, input.ruolo || input.role)) {
     const error = new Error("Non autorizzato");
     error.status = 403;
     throw error;

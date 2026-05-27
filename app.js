@@ -797,7 +797,7 @@ function showToast(message, type = "") {
 function showLogin() {
   clearStoredAuthToken();
   state.currentUser = null;
-  if (mainUserMenuButton) mainUserMenuButton.textContent = "Account OroActive";
+  if (mainUserMenuButton) mainUserMenuButton.textContent = "Elite";
   if (loggedUserName) loggedUserName.textContent = "";
   if (sessionUsername) sessionUsername.textContent = "";
   state.actsCache.clear();
@@ -850,14 +850,13 @@ function displayUsername(user = {}) {
 }
 
 function displayMenuUserName(user = {}) {
-  const firstName = String(user.nome || "").trim().split(/\s+/)[0];
-  if (firstName) return firstName;
-  return displayUsername(user) || "Account OroActive";
+  if (normalizeRole(user.ruolo) === "founder") return "Elite";
+  return displayUsername(user) || [user.nome, user.cognome].filter(Boolean).join(" ").trim() || "Utente OroActive";
 }
 
 function displayUserFullName(user = {}) {
   const fullName = [user.nome, user.cognome].filter(Boolean).join(" ").trim();
-  return fullName || displayUsername(user) || "Account OroActive";
+  return fullName || displayMenuUserName(user);
 }
 
 function formatDateTime(value) {
@@ -1463,7 +1462,7 @@ function applyRolePermissions() {
   }
 
   if (loggedUserName && state.currentUser) {
-    loggedUserName.textContent = `${displayUserFullName(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
+    loggedUserName.textContent = `${displayMenuUserName(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
   }
   const operatorStoreName = document.getElementById("operatorStoreName");
   if (operatorStoreName && state.currentUser && userSeesAllStores()) {
@@ -1473,7 +1472,7 @@ function applyRolePermissions() {
     sessionUsername.textContent = displayMenuUserName(state.currentUser);
   }
   if (mainUserMenuButton && state.currentUser) {
-    mainUserMenuButton.textContent = `${displayMenuUserName(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
+    mainUserMenuButton.textContent = displayMenuUserName(state.currentUser);
   }
   const qualityPanel = document.getElementById("qualityReviewPanel");
   if (qualityPanel) qualityPanel.hidden = !canReviewActs();
@@ -1963,11 +1962,17 @@ function configureUserFormPermissions() {
   const roleSelect = document.getElementById("userRole");
   const storeSelect = document.getElementById("userStore");
   if (!roleSelect || !storeSelect) return;
-  const allowedRoles = managedRolesForCurrentUser();
+  const editingUserId = document.getElementById("userId")?.value;
+  const editingUser = (state.users || []).find((user) => String(user.id) === String(editingUserId));
+  const editingFounder = isFounder() && normalizeRole(editingUser?.ruolo) === "founder";
+  const allowedRoles = editingFounder
+    ? ["founder", ...managedRolesForCurrentUser()]
+    : managedRolesForCurrentUser();
   [...roleSelect.options].forEach((option) => {
     option.hidden = !allowedRoles.includes(option.value);
   });
-  if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles[0] || "commesso";
+  if (!allowedRoles.includes(roleSelect.value)) roleSelect.value = allowedRoles.find((role) => role !== "founder") || "commesso";
+  roleSelect.disabled = editingFounder;
   const role = normalizeRole(roleSelect.value);
   if (["founder", "supervisore"].includes(role)) {
     storeSelect.value = "Tutti";
@@ -2109,10 +2114,15 @@ async function saveUser(event) {
       saveButton.disabled = true;
       saveButton.textContent = isEditing ? "Aggiornamento..." : "Creazione...";
     }
-    await apiRequest(isEditing ? `/utenti/${encodeURIComponent(id)}` : "/utenti", {
+    const savedUser = await apiRequest(isEditing ? `/utenti/${encodeURIComponent(id)}` : "/utenti", {
       method: isEditing ? "PUT" : "POST",
       body: JSON.stringify(payload)
     });
+    if (String(savedUser?.id || "") === String(state.currentUser?.id || "")) {
+      state.currentUser = { ...state.currentUser, ...savedUser };
+      applyRolePermissions();
+      renderProfileCard();
+    }
     resetUserForm();
     await loadUsers();
     showToast(isEditing ? "Utente aggiornato correttamente" : "Utente creato correttamente", "success");

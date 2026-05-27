@@ -43,7 +43,7 @@
   <section class="main-menu-screen" id="mainMenuScreen" hidden aria-label="Menu principale OroActive">
     <div class="main-menu-clock" id="mainMenuClock" aria-live="off">--:--:--</div>
     <div class="main-user-menu">
-      <button class="main-user-button" id="mainUserMenuButton" type="button" aria-expanded="false" aria-controls="mainUserDropdown">Account OroActive</button>
+      <button class="main-user-button" id="mainUserMenuButton" type="button" aria-expanded="false" aria-controls="mainUserDropdown">Elite</button>
       <div class="main-user-dropdown" id="mainUserDropdown" hidden>
         <button type="button" data-user-profile>Dati utente</button>
         <button class="user-directory-only" type="button" data-user-users>Utenti</button>
@@ -951,6 +951,7 @@
             <label>Password <input id="userPassword" type="password" autocomplete="new-password" placeholder="Minimo 8 caratteri" required></label>
             <label>Ruolo
               <select id="userRole">
+                <option value="founder">Founder</option>
                 <option value="aiuto_commesso">Aiuto Commesso/a</option>
                 <option value="commesso">Commesso/a</option>
                 <option value="responsabile">Responsabile</option>
