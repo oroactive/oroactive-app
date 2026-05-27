@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260527-verifiable-backup-1">
+  <link rel="stylesheet" href="styles.css?v=20260527-aurum-mascot-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -85,6 +85,55 @@
           </div>
         </div>
       </nav>
+    </div>
+    <div class="aurum-mascot-root" id="aurumMascotRoot" hidden>
+      <div class="aurum-tip" id="aurumTipBubble" role="status" aria-live="polite" hidden>
+        <span id="aurumTipText"></span>
+        <button type="button" id="aurumTipClose" aria-label="Chiudi consiglio Aurum">×</button>
+      </div>
+      <section class="aurum-chat-panel" id="aurumChatPanel" role="dialog" aria-modal="false" aria-labelledby="aurumChatTitle" hidden>
+        <div class="aurum-chat-header">
+          <div>
+            <p class="eyebrow">Test mascotte AI</p>
+            <h2 id="aurumChatTitle">Aurum — Assistente OroActive</h2>
+          </div>
+          <button type="button" id="aurumChatClose" aria-label="Chiudi chat Aurum">×</button>
+        </div>
+        <div class="aurum-chat-log" id="aurumChatMessages" aria-live="polite"></div>
+        <form class="aurum-chat-form" id="aurumChatForm">
+          <label>Domanda
+            <textarea id="aurumQuestion" rows="3" placeholder="Chiedi ad Aurum"></textarea>
+          </label>
+          <button class="primary-button" type="submit" id="aurumAskButton">Chiedi ad Aurum</button>
+        </form>
+      </section>
+      <button class="aurum-mascot-button" id="aurumMascotButton" type="button" aria-label="Aurum Assistente OroActive">
+        <svg class="aurum-owl" viewBox="0 0 120 120" role="img" aria-labelledby="aurumOwlTitle">
+          <title id="aurumOwlTitle">Aurum, mascotte AI OroActive</title>
+          <defs>
+            <linearGradient id="aurumGold" x1="22" x2="98" y1="18" y2="110" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#fff1ad"></stop>
+              <stop offset="0.42" stop-color="#ffb13b"></stop>
+              <stop offset="1" stop-color="#be5d0b"></stop>
+            </linearGradient>
+            <radialGradient id="aurumEyeGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0" stop-color="#fff7d0"></stop>
+              <stop offset="0.36" stop-color="#ff8a1f"></stop>
+              <stop offset="1" stop-color="#6d2500"></stop>
+            </radialGradient>
+          </defs>
+          <path class="aurum-wing aurum-wing-left" d="M32 47 16 35l10 34 17 24 3-38Z"></path>
+          <path class="aurum-wing aurum-wing-right" d="M88 47 104 35 94 69 77 93 74 55Z"></path>
+          <path class="aurum-body" d="M60 13c17 0 31 12 34 29 11 13 9 37-4 52-8 10-19 15-30 15S38 104 30 94C17 79 15 55 26 42 29 25 43 13 60 13Z"></path>
+          <path class="aurum-face" d="M27 43c9-11 22-14 33-5 11-9 24-6 33 5-2 25-14 46-33 58-19-12-31-33-33-58Z"></path>
+          <circle class="aurum-eye aurum-eye-left" cx="45" cy="50" r="13"></circle>
+          <circle class="aurum-eye aurum-eye-right" cx="75" cy="50" r="13"></circle>
+          <circle class="aurum-pupil" cx="45" cy="50" r="5"></circle>
+          <circle class="aurum-pupil" cx="75" cy="50" r="5"></circle>
+          <path class="aurum-beak" d="M60 60 53 70h14Z"></path>
+          <path class="aurum-circuit" d="M41 82h11l8 8 8-8h11M60 32v-9M36 63h-8M92 63h-8"></path>
+        </svg>
+      </button>
     </div>
     <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
   </section>
@@ -754,6 +803,22 @@
             <button class="ghost-button" type="button" id="reindexKnowledge">Rigenera embeddings</button>
             <div class="knowledge-status" id="knowledgeStatus"></div>
           </section>
+          <section class="knowledge-card aurum-test-panel founder-only" id="aurumFounderTestPanel" hidden>
+            <div>
+              <p class="eyebrow">Founder</p>
+              <h3>Test Mascotte AI</h3>
+              <p class="muted">Funzione sperimentale non definitiva.</p>
+            </div>
+            <label class="inline-check"><input id="aurumTestToggle" type="checkbox"> Test mascotte Aurum</label>
+            <div class="aurum-test-preview" aria-hidden="true">
+              <span class="aurum-test-orb"></span>
+              <strong>Aurum</strong>
+            </div>
+            <div class="user-form-actions">
+              <button class="ghost-button" type="button" id="aurumTestMessage">Prova messaggio</button>
+              <button class="primary-button" type="button" id="aurumOpenChat">Apri chat Aurum</button>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -1020,6 +1085,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260527-verifiable-backup-1"></script>
+  <script src="app.js?v=20260527-aurum-mascot-1"></script>
 </body>
 </html>

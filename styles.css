@@ -438,6 +438,263 @@ textarea {
   color: #fff;
 }
 
+.aurum-mascot-root {
+  position: fixed;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: max(92px, calc(env(safe-area-inset-bottom) + 92px));
+  z-index: 34;
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.aurum-mascot-root[hidden],
+.aurum-chat-panel[hidden],
+.aurum-tip[hidden] {
+  display: none;
+}
+
+.aurum-mascot-button {
+  width: 96px;
+  height: 96px;
+  border: 1px solid rgba(255, 182, 65, 0.64);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 174, 52, 0.28), transparent 42%),
+    linear-gradient(145deg, #15100b, #050505 72%);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.46), 0 0 28px rgba(255, 115, 28, 0.24);
+  cursor: pointer;
+  pointer-events: auto;
+  padding: 8px;
+  transform-origin: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: aurum-breath 4.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+.aurum-mascot-button:hover,
+.aurum-mascot-button:focus-visible {
+  transform: scale(1.06);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.5), 0 0 34px rgba(255, 115, 28, 0.34);
+  outline: 0;
+}
+
+.aurum-mascot-button.aurum-clicked {
+  animation: aurum-click 0.2s ease;
+}
+
+.aurum-owl {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.28));
+}
+
+.aurum-body {
+  fill: url(#aurumGold);
+  stroke: rgba(255, 243, 185, 0.78);
+  stroke-width: 2;
+}
+
+.aurum-face {
+  fill: rgba(18, 12, 7, 0.9);
+  stroke: rgba(255, 194, 85, 0.72);
+  stroke-width: 1.4;
+}
+
+.aurum-wing {
+  fill: #6d3207;
+  opacity: 0.86;
+}
+
+.aurum-eye {
+  fill: url(#aurumEyeGlow);
+  animation: aurum-blink 5.6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.aurum-pupil {
+  fill: #130a05;
+}
+
+.aurum-beak {
+  fill: #ff7a00;
+}
+
+.aurum-circuit {
+  fill: none;
+  stroke: rgba(255, 245, 208, 0.78);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.aurum-tip {
+  width: min(280px, calc(100vw - 34px));
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid rgba(255, 181, 72, 0.46);
+  border-radius: 8px;
+  background: rgba(16, 12, 8, 0.92);
+  color: #fff8ed;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  font-size: 13px;
+  line-height: 1.35;
+  pointer-events: auto;
+}
+
+.aurum-tip button,
+.aurum-chat-header button {
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffb26b;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  min-width: 30px;
+  min-height: 30px;
+}
+
+.aurum-chat-panel {
+  width: min(360px, calc(100vw - 34px));
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 181, 72, 0.52);
+  border-radius: 8px;
+  background: rgba(12, 9, 6, 0.94);
+  color: #fff8ed;
+  box-shadow: 0 26px 72px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.aurum-chat-header {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.aurum-chat-header h2 {
+  margin: 2px 0 0;
+  color: #fff4d5;
+  font-size: 18px;
+}
+
+.aurum-chat-log {
+  min-height: 130px;
+  max-height: 260px;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.aurum-message {
+  width: 92%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.38;
+  white-space: pre-wrap;
+}
+
+.aurum-message.user {
+  justify-self: end;
+  background: #ff7a00;
+  color: #160b04;
+  font-weight: 800;
+}
+
+.aurum-message.assistant {
+  justify-self: start;
+  border: 1px solid rgba(255, 183, 79, 0.32);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.aurum-chat-form {
+  display: grid;
+  gap: 10px;
+}
+
+.aurum-chat-form textarea {
+  width: 100%;
+  min-height: 86px;
+  border-color: rgba(255, 181, 72, 0.42);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.aurum-test-panel {
+  align-content: start;
+}
+
+.aurum-test-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px;
+  border: 1px solid rgba(255, 115, 28, 0.22);
+  border-radius: 8px;
+  background: #fff8f1;
+}
+
+.aurum-test-orb {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, #fff1ad 0 18%, #ff8a1f 42%, #17130d 78%);
+  box-shadow: 0 0 18px rgba(255, 115, 28, 0.34);
+}
+
+@keyframes aurum-breath {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-6px) scale(1.018);
+  }
+}
+
+@keyframes aurum-blink {
+  0%,
+  88%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  92% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes aurum-click {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurum-mascot-button,
+  .aurum-eye {
+    animation: none;
+    will-change: auto;
+  }
+}
+
 .assistant-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
@@ -4082,6 +4339,21 @@ button.quality-review-badge {
   .main-menu-actions button {
     font-size: 20px;
     min-height: 56px;
+  }
+
+  .aurum-mascot-root {
+    right: 12px;
+    bottom: max(84px, calc(env(safe-area-inset-bottom) + 84px));
+  }
+
+  .aurum-mascot-button {
+    width: 78px;
+    height: 78px;
+  }
+
+  .aurum-chat-panel,
+  .aurum-tip {
+    width: min(330px, calc(100vw - 24px));
   }
 
   .dashboard-grid,

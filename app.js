@@ -53,6 +53,11 @@ const state = {
   crmSearchTimer: null,
   backups: [],
   clockTimer: null,
+  aurumTipTimer: null,
+  aurumTipHideTimer: null,
+  aurumTipIndex: 0,
+  aurumMessages: [],
+  aurumSending: false,
   bullionChartLoaded: false,
   pendingSync: [],
   syncingPending: false,
@@ -68,6 +73,16 @@ const state = {
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
 const OROACTIVE_WEBSITE_URL = "https://oroactive.com/";
+const ENABLE_AURUM_MASCOT_TEST = true;
+const AURUM_MASCOT_STORAGE_KEY = "oroactive-aurum-mascot-test-active";
+const AURUM_TIPS = [
+  "Controlla sempre documento, firme e pagamento prima di archiviare.",
+  "Ricorda il limite contanti negli ultimi 7 giorni.",
+  "La trasparenza aumenta la fiducia del cliente.",
+  "Prima di fondere, verifica bene la giacenza per caratura.",
+  "Un cliente ricorrente va gestito con storico aggiornato.",
+  "La precisione protegge l'operatore e il negozio."
+];
 
 function normalizeSignatureArray(value, fallback = false) {
   const source = Array.isArray(value) ? value : [];
@@ -120,6 +135,21 @@ const assistantForm = document.getElementById("assistantForm");
 const assistantQuestion = document.getElementById("assistantQuestion");
 const assistantMode = document.getElementById("assistantMode");
 const assistantLoading = document.getElementById("assistantLoading");
+const aurumMascotRoot = document.getElementById("aurumMascotRoot");
+const aurumMascotButton = document.getElementById("aurumMascotButton");
+const aurumTipBubble = document.getElementById("aurumTipBubble");
+const aurumTipText = document.getElementById("aurumTipText");
+const aurumTipClose = document.getElementById("aurumTipClose");
+const aurumChatPanel = document.getElementById("aurumChatPanel");
+const aurumChatClose = document.getElementById("aurumChatClose");
+const aurumChatMessages = document.getElementById("aurumChatMessages");
+const aurumChatForm = document.getElementById("aurumChatForm");
+const aurumQuestion = document.getElementById("aurumQuestion");
+const aurumAskButton = document.getElementById("aurumAskButton");
+const aurumFounderTestPanel = document.getElementById("aurumFounderTestPanel");
+const aurumTestToggle = document.getElementById("aurumTestToggle");
+const aurumTestMessage = document.getElementById("aurumTestMessage");
+const aurumOpenChat = document.getElementById("aurumOpenChat");
 const knowledgeForm = document.getElementById("knowledgeForm");
 const knowledgeStatus = document.getElementById("knowledgeStatus");
 const reindexKnowledge = document.getElementById("reindexKnowledge");
@@ -807,6 +837,7 @@ function showLogin() {
   mainMenuScreen.hidden = true;
   closeMainMenuDropdowns();
   closeMainUserMenu();
+  updateAurumMascotVisibility();
   appShell.hidden = true;
   if (state.syncTimer) window.clearInterval(state.syncTimer);
   state.syncTimer = null;
@@ -1481,6 +1512,7 @@ function applyRolePermissions() {
   const qualityPanel = document.getElementById("qualityReviewPanel");
   if (qualityPanel) qualityPanel.hidden = !canReviewActs();
   configureUserFormPermissions();
+  updateAurumMascotVisibility();
 }
 
 async function startAuthenticatedApp() {
@@ -1849,11 +1881,13 @@ function openOroActiveWebsite() {
 function showMainMenuFromSplash() {
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = false;
+  updateAurumMascotVisibility();
   maybeStartFirstRunTutorial();
 }
 
 async function enterSectionFromMainMenu(section) {
   mainMenuScreen.hidden = true;
+  updateAurumMascotVisibility();
   if (section === "practice") {
     setScreen(section);
     await clearPracticeForFreshStart({ deferPracticeNumber: true });
@@ -1902,6 +1936,7 @@ async function returnToMainMenu() {
   closeBrandMenu();
   clearActSearch();
   mainMenuScreen.hidden = false;
+  updateAurumMascotVisibility();
 }
 
 function askEditingExitChoice() {
@@ -2263,6 +2298,140 @@ async function askAssistant(event) {
     if (assistantLoading) assistantLoading.hidden = true;
     if (sendButton) sendButton.disabled = false;
     renderAssistantMessages();
+  }
+}
+
+function isAurumMascotTestActive() {
+  if (!ENABLE_AURUM_MASCOT_TEST) return false;
+  return localStorage.getItem(AURUM_MASCOT_STORAGE_KEY) !== "0";
+}
+
+function syncAurumFounderControls() {
+  if (aurumFounderTestPanel) aurumFounderTestPanel.hidden = !ENABLE_AURUM_MASCOT_TEST || !isFounder();
+  if (aurumTestToggle) aurumTestToggle.checked = isAurumMascotTestActive();
+}
+
+function stopAurumTips() {
+  window.clearTimeout(state.aurumTipTimer);
+  window.clearTimeout(state.aurumTipHideTimer);
+  state.aurumTipTimer = null;
+  state.aurumTipHideTimer = null;
+  if (aurumTipBubble) aurumTipBubble.hidden = true;
+}
+
+function shouldShowAurumMascot() {
+  return Boolean(ENABLE_AURUM_MASCOT_TEST && state.currentUser && isAurumMascotTestActive());
+}
+
+function updateAurumMascotVisibility() {
+  const visible = shouldShowAurumMascot();
+  if (aurumMascotRoot) aurumMascotRoot.hidden = !visible;
+  syncAurumFounderControls();
+  if (!visible || mainMenuScreen?.hidden) {
+    stopAurumTips();
+    if (aurumChatPanel) aurumChatPanel.hidden = true;
+    return;
+  }
+  scheduleAurumTips();
+}
+
+function setAurumMascotTestActive(active, options = {}) {
+  if (!ENABLE_AURUM_MASCOT_TEST) return;
+  localStorage.setItem(AURUM_MASCOT_STORAGE_KEY, active ? "1" : "0");
+  updateAurumMascotVisibility();
+  if (options.notify) {
+    showToast(active ? "Test mascotte Aurum attivato." : "Test mascotte Aurum disattivato.");
+  }
+}
+
+function renderAurumMessages() {
+  if (!aurumChatMessages) return;
+  if (!state.aurumMessages.length) {
+    aurumChatMessages.innerHTML = '<div class="empty-state">Aurum è pronto per rispondere usando l’Assistente IA OroActive.</div>';
+    return;
+  }
+  aurumChatMessages.innerHTML = state.aurumMessages.map((message) => `
+    <article class="aurum-message ${message.role === "user" ? "user" : "assistant"}">${escapeHtml(message.content || "")}</article>
+  `).join("");
+  aurumChatMessages.scrollTop = aurumChatMessages.scrollHeight;
+}
+
+function openAurumChat() {
+  if (!shouldShowAurumMascot()) return;
+  if (mainMenuScreen) mainMenuScreen.hidden = false;
+  closeMainMenuDropdowns();
+  closeMainUserMenu();
+  if (aurumChatPanel) aurumChatPanel.hidden = false;
+  if (aurumTipBubble) aurumTipBubble.hidden = true;
+  renderAurumMessages();
+  window.setTimeout(() => aurumQuestion?.focus(), 60);
+  updateAurumMascotVisibility();
+}
+
+function closeAurumChat() {
+  if (aurumChatPanel) aurumChatPanel.hidden = true;
+}
+
+function showAurumTip(text = "") {
+  if (!shouldShowAurumMascot() || mainMenuScreen?.hidden || !aurumTipBubble || !aurumTipText) return;
+  const message = text || AURUM_TIPS[state.aurumTipIndex % AURUM_TIPS.length];
+  state.aurumTipIndex += 1;
+  aurumTipText.textContent = message;
+  aurumTipBubble.hidden = false;
+  window.clearTimeout(state.aurumTipHideTimer);
+  state.aurumTipHideTimer = window.setTimeout(() => {
+    if (aurumTipBubble) aurumTipBubble.hidden = true;
+  }, 6500);
+}
+
+function scheduleAurumTips() {
+  window.clearTimeout(state.aurumTipTimer);
+  if (!shouldShowAurumMascot() || mainMenuScreen?.hidden) return;
+  state.aurumTipTimer = window.setTimeout(() => {
+    showAurumTip();
+    scheduleAurumTips();
+  }, 24000);
+}
+
+function triggerAurumTestTip() {
+  if (!isAurumMascotTestActive()) setAurumMascotTestActive(true);
+  if (mainMenuScreen) mainMenuScreen.hidden = false;
+  updateAurumMascotVisibility();
+  showAurumTip("Sono Aurum: test grafico attivo, nessuna chiamata AI automatica.");
+}
+
+async function askAurum(event) {
+  event.preventDefault();
+  if (state.aurumSending) return;
+  const question = aurumQuestion?.value.trim();
+  if (!question) {
+    showToast("Scrivi una domanda per Aurum.");
+    return;
+  }
+  state.aurumMessages.push({ role: "user", content: question });
+  if (aurumQuestion) aurumQuestion.value = "";
+  renderAurumMessages();
+  state.aurumSending = true;
+  if (aurumAskButton) aurumAskButton.disabled = true;
+  try {
+    const data = await apiRequest("/ai/assistente", {
+      method: "POST",
+      body: JSON.stringify({ domanda: question, mode: "chat", interface: "aurum_mascot_test" }),
+      timeoutMs: 60000
+    });
+    state.aurumMessages.push({
+      role: "assistant",
+      content: data.risposta || "Risposta non disponibile."
+    });
+  } catch (error) {
+    state.aurumMessages.push({
+      role: "assistant",
+      content: error.message || "Aurum non riesce a contattare l'Assistente IA in questo momento."
+    });
+  } finally {
+    state.aurumSending = false;
+    if (aurumAskButton) aurumAskButton.disabled = false;
+    renderAurumMessages();
   }
 }
 
@@ -6847,6 +7016,24 @@ mainMenuLogoRefresh?.addEventListener("keydown", (event) => {
   triggerLogoRefresh();
 });
 assistantForm?.addEventListener("submit", askAssistant);
+aurumMascotButton?.addEventListener("click", () => {
+  aurumMascotButton.classList.add("aurum-clicked");
+  window.setTimeout(() => aurumMascotButton.classList.remove("aurum-clicked"), 220);
+  openAurumChat();
+});
+aurumChatClose?.addEventListener("click", closeAurumChat);
+aurumTipClose?.addEventListener("click", () => {
+  if (aurumTipBubble) aurumTipBubble.hidden = true;
+});
+aurumChatForm?.addEventListener("submit", askAurum);
+aurumTestToggle?.addEventListener("change", () => {
+  setAurumMascotTestActive(aurumTestToggle.checked, { notify: true });
+});
+aurumTestMessage?.addEventListener("click", triggerAurumTestTip);
+aurumOpenChat?.addEventListener("click", () => {
+  if (!isAurumMascotTestActive()) setAurumMascotTestActive(true);
+  openAurumChat();
+});
 knowledgeForm?.addEventListener("submit", uploadKnowledgeBook);
 reindexKnowledge?.addEventListener("click", reindexKnowledgeBase);
 knowledgeNoteForm?.addEventListener("submit", saveKnowledgeNote);
@@ -7006,11 +7193,13 @@ mainUserDropdown?.addEventListener("click", (event) => {
   event.stopPropagation();
   if (event.target.closest("[data-user-profile]")) {
     mainMenuScreen.hidden = true;
+    updateAurumMascotVisibility();
     setScreen("profile");
     return;
   }
   if (event.target.closest("[data-user-users]")) {
     mainMenuScreen.hidden = true;
+    updateAurumMascotVisibility();
     setScreen("users");
     return;
   }
@@ -7024,6 +7213,7 @@ document.querySelectorAll("[data-start-tutorial]").forEach((button) => {
     closeMainMenuDropdowns();
     closeBrandMenu();
     if (!button.closest(".main-menu-actions")) mainMenuScreen.hidden = true;
+    updateAurumMascotVisibility();
     startTutorial({ firstRun: false });
   });
 });

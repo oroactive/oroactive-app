@@ -340,6 +340,31 @@ test("strumenti contiene collegamento verificabile al sito OroActive", async () 
   assert.match(app, /window\.open\(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer"\)/);
 });
 
+test("mascotte Aurum e prototipo AI sono dietro feature flag", async () => {
+  const [index, app, styles] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("styles.css")
+  ]);
+
+  assert.match(index, /id="aurumMascotRoot"/);
+  assert.match(index, /aria-label="Aurum Assistente OroActive"/);
+  assert.match(index, /Aurum — Assistente OroActive/);
+  assert.match(index, /id="aurumFounderTestPanel"/);
+  assert.match(index, /Test Mascotte AI/);
+  assert.match(app, /const ENABLE_AURUM_MASCOT_TEST = true/);
+  assert.match(app, /AURUM_MASCOT_STORAGE_KEY/);
+  assert.match(app, /function updateAurumMascotVisibility/);
+  assert.match(app, /function askAurum/);
+  assert.match(app, /apiRequest\("\/ai\/assistente"/);
+  assert.match(app, /interface: "aurum_mascot_test"/);
+  assert.match(app, /setAurumMascotTestActive/);
+  assert.match(styles, /\.aurum-mascot-root/);
+  assert.match(styles, /@keyframes aurum-breath/);
+  assert.match(styles, /@keyframes aurum-blink/);
+  assert.match(styles, /prefers-reduced-motion: reduce/);
+});
+
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
   const app = await file("app.js");
   const enterStart = app.indexOf("async function enterSectionFromMainMenu");
