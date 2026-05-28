@@ -4469,6 +4469,59 @@ button.quality-review-badge {
   justify-content: flex-end;
 }
 
+.trust-pack-panel {
+  max-width: 780px;
+  margin: 0 auto 14px;
+  padding: 14px;
+  border: 1px solid rgba(244, 122, 32, 0.3);
+  border-radius: 8px;
+  background: #fff8f1;
+  color: #2f2118;
+}
+
+.trust-pack-panel h3 {
+  margin: 0 0 4px;
+  color: #b45309;
+}
+
+.trust-pack-panel p,
+.trust-pack-hint,
+.trust-pack-code {
+  margin: 0 0 10px;
+  color: #6b4a31;
+}
+
+.trust-pack-actions,
+.crm-trust-pack-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.crm-trust-pack-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.crm-trust-pack-row {
+  justify-content: space-between;
+  padding: 10px;
+  border: 1px solid #ead8c6;
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.crm-trust-pack-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.crm-trust-pack-row small {
+  color: #7b6b5d;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr 1.5fr;

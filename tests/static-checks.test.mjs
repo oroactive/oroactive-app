@@ -666,7 +666,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /store-health-1/);
+  assert.match(worker, /trust-pack-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -719,7 +719,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /store-health-1/);
+  assert.match(worker, /trust-pack-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -771,7 +771,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /store-health-1/);
+  assert.match(worker, /trust-pack-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -841,9 +841,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260528-store-health-1/);
-  assert.match(index, /styles\.css\?v=20260528-store-health-1/);
-  assert.match(worker, /store-health-1/);
+  assert.match(index, /app\.js\?v=20260528-trust-pack-1/);
+  assert.match(index, /styles\.css\?v=20260528-trust-pack-1/);
+  assert.match(worker, /trust-pack-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -950,7 +950,60 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /store-health-1/);
+  assert.match(worker, /trust-pack-1/);
+});
+
+test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
+  const [index, app, server, schema, migration, styles, worker] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260528_customer_trust_pack.sql"),
+    file("styles.css"),
+    file("service-worker.js")
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS customer_trust_packs/);
+  assert.match(schema, /sale_deed_id BIGINT NOT NULL/);
+  assert.match(schema, /trust_pack_code TEXT UNIQUE NOT NULL/);
+  assert.match(schema, /idx_customer_trust_packs_sale_deed_id/);
+  assert.match(migration, /customer_trust_packs_code_unique/);
+  assert.match(migration, /idx_customer_trust_packs_generated_at/);
+
+  assert.match(server, /async function assertCustomerTrustPackEligible/);
+  assert.match(server, /async function generateCustomerTrustPack/);
+  assert.match(server, /async function writeCustomerTrustPackPdf/);
+  assert.match(server, /drawPdfHeader\(doc,[\s\S]*Customer Trust Pack OroActive[\s\S]*centerLogo: true/);
+  assert.match(server, /Il Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
+  assert.match(server, /customer_trust_pack_generated/);
+  assert.match(server, /customer_trust_pack_downloaded/);
+  assert.match(server, /customer_trust_pack_sent_whatsapp/);
+  assert.match(server, /customer_trust_pack_regenerated/);
+  assert.match(server, /Content-Disposition/);
+  assert.match(server, /private_uploads", "customer-trust-packs"/);
+  const pdfStart = server.indexOf("async function writeCustomerTrustPackPdf");
+  const pdfEnd = server.indexOf("async function generateCustomerTrustPack", pdfStart);
+  const pdfBlock = server.slice(pdfStart, pdfEnd);
+  assert.doesNotMatch(pdfBlock, /risk_score|aurum_shield|audit|margine|utile|autorizzazione/i);
+
+  assert.match(app, /function canUseCustomerTrustPack/);
+  assert.match(app, /function customerTrustPackButtonsMarkup/);
+  assert.match(app, /async function generateCustomerTrustPackForAct/);
+  assert.match(app, /async function downloadCustomerTrustPack/);
+  assert.match(app, /data-open-trust-pack/);
+  assert.match(app, /data-generate-trust-pack/);
+  assert.match(app, /data-download-trust-pack/);
+  assert.match(app, /data-email-trust-pack/);
+  assert.match(app, /data-whatsapp-trust-pack/);
+  assert.match(app, /detail\.trust_packs/);
+  assert.match(app, /customer_trust_pack: \{/);
+  assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
+  assert.match(styles, /\.trust-pack-panel/);
+  assert.match(styles, /\.crm-trust-pack-list/);
+  assert.match(index, /app\.js\?v=20260528-trust-pack-1/);
+  assert.match(index, /styles\.css\?v=20260528-trust-pack-1/);
+  assert.match(worker, /trust-pack-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {

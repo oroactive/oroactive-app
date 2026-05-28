@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
@@ -44,6 +44,8 @@ const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embeddi
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
 const backupDirectory = process.env.BACKUP_DIR || "/data/oroactive/backups";
 const academyUploadDirectory = process.env.ACADEMY_UPLOAD_DIR || path.join(__dirname, "private_uploads", "academy");
+const trustPackDirectory = process.env.CUSTOMER_TRUST_PACK_DIR || path.join(__dirname, "private_uploads", "customer-trust-packs");
+const oroactiveSiteUrl = process.env.OROACTIVE_SITE_URL || "http://wcfme33owxz0wfkr0ysnzthy.188.213.161.151.sslip.io/";
 const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const pgRestorePath = process.env.PG_RESTORE_PATH || "pg_restore";
 const backupIntervalMs = 24 * 60 * 60 * 1000;
@@ -488,7 +490,12 @@ function auditActionLabel(action = "") {
     founder_daily_report_generated: "Founder Daily Report generato",
     founder_daily_report_downloaded: "Download Founder Daily Report",
     founder_daily_report_sent: "Invio Founder Daily Report",
-    founder_daily_report_failed: "Errore Founder Daily Report"
+    founder_daily_report_failed: "Errore Founder Daily Report",
+    customer_trust_pack_generated: "Customer Trust Pack generato",
+    customer_trust_pack_downloaded: "Download Customer Trust Pack",
+    customer_trust_pack_sent_email: "Customer Trust Pack inviato email",
+    customer_trust_pack_sent_whatsapp: "Customer Trust Pack WhatsApp preparato",
+    customer_trust_pack_regenerated: "Customer Trust Pack rigenerato"
   }[action] || activityLabel(action) || "Attività";
 }
 
@@ -9853,7 +9860,14 @@ async function crmClientDetail(id, user = {}) {
     open_alerts: [],
     history: []
   }));
-  return { client: publicClient(client), acts: acts.rows.map((row) => rowToAct(row, { full: false })), notes: notes.rows, aurum_shield: shield };
+  const trustPacks = await listCustomerTrustPacksForClient(id, user).catch(() => []);
+  return {
+    client: publicClient(client),
+    acts: acts.rows.map((row) => rowToAct(row, { full: false })),
+    notes: notes.rows,
+    aurum_shield: shield,
+    trust_packs: trustPacks
+  };
 }
 
 async function addClientNote(id, input = {}, user = {}, req = null) {
@@ -13772,6 +13786,493 @@ app.post("/api/pdf/acts", async (request, response, next) => {
   }
 });
 
+function customerTrustPackFilename(code = "") {
+  const safeCode = String(code || "trust-pack").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 120);
+  return `${safeCode || "trust-pack"}.pdf`;
+}
+
+function customerTrustPackPath(code = "") {
+  return path.join(trustPackDirectory, customerTrustPackFilename(code));
+}
+
+function customerTrustPackCodeForAct(act = {}, row = {}) {
+  const parsed = parsePracticeNumber(act.practiceNumber || row.practice_number || "");
+  const year = parsed?.year
+    || new Date(row.completed_at || row.archived_at || row.data_atto || Date.now()).getFullYear();
+  const storeCode = String(parsed?.storeCode || row.store_code || row.codice_negozio || storeCodeFromName(row.store || act.store || ""))
+    .replace(/[^A-Z0-9]+/gi, "")
+    .toUpperCase()
+    .slice(0, 16) || "STORE";
+  const number = parsed?.number
+    ? String(parsed.number).padStart(6, "0")
+    : String(row.act_number || row.numero_atto_negozio || row.id || Date.now()).padStart(6, "0");
+  return `TP-OA-${year}-${storeCode}-${number}`;
+}
+
+function publicCustomerTrustPack(row = {}) {
+  return {
+    id: row.id,
+    trust_pack_code: row.trust_pack_code,
+    sale_deed_id: row.sale_deed_id,
+    client_id: row.client_id || null,
+    store_id: row.store_id || null,
+    practice_number: row.practice_number || row.entity_label || "",
+    customer_name: [row.cliente_nome, row.cliente_cognome].filter(Boolean).join(" "),
+    store_name: row.store_name || row.store || "",
+    delivery_status: row.delivery_status || "generated",
+    delivered_via: row.delivered_via || "",
+    delivered_to: row.delivered_to || "",
+    generated_at: row.generated_at || null,
+    delivered_at: row.delivered_at || null,
+    metadata: row.metadata || {},
+    pdf_url: row.id ? `/api/customer-trust-pack/${row.id}/download` : ""
+  };
+}
+
+async function customerTrustPackStoreForAct(row = {}) {
+  if (row.negozio_id) {
+    const result = await pool.query("SELECT * FROM negozi WHERE id = $1::bigint LIMIT 1", [row.negozio_id]);
+    if (result.rows[0]) return result.rows[0];
+  }
+  return storeByCodeOrName(row.store_code || row.codice_negozio || row.store);
+}
+
+async function customerTrustPackClientForAct(row = {}, act = {}) {
+  const result = await pool.query(
+    `SELECT *
+     FROM clienti
+     WHERE ($1::bigint IS NOT NULL AND id = $1::bigint)
+        OR ($2::text <> '' AND UPPER(codice_fiscale) = UPPER($2::text))
+     ORDER BY id ASC
+     LIMIT 1`,
+    [row.cliente_id || null, row.codice_fiscale || act.fiscalCode || ""]
+  );
+  return result.rows[0] || null;
+}
+
+function customerTrustPackEligibilityError() {
+  const error = new Error("Il Customer Trust Pack può essere generato solo per pratiche completate o archiviate.");
+  error.status = 400;
+  return error;
+}
+
+async function assertCustomerTrustPackEligible(saleDeedId, user = {}) {
+  const row = await findExisting(saleDeedId);
+  if (!row) {
+    const error = new Error("Atto non trovato");
+    error.status = 404;
+    throw error;
+  }
+  if (!canAccessAct(row, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const status = normalizeWorkflowStatus(row.status);
+  const archivedCompleted = /archiviata|archiviato|archived/i.test(String(row.status || "")) && row.completed_at;
+  const completedOrArchived = ["completed", "archived_completed"].includes(status) || archivedCompleted;
+  if (row.deleted_at || status === "deleted" || !completedOrArchived || !row.completed_at) {
+    throw customerTrustPackEligibilityError();
+  }
+  return row;
+}
+
+async function customerTrustPackRowById(id, user = {}) {
+  const result = await pool.query(
+    `SELECT ctp.*,
+            a.practice_number,
+            a.store,
+            a.negozio_id AS act_store_id,
+            a.deleted_at AS act_deleted_at,
+            a.status AS act_status,
+            a.cliente_nome,
+            a.cliente_cognome,
+            a.telefono AS act_phone,
+            c.telefono AS client_phone,
+            n.nome AS store_name
+     FROM customer_trust_packs ctp
+     JOIN ${actsTable} a ON a.id = ctp.sale_deed_id
+     LEFT JOIN clienti c ON c.id = ctp.client_id
+     LEFT JOIN negozi n ON n.id = ctp.store_id
+     WHERE ctp.id::text = $1::text
+       AND ctp.deleted_at IS NULL
+     LIMIT 1`,
+    [String(id || "")]
+  );
+  const row = result.rows[0];
+  if (!row || row.act_deleted_at) return null;
+  if (!canAccessAct({ store: row.store }, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  return row;
+}
+
+async function listCustomerTrustPacksForSaleDeed(saleDeedId, user = {}) {
+  const act = await findExisting(saleDeedId);
+  if (!act) {
+    const error = new Error("Atto non trovato");
+    error.status = 404;
+    throw error;
+  }
+  if (!canAccessAct(act, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `SELECT ctp.*, a.practice_number, a.cliente_nome, a.cliente_cognome, n.nome AS store_name
+     FROM customer_trust_packs ctp
+     JOIN ${actsTable} a ON a.id = ctp.sale_deed_id
+     LEFT JOIN negozi n ON n.id = ctp.store_id
+     WHERE ctp.sale_deed_id = $1::bigint
+       AND ctp.deleted_at IS NULL
+     ORDER BY ctp.generated_at DESC`,
+    [act.id]
+  );
+  return result.rows.map(publicCustomerTrustPack);
+}
+
+async function listCustomerTrustPacksForClient(clientId, user = {}) {
+  const values = [clientId];
+  const storeWhere = await visibleStoreWhere(user, values, "a");
+  const result = await pool.query(
+    `SELECT ctp.*, a.practice_number, a.cliente_nome, a.cliente_cognome, a.store, n.nome AS store_name
+     FROM customer_trust_packs ctp
+     JOIN ${actsTable} a ON a.id = ctp.sale_deed_id
+     LEFT JOIN negozi n ON n.id = ctp.store_id
+     WHERE ctp.client_id = $1::bigint
+       AND ctp.deleted_at IS NULL
+       AND a.deleted_at IS NULL
+       ${storeWhere}
+     ORDER BY ctp.generated_at DESC
+     LIMIT 50`,
+    values
+  );
+  return result.rows.map(publicCustomerTrustPack);
+}
+
+function drawTrustPackText(doc, text, y, options = {}) {
+  const x = options.x || 42;
+  const width = options.width || 511;
+  doc.fillColor(options.color || "#333")
+    .font(options.bold ? "Helvetica-Bold" : "Helvetica")
+    .fontSize(options.size || 9)
+    .text(text, x, y, { width, lineGap: options.lineGap ?? 2 });
+  return doc.y + (options.marginBottom ?? 8);
+}
+
+function trustPackPaymentStatus(act = {}) {
+  const method = String(act.paymentMethod || "").trim();
+  if (!method) return "Metodo pagamento non inserito";
+  if (/bonifico/i.test(method)) return "Pagamento tracciabile indicato in pratica";
+  if (/assegno/i.test(method)) return "Pagamento con assegno indicato in pratica";
+  if (/contanti/i.test(method)) return "Pagamento in contanti indicato in pratica";
+  return "Pagamento registrato secondo metodo indicato";
+}
+
+async function writeCustomerTrustPackPdf({ act, row, store, client, trustPackCode, outputPath }) {
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  const doc = new PDFDocument({ size: "A4", autoFirstPage: false, margin: 42, bufferPages: true });
+  const stream = createWriteStream(outputPath);
+  const completed = new Promise((resolve, reject) => {
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+    doc.on("error", reject);
+  });
+  doc.pipe(stream);
+  doc.addPage();
+  drawPdfHeader(doc, { ...act, operatorUsername: "", operatorName: "" }, "Customer Trust Pack OroActive", { centerLogo: true });
+  doc.fillColor("#555").font("Helvetica").fontSize(11).text("Riepilogo trasparente della tua vendita", 42, 190, { width: 511, align: "center" });
+
+  let y = 225;
+  y = drawPdfSectionTitle(doc, "Dati negozio", y);
+  y = drawPdfFields(doc, [
+    { label: "Negozio", value: store?.nome || act.store || row.store || "OroActive" },
+    { label: "Indirizzo", value: [store?.indirizzo, store?.citta, store?.provincia].filter(Boolean).join(", ") },
+    { label: "Telefono", value: store?.telefono || "Contatta il negozio OroActive" },
+    { label: "Email", value: store?.email || "Dato non configurato" },
+    { label: "Data operazione", value: `${act.date || dateText(row.data_atto)} ${act.time || ""}`.trim() },
+    { label: "Sito OroActive", value: oroactiveSiteUrl }
+  ], y, 2);
+
+  y = ensurePdfSpace(doc, y, 120);
+  y = drawPdfSectionTitle(doc, "Dati cliente essenziali", y);
+  y = drawPdfFields(doc, [
+    { label: "Nome", value: act.name || client?.nome },
+    { label: "Cognome", value: act.surname || client?.cognome },
+    { label: "Numero atto", value: act.practiceNumber || row.practice_number },
+    { label: "Data atto", value: act.date || dateText(row.data_atto) },
+    { label: "Tipo documento", value: act.documentType || client?.documento_tipo || "Dato non inserito" },
+    { label: "Codice Trust Pack", value: trustPackCode }
+  ], y, 2);
+
+  y = ensurePdfSpace(doc, y, 150);
+  y = drawPdfSectionTitle(doc, "Riepilogo vendita", y);
+  const items = Array.isArray(act.items) && act.items.length
+    ? act.items
+    : [{ description: "Oggetto prezioso", metal: "Oro", title: "", weight: act.weight }];
+  items.slice(0, 12).forEach((item, index) => {
+    y = ensurePdfSpace(doc, y, 42);
+    const weightText = act.printWeightCustomer && item.weight ? ` · ${item.weight} g` : "";
+    doc.roundedRect(42, y, 511, 34, 4).strokeColor("#e6d6c8").stroke();
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(9).text(`${index + 1}. ${item.description || "Oggetto prezioso"}`, 50, y + 7, { width: 292, height: 18, ellipsis: true });
+    doc.fillColor("#555").font("Helvetica").fontSize(9).text(`${item.metal || "Metallo"} ${item.title || ""}${weightText}`.trim(), 360, y + 7, { width: 180, height: 18, ellipsis: true });
+    y += 40;
+  });
+  y = ensurePdfSpace(doc, y, 92);
+  y = drawPdfFields(doc, [
+    { label: "Metodo pagamento", value: act.paymentMethod || row.payment_method || "Dato non inserito" },
+    { label: "Importo corrisposto", value: pdfFormatEuro(act.amount ?? row.totale) },
+    { label: "Stato pagamento", value: trustPackPaymentStatus(act) },
+    { label: "Conferma documenti", value: "Documenti e firme gestiti nella pratica digitale OroActive" }
+  ], y, 2);
+
+  y = ensurePdfSpace(doc, y, 130);
+  y = drawPdfSectionTitle(doc, "Trasparenza OroActive", y);
+  y = drawTrustPackText(doc, "OroActive opera con un metodo basato su identificazione, tracciabilità, trasparenza e controllo documentale. Ogni pratica viene registrata, verificata e conservata secondo le procedure interne previste.", y);
+  y = drawPdfSectionTitle(doc, "Cosa succede dopo", y);
+  y = drawTrustPackText(doc, "La pratica viene conservata digitalmente. Per qualsiasi richiesta indica sempre il numero atto riportato in questo documento. Il pagamento segue il metodo indicato nella pratica.", y);
+
+  y = ensurePdfSpace(doc, y, 190);
+  y = drawPdfSectionTitle(doc, "FAQ post-vendita", y);
+  [
+    ["A cosa serve il numero atto?", "Serve a identificare rapidamente la pratica e recuperare il riepilogo della vendita."],
+    ["Posso richiedere una copia della pratica?", "Sì, puoi contattare il negozio indicando il numero atto."],
+    ["Come posso contattare il negozio?", "Usa telefono, email o WhatsApp se configurati per il punto vendita."],
+    ["Come viene tutelata la mia privacy?", "Il documento evita dati interni e riporta solo informazioni utili al cliente."],
+    ["Cosa devo fare se ho bisogno di chiarimenti?", "Contatta il negozio OroActive e comunica il codice Trust Pack."]
+  ].forEach(([question, answer]) => {
+    y = ensurePdfSpace(doc, y, 42);
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(9).text(question, 42, y, { width: 511 });
+    doc.fillColor("#555").font("Helvetica").fontSize(8.5).text(answer, 42, y + 13, { width: 511, lineGap: 1 });
+    y += 38;
+  });
+
+  y = ensurePdfSpace(doc, y, 110);
+  y = drawPdfSectionTitle(doc, "Contatti", y);
+  y = drawPdfFields(doc, [
+    { label: "Telefono negozio", value: store?.telefono || "Dato non configurato" },
+    { label: "Email negozio", value: store?.email || "Dato non configurato" },
+    { label: "Sito ufficiale", value: oroactiveSiteUrl },
+    { label: "Codice univoco", value: trustPackCode }
+  ], y, 2);
+
+  doc.fillColor("#777").font("Helvetica").fontSize(8)
+    .text(`Documento generato digitalmente dal gestionale OroActive · ${trustPackCode} · ${new Date().toLocaleString("it-IT")}`, 42, 768, { width: 511, align: "center" });
+  doc.fillColor("#777").fontSize(7).text("© OroActive - Customer Trust Pack", 42, 782, { width: 511, align: "center" });
+  doc.end();
+  await completed;
+}
+
+async function generateCustomerTrustPack(input = {}, user = {}, req = null) {
+  const saleDeedId = input.sale_deed_id || input.saleDeedId || input.id;
+  const row = await assertCustomerTrustPackEligible(saleDeedId, user);
+  const act = rowToAct(row);
+  const store = await customerTrustPackStoreForAct(row);
+  const client = await customerTrustPackClientForAct(row, act);
+  const trustPackCode = customerTrustPackCodeForAct(act, row);
+  const existing = await pool.query(
+    "SELECT * FROM customer_trust_packs WHERE trust_pack_code = $1::text AND deleted_at IS NULL LIMIT 1",
+    [trustPackCode]
+  );
+  const regenerate = input.regenerate === true;
+  if (existing.rowCount && !regenerate) {
+    return publicCustomerTrustPack({ ...existing.rows[0], practice_number: act.practiceNumber, cliente_nome: act.name, cliente_cognome: act.surname, store_name: store?.nome || act.store });
+  }
+
+  const outputPath = customerTrustPackPath(trustPackCode);
+  await writeCustomerTrustPackPdf({ act, row, store, client, trustPackCode, outputPath });
+  const metadata = sanitizeForPostgres({
+    included_sections: ["copia_cliente_pdf", "riepilogo_vendita", "dati_negozio", "faq_post_vendita", "contatti"],
+    privacy: "Dati interni, risk score, audit trail, margini e note operative esclusi dal Customer Trust Pack.",
+    items_count: Array.isArray(act.items) ? act.items.length : 0,
+    oroactive_site_url: oroactiveSiteUrl
+  });
+  const values = [
+    trustPackCode,
+    row.id,
+    row.cliente_id || client?.id || null,
+    row.negozio_id || store?.id || null,
+    user.id || null,
+    outputPath,
+    metadata
+  ];
+  const result = existing.rowCount
+    ? await pool.query(
+      `UPDATE customer_trust_packs
+       SET pdf_path = $1::text,
+           delivery_status = 'generated',
+           delivered_via = NULL,
+           delivered_to = NULL,
+           delivered_at = NULL,
+           generated_by = $2::bigint,
+           generated_at = NOW(),
+           metadata = $3::jsonb
+       WHERE id = $4::uuid
+       RETURNING *`,
+      [outputPath, user.id || null, metadata, existing.rows[0].id]
+    )
+    : await pool.query(
+      `INSERT INTO customer_trust_packs (
+        trust_pack_code, sale_deed_id, client_id, store_id, generated_by,
+        pdf_path, delivery_status, metadata
+      ) VALUES (
+        $1::text,$2::bigint,$3::bigint,$4::bigint,$5::bigint,
+        $6::text,'generated',$7::jsonb
+      )
+      RETURNING *`,
+      values
+    );
+  const trustPack = publicCustomerTrustPack({
+    ...result.rows[0],
+    practice_number: act.practiceNumber,
+    cliente_nome: act.name,
+    cliente_cognome: act.surname,
+    store_name: store?.nome || act.store
+  });
+  const auditAction = existing.rowCount ? "customer_trust_pack_regenerated" : "customer_trust_pack_generated";
+  void writeAuditLog({
+    req,
+    user,
+    action: auditAction,
+    entityType: "customer_trust_pack",
+    entityId: trustPack.id,
+    entityLabel: trustPack.trust_pack_code,
+    afterData: { trust_pack_code: trustPack.trust_pack_code, sale_deed_id: row.id, practice_number: act.practiceNumber },
+    metadata: { sale_deed_id: row.id, practice_number: act.practiceNumber, store_id: row.negozio_id || store?.id || null }
+  });
+  void createNotification({
+    targetRole: "founder",
+    title: "Customer Trust Pack generato",
+    message: `Trust Pack ${trustPack.trust_pack_code} generato per la pratica ${act.practiceNumber}.`,
+    type: "system",
+    severity: "success",
+    entityType: "customer_trust_pack",
+    entityId: trustPack.id,
+    actionUrl: `customer-trust-pack:${trustPack.id}`,
+    createdBy: user.id || null,
+    actor: user,
+    req,
+    metadata: { sale_deed_id: row.id, practice_number: act.practiceNumber }
+  });
+  return trustPack;
+}
+
+app.post("/api/customer-trust-pack/generate", async (request, response, next) => {
+  try {
+    const trustPack = await generateCustomerTrustPack(request.body || {}, request.user, request);
+    response.json({ ok: true, message: "Customer Trust Pack generato correttamente", trust_pack: trustPack });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/customer-trust-pack/sale-deed/:saleDeedId", async (request, response, next) => {
+  try {
+    const trustPacks = await listCustomerTrustPacksForSaleDeed(request.params.saleDeedId, request.user);
+    response.json({ ok: true, trust_packs: trustPacks, trust_pack: trustPacks[0] || null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/customer-trust-pack/client/:clientId", async (request, response, next) => {
+  try {
+    response.json({ ok: true, trust_packs: await listCustomerTrustPacksForClient(request.params.clientId, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/customer-trust-pack/:id/download", async (request, response, next) => {
+  try {
+    const row = await customerTrustPackRowById(request.params.id, request.user);
+    if (!row) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
+    const stats = await fs.stat(row.pdf_path).catch(() => null);
+    if (!stats?.isFile()) return response.status(404).json({ error: "PDF Customer Trust Pack non disponibile" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "customer_trust_pack_downloaded",
+      entityType: "customer_trust_pack",
+      entityId: row.id,
+      entityLabel: row.trust_pack_code,
+      metadata: { sale_deed_id: row.sale_deed_id, practice_number: row.practice_number }
+    });
+    await pool.query(
+      "UPDATE customer_trust_packs SET delivery_status = 'downloaded', delivered_via = 'download', delivered_at = NOW() WHERE id = $1::uuid",
+      [row.id]
+    );
+    response.setHeader("Content-Type", "application/pdf");
+    response.setHeader("Content-Length", String(stats.size));
+    response.setHeader("Content-Disposition", `attachment; filename="${customerTrustPackFilename(row.trust_pack_code)}"`);
+    createReadStream(row.pdf_path).pipe(response);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/customer-trust-pack/:id/send-email", async (request, response, next) => {
+  try {
+    const row = await customerTrustPackRowById(request.params.id, request.user);
+    if (!row) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
+    response.json({
+      ok: false,
+      message: "Invio email non configurato. Puoi scaricare il PDF manualmente.",
+      trust_pack: publicCustomerTrustPack(row)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/customer-trust-pack/:id/mark-whatsapp", async (request, response, next) => {
+  try {
+    const row = await customerTrustPackRowById(request.params.id, request.user);
+    if (!row) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
+    const phone = String(request.body?.phone || row.client_phone || row.act_phone || "").replace(/[^\d+]/g, "");
+    const message = `Buongiorno, le inviamo il Customer Trust Pack OroActive relativo alla sua pratica n. ${row.practice_number}. Per qualsiasi chiarimento puo contattarci.`;
+    await pool.query(
+      `UPDATE customer_trust_packs
+       SET delivery_status = 'sent_whatsapp',
+           delivered_via = 'whatsapp',
+           delivered_to = NULLIF($2::text, ''),
+           delivered_at = NOW()
+       WHERE id = $1::uuid`,
+      [row.id, phone]
+    );
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "customer_trust_pack_sent_whatsapp",
+      entityType: "customer_trust_pack",
+      entityId: row.id,
+      entityLabel: row.trust_pack_code,
+      metadata: { sale_deed_id: row.sale_deed_id, practice_number: row.practice_number }
+    });
+    response.json({
+      ok: true,
+      message: "Invio WhatsApp preparato. Scarica il PDF e allegalo manualmente se necessario.",
+      whatsapp_url: phone ? `https://wa.me/${phone.replace(/^\+/, "")}?text=${encodeURIComponent(message)}` : "",
+      trust_pack: publicCustomerTrustPack({ ...row, delivery_status: "sent_whatsapp", delivered_via: "whatsapp", delivered_to: phone, delivered_at: new Date().toISOString() })
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/customer-trust-pack/:id", async (request, response, next) => {
+  try {
+    const row = await customerTrustPackRowById(request.params.id, request.user);
+    if (!row) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
+    response.json({ ok: true, trust_pack: publicCustomerTrustPack(row) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get(["/api/atti/next-number", "/api/acts/next-number"], async (request, response, next) => {
   try {
     const userStore = await storeForUser(request.user);
@@ -13833,6 +14334,9 @@ function friendlyDatabaseError(error, request) {
   const url = request?.originalUrl || "";
   const constraint = String(error.constraint || "");
   if (error.code === "23505") {
+    if (url.includes("/api/customer-trust-pack") || /customer_trust_packs/i.test(constraint)) {
+      return "Customer Trust Pack già presente per questa pratica.";
+    }
     if (/\/api\/(utenti|users)/.test(url) || /utenti_(email|username)|utenti.*unique/i.test(constraint)) {
       return "Email/username già presente";
     }
@@ -13861,6 +14365,7 @@ function friendlyDatabaseError(error, request) {
   if (url.includes("/api/atti") || url.includes("/api/acts")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Errore database durante il salvataggio Academy.";
   if (url.includes("/api/crm")) return "Errore database durante il salvataggio CRM.";
+  if (url.includes("/api/customer-trust-pack")) return "Errore database durante il Customer Trust Pack.";
   if (url.includes("/api/store-health")) return "Errore database durante il calcolo Salute Negozio.";
   if (url.includes("/api/founder-daily-report")) return "Errore database durante il Founder Daily Report.";
   if (url.includes("/api/backups")) return "Errore database durante il backup.";
@@ -13879,6 +14384,7 @@ function safeRouteErrorMessage(request) {
   if (url.includes("/api/suspended-practices")) return "Operazione pratica sospesa non completata.";
   if (url.includes("/api/approvals")) return "Operazione autorizzazione non completata.";
   if (url.includes("/api/notifications")) return "Operazione notifiche non completata.";
+  if (url.includes("/api/customer-trust-pack")) return "Customer Trust Pack non completato.";
   if (url.includes("/api/founder-daily-report")) return "Founder Daily Report non completato.";
   if (url.includes("/api/backups")) return "Operazione backup non completata.";
   if (url.includes("/api/store-health")) return "Salute Negozio non caricata.";

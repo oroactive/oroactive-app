@@ -296,6 +296,16 @@ const OROACTIVE_APP_GUIDE = {
     commonErrors: ["quotazione non disponibile", "grafico non incorporabile"],
     permissions: ["commesso", "responsabile", "supervisore", "founder"]
   },
+  customer_trust_pack: {
+    title: "Customer Trust Pack",
+    description: "Pacchetto cliente post-vendita con riepilogo trasparente, copia cliente, contatti e FAQ.",
+    fields: ["codice Trust Pack", "numero atto", "dati negozio", "riepilogo vendita", "metodo pagamento", "contatti"],
+    actions: ["genera Trust Pack", "scarica PDF", "prepara WhatsApp", "invio email se configurato"],
+    steps: ["Completa o archivia l'atto", "Apri l'atto dall'elenco", "Clicca Genera Customer Trust Pack", "Scarica il PDF", "Invialo manualmente o prepara WhatsApp"],
+    checks: ["atto completato o archiviato", "atto non eliminato", "dati cliente e pagamento presenti", "nessun dato interno nel PDF"],
+    commonErrors: ["atto non completato", "PDF non disponibile", "invio email non configurato"],
+    permissions: ["commesso", "responsabile", "supervisore", "founder"]
+  },
   dashboard: {
     title: "Dashboard",
     description: "KPI, fatturato, grammi acquistati, pagamenti, ranking e controlli direzionali.",
@@ -1108,6 +1118,7 @@ function apiErrorFallback(path = "", status = 0) {
   if (/\/suspended-practices/.test(path)) return "Operazione pratica sospesa non completata.";
   if (/\/approvals/.test(path)) return "Operazione autorizzazione non completata.";
   if (/\/notifications/.test(path)) return "Operazione notifiche non completata.";
+  if (/\/customer-trust-pack/.test(path)) return "Customer Trust Pack non completato.";
   if (/\/store-health/.test(path)) return "Salute Negozio non caricata.";
   if (/\/founder-daily-report/.test(path)) return "Founder Daily Report non completato.";
   if (/\/backups/.test(path)) return "Operazione backup non completata.";
@@ -4973,6 +4984,11 @@ function auditActionLabel(action = "") {
     founder_daily_report_sent: "Invio Founder Daily Report",
     founder_daily_report_failed: "Errore Founder Daily Report",
     store_health_score_calculated: "Store Health Score ricalcolato",
+    customer_trust_pack_generated: "Customer Trust Pack generato",
+    customer_trust_pack_downloaded: "Download Customer Trust Pack",
+    customer_trust_pack_sent_email: "Customer Trust Pack inviato email",
+    customer_trust_pack_sent_whatsapp: "Customer Trust Pack WhatsApp preparato",
+    customer_trust_pack_regenerated: "Customer Trust Pack rigenerato",
     api_request_error: "Errore API"
   }[action] || action.replace(/_/g, " ") || "Attività";
 }
@@ -7098,6 +7114,15 @@ async function openCrmClient(id) {
       </div>
       <h4>Storico atti</h4>
       ${(detail.acts || []).map((act) => `<p>${escapeHtml(act.practiceNumber)} · ${escapeHtml(act.date)} · ${escapeHtml(formatEuro(act.amount || 0))}</p>`).join("") || "<p>Nessun atto collegato.</p>"}
+      <h4>Trust Pack</h4>
+      <div class="crm-trust-pack-list">
+        ${(detail.trust_packs || []).map((pack) => `
+          <div class="crm-trust-pack-row">
+            <span><strong>${escapeHtml(pack.trust_pack_code || "Trust Pack")}</strong><small>${escapeHtml(pack.practice_number || "")} · ${escapeHtml(formatDateTime(pack.generated_at || ""))} · ${escapeHtml(pack.delivery_status || "generated")}</small></span>
+            <button type="button" data-download-trust-pack="${escapeHtml(String(pack.id))}">Download</button>
+          </div>
+        `).join("") || "<p>Nessun Customer Trust Pack generato.</p>"}
+      </div>
       <h4>Aurum Shield</h4>
       <div class="aurum-shield-crm">
         <p>Score medio storico: <strong>${Number(detail.aurum_shield?.average_score || 0)}/100</strong></p>
@@ -7505,6 +7530,9 @@ function archiveRowActionsMarkup(act) {
     `<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}" ${canModify ? "" : "disabled"}>${archivedIncomplete ? "Riapri" : "Modifica"}</button>`,
     `<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}" ${canDelete ? "" : "disabled"}>Elimina</button>`
   ];
+  if (canUseCustomerTrustPack(act)) {
+    actions.splice(2, 0, `<button type="button" data-open-trust-pack="${escapeHtml(act.practiceNumber)}">Trust Pack</button>`);
+  }
 
   return `
     <div class="row-actions">
@@ -7686,6 +7714,109 @@ async function requestPdf(path, payload, filename) {
   } finally {
     hideLoading();
   }
+}
+
+async function downloadProtectedFile(path, filename, loadingText = "Preparazione download...") {
+  const headers = {};
+  if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
+  showLoading(loadingText);
+  try {
+    const response = await fetch(`${apiBase}${path}`, { headers });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(cleanUserMessage(body.error, apiErrorFallback(path, response.status)));
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="?([^"]+)"?/i);
+    const finalFilename = match?.[1] || filename || "oroactive-download.pdf";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = finalFilename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } finally {
+    hideLoading();
+  }
+}
+
+function canUseCustomerTrustPack(act = {}) {
+  const status = workflowStatusCode(act.status);
+  return Boolean(act && !act.deletedAt && (isCompletedWorkflowStatus(act.status) || (act.completedAt && status === "archived_incomplete")));
+}
+
+function customerTrustPackButtonsMarkup(act = {}, trustPack = null) {
+  if (!canUseCustomerTrustPack(act)) {
+    return `<p class="trust-pack-hint">Il Customer Trust Pack può essere generato solo per pratiche completate o archiviate.</p>`;
+  }
+  const identifier = escapeHtml(String(act.id || act.practiceNumber || ""));
+  if (trustPack?.id) {
+    const id = escapeHtml(String(trustPack.id));
+    return `
+      <div class="trust-pack-actions">
+        <button class="primary-button" type="button" data-download-trust-pack="${id}">Scarica Trust Pack</button>
+        <button type="button" data-email-trust-pack="${id}">Invia email</button>
+        <button type="button" data-whatsapp-trust-pack="${id}">Invia WhatsApp</button>
+        <button type="button" data-generate-trust-pack="${identifier}" data-regenerate-trust-pack="true">Rigenera</button>
+      </div>
+      <small class="trust-pack-code">Codice ${escapeHtml(trustPack.trust_pack_code || "")}</small>
+    `;
+  }
+  return `
+    <div class="trust-pack-actions">
+      <button class="primary-button" type="button" data-generate-trust-pack="${identifier}">Genera Customer Trust Pack</button>
+    </div>
+  `;
+}
+
+async function fetchCustomerTrustPackForAct(identifier) {
+  try {
+    const data = await apiRequest(`/customer-trust-pack/sale-deed/${encodeURIComponent(identifier)}`);
+    return data.trust_pack || data.trust_packs?.[0] || null;
+  } catch (error) {
+    if (error.status === 404) return null;
+    throw error;
+  }
+}
+
+async function refreshCustomerTrustPackPanel(act, trustPack = null) {
+  const panel = document.querySelector("[data-trust-pack-panel]");
+  if (!panel) return;
+  panel.innerHTML = customerTrustPackButtonsMarkup(act, trustPack);
+}
+
+async function generateCustomerTrustPackForAct(identifier, options = {}) {
+  const data = await apiRequest("/customer-trust-pack/generate", {
+    method: "POST",
+    body: JSON.stringify({
+      sale_deed_id: identifier,
+      regenerate: options.regenerate === true
+    })
+  });
+  const trustPack = data.trust_pack || null;
+  showToast(data.message || "Customer Trust Pack generato correttamente", "success");
+  const act = await getActRecord(identifier);
+  if (act) await refreshCustomerTrustPackPanel(act, trustPack);
+  return trustPack;
+}
+
+async function downloadCustomerTrustPack(id) {
+  await downloadProtectedFile(`/customer-trust-pack/${encodeURIComponent(id)}/download`, "customer-trust-pack-oroactive.pdf", "Download Trust Pack...");
+  showToast("Customer Trust Pack scaricato.", "success");
+}
+
+async function sendCustomerTrustPackEmail(id) {
+  const data = await apiRequest(`/customer-trust-pack/${encodeURIComponent(id)}/send-email`, { method: "POST", body: "{}" });
+  showToast(data.message || "Invio email non configurato. Puoi scaricare il PDF manualmente.", data.ok ? "success" : "warning");
+}
+
+async function markCustomerTrustPackWhatsapp(id) {
+  const data = await apiRequest(`/customer-trust-pack/${encodeURIComponent(id)}/mark-whatsapp`, { method: "POST", body: "{}" });
+  if (data.whatsapp_url) window.open(data.whatsapp_url, "_blank", "noopener");
+  showToast(data.message || "Invio WhatsApp preparato.", "success");
 }
 
 function parseActDate(date) {
@@ -8130,6 +8261,7 @@ async function openArchivedAct(practiceNumber) {
     showToast("Atto di vendita non trovato.");
     return;
   }
+  const trustPack = canUseCustomerTrustPack(act) ? await fetchCustomerTrustPackForAct(act.id || act.practiceNumber).catch(() => null) : null;
 
   previewTitle.textContent = `Atto di vendita ${act.practiceNumber}`;
   previewBody.innerHTML = `
@@ -8137,6 +8269,11 @@ async function openArchivedAct(practiceNumber) {
       <button type="button" data-preview-act-print="${escapeHtml(act.practiceNumber)}" data-preview-print-scope="customer">Stampa copia cliente</button>
       <button type="button" data-preview-act-print="${escapeHtml(act.practiceNumber)}" data-preview-print-scope="company">Stampa copia aziendale</button>
     </div>
+    <section class="trust-pack-panel" data-trust-pack-panel="${escapeHtml(String(act.id || act.practiceNumber || ""))}">
+      <h3>Customer Trust Pack OroActive</h3>
+      <p>Riepilogo cliente professionale con vendita, contatti e informazioni post-vendita.</p>
+      ${customerTrustPackButtonsMarkup(act, trustPack)}
+    </section>
     ${act.readOnlyHtml || buildArchivedActFallback(act)}
   `;
   previewModal.hidden = false;
@@ -11225,6 +11362,11 @@ document.getElementById("archiveGroups").addEventListener("click", (event) => {
     approveDeleteAct(approveDeleteButton.dataset.approveDeleteAct);
     return;
   }
+  const trustPackButton = event.target.closest("[data-open-trust-pack]");
+  if (trustPackButton) {
+    openArchivedAct(trustPackButton.dataset.openTrustPack);
+    return;
+  }
   const deleteButton = event.target.closest("[data-delete-act]");
   if (deleteButton) {
     deleteAct(deleteButton.dataset.deleteAct);
@@ -11327,6 +11469,26 @@ previewBody.addEventListener("click", async (event) => {
     } catch (error) {
       showToast(error.message || "PDF non generato.", "error");
     }
+    return;
+  }
+  const generateTrustPack = event.target.closest("[data-generate-trust-pack]");
+  if (generateTrustPack) {
+    await withButtonBusy(generateTrustPack, generateTrustPack.dataset.regenerateTrustPack === "true" ? "Rigenero..." : "Genero...", () => generateCustomerTrustPackForAct(generateTrustPack.dataset.generateTrustPack, { regenerate: generateTrustPack.dataset.regenerateTrustPack === "true" }));
+    return;
+  }
+  const downloadTrustPack = event.target.closest("[data-download-trust-pack]");
+  if (downloadTrustPack) {
+    await withButtonBusy(downloadTrustPack, "Scarico...", () => downloadCustomerTrustPack(downloadTrustPack.dataset.downloadTrustPack));
+    return;
+  }
+  const emailTrustPack = event.target.closest("[data-email-trust-pack]");
+  if (emailTrustPack) {
+    await withButtonBusy(emailTrustPack, "Invio...", () => sendCustomerTrustPackEmail(emailTrustPack.dataset.emailTrustPack));
+    return;
+  }
+  const whatsappTrustPack = event.target.closest("[data-whatsapp-trust-pack]");
+  if (whatsappTrustPack) {
+    await withButtonBusy(whatsappTrustPack, "Preparo...", () => markCustomerTrustPackWhatsapp(whatsappTrustPack.dataset.whatsappTrustPack));
     return;
   }
   const requestDeleteButton = event.target.closest("[data-request-delete-act]");
