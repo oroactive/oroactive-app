@@ -467,7 +467,15 @@ function auditActionLabel(action = "") {
     ask_aurum: "Domanda ad Aurum",
     aurum_support_request: "Richiesta supporto Aurum",
     aurum_memory_created: "Memoria Aurum creata",
-    aurum_memory_deleted: "Memoria Aurum eliminata"
+    aurum_memory_deleted: "Memoria Aurum eliminata",
+    approval_requested: "Richiesta autorizzazione",
+    approval_approved: "Autorizzazione approvata",
+    approval_rejected: "Autorizzazione rifiutata",
+    approval_cancelled: "Autorizzazione annullata",
+    approval_required_blocked_completion: "Completamento bloccato per autorizzazione",
+    approval_unauthorized_attempt: "Tentativo autorizzazione non consentito",
+    sale_deed_completed_after_approval: "Atto completato dopo autorizzazione",
+    sale_deed_modified_after_approval_request: "Modifica atto dopo richiesta autorizzazione"
   }[action] || activityLabel(action) || "Attività";
 }
 
@@ -1005,6 +1013,9 @@ function normalizeWorkflowStatus(status = "archived_incomplete") {
   const normalized = status.trim().toLowerCase();
   if (["completed", "complete", "completato", "completata"].includes(normalized)) return "completed";
   if (["archived_completed", "archiviato completato", "archiviata completata"].includes(normalized)) return "archived_completed";
+  if (["pending_approval", "in_attesa_autorizzazione", "in attesa autorizzazione", "attesa autorizzazione"].includes(normalized)) return "pending_approval";
+  if (["approval_approved", "autorizzazione_approvata", "autorizzazione approvata"].includes(normalized)) return "approval_approved";
+  if (["approval_rejected", "autorizzazione_rifiutata", "autorizzazione rifiutata"].includes(normalized)) return "approval_rejected";
   if (["draft", "bozza", "in bozza"].includes(normalized)) return "draft";
   if (["archived_incomplete", "archived", "archiviato", "archiviata", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "archived_incomplete";
   if (["deleted", "eliminato", "eliminata", "cancellato", "cancellata"].includes(normalized)) return "deleted";
@@ -1035,6 +1046,12 @@ function visibleRealActStatusSql(alias = "") {
       ${realCompletedStatusSql(alias)}
       OR COALESCE(${prefix}status, '') ILIKE 'archived_incomplete'
       OR (COALESCE(${prefix}status, '') ILIKE 'Archiviata' AND ${prefix}completed_at IS NULL)
+      OR COALESCE(${prefix}status, '') ILIKE 'pending_approval'
+      OR COALESCE(${prefix}status, '') ILIKE 'in_attesa_autorizzazione'
+      OR COALESCE(${prefix}status, '') ILIKE 'approval_approved'
+      OR COALESCE(${prefix}status, '') ILIKE 'autorizzazione_approvata'
+      OR COALESCE(${prefix}status, '') ILIKE 'approval_rejected'
+      OR COALESCE(${prefix}status, '') ILIKE 'autorizzazione_rifiutata'
     )`;
 }
 
@@ -2578,11 +2595,6 @@ function normalizeAct(input = {}, existing = null) {
   const totale = numberFrom(input.amount ?? input.totale ?? existing?.totale);
   const paymentMethod = input.paymentMethod || existing?.payment_method || "";
   const normalizedStatus = normalizeWorkflowStatus(input.status || existing?.status || "archived_incomplete");
-  if (String(paymentMethod).toLowerCase().includes("contanti") && totale > 500 && !isDraftLikeStatus(normalizedStatus)) {
-    const error = new Error("Il pagamento in contanti non puo superare 500 euro. Seleziona Bonifico o Assegno come pagamento a norma di legge.");
-    error.status = 400;
-    throw error;
-  }
   const iban = String(input.iban ?? payload.iban ?? existing?.iban ?? "").replace(/\s+/g, "").toUpperCase();
   if (String(paymentMethod).toLowerCase().includes("bonifico") && iban && !isValidIban(iban)) {
     const error = new Error("IBAN non valido. Controlla il formato prima di salvare.");
@@ -2618,7 +2630,7 @@ function isCashPaymentMethod(method = "") {
 
 function isDraftLikeStatus(status = "") {
   const normalized = normalizeWorkflowStatus(status).toLowerCase();
-  return ["draft", "annullata", "deleted", "abandoned"].includes(normalized);
+  return ["draft", "pending_approval", "approval_approved", "approval_rejected", "annullata", "deleted", "abandoned"].includes(normalized);
 }
 
 function amlMessage(ok) {
@@ -2727,7 +2739,7 @@ async function saveDocumentIntegrityLog(act = {}, attoId = null, user = null) {
   return result.rows[0] || null;
 }
 
-async function enforceCashAntiMoneyLaundering(act, user, existing = null) {
+async function enforceCashAntiMoneyLaundering(act, user, existing = null, options = {}) {
   if (!isCashPaymentMethod(act.paymentMethod)) return null;
   const check = await cashAntiMoneyLaunderingCheck({
     codice_fiscale: act.codiceFiscale,
@@ -2739,7 +2751,7 @@ async function enforceCashAntiMoneyLaundering(act, user, existing = null) {
   if (!isDraftLikeStatus(act.status) && (existing?.id || act.id)) {
     await saveAmlAlert({ check, act, user, attoId: existing?.id || act.id || null });
   }
-  if (!isDraftLikeStatus(act.status) && !check.ok) {
+  if (!isDraftLikeStatus(act.status) && !check.ok && !options.allowApproved) {
     const error = new Error(check.messaggio);
     error.status = 400;
     error.details = check;
@@ -2788,6 +2800,9 @@ function rowToAct(row, options = {}) {
     archivedAt: row.archived_at || payload.archivedAt || null,
     deletedAt: row.deleted_at || payload.deletedAt || null,
     deletedBy: row.deleted_by || payload.deletedBy || null,
+    approvalStatus: row.approval_status || payload.approvalStatus || "",
+    approvalRequestId: row.approval_request_id || payload.approvalRequestId || null,
+    approvalRequiredAt: row.approval_required_at || payload.approvalRequiredAt || null,
     operatorId: row.operatore_id || payload.operatorId || payload.operatore_id || null,
     operatorUsername: row.operator_username || payload.operatorUsername || "",
     operatorName: [row.operator_nome, row.operator_cognome].filter(Boolean).join(" ") || payload.operatorName || "",
@@ -4069,6 +4084,10 @@ async function dashboardKpis(user = {}) {
       latest: []
     };
   });
+  const approvalSummary = await dashboardApprovalStats(user).catch((error) => {
+    console.error("APPROVAL SUMMARY ERROR", error);
+    return { pending: 0, risky_pending: 0, latest: [] };
+  });
   return {
     kpi: {
       fatturato_giornaliero: sum(dailyActs, (act) => act.amount),
@@ -4098,6 +4117,7 @@ async function dashboardKpis(user = {}) {
     ranking_negozi: Object.values(byStore).sort((a, b) => b.fatturato - a.fatturato),
     ranking_operatori: Object.values(byOperator).sort((a, b) => b.fatturato - a.fatturato),
     aurum_shield: aurumShield,
+    approval_summary: approvalSummary,
     audit_summary: auditSummary
   };
 }
@@ -5164,9 +5184,9 @@ async function validateQualityChecklist(input = {}, user = {}) {
   };
 }
 
-async function assertQualityAllowsFinalSave(input = {}, user = {}) {
+async function assertQualityAllowsFinalSave(input = {}, user = {}, options = {}) {
   const quality = await validateQualityChecklist(input, user);
-  if (quality.quality_status === "non_completabile") {
+  if (quality.quality_status === "non_completabile" && !options.allowApproved) {
     const error = new Error(`Pratica non completabile: ${(quality.blocking_errors || []).slice(0, 3).join("; ") || "controlli obbligatori mancanti"}`);
     error.status = 400;
     error.quality = quality;
@@ -5221,6 +5241,438 @@ async function saveQualityCheckResult(input = {}, user = {}) {
 async function persistQualityCheckForAct(saleDeedRow, user = {}) {
   if (!saleDeedRow?.id || saleDeedRow.deleted_at || normalizeWorkflowStatus(saleDeedRow.status) === "deleted") return null;
   return saveQualityCheckResult({ sale_deed_id: saleDeedRow.id, draft_data: rowToAct(saleDeedRow) }, user);
+}
+
+function approvalStatusLabel(status = "pending") {
+  return {
+    pending: "In attesa",
+    approved: "Approvata",
+    rejected: "Rifiutata",
+    cancelled: "Annullata"
+  }[String(status || "pending").toLowerCase()] || "In attesa";
+}
+
+function approvalRequestRowToPublic(row = {}) {
+  return {
+    id: row.id,
+    sale_deed_id: row.sale_deed_id,
+    saleDeedId: row.sale_deed_id,
+    practiceNumber: row.practice_number || "",
+    clientName: [row.cliente_nome, row.cliente_cognome].filter(Boolean).join(" ") || "",
+    store: row.store || row.store_name || "",
+    store_id: row.store_id || row.negozio_id || null,
+    requested_by: row.requested_by,
+    requestedByName: [row.requester_nome, row.requester_cognome].filter(Boolean).join(" ") || row.requester_username || "",
+    requested_by_role: row.requested_by_role || "",
+    requested_to_role: row.requested_to_role || "",
+    status: row.status || "pending",
+    statusLabel: approvalStatusLabel(row.status),
+    risk_score: Number(row.risk_score || 0),
+    risk_level: row.risk_level || "",
+    reasons: Array.isArray(row.reasons) ? row.reasons : [],
+    quality_check: row.quality_check || {},
+    aurum_shield: row.aurum_shield || {},
+    requester_note: row.requester_note || "",
+    reviewer_note: row.reviewer_note || "",
+    reviewed_by: row.reviewed_by || null,
+    reviewedByName: [row.reviewer_nome, row.reviewer_cognome].filter(Boolean).join(" ") || row.reviewer_username || "",
+    reviewed_at: row.reviewed_at || null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null
+  };
+}
+
+function approvalRequestSelectSql() {
+  return `ar.*, a.practice_number, a.cliente_nome, a.cliente_cognome, a.store, a.negozio_id,
+          requester.username AS requester_username, requester.nome AS requester_nome, requester.cognome AS requester_cognome,
+          reviewer.username AS reviewer_username, reviewer.nome AS reviewer_nome, reviewer.cognome AS reviewer_cognome`;
+}
+
+function approvalRequestJoinSql() {
+  return `FROM approval_requests ar
+          LEFT JOIN ${actsTable} a ON a.id = ar.sale_deed_id
+          LEFT JOIN utenti requester ON requester.id = ar.requested_by
+          LEFT JOIN utenti reviewer ON reviewer.id = ar.reviewed_by`;
+}
+
+async function addApprovalVisibilityWhere(user = {}, where = [], values = [], alias = "ar") {
+  const role = normalizeRole(user.ruolo);
+  if (role === "founder") return;
+  if (role === "supervisore") {
+    where.push("LOWER(COALESCE(requester.ruolo, '')) <> 'founder'");
+    return;
+  }
+  if (role === "responsabile") {
+    const store = await storeForUser(user);
+    if (!store) {
+      where.push("1 = 0");
+      return;
+    }
+    values.push(store.id, store.nome);
+    where.push(`(${alias}.store_id = $${values.length - 1}::bigint OR a.negozio_id = $${values.length - 1}::bigint OR a.store = $${values.length}::text)`);
+    where.push("LOWER(COALESCE(requester.ruolo, '')) IN ('commesso', 'aiuto_commesso')");
+    return;
+  }
+  values.push(user.id || null);
+  where.push(`${alias}.requested_by = $${values.length}::bigint`);
+}
+
+async function canApproveApprovalRequest(row = {}, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const requesterRole = normalizeRole(row.requested_by_role || row.requester_role || "");
+  if (role === "founder") return true;
+  if (role === "supervisore") return requesterRole !== "founder";
+  if (role !== "responsabile") return false;
+  if (!["commesso", "aiuto_commesso"].includes(requesterRole)) return false;
+  const store = await storeForUser(user);
+  if (!store) return false;
+  return String(row.store_id || row.negozio_id || "") === String(store.id)
+    || String(row.store || "") === String(store.nome);
+}
+
+async function createInternalNotification(input = {}) {
+  try {
+    const table = await pool.query("SELECT to_regclass('public.notifications') AS name");
+    if (table.rows[0]?.name) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, title, message, payload, created_at)
+         VALUES ($1::bigint,$2::text,$3::text,$4::jsonb,NOW())`,
+        [
+          input.user_id || input.userId || null,
+          input.title || "Notifica OroActive",
+          input.message || "",
+          sanitizeForPostgres(input.payload || {})
+        ]
+      );
+    } else {
+      console.log("INTERNAL NOTIFICATION", compactAuditPayload(input));
+    }
+  } catch (error) {
+    console.error("INTERNAL NOTIFICATION ERROR", error.message || error);
+  }
+}
+
+function reasonFromText(type, severity, message) {
+  return { type, severity, message };
+}
+
+function approvalReasonsFromQualityShield({ quality = null, shield = null, amlCheck = null } = {}) {
+  const reasons = [];
+  if (shield && ["alto", "critico"].includes(String(shield.risk_level || "").toLowerCase())) {
+    reasons.push(reasonFromText("aurum_shield", shield.risk_level, `${shield.summary || "Aurum Shield richiede verifica"} (${Number(shield.score || 0)}/100)`));
+  }
+  (shield?.factors || []).forEach((factor) => {
+    const severity = String(factor.severity || "").toLowerCase();
+    if (["high", "critical", "alto", "critico"].includes(severity) || Number(factor.points || 0) >= 20) {
+      reasons.push(reasonFromText(factor.type || "risk_factor", severity || "warning", factor.message || "Fattore rischio da verificare"));
+    }
+  });
+  const qualityStatus = String(quality?.quality_status || quality?.status || "").toLowerCase();
+  if (qualityStatus === "non_completabile") {
+    (quality.blocking_errors || []).slice(0, 8).forEach((message) => reasons.push(reasonFromText("quality_error", "error", message)));
+  } else if (qualityStatus === "attenzione") {
+    (quality.warnings || []).slice(0, 6).forEach((message) => reasons.push(reasonFromText("quality_warning", "warning", message)));
+  }
+  if (amlCheck?.ok === false) {
+    reasons.push(reasonFromText("cash_limit", "critical", amlCheck.messaggio || "Limite contanti superato."));
+  } else if (amlCheck && Number(amlCheck.totale_previsto || 0) >= Number(amlCheck.limite || 500) * 0.8) {
+    reasons.push(reasonFromText("cash_limit", "high", "Contanti vicino alla soglia configurata."));
+  }
+  const seen = new Set();
+  return reasons.filter((reason) => {
+    const key = `${reason.type}:${reason.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function findApprovedApprovalForAct(saleDeedId) {
+  if (!saleDeedId) return null;
+  const result = await pool.query(
+    `SELECT ${approvalRequestSelectSql()}
+     ${approvalRequestJoinSql()}
+     WHERE ar.sale_deed_id = $1::bigint
+       AND ar.status = 'approved'
+     ORDER BY ar.reviewed_at DESC NULLS LAST, ar.updated_at DESC
+     LIMIT 1`,
+    [saleDeedId]
+  );
+  return result.rows[0] || null;
+}
+
+async function assertApprovalAllowsFinalSave({ saleDeedId = null, draftData = {}, user = {}, req = null } = {}) {
+  const role = normalizeRole(user.ruolo);
+  const quality = await validateQualityChecklist({ sale_deed_id: saleDeedId || "", draft_data: draftData }, user);
+  const shield = quality.aurum_shield || await calculateAurumShieldRisk({ sale_deed_id: saleDeedId || "", draft_data: draftData }, user).catch(() => null);
+  const amlCheck = isCashPaymentMethod(draftData.paymentMethod || draftData.metodo_pagamento)
+    ? await cashAntiMoneyLaunderingCheck({
+      codice_fiscale: draftData.fiscalCode || draftData.codice_fiscale,
+      cliente_id: draftData.cliente_id || draftData.clienteId,
+      data_atto: draftData.date || draftData.data_atto,
+      importo_corrente: draftData.amount || draftData.totale,
+      atto_id: saleDeedId || draftData.id || null
+    }).catch(() => null)
+    : null;
+  const reasons = approvalReasonsFromQualityShield({ quality, shield, amlCheck });
+  const needsApproval = reasons.length > 0;
+  if (!needsApproval) return { approved: false, request: null, quality, shield, amlCheck, reasons: [] };
+  const approvedRequest = await findApprovedApprovalForAct(saleDeedId);
+  if (approvedRequest) return { approved: true, request: approvedRequest, quality, shield, amlCheck, reasons };
+  if (["commesso", "aiuto_commesso"].includes(role)) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "approval_required_blocked_completion",
+      entityType: "atto",
+      entityId: saleDeedId || draftData.practiceNumber || null,
+      entityLabel: draftData.practiceNumber || "",
+      afterData: { reasons, quality, aurum_shield: shield },
+      metadata: { critical: true, risk_score: shield?.score || 0, risk_level: shield?.risk_level || "" }
+    });
+    const error = new Error("Questa pratica richiede autorizzazione di un responsabile o founder prima di essere completata.");
+    error.status = 409;
+    error.code = "APPROVAL_REQUIRED";
+    error.approval_required = true;
+    error.reasons = reasons;
+    error.quality_check = quality;
+    error.aurum_shield = shield;
+    throw error;
+  }
+  return { approved: false, request: null, quality, shield, amlCheck, reasons };
+}
+
+async function listApprovalRequests(query = {}, user = {}) {
+  const values = [];
+  const where = ["COALESCE(ar.status, '') <> 'deleted'"];
+  await addApprovalVisibilityWhere(user, where, values);
+  if (query.status) {
+    values.push(String(query.status));
+    where.push(`ar.status = $${values.length}::text`);
+  }
+  const result = await pool.query(
+    `SELECT ${approvalRequestSelectSql()}
+     ${approvalRequestJoinSql()}
+     WHERE ${where.join(" AND ")}
+     ORDER BY ar.created_at DESC
+     LIMIT 200`,
+    values
+  );
+  return result.rows.map(approvalRequestRowToPublic);
+}
+
+async function dashboardApprovalStats(user = {}) {
+  const values = [];
+  const where = ["ar.status = 'pending'"];
+  await addApprovalVisibilityWhere(user, where, values);
+  const result = await pool.query(
+    `SELECT COUNT(*)::int AS pending,
+            COUNT(*) FILTER (WHERE ar.risk_level IN ('alto', 'critico') OR ar.risk_score >= 61)::int AS risky_pending
+     ${approvalRequestJoinSql()}
+     WHERE ${where.join(" AND ")}`,
+    values
+  ).catch(() => ({ rows: [{ pending: 0, risky_pending: 0 }] }));
+  const latest = await listApprovalRequests({ status: "pending" }, user).catch(() => []);
+  return {
+    pending: Number(result.rows[0]?.pending || 0),
+    risky_pending: Number(result.rows[0]?.risky_pending || 0),
+    latest: latest.slice(0, 10)
+  };
+}
+
+async function getApprovalRequest(id, user = {}) {
+  const values = [id];
+  const where = ["ar.id = $1::bigint"];
+  await addApprovalVisibilityWhere(user, where, values);
+  const result = await pool.query(
+    `SELECT ${approvalRequestSelectSql()}
+     ${approvalRequestJoinSql()}
+     WHERE ${where.join(" AND ")}
+     LIMIT 1`,
+    values
+  );
+  return result.rows[0] ? approvalRequestRowToPublic(result.rows[0]) : null;
+}
+
+async function createApprovalRequest(input = {}, user = {}, req = null) {
+  const saleDeedId = input.sale_deed_id || input.saleDeedId || input.atto_id || input.id || "";
+  const row = saleDeedId ? await findExisting(saleDeedId) : null;
+  if (!row) {
+    const error = new Error("Atto non trovato");
+    error.status = 404;
+    throw error;
+  }
+  if (!canAccessAct(row, user) || !canEditAct(row, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const existing = await pool.query(
+    `SELECT ${approvalRequestSelectSql()}
+     ${approvalRequestJoinSql()}
+     WHERE ar.sale_deed_id = $1::bigint
+       AND ar.status = 'pending'
+     ORDER BY ar.created_at DESC
+     LIMIT 1`,
+    [row.id]
+  );
+  if (existing.rows[0]) return approvalRequestRowToPublic(existing.rows[0]);
+  const reasons = Array.isArray(input.reasons) ? input.reasons : [];
+  const shield = input.aurum_shield || input.aurumShield || {};
+  const quality = input.quality_check || input.qualityCheck || {};
+  const riskScore = Number(input.risk_score ?? shield.score ?? 0);
+  const riskLevel = String(input.risk_level || shield.risk_level || "").toLowerCase();
+  const store = row.negozio_id ? null : await storeByCodeOrName(row.store);
+  const result = await pool.query(
+    `INSERT INTO approval_requests
+      (sale_deed_id, requested_by, requested_by_role, requested_to_role, store_id, status,
+       risk_score, risk_level, reasons, quality_check, aurum_shield, requester_note, updated_at)
+     VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::bigint,'pending',
+       $6::integer,$7::text,$8::jsonb,$9::jsonb,$10::jsonb,$11::text,NOW())
+     RETURNING *`,
+    [
+      row.id,
+      user.id,
+      normalizeRole(user.ruolo),
+      "responsabile_founder",
+      row.negozio_id || store?.id || null,
+      riskScore,
+      riskLevel,
+      sanitizeForPostgres(reasons),
+      sanitizeForPostgres(quality),
+      sanitizeForPostgres(shield),
+      input.requester_note || input.requesterNote || ""
+    ]
+  );
+  const approval = result.rows[0];
+  await pool.query(
+    `UPDATE ${actsTable}
+     SET status = 'pending_approval',
+         approval_status = 'pending',
+         approval_request_id = $2::bigint,
+         approval_required_at = COALESCE(approval_required_at, NOW()),
+         payload = COALESCE(payload, '{}'::jsonb) || $3::jsonb,
+         updated_at = NOW()
+     WHERE id = $1::bigint`,
+    [
+      row.id,
+      approval.id,
+      sanitizeForPostgres({
+        approvalStatus: "pending",
+        approvalRequestId: approval.id,
+        approvalRequestedAt: new Date().toISOString(),
+        approvalReasons: reasons
+      })
+    ]
+  );
+  void createInternalNotification({
+    title: "Nuova richiesta autorizzazione",
+    message: `Richiesta autorizzazione per ${row.practice_number || `atto ${row.id}`}`,
+    payload: { approval_request_id: approval.id, sale_deed_id: row.id, risk_score: riskScore, risk_level: riskLevel }
+  });
+  void writeAuditLog({
+    req,
+    user,
+    action: "approval_requested",
+    entityType: "approval_request",
+    entityId: approval.id,
+    entityLabel: row.practice_number || "",
+    afterData: approvalRequestRowToPublic({ ...approval, practice_number: row.practice_number, cliente_nome: row.cliente_nome, cliente_cognome: row.cliente_cognome, store: row.store }),
+    metadata: { sale_deed_id: row.id, risk_score: riskScore, risk_level: riskLevel, critical: true }
+  });
+  return approvalRequestRowToPublic({ ...approval, practice_number: row.practice_number, cliente_nome: row.cliente_nome, cliente_cognome: row.cliente_cognome, store: row.store });
+}
+
+async function reviewApprovalRequest(id, input = {}, user = {}, req = null, targetStatus = "approved") {
+  const result = await pool.query(
+    `SELECT ${approvalRequestSelectSql()}, requester.ruolo AS requester_role
+     ${approvalRequestJoinSql()}
+     WHERE ar.id = $1::bigint
+     LIMIT 1`,
+    [id]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  const isCancel = targetStatus === "cancelled";
+  const canCancel = isCancel && (String(row.requested_by) === String(user.id) || await canApproveApprovalRequest(row, user));
+  if (!canCancel && !(await canApproveApprovalRequest(row, user))) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "approval_unauthorized_attempt",
+      entityType: "approval_request",
+      entityId: id,
+      entityLabel: row.practice_number || "",
+      metadata: { attempted_status: targetStatus, critical: true }
+    });
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const note = String(input.reviewer_note || input.reviewerNote || input.note || "").trim();
+  if (targetStatus === "rejected" && !note) {
+    const error = new Error("Nota obbligatoria per rifiutare l'autorizzazione.");
+    error.status = 400;
+    throw error;
+  }
+  const reviewed = await pool.query(
+    `UPDATE approval_requests
+     SET status = $2::text,
+         reviewer_note = $3::text,
+         reviewed_by = CASE WHEN $2::text = 'cancelled' THEN reviewed_by ELSE $4::bigint END,
+         reviewed_at = CASE WHEN $2::text = 'cancelled' THEN reviewed_at ELSE NOW() END,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [id, targetStatus, note, user.id || null]
+  );
+  const statusForAct = {
+    approved: "approval_approved",
+    rejected: "approval_rejected",
+    cancelled: "archived_incomplete"
+  }[targetStatus] || "pending_approval";
+  await pool.query(
+    `UPDATE ${actsTable}
+     SET status = $2::text,
+         approval_status = $3::text,
+         payload = COALESCE(payload, '{}'::jsonb) || $4::jsonb,
+         updated_at = NOW()
+     WHERE id = $1::bigint`,
+    [
+      row.sale_deed_id,
+      statusForAct,
+      targetStatus,
+      sanitizeForPostgres({
+        approvalStatus: targetStatus,
+        approvalRequestId: row.id,
+        approvalReviewedAt: targetStatus === "cancelled" ? null : new Date().toISOString(),
+        approvalReviewerNote: note
+      })
+    ]
+  );
+  void createInternalNotification({
+    user_id: row.requested_by,
+    title: targetStatus === "approved" ? "Autorizzazione approvata" : targetStatus === "rejected" ? "Autorizzazione rifiutata" : "Autorizzazione annullata",
+    message: targetStatus === "approved"
+      ? "Autorizzazione approvata. La pratica può essere completata."
+      : targetStatus === "rejected"
+        ? "Autorizzazione rifiutata. Correggere la pratica prima di procedere."
+        : "Richiesta autorizzazione annullata.",
+    payload: { approval_request_id: row.id, sale_deed_id: row.sale_deed_id }
+  });
+  const auditAction = targetStatus === "approved" ? "approval_approved" : targetStatus === "rejected" ? "approval_rejected" : "approval_cancelled";
+  void writeAuditLog({
+    req,
+    user,
+    action: auditAction,
+    entityType: "approval_request",
+    entityId: id,
+    entityLabel: row.practice_number || "",
+    beforeData: approvalRequestRowToPublic(row),
+    afterData: approvalRequestRowToPublic({ ...row, ...reviewed.rows[0], reviewed_by: user.id }),
+    metadata: { sale_deed_id: row.sale_deed_id, status: targetStatus, critical: true }
+  });
+  return approvalRequestRowToPublic({ ...row, ...reviewed.rows[0], reviewed_by: user.id });
 }
 
 async function rowWithAurumShield(id) {
@@ -7347,11 +7799,14 @@ async function saveAct(input, user, req = null) {
   }
   if (existing) return updateAct(existing.id, protectedInput, user, req);
   const act = await enrichActStore(normalizeAct(protectedInput, existing), user);
-  const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing);
   const nowIso = new Date().toISOString();
   const statusCode = normalizeWorkflowStatus(act.status);
+  const approvalCheck = ["completed", "archived_completed"].includes(statusCode)
+    ? await assertApprovalAllowsFinalSave({ saleDeedId: null, draftData: { ...act.payload, status: statusCode }, user, req })
+    : { approved: false };
+  const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing, { allowApproved: Boolean(approvalCheck.approved) });
   if (["completed", "archived_completed"].includes(statusCode)) {
-    await assertQualityAllowsFinalSave({ draft_data: { ...act.payload, status: statusCode } }, user);
+    await assertQualityAllowsFinalSave({ draft_data: { ...act.payload, status: statusCode } }, user, { allowApproved: Boolean(approvalCheck.approved) });
   }
   const completedAt = ["completed", "archived_completed"].includes(statusCode) ? nowIso : null;
   const archivedAt = ["archived_incomplete", "archived_completed"].includes(statusCode) ? nowIso : null;
@@ -7460,6 +7915,23 @@ async function saveAct(input, user, req = null) {
       store_name: finalRow.store || null
     }
   });
+  if (approvalCheck.approved) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "sale_deed_completed_after_approval",
+      entityType: "atto",
+      entityId: finalRow.id,
+      entityLabel: finalAct.practiceNumber || finalRow.practice_number || "",
+      afterData: finalAct,
+      metadata: {
+        approval_request_id: approvalCheck.request?.id || null,
+        status: statusCode,
+        store_id: finalRow.negozio_id || null,
+        critical: true
+      }
+    });
+  }
   return { ...finalAct, aurumShield: shield || finalAct.aurumShield, qualityCheck: quality || finalAct.qualityCheck };
 }
 
@@ -7479,8 +7951,11 @@ async function updateAct(identifier, input, user, req = null) {
   const beforeAct = rowToAct(existing, { full: false });
   const act = await enrichActStore(normalizeAct(enforceActStore(input, user), existing), user);
   const normalizedStatus = normalizeWorkflowStatus(act.status);
+  const approvalCheck = ["completed", "archived_completed"].includes(normalizedStatus)
+    ? await assertApprovalAllowsFinalSave({ saleDeedId: existing.id, draftData: { ...act.payload, status: normalizedStatus }, user, req })
+    : { approved: false };
   if (["completed", "archived_completed"].includes(normalizedStatus)) {
-    await assertQualityAllowsFinalSave({ sale_deed_id: existing.id, draft_data: { ...act.payload, status: normalizedStatus } }, user);
+    await assertQualityAllowsFinalSave({ sale_deed_id: existing.id, draft_data: { ...act.payload, status: normalizedStatus } }, user, { allowApproved: Boolean(approvalCheck.approved) });
   }
   const updateValues = [
     existing.id,
@@ -7507,7 +7982,7 @@ async function updateAct(identifier, input, user, req = null) {
     nullIfEmpty(act.operatoreId),
     normalizedStatus
   ];
-  await enforceCashAntiMoneyLaundering(act, user, existing);
+  await enforceCashAntiMoneyLaundering(act, user, existing, { allowApproved: Boolean(approvalCheck.approved) });
   console.log("UPDATE PAYLOAD", redactedActPayloadForLog(act));
   console.log("ATTO ID", existing.id);
   let result;
@@ -7624,6 +8099,36 @@ async function updateAct(identifier, input, user, req = null) {
       changed_fields: changedFields
     }
   });
+  if (approvalCheck.approved) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "sale_deed_completed_after_approval",
+      entityType: "atto",
+      entityId: finalRow.id,
+      entityLabel: finalAct.practiceNumber || finalRow.practice_number || "",
+      afterData: finalAct,
+      metadata: {
+        approval_request_id: approvalCheck.request?.id || null,
+        status: normalizedStatus,
+        store_id: finalRow.negozio_id || null,
+        critical: true
+      }
+    });
+  }
+  if (["pending_approval", "approval_approved", "approval_rejected"].includes(normalizeWorkflowStatus(existing.status)) && !["completed", "archived_completed"].includes(normalizedStatus)) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "sale_deed_modified_after_approval_request",
+      entityType: "atto",
+      entityId: finalRow.id,
+      entityLabel: finalAct.practiceNumber || "",
+      beforeData: beforeAct,
+      afterData: finalAct,
+      metadata: { status: normalizedStatus, approval_status: finalAct.approvalStatus || "", store_id: finalRow.negozio_id || null }
+    });
+  }
   if (beforeAct.paymentMethod !== finalAct.paymentMethod || Number(beforeAct.amount || 0) !== Number(finalAct.amount || 0) || beforeAct.iban !== finalAct.iban) {
     void writeAuditLog({
       req,
@@ -8595,6 +9100,75 @@ app.put("/api/antifrode/:id", async (request, response, next) => {
     const alert = await updateAntifraudAlert(request.params.id, request.body, request.user);
     if (!alert) return response.status(404).json({ error: "Alert non trovato" });
     response.json(alert);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/approvals", async (request, response, next) => {
+  try {
+    response.json({ approvals: await listApprovalRequests(request.query, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/approvals/:id", async (request, response, next) => {
+  try {
+    const approval = await getApprovalRequest(request.params.id, request.user);
+    if (!approval) return response.status(404).json({ error: "Richiesta autorizzazione non trovata" });
+    response.json({ approval_request: approval });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/approvals/request", async (request, response, next) => {
+  try {
+    const approval = await createApprovalRequest(request.body || {}, request.user, request);
+    response.status(201).json({
+      ok: true,
+      message: "Richiesta autorizzazione inviata",
+      approval_request: approval
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/approvals/:id/approve", async (request, response, next) => {
+  try {
+    const approval = await reviewApprovalRequest(request.params.id, request.body || {}, request.user, request, "approved");
+    if (!approval) return response.status(404).json({ error: "Richiesta autorizzazione non trovata" });
+    response.json({
+      ok: true,
+      message: "Autorizzazione approvata. La pratica può essere completata.",
+      approval_request: approval
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/approvals/:id/reject", async (request, response, next) => {
+  try {
+    const approval = await reviewApprovalRequest(request.params.id, request.body || {}, request.user, request, "rejected");
+    if (!approval) return response.status(404).json({ error: "Richiesta autorizzazione non trovata" });
+    response.json({
+      ok: true,
+      message: "Autorizzazione rifiutata. Correggere la pratica prima di procedere.",
+      approval_request: approval
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/approvals/:id/cancel", async (request, response, next) => {
+  try {
+    const approval = await reviewApprovalRequest(request.params.id, request.body || {}, request.user, request, "cancelled");
+    if (!approval) return response.status(404).json({ error: "Richiesta autorizzazione non trovata" });
+    response.json({ ok: true, message: "Richiesta autorizzazione annullata.", approval_request: approval });
   } catch (error) {
     next(error);
   }
@@ -10388,7 +10962,15 @@ app.use((error, request, response, _next) => {
   const message = isDatabaseError
     ? friendlyDatabaseError(error, request)
     : error.message || "Errore server";
-  response.status(error.status || 500).json({ ok: false, error: message });
+  const payload = { ok: false, error: message };
+  if (error.code) payload.code = error.code;
+  if (error.approval_required) {
+    payload.approval_required = true;
+    payload.reasons = error.reasons || [];
+    payload.quality_check = error.quality_check || null;
+    payload.aurum_shield = error.aurum_shield || null;
+  }
+  response.status(error.status || 500).json(payload);
 });
 
 app.listen(port, () => {

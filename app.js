@@ -17,6 +17,8 @@ const state = {
   searchActive: false,
   editingActId: null,
   editingOriginalStatus: "",
+  editingApprovalStatus: "",
+  editingApprovalRequestId: null,
   editingDirty: false,
   suppressDirtyTracking: false,
   cashLimitWarningShown: false,
@@ -59,6 +61,7 @@ const state = {
   crmClients: [],
   crmSearchTimer: null,
   backups: [],
+  approvals: [],
   auditLogs: [],
   auditPagination: { page: 1, limit: 50, total: 0 },
   clockTimer: null,
@@ -680,6 +683,8 @@ const trainingCourseFormPanel = document.getElementById("trainingCourseForm");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
+const approvalsList = document.getElementById("approvalsList");
+const refreshApprovals = document.getElementById("refreshApprovals");
 const auditTrailFilters = document.getElementById("auditTrailFilters");
 const auditTrailList = document.getElementById("auditTrailList");
 const auditTrailPageInfo = document.getElementById("auditTrailPageInfo");
@@ -1060,6 +1065,7 @@ async function apiRequest(path, options = {}) {
         }
         const error = new Error(body.error || "Errore comunicazione server");
         error.status = response.status;
+        Object.assign(error, body);
         if (attempt < attempts && shouldRetryApi(error, response.status)) {
           await wait(350 * attempt);
           continue;
@@ -1945,6 +1951,10 @@ function canReviewActs(user = state.currentUser) {
   return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
 
+function currentUserNeedsApprovalForRisk() {
+  return ["commesso", "aiuto_commesso"].includes(normalizeRole(state.currentUser?.ruolo));
+}
+
 function userSeesAllStores(user = state.currentUser) {
   return ["founder", "supervisore"].includes(normalizeRole(user?.ruolo));
 }
@@ -1973,6 +1983,10 @@ function canManageBackupsUi() {
   return ["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
+function canUseApprovalSectionUi() {
+  return Boolean(state.currentUser);
+}
+
 function applyRolePermissions() {
   document.querySelectorAll(".user-directory-only").forEach((element) => {
     element.hidden = !canViewUsersDirectory();
@@ -1985,6 +1999,9 @@ function applyRolePermissions() {
   });
   document.querySelectorAll(".backup-manager-only").forEach((element) => {
     element.hidden = !canManageBackupsUi();
+  });
+  document.querySelectorAll(".approval-section-only").forEach((element) => {
+    element.hidden = !canUseApprovalSectionUi();
   });
   document.querySelectorAll(".knowledge-editor-only").forEach((element) => {
     element.hidden = !canManageKnowledgeUi();
@@ -2276,6 +2293,10 @@ function setScreen(id) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
+  if (id === "approvals" && !canUseApprovalSectionUi()) {
+    showToast("Sezione non disponibile per il tuo ruolo.");
+    return;
+  }
   closeMainMenuDropdowns();
   closeMainUserMenu();
   const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
@@ -2307,6 +2328,7 @@ async function handleScreenDataLoad(id) {
     initBullionVaultChart();
   }
   if (id === "backups") await loadBackups();
+  if (id === "approvals") await loadApprovals();
   if (id === "stores") await loadStores();
   if (id === "antifraud") await loadAntifraud();
   if (id === "aurumShield") await loadAurumShieldAdmin();
@@ -4127,6 +4149,7 @@ function renderDashboard() {
   const kpi = data.kpi || {};
   const shield = data.aurum_shield || {};
   const audit = data.audit_summary || {};
+  const approvals = data.approval_summary || {};
   dashboardGrid.innerHTML = [
     metricCard("Totale oro oggi", `${Number(kpi.grammi_giornalieri?.Oro || 0).toFixed(2)} gr`),
     metricCard("Totale argento oggi", `${Number(kpi.grammi_giornalieri?.Argento || 0).toFixed(2)} gr`),
@@ -4144,6 +4167,8 @@ function renderDashboard() {
     metricCard("Shield alto rischio oggi", shield.high_today || 0),
     metricCard("Shield critici", shield.critical_open || 0),
     metricCard("Shield score medio", `${Number(shield.average_score || 0)}/100`),
+    metricCard("Autorizzazioni in attesa", approvals.pending || 0),
+    metricCard("Richieste rischiose", approvals.risky_pending || 0),
     metricCard("Login oggi", audit.logins_today || 0),
     metricCard("Azioni critiche oggi", Number(audit.acts_deleted_today || 0) + Number(audit.shield_alerts_today || 0)),
     metricCard("Oro mensile", `${Number(kpi.grammi_mensili?.Oro || 0).toFixed(2)} gr`),
@@ -4165,6 +4190,11 @@ function renderDashboard() {
       <div class="dashboard-rank-row"><span>Alert aperti</span><strong>${escapeHtml(String(shield.open_alerts || 0))}</strong><em>Pratiche da verificare</em></div>
       <div class="dashboard-rank-row"><span>Negozio con piu alert</span><strong>${escapeHtml(shield.top_store?.store || "Nessun dato")}</strong><em>${escapeHtml(String(shield.top_store?.alerts || 0))} alert</em></div>
       <div class="dashboard-rank-row"><span>Operatore con piu alert</span><strong>${escapeHtml(shield.top_operator?.operator || "Nessun dato")}</strong><em>${escapeHtml(String(shield.top_operator?.alerts || 0))} alert</em></div>
+    </section>
+    <section class="dashboard-panel"><h3>Richieste autorizzazione</h3>
+      <div class="dashboard-rank-row"><span>In attesa</span><strong>${escapeHtml(String(approvals.pending || 0))}</strong><em>Da approvare o rifiutare</em></div>
+      <div class="dashboard-rank-row"><span>Rischiose</span><strong>${escapeHtml(String(approvals.risky_pending || 0))}</strong><em>Alto/critico o score sopra soglia</em></div>
+      ${(approvals.latest || []).slice(0, 5).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.practiceNumber || "Atto")}</span><strong>${escapeHtml(item.statusLabel || approvalStatusMeta(item.status).label)}</strong><em>${escapeHtml(item.requestedByName || "Utente")} · ${escapeHtml(String(item.risk_score || 0))}/100</em></div>`).join("") || '<div class="empty-state">Nessuna richiesta in attesa.</div>'}
     </section>
     <section class="dashboard-panel"><h3>Oggi nell'app</h3>
       <div class="dashboard-rank-row"><span>Atti creati</span><strong>${escapeHtml(String(audit.acts_created_today || 0))}</strong><em>Da Audit Trail</em></div>
@@ -4230,6 +4260,14 @@ function auditActionLabel(action = "") {
     aurum_support_request: "Richiesta supporto Aurum",
     aurum_memory_created: "Memoria Aurum creata",
     aurum_memory_deleted: "Memoria Aurum eliminata",
+    approval_requested: "Richiesta autorizzazione",
+    approval_approved: "Autorizzazione approvata",
+    approval_rejected: "Autorizzazione rifiutata",
+    approval_cancelled: "Autorizzazione annullata",
+    approval_required_blocked_completion: "Completamento bloccato per autorizzazione",
+    approval_unauthorized_attempt: "Tentativo autorizzazione non consentito",
+    sale_deed_completed_after_approval: "Atto completato dopo autorizzazione",
+    sale_deed_modified_after_approval_request: "Modifica atto dopo richiesta autorizzazione",
     create_academy_course: "Creazione corso Academy",
     update_academy_course: "Modifica corso Academy",
     delete_academy_course: "Eliminazione corso Academy",
@@ -4329,6 +4367,180 @@ async function viewAuditLog(id) {
     previewModal.hidden = false;
   } catch (error) {
     showToast(error.message || "Dettaglio audit non caricato.", "error");
+  }
+}
+
+function approvalStatusMeta(status = "pending") {
+  return {
+    pending: { label: "In attesa", className: "approval-pending" },
+    approved: { label: "Approvata", className: "approval-approved" },
+    rejected: { label: "Rifiutata", className: "approval-rejected" },
+    cancelled: { label: "Annullata", className: "approval-cancelled" }
+  }[String(status || "pending").toLowerCase()] || { label: "In attesa", className: "approval-pending" };
+}
+
+function approvalReasonText(reason = {}) {
+  if (typeof reason === "string") return reason;
+  return reason.message || reason.label || reason.title || "Motivo da verificare";
+}
+
+function approvalReasonsMarkup(reasons = []) {
+  const items = Array.isArray(reasons) ? reasons : [];
+  if (!items.length) return '<small class="muted">Nessun motivo dettagliato disponibile.</small>';
+  return `
+    <ul class="approval-reasons">
+      ${items.slice(0, 6).map((reason) => `
+        <li>
+          <strong>${escapeHtml(reason.severity || reason.type || "verifica")}</strong>
+          <span>${escapeHtml(approvalReasonText(reason))}</span>
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function canReviewApprovalRequest(approval = {}) {
+  return canReviewActs() && String(approval.status || "pending") === "pending";
+}
+
+function canCancelApprovalRequest(approval = {}) {
+  return String(approval.status || "pending") === "pending"
+    && String(approval.requested_by || "") === String(state.currentUser?.id || "");
+}
+
+function renderApprovals() {
+  if (!approvalsList) return;
+  const approvals = state.approvals || [];
+  if (!approvals.length) {
+    approvalsList.innerHTML = '<div class="empty-state">Nessuna richiesta autorizzazione visibile per il tuo ruolo.</div>';
+    return;
+  }
+  approvalsList.innerHTML = `
+    <div class="table-row head">
+      <span>Pratica</span><span>Richiedente</span><span>Rischio</span><span>Motivi</span><span>Stato</span><span>Azioni</span>
+    </div>
+    ${approvals.map((approval) => {
+      const meta = approvalStatusMeta(approval.status);
+      const canReview = canReviewApprovalRequest(approval);
+      const canCancel = canCancelApprovalRequest(approval);
+      return `
+        <div class="table-row approval-row">
+          <span>
+            <strong>${escapeHtml(approval.practiceNumber || `Atto ${approval.sale_deed_id || ""}`)}</strong>
+            <small>${escapeHtml(approval.clientName || "Cliente non indicato")}${approval.store ? ` · ${escapeHtml(approval.store)}` : ""}</small>
+          </span>
+          <span>
+            ${escapeHtml(approval.requestedByName || "Utente")}
+            <small>${escapeHtml(roleLabel(approval.requested_by_role || ""))} · ${escapeHtml(formatDateTime(approval.created_at))}</small>
+          </span>
+          <span>
+            <strong>${escapeHtml(Number(approval.risk_score || 0))}/100</strong>
+            <small>${escapeHtml(approval.risk_level || "da verificare")}</small>
+          </span>
+          <span>${approvalReasonsMarkup(approval.reasons)}</span>
+          <span><mark class="approval-status ${meta.className}">${escapeHtml(meta.label)}</mark></span>
+          <span class="row-actions">
+            <button type="button" data-open-approval-act="${escapeHtml(approval.practiceNumber || "")}" ${approval.practiceNumber ? "" : "disabled"}>Apri</button>
+            <button type="button" data-edit-approval-act="${escapeHtml(approval.practiceNumber || "")}" ${approval.practiceNumber ? "" : "disabled"}>Modifica</button>
+            <button class="ghost-button" type="button" data-view-approval="${escapeHtml(approval.id)}">Dettaglio</button>
+            ${canReview ? `<button class="primary-button" type="button" data-approve-approval="${escapeHtml(approval.id)}">Approva</button>` : ""}
+            ${canReview ? `<button class="danger-button" type="button" data-reject-approval="${escapeHtml(approval.id)}">Rifiuta</button>` : ""}
+            ${canCancel ? `<button class="ghost-button" type="button" data-cancel-approval="${escapeHtml(approval.id)}">Annulla</button>` : ""}
+          </span>
+        </div>
+      `;
+    }).join("")}
+  `;
+}
+
+async function loadApprovals() {
+  if (!canUseApprovalSectionUi()) return;
+  if (approvalsList) approvalsList.innerHTML = '<div class="empty-state">Caricamento richieste autorizzazione...</div>';
+  try {
+    const data = await apiRequest("/approvals");
+    state.approvals = data.approvals || [];
+    renderApprovals();
+  } catch (error) {
+    if (approvalsList) approvalsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Richieste autorizzazione non caricate.")}</div>`;
+  }
+}
+
+async function viewApprovalRequest(id) {
+  try {
+    const data = await apiRequest(`/approvals/${encodeURIComponent(id)}`);
+    const approval = data.approval_request || data;
+    const meta = approvalStatusMeta(approval.status);
+    previewTitle.textContent = `Autorizzazione · ${approval.practiceNumber || approval.sale_deed_id || id}`;
+    previewBody.innerHTML = `
+      <div class="audit-detail-grid">
+        <div><span>Stato</span><strong>${escapeHtml(meta.label)}</strong></div>
+        <div><span>Richiedente</span><strong>${escapeHtml(approval.requestedByName || "Utente")}</strong></div>
+        <div><span>Ruolo</span><strong>${escapeHtml(roleLabel(approval.requested_by_role || ""))}</strong></div>
+        <div><span>Negozio</span><strong>${escapeHtml(approval.store || "Dato non inserito")}</strong></div>
+        <div><span>Risk score</span><strong>${escapeHtml(Number(approval.risk_score || 0))}/100 · ${escapeHtml(approval.risk_level || "n/d")}</strong></div>
+        <div><span>Data richiesta</span><strong>${escapeHtml(formatDateTime(approval.created_at))}</strong></div>
+      </div>
+      <section class="audit-detail-block">
+        <h4>Motivi</h4>
+        ${approvalReasonsMarkup(approval.reasons)}
+      </section>
+      ${approval.requester_note ? auditDataBlock("Nota richiedente", approval.requester_note) : ""}
+      ${approval.reviewer_note ? auditDataBlock("Nota revisore", approval.reviewer_note) : ""}
+      ${auditDataBlock("Controllo Qualità", approval.quality_check)}
+      ${auditDataBlock("Aurum Shield", approval.aurum_shield)}
+    `;
+    previewModal.hidden = false;
+  } catch (error) {
+    showToast(error.message || "Dettaglio autorizzazione non caricato.", "error");
+  }
+}
+
+async function approveApprovalRequest(id) {
+  const reviewerNote = window.prompt("Nota opzionale per l'approvazione:") || "";
+  try {
+    const data = await apiRequest(`/approvals/${encodeURIComponent(id)}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ reviewer_note: reviewerNote })
+    });
+    showToast(data.message || "Autorizzazione approvata. La pratica può essere completata.", "success");
+    await loadApprovals();
+    await loadArchiveScreenData({ force: true, silent: true }).catch(() => {});
+    renderArchiveGroups();
+  } catch (error) {
+    showToast(error.message || "Autorizzazione non approvata.", "error");
+  }
+}
+
+async function rejectApprovalRequest(id) {
+  const reviewerNote = window.prompt("Motivo del rifiuto autorizzazione:");
+  if (!reviewerNote || !reviewerNote.trim()) {
+    showToast("Nota obbligatoria per rifiutare l'autorizzazione.", "warning");
+    return;
+  }
+  try {
+    const data = await apiRequest(`/approvals/${encodeURIComponent(id)}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reviewer_note: reviewerNote.trim() })
+    });
+    showToast(data.message || "Autorizzazione rifiutata. Correggere la pratica prima di procedere.", "success");
+    await loadApprovals();
+    await loadArchiveScreenData({ force: true, silent: true }).catch(() => {});
+    renderArchiveGroups();
+  } catch (error) {
+    showToast(error.message || "Autorizzazione non rifiutata.", "error");
+  }
+}
+
+async function cancelApprovalRequest(id) {
+  if (!window.confirm("Vuoi annullare questa richiesta autorizzazione?")) return;
+  try {
+    const data = await apiRequest(`/approvals/${encodeURIComponent(id)}/cancel`, { method: "POST" });
+    showToast(data.message || "Richiesta autorizzazione annullata.", "success");
+    await loadApprovals();
+    await loadArchiveScreenData({ force: true, silent: true }).catch(() => {});
+    renderArchiveGroups();
+  } catch (error) {
+    showToast(error.message || "Richiesta non annullata.", "error");
   }
 }
 
@@ -4436,10 +4648,155 @@ function scheduleAurumShieldEvaluation() {
   scheduleQualityCheckValidation();
 }
 
-async function confirmAurumShieldBeforeFinalSave(shield) {
+function frontendApprovalReasons({ quality = null, shield = null } = {}) {
+  const reasons = [];
+  const shieldLevel = String(shield?.risk_level || "").toLowerCase();
+  if (shield && ["alto", "critico"].includes(shieldLevel)) {
+    reasons.push({
+      type: "aurum_shield",
+      severity: shieldLevel,
+      message: `${shield.summary || "Aurum Shield richiede verifica"} (${Number(shield.score || 0)}/100)`
+    });
+  }
+  (shield?.factors || []).forEach((factor) => {
+    const points = Number(factor.points || 0);
+    const severity = String(factor.severity || "").toLowerCase();
+    if (points >= 20 || ["high", "critical", "alto", "critico"].includes(severity)) {
+      reasons.push({
+        type: factor.type || "risk_factor",
+        severity: severity || "warning",
+        message: factor.message || "Fattore rischio da verificare"
+      });
+    }
+  });
+  const qualityStatus = String(quality?.quality_status || quality?.status || "").toLowerCase();
+  if (qualityStatus === "non_completabile") {
+    (quality.blocking_errors || []).slice(0, 8).forEach((message) => {
+      reasons.push({ type: "quality_error", severity: "error", message });
+    });
+  }
+  if (qualityStatus === "attenzione") {
+    (quality.warnings || []).slice(0, 6).forEach((message) => {
+      reasons.push({ type: "quality_warning", severity: "warning", message });
+    });
+  }
+  if (state.amlCashCheck?.ok === false) {
+    reasons.push({ type: "cash_limit", severity: "critical", message: state.amlCashCheck.messaggio || cashPaymentLimitMessage() });
+  } else if (isCashPayment() && saleTotalAmount() >= CASH_PAYMENT_LIMIT * 0.8) {
+    reasons.push({ type: "cash_limit", severity: "high", message: "Contanti vicino alla soglia configurata." });
+  }
+  const seen = new Set();
+  return reasons.filter((reason) => {
+    const key = `${reason.type}:${reason.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function approvalPromptText({ reasons = [], shield = null, quality = null } = {}) {
+  const status = quality?.quality_status || quality?.status || "";
+  const title = "Questa pratica richiede autorizzazione di un responsabile o founder prima di essere completata.";
+  const reasonLines = reasons.length
+    ? reasons.slice(0, 7).map((reason) => `- ${approvalReasonText(reason)}`).join("\n")
+    : "- Elementi operativi da verificare prima del completamento";
+  const scoreLine = shield ? `\nRisk score: ${Number(shield.score || 0)}/100 (${shield.risk_level || "n/d"})` : "";
+  const qualityLine = status ? `\nControllo Qualità: ${status}` : "";
+  return `${title}${scoreLine}${qualityLine}\n\nMotivi:\n${reasonLines}\n\nVuoi inviare la richiesta autorizzazione?`;
+}
+
+function shouldRequestApprovalForQuality(quality, action = "complete") {
+  if (!["complete", "archive"].includes(action)) return false;
+  if (String(state.editingApprovalStatus || "").toLowerCase() === "approved") return false;
+  const status = String(quality?.quality_status || quality?.status || "").toLowerCase();
+  return currentUserNeedsApprovalForRisk() && ["non_completabile", "attenzione"].includes(status);
+}
+
+function shouldRequestApprovalForShield(shield) {
+  if (!currentUserNeedsApprovalForRisk()) return false;
+  if (String(state.editingApprovalStatus || "").toLowerCase() === "approved") return false;
+  const score = Number(shield?.score || 0);
+  const level = String(shield?.risk_level || "").toLowerCase();
+  return score > 60 || ["alto", "critico"].includes(level);
+}
+
+function hasApprovedApprovalForCurrentAct() {
+  return String(state.editingApprovalStatus || "").toLowerCase() === "approved"
+    || workflowStatusCode(state.editingOriginalStatus || "") === "approval_approved";
+}
+
+async function requestApprovalForCurrentPractice(options = {}) {
+  if (!currentUserNeedsApprovalForRisk()) return false;
+  if (!fieldValue("#practiceNumber")) await updatePracticeNumber();
+  if (!fieldValue("#practiceNumber")) {
+    showToast("Numerazione atto momentaneamente non disponibile.", "warning");
+    return false;
+  }
+  const quality = options.quality || state.guidedQualityCheck || null;
+  const shield = options.shield || quality?.aurum_shield || state.aurumShield || null;
+  const reasons = options.reasons?.length ? options.reasons : frontendApprovalReasons({ quality, shield });
+  if (options.askConfirm !== false && !window.confirm(approvalPromptText({ reasons, shield, quality }))) return false;
+  const targetStatus = options.targetStatus || "completed";
+  const pendingAct = {
+    ...(options.draftData || currentActSnapshot("pending_approval")),
+    status: "pending_approval",
+    approvalStatus: "pending",
+    approvalReasons: reasons,
+    aurumShield: shield || null,
+    qualityCheck: quality || null
+  };
+  pendingAct.practiceNumber ||= fieldValue("#practiceNumber");
+  const method = state.editingActId || state.editingPracticeNumber || pendingAct.id ? "PUT" : "POST";
+  try {
+    const saved = await saveActRecord(pendingAct, method);
+    state.editingActId = saved.id || state.editingActId;
+    state.editingPracticeNumber = saved.practiceNumber || pendingAct.practiceNumber || state.editingPracticeNumber;
+    state.editingApprovalStatus = "pending";
+    const data = await apiRequest("/approvals/request", {
+      method: "POST",
+      body: JSON.stringify({
+        sale_deed_id: saved.id,
+        requester_note: options.requesterNote || "",
+        reasons,
+        risk_score: Number(shield?.score || 0),
+        risk_level: shield?.risk_level || "",
+        quality_check: quality || {},
+        aurum_shield: shield || {},
+        target_status: targetStatus,
+        action: options.action || "complete"
+      })
+    });
+    showToast(data.message || "Richiesta autorizzazione inviata", "success");
+    state.editingApprovalRequestId = data.approval_request?.id || state.editingApprovalRequestId;
+    if (shouldShowAurumMascot()) {
+      showAurumTip("Ho inviato la richiesta autorizzazione. Responsabile o Founder potranno approvarla o rifiutarla.");
+    }
+    await Promise.all([
+      loadApprovals().catch(() => {}),
+      loadArchiveScreenData({ force: true, silent: true }).catch(() => {})
+    ]);
+    renderArchiveGroups();
+    if (document.getElementById("approvals") && canUseApprovalSectionUi()) setScreen("approvals");
+    return true;
+  } catch (error) {
+    showToast(error.message || "Richiesta autorizzazione non inviata.", "error");
+    return false;
+  }
+}
+
+async function confirmAurumShieldBeforeFinalSave(shield, options = {}) {
   if (!shield || Number(shield.score || 0) <= 60) return true;
   const level = String(shield.risk_level || "");
-  if (level === "critico" && shield.block_critical_practices && !["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) {
+  if (shouldRequestApprovalForShield(shield)) {
+    await requestApprovalForCurrentPractice({
+      ...options,
+      shield,
+      reasons: frontendApprovalReasons({ quality: options.quality || state.guidedQualityCheck, shield }),
+      askConfirm: true
+    });
+    return false;
+  }
+  if (level === "critico" && shield.block_critical_practices && !hasApprovedApprovalForCurrentAct() && !["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) {
     showToast("Aurum Shield ha rilevato rischio critico: richiedi verifica a Responsabile o Founder.", "warning");
     return false;
   }
@@ -4573,6 +4930,23 @@ async function ensureGuidedQualityAllows(action = "complete", options = {}) {
   const quality = await validateQualityChecklist({ status: options.status || "completed", silent: false, draftData: options.draftData });
   if (!quality) return false;
   const status = quality.quality_status || quality.status;
+  if (shouldRequestApprovalForQuality(quality, action)) {
+    showAurumQualityGuidance(quality);
+    await requestApprovalForCurrentPractice({
+      action,
+      targetStatus: options.status || "completed",
+      draftData: options.draftData || qualityCheckDraftData(options.status || "completed"),
+      quality,
+      shield: quality.aurum_shield || state.aurumShield,
+      reasons: frontendApprovalReasons({ quality, shield: quality.aurum_shield || state.aurumShield })
+    });
+    return false;
+  }
+  if (status === "non_completabile" && hasApprovedApprovalForCurrentAct()) {
+    showAurumQualityGuidance(quality);
+    const preview = (quality.blocking_errors || quality.required_actions || []).slice(0, 6).join("\n- ");
+    return window.confirm(`Autorizzazione approvata per questa pratica.\n\nRestano punti da controllare:\n- ${preview || "verifica superiore ricevuta"}\n\nVuoi procedere comunque?`);
+  }
   if (status === "non_completabile") {
     showToast("Non puoi completare questa pratica. Risolvi prima i controlli obbligatori evidenziati.", "error");
     showAurumQualityGuidance(quality);
@@ -5788,6 +6162,9 @@ function normalizeWorkflowStatus(status = "Archiviata") {
   if (["archived_completed", "archiviato completato", "archiviata completata"].includes(normalized)) return "Archiviato completato";
   if (["draft", "bozza"].includes(normalized)) return "Bozza";
   if (["archived_incomplete", "archived", "archiviato", "archiviata", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "Archiviato incompleto";
+  if (["pending_approval", "in_attesa_autorizzazione", "in attesa autorizzazione", "attesa autorizzazione"].includes(normalized)) return "In attesa autorizzazione";
+  if (["approval_approved", "autorizzazione_approvata", "autorizzazione approvata"].includes(normalized)) return "Autorizzazione approvata";
+  if (["approval_rejected", "autorizzazione_rifiutata", "autorizzazione rifiutata"].includes(normalized)) return "Autorizzazione rifiutata";
   if (["deleted", "eliminato", "eliminata"].includes(normalized)) return "Eliminato";
   if (["abandoned", "abbandonato", "abbandonata"].includes(normalized)) return "Abbandonato";
   return "Archiviata";
@@ -5799,6 +6176,9 @@ function workflowStatusCode(status = "") {
   if (label === "Archiviato completato") return "archived_completed";
   if (label === "Bozza") return "draft";
   if (label === "Archiviato incompleto" || label === "Archiviata") return "archived_incomplete";
+  if (label === "In attesa autorizzazione") return "pending_approval";
+  if (label === "Autorizzazione approvata") return "approval_approved";
+  if (label === "Autorizzazione rifiutata") return "approval_rejected";
   if (label === "Eliminato") return "deleted";
   if (label === "Abbandonato") return "abandoned";
   return "archived_incomplete";
@@ -5807,6 +6187,9 @@ function workflowStatusCode(status = "") {
 function workflowStatusListLabel(status = "") {
   const code = workflowStatusCode(status);
   if (code === "completed" || code === "archived_completed") return "Completato";
+  if (code === "pending_approval") return "In attesa autorizzazione";
+  if (code === "approval_approved") return "Autorizzazione approvata";
+  if (code === "approval_rejected") return "Autorizzazione rifiutata";
   if (code === "deleted") return "Eliminato";
   return "Archiviato";
 }
@@ -5820,6 +6203,9 @@ function statusClass(status = "") {
   if (normalized === "completed" || normalized === "archived_completed") return "status-completed";
   if (normalized === "draft") return "status-draft";
   if (normalized === "archived_incomplete") return "status-archived";
+  if (normalized === "pending_approval") return "status-pending-approval";
+  if (normalized === "approval_approved") return "status-approval-approved";
+  if (normalized === "approval_rejected") return "status-approval-rejected";
   if (normalized === "deleted" || normalized === "abandoned") return "status-deleted";
   return "";
 }
@@ -6140,6 +6526,8 @@ function currentActSnapshot(status = "Archiviata") {
     signatures: [...state.signatures],
     signatureImages: signatureImages(),
     captures,
+    approvalStatus: state.editingApprovalStatus || "",
+    approvalRequestId: state.editingApprovalRequestId || null,
     status: workflowStatusCode(status)
   };
 }
@@ -6245,7 +6633,7 @@ function renderArchiveGroups() {
                     <div class="table-row ${canViewActQuality(act) ? `${qualityReviewClass(act.qualityReview)}-row` : ""}">
                       <span>
                         ${escapeHtml(act.practiceNumber)}
-                        <small>${isCompletedWorkflowStatus(act.status) ? "Completato" : "Archiviato"}</small>
+                        <small>${escapeHtml(workflowStatusListLabel(act.status))}</small>
                       </span>
                       <span>${escapeHtml(act.store || "Dato non inserito")}</span>
                       <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
@@ -6830,6 +7218,8 @@ async function loadActForEdit(practiceNumber) {
   state.editingPracticeNumber = act.practiceNumber;
   state.editingActId = act.id || null;
   state.editingOriginalStatus = normalizeWorkflowStatus(act.status || "Archiviata");
+  state.editingApprovalStatus = act.approvalStatus || "";
+  state.editingApprovalRequestId = act.approvalRequestId || null;
 
   setFieldValue("#storeCode", storeCodeFromAct(act));
   setFieldValue("#practiceNumber", act.practiceNumber);
@@ -6957,6 +7347,8 @@ async function resetCurrentPractice(options = {}) {
   state.editingPracticeNumber = null;
   state.editingActId = null;
   state.editingOriginalStatus = "";
+  state.editingApprovalStatus = "";
+  state.editingApprovalRequestId = null;
   state.editingDirty = false;
   state.suppressDirtyTracking = false;
   state.loadedSignatureImages = SIGNATURE_LABELS.map(() => "");
@@ -8683,7 +9075,7 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
     showToast("Numerazione atto momentaneamente non disponibile.");
     return false;
   }
-  if (normalizeWorkflowStatus(status) !== "Bozza" && notifyCashPaymentLimitIfNeeded({ force: true })) return false;
+  if (normalizeWorkflowStatus(status) !== "Bozza" && notifyCashPaymentLimitIfNeeded({ force: true }) && !currentUserNeedsApprovalForRisk()) return false;
   const review = currentQualityReview();
   if (review?.status === "negative" && !review.feedback) {
     showToast("Inserisci il feedback scritto per il controllo qualità negativo.");
@@ -8703,12 +9095,14 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   const isCompletion = ["completed", "archived_completed"].includes(targetStatus);
   const missing = isCompletion ? validatePrintScope("company") : [];
   if (requestedStatus !== "draft" && !options.skipQualityCheck) {
+    const qualityDraft = currentActSnapshot(isCompletion ? targetStatus : "archived_completed");
     const allowed = await ensureGuidedQualityAllows(isCompletion ? "complete" : "archive", {
-      status: isCompletion ? targetStatus : "archived_completed"
+      status: isCompletion ? targetStatus : "archived_completed",
+      draftData: qualityDraft
     });
     if (!allowed) return false;
   }
-  if (isCompletion && missing.length && !options.skipValidation) {
+  if (isCompletion && missing.length && !options.skipValidation && !hasApprovedApprovalForCurrentAct()) {
     showToast(validationMessage(missing, "la copia aziendale"));
     return false;
   }
@@ -8728,11 +9122,28 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   archivedAct = await attachLegalSignatureMetadata(archivedAct);
   archivedAct.readOnlyHtml = buildPrintCopy("Atto archiviato - Sola lettura", "Dato interno aziendale", "company");
   const shield = await evaluateAurumShield({ draftData: archivedAct, status: targetStatus, silent: true, loading: true });
-  if (!(await confirmAurumShieldBeforeFinalSave(shield))) return false;
+  if (!(await confirmAurumShieldBeforeFinalSave(shield, {
+    action: isCompletion ? "complete" : "archive",
+    targetStatus,
+    draftData: archivedAct,
+    quality: state.guidedQualityCheck
+  }))) return false;
   if (shield) archivedAct.aurumShield = shield;
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   } catch (error) {
+    if (error.approval_required) {
+      await requestApprovalForCurrentPractice({
+        action: isCompletion ? "complete" : "archive",
+        targetStatus,
+        draftData: archivedAct,
+        quality: error.quality_check || state.guidedQualityCheck,
+        shield: error.aurum_shield || shield,
+        reasons: error.reasons || frontendApprovalReasons({ quality: error.quality_check || state.guidedQualityCheck, shield: error.aurum_shield || shield }),
+        askConfirm: true
+      });
+      return false;
+    }
     showToast(error.message || "Errore nel salvataggio dell'atto.", "error");
     return false;
   }
@@ -8796,7 +9207,7 @@ async function runAiActCheck(act) {
 async function completeCurrentPractice() {
   if (!(await ensureGuidedQualityAllows("complete", { status: "completed" }))) return false;
   const missing = validatePrintScope("company");
-  if (!missing.length) {
+  if (!missing.length || hasApprovedApprovalForCurrentAct()) {
     const act = currentActSnapshot("Completato");
     const aiCheck = await runAiActCheck(act);
     const aiProblems = [
@@ -8812,7 +9223,7 @@ async function completeCurrentPractice() {
         return false;
       }
     }
-    return archiveCurrentPractice("completed", { skipQualityCheck: true });
+    return archiveCurrentPractice("completed", { skipQualityCheck: true, skipValidation: hasApprovedApprovalForCurrentAct() });
   }
 
   showToast(validationMessage(missing, "la pratica"));
@@ -9067,6 +9478,21 @@ auditTrailPrev?.addEventListener("click", () => {
 auditTrailNext?.addEventListener("click", () => {
   const page = Number(state.auditPagination?.page || 1) + 1;
   loadAuditTrail(page);
+});
+refreshApprovals?.addEventListener("click", loadApprovals);
+approvalsList?.addEventListener("click", (event) => {
+  const open = event.target.closest("[data-open-approval-act]");
+  const edit = event.target.closest("[data-edit-approval-act]");
+  const view = event.target.closest("[data-view-approval]");
+  const approve = event.target.closest("[data-approve-approval]");
+  const reject = event.target.closest("[data-reject-approval]");
+  const cancel = event.target.closest("[data-cancel-approval]");
+  if (open) openArchivedAct(open.dataset.openApprovalAct);
+  if (edit) loadActForEdit(edit.dataset.editApprovalAct);
+  if (view) viewApprovalRequest(view.dataset.viewApproval);
+  if (approve) approveApprovalRequest(approve.dataset.approveApproval);
+  if (reject) rejectApprovalRequest(reject.dataset.rejectApproval);
+  if (cancel) cancelApprovalRequest(cancel.dataset.cancelApproval);
 });
 document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
   refreshBullionVaultPrices({ notify: true });

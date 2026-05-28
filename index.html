@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260528-audit-trail-1">
+  <link rel="stylesheet" href="styles.css?v=20260528-approval-workflow-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -61,6 +61,7 @@
             <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
+            <button class="approval-section-only" type="button" data-section="approvals">Richieste autorizzazione</button>
             <button type="button" data-section="fusion">Giacenza</button>
           </div>
         </div>
@@ -109,6 +110,7 @@
             <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
+            <button class="approval-section-only" type="button" data-section="approvals">Richieste autorizzazione</button>
             <button type="button" data-section="fusion">Giacenza</button>
           </div>
           <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandToolsSubmenu" aria-expanded="false">Strumenti</button>
@@ -633,6 +635,19 @@
           </div>
         </div>
         <div class="archive-groups" id="archiveGroups"></div>
+      </section>
+
+      <section id="approvals" class="screen approval-section-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Controllo superiore</p>
+            <h2>Richieste autorizzazione</h2>
+            <p class="muted">Gestisci le pratiche bloccate da Aurum Shield, Controllo Qualità o anomalie operative.</p>
+          </div>
+          <button class="primary-button" type="button" id="refreshApprovals">Aggiorna</button>
+        </div>
+        <div class="archive-table users-table approvals-table" id="approvalsList" aria-live="polite"></div>
       </section>
 
       <section id="fusion" class="screen">
@@ -1253,6 +1268,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260528-audit-trail-1"></script>
+  <script src="app.js?v=20260528-approval-workflow-1"></script>
 </body>
 </html>

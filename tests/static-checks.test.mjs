@@ -623,6 +623,52 @@ test("OroActive Audit Trail traccia azioni utenti e ha UI Founder", async () => 
   assert.match(styles, /\.audit-detail-grid/);
 });
 
+test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", async () => {
+  const [index, app, server, schema, migration, styles, worker] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260528_sale_deed_approval_workflow.sql"),
+    file("styles.css"),
+    file("service-worker.js")
+  ]);
+
+  assert.match(schema, /ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS approval_status/);
+  assert.match(schema, /ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS approval_request_id/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS approval_requests/);
+  assert.match(schema, /idx_approval_requests_sale_deed_id/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS approval_requests/);
+  assert.match(migration, /idx_approval_requests_status/);
+
+  assert.match(server, /async function assertApprovalAllowsFinalSave/);
+  assert.match(server, /async function createApprovalRequest/);
+  assert.match(server, /async function reviewApprovalRequest/);
+  assert.match(server, /app\.get\("\/api\/approvals"/);
+  assert.match(server, /app\.post\("\/api\/approvals\/request"/);
+  assert.match(server, /app\.post\("\/api\/approvals\/:id\/approve"/);
+  assert.match(server, /app\.post\("\/api\/approvals\/:id\/reject"/);
+  assert.match(server, /approval_required = true/);
+  assert.match(server, /approval_required_blocked_completion/);
+  assert.match(server, /sale_deed_completed_after_approval/);
+
+  assert.match(index, /id="approvals"/);
+  assert.match(index, /data-section="approvals"/);
+  assert.match(index, /id="approvalsList"/);
+  assert.match(app, /async function loadApprovals/);
+  assert.match(app, /function renderApprovals/);
+  assert.match(app, /async function requestApprovalForCurrentPractice/);
+  assert.match(app, /function shouldRequestApprovalForQuality/);
+  assert.match(app, /function hasApprovedApprovalForCurrentAct/);
+  assert.match(app, /confirmAurumShieldBeforeFinalSave\(shield, options = \{\}\)/);
+  assert.match(app, /apiRequest\("\/approvals\/request"/);
+  assert.match(app, /data-approve-approval/);
+  assert.match(app, /In attesa autorizzazione/);
+  assert.match(styles, /\.approvals-table/);
+  assert.match(styles, /\.approval-status\.approval-approved/);
+  assert.match(worker, /approval-workflow-1/);
+});
+
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
   const app = await file("app.js");
   const enterStart = app.indexOf("async function enterSectionFromMainMenu");

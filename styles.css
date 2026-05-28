@@ -3325,6 +3325,81 @@ input.document-expired {
   grid-template-columns: 0.95fr 1.05fr 0.9fr 0.95fr 1.2fr 0.7fr;
 }
 
+.approvals-table .table-row {
+  grid-template-columns: 0.95fr 0.95fr 0.65fr 1.2fr 0.65fr 1fr;
+}
+
+.approval-row {
+  align-items: start;
+}
+
+.approval-row .row-actions {
+  align-items: stretch;
+}
+
+.approval-reasons {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.approval-reasons li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 115, 28, 0.18);
+  border-radius: 8px;
+  background: #fffaf3;
+}
+
+.approval-reasons strong {
+  color: var(--gold-dark);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.approval-reasons span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.approval-status {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 950;
+}
+
+.approval-status.approval-pending,
+.table-row em.status-pending-approval,
+.archive-export-row em.status-pending-approval {
+  background: #fff1b8;
+  color: #0b0b0a;
+}
+
+.approval-status.approval-approved,
+.table-row em.status-approval-approved,
+.archive-export-row em.status-approval-approved {
+  background: #dff7e8;
+  color: #0b0b0a;
+}
+
+.approval-status.approval-rejected,
+.table-row em.status-approval-rejected,
+.archive-export-row em.status-approval-rejected {
+  background: #ffe3e3;
+  color: #9f1239;
+}
+
+.approval-status.approval-cancelled {
+  background: #f2f2f2;
+  color: #666;
+}
+
 .users-table .table-row strong,
 .users-table .table-row span {
   display: grid;
@@ -4667,6 +4742,7 @@ button.quality-review-badge {
   .fusion-table .table-row,
   .users-table .table-row,
   #auditTrailList .table-row,
+  .approvals-table .table-row,
   .stats-table .table-row {
     grid-template-columns: 1fr;
   }
