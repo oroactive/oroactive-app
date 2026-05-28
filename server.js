@@ -186,18 +186,19 @@ function auditApiRequest(request, response, next) {
     const method = request.method;
     const route = request.originalUrl.split("?")[0];
     if (route.includes("/auth/me")) return;
-    pool.query(
-      `INSERT INTO audit_logs (user_id, method, route, status_code, duration_ms, ip_address, created_at)
-       VALUES ($1::bigint,$2::text,$3::text,$4::integer,$5::integer,$6::text,NOW())`,
-      [
-        request.user.id,
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: response.statusCode >= 400 ? "api_request_error" : "api_request",
+      entityType: "api",
+      entityLabel: `${method} ${route}`,
+      metadata: {
         method,
         route,
-        response.statusCode,
-        Date.now() - startedAt,
-        request.ip || request.socket.remoteAddress || ""
-      ]
-    ).catch((error) => console.error("AUDIT LOG ERROR", error));
+        status_code: response.statusCode,
+        duration_ms: Date.now() - startedAt
+      }
+    });
   });
   next();
 }
@@ -401,6 +402,391 @@ function publicActivity(row) {
   };
 }
 
+function auditActionLabel(action = "") {
+  return {
+    api_request: "Richiesta API",
+    api_request_error: "Errore API",
+    login: "Login utente",
+    logout: "Logout utente",
+    login_failed: "Login fallito",
+    session_expired: "Sessione scaduta",
+    create_act: "Creazione atto",
+    save_draft: "Salvataggio bozza",
+    update_act: "Modifica atto",
+    complete_act: "Completamento atto",
+    archive_act: "Archiviazione atto",
+    delete_act: "Eliminazione atto",
+    reopen_act: "Riapertura atto",
+    print_customer_copy: "Stampa copia cliente",
+    print_company_copy: "Stampa copia aziendale",
+    generate_pdf: "Generazione PDF",
+    modify_payment: "Modifica pagamento",
+    modify_deed_client_data: "Modifica dati cliente atto",
+    upload_documents: "Caricamento documenti",
+    upload_jewelry_photos: "Caricamento foto preziosi",
+    customer_signature: "Firma cliente",
+    quality_check_executed: "Controllo qualità eseguito",
+    quality_check_failed: "Controllo qualità fallito",
+    risky_practice_approved: "Approvazione pratica rischiosa",
+    risk_score_calculated: "Risk score calcolato",
+    aurum_shield_alert_created: "Alert rischio creato",
+    aurum_shield_alert_reviewed: "Alert rischio in verifica",
+    aurum_shield_alert_resolved: "Alert rischio risolto",
+    update_aurum_shield_settings: "Modifica configurazione Aurum Shield",
+    create_user: "Creazione utente",
+    update_user: "Modifica utente",
+    change_user_role: "Cambio ruolo utente",
+    change_user_store: "Cambio negozio utente",
+    deactivate_user: "Disattivazione utente",
+    delete_user: "Eliminazione utente",
+    view_user_activity: "Visualizzazione attività utente",
+    create_crm_client: "Creazione cliente CRM",
+    update_crm_client: "Modifica cliente CRM",
+    delete_crm_client: "Archiviazione cliente CRM",
+    add_crm_note: "Aggiunta nota CRM",
+    update_client_bank_data: "Modifica dati bancari cliente",
+    create_fusion_lot: "Creazione lotto fusione",
+    update_fusion_lot: "Modifica lotto fusione",
+    delete_fusion_lot: "Eliminazione lotto fusione",
+    change_fusion_lot_status: "Cambio stato lotto fusione",
+    print_fusion_pdf: "Stampa PDF fusione",
+    create_academy_course: "Creazione corso Academy",
+    update_academy_course: "Modifica corso Academy",
+    delete_academy_course: "Eliminazione corso Academy",
+    upload_academy_material: "Caricamento materiale corso",
+    complete_academy_lesson: "Completamento lezione",
+    complete_academy_course: "Completamento corso",
+    assign_certificate: "Assegnazione certificazione",
+    assign_badge: "Assegnazione badge",
+    revoke_badge: "Revoca badge",
+    create_backup: "Creazione backup",
+    verify_backup: "Verifica backup",
+    download_backup: "Download backup",
+    delete_backup: "Eliminazione backup",
+    test_restore_backup: "Test restore backup",
+    ask_aurum: "Domanda ad Aurum",
+    aurum_support_request: "Richiesta supporto Aurum",
+    aurum_memory_created: "Memoria Aurum creata",
+    aurum_memory_deleted: "Memoria Aurum eliminata"
+  }[action] || activityLabel(action) || "Attività";
+}
+
+function auditRequestIp(req) {
+  return req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim()
+    || req?.ip
+    || req?.socket?.remoteAddress
+    || "";
+}
+
+function auditDeviceInfo(userAgent = "") {
+  const ua = String(userAgent || "");
+  if (!ua) return "";
+  const platform = /iphone|ipad|ios/i.test(ua)
+    ? "iOS/iPadOS"
+    : /macintosh|mac os/i.test(ua)
+      ? "Mac"
+      : /android/i.test(ua)
+        ? "Android"
+        : /windows/i.test(ua)
+          ? "Windows"
+          : "Web";
+  const browser = /edg/i.test(ua)
+    ? "Edge"
+    : /chrome|crios/i.test(ua)
+      ? "Chrome"
+      : /safari/i.test(ua)
+        ? "Safari"
+        : /firefox/i.test(ua)
+          ? "Firefox"
+          : "Browser";
+  return `${platform} · ${browser}`;
+}
+
+function auditUserName(user = {}) {
+  return [user.nome, user.cognome].filter(Boolean).join(" ").trim()
+    || user.username
+    || user.email
+    || "";
+}
+
+function maskAuditString(key = "", value = "") {
+  const text = String(value || "");
+  if (!text) return text;
+  if (/iban/i.test(key)) {
+    return text.length > 8 ? `${text.slice(0, 4)}${"*".repeat(Math.max(text.length - 8, 0))}${text.slice(-4)}` : "********";
+  }
+  if (/codice[_\s-]*fiscale|fiscal/i.test(key)) {
+    return text.length > 6 ? `${text.slice(0, 3)}${"*".repeat(Math.max(text.length - 6, 0))}${text.slice(-3)}` : "******";
+  }
+  if (text.length > 500) return `${text.slice(0, 500)}...`;
+  return text;
+}
+
+function compactAuditPayload(value, key = "", depth = 0) {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  if (depth > 4) return "[contenuto omesso]";
+  if (typeof value === "string") {
+    if (/password|token|secret|hash|firma|signature|base64|documento.*(url|file)|foto|image|pdf|file_path/i.test(key)) {
+      return value ? "[dato protetto]" : "";
+    }
+    return maskAuditString(key, value);
+  }
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) {
+    return value.slice(0, 25).map((item) => compactAuditPayload(item, key, depth + 1));
+  }
+  if (typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).slice(0, 80).map(([entryKey, entryValue]) => {
+      if (/password|token|secret|hash|firma|signature|base64|document.*file|captureFiles|loadedSignatureImages|buffer/i.test(entryKey)) {
+        return [entryKey, entryValue ? "[dato protetto]" : null];
+      }
+      return [entryKey, compactAuditPayload(entryValue, entryKey, depth + 1)];
+    }));
+  }
+  return String(value);
+}
+
+function auditChangedFields(beforeData = {}, afterData = {}) {
+  const before = beforeData || {};
+  const after = afterData || {};
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  return [...keys].filter((key) => JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null)).slice(0, 30);
+}
+
+async function writeAuditLog({
+  req = null,
+  user = null,
+  action = "activity",
+  entityType = "system",
+  entityId = null,
+  entityLabel = null,
+  beforeData = null,
+  afterData = null,
+  metadata = {}
+} = {}) {
+  try {
+    const actor = user || req?.user || null;
+    const safeMetadata = compactAuditPayload(metadata || {});
+    const userAgent = req?.headers?.["user-agent"] || safeMetadata.user_agent || "";
+    await pool.query(
+      `INSERT INTO audit_logs (
+        user_id, user_name, user_role, store_id, store_name,
+        action, entity_type, entity_id, entity_label,
+        before_data, after_data, metadata,
+        ip_address, user_agent, device_info,
+        method, route, status_code, duration_ms, created_at
+      ) VALUES (
+        $1::bigint,$2::text,$3::text,$4::bigint,$5::text,
+        $6::text,$7::text,$8::text,$9::text,
+        $10::jsonb,$11::jsonb,$12::jsonb,
+        $13::text,$14::text,$15::text,
+        $16::text,$17::text,$18::integer,$19::integer,NOW()
+      )`,
+      [
+        actor?.id || null,
+        auditUserName(actor),
+        actor?.ruolo ? normalizeRole(actor.ruolo) : null,
+        safeMetadata.store_id || actor?.negozio_id || null,
+        safeMetadata.store_name || actor?.negozio || null,
+        action,
+        entityType,
+        entityId === undefined || entityId === null ? null : String(entityId),
+        entityLabel || null,
+        beforeData === undefined ? null : sanitizeForPostgres(compactAuditPayload(beforeData)),
+        afterData === undefined ? null : sanitizeForPostgres(compactAuditPayload(afterData)),
+        sanitizeForPostgres(safeMetadata),
+        auditRequestIp(req),
+        userAgent,
+        auditDeviceInfo(userAgent),
+        safeMetadata.method || req?.method || null,
+        safeMetadata.route || req?.originalUrl?.split("?")[0] || null,
+        Number.isFinite(Number(safeMetadata.status_code)) ? Number(safeMetadata.status_code) : null,
+        Number.isFinite(Number(safeMetadata.duration_ms)) ? Number(safeMetadata.duration_ms) : null
+      ]
+    );
+  } catch (err) {
+    console.error("AUDIT LOG ERROR", err);
+  }
+}
+
+function publicAuditLog(row = {}) {
+  const action = row.action || row.activity_type || "activity";
+  return {
+    id: row.id,
+    type: action,
+    action,
+    label: auditActionLabel(action),
+    user_id: row.user_id,
+    userName: row.user_name || [row.actor_nome, row.actor_cognome].filter(Boolean).join(" ") || row.actor_username || row.actor_email || "",
+    userRole: row.user_role || "",
+    store_id: row.store_id || null,
+    storeName: row.store_name || "",
+    entityType: row.entity_type || "",
+    entityId: row.entity_id || "",
+    entityLabel: row.entity_label || "",
+    description: row.entity_label || row.metadata?.description || auditActionLabel(action),
+    before_data: row.before_data || null,
+    after_data: row.after_data || null,
+    metadata: row.metadata || {},
+    ip_address: row.ip_address || "",
+    user_agent: row.user_agent || "",
+    device_info: row.device_info || "",
+    method: row.method || "",
+    route: row.route || "",
+    status_code: row.status_code || null,
+    duration_ms: row.duration_ms || null,
+    created_at: row.created_at,
+    actor: row.user_name || [row.actor_nome, row.actor_cognome].filter(Boolean).join(" ") || row.actor_username || row.actor_email || ""
+  };
+}
+
+function canViewAuditTrail(user = {}) {
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
+}
+
+function addAuditVisibilityWhere(user, conditions, values, alias = "al") {
+  const role = normalizeRole(user?.ruolo);
+  if (role === "founder") return;
+  if (role === "supervisore") {
+    conditions.push(`COALESCE(${alias}.user_role, '') <> 'founder'`);
+    return;
+  }
+  if (role === "responsabile") {
+    const roleParam = values.push(["commesso", "aiuto_commesso"]) || values.length;
+    const clauses = [`${alias}.user_id = $${values.push(user?.id || null)}::bigint`];
+    const storeClauses = [];
+    if (user?.negozio_id) storeClauses.push(`${alias}.store_id = $${values.push(user.negozio_id)}::bigint`);
+    if (user?.negozio) storeClauses.push(`${alias}.store_name = $${values.push(user.negozio)}::text`);
+    if (storeClauses.length) {
+      clauses.push(`(COALESCE(${alias}.user_role, '') = ANY($${roleParam}::text[]) AND (${storeClauses.join(" OR ")}))`);
+    }
+    conditions.push(`(${clauses.join(" OR ")})`);
+    return;
+  }
+  conditions.push(`${alias}.user_id = $${values.push(user?.id || null)}::bigint`);
+}
+
+async function listAuditLogs(query = {}, user = {}) {
+  if (!canViewAuditTrail(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const page = Math.max(1, Number(query.page || 1));
+  const limit = Math.min(50, Math.max(1, Number(query.limit || 50)));
+  const offset = (page - 1) * limit;
+  const values = [];
+  const conditions = ["1=1"];
+  addAuditVisibilityWhere(user, conditions, values, "al");
+  if (query.user_id) conditions.push(`al.user_id = $${values.push(query.user_id)}::bigint`);
+  if (query.action) conditions.push(`al.action = $${values.push(query.action)}::text`);
+  if (query.entity_type) conditions.push(`al.entity_type = $${values.push(query.entity_type)}::text`);
+  if (query.entity_id) conditions.push(`al.entity_id = $${values.push(String(query.entity_id))}::text`);
+  if (query.store_id) conditions.push(`al.store_id = $${values.push(query.store_id)}::bigint`);
+  if (query.role) conditions.push(`al.user_role = $${values.push(normalizeRole(query.role))}::text`);
+  if (query.date_from) conditions.push(`al.created_at >= $${values.push(query.date_from)}::date`);
+  if (query.date_to) conditions.push(`al.created_at < ($${values.push(query.date_to)}::date + INTERVAL '1 day')`);
+  if (query.search) {
+    const searchParam = values.push(`%${String(query.search).trim()}%`);
+    conditions.push(`(
+      al.user_name ILIKE $${searchParam}
+      OR al.action ILIKE $${searchParam}
+      OR al.entity_type ILIKE $${searchParam}
+      OR al.entity_id ILIKE $${searchParam}
+      OR al.entity_label ILIKE $${searchParam}
+      OR al.route ILIKE $${searchParam}
+    )`);
+  }
+  const where = conditions.join(" AND ");
+  const totalResult = await pool.query(`SELECT COUNT(*)::int AS total FROM audit_logs al WHERE ${where}`, values);
+  const result = await pool.query(
+    `SELECT al.*
+     FROM audit_logs al
+     WHERE ${where}
+     ORDER BY al.created_at DESC, al.id DESC
+     LIMIT $${values.push(limit)}::integer OFFSET $${values.push(offset)}::integer`,
+    values
+  );
+  return {
+    ok: true,
+    logs: result.rows.map(publicAuditLog),
+    pagination: { page, limit, total: totalResult.rows[0]?.total || 0 }
+  };
+}
+
+async function getAuditLogDetail(id, user = {}) {
+  if (!canViewAuditTrail(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const values = [id];
+  const conditions = ["al.id = $1::bigint"];
+  addAuditVisibilityWhere(user, conditions, values, "al");
+  const result = await pool.query(`SELECT al.* FROM audit_logs al WHERE ${conditions.join(" AND ")} LIMIT 1`, values);
+  return result.rows[0] ? publicAuditLog(result.rows[0]) : null;
+}
+
+async function dashboardAuditSummary(user = {}) {
+  if (!canViewAuditTrail(user)) {
+    return {
+      logins_today: 0,
+      acts_created_today: 0,
+      acts_updated_today: 0,
+      acts_deleted_today: 0,
+      customer_prints_today: 0,
+      shield_alerts_today: 0,
+      top_users: [],
+      latest: []
+    };
+  }
+  const values = [];
+  const conditions = ["al.created_at >= CURRENT_DATE"];
+  addAuditVisibilityWhere(user, conditions, values, "al");
+  const where = conditions.join(" AND ");
+  const [counts, topUsers, latest] = await Promise.all([
+    pool.query(
+      `SELECT action, COUNT(*)::int AS total
+       FROM audit_logs al
+       WHERE ${where}
+       GROUP BY action`,
+      values
+    ),
+    pool.query(
+      `SELECT COALESCE(user_name, 'Utente') AS user_name, COALESCE(user_role, '') AS user_role, COUNT(*)::int AS total
+       FROM audit_logs al
+       WHERE ${where}
+         AND al.user_id IS NOT NULL
+       GROUP BY user_name, user_role
+       ORDER BY total DESC
+       LIMIT 5`,
+      values
+    ),
+    pool.query(
+      `SELECT al.*
+       FROM audit_logs al
+       WHERE ${where}
+         AND COALESCE(action, '') <> 'api_request'
+       ORDER BY created_at DESC, id DESC
+       LIMIT 10`,
+      values
+    )
+  ]);
+  const byAction = Object.fromEntries(counts.rows.map((row) => [row.action, row.total]));
+  return {
+    logins_today: byAction.login || 0,
+    acts_created_today: byAction.create_act || byAction.save_draft || 0,
+    acts_updated_today: byAction.update_act || 0,
+    acts_deleted_today: byAction.delete_act || 0,
+    customer_prints_today: byAction.print_customer_copy || 0,
+    shield_alerts_today: byAction.aurum_shield_alert_created || 0,
+    top_users: topUsers.rows,
+    latest: latest.rows.map(publicAuditLog)
+  };
+}
+
 function signUserToken(user) {
   return jwt.sign(
     {
@@ -435,6 +821,12 @@ async function authenticate(request, response, next) {
     request.user = user;
     next();
   } catch {
+    void writeAuditLog({
+      req: request,
+      action: "session_expired",
+      entityType: "sessione",
+      entityLabel: "Token non valido o scaduto"
+    });
     response.status(401).json({ error: "Sessione scaduta o non valida" });
   }
 }
@@ -1635,6 +2027,15 @@ async function createAurumMemory(input = {}, user = {}) {
     entityType: "aurum_memory",
     entityId: result.rows[0]?.id,
     description: "Memoria Aurum salvata con consenso esplicito"
+  });
+  void writeAuditLog({
+    user,
+    action: "aurum_memory_created",
+    entityType: "aurum_memory",
+    entityId: result.rows[0]?.id,
+    entityLabel: "Memoria Aurum",
+    afterData: publicAurumMemory(result.rows[0]),
+    metadata: { memory_type: normalizeAurumMemoryType(input.memory_type) }
   });
   return publicAurumMemory(result.rows[0]);
 }
@@ -3655,6 +4056,19 @@ async function dashboardKpis(user = {}) {
     top_store: null,
     top_operator: null
   }));
+  const auditSummary = await dashboardAuditSummary(user).catch((error) => {
+    console.error("AUDIT SUMMARY ERROR", error);
+    return {
+      logins_today: 0,
+      acts_created_today: 0,
+      acts_updated_today: 0,
+      acts_deleted_today: 0,
+      customer_prints_today: 0,
+      shield_alerts_today: 0,
+      top_users: [],
+      latest: []
+    };
+  });
   return {
     kpi: {
       fatturato_giornaliero: sum(dailyActs, (act) => act.amount),
@@ -3683,7 +4097,8 @@ async function dashboardKpis(user = {}) {
     pagamenti: paymentSplit,
     ranking_negozi: Object.values(byStore).sort((a, b) => b.fatturato - a.fatturato),
     ranking_operatori: Object.values(byOperator).sort((a, b) => b.fatturato - a.fatturato),
-    aurum_shield: aurumShield
+    aurum_shield: aurumShield,
+    audit_summary: auditSummary
   };
 }
 
@@ -4399,6 +4814,22 @@ async function syncAurumShieldAlert({ saleDeedRow, shield, user = {} }) {
       description
     ]
   );
+  if (result.rows[0]) {
+    void writeAuditLog({
+      user,
+      action: "aurum_shield_alert_created",
+      entityType: "aurum_shield_alert",
+      entityId: result.rows[0].id,
+      entityLabel: title,
+      afterData: result.rows[0],
+      metadata: {
+        sale_deed_id: saleDeedRow.id,
+        client_id: saleDeedRow.cliente_id || null,
+        store_id: saleDeedRow.negozio_id || null,
+        severity: shield.risk_level
+      }
+    });
+  }
   return result.rows[0] || null;
 }
 
@@ -4439,6 +4870,15 @@ async function persistAurumShieldForAct(saleDeedRow, user = {}) {
     [saleDeedRow.id, shield.score, shield.risk_level, shield.summary, sanitizeForPostgres(shield.factors || [])]
   );
   await syncAurumShieldAlert({ saleDeedRow, shield, user });
+  void writeAuditLog({
+    user,
+    action: "risk_score_calculated",
+    entityType: "atto",
+    entityId: saleDeedRow.id,
+    entityLabel: saleDeedRow.practice_number || "",
+    afterData: { score: shield.score, risk_level: shield.risk_level, summary: shield.summary, factors: shield.factors },
+    metadata: { store_id: saleDeedRow.negozio_id || null, store_name: saleDeedRow.store || null }
+  });
   return {
     ...shield,
     id: result.rows[0]?.id || null,
@@ -6660,17 +7100,27 @@ async function crmClientDetail(id, user = {}) {
   return { client: publicClient(client), acts: acts.rows.map((row) => rowToAct(row, { full: false })), notes: notes.rows, aurum_shield: shield };
 }
 
-async function addClientNote(id, input = {}, user = {}) {
+async function addClientNote(id, input = {}, user = {}, req = null) {
   const result = await pool.query(
     `INSERT INTO client_notes (cliente_id, user_id, note)
      VALUES ($1,$2,$3)
      RETURNING *`,
     [id, user.id, input.note || ""]
   );
+  void writeAuditLog({
+    req,
+    user,
+    action: "add_crm_note",
+    entityType: "cliente",
+    entityId: id,
+    entityLabel: `Cliente ${id}`,
+    afterData: { note: input.note || "" },
+    metadata: { client_id: id }
+  });
   return result.rows[0];
 }
 
-async function updateCrmClient(id, input = {}, user = {}) {
+async function updateCrmClient(id, input = {}, user = {}, req = null) {
   const detail = await crmClientDetail(id, user);
   if (!detail) return null;
   const payload = {
@@ -6723,16 +7173,54 @@ async function updateCrmClient(id, input = {}, user = {}) {
       sanitizeForPostgres(payload)
     ]
   );
-  return publicClient(result.rows[0]);
+  const updated = publicClient(result.rows[0]);
+  void writeAuditLog({
+    req,
+    user,
+    action: "update_crm_client",
+    entityType: "cliente",
+    entityId: id,
+    entityLabel: [updated.name, updated.surname].filter(Boolean).join(" ") || `Cliente ${id}`,
+    beforeData: detail.client,
+    afterData: updated,
+    metadata: { client_id: id, changed_fields: auditChangedFields(detail.client || {}, updated || {}) }
+  });
+  if ((detail.client?.iban || "") !== (updated.iban || "") || (detail.client?.accountHolder || "") !== (updated.accountHolder || "")) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "update_client_bank_data",
+      entityType: "cliente",
+      entityId: id,
+      entityLabel: [updated.name, updated.surname].filter(Boolean).join(" ") || `Cliente ${id}`,
+      beforeData: { iban: detail.client?.iban || "", accountHolder: detail.client?.accountHolder || "" },
+      afterData: { iban: updated.iban || "", accountHolder: updated.accountHolder || "" },
+      metadata: { client_id: id, critical: true }
+    });
+  }
+  return updated;
 }
 
-async function archiveCrmClient(id, user = {}) {
+async function archiveCrmClient(id, user = {}, req = null) {
   const detail = await crmClientDetail(id, user);
   if (!detail) return false;
   const result = await pool.query(
     "UPDATE clienti SET archiviato = TRUE, updated_at = NOW() WHERE id = $1::bigint RETURNING id",
     [id]
   );
+  if (result.rowCount) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "delete_crm_client",
+      entityType: "cliente",
+      entityId: id,
+      entityLabel: [detail.client?.name, detail.client?.surname].filter(Boolean).join(" ") || `Cliente ${id}`,
+      beforeData: detail.client,
+      afterData: { archiviato: true },
+      metadata: { client_id: id, critical: true }
+    });
+  }
   return result.rowCount > 0;
 }
 
@@ -6845,7 +7333,7 @@ function stockSummaryFromActs(acts = []) {
   ));
 }
 
-async function saveAct(input, user) {
+async function saveAct(input, user, req = null) {
   const protectedInput = enforceActStore(input, user);
   const existing = protectedInput.id
     ? await findExisting(protectedInput.id)
@@ -6857,7 +7345,7 @@ async function saveAct(input, user) {
     error.status = 403;
     throw error;
   }
-  if (existing) return updateAct(existing.id, protectedInput, user);
+  if (existing) return updateAct(existing.id, protectedInput, user, req);
   const act = await enrichActStore(normalizeAct(protectedInput, existing), user);
   const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing);
   const nowIso = new Date().toISOString();
@@ -6949,10 +7437,33 @@ async function saveAct(input, user) {
       return null;
     })
     : null;
+  void writeAuditLog({
+    req,
+    user,
+    action: ["completed", "archived_completed"].includes(statusCode)
+      ? "complete_act"
+      : statusCode === "archived_incomplete"
+        ? "archive_act"
+        : isDraftLikeStatus(statusCode)
+          ? "save_draft"
+          : "create_act",
+    entityType: "atto",
+    entityId: finalRow.id,
+    entityLabel: finalAct.practiceNumber || finalRow.practice_number || "",
+    afterData: finalAct,
+    metadata: {
+      description: `Atto ${finalAct.practiceNumber || finalRow.id} salvato`,
+      practiceNumber: finalAct.practiceNumber,
+      status: statusCode,
+      store: finalAct.store,
+      store_id: finalRow.negozio_id || null,
+      store_name: finalRow.store || null
+    }
+  });
   return { ...finalAct, aurumShield: shield || finalAct.aurumShield, qualityCheck: quality || finalAct.qualityCheck };
 }
 
-async function updateAct(identifier, input, user) {
+async function updateAct(identifier, input, user, req = null) {
   const existing = await findExisting(identifier);
   if (!existing) return null;
   if (!canAccessAct(existing, user)) {
@@ -6965,6 +7476,7 @@ async function updateAct(identifier, input, user) {
     error.status = 403;
     throw error;
   }
+  const beforeAct = rowToAct(existing, { full: false });
   const act = await enrichActStore(normalizeAct(enforceActStore(input, user), existing), user);
   const normalizedStatus = normalizeWorkflowStatus(act.status);
   if (["completed", "archived_completed"].includes(normalizedStatus)) {
@@ -7087,10 +7599,61 @@ async function updateAct(identifier, input, user) {
       return null;
     })
     : null;
+  const changedFields = auditChangedFields(beforeAct, finalAct);
+  const action = ["completed", "archived_completed"].includes(normalizedStatus)
+    ? "complete_act"
+    : normalizedStatus === "archived_incomplete"
+      ? "archive_act"
+      : "update_act";
+  void writeAuditLog({
+    req,
+    user,
+    action,
+    entityType: "atto",
+    entityId: finalRow.id,
+    entityLabel: finalAct.practiceNumber || finalRow.practice_number || "",
+    beforeData: beforeAct,
+    afterData: finalAct,
+    metadata: {
+      description: `Atto ${finalAct.practiceNumber || finalRow.id} aggiornato`,
+      practiceNumber: finalAct.practiceNumber,
+      status: normalizedStatus,
+      store: finalAct.store,
+      store_id: finalRow.negozio_id || null,
+      store_name: finalRow.store || null,
+      changed_fields: changedFields
+    }
+  });
+  if (beforeAct.paymentMethod !== finalAct.paymentMethod || Number(beforeAct.amount || 0) !== Number(finalAct.amount || 0) || beforeAct.iban !== finalAct.iban) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "modify_payment",
+      entityType: "atto",
+      entityId: finalRow.id,
+      entityLabel: finalAct.practiceNumber || "",
+      beforeData: { paymentMethod: beforeAct.paymentMethod, amount: beforeAct.amount, iban: beforeAct.iban },
+      afterData: { paymentMethod: finalAct.paymentMethod, amount: finalAct.amount, iban: finalAct.iban },
+      metadata: { practiceNumber: finalAct.practiceNumber, store_id: finalRow.negozio_id || null, store_name: finalRow.store || null }
+    });
+  }
+  if (["name", "surname", "fiscalCode", "phone"].some((key) => beforeAct[key] !== finalAct[key])) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "modify_deed_client_data",
+      entityType: "atto",
+      entityId: finalRow.id,
+      entityLabel: finalAct.practiceNumber || "",
+      beforeData: { name: beforeAct.name, surname: beforeAct.surname, fiscalCode: beforeAct.fiscalCode, phone: beforeAct.phone },
+      afterData: { name: finalAct.name, surname: finalAct.surname, fiscalCode: finalAct.fiscalCode, phone: finalAct.phone },
+      metadata: { practiceNumber: finalAct.practiceNumber, store_id: finalRow.negozio_id || null, store_name: finalRow.store || null }
+    });
+  }
   return { ...finalAct, aurumShield: shield || finalAct.aurumShield, qualityCheck: quality || finalAct.qualityCheck };
 }
 
-async function deleteAct(identifier, user) {
+async function deleteAct(identifier, user, req = null) {
   const existing = await findExisting(identifier);
   if (!existing) return false;
   if (!canAccessAct(existing, user)) {
@@ -7146,11 +7709,29 @@ async function deleteAct(identifier, user) {
       description: `Atto ${existing.practice_number} eliminato`,
       metadata: { practiceNumber: existing.practice_number, store: existing.store }
     });
+    void writeAuditLog({
+      req,
+      user,
+      action: "delete_act",
+      entityType: "atto",
+      entityId: existing.id,
+      entityLabel: existing.practice_number || "",
+      beforeData: rowToAct(existing, { full: false }),
+      afterData: { status: "deleted", deleted_by: user?.id || null },
+      metadata: {
+        description: `Atto ${existing.practice_number || existing.id} eliminato`,
+        practiceNumber: existing.practice_number,
+        store: existing.store,
+        store_id: existing.negozio_id || null,
+        store_name: existing.store || null,
+        critical: true
+      }
+    });
   }
   return result.rowCount > 0;
 }
 
-async function createUser(input, actor) {
+async function createUser(input, actor, req = null) {
   const firstName = String(input.nome || input.name || "").trim();
   const surname = String(input.cognome || input.surname || "").trim();
   const role = normalizeRole(input.ruolo || input.role || "");
@@ -7242,6 +7823,7 @@ async function createUser(input, actor) {
       input.attivo !== false
     ]
   );
+  const createdUser = publicUser(result.rows[0]);
   void logUserActivity({
     userId: result.rows[0].id,
     actorId: actor?.id,
@@ -7251,7 +7833,17 @@ async function createUser(input, actor) {
     description: "Utente creato",
     metadata: { role: finalRole, store: finalStore }
   });
-  return publicUser(result.rows[0]);
+  void writeAuditLog({
+    req,
+    user: actor,
+    action: "create_user",
+    entityType: "utente",
+    entityId: result.rows[0].id,
+    entityLabel: auditUserName(createdUser),
+    afterData: createdUser,
+    metadata: { target_user_id: result.rows[0].id, role: finalRole, store: finalStore, store_id: store?.id || null, store_name: finalStore }
+  });
+  return createdUser;
 }
 
 async function findUserRawById(id) {
@@ -7292,9 +7884,10 @@ function canUseRequestedRoleForUpdate(actor, target, requestedRole) {
   return managedRolesForActor(actor).includes(normalizedRequestedRole);
 }
 
-async function updateUser(id, input, actor) {
+async function updateUser(id, input, actor, req = null) {
   const target = await findUserRawById(id);
   if (!target) return null;
+  const beforeUser = publicUser(target);
   const targetIsFounder = normalizeRole(target.ruolo) === "founder";
   if (!targetIsFounder) {
     delete input.email;
@@ -7400,6 +7993,8 @@ async function updateUser(id, input, actor) {
     values
   );
   if (result.rowCount) {
+    const updatedUser = publicUser(result.rows[0]);
+    const changedFields = fields.map((field) => field.split(" = ")[0]).filter((field) => field !== "updated_at");
     void logUserActivity({
       userId: result.rows[0].id,
       actorId: actor?.id,
@@ -7407,8 +8002,45 @@ async function updateUser(id, input, actor) {
       entityType: "utente",
       entityId: result.rows[0].id,
       description: "Utente aggiornato",
-      metadata: { changedFields: fields.map((field) => field.split(" = ")[0]) }
+      metadata: { changedFields }
     });
+    void writeAuditLog({
+      req,
+      user: actor,
+      action: "update_user",
+      entityType: "utente",
+      entityId: result.rows[0].id,
+      entityLabel: auditUserName(updatedUser),
+      beforeData: beforeUser,
+      afterData: updatedUser,
+      metadata: { target_user_id: result.rows[0].id, changed_fields: changedFields, store_id: updatedUser.negozio_id || null, store_name: updatedUser.negozio || null }
+    });
+    if (normalizeRole(beforeUser.ruolo) !== normalizeRole(updatedUser.ruolo)) {
+      void writeAuditLog({
+        req,
+        user: actor,
+        action: "change_user_role",
+        entityType: "utente",
+        entityId: result.rows[0].id,
+        entityLabel: auditUserName(updatedUser),
+        beforeData: { ruolo: beforeUser.ruolo },
+        afterData: { ruolo: updatedUser.ruolo },
+        metadata: { target_user_id: result.rows[0].id, critical: true }
+      });
+    }
+    if (String(beforeUser.negozio_id || beforeUser.negozio || "") !== String(updatedUser.negozio_id || updatedUser.negozio || "")) {
+      void writeAuditLog({
+        req,
+        user: actor,
+        action: "change_user_store",
+        entityType: "utente",
+        entityId: result.rows[0].id,
+        entityLabel: auditUserName(updatedUser),
+        beforeData: { negozio_id: beforeUser.negozio_id, negozio: beforeUser.negozio },
+        afterData: { negozio_id: updatedUser.negozio_id, negozio: updatedUser.negozio },
+        metadata: { target_user_id: result.rows[0].id }
+      });
+    }
   }
   return result.rowCount ? publicUser(result.rows[0]) : null;
 }
@@ -7489,18 +8121,19 @@ async function listUserActivitiesForActor(id, actor) {
     throw error;
   }
   const result = await pool.query(
-    `SELECT l.*, a.nome AS actor_nome, a.cognome AS actor_cognome, a.username AS actor_username, a.email AS actor_email
-     FROM user_activity_logs l
-     LEFT JOIN utenti a ON a.id = l.actor_id
-     WHERE l.user_id = $1::bigint
-     ORDER BY l.created_at DESC
+    `SELECT al.*
+     FROM audit_logs al
+     WHERE al.user_id = $1::bigint
+        OR (al.entity_type = 'utente' AND al.entity_id = $2::text)
+        OR (al.metadata->>'target_user_id') = $2::text
+     ORDER BY al.created_at DESC, al.id DESC
      LIMIT 100`,
-    [id]
+    [id, String(id)]
   );
-  return result.rows.map(publicActivity);
+  return result.rows.map(publicAuditLog);
 }
 
-async function deleteUser(id, actor) {
+async function deleteUser(id, actor, req = null) {
   if (String(actor.id) === String(id)) {
     const error = new Error("Non puoi disattivare il tuo stesso accesso");
     error.status = 400;
@@ -7524,11 +8157,22 @@ async function deleteUser(id, actor) {
       entityId: id,
       description: "Utente disattivato"
     });
+    void writeAuditLog({
+      req,
+      user: actor,
+      action: "deactivate_user",
+      entityType: "utente",
+      entityId: id,
+      entityLabel: auditUserName(target),
+      beforeData: publicUser(target),
+      afterData: { attivo: false },
+      metadata: { target_user_id: id, critical: true }
+    });
   }
   return result.rowCount > 0;
 }
 
-async function loginUser(identifier, password) {
+async function loginUser(identifier, password, req = null) {
   const loginIdentifier = String(identifier || "").trim();
   const result = await pool.query(
     `SELECT *
@@ -7560,6 +8204,16 @@ async function loginUser(identifier, password) {
     entityId: user.id,
     description: "Login effettuato"
   });
+  void writeAuditLog({
+    req,
+    user,
+    action: "login",
+    entityType: "sessione",
+    entityId: user.id,
+    entityLabel: auditUserName(user),
+    afterData: safeUser,
+    metadata: { login_method: "password" }
+  });
   return { token: signUserToken(safeUser), user: safeUser };
 }
 
@@ -7578,7 +8232,7 @@ async function registerFaceId(user, credentialId) {
   return publicUser(result.rows[0]);
 }
 
-async function loginWithFaceId(identifier, credentialId) {
+async function loginWithFaceId(identifier, credentialId, req = null) {
   const result = await pool.query(
     "SELECT * FROM utenti WHERE LOWER(username) = LOWER($1) AND face_id_credential = $2",
     [identifier || "", String(credentialId || "")]
@@ -7599,6 +8253,16 @@ async function loginWithFaceId(identifier, credentialId) {
     entityType: "sessione",
     entityId: user.id,
     description: "Login Face ID effettuato"
+  });
+  void writeAuditLog({
+    req,
+    user,
+    action: "login",
+    entityType: "sessione",
+    entityId: user.id,
+    entityLabel: auditUserName(user),
+    afterData: safeUser,
+    metadata: { login_method: "face_id" }
   });
   return { token: signUserToken(safeUser), user: safeUser };
 }
@@ -7622,24 +8286,45 @@ app.get("/api/health", (_request, response) => {
 
 app.post("/api/auth/login", async (request, response, next) => {
   try {
-    response.json(await loginUser(request.body.username, request.body.password));
+    response.json(await loginUser(request.body.username, request.body.password, request));
   } catch (error) {
+    void writeAuditLog({
+      req: request,
+      action: "login_failed",
+      entityType: "sessione",
+      entityLabel: request.body?.username || "",
+      metadata: { reason: error.message, status: error.status || 500 }
+    });
     next(error);
   }
 });
 
 app.post("/api/login", async (request, response, next) => {
   try {
-    response.json(await loginUser(request.body.username, request.body.password));
+    response.json(await loginUser(request.body.username, request.body.password, request));
   } catch (error) {
+    void writeAuditLog({
+      req: request,
+      action: "login_failed",
+      entityType: "sessione",
+      entityLabel: request.body?.username || "",
+      metadata: { reason: error.message, status: error.status || 500 }
+    });
     next(error);
   }
 });
 
 app.post("/api/auth/faceid/login", async (request, response, next) => {
   try {
-    response.json(await loginWithFaceId(request.body.username, request.body.credentialId));
+    response.json(await loginWithFaceId(request.body.username, request.body.credentialId, request));
   } catch (error) {
+    void writeAuditLog({
+      req: request,
+      action: "login_failed",
+      entityType: "sessione",
+      entityLabel: request.body?.username || "",
+      metadata: { reason: error.message, status: error.status || 500, login_method: "face_id" }
+    });
     next(error);
   }
 });
@@ -7655,6 +8340,14 @@ app.post("/api/auth/logout", async (request, response) => {
         entityType: "sessione",
         entityId: user.id,
         description: "Logout effettuato"
+      });
+      void writeAuditLog({
+        req: request,
+        user,
+        action: "logout",
+        entityType: "sessione",
+        entityId: user.id,
+        entityLabel: auditUserName(user)
       });
     }
   } catch {
@@ -7686,6 +8379,24 @@ app.get("/api/dashboard", async (request, response, next) => {
   }
 });
 
+app.get("/api/audit-logs", async (request, response, next) => {
+  try {
+    response.json(await listAuditLogs(request.query, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/audit-logs/:id", async (request, response, next) => {
+  try {
+    const log = await getAuditLogDetail(request.params.id, request.user);
+    if (!log) return response.status(404).json({ error: "Audit log non trovato" });
+    response.json({ ok: true, log });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/intelligence/insights", async (request, response, next) => {
   try {
     response.json(await oroActiveIntelligence(request.user));
@@ -7704,7 +8415,18 @@ app.get("/api/backups", requireBackupManager, async (request, response, next) =>
 
 app.post("/api/backups/create", requireBackupManager, async (request, response, next) => {
   try {
-    response.status(201).json({ backup: await createManualBackup(request.user) });
+    const backup = await createManualBackup(request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "create_backup",
+      entityType: "backup",
+      entityId: backup?.id,
+      entityLabel: backup?.backup_code || backup?.backupCode || "",
+      afterData: backup,
+      metadata: { backup_code: backup?.backup_code || backup?.backupCode || "", status: backup?.status }
+    });
+    response.status(201).json({ backup });
   } catch (error) {
     next(error);
   }
@@ -7712,7 +8434,18 @@ app.post("/api/backups/create", requireBackupManager, async (request, response, 
 
 app.post("/api/backups/run", requireBackupManager, async (request, response, next) => {
   try {
-    response.status(201).json({ backup: await createManualBackup(request.user) });
+    const backup = await createManualBackup(request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "create_backup",
+      entityType: "backup",
+      entityId: backup?.id,
+      entityLabel: backup?.backup_code || backup?.backupCode || "",
+      afterData: backup,
+      metadata: { backup_code: backup?.backup_code || backup?.backupCode || "", status: backup?.status }
+    });
+    response.status(201).json({ backup });
   } catch (error) {
     next(error);
   }
@@ -7732,6 +8465,16 @@ app.post("/api/backups/:id/verify", requireBackupManager, async (request, respon
   try {
     const backup = await verifyBackup(request.params.id, request.user);
     if (!backup) return response.status(404).json({ error: "Backup non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "verify_backup",
+      entityType: "backup",
+      entityId: backup.id || request.params.id,
+      entityLabel: backup.backup_code || backup.backupCode || "",
+      afterData: { verification_status: backup.verification_status || backup.verificationStatus, checksum_sha256: backup.checksum_sha256 || backup.checksumSha256 },
+      metadata: { backup_code: backup.backup_code || backup.backupCode || "", status: backup.status }
+    });
     response.json({ backup });
   } catch (error) {
     next(error);
@@ -7742,6 +8485,16 @@ app.post("/api/backups/:id/test-restore", requireFounder, async (request, respon
   try {
     const backup = await testRestoreBackup(request.params.id, request.user);
     if (!backup) return response.status(404).json({ error: "Backup non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "test_restore_backup",
+      entityType: "backup",
+      entityId: backup.id || request.params.id,
+      entityLabel: backup.backup_code || backup.backupCode || "",
+      afterData: { restore_test_status: backup.restore_test_status || backup.restoreTestStatus },
+      metadata: { backup_code: backup.backup_code || backup.backupCode || "", status: backup.status, critical: true }
+    });
     response.json({ backup });
   } catch (error) {
     next(error);
@@ -7752,6 +8505,16 @@ app.delete("/api/backups/:id", requireFounder, async (request, response, next) =
   try {
     const deleted = await deleteBackup(request.params.id, request.user);
     if (!deleted) return response.status(404).json({ error: "Backup non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "delete_backup",
+      entityType: "backup",
+      entityId: request.params.id,
+      entityLabel: `Backup ${request.params.id}`,
+      afterData: { status: "deleted" },
+      metadata: { critical: true }
+    });
     response.json({ ok: true, id: request.params.id });
   } catch (error) {
     next(error);
@@ -7770,6 +8533,15 @@ app.get("/api/backups/:id/download", requireFounder, async (request, response, n
     if (relative.startsWith("..") || path.isAbsolute(relative)) {
       return response.status(403).json({ error: "Non autorizzato" });
     }
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "download_backup",
+      entityType: "backup",
+      entityId: backup.id || request.params.id,
+      entityLabel: backup.backup_code || backup.backupCode || "",
+      metadata: { backup_code: backup.backup_code || backup.backupCode || "", file_size: backup.file_size || backup.fileSize || 0, critical: true }
+    });
     response.download(resolved, path.basename(resolved));
   } catch (error) {
     next(error);
@@ -7838,7 +8610,17 @@ app.get("/api/aurum-shield/settings", async (_request, response, next) => {
 
 app.put("/api/aurum-shield/settings", requireFounder, async (request, response, next) => {
   try {
-    response.json({ settings: await updateAurumShieldSettings(request.body, request.user) });
+    const settings = await updateAurumShieldSettings(request.body, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "update_aurum_shield_settings",
+      entityType: "aurum_shield_settings",
+      entityLabel: "Configurazione Aurum Shield",
+      afterData: settings,
+      metadata: { critical: true }
+    });
+    response.json({ settings });
   } catch (error) {
     next(error);
   }
@@ -7863,7 +8645,18 @@ app.post("/api/quality-check/validate", async (request, response, next) => {
 
 app.post("/api/quality-check/save", async (request, response, next) => {
   try {
-    response.status(201).json(await saveQualityCheckResult(request.body || {}, request.user));
+    const quality = await saveQualityCheckResult(request.body || {}, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: quality.quality_status === "non_completabile" || quality.status === "non_completabile" ? "quality_check_failed" : "quality_check_executed",
+      entityType: "quality_check",
+      entityId: quality.id || request.body?.sale_deed_id || request.body?.atto_id || null,
+      entityLabel: "Controllo qualità pratica",
+      afterData: quality,
+      metadata: { sale_deed_id: request.body?.sale_deed_id || request.body?.atto_id || null }
+    });
+    response.status(201).json(quality);
   } catch (error) {
     next(error);
   }
@@ -7901,6 +8694,16 @@ app.put("/api/aurum-shield/alerts/:id/review", async (request, response, next) =
   try {
     const alert = await reviewAurumShieldAlert(request.params.id, request.body, request.user);
     if (!alert) return response.status(404).json({ error: "Alert Aurum Shield non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: alert.status === "resolved" ? "aurum_shield_alert_resolved" : "aurum_shield_alert_reviewed",
+      entityType: "aurum_shield_alert",
+      entityId: alert.id,
+      entityLabel: alert.title || "",
+      afterData: alert,
+      metadata: { sale_deed_id: alert.sale_deed_id || null, severity: alert.severity || "" }
+    });
     response.json(alert);
   } catch (error) {
     next(error);
@@ -7911,6 +8714,16 @@ app.put("/api/aurum-shield/alerts/:id/resolve", async (request, response, next) 
   try {
     const alert = await reviewAurumShieldAlert(request.params.id, { status: "resolved" }, request.user);
     if (!alert) return response.status(404).json({ error: "Alert Aurum Shield non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "aurum_shield_alert_resolved",
+      entityType: "aurum_shield_alert",
+      entityId: alert.id,
+      entityLabel: alert.title || "",
+      afterData: alert,
+      metadata: { sale_deed_id: alert.sale_deed_id || null, severity: alert.severity || "" }
+    });
     response.json(alert);
   } catch (error) {
     next(error);
@@ -8010,7 +8823,17 @@ app.get("/api/academy/courses/:id", async (request, response, next) => {
 
 app.post("/api/academy/courses", async (request, response, next) => {
   try {
-    response.status(201).json(await createAcademyCourse(request.body, request.user));
+    const course = await createAcademyCourse(request.body, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "create_academy_course",
+      entityType: "academy_course",
+      entityId: course?.id,
+      entityLabel: course?.title || "",
+      afterData: course
+    });
+    response.status(201).json(course);
   } catch (error) {
     next(error);
   }
@@ -8020,6 +8843,15 @@ app.put("/api/academy/courses/:id", async (request, response, next) => {
   try {
     const course = await updateAcademyCourse(request.params.id, request.body, request.user);
     if (!course) return response.status(404).json({ error: "Corso non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "update_academy_course",
+      entityType: "academy_course",
+      entityId: course.id || request.params.id,
+      entityLabel: course.title || "",
+      afterData: course
+    });
     response.json(course);
   } catch (error) {
     next(error);
@@ -8030,6 +8862,16 @@ app.delete("/api/academy/courses/:id", async (request, response, next) => {
   try {
     const deleted = await deleteCourse(request.params.id, request.user);
     if (!deleted) return response.status(404).json({ error: "Corso non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "delete_academy_course",
+      entityType: "academy_course",
+      entityId: request.params.id,
+      entityLabel: `Corso ${request.params.id}`,
+      afterData: { deleted: true },
+      metadata: { critical: true }
+    });
     response.status(204).end();
   } catch (error) {
     next(error);
@@ -8184,7 +9026,18 @@ app.post("/api/academy/progress/start-course", async (request, response, next) =
 
 app.post("/api/academy/progress/complete-lesson", async (request, response, next) => {
   try {
-    response.status(201).json(await completeAcademyLesson(request.body, request.user));
+    const progress = await completeAcademyLesson(request.body, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "complete_academy_lesson",
+      entityType: "academy_lesson",
+      entityId: request.body.lesson_id || request.body.lessonId || progress?.lesson_id || null,
+      entityLabel: "Lezione Academy",
+      afterData: progress,
+      metadata: { course_id: request.body.course_id || request.body.courseId || progress?.course_id || null }
+    });
+    response.status(201).json(progress);
   } catch (error) {
     next(error);
   }
@@ -8280,7 +9133,17 @@ app.get("/api/academy/certificates", async (request, response, next) => {
 
 app.post("/api/academy/certificates/generate", async (request, response, next) => {
   try {
-    response.status(201).json(await generateAcademyCertificate(request.body, request.user));
+    const certificate = await generateAcademyCertificate(request.body, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "assign_certificate",
+      entityType: "academy_certificate",
+      entityId: certificate?.id,
+      entityLabel: certificate?.certificate_code || "Certificazione Academy",
+      afterData: certificate
+    });
+    response.status(201).json(certificate);
   } catch (error) {
     next(error);
   }
@@ -8314,7 +9177,17 @@ app.get("/api/academy/badges", async (request, response, next) => {
 
 app.post("/api/academy/badges/assign", async (request, response, next) => {
   try {
-    response.status(201).json(await assignAcademyBadge(request.body, request.user));
+    const badge = await assignAcademyBadge(request.body, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "assign_badge",
+      entityType: "academy_badge",
+      entityId: badge?.id,
+      entityLabel: badge?.badge_name || badge?.name || "Badge Academy",
+      afterData: badge
+    });
+    response.status(201).json(badge);
   } catch (error) {
     next(error);
   }
@@ -8324,6 +9197,16 @@ app.put("/api/academy/badges/:id/revoke", async (request, response, next) => {
   try {
     const badge = await revokeAcademyBadge(request.params.id, request.user);
     if (!badge) return response.status(404).json({ error: "Badge non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "revoke_badge",
+      entityType: "academy_badge",
+      entityId: badge.id || request.params.id,
+      entityLabel: badge.badge_name || badge.name || "Badge Academy",
+      afterData: badge,
+      metadata: { critical: true }
+    });
     response.json(badge);
   } catch (error) {
     next(error);
@@ -8357,7 +9240,17 @@ app.post("/api/academy/recalculate-level/:userId", async (request, response, nex
 
 app.post("/api/corsi", async (request, response, next) => {
   try {
-    response.status(201).json(await createCourse(request.body, request.user));
+    const course = await createCourse(request.body, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "create_academy_course",
+      entityType: "academy_course",
+      entityId: course?.id,
+      entityLabel: course?.title || "",
+      afterData: course
+    });
+    response.status(201).json(course);
   } catch (error) {
     next(error);
   }
@@ -8367,6 +9260,15 @@ app.put("/api/corsi/:id", async (request, response, next) => {
   try {
     const course = await updateCourse(request.params.id, request.body, request.user);
     if (!course) return response.status(404).json({ error: "Corso non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "update_academy_course",
+      entityType: "academy_course",
+      entityId: course.id || request.params.id,
+      entityLabel: course.title || "",
+      afterData: course
+    });
     response.json(course);
   } catch (error) {
     next(error);
@@ -8377,6 +9279,16 @@ app.delete("/api/corsi/:id", async (request, response, next) => {
   try {
     const deleted = await deleteCourse(request.params.id, request.user);
     if (!deleted) return response.status(404).json({ error: "Corso non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "delete_academy_course",
+      entityType: "academy_course",
+      entityId: request.params.id,
+      entityLabel: `Corso ${request.params.id}`,
+      afterData: { deleted: true },
+      metadata: { critical: true }
+    });
     response.status(204).end();
   } catch (error) {
     next(error);
@@ -8481,7 +9393,7 @@ app.get("/api/crm/clienti/:id", async (request, response, next) => {
 
 app.put("/api/crm/clienti/:id", async (request, response, next) => {
   try {
-    const client = await updateCrmClient(request.params.id, request.body, request.user);
+    const client = await updateCrmClient(request.params.id, request.body, request.user, request);
     if (!client) return response.status(404).json({ error: "Cliente non trovato" });
     response.json(client);
   } catch (error) {
@@ -8491,7 +9403,7 @@ app.put("/api/crm/clienti/:id", async (request, response, next) => {
 
 app.delete("/api/crm/clienti/:id", async (request, response, next) => {
   try {
-    const deleted = await archiveCrmClient(request.params.id, request.user);
+    const deleted = await archiveCrmClient(request.params.id, request.user, request);
     if (!deleted) return response.status(404).json({ error: "Cliente non trovato" });
     response.status(204).end();
   } catch (error) {
@@ -8501,7 +9413,7 @@ app.delete("/api/crm/clienti/:id", async (request, response, next) => {
 
 app.post("/api/crm/clienti/:id/note", async (request, response, next) => {
   try {
-    response.status(201).json(await addClientNote(request.params.id, request.body, request.user));
+    response.status(201).json(await addClientNote(request.params.id, request.body, request.user, request));
   } catch (error) {
     next(error);
   }
@@ -8541,12 +9453,27 @@ app.post("/api/ai/controlla-atto", async (request, response, next) => {
 
 app.post("/api/ai/assistente", async (request, response, next) => {
   try {
-    response.json(await askOroActiveAssistant(request.body.domanda || request.body.message || request.body.question || "", {
+    const question = request.body.domanda || request.body.message || request.body.question || "";
+    const answer = await askOroActiveAssistant(question, {
       mode: request.body.mode,
       section: request.body.section || "",
       context: sanitizeForPostgres(request.body.context || {}),
       interface: request.body.interface || ""
-    }));
+    });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "ask_aurum",
+      entityType: "aurum",
+      entityLabel: String(request.body.interface || "").includes("aurum") ? "Aurum" : "Assistente IA OroActive",
+      metadata: {
+        section: request.body.section || "",
+        mode: request.body.mode || "",
+        interface: request.body.interface || "",
+        question_preview: sanitizeAurumMemoryText(question).slice(0, 180)
+      }
+    });
+    response.json(answer);
   } catch (error) {
     if (!error.status) error.status = 502;
     if (!error.message) error.message = "Assistente IA non disponibile.";
@@ -8726,6 +9653,15 @@ app.delete("/api/aurum/memories/:id", async (request, response, next) => {
   try {
     const deleted = await deleteAurumMemory(request.params.id, request.user);
     if (!deleted) return response.status(404).json({ error: "Memoria Aurum non trovata" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "aurum_memory_deleted",
+      entityType: "aurum_memory",
+      entityId: request.params.id,
+      entityLabel: "Memoria Aurum",
+      metadata: { critical: false }
+    });
     response.json({ ok: true });
   } catch (error) {
     next(error);
@@ -8742,7 +9678,18 @@ app.get("/api/aurum/support-requests", async (request, response, next) => {
 
 app.post("/api/aurum/support-requests", async (request, response, next) => {
   try {
-    response.status(201).json({ request: await createAurumSupportRequest(request.body, request.user) });
+    const supportRequest = await createAurumSupportRequest(request.body, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "aurum_support_request",
+      entityType: "aurum_support_request",
+      entityId: supportRequest?.id,
+      entityLabel: supportRequest?.subject || "Richiesta supporto Aurum",
+      afterData: supportRequest,
+      metadata: { requested_role: request.body?.requested_role || request.body?.role || "" }
+    });
+    response.status(201).json({ request: supportRequest });
   } catch (error) {
     next(error);
   }
@@ -8788,6 +9735,15 @@ app.get(["/api/utenti/:id/activity", "/api/users/:id/activity"], async (request,
   try {
     const activities = await listUserActivitiesForActor(request.params.id, request.user);
     if (!activities) return response.status(404).json({ error: "Utente non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "view_user_activity",
+      entityType: "utente",
+      entityId: request.params.id,
+      entityLabel: `Utente ${request.params.id}`,
+      metadata: { target_user_id: request.params.id }
+    });
     response.json({ activities });
   } catch (error) {
     next(error);
@@ -8806,7 +9762,7 @@ app.get(["/api/utenti/:id", "/api/users/:id"], async (request, response, next) =
 
 app.post(["/api/utenti", "/api/users"], requireAdmin, async (request, response, next) => {
   try {
-    response.status(201).json(await createUser(request.body, request.user));
+    response.status(201).json(await createUser(request.body, request.user, request));
   } catch (error) {
     next(error);
   }
@@ -8814,7 +9770,7 @@ app.post(["/api/utenti", "/api/users"], requireAdmin, async (request, response, 
 
 app.put(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, response, next) => {
   try {
-    const user = await updateUser(request.params.id, request.body, request.user);
+    const user = await updateUser(request.params.id, request.body, request.user, request);
     if (!user) return response.status(404).json({ error: "Utente non trovato" });
     response.json(user);
   } catch (error) {
@@ -8824,7 +9780,7 @@ app.put(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, res
 
 app.patch(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, response, next) => {
   try {
-    const user = await updateUser(request.params.id, request.body, request.user);
+    const user = await updateUser(request.params.id, request.body, request.user, request);
     if (!user) return response.status(404).json({ error: "Utente non trovato" });
     response.json(user);
   } catch (error) {
@@ -8834,7 +9790,7 @@ app.patch(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, r
 
 app.delete(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, response, next) => {
   try {
-    const deleted = await deleteUser(request.params.id, request.user);
+    const deleted = await deleteUser(request.params.id, request.user, request);
     if (!deleted) return response.status(404).json({ error: "Utente non trovato" });
     response.json({ ok: true, id: request.params.id });
   } catch (error) {
@@ -8984,6 +9940,16 @@ app.post("/api/fusioni/lotti", async (request, response, next) => {
         request.user.id
       ]
     );
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "create_fusion_lot",
+      entityType: "lotto_fusione",
+      entityId: result.rows[0]?.id,
+      entityLabel: result.rows[0]?.lotto_code || lottoCode,
+      afterData: result.rows[0],
+      metadata: { store_id: storeRow?.id || null, store_name: store, acts_count: acts.length }
+    });
     response.status(201).json(result.rows[0]);
   } catch (error) {
     next(error);
@@ -9286,6 +10252,24 @@ app.post("/api/pdf/act", async (request, response, next) => {
       description: scope === "customer" ? "Stampa copia cliente" : "Stampa copia aziendale",
       metadata: { practiceNumber: act.practiceNumber || "", scope }
     });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: scope === "customer" ? "print_customer_copy" : "print_company_copy",
+      entityType: "atto",
+      entityId: act.id || act.practiceNumber || null,
+      entityLabel: act.practiceNumber || "",
+      metadata: { practiceNumber: act.practiceNumber || "", scope }
+    });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "generate_pdf",
+      entityType: "pdf",
+      entityId: act.id || act.practiceNumber || null,
+      entityLabel: request.body.title || "Atto di vendita OroActive",
+      metadata: { practiceNumber: act.practiceNumber || "", scope }
+    });
     buildPdfForActs(response, { title: request.body.title || "Atto di vendita OroActive", scope: request.body.scope || "company", acts: [request.body.act || {}] });
   } catch (error) {
     next(error);
@@ -9332,7 +10316,7 @@ app.get(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
 
 app.post(["/api/atti", "/api/acts"], async (request, response, next) => {
   try {
-    response.status(201).json(await saveAct(request.body, request.user));
+    response.status(201).json(await saveAct(request.body, request.user, request));
   } catch (error) {
     next(error);
   }
@@ -9340,7 +10324,7 @@ app.post(["/api/atti", "/api/acts"], async (request, response, next) => {
 
 app.put(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
-    const act = await updateAct(request.params.id, request.body, request.user);
+    const act = await updateAct(request.params.id, request.body, request.user, request);
     if (!act) return response.status(404).json({ error: "Atto non trovato" });
     response.json(act);
   } catch (error) {
@@ -9350,7 +10334,7 @@ app.put(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
 
 app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) => {
   try {
-    const deleted = await deleteAct(request.params.id, request.user);
+    const deleted = await deleteAct(request.params.id, request.user, request);
     if (!deleted) return response.status(404).json({ error: "Atto non trovato" });
     response.json({ ok: true, id: request.params.id });
   } catch (error) {

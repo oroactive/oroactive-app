@@ -400,20 +400,52 @@ CREATE INDEX IF NOT EXISTS backup_restore_tests_backup_id_idx
 CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT,
+  user_name TEXT,
+  user_role TEXT,
+  store_id BIGINT,
+  store_name TEXT,
+  action TEXT DEFAULT 'api_request',
+  entity_type TEXT DEFAULT 'system',
+  entity_id TEXT,
+  entity_label TEXT,
+  before_data JSONB DEFAULT NULL,
+  after_data JSONB DEFAULT NULL,
   method TEXT,
   route TEXT,
   status_code INTEGER,
   duration_ms INTEGER,
   ip_address TEXT,
+  user_agent TEXT,
+  device_info TEXT,
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_role TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS store_id BIGINT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS store_name TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS action TEXT DEFAULT 'api_request';
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_type TEXT DEFAULT 'system';
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_id TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_label TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS before_data JSONB DEFAULT NULL;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS after_data JSONB DEFAULT NULL;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS device_info TEXT;
 
 CREATE INDEX IF NOT EXISTS audit_logs_user_created_idx
   ON audit_logs (user_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS audit_logs_route_created_idx
   ON audit_logs (route, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs(entity_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_id ON audit_logs(entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_store_id ON audit_logs(store_id);
 
 CREATE TABLE IF NOT EXISTS user_activity_logs (
   id BIGSERIAL PRIMARY KEY,

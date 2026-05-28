@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260527-guided-quality-1">
+  <link rel="stylesheet" href="styles.css?v=20260528-audit-trail-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -69,6 +69,7 @@
           <div class="main-menu-submenu" id="toolsSubmenu" hidden>
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
             <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
+            <button class="founder-only" type="button" data-section="auditTrail">Audit Trail</button>
             <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
@@ -114,6 +115,7 @@
           <div class="brand-submenu" id="brandToolsSubmenu" hidden>
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
             <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
+            <button class="founder-only" type="button" data-section="auditTrail">Audit Trail</button>
             <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
@@ -745,6 +747,47 @@
         <div class="archive-table users-table" id="antifraudList" aria-live="polite"></div>
       </section>
 
+      <section id="auditTrail" class="screen founder-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Sicurezza operativa</p>
+            <h2>OroActive Audit Trail</h2>
+            <p class="muted">Consulta chi ha fatto cosa, quando, su quale pratica, cliente, utente o sezione.</p>
+          </div>
+        </div>
+        <form class="settings-list audit-trail-filters" id="auditTrailFilters">
+          <label>Ricerca <input name="search" placeholder="Utente, entit&agrave;, pratica o azione"></label>
+          <label>Azione
+            <select name="action">
+              <option value="">Tutte</option>
+              <option value="login">Login</option>
+              <option value="create_act">Creazione atto</option>
+              <option value="update_act">Modifica atto</option>
+              <option value="delete_act">Eliminazione atto</option>
+              <option value="modify_payment">Modifica pagamento</option>
+              <option value="print_customer_copy">Stampa copia cliente</option>
+              <option value="create_user">Creazione utente</option>
+              <option value="update_user">Modifica utente</option>
+              <option value="download_backup">Download backup</option>
+              <option value="aurum_shield_alert_created">Alert Aurum Shield</option>
+            </select>
+          </label>
+          <label>Tipo entit&agrave; <input name="entity_type" placeholder="atto, cliente, utente, backup"></label>
+          <label>Utente ID <input name="user_id" inputmode="numeric"></label>
+          <label>Negozio ID <input name="store_id" inputmode="numeric"></label>
+          <label>Dal <input name="date_from" type="date"></label>
+          <label>Al <input name="date_to" type="date"></label>
+          <button class="primary-button" type="submit">Filtra Audit Trail</button>
+        </form>
+        <div class="archive-table users-table" id="auditTrailList" aria-live="polite"></div>
+        <div class="audit-pagination">
+          <button class="ghost-button" type="button" id="auditTrailPrev">Indietro</button>
+          <span id="auditTrailPageInfo">Pagina 1</span>
+          <button class="ghost-button" type="button" id="auditTrailNext">Avanti</button>
+        </div>
+      </section>
+
       <section id="aurumShield" class="screen founder-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
@@ -1210,6 +1253,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260527-guided-quality-1"></script>
+  <script src="app.js?v=20260528-audit-trail-1"></script>
 </body>
 </html>

@@ -570,6 +570,59 @@ test("controllo qualità guidato blocca completamento e stampe finali", async ()
   assert.doesNotMatch(completeBlock, /archiviato\. Potrai completarlo da Elenco/);
 });
 
+test("OroActive Audit Trail traccia azioni utenti e ha UI Founder", async () => {
+  const [index, app, server, schema, migration, styles] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260528_oroactive_audit_trail.sql"),
+    file("styles.css")
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS audit_logs/);
+  assert.match(schema, /user_name TEXT/);
+  assert.match(schema, /before_data JSONB DEFAULT NULL/);
+  assert.match(schema, /after_data JSONB DEFAULT NULL/);
+  assert.match(schema, /idx_audit_logs_action/);
+  assert.match(schema, /idx_audit_logs_store_id/);
+  assert.match(migration, /ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS action TEXT DEFAULT 'api_request'/);
+  assert.match(migration, /idx_audit_logs_entity_type/);
+
+  assert.match(server, /async function writeAuditLog/);
+  assert.match(server, /function compactAuditPayload/);
+  assert.match(server, /function listAuditLogs/);
+  assert.match(server, /function getAuditLogDetail/);
+  assert.match(server, /function dashboardAuditSummary/);
+  assert.match(server, /AUDIT LOG ERROR/);
+  assert.match(server, /app\.get\("\/api\/audit-logs"/);
+  assert.match(server, /app\.get\("\/api\/audit-logs\/:id"/);
+  assert.match(server, /action: "login"/);
+  assert.match(server, /action: "login_failed"/);
+  assert.match(server, /action: "delete_act"/);
+  assert.match(server, /action: "modify_payment"/);
+  assert.match(server, /action: "change_user_role"/);
+  assert.match(server, /action: "download_backup"/);
+  assert.match(server, /action: "risk_score_calculated"/);
+  assert.match(server, /quality_check_executed/);
+  assert.match(server, /FROM audit_logs al/);
+  assert.match(server, /audit_summary: auditSummary/);
+
+  assert.match(index, /id="auditTrail"/);
+  assert.match(index, /data-section="auditTrail"/);
+  assert.match(index, /id="auditTrailFilters"/);
+  assert.match(index, /id="auditTrailList"/);
+  assert.match(app, /async function loadAuditTrail/);
+  assert.match(app, /function renderAuditTrail/);
+  assert.match(app, /function viewAuditLog/);
+  assert.match(app, /apiRequest\(`\/audit-logs/);
+  assert.match(app, /apiRequest\(`\/audit-logs\/\$\{encodeURIComponent\(id\)\}`/);
+  assert.match(app, /Oggi nell'app/);
+  assert.match(styles, /\.audit-trail-filters/);
+  assert.match(styles, /\.audit-action-badge/);
+  assert.match(styles, /\.audit-detail-grid/);
+});
+
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
   const app = await file("app.js");
   const enterStart = app.indexOf("async function enterSectionFromMainMenu");

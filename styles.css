@@ -3321,6 +3321,10 @@ input.document-expired {
   grid-template-columns: 1fr 1.05fr 0.75fr 0.75fr 0.9fr 1.05fr 0.9fr;
 }
 
+#auditTrailList .table-row {
+  grid-template-columns: 0.95fr 1.05fr 0.9fr 0.95fr 1.2fr 0.7fr;
+}
+
 .users-table .table-row strong,
 .users-table .table-row span {
   display: grid;
@@ -3701,6 +3705,77 @@ button.quality-review-badge {
 .table-row em.warning {
   background: #fff4cc;
   color: #8a5b00;
+}
+
+.audit-trail-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.audit-trail-filters label {
+  display: grid;
+  gap: 7px;
+  font-weight: 900;
+  color: var(--soft-ink);
+}
+
+.audit-trail-filters button {
+  align-self: end;
+}
+
+.audit-action-badge {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fff0e6;
+  color: var(--gold-dark);
+  font-weight: 950;
+}
+
+.audit-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.audit-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.audit-detail-grid div,
+.audit-detail-block {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fffaf5;
+}
+
+.audit-detail-grid span,
+.audit-detail-block h4 {
+  display: block;
+  margin: 0 0 6px;
+  color: var(--soft-ink);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.audit-detail-block pre {
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
 }
 
 .table-row button,
@@ -4524,6 +4599,10 @@ button.quality-review-badge {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .audit-trail-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .signature-grid,
   .capture-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4587,6 +4666,7 @@ button.quality-review-badge {
   .acts-table .table-row,
   .fusion-table .table-row,
   .users-table .table-row,
+  #auditTrailList .table-row,
   .stats-table .table-row {
     grid-template-columns: 1fr;
   }
@@ -4638,6 +4718,11 @@ button.quality-review-badge {
   .document-scan-controls > *,
   .document-scan-preview-actions > * {
     width: 100%;
+  }
+
+  .audit-trail-filters,
+  .audit-detail-grid {
+    grid-template-columns: 1fr;
   }
 
   .ceded-items-head {

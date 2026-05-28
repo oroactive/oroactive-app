@@ -59,6 +59,8 @@ const state = {
   crmClients: [],
   crmSearchTimer: null,
   backups: [],
+  auditLogs: [],
+  auditPagination: { page: 1, limit: 50, total: 0 },
   clockTimer: null,
   aurumSettings: null,
   aurumCurrentSection: "menu",
@@ -678,6 +680,11 @@ const trainingCourseFormPanel = document.getElementById("trainingCourseForm");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
+const auditTrailFilters = document.getElementById("auditTrailFilters");
+const auditTrailList = document.getElementById("auditTrailList");
+const auditTrailPageInfo = document.getElementById("auditTrailPageInfo");
+const auditTrailPrev = document.getElementById("auditTrailPrev");
+const auditTrailNext = document.getElementById("auditTrailNext");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -2261,6 +2268,10 @@ function setScreen(id) {
     showToast("Aurum Shield è riservato al Founder.");
     return;
   }
+  if (id === "auditTrail" && !isFounder()) {
+    showToast("OroActive Audit Trail è riservato al Founder.");
+    return;
+  }
   if (id === "backups" && !canManageBackupsUi()) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
@@ -2299,6 +2310,7 @@ async function handleScreenDataLoad(id) {
   if (id === "stores") await loadStores();
   if (id === "antifraud") await loadAntifraud();
   if (id === "aurumShield") await loadAurumShieldAdmin();
+  if (id === "auditTrail") await loadAuditTrail();
   if (id === "training") await loadTraining();
   if (id === "crm") await loadCrmClients();
   if (id === "assistant") {
@@ -4114,6 +4126,7 @@ function renderDashboard() {
   const data = state.dashboard || {};
   const kpi = data.kpi || {};
   const shield = data.aurum_shield || {};
+  const audit = data.audit_summary || {};
   dashboardGrid.innerHTML = [
     metricCard("Totale oro oggi", `${Number(kpi.grammi_giornalieri?.Oro || 0).toFixed(2)} gr`),
     metricCard("Totale argento oggi", `${Number(kpi.grammi_giornalieri?.Argento || 0).toFixed(2)} gr`),
@@ -4131,6 +4144,8 @@ function renderDashboard() {
     metricCard("Shield alto rischio oggi", shield.high_today || 0),
     metricCard("Shield critici", shield.critical_open || 0),
     metricCard("Shield score medio", `${Number(shield.average_score || 0)}/100`),
+    metricCard("Login oggi", audit.logins_today || 0),
+    metricCard("Azioni critiche oggi", Number(audit.acts_deleted_today || 0) + Number(audit.shield_alerts_today || 0)),
     metricCard("Oro mensile", `${Number(kpi.grammi_mensili?.Oro || 0).toFixed(2)} gr`),
     metricCard("Argento mensile", `${Number(kpi.grammi_mensili?.Argento || 0).toFixed(2)} gr`),
     metricCard("Platino mensile", `${Number(kpi.grammi_mensili?.Platino || 0).toFixed(2)} gr`)
@@ -4151,6 +4166,14 @@ function renderDashboard() {
       <div class="dashboard-rank-row"><span>Negozio con piu alert</span><strong>${escapeHtml(shield.top_store?.store || "Nessun dato")}</strong><em>${escapeHtml(String(shield.top_store?.alerts || 0))} alert</em></div>
       <div class="dashboard-rank-row"><span>Operatore con piu alert</span><strong>${escapeHtml(shield.top_operator?.operator || "Nessun dato")}</strong><em>${escapeHtml(String(shield.top_operator?.alerts || 0))} alert</em></div>
     </section>
+    <section class="dashboard-panel"><h3>Oggi nell'app</h3>
+      <div class="dashboard-rank-row"><span>Atti creati</span><strong>${escapeHtml(String(audit.acts_created_today || 0))}</strong><em>Da Audit Trail</em></div>
+      <div class="dashboard-rank-row"><span>Atti modificati</span><strong>${escapeHtml(String(audit.acts_updated_today || 0))}</strong><em>Da Audit Trail</em></div>
+      <div class="dashboard-rank-row"><span>Atti eliminati</span><strong>${escapeHtml(String(audit.acts_deleted_today || 0))}</strong><em>Azioni critiche</em></div>
+      <div class="dashboard-rank-row"><span>Stampe copia cliente</span><strong>${escapeHtml(String(audit.customer_prints_today || 0))}</strong><em>PDF cliente</em></div>
+      ${(audit.top_users || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.user_name || "Utente")}</span><strong>${escapeHtml(String(item.total || 0))}</strong><em>${escapeHtml(roleLabel(item.user_role || ""))}</em></div>`).join("") || '<div class="empty-state">Nessuna attività rilevante oggi.</div>'}
+      ${(audit.latest || []).slice(0, 5).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(formatDateTime(item.created_at))}</span><strong>${escapeHtml(item.label || auditActionLabel(item.action))}</strong><em>${escapeHtml(item.userName || item.actor || "")}</em></div>`).join("")}
+    </section>
     <section class="dashboard-panel"><h3>OroActive Intelligence</h3>${(data.insights || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.title)}</span><strong>${escapeHtml(item.level || "info")}</strong><em>${escapeHtml(item.text)}</em></div>`).join("") || '<div class="empty-state">Nessun insight disponibile.</div>'}</section>
     <section class="dashboard-panel"><h3>Fusioni</h3>${Object.entries(data.fusioni || {}).map(([key, value]) => `<div class="dashboard-rank-row"><span>${escapeHtml(key)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join("") || '<div class="empty-state">Nessuna fusione registrata.</div>'}</section>
     <section class="dashboard-panel"><h3>Carature frequenti</h3>${(data.carature_frequenti || []).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.titolo)}</span><strong>${item.count}</strong></div>`).join("") || '<div class="empty-state">Nessun dato disponibile.</div>'}</section>
@@ -4164,6 +4187,148 @@ async function loadDashboard() {
     renderDashboard();
   } catch (error) {
     if (dashboardGrid) dashboardGrid.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Dashboard non caricata.")}</div>`;
+  }
+}
+
+function auditActionLabel(action = "") {
+  return {
+    login: "Login",
+    logout: "Logout",
+    login_failed: "Login fallito",
+    session_expired: "Sessione scaduta",
+    create_act: "Creazione atto",
+    save_draft: "Salvataggio bozza",
+    update_act: "Modifica atto",
+    complete_act: "Completamento atto",
+    archive_act: "Archiviazione atto",
+    delete_act: "Eliminazione atto",
+    print_customer_copy: "Stampa copia cliente",
+    print_company_copy: "Stampa copia aziendale",
+    generate_pdf: "Generazione PDF",
+    modify_payment: "Modifica pagamento",
+    risk_score_calculated: "Risk score calcolato",
+    aurum_shield_alert_created: "Alert rischio creato",
+    aurum_shield_alert_reviewed: "Alert rischio in verifica",
+    aurum_shield_alert_resolved: "Alert rischio risolto",
+    quality_check_executed: "Controllo qualità eseguito",
+    quality_check_failed: "Controllo qualità fallito",
+    create_user: "Creazione utente",
+    update_user: "Modifica utente",
+    change_user_role: "Cambio ruolo utente",
+    change_user_store: "Cambio negozio utente",
+    deactivate_user: "Disattivazione utente",
+    view_user_activity: "Visualizzazione attività utente",
+    update_crm_client: "Modifica cliente CRM",
+    add_crm_note: "Nota CRM",
+    delete_crm_client: "Archiviazione cliente CRM",
+    create_backup: "Creazione backup",
+    verify_backup: "Verifica backup",
+    download_backup: "Download backup",
+    delete_backup: "Eliminazione backup",
+    test_restore_backup: "Test restore backup",
+    ask_aurum: "Domanda ad Aurum",
+    aurum_support_request: "Richiesta supporto Aurum",
+    aurum_memory_created: "Memoria Aurum creata",
+    aurum_memory_deleted: "Memoria Aurum eliminata",
+    create_academy_course: "Creazione corso Academy",
+    update_academy_course: "Modifica corso Academy",
+    delete_academy_course: "Eliminazione corso Academy",
+    complete_academy_lesson: "Completamento lezione",
+    assign_certificate: "Assegnazione certificazione",
+    assign_badge: "Assegnazione badge",
+    revoke_badge: "Revoca badge",
+    create_fusion_lot: "Creazione lotto fusione",
+    api_request_error: "Errore API"
+  }[action] || action.replace(/_/g, " ") || "Attività";
+}
+
+function auditTrailParams(page = 1) {
+  const params = new URLSearchParams({ page: String(page), limit: "50" });
+  if (!auditTrailFilters) return params;
+  const formData = new FormData(auditTrailFilters);
+  for (const [key, value] of formData.entries()) {
+    const text = String(value || "").trim();
+    if (text) params.set(key, text);
+  }
+  return params;
+}
+
+function auditDataBlock(title, data) {
+  if (!data) return "";
+  return `
+    <section class="audit-detail-block">
+      <h4>${escapeHtml(title)}</h4>
+      <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+    </section>
+  `;
+}
+
+function renderAuditTrail() {
+  if (!auditTrailList) return;
+  const logs = state.auditLogs || [];
+  if (!logs.length) {
+    auditTrailList.innerHTML = '<div class="empty-state">Nessuna attività trovata con questi filtri.</div>';
+  } else {
+    auditTrailList.innerHTML = `
+      <div class="table-row head">
+        <span>Data</span><span>Utente</span><span>Azione</span><span>Entità</span><span>Dettaglio</span><span></span>
+      </div>
+      ${logs.map((log) => `
+        <div class="table-row audit-row">
+          <span>${escapeHtml(formatDateTime(log.created_at))}</span>
+          <span>
+            <strong>${escapeHtml(log.userName || log.actor || "Utente")}</strong>
+            <small>${escapeHtml(roleLabel(log.userRole || ""))}${log.storeName ? ` · ${escapeHtml(log.storeName)}` : ""}</small>
+          </span>
+          <span><mark class="audit-action-badge">${escapeHtml(log.label || auditActionLabel(log.action))}</mark></span>
+          <span>${escapeHtml(log.entityType || "Sistema")}<small>${escapeHtml(log.entityLabel || log.entityId || "")}</small></span>
+          <span>${escapeHtml(log.description || log.route || "")}</span>
+          <span><button class="ghost-button small-button" type="button" data-view-audit-log="${escapeHtml(log.id)}">Dettaglio</button></span>
+        </div>
+      `).join("")}
+    `;
+  }
+  const pagination = state.auditPagination || { page: 1, limit: 50, total: 0 };
+  const totalPages = Math.max(1, Math.ceil(Number(pagination.total || 0) / Number(pagination.limit || 50)));
+  if (auditTrailPageInfo) auditTrailPageInfo.textContent = `Pagina ${pagination.page || 1} di ${totalPages} · ${pagination.total || 0} log`;
+  if (auditTrailPrev) auditTrailPrev.disabled = Number(pagination.page || 1) <= 1;
+  if (auditTrailNext) auditTrailNext.disabled = Number(pagination.page || 1) >= totalPages;
+}
+
+async function loadAuditTrail(page = 1) {
+  if (!isFounder()) return;
+  if (auditTrailList) auditTrailList.innerHTML = '<div class="empty-state">Caricamento Audit Trail...</div>';
+  try {
+    const data = await apiRequest(`/audit-logs?${auditTrailParams(page).toString()}`);
+    state.auditLogs = data.logs || [];
+    state.auditPagination = data.pagination || { page, limit: 50, total: state.auditLogs.length };
+    renderAuditTrail();
+  } catch (error) {
+    if (auditTrailList) auditTrailList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Audit Trail non caricato.")}</div>`;
+  }
+}
+
+async function viewAuditLog(id) {
+  try {
+    const data = await apiRequest(`/audit-logs/${encodeURIComponent(id)}`);
+    const log = data.log || data;
+    previewTitle.textContent = `Audit Trail · ${auditActionLabel(log.action || log.type)}`;
+    previewBody.innerHTML = `
+      <div class="audit-detail-grid">
+        <div><span>Data</span><strong>${escapeHtml(formatDateTime(log.created_at))}</strong></div>
+        <div><span>Utente</span><strong>${escapeHtml(log.userName || log.actor || "Utente")}</strong></div>
+        <div><span>Ruolo</span><strong>${escapeHtml(roleLabel(log.userRole || ""))}</strong></div>
+        <div><span>Negozio</span><strong>${escapeHtml(log.storeName || "Dato non inserito")}</strong></div>
+        <div><span>Entità</span><strong>${escapeHtml(log.entityType || "Sistema")} ${escapeHtml(log.entityLabel || log.entityId || "")}</strong></div>
+        <div><span>IP / Device</span><strong>${escapeHtml([log.ip_address, log.device_info].filter(Boolean).join(" · ") || "Dato non inserito")}</strong></div>
+      </div>
+      ${auditDataBlock("Prima", log.before_data)}
+      ${auditDataBlock("Dopo", log.after_data)}
+      ${auditDataBlock("Metadata", log.metadata)}
+    `;
+    previewModal.hidden = false;
+  } catch (error) {
+    showToast(error.message || "Dettaglio audit non caricato.", "error");
   }
 }
 
@@ -8886,6 +9051,22 @@ backupsList?.addEventListener("click", (event) => {
   if (deleteButton) deleteBackup(deleteButton.dataset.deleteBackup);
   if (verify) verifyBackup(verify.dataset.verifyBackup);
   if (restore) testRestoreBackup(restore.dataset.testRestoreBackup);
+});
+auditTrailFilters?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  loadAuditTrail(1);
+});
+auditTrailList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-view-audit-log]");
+  if (button) viewAuditLog(button.dataset.viewAuditLog);
+});
+auditTrailPrev?.addEventListener("click", () => {
+  const page = Math.max(1, Number(state.auditPagination?.page || 1) - 1);
+  loadAuditTrail(page);
+});
+auditTrailNext?.addEventListener("click", () => {
+  const page = Number(state.auditPagination?.page || 1) + 1;
+  loadAuditTrail(page);
 });
 document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
   refreshBullionVaultPrices({ notify: true });
