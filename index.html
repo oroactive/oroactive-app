@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260528-founder-report-1">
+  <link rel="stylesheet" href="styles.css?v=20260528-store-health-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -59,6 +59,7 @@
           <button class="main-menu-group-button" type="button" data-main-menu-toggle="salesSubmenu" aria-expanded="false">Atti di vendita</button>
           <div class="main-menu-submenu" id="salesSubmenu" hidden>
             <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
+            <button class="control-only" type="button" data-section="storeHealth">Salute Negozio</button>
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
             <button type="button" data-section="suspendedPractices">Pratiche sospese</button>
@@ -126,6 +127,7 @@
           <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandSalesSubmenu" aria-expanded="false">Atti di vendita</button>
           <div class="brand-submenu" id="brandSalesSubmenu" hidden>
             <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
+            <button class="control-only" type="button" data-section="storeHealth">Salute Negozio</button>
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
             <button type="button" data-section="suspendedPractices">Pratiche sospese</button>
@@ -824,6 +826,37 @@
         <div class="dashboard-panels" id="dashboardPanels"></div>
       </section>
 
+      <section id="storeHealth" class="screen control-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header store-health-header">
+          <div>
+            <p class="eyebrow">Founder Control</p>
+            <h2>Salute Negozio</h2>
+            <p class="muted">Controllo qualità, rischio e performance dei punti vendita OroActive.</p>
+          </div>
+          <form class="store-health-filters" id="storeHealthFilters">
+            <label>Periodo
+              <select id="storeHealthPeriod" name="period">
+                <option value="today">Oggi</option>
+                <option value="last_7" selected>Ultimi 7 giorni</option>
+                <option value="last_30">Ultimi 30 giorni</option>
+                <option value="month">Mese corrente</option>
+                <option value="custom">Personalizzato</option>
+              </select>
+            </label>
+            <label>Da
+              <input id="storeHealthDateFrom" name="date_from" type="date">
+            </label>
+            <label>A
+              <input id="storeHealthDateTo" name="date_to" type="date">
+            </label>
+            <button class="primary-button" type="submit" id="recalculateStoreHealth">Ricalcola score</button>
+          </form>
+        </div>
+        <div class="dashboard-grid store-health-summary" id="storeHealthSummary"></div>
+        <div class="store-health-list" id="storeHealthList" aria-live="polite"></div>
+      </section>
+
       <section id="founderDailyReport" class="screen founder-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header founder-report-header">
@@ -1435,6 +1468,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260528-founder-report-1"></script>
+  <script src="app.js?v=20260528-store-health-1"></script>
 </body>
 </html>

@@ -484,6 +484,7 @@ function auditActionLabel(action = "") {
     notification_created: "Notifica creata",
     notification_read: "Notifica letta",
     notification_action_opened: "Apertura notifica",
+    store_health_score_calculated: "Store Health Score ricalcolato",
     founder_daily_report_generated: "Founder Daily Report generato",
     founder_daily_report_downloaded: "Download Founder Daily Report",
     founder_daily_report_sent: "Invio Founder Daily Report",
@@ -4150,6 +4151,10 @@ async function dashboardKpis(user = {}) {
     console.error("SUSPENDED PRACTICES SUMMARY ERROR", error);
     return { total: 0, today: 0, latest: [], top_reasons: [] };
   });
+  const storeHealth = await storeHealthNetworkSummary(user).catch((error) => {
+    console.error("STORE HEALTH SUMMARY ERROR", error);
+    return { average_score: 0, best_store: null, critical_store: null, alert_count: 0, stores: [] };
+  });
   return {
     kpi: {
       fatturato_giornaliero: sum(dailyActs, (act) => act.amount),
@@ -4181,7 +4186,516 @@ async function dashboardKpis(user = {}) {
     aurum_shield: aurumShield,
     approval_summary: approvalSummary,
     suspended_practices: suspendedSummary,
-    audit_summary: auditSummary
+    audit_summary: auditSummary,
+    store_health: storeHealth
+  };
+}
+
+function canViewStoreHealth(user = {}) {
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
+}
+
+function dateInputString(date = new Date()) {
+  const value = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(value.getTime())) return new Date().toISOString().slice(0, 10);
+  return value.toISOString().slice(0, 10);
+}
+
+function addDaysToDateString(dateTextValue, days) {
+  const date = new Date(`${dateTextValue}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function storeHealthDateRange(input = {}) {
+  const period = String(input.period || input.range || "last_7").trim();
+  const today = dateInputString();
+  if (input.date_from || input.date_to) {
+    const dateFrom = founderReportDate(input.date_from || today);
+    const dateTo = founderReportDate(input.date_to || today);
+    return dateFrom <= dateTo ? { date_from: dateFrom, date_to: dateTo, period: "custom" } : { date_from: dateTo, date_to: dateFrom, period: "custom" };
+  }
+  if (period === "today") return { date_from: today, date_to: today, period };
+  if (period === "last_30") return { date_from: addDaysToDateString(today, -29), date_to: today, period };
+  if (period === "month") return { date_from: `${today.slice(0, 7)}-01`, date_to: today, period };
+  return { date_from: addDaysToDateString(today, -6), date_to: today, period: "last_7" };
+}
+
+function storeHealthStatus(score = 0) {
+  const value = Math.max(0, Math.min(100, Math.round(Number(score || 0))));
+  if (value >= 85) return { status: "ottimo", label: "Ottimo", color: "green" };
+  if (value >= 70) return { status: "buono", label: "Buono", color: "lime" };
+  if (value >= 50) return { status: "da_controllare", label: "Da controllare", color: "orange" };
+  return { status: "critico", label: "Critico", color: "red" };
+}
+
+function storeHealthStoreCondition(alias = "a", values = [], store = {}) {
+  values.push(store.id, store.nome);
+  return `(${alias}.negozio_id = $${values.length - 1}::bigint OR ${alias}.store = $${values.length}::text)`;
+}
+
+function storeHealthStoreIdCondition(alias = "x", values = [], store = {}) {
+  values.push(store.id);
+  return `${alias}.store_id = $${values.length}::bigint`;
+}
+
+async function visibleStoreHealthStores(user = {}, requestedStoreId = null) {
+  if (!canViewStoreHealth(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const stores = await listStores(user);
+  const activeStores = stores.filter((store) => store && store.attivo !== false);
+  if (!requestedStoreId) return activeStores;
+  const selected = activeStores.find((store) => String(store.id) === String(requestedStoreId));
+  if (!selected) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  return [selected];
+}
+
+function activityCountByAction(rows = []) {
+  return Object.fromEntries(rows.map((row) => [row.action, Number(row.total || 0)]));
+}
+
+function generateStoreHealthRecommendations(data = {}) {
+  const recommendations = [];
+  if (data.operational?.suspended_open > 0) recommendations.push("Risolvi le pratiche sospese prima della chiusura giornata.");
+  if (data.operational?.suspended_over_48h > 0) recommendations.push(`Verificare ${data.operational.suspended_over_48h} pratiche sospese da oltre 48 ore.`);
+  if (data.risk?.critical_alerts > 0) recommendations.push("Controlla subito le pratiche con rischio critico.");
+  if (data.quality?.failed_checks > 0) recommendations.push("Rivedere i controlli qualità non superati e correggere i dati mancanti.");
+  if (data.academy?.average_progress < 70 && data.operators?.active_operators > 0) recommendations.push("Programma formazione per operatori con corsi non completati.");
+  if (!data.backup?.latest_verified) recommendations.push("Verifica il backup più recente.");
+  if (data.commercial?.average_margin < 8 && data.commercial?.completed_acts > 0) recommendations.push("Analizza gli atti dell'operatore con margine medio più basso.");
+  if (data.operators?.too_many_updates > 0) recommendations.push("Controlla gli operatori con molte modifiche agli atti.");
+  if (!recommendations.length) recommendations.push("Mantenere ritmo operativo, formazione e verifica backup attuali.");
+  return recommendations.slice(0, 8);
+}
+
+function storeHealthMainAlerts(factors = {}) {
+  const alerts = [];
+  if (factors.risk?.critical_alerts) alerts.push(`${factors.risk.critical_alerts} alert critici Aurum Shield`);
+  if (factors.operational?.suspended_open) alerts.push(`${factors.operational.suspended_open} pratiche sospese`);
+  if (factors.operational?.pending_approvals) alerts.push(`${factors.operational.pending_approvals} autorizzazioni in attesa`);
+  if (factors.quality?.failed_checks) alerts.push(`${factors.quality.failed_checks} controlli qualità non superati`);
+  if (factors.backup && !factors.backup.latest_verified) alerts.push("Backup più recente non verificato");
+  return alerts.slice(0, 5);
+}
+
+function scorePenalty(penalties, label, points, count = 1) {
+  const value = Math.max(0, Number(points || 0)) * Math.max(0, Number(count || 0));
+  if (value > 0) penalties.push({ label, points: value, count: Number(count || 0) });
+  return value;
+}
+
+function scoreBonus(bonuses, label, points) {
+  const value = Math.max(0, Number(points || 0));
+  if (value > 0) bonuses.push({ label, points: value });
+  return value;
+}
+
+async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) {
+  const stores = options.store ? [options.store] : await visibleStoreHealthStores(options.user || { ruolo: "founder" }, storeId);
+  const store = stores[0];
+  if (!store) {
+    const error = new Error("Negozio non trovato");
+    error.status = 404;
+    throw error;
+  }
+  const range = storeHealthDateRange(dateRange);
+  const values = [];
+  const storeCondition = storeHealthStoreCondition("a", values, store);
+  values.push(range.date_from, range.date_to);
+  const fromIndex = values.length - 1;
+  const toIndex = values.length;
+  const completedRows = await reportQuery(
+    `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome
+     FROM ${actsTable} a
+     LEFT JOIN utenti u ON u.id = a.operatore_id
+     WHERE ${realCompletedStatusSql("a")}
+       AND ${storeCondition}
+       AND COALESCE(a.completed_at, a.archived_at, a.data_atto::timestamptz, a.updated_at, a.created_at) >= $${fromIndex}::date
+       AND COALESCE(a.completed_at, a.archived_at, a.data_atto::timestamptz, a.updated_at, a.created_at) < ($${toIndex}::date + INTERVAL '1 day')
+     ORDER BY COALESCE(a.completed_at, a.archived_at, a.created_at) DESC
+     LIMIT 1000`,
+    values
+  );
+  const completedActs = completedRows.map((row) => rowToAct(row));
+  const materialSummary = founderReportMaterials(completedActs);
+  const payments = founderReportPayments(completedActs);
+  const avgCompletionHours = completedActs.length
+    ? completedActs.reduce((sum, act) => {
+      const start = new Date(act.createdAt || act.date || Date.now()).getTime();
+      const end = new Date(act.completedAt || act.archivedAt || act.date || Date.now()).getTime();
+      return sum + Math.max(0, end - start) / 36e5;
+    }, 0) / completedActs.length
+    : 0;
+  const distinctClients = new Set(completedActs.map((act) => normalizeFiscalCode(act.fiscalCode)).filter(Boolean));
+  const clientFrequency = completedActs.reduce((items, act) => {
+    const key = normalizeFiscalCode(act.fiscalCode);
+    if (key) items[key] = (items[key] || 0) + 1;
+    return items;
+  }, {});
+
+  const [suspendedRows, deletedRows, qualityRows, riskRows, shieldAlertRows, approvalRows, fusionRows, operatorRows, auditRows, backupRows, academyRows] = await Promise.all([
+    reportQuery(
+      `SELECT COUNT(*)::int AS suspended_open,
+              COUNT(*) FILTER (WHERE a.suspended_at < NOW() - INTERVAL '48 hours')::int AS suspended_over_48h,
+              COUNT(*) FILTER (WHERE COALESCE(a.status, '') ILIKE 'pending_approval' OR COALESCE(a.status, '') ILIKE 'in_attesa_autorizzazione')::int AS pending_authorization
+       FROM ${actsTable} a
+       WHERE ${suspendedStatusWhere("a")}
+         AND ${storeHealthStoreCondition("a", [], store).replace(/\$1/g, "$1").replace(/\$2/g, "$2")}`,
+      [store.id, store.nome]
+    ),
+    reportQuery(
+      `SELECT COUNT(*)::int AS deleted_acts
+       FROM ${actsTable} a
+       WHERE a.deleted_at >= $3::date
+         AND a.deleted_at < ($4::date + INTERVAL '1 day')
+         AND ${storeHealthStoreCondition("a", [], store).replace(/\$1/g, "$1").replace(/\$2/g, "$2")}`,
+      [store.id, store.nome, range.date_from, range.date_to]
+    ),
+    reportQuery(
+      `SELECT
+         COUNT(*) FILTER (WHERE LOWER(COALESCE(qc.status, '')) IN ('non_completabile','failed','error'))::int AS failed_checks,
+         COUNT(*) FILTER (WHERE LOWER(COALESCE(qc.status, '')) IN ('attenzione','warning'))::int AS warning_checks,
+         COUNT(*)::int AS total_checks
+       FROM quality_checks qc
+       JOIN ${actsTable} a ON a.id = qc.sale_deed_id
+       WHERE qc.created_at >= $3::date
+         AND qc.created_at < ($4::date + INTERVAL '1 day')
+         AND ${storeHealthStoreCondition("a", [], store).replace(/\$1/g, "$1").replace(/\$2/g, "$2")}`,
+      [store.id, store.nome, range.date_from, range.date_to]
+    ),
+    reportQuery(
+      `SELECT
+         COALESCE(ROUND(AVG(s.score), 1), 0) AS average_score,
+         COUNT(*) FILTER (WHERE LOWER(s.risk_level) IN ('alto','high'))::int AS high_alerts,
+         COUNT(*) FILTER (WHERE LOWER(s.risk_level) IN ('critico','critical'))::int AS critical_alerts
+       FROM aurum_shield_scores s
+       JOIN ${actsTable} a ON a.id = s.sale_deed_id
+       WHERE s.updated_at >= $3::date
+         AND s.updated_at < ($4::date + INTERVAL '1 day')
+         AND ${storeHealthStoreCondition("a", [], store).replace(/\$1/g, "$1").replace(/\$2/g, "$2")}`,
+      [store.id, store.nome, range.date_from, range.date_to]
+    ),
+    reportQuery(
+      `SELECT COUNT(*)::int AS open_alerts,
+              COUNT(*) FILTER (WHERE severity IN ('danger','critical') OR severity ILIKE 'alto' OR severity ILIKE 'critico')::int AS severe_alerts
+       FROM aurum_shield_alerts asa
+       WHERE asa.created_at >= $2::date
+         AND asa.created_at < ($3::date + INTERVAL '1 day')
+         AND asa.store_id = $1::bigint
+         AND COALESCE(asa.status, 'open') <> 'resolved'`,
+      [store.id, range.date_from, range.date_to]
+    ),
+    reportQuery(
+      `SELECT
+         COUNT(*) FILTER (WHERE ar.created_at >= $2::date AND ar.created_at < ($3::date + INTERVAL '1 day'))::int AS requested,
+         COUNT(*) FILTER (WHERE ar.status = 'rejected' AND ar.reviewed_at >= $2::date AND ar.reviewed_at < ($3::date + INTERVAL '1 day'))::int AS rejected,
+         COUNT(*) FILTER (WHERE ar.status = 'pending')::int AS pending
+       FROM approval_requests ar
+       WHERE ar.store_id = $1::bigint`,
+      [store.id, range.date_from, range.date_to]
+    ),
+    reportQuery(
+      `SELECT COUNT(*)::int AS lots_total,
+              COUNT(*) FILTER (WHERE COALESCE(stato, '') ILIKE 'conclus%' OR COALESCE(stato, '') ILIKE 'completed')::int AS lots_completed,
+              COUNT(*) FILTER (WHERE NOT (COALESCE(stato, '') ILIKE 'conclus%' OR COALESCE(stato, '') ILIKE 'completed'))::int AS lots_open,
+              COUNT(*) FILTER (WHERE data_invio IS NOT NULL AND data_invio < CURRENT_DATE - INTERVAL '14 days' AND NOT (COALESCE(stato, '') ILIKE 'conclus%' OR COALESCE(stato, '') ILIKE 'completed'))::int AS lots_late
+       FROM fusion_lots
+       WHERE created_at >= $3::date
+         AND created_at < ($4::date + INTERVAL '1 day')
+         AND (negozio_id = $1::bigint OR negozio = $2::text)`,
+      [store.id, store.nome, range.date_from, range.date_to]
+    ),
+    reportQuery(
+      `SELECT COUNT(*)::int AS active_operators
+       FROM utenti
+       WHERE COALESCE(attivo, TRUE) = TRUE
+         AND (negozio_id = $1::bigint OR negozio = $2::text)`,
+      [store.id, store.nome]
+    ),
+    reportQuery(
+      `SELECT action, COUNT(*)::int AS total
+       FROM audit_logs
+       WHERE created_at >= $3::date
+         AND created_at < ($4::date + INTERVAL '1 day')
+         AND (store_id = $1::bigint OR store_name = $2::text)
+       GROUP BY action`,
+      [store.id, store.nome, range.date_from, range.date_to]
+    ),
+    reportQuery(
+      `SELECT *
+       FROM backups
+       WHERE (store_id IS NULL OR store_id = $1::bigint)
+       ORDER BY created_at DESC
+       LIMIT 5`,
+      [store.id]
+    ),
+    reportQuery(
+      `SELECT
+         COALESCE(ROUND(AVG(COALESCE(p.percentuale, 0)), 1), 0) AS average_progress,
+         COUNT(DISTINCT u.id) FILTER (WHERE COALESCE(p.percentuale, 0) < 60)::int AS operators_below_60,
+         COUNT(DISTINCT cert.id)::int AS certificates,
+         COUNT(DISTINCT badge.id)::int AS badges
+       FROM utenti u
+       LEFT JOIN academy_user_progress p ON p.user_id = u.id
+       LEFT JOIN academy_certificates cert ON cert.user_id = u.id
+       LEFT JOIN academy_badges badge ON badge.user_id = u.id
+       WHERE COALESCE(u.attivo, TRUE) = TRUE
+         AND (u.negozio_id = $1::bigint OR u.negozio = $2::text)`,
+      [store.id, store.nome]
+    )
+  ]);
+
+  const auditActions = activityCountByAction(auditRows);
+  const latestBackup = backupRows[0] || null;
+  const backupFailed = backupRows.some((backup) => backup.status === "failed");
+  const backupVerified = latestBackup?.verification_status === "verified";
+  const totalRevenue = completedActs.reduce((sum, act) => sum + reportNumber(act.amount), 0);
+  const estimatedProfit = totalRevenue * 0.08;
+  const averageMargin = totalRevenue > 0 ? 8 : 0;
+  const expiredDocuments = completedActs.filter((act) => act.documentExpiry && new Date(act.documentExpiry) < new Date()).length;
+  const factors = {
+    store: { id: store.id, name: store.nome, code: store.codice || "" },
+    date_range: range,
+    operational: {
+      completed_acts: completedActs.length,
+      suspended_open: Number(suspendedRows[0]?.suspended_open || 0),
+      pending_approvals: Number(approvalRows[0]?.pending || suspendedRows[0]?.pending_authorization || 0),
+      deleted_acts: Number(deletedRows[0]?.deleted_acts || 0),
+      average_completion_hours: Number(avgCompletionHours.toFixed(1)),
+      incomplete_practices: Number(suspendedRows[0]?.suspended_open || 0),
+      suspended_over_48h: Number(suspendedRows[0]?.suspended_over_48h || 0)
+    },
+    quality: {
+      failed_checks: Number(qualityRows[0]?.failed_checks || 0),
+      warning_checks: Number(qualityRows[0]?.warning_checks || 0),
+      total_checks: Number(qualityRows[0]?.total_checks || 0),
+      expired_documents: expiredDocuments,
+      missing_receipts: payments.missing_receipts
+    },
+    risk: {
+      average_shield_score: Number(riskRows[0]?.average_score || 0),
+      high_alerts: Number(riskRows[0]?.high_alerts || 0),
+      critical_alerts: Number(riskRows[0]?.critical_alerts || 0),
+      open_alerts: Number(shieldAlertRows[0]?.open_alerts || 0),
+      severe_alerts: Number(shieldAlertRows[0]?.severe_alerts || 0),
+      approvals_requested: Number(approvalRows[0]?.requested || 0),
+      approvals_rejected: Number(approvalRows[0]?.rejected || 0)
+    },
+    commercial: {
+      gold_grams: materialSummary.totals.Oro,
+      silver_grams: materialSummary.totals.Argento,
+      platinum_grams: materialSummary.totals.Platino,
+      estimated_profit: estimatedProfit,
+      average_margin: averageMargin,
+      customers: distinctClients.size,
+      recurring_customers: Object.values(clientFrequency).filter((count) => count > 1).length,
+      payment_volume: totalRevenue,
+      completed_acts: completedActs.length
+    },
+    payments: {
+      cash: payments.contanti_amount,
+      bank_transfers: payments.bonifico_amount,
+      checks: payments.assegno_amount,
+      missing_receipts: payments.missing_receipts,
+      suspicious_payments: Number(shieldAlertRows[0]?.severe_alerts || 0)
+    },
+    stock_and_fusion: {
+      stock_by_metal: materialSummary.totals,
+      gold_by_title: materialSummary.oro_by_title,
+      silver_by_title: materialSummary.argento_by_title,
+      platinum_by_title: materialSummary.platino_by_title,
+      fusion_lots_open: Number(fusionRows[0]?.lots_open || 0),
+      fusion_lots_completed: Number(fusionRows[0]?.lots_completed || 0),
+      fusion_lots_late: Number(fusionRows[0]?.lots_late || 0)
+    },
+    operators: {
+      active_operators: Number(operatorRows[0]?.active_operators || 0),
+      logins: Number(auditActions.login || 0),
+      total_activity: auditRows.reduce((sum, row) => sum + Number(row.total || 0), 0),
+      too_many_errors: Number(auditActions.api_request_error || 0) + Number(auditActions.quality_check_failed || 0),
+      too_many_updates: Number(auditActions.update_act || 0)
+    },
+    academy: {
+      average_progress: Number(academyRows[0]?.average_progress || 0),
+      operators_below_60: Number(academyRows[0]?.operators_below_60 || 0),
+      certificates: Number(academyRows[0]?.certificates || 0),
+      badges: Number(academyRows[0]?.badges || 0)
+    },
+    backup: {
+      latest_backup_code: latestBackup?.backup_code || "",
+      latest_status: latestBackup?.status || "not_available",
+      latest_verified: backupVerified,
+      failed_recently: backupFailed
+    },
+    security: {
+      audit_critical: Number(auditActions.delete_act || 0) + Number(auditActions.change_user_role || 0) + Number(auditActions.approval_unauthorized_attempt || 0),
+      unauthorized_attempts: Number(auditActions.approval_unauthorized_attempt || 0)
+    }
+  };
+  const penalties = [];
+  const bonuses = [];
+  let score = 100;
+  score -= scorePenalty(penalties, "Pratiche sospese aperte", 4, factors.operational.suspended_open);
+  score -= scorePenalty(penalties, "Pratiche in attesa autorizzazione", 3, factors.operational.pending_approvals);
+  score -= scorePenalty(penalties, "Alert Aurum Shield alto rischio", 6, factors.risk.high_alerts);
+  score -= scorePenalty(penalties, "Alert Aurum Shield critici", 10, factors.risk.critical_alerts);
+  score -= scorePenalty(penalties, "Controlli qualità falliti", 5, factors.quality.failed_checks);
+  score -= scorePenalty(penalties, "Documenti scaduti", 8, factors.quality.expired_documents);
+  score -= scorePenalty(penalties, "Atti eliminati", 6, factors.operational.deleted_acts);
+  if (factors.backup.failed_recently) score -= scorePenalty(penalties, "Backup fallito recente", 10, 1);
+  if (factors.academy.average_progress < 60 && factors.operators.active_operators > 0) score -= scorePenalty(penalties, "Formazione media sotto 60%", 10, 1);
+  if (factors.operational.average_completion_hours > 24) score -= scorePenalty(penalties, "Tempo medio completamento alto", 5, 1);
+  if (factors.commercial.completed_acts > 0 && factors.commercial.average_margin < 8) score -= scorePenalty(penalties, "Margine medio sotto soglia", 8, 1);
+  if (backupVerified) score += scoreBonus(bonuses, "Backup verificato", 3);
+  if (factors.academy.average_progress > 85) score += scoreBonus(bonuses, "Formazione media sopra 85%", 5);
+  if (!factors.risk.critical_alerts) score += scoreBonus(bonuses, "Nessun alert critico", 5);
+  if (!factors.operational.suspended_over_48h) score += scoreBonus(bonuses, "Nessuna sospesa oltre 48 ore", 5);
+  if (factors.commercial.completed_acts > 0 && factors.commercial.average_margin >= 8) score += scoreBonus(bonuses, "Margine medio sopra soglia", 5);
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const status = storeHealthStatus(score);
+  const recommendations = generateStoreHealthRecommendations(factors);
+  const saved = await pool.query(
+    `INSERT INTO store_health_scores (
+       store_id, score, status, date_from, date_to, factors, penalties, bonuses, recommendations, updated_at
+     ) VALUES (
+       $1::bigint,$2::integer,$3::text,$4::date,$5::date,$6::jsonb,$7::jsonb,$8::jsonb,$9::jsonb,NOW()
+     )
+     ON CONFLICT (store_id, date_from, date_to) DO UPDATE SET
+       score = EXCLUDED.score,
+       status = EXCLUDED.status,
+       factors = EXCLUDED.factors,
+       penalties = EXCLUDED.penalties,
+       bonuses = EXCLUDED.bonuses,
+       recommendations = EXCLUDED.recommendations,
+       updated_at = NOW()
+     RETURNING *`,
+    [
+      store.id,
+      score,
+      status.status,
+      range.date_from,
+      range.date_to,
+      sanitizeForPostgres(factors),
+      sanitizeForPostgres(penalties),
+      sanitizeForPostgres(bonuses),
+      sanitizeForPostgres(recommendations)
+    ]
+  );
+  return publicStoreHealthScore(saved.rows[0], store);
+}
+
+async function storeHealthTrend(storeId, dateFrom) {
+  const result = await pool.query(
+    `SELECT score
+     FROM store_health_scores
+     WHERE store_id = $1::bigint
+       AND date_to < $2::date
+     ORDER BY date_to DESC, updated_at DESC
+     LIMIT 1`,
+    [storeId, dateFrom]
+  ).catch(() => ({ rows: [] }));
+  return result.rows[0]?.score ?? null;
+}
+
+function publicStoreHealthScore(row = {}, store = {}) {
+  const score = Number(row.score || 0);
+  const status = storeHealthStatus(score);
+  const factors = row.factors || {};
+  return {
+    id: row.id,
+    store_id: row.store_id || store.id || null,
+    store_name: store.nome || factors.store?.name || "Negozio",
+    store_code: store.codice || factors.store?.code || "",
+    score,
+    status: row.status || status.status,
+    status_label: status.label,
+    status_color: status.color,
+    date_from: row.date_from ? dateInputString(row.date_from) : null,
+    date_to: row.date_to ? dateInputString(row.date_to) : null,
+    factors,
+    penalties: reportArray(row.penalties),
+    bonuses: reportArray(row.bonuses),
+    recommendations: reportArray(row.recommendations),
+    main_alerts: storeHealthMainAlerts(factors),
+    trend: row.trend ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+async function listStoreHealthScores(query = {}, user = {}, options = {}) {
+  const range = storeHealthDateRange(query);
+  const stores = await visibleStoreHealthStores(user, query.store_id || query.storeId || null);
+  const scores = [];
+  for (const store of stores) {
+    let row = null;
+    if (!options.force) {
+      const saved = await pool.query(
+        `SELECT * FROM store_health_scores
+         WHERE store_id = $1::bigint
+           AND date_from = $2::date
+           AND date_to = $3::date
+         LIMIT 1`,
+        [store.id, range.date_from, range.date_to]
+      ).catch(() => ({ rows: [] }));
+      row = saved.rows[0] || null;
+    }
+    const score = row ? publicStoreHealthScore(row, store) : await calculateStoreHealthScore(store.id, range, { store, user });
+    const previous = await storeHealthTrend(store.id, range.date_from);
+    score.trend = previous === null ? null : score.score - Number(previous || 0);
+    scores.push(score);
+  }
+  return scores.sort((a, b) => b.score - a.score || a.store_name.localeCompare(b.store_name));
+}
+
+async function getStoreHealthDetail(storeId, query = {}, user = {}) {
+  const scores = await listStoreHealthScores({ ...query, store_id: storeId }, user);
+  return scores[0] || null;
+}
+
+async function storeHealthHistory(storeId, user = {}, limit = 30) {
+  const stores = await visibleStoreHealthStores(user, storeId);
+  const store = stores[0];
+  const result = await pool.query(
+    `SELECT *
+     FROM store_health_scores
+     WHERE store_id = $1::bigint
+     ORDER BY date_to DESC, updated_at DESC
+     LIMIT $2::integer`,
+    [store.id, Math.min(100, Math.max(1, Number(limit || 30)))]
+  );
+  return result.rows.map((row) => publicStoreHealthScore(row, store));
+}
+
+async function storeHealthNetworkSummary(user = {}) {
+  if (!canViewStoreHealth(user)) return { average_score: 0, best_store: null, critical_store: null, alert_count: 0, stores: [] };
+  const stores = await listStoreHealthScores({ period: "last_7" }, user).catch(() => []);
+  if (!stores.length) return { average_score: 0, best_store: null, critical_store: null, alert_count: 0, stores: [] };
+  const average = stores.reduce((sum, row) => sum + Number(row.score || 0), 0) / stores.length;
+  const critical = [...stores].sort((a, b) => a.score - b.score)[0] || null;
+  const best = stores[0] || null;
+  return {
+    average_score: Math.round(average),
+    best_store: best ? { store_name: best.store_name, score: best.score, status: best.status_label } : null,
+    critical_store: critical ? { store_name: critical.store_name, score: critical.score, status: critical.status_label } : null,
+    alert_count: stores.reduce((sum, row) => sum + reportArray(row.main_alerts).length, 0),
+    stores: stores.map((row) => ({
+      store_id: row.store_id,
+      store_name: row.store_name,
+      score: row.score,
+      status: row.status,
+      status_label: row.status_label,
+      trend: row.trend,
+      main_alerts: row.main_alerts,
+      recommendations: row.recommendations
+    }))
   };
 }
 
@@ -4389,6 +4903,7 @@ function publicFounderDailyReport(row = {}) {
     notifications_data: row.notifications_data || {},
     audit_data: row.audit_data || {},
     backup_data: row.backup_data || {},
+    store_health_data: row.store_health_data || {},
     academy_data: row.academy_data || {},
     ai_data: row.ai_data || {},
     pdf_path: row.pdf_path || null,
@@ -4687,6 +5202,13 @@ async function generateFounderDailyReport(date = new Date(), generatedBy = null,
        ORDER BY created_at DESC
        LIMIT 1`
     );
+    const storeHealthRows = await listStoreHealthScores({ date_from: reportDate, date_to: reportDate }, generatedBy || { ruolo: "founder" }).catch((error) => {
+      console.error("FOUNDER DAILY REPORT STORE HEALTH ERROR", error.message || error);
+      return [];
+    });
+    const storeHealthAverage = storeHealthRows.length
+      ? Math.round(storeHealthRows.reduce((sum, row) => sum + Number(row.score || 0), 0) / storeHealthRows.length)
+      : 0;
     const summary = {
       report_date: reportDate,
       generated_at: new Date().toISOString(),
@@ -4779,6 +5301,21 @@ async function generateFounderDailyReport(date = new Date(), generatedBy = null,
         latest_backup: latestBackupRows[0] || null,
         latest_restore_test_status: latestBackupRows[0]?.restore_test_status || "not_tested"
       },
+      store_health_data: {
+        average_score: storeHealthAverage,
+        best_store: storeHealthRows[0] || null,
+        critical_store: [...storeHealthRows].sort((a, b) => a.score - b.score)[0] || null,
+        stores: storeHealthRows.map((row) => ({
+          store_id: row.store_id,
+          store_name: row.store_name,
+          score: row.score,
+          status: row.status,
+          status_label: row.status_label,
+          trend: row.trend,
+          main_alerts: row.main_alerts,
+          recommendations: row.recommendations
+        }))
+      },
       academy_data: {
         courses_completed_today: Number(academyRows[0]?.courses_completed || 0),
         certificates_issued_today: Number(academyRows[0]?.certificates_issued || 0),
@@ -4801,11 +5338,11 @@ async function generateFounderDailyReport(date = new Date(), generatedBy = null,
       `INSERT INTO founder_daily_reports (
         report_date, status, generated_by, summary, stores_data, operators_data, risks_data,
         quality_data, suspended_data, approvals_data, notifications_data, audit_data,
-        backup_data, academy_data, ai_data, error_message, updated_at
+        backup_data, store_health_data, academy_data, ai_data, error_message, updated_at
       ) VALUES (
         $1::date,'generated',$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,
         $7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,$11::jsonb,
-        $12::jsonb,$13::jsonb,$14::jsonb,NULL,NOW()
+        $12::jsonb,$13::jsonb,$14::jsonb,$15::jsonb,NULL,NOW()
       )
       ON CONFLICT (report_date) DO UPDATE SET
         status = 'generated',
@@ -4820,6 +5357,7 @@ async function generateFounderDailyReport(date = new Date(), generatedBy = null,
         notifications_data = EXCLUDED.notifications_data,
         audit_data = EXCLUDED.audit_data,
         backup_data = EXCLUDED.backup_data,
+        store_health_data = EXCLUDED.store_health_data,
         academy_data = EXCLUDED.academy_data,
         ai_data = EXCLUDED.ai_data,
         error_message = NULL,
@@ -4838,6 +5376,7 @@ async function generateFounderDailyReport(date = new Date(), generatedBy = null,
         sanitizeForPostgres(reportPayload.notifications_data),
         sanitizeForPostgres(reportPayload.audit_data),
         sanitizeForPostgres(reportPayload.backup_data),
+        sanitizeForPostgres(reportPayload.store_health_data),
         sanitizeForPostgres(reportPayload.academy_data),
         sanitizeForPostgres(reportPayload.ai_data)
       ]
@@ -4954,6 +5493,10 @@ function writeFounderDailyReportPdf(response, report) {
   pdfSection(doc, "Backup, Academy, Audit");
   pdfLine(doc, "Backup creati", report.backup_data?.created_today || 0);
   pdfLine(doc, "Backup falliti", report.backup_data?.failed_today || 0);
+  pdfLine(doc, "Health Score medio rete", report.store_health_data?.average_score || 0);
+  reportArray(report.store_health_data?.stores).slice(0, 6).forEach((store) => {
+    doc.text(`${store.store_name}: ${store.score}/100 · ${store.status_label || store.status || "stato"}`);
+  });
   pdfLine(doc, "Corsi completati", report.academy_data?.courses_completed_today || 0);
   pdfLine(doc, "Azioni audit", report.audit_data?.actions_today || 0);
 
@@ -10870,6 +11413,66 @@ app.get("/api/dashboard", async (request, response, next) => {
   }
 });
 
+app.get("/api/store-health", async (request, response, next) => {
+  try {
+    if (!canViewStoreHealth(request.user)) return response.status(403).json({ error: "Non autorizzato" });
+    const stores = await listStoreHealthScores(request.query, request.user);
+    const average = stores.length ? Math.round(stores.reduce((sum, row) => sum + Number(row.score || 0), 0) / stores.length) : 0;
+    response.json({
+      ok: true,
+      date_range: storeHealthDateRange(request.query),
+      average_score: average,
+      stores
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/store-health/calculate", async (request, response, next) => {
+  try {
+    if (!canViewStoreHealth(request.user)) return response.status(403).json({ error: "Non autorizzato" });
+    const stores = await listStoreHealthScores({
+      period: request.body?.period,
+      date_from: request.body?.date_from,
+      date_to: request.body?.date_to,
+      store_id: request.body?.store_id
+    }, request.user, { force: true });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "store_health_score_calculated",
+      entityType: "store_health",
+      entityLabel: "Salute Negozio",
+      afterData: { stores: stores.map((store) => ({ store_id: store.store_id, score: store.score, status: store.status })) },
+      metadata: { store_count: stores.length, period: request.body?.period || "custom" }
+    });
+    response.json({ ok: true, message: "Store Health Score ricalcolato", stores });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/store-health/:storeId/history", async (request, response, next) => {
+  try {
+    if (!canViewStoreHealth(request.user)) return response.status(403).json({ error: "Non autorizzato" });
+    response.json({ ok: true, history: await storeHealthHistory(request.params.storeId, request.user, request.query.limit || 30) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/store-health/:storeId", async (request, response, next) => {
+  try {
+    if (!canViewStoreHealth(request.user)) return response.status(403).json({ error: "Non autorizzato" });
+    const store = await getStoreHealthDetail(request.params.storeId, request.query, request.user);
+    if (!store) return response.status(404).json({ error: "Negozio non trovato" });
+    response.json({ ok: true, store });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/founder-daily-report", requireFounder, async (request, response, next) => {
   try {
     response.json({ ok: true, reports: await listFounderDailyReports(request.query.limit || 30) });
@@ -13258,6 +13861,7 @@ function friendlyDatabaseError(error, request) {
   if (url.includes("/api/atti") || url.includes("/api/acts")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Errore database durante il salvataggio Academy.";
   if (url.includes("/api/crm")) return "Errore database durante il salvataggio CRM.";
+  if (url.includes("/api/store-health")) return "Errore database durante il calcolo Salute Negozio.";
   if (url.includes("/api/founder-daily-report")) return "Errore database durante il Founder Daily Report.";
   if (url.includes("/api/backups")) return "Errore database durante il backup.";
   if (url.includes("/api/quotes") || url.includes("/api/quotazioni")) return "Errore database durante il salvataggio quotazioni.";
@@ -13277,6 +13881,7 @@ function safeRouteErrorMessage(request) {
   if (url.includes("/api/notifications")) return "Operazione notifiche non completata.";
   if (url.includes("/api/founder-daily-report")) return "Founder Daily Report non completato.";
   if (url.includes("/api/backups")) return "Operazione backup non completata.";
+  if (url.includes("/api/store-health")) return "Salute Negozio non caricata.";
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Operazione Academy non completata.";
   if (url.includes("/api/crm") || url.includes("/api/clienti")) return "Operazione CRM non completata.";
   if (url.includes("/api/aurum-shield") || url.includes("/api/quality-check")) return "Controllo pratica non completato.";

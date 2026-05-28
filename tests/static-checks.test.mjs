@@ -666,7 +666,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /founder-report-1/);
+  assert.match(worker, /store-health-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -719,7 +719,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /founder-report-1/);
+  assert.match(worker, /store-health-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -771,7 +771,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /founder-report-1/);
+  assert.match(worker, /store-health-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -841,9 +841,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260528-founder-report-1/);
-  assert.match(index, /styles\.css\?v=20260528-founder-report-1/);
-  assert.match(worker, /founder-report-1/);
+  assert.match(index, /app\.js\?v=20260528-store-health-1/);
+  assert.match(index, /styles\.css\?v=20260528-store-health-1/);
+  assert.match(worker, /store-health-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -896,6 +896,61 @@ test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () 
   assert.match(app, /Founder Daily Report generato\./);
   assert.match(styles, /founder-report-actions/);
   assert.match(styles, /founder-report-history-item/);
+});
+
+test("Store Health Score ha schema API UI dashboard e report Founder", async () => {
+  const [index, app, server, schema, migration, styles, worker] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260528_store_health_score.sql"),
+    file("styles.css"),
+    file("service-worker.js")
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS store_health_scores/);
+  assert.match(schema, /store_id BIGINT NOT NULL/);
+  assert.match(schema, /store_health_scores_store_date_unique/);
+  assert.match(schema, /store_health_data JSONB/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS store_health_scores/);
+  assert.match(migration, /idx_store_health_scores_store_id/);
+  assert.match(migration, /store_health_scores_store_date_unique/);
+  assert.match(migration, /ALTER TABLE founder_daily_reports ADD COLUMN IF NOT EXISTS store_health_data/);
+
+  assert.match(server, /function canViewStoreHealth/);
+  assert.match(server, /async function calculateStoreHealthScore/);
+  assert.match(server, /function generateStoreHealthRecommendations/);
+  assert.match(server, /async function storeHealthNetworkSummary/);
+  assert.match(server, /app\.get\("\/api\/store-health"/);
+  assert.match(server, /app\.post\("\/api\/store-health\/calculate"/);
+  assert.match(server, /app\.get\("\/api\/store-health\/:storeId\/history"/);
+  assert.match(server, /app\.get\("\/api\/store-health\/:storeId"/);
+  assert.match(server, /realCompletedStatusSql\("a"\)/);
+  assert.match(server, /suspendedStatusWhere\("a"\)/);
+  assert.match(server, /store_health_score_calculated/);
+  assert.match(server, /store_health_data/);
+  assert.match(server, /Salute Negozio non caricata/);
+
+  assert.match(index, /id="storeHealth" class="screen control-only"/);
+  assert.match(index, /data-section="storeHealth">Salute Negozio/);
+  assert.match(index, /id="storeHealthFilters"/);
+  assert.match(index, /id="storeHealthSummary"/);
+  assert.match(index, /id="storeHealthList"/);
+  assert.match(app, /storeHealth: \[\]/);
+  assert.match(app, /storeHealthDateRange: null/);
+  assert.match(app, /function renderStoreHealth/);
+  assert.match(app, /async function loadStoreHealth/);
+  assert.match(app, /async function recalculateStoreHealth/);
+  assert.match(app, /async function openStoreHealthDetail/);
+  assert.match(app, /data-open-store-health/);
+  assert.match(app, /Salute negozi/);
+  assert.match(app, /store_health_data/);
+  assert.match(app, /Store Health Score ricalcolato/);
+  assert.match(styles, /\.store-health-card/);
+  assert.match(styles, /\.store-health-score/);
+  assert.match(styles, /\.store-health-detail/);
+  assert.match(worker, /store-health-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {

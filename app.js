@@ -64,6 +64,9 @@ const state = {
   crmClients: [],
   crmSearchTimer: null,
   backups: [],
+  storeHealth: [],
+  storeHealthDateRange: null,
+  storeHealthDetail: null,
   approvals: [],
   suspendedPractices: [],
   suspendedPagination: { page: 1, limit: 50, total: 0 },
@@ -173,6 +176,10 @@ const AURUM_SECTION_TIPS = {
   dashboard: [
     "La dashboard deve contare solo dati reali e non eliminati.",
     "Se un valore sembra strano, conviene controllare filtri e periodo."
+  ],
+  storeHealth: [
+    "La Salute Negozio unisce qualità, rischio, formazione, backup e performance.",
+    "Uno score basso va letto partendo da pratiche sospese, alert critici e backup."
   ]
 };
 const AURUM_MENU_POSITIONS = [
@@ -193,6 +200,7 @@ const AURUM_SECTION_MAP = {
   quotazione: "quotazioni",
   aurumAdmin: "assistente_ai",
   dashboard: "dashboard",
+  storeHealth: "dashboard",
   assistant: "assistente_ai",
   knowledgeNotes: "assistente_ai",
   antifraud: "elenco_atti"
@@ -669,6 +677,13 @@ const aiFeedbackList = document.getElementById("aiFeedbackList");
 const resetKnowledgeNoteButton = document.getElementById("resetKnowledgeNoteForm");
 const dashboardGrid = document.getElementById("dashboardGrid");
 const dashboardPanels = document.getElementById("dashboardPanels");
+const storeHealthFilters = document.getElementById("storeHealthFilters");
+const storeHealthPeriod = document.getElementById("storeHealthPeriod");
+const storeHealthDateFrom = document.getElementById("storeHealthDateFrom");
+const storeHealthDateTo = document.getElementById("storeHealthDateTo");
+const storeHealthSummary = document.getElementById("storeHealthSummary");
+const storeHealthList = document.getElementById("storeHealthList");
+const recalculateStoreHealthButton = document.getElementById("recalculateStoreHealth");
 const founderReportDate = document.getElementById("founderReportDate");
 const founderReportStatus = document.getElementById("founderReportStatus");
 const founderReportCards = document.getElementById("founderReportCards");
@@ -1093,6 +1108,7 @@ function apiErrorFallback(path = "", status = 0) {
   if (/\/suspended-practices/.test(path)) return "Operazione pratica sospesa non completata.";
   if (/\/approvals/.test(path)) return "Operazione autorizzazione non completata.";
   if (/\/notifications/.test(path)) return "Operazione notifiche non completata.";
+  if (/\/store-health/.test(path)) return "Salute Negozio non caricata.";
   if (/\/founder-daily-report/.test(path)) return "Founder Daily Report non completato.";
   if (/\/backups/.test(path)) return "Operazione backup non completata.";
   if (/\/academy|\/corsi/.test(path)) return "Operazione Academy non completata.";
@@ -2384,7 +2400,7 @@ function setScreen(id) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
-  if (["dashboard", "antifraud"].includes(id) && !canViewControlSectionsUi()) {
+  if (["dashboard", "antifraud", "storeHealth"].includes(id) && !canViewControlSectionsUi()) {
     showToast("Sezione riservata a Founder, Supervisore o Responsabile.");
     return;
   }
@@ -2441,6 +2457,7 @@ function sectionLoadErrorMessage(id, error) {
     notifications: "Notifiche non caricate.",
     fusion: "Giacenza e fusioni non caricate.",
     dashboard: "Dashboard non caricata.",
+    storeHealth: "Salute Negozio non caricata.",
     quotazione: "Quotazioni non caricate.",
     backups: "Backup non caricati.",
     stores: "Negozi non caricati.",
@@ -2468,6 +2485,7 @@ async function handleScreenDataLoad(id) {
     renderFusionGroups();
   }
   if (id === "dashboard") await loadDashboard();
+  if (id === "storeHealth") await loadStoreHealth();
   if (id === "quotazione") {
     renderQuoteDashboard();
     await refreshBullionVaultPrices();
@@ -4300,6 +4318,7 @@ function renderDashboard() {
   const audit = data.audit_summary || {};
   const approvals = data.approval_summary || {};
   const suspended = data.suspended_practices || {};
+  const storeHealth = data.store_health || {};
   dashboardGrid.innerHTML = [
     metricCard("Totale oro oggi", `${Number(kpi.grammi_giornalieri?.Oro || 0).toFixed(2)} gr`),
     metricCard("Totale argento oggi", `${Number(kpi.grammi_giornalieri?.Argento || 0).toFixed(2)} gr`),
@@ -4321,6 +4340,8 @@ function renderDashboard() {
     metricCard("Richieste rischiose", approvals.risky_pending || 0),
     metricCard("Pratiche sospese", suspended.total || 0),
     metricCard("Sospese oggi", suspended.today || 0),
+    metricCard("Health Score rete", `${Number(storeHealth.average_score || 0)}/100`),
+    metricCard("Negozi critici", (storeHealth.stores || []).filter((store) => store.status === "critico").length),
     metricCard("Login oggi", audit.logins_today || 0),
     metricCard("Azioni critiche oggi", Number(audit.acts_deleted_today || 0) + Number(audit.shield_alerts_today || 0)),
     metricCard("Oro mensile", `${Number(kpi.grammi_mensili?.Oro || 0).toFixed(2)} gr`),
@@ -4353,6 +4374,13 @@ function renderDashboard() {
       <div class="dashboard-rank-row"><span>Sospese oggi</span><strong>${escapeHtml(String(suspended.today || 0))}</strong><em>Da correggere</em></div>
       ${(suspended.latest || []).slice(0, 5).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.practiceNumber || item.numero_atto || "Atto")}</span><strong>${escapeHtml(String(item.risk_score || 0))}/100</strong><em>${escapeHtml((item.motivi || [])[0] || "Motivo da verificare")}</em></div>`).join("") || '<div class="empty-state">Nessuna pratica sospesa.</div>'}
     </section>
+    <section class="dashboard-panel"><h3>Salute Negozi</h3>
+      <div class="dashboard-rank-row"><span>Score medio rete</span><strong>${escapeHtml(String(storeHealth.average_score || 0))}/100</strong><em>Ultimi 7 giorni</em></div>
+      <div class="dashboard-rank-row"><span>Miglior negozio</span><strong>${escapeHtml(storeHealth.best_store?.store_name || "Nessun dato")}</strong><em>${escapeHtml(String(storeHealth.best_store?.score || 0))}/100 · ${escapeHtml(storeHealth.best_store?.status || "")}</em></div>
+      <div class="dashboard-rank-row"><span>Negozio più critico</span><strong>${escapeHtml(storeHealth.critical_store?.store_name || "Nessun dato")}</strong><em>${escapeHtml(String(storeHealth.critical_store?.score || 0))}/100 · ${escapeHtml(storeHealth.critical_store?.status || "")}</em></div>
+      <div class="dashboard-rank-row"><span>Alert salute</span><strong>${escapeHtml(String(storeHealth.alert_count || 0))}</strong><em>Pratiche, rischio, qualità, backup</em></div>
+      <button class="ghost-button small-button" type="button" data-open-store-health>Apri Salute Negozio</button>
+    </section>
     <section class="dashboard-panel"><h3>Oggi nell'app</h3>
       <div class="dashboard-rank-row"><span>Atti creati</span><strong>${escapeHtml(String(audit.acts_created_today || 0))}</strong><em>Da Audit Trail</em></div>
       <div class="dashboard-rank-row"><span>Atti modificati</span><strong>${escapeHtml(String(audit.acts_updated_today || 0))}</strong><em>Da Audit Trail</em></div>
@@ -4375,6 +4403,262 @@ async function loadDashboard() {
   } catch (error) {
     if (dashboardGrid) dashboardGrid.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Dashboard non caricata.")}</div>`;
   }
+}
+
+function storeHealthStatusClass(status = "") {
+  const normalized = String(status || "").toLowerCase().replace(/\s+/g, "_");
+  if (normalized.includes("ottimo")) return "store-health-ottimo";
+  if (normalized.includes("buono")) return "store-health-buono";
+  if (normalized.includes("controll")) return "store-health-da-controllare";
+  return "store-health-critico";
+}
+
+function storeHealthPeriodParams() {
+  const period = storeHealthPeriod?.value || "last_7";
+  const params = { period };
+  const dateFrom = storeHealthDateFrom?.value || "";
+  const dateTo = storeHealthDateTo?.value || "";
+  if (period === "custom" || dateFrom || dateTo) {
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+  }
+  return params;
+}
+
+function updateStoreHealthDateInputs() {
+  const custom = storeHealthPeriod?.value === "custom";
+  [storeHealthDateFrom, storeHealthDateTo].forEach((input) => {
+    if (!input) return;
+    input.disabled = !custom;
+    input.closest("label")?.classList.toggle("muted-control", !custom);
+  });
+}
+
+function storeHealthTrendText(trend) {
+  if (trend === null || trend === undefined || Number.isNaN(Number(trend))) return "Trend non disponibile";
+  const value = Number(trend);
+  if (value === 0) return "Trend stabile";
+  return `${value > 0 ? "+" : ""}${value} rispetto al periodo precedente`;
+}
+
+function storeHealthReadableValue(value) {
+  if (value === null || value === undefined || value === "") return "Dato non disponibile";
+  if (typeof value === "boolean") return value ? "Sì" : "No";
+  if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "Nessun dato";
+  if (typeof value === "object") {
+    const entries = Object.entries(value).filter(([, item]) => item !== null && item !== undefined && item !== "");
+    return entries.length
+      ? entries.map(([key, item]) => `${key}: ${storeHealthReadableValue(item)}`).join(" · ")
+      : "Nessun dato";
+  }
+  return String(value);
+}
+
+function storeHealthRowsFromObject(data = {}, labels = {}) {
+  const entries = Object.entries(data || {});
+  if (!entries.length) return '<div class="empty-state">Nessun dato disponibile.</div>';
+  return entries.map(([key, value]) => founderReportRow(labels[key] || key.replace(/_/g, " "), storeHealthReadableValue(value))).join("");
+}
+
+function storeHealthArrayRows(rows = [], emptyText = "Nessun dato disponibile.") {
+  if (!rows.length) return `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+  return rows.map((row) => founderReportRow(
+    row.label || row.title || row.message || "Voce",
+    row.points !== undefined ? `${row.count !== undefined ? "-" : "+"}${row.points}` : row.score || row.value || "",
+    row.count !== undefined ? `${row.count} occorrenze` : row.detail || row.description || ""
+  )).join("");
+}
+
+function renderStoreHealth() {
+  if (!storeHealthSummary || !storeHealthList) return;
+  const stores = state.storeHealth || [];
+  const average = stores.length ? Math.round(stores.reduce((sum, store) => sum + Number(store.score || 0), 0) / stores.length) : 0;
+  const excellent = stores.filter((store) => store.status === "ottimo").length;
+  const warning = stores.filter((store) => ["da_controllare", "critico"].includes(store.status)).length;
+  const critical = stores.filter((store) => store.status === "critico").length;
+  const alerts = stores.reduce((sum, store) => sum + (store.main_alerts || []).length, 0);
+  storeHealthSummary.innerHTML = [
+    metricCard("Health Score medio rete", `${average}/100`),
+    metricCard("Negozi ottimi", excellent),
+    metricCard("Negozi da controllare", warning),
+    metricCard("Negozi critici", critical),
+    metricCard("Alert aperti", alerts)
+  ].join("");
+
+  if (!stores.length) {
+    storeHealthList.innerHTML = '<div class="empty-state">Nessuno score disponibile per il periodo selezionato.</div>';
+    return;
+  }
+  storeHealthList.innerHTML = stores.map((store) => {
+    const factors = store.factors || {};
+    const operational = factors.operational || {};
+    const risk = factors.risk || {};
+    const academy = factors.academy || {};
+    const backup = factors.backup || {};
+    const statusClass = storeHealthStatusClass(store.status);
+    return `
+      <article class="store-health-card ${statusClass}">
+        <div class="store-health-card-head">
+          <div>
+            <p class="eyebrow">${escapeHtml(store.store_code || "Negozio")}</p>
+            <h3>${escapeHtml(store.store_name || "Negozio")}</h3>
+            <span class="store-health-trend">${escapeHtml(storeHealthTrendText(store.trend))}</span>
+          </div>
+          <div class="store-health-score" aria-label="Health Score ${escapeHtml(store.store_name || "")}">
+            <strong>${escapeHtml(String(store.score || 0))}</strong>
+            <span>/100</span>
+            <em>${escapeHtml(store.status_label || store.status || "Stato")}</em>
+          </div>
+        </div>
+        <div class="store-health-kpis">
+          <span><strong>${escapeHtml(String(operational.completed_acts || 0))}</strong> atti completati</span>
+          <span><strong>${escapeHtml(String(operational.suspended_open || 0))}</strong> sospese</span>
+          <span><strong>${escapeHtml(String(risk.critical_alerts || 0))}</strong> alert critici</span>
+          <span><strong>${escapeHtml(String(Number(academy.average_progress || 0).toFixed(1)))}%</strong> Academy</span>
+          <span><strong>${escapeHtml(backup.latest_verified ? "OK" : "Da verificare")}</strong> backup</span>
+        </div>
+        <div class="store-health-alerts">
+          ${(store.main_alerts || []).map((item) => `<mark>${escapeHtml(item)}</mark>`).join("") || "<span>Nessun alert principale.</span>"}
+        </div>
+        <div class="store-health-recommendations">
+          ${(store.recommendations || []).slice(0, 3).map((item) => `<p>${escapeHtml(item)}</p>`).join("") || "<p>Mantenere il monitoraggio operativo.</p>"}
+        </div>
+        <button class="ghost-button small-button" type="button" data-store-health-detail="${escapeHtml(String(store.store_id || ""))}">Dettaglio</button>
+      </article>
+    `;
+  }).join("");
+}
+
+async function loadStoreHealth() {
+  if (!canViewControlSectionsUi()) return;
+  updateStoreHealthDateInputs();
+  if (storeHealthList) storeHealthList.innerHTML = '<div class="empty-state">Calcolo Salute Negozio...</div>';
+  const params = storeHealthPeriodParams();
+  const query = queryString(params);
+  const data = await apiRequest(`/store-health${query ? `?${query}` : ""}`, { timeoutMs: 45000 });
+  state.storeHealth = data.stores || [];
+  state.storeHealthDateRange = data.date_range || null;
+  renderStoreHealth();
+}
+
+async function recalculateStoreHealth() {
+  if (!canViewControlSectionsUi()) return;
+  updateStoreHealthDateInputs();
+  const body = storeHealthPeriodParams();
+  const data = await apiRequest("/store-health/calculate", {
+    method: "POST",
+    body: JSON.stringify(body),
+    timeoutMs: 60000
+  });
+  state.storeHealth = data.stores || [];
+  renderStoreHealth();
+  showToast(data.message || "Store Health Score ricalcolato.", "success");
+}
+
+async function openStoreHealthDetail(storeId) {
+  if (!storeId || !previewModal || !previewBody || !previewTitle) return;
+  const params = storeHealthPeriodParams();
+  const query = queryString(params);
+  const [detailResponse, historyResponse] = await Promise.all([
+    apiRequest(`/store-health/${encodeURIComponent(storeId)}${query ? `?${query}` : ""}`, { timeoutMs: 45000 }),
+    apiRequest(`/store-health/${encodeURIComponent(storeId)}/history?limit=12`, { timeoutMs: 45000 }).catch(() => ({ history: [] }))
+  ]);
+  const store = detailResponse.store || null;
+  if (!store) return;
+  state.storeHealthDetail = store;
+  const factors = store.factors || {};
+  const historyRows = (historyResponse.history || []).map((row) => founderReportRow(
+    `${row.date_from || ""} / ${row.date_to || ""}`,
+    `${row.score || 0}/100`,
+    row.status_label || row.status || ""
+  )).join("") || '<div class="empty-state">Storico non ancora disponibile.</div>';
+  previewTitle.textContent = `Salute Negozio · ${store.store_name || "Dettaglio"}`;
+  previewBody.innerHTML = `
+    <div class="store-health-detail ${storeHealthStatusClass(store.status)}">
+      <div class="store-health-detail-hero">
+        <div>
+          <p class="eyebrow">${escapeHtml(store.store_code || "Negozio")}</p>
+          <h3>${escapeHtml(store.store_name || "Negozio")}</h3>
+          <p>${escapeHtml(storeHealthTrendText(store.trend))}</p>
+        </div>
+        <div class="store-health-score">
+          <strong>${escapeHtml(String(store.score || 0))}</strong>
+          <span>/100</span>
+          <em>${escapeHtml(store.status_label || store.status || "Stato")}</em>
+        </div>
+      </div>
+      <section class="dashboard-panel"><h3>Raccomandazioni operative</h3>
+        ${(store.recommendations || []).map((item) => founderReportRow("Azione", item)).join("") || '<div class="empty-state">Nessuna raccomandazione.</div>'}
+      </section>
+      <section class="dashboard-panel"><h3>Penalità applicate</h3>${storeHealthArrayRows(store.penalties || [], "Nessuna penalità applicata.")}</section>
+      <section class="dashboard-panel"><h3>Bonus applicati</h3>${storeHealthArrayRows(store.bonuses || [], "Nessun bonus applicato.")}</section>
+      <section class="dashboard-panel"><h3>KPI atti</h3>${storeHealthRowsFromObject(factors.operational || {}, {
+        completed_acts: "Atti completati",
+        suspended_open: "Pratiche sospese",
+        pending_approvals: "Autorizzazioni in attesa",
+        deleted_acts: "Atti eliminati",
+        average_completion_hours: "Tempo medio completamento",
+        suspended_over_48h: "Sospese oltre 48h"
+      })}</section>
+      <section class="dashboard-panel"><h3>Rischio e qualità</h3>
+        ${storeHealthRowsFromObject({ ...(factors.risk || {}), ...(factors.quality || {}) }, {
+          average_shield_score: "Score Shield medio",
+          high_alerts: "Alert alto rischio",
+          critical_alerts: "Alert critici",
+          failed_checks: "Controlli falliti",
+          warning_checks: "Controlli con attenzione",
+          expired_documents: "Documenti scaduti",
+          missing_receipts: "Contabili mancanti"
+        })}
+      </section>
+      <section class="dashboard-panel"><h3>Commerciale e pagamenti</h3>
+        ${storeHealthRowsFromObject({ ...(factors.commercial || {}), ...(factors.payments || {}) }, {
+          gold_grams: "Oro acquistato",
+          silver_grams: "Argento acquistato",
+          platinum_grams: "Platino acquistato",
+          estimated_profit: "Utile stimato",
+          average_margin: "Margine medio",
+          customers: "Clienti",
+          recurring_customers: "Clienti ricorrenti",
+          payment_volume: "Volume pagamenti",
+          cash: "Contanti",
+          bank_transfers: "Bonifici",
+          checks: "Assegni",
+          suspicious_payments: "Pagamenti sospetti"
+        })}
+      </section>
+      <section class="dashboard-panel"><h3>Giacenza, fusioni e Academy</h3>
+        ${storeHealthRowsFromObject({ ...(factors.stock_and_fusion || {}), ...(factors.academy || {}) }, {
+          stock_by_metal: "Giacenza per metallo",
+          fusion_lots_open: "Fusioni aperte",
+          fusion_lots_completed: "Fusioni concluse",
+          fusion_lots_late: "Lotti in ritardo",
+          average_progress: "Formazione media",
+          operators_below_60: "Operatori sotto 60%",
+          certificates: "Certificazioni",
+          badges: "Badge"
+        })}
+      </section>
+      <section class="dashboard-panel"><h3>Operatori, backup e sicurezza</h3>
+        ${storeHealthRowsFromObject({ ...(factors.operators || {}), ...(factors.backup || {}), ...(factors.security || {}) }, {
+          active_operators: "Operatori attivi",
+          logins: "Login",
+          total_activity: "Attività totale",
+          too_many_errors: "Errori operativi",
+          too_many_updates: "Modifiche atti",
+          latest_backup_code: "Ultimo backup",
+          latest_status: "Stato backup",
+          latest_verified: "Backup verificato",
+          failed_recently: "Backup fallito recente",
+          audit_critical: "Audit critici",
+          unauthorized_attempts: "Tentativi non autorizzati"
+        })}
+      </section>
+      <section class="dashboard-panel"><h3>Storico score</h3>${historyRows}</section>
+    </div>
+  `;
+  previewModal.hidden = false;
 }
 
 function todayDateInputValue() {
@@ -4429,6 +4713,7 @@ function renderFounderDailyReport() {
   const summary = report.summary || {};
   const risks = report.risks_data || {};
   const backup = report.backup_data || {};
+  const storeHealthData = report.store_health_data || {};
   const payments = summary.payments || {};
   const metals = summary.metals?.totals || {};
   founderReportStatus.textContent = `Report ${report.report_date} · stato ${report.status || "generated"} · aggiornato ${formatDateTime(report.updated_at)}`;
@@ -4438,6 +4723,7 @@ function renderFounderDailyReport() {
     metricCard("Alert Shield critici", risks.critical_count || 0),
     metricCard("Contanti erogati", formatEuro(payments.contanti_amount || 0)),
     metricCard("Oro acquistato", formatGrams(metals.Oro || 0)),
+    metricCard("Health Score medio", `${Number(storeHealthData.average_score || 0)}/100`),
     metricCard("Backup status", backup.failed_today ? "Da verificare" : "Regolare")
   ].join("");
 
@@ -4503,6 +4789,11 @@ function renderFounderDailyReport() {
     founderReportRow("Domande ad Aurum", report.ai_data?.aurum_questions_today || 0),
     founderReportRow("Richieste supporto", report.ai_data?.support_requests_today || 0)
   ].join("");
+  const storeHealthRows = (storeHealthData.stores || []).slice(0, 8).map((store) => founderReportRow(
+    store.store_name || "Negozio",
+    `${store.score || 0}/100`,
+    `${store.status_label || store.status || "Stato"} · ${store.trend === null || store.trend === undefined ? "trend n/d" : `${store.trend > 0 ? "+" : ""}${store.trend}`}`
+  )).join("") || '<div class="empty-state">Nessuno score negozio disponibile.</div>';
   const actionRows = (report.actions_recommended || []).map((item, index) => founderReportRow(`Azione ${index + 1}`, item)).join("") || '<div class="empty-state">Nessuna azione consigliata.</div>';
 
   founderReportBody.innerHTML = `
@@ -4522,6 +4813,12 @@ function renderFounderDailyReport() {
       ${founderReportRow("Contabili mancanti", payments.missing_receipts || 0)}
     </section>
     <section class="dashboard-panel"><h3>Negozi</h3>${storeRows}</section>
+    <section class="dashboard-panel"><h3>Salute negozi</h3>
+      ${founderReportRow("Score medio rete", `${storeHealthData.average_score || 0}/100`)}
+      ${founderReportRow("Miglior negozio", storeHealthData.best_store?.store_name || "Nessun dato", `${storeHealthData.best_store?.score || 0}/100`)}
+      ${founderReportRow("Negozio più critico", storeHealthData.critical_store?.store_name || "Nessun dato", `${storeHealthData.critical_store?.score || 0}/100`)}
+      ${storeHealthRows}
+    </section>
     <section class="dashboard-panel"><h3>Operatori</h3>${operatorRows}</section>
     <section class="dashboard-panel"><h3>Aurum Shield</h3>${riskRows}</section>
     <section class="dashboard-panel"><h3>Controllo Qualità</h3>${qualityRows}</section>
@@ -4675,6 +4972,7 @@ function auditActionLabel(action = "") {
     founder_daily_report_downloaded: "Download Founder Daily Report",
     founder_daily_report_sent: "Invio Founder Daily Report",
     founder_daily_report_failed: "Errore Founder Daily Report",
+    store_health_score_calculated: "Store Health Score ricalcolato",
     api_request_error: "Errore API"
   }[action] || action.replace(/_/g, " ") || "Attività";
 }
@@ -10428,6 +10726,27 @@ backupsList?.addEventListener("click", (event) => {
   if (deleteButton) withButtonBusy(deleteButton, "Elimino...", () => deleteBackup(deleteButton.dataset.deleteBackup));
   if (verify) withButtonBusy(verify, "Verifico...", () => verifyBackup(verify.dataset.verifyBackup));
   if (restore) withButtonBusy(restore, "Test...", () => testRestoreBackup(restore.dataset.testRestoreBackup));
+});
+dashboardPanels?.addEventListener("click", (event) => {
+  if (!event.target.closest("[data-open-store-health]")) return;
+  setScreen("storeHealth");
+});
+storeHealthFilters?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  withButtonBusy(recalculateStoreHealthButton || event.submitter, "Ricalcolo...", recalculateStoreHealth);
+});
+storeHealthPeriod?.addEventListener("change", () => {
+  updateStoreHealthDateInputs();
+  loadStoreHealth().catch((error) => showToast(error.message || "Salute Negozio non caricata.", "error"));
+});
+[storeHealthDateFrom, storeHealthDateTo].forEach((input) => {
+  input?.addEventListener("change", () => {
+    if (storeHealthPeriod?.value === "custom") loadStoreHealth().catch((error) => showToast(error.message || "Salute Negozio non caricata.", "error"));
+  });
+});
+storeHealthList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-store-health-detail]");
+  if (button) openStoreHealthDetail(button.dataset.storeHealthDetail).catch((error) => showToast(error.message || "Dettaglio Salute Negozio non caricato.", "error"));
 });
 founderReportDate?.addEventListener("change", () => loadFounderDailyReport(selectedFounderReportDate()));
 generateFounderReportButton?.addEventListener("click", (event) => {
