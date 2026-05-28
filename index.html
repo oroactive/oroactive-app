@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260528-suspended-practices-1">
+  <link rel="stylesheet" href="styles.css?v=20260528-state-separation-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -647,6 +647,10 @@
             </select>
           </label>
           <input class="search" id="searchKeyword" placeholder="Inserisci parola chiave">
+          <label class="inline-check">
+            <input type="checkbox" id="archiveIncludeSuspended">
+            Mostra sospese
+          </label>
           <div class="archive-search-actions">
             <button type="button" id="runActSearch">Cerca</button>
             <button class="ghost-button" type="button" id="clearActSearch">Cancella ricerca</button>
@@ -1403,6 +1407,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260528-suspended-practices-1"></script>
+  <script src="app.js?v=20260528-state-separation-1"></script>
 </body>
 </html>

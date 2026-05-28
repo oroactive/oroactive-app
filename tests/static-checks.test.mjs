@@ -666,7 +666,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /suspended-practices-1/);
+  assert.match(worker, /state-separation-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -719,7 +719,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /suspended-practices-1/);
+  assert.match(worker, /state-separation-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -735,11 +735,14 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
 
   assert.match(schema, /ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS suspended_reason/);
   assert.match(schema, /ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS suspended_reasons/);
+  assert.match(schema, /ALTER TABLE atti_vendita ALTER COLUMN status SET DEFAULT 'draft'/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS suspended_practice_logs/);
+  assert.match(schema, /status = 'suspended'/);
   assert.match(schema, /idx_suspended_practice_logs_sale_deed_id/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS suspended_practice_logs/);
   assert.match(migration, /atti_vendita_suspended_status_idx/);
 
+  assert.match(server, /function reservedActNumberStatusSql/);
   assert.match(server, /function suspendedStatusWhere/);
   assert.match(server, /async function listSuspendedPractices/);
   assert.match(server, /async function suspendPractice/);
@@ -755,17 +758,20 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
 
   assert.match(index, /id="suspendedPractices"/);
   assert.match(index, /data-section="suspendedPractices">Pratiche sospese/);
+  assert.match(index, /id="archiveIncludeSuspended"/);
   assert.match(index, /id="saveSuspendedPractice"/);
   assert.match(index, /id="suspendedPracticesList"/);
   assert.match(app, /async function loadSuspendedPractices/);
   assert.match(app, /function renderSuspendedPractices/);
   assert.match(app, /async function saveCurrentPracticeAsSuspended/);
+  assert.match(app, /function archiveShowsSuspended/);
+  assert.match(app, /includeSuspended: archiveShowsSuspended\(\)/);
   assert.match(app, /apiRequest\(`\/suspended-practices/);
-  assert.match(app, /workflowStatusCode\(act\.status\)[\s\S]*suspended/);
+  assert.match(app, /isCompletedWorkflowStatus\(status\) \|\| \(archiveShowsSuspended\(\) && suspendedStatus\)/);
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /suspended-practices-1/);
+  assert.match(worker, /state-separation-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {

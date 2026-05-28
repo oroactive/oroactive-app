@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS atti_vendita (
   act_year INTEGER,
   act_number INTEGER,
   payment_method TEXT,
-  status TEXT DEFAULT 'archived_incomplete',
+  status TEXT DEFAULT 'draft',
   payload JSONB DEFAULT '{}'::jsonb,
   completed_at TIMESTAMPTZ,
   archived_at TIMESTAMPTZ,
@@ -41,7 +41,8 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS store_code TEXT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS act_year INTEGER;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS act_number INTEGER;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS payment_method TEXT;
-ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'archived_incomplete';
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft';
+ALTER TABLE atti_vendita ALTER COLUMN status SET DEFAULT 'draft';
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS cliente_id BIGINT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS negozio_id BIGINT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS codice_negozio TEXT;
@@ -93,6 +94,25 @@ UPDATE atti_vendita
 SET deleted_at = COALESCE(deleted_at, updated_at, created_at, NOW())
 WHERE deleted_at IS NULL
   AND (COALESCE(status, '') ILIKE 'Deleted' OR COALESCE(status, '') ILIKE 'deleted');
+
+UPDATE atti_vendita
+SET status = 'suspended',
+    suspended_reason = COALESCE(suspended_reason, 'Pratica non completata: spostata tra le pratiche sospese.'),
+    suspended_reasons = CASE
+      WHEN suspended_reasons IS NULL OR suspended_reasons = '[]'::jsonb THEN '["Pratica non completata: controlli da risolvere."]'::jsonb
+      ELSE suspended_reasons
+    END,
+    suspended_at = COALESCE(suspended_at, archived_at, updated_at, created_at, NOW())
+WHERE deleted_at IS NULL
+  AND completed_at IS NULL
+  AND (
+    COALESCE(status, '') ILIKE 'archived_incomplete'
+    OR COALESCE(status, '') ILIKE 'Archiviata'
+    OR COALESCE(status, '') ILIKE 'approval_approved'
+    OR COALESCE(status, '') ILIKE 'autorizzazione_approvata'
+    OR COALESCE(status, '') ILIKE 'approval_rejected'
+    OR COALESCE(status, '') ILIKE 'autorizzazione_rifiutata'
+  );
 
 DROP INDEX IF EXISTS atti_vendita_practice_number_unique;
 DROP INDEX IF EXISTS atti_vendita_practice_number_active_unique;

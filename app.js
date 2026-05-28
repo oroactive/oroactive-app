@@ -1134,12 +1134,13 @@ async function loadSavedActs(options = {}) {
     store = "",
     field = "",
     q = "",
+    includeSuspended = false,
     limit = ACT_LIST_LIMIT,
     offset = 0,
     silent = false
   } = options;
   const endpoint = q ? "/atti/search" : "/atti";
-  const params = queryString({ store, field, q, limit, offset });
+  const params = queryString({ store, field, q, includeSuspended: includeSuspended ? "true" : "", limit, offset });
   const cacheKey = `${endpoint}?${params}`;
   const cached = state.actsCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.time < ACT_CACHE_TTL) {
@@ -7148,6 +7149,10 @@ function selectedArchiveStore() {
   return document.getElementById("archiveStoreFilter")?.value || "Tutti";
 }
 
+function archiveShowsSuspended() {
+  return Boolean(document.getElementById("archiveIncludeSuspended")?.checked);
+}
+
 function selectedFusionStore() {
   return document.getElementById("fusionStoreFilter")?.value || "Busto Arsizio";
 }
@@ -7156,6 +7161,7 @@ async function loadArchiveScreenData(options = {}) {
   await loadSavedActs({
     force: options.force || false,
     store: selectedArchiveStore(),
+    includeSuspended: archiveShowsSuspended(),
     limit: ACT_LIST_LIMIT,
     silent: options.silent || false
   });
@@ -7179,7 +7185,8 @@ function archiveVisibleActs() {
     const storeMatches = selectedStore === "Tutti" || act.store === selectedStore;
     const keywordMatches = !keyword || archiveSearchValue(act, field).includes(keyword);
     const status = workflowStatusCode(act.status);
-    const operativeStatus = !["suspended", "pending_approval", "approval_approved", "approval_rejected"].includes(status);
+    const suspendedStatus = ["suspended", "pending_approval"].includes(status);
+    const operativeStatus = isCompletedWorkflowStatus(status) || (archiveShowsSuspended() && suspendedStatus);
     return storeMatches && keywordMatches && operativeStatus;
   });
 }
@@ -8452,6 +8459,7 @@ async function runActSearch() {
     store: selectedArchiveStore(),
     field: document.getElementById("searchField")?.value || "name",
     q: keyword,
+    includeSuspended: archiveShowsSuspended(),
     limit: ACT_LIST_LIMIT
   });
   state.lastSearchResults = results;
@@ -9699,7 +9707,7 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
         ? "draft"
         : hasCompleteData
           ? "archived_completed"
-          : "archived_incomplete";
+          : "suspended";
   const isCompletion = ["completed", "archived_completed"].includes(targetStatus);
   const missing = isCompletion ? validatePrintScope("company") : [];
   if (requestedStatus !== "draft" && !options.skipQualityCheck) {
@@ -9769,6 +9777,8 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   if (wasEditing && options.destination === "menu") mainMenuScreen.hidden = false;
   const successMessage = targetStatus === "archived_incomplete"
     ? "Atto archiviato. Puoi riaprirlo e completarlo dall'elenco."
+    : targetStatus === "suspended"
+      ? "Pratica salvata tra le sospese. Correggi i controlli prima di completarla."
     : targetStatus === "archived_completed"
       ? "Atto completato e archiviato correttamente."
       : targetStatus === "completed"
@@ -9776,7 +9786,7 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
         : wasEditing
           ? "Atto di vendita modificato e salvato."
           : "Atto di vendita salvato.";
-  showToast(wasEditing && targetStatus !== "archived_incomplete" ? "Atto di vendita modificato e salvato." : successMessage, "success");
+  showToast(wasEditing && !["archived_incomplete", "suspended"].includes(targetStatus) ? "Atto di vendita modificato e salvato." : successMessage, "success");
   return true;
 }
 
@@ -10668,6 +10678,14 @@ document.getElementById("searchField").addEventListener("change", () => {
   state.searchActive = false;
   state.lastSearchResults = [];
   state.archivePage = 1;
+  renderArchiveGroups();
+});
+
+document.getElementById("archiveIncludeSuspended")?.addEventListener("change", async () => {
+  state.searchActive = false;
+  state.lastSearchResults = [];
+  state.archivePage = 1;
+  await loadArchiveScreenData({ force: true, silent: true });
   renderArchiveGroups();
 });
 

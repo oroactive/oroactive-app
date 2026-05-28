@@ -1044,6 +1044,12 @@ function realCompletedStatusSql(alias = "") {
 
 function visibleRealActStatusSql(alias = "") {
   const prefix = alias ? `${alias}.` : "";
+  return `${realCompletedStatusSql(alias)}
+    AND NOT (${prefix}suspended_at IS NOT NULL AND ${prefix}resumed_at IS NULL)`;
+}
+
+function reservedActNumberStatusSql(alias = "") {
+  const prefix = alias ? `${alias}.` : "";
   return `${prefix}deleted_at IS NULL
     AND COALESCE(${prefix}status, '') NOT ILIKE 'draft'
     AND COALESCE(${prefix}status, '') NOT ILIKE 'Bozza'
@@ -3610,6 +3616,8 @@ function buildActsQuery({ store, field, q, fusionEligible, includeDrafts, includ
 
   if (shouldIncludeDrafts) {
     where.push("deleted_at IS NULL AND COALESCE(status, '') NOT ILIKE 'deleted' AND COALESCE(status, '') NOT ILIKE 'Deleted' AND COALESCE(status, '') NOT ILIKE 'abandoned' AND COALESCE(status, '') NOT ILIKE 'Abandoned'");
+  } else if (shouldIncludeSuspended) {
+    where.push(`(${visibleRealActStatusSql()} OR ${suspendedStatusWhere("")})`);
   } else {
     where.push(visibleRealActStatusSql());
   }
@@ -3725,7 +3733,7 @@ async function nextActNumber(storeCode, year) {
        FROM ${actsTable}
        WHERE COALESCE(codice_negozio, store_code) = $1::text
          AND act_year = $2::integer
-         AND ${visibleRealActStatusSql()}
+         AND ${reservedActNumberStatusSql()}
          AND COALESCE(numero_atto_negozio, act_number) IS NOT NULL
      ),
      candidates AS (
@@ -5386,14 +5394,14 @@ async function writeSuspendedPracticeLog({ saleDeedId, user = {}, action, reason
 }
 
 function suspendedStatusWhere(alias = "a") {
-  return `(
-    COALESCE(${alias}.status, '') ILIKE 'suspended'
-    OR COALESCE(${alias}.status, '') ILIKE 'sospesa'
-    OR COALESCE(${alias}.status, '') ILIKE 'pending_approval'
-    OR COALESCE(${alias}.status, '') ILIKE 'in_attesa_autorizzazione'
-    OR COALESCE(${alias}.status, '') ILIKE 'approval_rejected'
-    OR COALESCE(${alias}.status, '') ILIKE 'autorizzazione_rifiutata'
-    OR (${alias}.suspended_at IS NOT NULL AND ${alias}.resumed_at IS NULL)
+  const prefix = alias ? `${alias}.` : "";
+  return `${prefix}deleted_at IS NULL AND (
+    COALESCE(${prefix}status, '') ILIKE 'suspended'
+    OR COALESCE(${prefix}status, '') ILIKE 'sospesa'
+    OR COALESCE(${prefix}status, '') ILIKE 'sospeso'
+    OR COALESCE(${prefix}status, '') ILIKE 'pending_approval'
+    OR COALESCE(${prefix}status, '') ILIKE 'in_attesa_autorizzazione'
+    OR (${prefix}suspended_at IS NOT NULL AND ${prefix}resumed_at IS NULL)
   )`;
 }
 
@@ -6556,14 +6564,38 @@ async function reviewApprovalRequest(id, input = {}, user = {}, req = null, targ
     [id, targetStatus, note, user.id || null]
   );
   const statusForAct = {
-    approved: "approval_approved",
-    rejected: "approval_rejected",
-    cancelled: "archived_incomplete"
+    approved: "suspended",
+    rejected: "suspended",
+    cancelled: "draft"
   }[targetStatus] || "pending_approval";
   await pool.query(
     `UPDATE ${actsTable}
      SET status = $2::text,
          approval_status = $3::text,
+         suspended_reason = CASE
+           WHEN $2::text = 'suspended' THEN COALESCE(suspended_reason, $5::text)
+           ELSE suspended_reason
+         END,
+         suspended_reasons = CASE
+           WHEN $2::text = 'suspended' THEN COALESCE(NULLIF($6::jsonb, '[]'::jsonb), suspended_reasons, '[]'::jsonb)
+           ELSE suspended_reasons
+         END,
+         suspended_at = CASE
+           WHEN $2::text = 'suspended' THEN COALESCE(suspended_at, NOW())
+           ELSE suspended_at
+         END,
+         suspended_by = CASE
+           WHEN $2::text = 'suspended' THEN COALESCE(suspended_by, $7::bigint)
+           ELSE suspended_by
+         END,
+         resumed_at = CASE
+           WHEN $2::text = 'draft' AND suspended_at IS NOT NULL THEN COALESCE(resumed_at, NOW())
+           ELSE resumed_at
+         END,
+         resumed_by = CASE
+           WHEN $2::text = 'draft' AND suspended_at IS NOT NULL THEN COALESCE(resumed_by, $7::bigint)
+           ELSE resumed_by
+         END,
          payload = COALESCE(payload, '{}'::jsonb) || $4::jsonb,
          updated_at = NOW()
      WHERE id = $1::bigint`,
@@ -6576,7 +6608,14 @@ async function reviewApprovalRequest(id, input = {}, user = {}, req = null, targ
         approvalRequestId: row.id,
         approvalReviewedAt: targetStatus === "cancelled" ? null : new Date().toISOString(),
         approvalReviewerNote: note
-      })
+      }),
+      targetStatus === "approved"
+        ? "Autorizzazione approvata: pratica da completare."
+        : targetStatus === "rejected"
+          ? "Autorizzazione rifiutata: pratica da correggere."
+          : "",
+      sanitizeForPostgres(row.reasons || []),
+      user.id || null
     ]
   );
   void createNotification({
