@@ -21,6 +21,7 @@ const state = {
   editingApprovalRequestId: null,
   editingDirty: false,
   suppressDirtyTracking: false,
+  loggingIn: false,
   cashLimitWarningShown: false,
   amlCashCheck: null,
   amlCashCheckTimer: null,
@@ -1057,9 +1058,37 @@ function shouldRetryApi(error, responseStatus) {
 }
 
 function serverConnectionError() {
-  const error = new Error("Connessione al server OroActive non riuscita");
+  const error = new Error("Connessione al server non disponibile. Riprova tra qualche secondo.");
   error.isConnectionError = true;
   return error;
+}
+
+function cleanUserMessage(message, fallback = "Operazione non completata. Riprova tra qualche secondo.") {
+  const raw = typeof message === "string" ? message.trim() : "";
+  if (!raw || raw === "undefined" || raw === "null" || raw === "[object Object]") return fallback;
+  if (/Failed to fetch|NetworkError|Load failed/i.test(raw)) {
+    return "Connessione al server non disponibile. Riprova tra qualche secondo.";
+  }
+  if (/TypeError|ReferenceError|SyntaxError|Cannot read|is not defined|Unexpected token|stack trace|duplicate key|violates .*constraint|invalid input syntax|PostgreSQL|SQLSTATE/i.test(raw)) {
+    return fallback;
+  }
+  return raw.length > 320 ? `${raw.slice(0, 317)}...` : raw;
+}
+
+function apiErrorFallback(path = "", status = 0) {
+  if (status === 401) return "Sessione scaduta. Effettua nuovamente l'accesso.";
+  if (status === 403) return "Operazione non autorizzata.";
+  if (/\/utenti|\/users/.test(path)) return "Operazione utenti non completata.";
+  if (/\/atti|\/acts/.test(path)) return "Operazione atto non completata.";
+  if (/\/suspended-practices/.test(path)) return "Operazione pratica sospesa non completata.";
+  if (/\/approvals/.test(path)) return "Operazione autorizzazione non completata.";
+  if (/\/notifications/.test(path)) return "Operazione notifiche non completata.";
+  if (/\/backups/.test(path)) return "Operazione backup non completata.";
+  if (/\/academy|\/corsi/.test(path)) return "Operazione Academy non completata.";
+  if (/\/crm|\/clienti/.test(path)) return "Operazione CRM non completata.";
+  if (/\/aurum-shield|\/quality-check/.test(path)) return "Controllo pratica non completato.";
+  if (/\/ai|\/aurum/.test(path)) return "Operazione Aurum non completata.";
+  return "Operazione non completata. Riprova tra qualche secondo.";
 }
 
 function sanitizeForSave(value) {
@@ -1091,7 +1120,7 @@ async function apiRequest(path, options = {}) {
         if (response.status === 401 && !path.startsWith("/auth/login")) {
           showLogin();
         }
-        const error = new Error(body.error || "Errore comunicazione server");
+        const error = new Error(cleanUserMessage(body.error, apiErrorFallback(path, response.status)));
         error.status = response.status;
         Object.assign(error, body);
         if (attempt < attempts && shouldRetryApi(error, response.status)) {
@@ -1362,7 +1391,7 @@ async function getActRecord(identifier) {
 }
 
 function showToast(message, type = "") {
-  toast.textContent = message;
+  toast.textContent = cleanUserMessage(message);
   toast.classList.remove("success", "error", "warning");
   if (type) toast.classList.add(type);
   toast.classList.add("show");
@@ -1370,6 +1399,21 @@ function showToast(message, type = "") {
   showToast.timer = window.setTimeout(() => {
     toast.classList.remove("show", "success", "error", "warning");
   }, 2600);
+}
+
+async function withButtonBusy(button, busyText, task) {
+  if (!button || button.disabled) return;
+  const previousText = button.textContent;
+  button.disabled = true;
+  if (busyText) button.textContent = busyText;
+  try {
+    await task();
+  } catch (error) {
+    showToast(cleanUserMessage(error?.message), "error");
+  } finally {
+    button.disabled = false;
+    if (busyText) button.textContent = previousText;
+  }
 }
 
 function showLogin() {
@@ -2157,9 +2201,18 @@ async function restoreSession() {
 
 async function handleLogin(event) {
   event.preventDefault();
+  if (state.loggingIn) return;
   loginMessage.textContent = "";
   const username = document.getElementById("loginUsername").value.trim();
   const password = document.getElementById("loginPassword").value;
+  const submitButton = loginForm.querySelector('button[type="submit"]');
+  state.loggingIn = true;
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Accesso...";
+  }
+  if (faceIdLoginButton) faceIdLoginButton.disabled = true;
+  showLoading("Accesso in corso...");
   try {
     const body = JSON.stringify({ username, password });
     let data;
@@ -2180,10 +2233,18 @@ async function handleLogin(event) {
     loginMessage.textContent = error.status === 401
       ? "Credenziali non valide"
       : error.isConnectionError
-        ? "Connessione al server OroActive non riuscita"
+        ? "Connessione al server non disponibile. Riprova tra qualche secondo."
         : error.status
-          ? `Errore ${error.status}: ${error.message || "Accesso non riuscito."}`
-          : error.message || "Accesso non riuscito.";
+          ? cleanUserMessage(error.message, "Accesso non riuscito.")
+          : cleanUserMessage(error.message, "Accesso non riuscito.");
+  } finally {
+    state.loggingIn = false;
+    hideLoading();
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = "Accedi";
+    }
+    if (faceIdLoginButton) faceIdLoginButton.disabled = false;
   }
 }
 
@@ -2352,7 +2413,33 @@ function setScreen(id) {
     state.bullionChartLoaded = false;
   }
   setAurumSection(id);
-  handleScreenDataLoad(id);
+  void handleScreenDataLoad(id).catch((error) => {
+    showToast(sectionLoadErrorMessage(id, error), "error");
+  });
+}
+
+function sectionLoadErrorMessage(id, error) {
+  const labels = {
+    archive: "Elenco atti non caricato.",
+    suspendedPractices: "Pratiche sospese non caricate.",
+    approvals: "Richieste autorizzazione non caricate.",
+    notifications: "Notifiche non caricate.",
+    fusion: "Giacenza e fusioni non caricate.",
+    dashboard: "Dashboard non caricata.",
+    quotazione: "Quotazioni non caricate.",
+    backups: "Backup non caricati.",
+    stores: "Negozi non caricati.",
+    antifraud: "Antifrode non caricato.",
+    aurumShield: "Aurum Shield non caricato.",
+    auditTrail: "Audit Trail non caricato.",
+    training: "Academy non caricata.",
+    crm: "CRM non caricato.",
+    assistant: "Assistente IA non caricato.",
+    aurumAdmin: "Gestione Aurum non caricata.",
+    knowledgeNotes: "Conoscenze OroActive non caricate.",
+    users: "Utenti non caricati."
+  };
+  return cleanUserMessage(error?.message, labels[id] || "Sezione non caricata.");
 }
 
 async function handleScreenDataLoad(id) {
@@ -10073,18 +10160,20 @@ previewBody?.addEventListener("click", async (event) => {
     showToast(error.message || "Operazione CRM non riuscita.");
   }
 });
-document.getElementById("runBackupNow")?.addEventListener("click", () => runBackupNow());
+document.getElementById("runBackupNow")?.addEventListener("click", (event) => {
+  withButtonBusy(event.currentTarget, "Backup...", () => runBackupNow());
+});
 backupsList?.addEventListener("click", (event) => {
   const download = event.target.closest("[data-download-backup]");
   const view = event.target.closest("[data-view-backup]");
   const deleteButton = event.target.closest("[data-delete-backup]");
   const verify = event.target.closest("[data-verify-backup]");
   const restore = event.target.closest("[data-test-restore-backup]");
-  if (download) downloadBackup(download.dataset.downloadBackup);
+  if (download) withButtonBusy(download, "Download...", () => downloadBackup(download.dataset.downloadBackup));
   if (view) viewBackup(view.dataset.viewBackup);
-  if (deleteButton) deleteBackup(deleteButton.dataset.deleteBackup);
-  if (verify) verifyBackup(verify.dataset.verifyBackup);
-  if (restore) testRestoreBackup(restore.dataset.testRestoreBackup);
+  if (deleteButton) withButtonBusy(deleteButton, "Elimino...", () => deleteBackup(deleteButton.dataset.deleteBackup));
+  if (verify) withButtonBusy(verify, "Verifico...", () => verifyBackup(verify.dataset.verifyBackup));
+  if (restore) withButtonBusy(restore, "Test...", () => testRestoreBackup(restore.dataset.testRestoreBackup));
 });
 auditTrailFilters?.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -10151,7 +10240,7 @@ notificationsNext?.addEventListener("click", () => {
   const page = Number(state.notificationPagination?.page || 1) + 1;
   loadNotificationsPage(page);
 });
-refreshApprovals?.addEventListener("click", loadApprovals);
+refreshApprovals?.addEventListener("click", (event) => withButtonBusy(event.currentTarget, "Aggiorno...", loadApprovals));
 approvalsList?.addEventListener("click", (event) => {
   const open = event.target.closest("[data-open-approval-act]");
   const edit = event.target.closest("[data-edit-approval-act]");
@@ -10162,11 +10251,13 @@ approvalsList?.addEventListener("click", (event) => {
   if (open) openArchivedAct(open.dataset.openApprovalAct);
   if (edit) loadActForEdit(edit.dataset.editApprovalAct);
   if (view) viewApprovalRequest(view.dataset.viewApproval);
-  if (approve) approveApprovalRequest(approve.dataset.approveApproval);
-  if (reject) rejectApprovalRequest(reject.dataset.rejectApproval);
-  if (cancel) cancelApprovalRequest(cancel.dataset.cancelApproval);
+  if (approve) withButtonBusy(approve, "Approvo...", () => approveApprovalRequest(approve.dataset.approveApproval));
+  if (reject) withButtonBusy(reject, "Rifiuto...", () => rejectApprovalRequest(reject.dataset.rejectApproval));
+  if (cancel) withButtonBusy(cancel, "Annullamento...", () => cancelApprovalRequest(cancel.dataset.cancelApproval));
 });
-refreshSuspendedPractices?.addEventListener("click", () => loadSuspendedPractices(state.suspendedPagination?.page || 1));
+refreshSuspendedPractices?.addEventListener("click", (event) => {
+  withButtonBusy(event.currentTarget, "Aggiorno...", () => loadSuspendedPractices(state.suspendedPagination?.page || 1));
+});
 suspendedPracticeFilters?.addEventListener("submit", (event) => {
   event.preventDefault();
   loadSuspendedPractices(1);
@@ -10182,9 +10273,9 @@ suspendedPracticesList?.addEventListener("click", (event) => {
   const remove = event.target.closest("[data-delete-suspended]");
   if (open) viewSuspendedPractice(open.dataset.openSuspended);
   if (edit) editSuspendedPractice(edit.dataset.editSuspended);
-  if (resolve) resolveSuspendedPractice(resolve.dataset.resolveSuspended);
-  if (approval) requestSuspendedPracticeApproval(approval.dataset.approvalSuspended);
-  if (remove) deleteSuspendedPractice(remove.dataset.deleteSuspended);
+  if (resolve) withButtonBusy(resolve, "Controllo...", () => resolveSuspendedPractice(resolve.dataset.resolveSuspended));
+  if (approval) withButtonBusy(approval, "Invio...", () => requestSuspendedPracticeApproval(approval.dataset.approvalSuspended));
+  if (remove) withButtonBusy(remove, "Elimino...", () => deleteSuspendedPractice(remove.dataset.deleteSuspended));
 });
 document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
   refreshBullionVaultPrices({ notify: true });

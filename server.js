@@ -2974,7 +2974,7 @@ async function addBackupLog(backupId, level, message, metadata = {}) {
 
 async function createPostgresBackup(outputPath, backupId = null) {
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL non configurato: impossibile creare backup PostgreSQL reale.");
+    throw new Error("Backup fallito: configurazione database non disponibile.");
   }
   const env = postgresToolEnv();
   try {
@@ -9027,8 +9027,6 @@ async function updateAct(identifier, input, user, req = null) {
     sanitizeForPostgres(suspension.reasons)
   ];
   await enforceCashAntiMoneyLaundering(act, user, existing, { allowApproved: Boolean(approvalCheck.approved) });
-  console.log("UPDATE PAYLOAD", redactedActPayloadForLog(act));
-  console.log("ATTO ID", existing.id);
   let result;
   try {
     result = await pool.query(
@@ -12415,14 +12413,37 @@ function friendlyDatabaseError(error, request) {
   return "Errore database: operazione non completata.";
 }
 
+function looksTechnicalErrorMessage(message = "") {
+  return /TypeError|ReferenceError|SyntaxError|Cannot read|is not defined|Unexpected token|duplicate key|violates .*constraint|invalid input syntax|SQLSTATE|PostgreSQL|DATABASE_URL|SELECT |INSERT |UPDATE |DELETE |at .+:\d+:\d+/i.test(String(message || ""));
+}
+
+function safeRouteErrorMessage(request) {
+  const url = request?.originalUrl || "";
+  if (url.includes("/api/utenti") || url.includes("/api/users")) return "Operazione utenti non completata.";
+  if (url.includes("/api/atti") || url.includes("/api/acts")) return "Operazione atto non completata.";
+  if (url.includes("/api/suspended-practices")) return "Operazione pratica sospesa non completata.";
+  if (url.includes("/api/approvals")) return "Operazione autorizzazione non completata.";
+  if (url.includes("/api/notifications")) return "Operazione notifiche non completata.";
+  if (url.includes("/api/backups")) return "Operazione backup non completata.";
+  if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Operazione Academy non completata.";
+  if (url.includes("/api/crm") || url.includes("/api/clienti")) return "Operazione CRM non completata.";
+  if (url.includes("/api/aurum-shield") || url.includes("/api/quality-check")) return "Controllo pratica non completato.";
+  if (url.includes("/api/ai") || url.includes("/api/aurum")) return "Operazione Aurum non completata.";
+  return "Operazione non completata. Riprova tra qualche secondo.";
+}
+
+function publicErrorMessage(error, request) {
+  const isDatabaseError = Boolean(error.code || error.severity || error.routine);
+  if (isDatabaseError) return friendlyDatabaseError(error, request);
+  const message = String(error.message || "").trim();
+  if (!message || looksTechnicalErrorMessage(message)) return safeRouteErrorMessage(request);
+  return message.length > 500 ? `${message.slice(0, 497)}...` : message;
+}
+
 app.use((error, request, response, _next) => {
   console.error(error);
-  const isDatabaseError = Boolean(error.code || error.severity || error.routine);
-  const message = isDatabaseError
-    ? friendlyDatabaseError(error, request)
-    : error.message || "Errore server";
+  const message = publicErrorMessage(error, request);
   const payload = { ok: false, error: message };
-  if (error.code) payload.code = error.code;
   if (error.approval_required) {
     payload.approval_required = true;
     payload.reasons = error.reasons || [];

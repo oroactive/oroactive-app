@@ -666,7 +666,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /state-separation-1/);
+  assert.match(worker, /total-quality-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -719,7 +719,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /state-separation-1/);
+  assert.match(worker, /total-quality-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -771,7 +771,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /state-separation-1/);
+  assert.match(worker, /total-quality-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -803,6 +803,50 @@ test("errori database sono separati per modulo", async () => {
   assert.match(friendlyBlock, /Errore database durante il salvataggio CRM/);
   assert.match(friendlyBlock, /Errore database durante il backup/);
   assert.match(friendlyBlock, /Errore database durante il salvataggio Academy/);
+});
+
+test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezione", async () => {
+  const [index, app, server, worker] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("service-worker.js")
+  ]);
+  const loginStart = app.indexOf("async function handleLogin");
+  const loginEnd = app.indexOf("function bytesToBase64Url", loginStart);
+  const loginBlock = app.slice(loginStart, loginEnd);
+  const toastStart = app.indexOf("function showToast");
+  const toastEnd = app.indexOf("function showLogin", toastStart);
+  const toastBlock = app.slice(toastStart, toastEnd);
+  const setScreenStart = app.indexOf("function setScreen");
+  const setScreenEnd = app.indexOf("async function handleScreenDataLoad", setScreenStart);
+  const setScreenBlock = app.slice(setScreenStart, setScreenEnd);
+  const errorStart = server.indexOf("function friendlyDatabaseError");
+  const errorBlock = server.slice(errorStart);
+
+  assert.match(app, /loggingIn: false/);
+  assert.match(loginBlock, /if \(state\.loggingIn\) return/);
+  assert.match(loginBlock, /submitButton\.disabled = true/);
+  assert.match(loginBlock, /submitButton\.textContent = "Accesso\.\.\."/);
+  assert.match(loginBlock, /faceIdLoginButton\.disabled = true/);
+  assert.match(loginBlock, /Connessione al server non disponibile\. Riprova tra qualche secondo\./);
+  assert.match(app, /function cleanUserMessage/);
+  assert.match(app, /Failed to fetch\|NetworkError\|Load failed/);
+  assert.match(toastBlock, /cleanUserMessage\(message\)/);
+  assert.match(app, /function withButtonBusy/);
+  assert.match(setScreenBlock, /handleScreenDataLoad\(id\)\.catch/);
+  assert.match(setScreenBlock, /sectionLoadErrorMessage/);
+  assert.match(server, /function publicErrorMessage/);
+  assert.match(server, /function looksTechnicalErrorMessage/);
+  assert.match(server, /function safeRouteErrorMessage/);
+  assert.doesNotMatch(errorBlock, /payload\.code/);
+  assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
+  assert.match(index, /app\.js\?v=20260528-total-quality-1/);
+  assert.match(index, /styles\.css\?v=20260528-total-quality-1/);
+  assert.match(worker, /total-quality-1/);
+  const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
+  const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
+  assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {

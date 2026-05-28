@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260528-state-separation-1";
+const STATIC_CACHE = "oroactive-static-v20260528-total-quality-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260528-state-separation-1",
-  "/app.js?v=20260528-state-separation-1",
+  "/styles.css?v=20260528-total-quality-1",
+  "/app.js?v=20260528-total-quality-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",
