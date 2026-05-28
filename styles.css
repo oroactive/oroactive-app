@@ -3508,6 +3508,37 @@ input.document-expired {
   grid-template-columns: 1.35fr 0.7fr 0.6fr 0.85fr 0.95fr;
 }
 
+.suspended-practices-table .table-row {
+  grid-template-columns: 0.9fr 1fr 0.75fr 1.25fr 0.75fr 0.75fr 1.2fr;
+}
+
+.suspended-practice-row {
+  align-items: start;
+}
+
+.suspended-practice-filters {
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  align-items: end;
+}
+
+.suspended-reasons {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.suspended-reasons li {
+  border: 1px solid rgba(255, 115, 28, 0.22);
+  border-radius: 8px;
+  background: #fffaf3;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 7px 9px;
+}
+
 .notification-row {
   border-left: 4px solid #8d96a0;
 }
@@ -3589,6 +3620,13 @@ input.document-expired {
 .approval-status.approval-cancelled {
   background: #f2f2f2;
   color: #666;
+}
+
+.table-row em.status-suspended,
+.archive-export-row em.status-suspended {
+  background: #fff1b8;
+  color: #7a3410;
+  border: 1px solid rgba(255, 115, 28, 0.35);
 }
 
 .users-table .table-row strong,
@@ -3973,7 +4011,8 @@ button.quality-review-badge {
   color: #8a5b00;
 }
 
-.audit-trail-filters {
+.audit-trail-filters,
+.suspended-practice-filters {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
@@ -3981,14 +4020,16 @@ button.quality-review-badge {
   margin-bottom: 18px;
 }
 
-.audit-trail-filters label {
+.audit-trail-filters label,
+.suspended-practice-filters label {
   display: grid;
   gap: 7px;
   font-weight: 900;
   color: var(--soft-ink);
 }
 
-.audit-trail-filters button {
+.audit-trail-filters button,
+.suspended-practice-filters button {
   align-self: end;
 }
 
@@ -4873,7 +4914,8 @@ button.quality-review-badge {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .audit-trail-filters {
+  .audit-trail-filters,
+  .suspended-practice-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -4960,6 +5002,7 @@ button.quality-review-badge {
   #auditTrailList .table-row,
   .approvals-table .table-row,
   .notifications-table .table-row,
+  .suspended-practices-table .table-row,
   .stats-table .table-row {
     grid-template-columns: 1fr;
   }
@@ -5014,6 +5057,7 @@ button.quality-review-badge {
   }
 
   .audit-trail-filters,
+  .suspended-practice-filters,
   .audit-detail-grid {
     grid-template-columns: 1fr;
   }

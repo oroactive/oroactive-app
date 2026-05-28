@@ -62,6 +62,8 @@ const state = {
   crmSearchTimer: null,
   backups: [],
   approvals: [],
+  suspendedPractices: [],
+  suspendedPagination: { page: 1, limit: 50, total: 0 },
   auditLogs: [],
   auditPagination: { page: 1, limit: 50, total: 0 },
   notifications: [],
@@ -696,6 +698,13 @@ const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
 const approvalsList = document.getElementById("approvalsList");
 const refreshApprovals = document.getElementById("refreshApprovals");
+const suspendedPracticesList = document.getElementById("suspendedPracticesList");
+const suspendedPracticeFilters = document.getElementById("suspendedPracticeFilters");
+const refreshSuspendedPractices = document.getElementById("refreshSuspendedPractices");
+const suspendedPracticesPrev = document.getElementById("suspendedPracticesPrev");
+const suspendedPracticesNext = document.getElementById("suspendedPracticesNext");
+const suspendedPracticesPageInfo = document.getElementById("suspendedPracticesPageInfo");
+const saveSuspendedPracticeButton = document.getElementById("saveSuspendedPractice");
 const auditTrailFilters = document.getElementById("auditTrailFilters");
 const auditTrailList = document.getElementById("auditTrailList");
 const auditTrailPageInfo = document.getElementById("auditTrailPageInfo");
@@ -1205,6 +1214,7 @@ function markPracticeDirty() {
 async function syncActsFromServer() {
   const activeArchive = document.getElementById("archive")?.classList.contains("active-screen");
   const activeFusion = document.getElementById("fusion")?.classList.contains("active-screen");
+  const activeSuspended = document.getElementById("suspendedPractices")?.classList.contains("active-screen");
   if (activeArchive) {
     await loadArchiveScreenData({ force: true, silent: true });
     renderArchiveGroups();
@@ -1212,6 +1222,9 @@ async function syncActsFromServer() {
   if (activeFusion) {
     await loadFusionScreenData({ force: true, silent: true });
     renderFusionGroups();
+  }
+  if (activeSuspended) {
+    await loadSuspendedPractices();
   }
   if (isAdmin() && document.getElementById("users")?.classList.contains("active-screen")) {
     await loadUsers();
@@ -1283,7 +1296,7 @@ async function saveActRecord(act, method = "POST") {
   state.saving = true;
   const identifier = act.id || state.editingActId || state.editingPracticeNumber || act.practiceNumber;
   const path = method === "PUT" ? `/atti/${encodeURIComponent(identifier)}` : "/atti";
-  document.querySelectorAll("#archivePractice, #nextStep").forEach((button) => {
+  document.querySelectorAll("#archivePractice, #saveSuspendedPractice, #nextStep").forEach((button) => {
     button.disabled = true;
   });
   showLoading("Salvataggio in corso...");
@@ -1305,7 +1318,7 @@ async function saveActRecord(act, method = "POST") {
   } finally {
     hideLoading();
     state.saving = false;
-    document.querySelectorAll("#archivePractice, #nextStep").forEach((button) => {
+    document.querySelectorAll("#archivePractice, #saveSuspendedPractice, #nextStep").forEach((button) => {
       button.disabled = false;
     });
   }
@@ -2358,6 +2371,7 @@ async function handleScreenDataLoad(id) {
   }
   if (id === "backups") await loadBackups();
   if (id === "approvals") await loadApprovals();
+  if (id === "suspendedPractices") await loadSuspendedPractices(1);
   if (id === "notifications") await loadNotificationsPage(1);
   if (id === "stores") await loadStores();
   if (id === "antifraud") await loadAntifraud();
@@ -4180,6 +4194,7 @@ function renderDashboard() {
   const shield = data.aurum_shield || {};
   const audit = data.audit_summary || {};
   const approvals = data.approval_summary || {};
+  const suspended = data.suspended_practices || {};
   dashboardGrid.innerHTML = [
     metricCard("Totale oro oggi", `${Number(kpi.grammi_giornalieri?.Oro || 0).toFixed(2)} gr`),
     metricCard("Totale argento oggi", `${Number(kpi.grammi_giornalieri?.Argento || 0).toFixed(2)} gr`),
@@ -4199,6 +4214,8 @@ function renderDashboard() {
     metricCard("Shield score medio", `${Number(shield.average_score || 0)}/100`),
     metricCard("Autorizzazioni in attesa", approvals.pending || 0),
     metricCard("Richieste rischiose", approvals.risky_pending || 0),
+    metricCard("Pratiche sospese", suspended.total || 0),
+    metricCard("Sospese oggi", suspended.today || 0),
     metricCard("Login oggi", audit.logins_today || 0),
     metricCard("Azioni critiche oggi", Number(audit.acts_deleted_today || 0) + Number(audit.shield_alerts_today || 0)),
     metricCard("Oro mensile", `${Number(kpi.grammi_mensili?.Oro || 0).toFixed(2)} gr`),
@@ -4225,6 +4242,11 @@ function renderDashboard() {
       <div class="dashboard-rank-row"><span>In attesa</span><strong>${escapeHtml(String(approvals.pending || 0))}</strong><em>Da approvare o rifiutare</em></div>
       <div class="dashboard-rank-row"><span>Rischiose</span><strong>${escapeHtml(String(approvals.risky_pending || 0))}</strong><em>Alto/critico o score sopra soglia</em></div>
       ${(approvals.latest || []).slice(0, 5).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.practiceNumber || "Atto")}</span><strong>${escapeHtml(item.statusLabel || approvalStatusMeta(item.status).label)}</strong><em>${escapeHtml(item.requestedByName || "Utente")} · ${escapeHtml(String(item.risk_score || 0))}/100</em></div>`).join("") || '<div class="empty-state">Nessuna richiesta in attesa.</div>'}
+    </section>
+    <section class="dashboard-panel"><h3>Pratiche sospese</h3>
+      <div class="dashboard-rank-row"><span>Totale visibili</span><strong>${escapeHtml(String(suspended.total || 0))}</strong><em>Non contate come completate</em></div>
+      <div class="dashboard-rank-row"><span>Sospese oggi</span><strong>${escapeHtml(String(suspended.today || 0))}</strong><em>Da correggere</em></div>
+      ${(suspended.latest || []).slice(0, 5).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.practiceNumber || item.numero_atto || "Atto")}</span><strong>${escapeHtml(String(item.risk_score || 0))}/100</strong><em>${escapeHtml((item.motivi || [])[0] || "Motivo da verificare")}</em></div>`).join("") || '<div class="empty-state">Nessuna pratica sospesa.</div>'}
     </section>
     <section class="dashboard-panel"><h3>Oggi nell'app</h3>
       <div class="dashboard-rank-row"><span>Atti creati</span><strong>${escapeHtml(String(audit.acts_created_today || 0))}</strong><em>Da Audit Trail</em></div>
@@ -4298,6 +4320,11 @@ function auditActionLabel(action = "") {
     approval_unauthorized_attempt: "Tentativo autorizzazione non consentito",
     sale_deed_completed_after_approval: "Atto completato dopo autorizzazione",
     sale_deed_modified_after_approval_request: "Modifica atto dopo richiesta autorizzazione",
+    sale_deed_suspended: "Pratica sospesa",
+    suspended_practice_reopened: "Pratica sospesa riaperta",
+    suspended_practice_resolved: "Controlli pratica sospesa risolti",
+    suspended_practice_deleted: "Pratica sospesa eliminata",
+    sale_deed_completed_after_suspension: "Atto completato dopo sospensione",
     create_academy_course: "Creazione corso Academy",
     update_academy_course: "Modifica corso Academy",
     delete_academy_course: "Eliminazione corso Academy",
@@ -4417,6 +4444,10 @@ function notificationTypeLabel(type = "system") {
     academy_course_assigned: "Academy",
     academy_course_completed: "Academy",
     aurum_support_request: "Aurum",
+    suspended_practice_created: "Pratiche sospese",
+    suspended_practice_resolved: "Pratica risolta",
+    suspended_practice_deleted: "Pratica eliminata",
+    suspended_practice_pending_too_long: "Sospesa da verificare",
     system: "Sistema"
   }[String(type || "system")] || "Sistema";
 }
@@ -4832,6 +4863,247 @@ async function cancelApprovalRequest(id) {
   }
 }
 
+function suspendedPracticeParams(page = 1) {
+  const formData = suspendedPracticeFilters ? new FormData(suspendedPracticeFilters) : new FormData();
+  const params = {
+    page,
+    limit: state.suspendedPagination.limit || 50
+  };
+  for (const [key, value] of formData.entries()) {
+    const text = String(value || "").trim();
+    if (text) params[key] = text;
+  }
+  return queryString(params);
+}
+
+function suspendedPracticeReasonsMarkup(reasons = []) {
+  const list = Array.isArray(reasons) ? reasons : [];
+  if (!list.length) return '<span class="muted">Motivo da verificare</span>';
+  return `
+    <ul class="suspended-reasons">
+      ${list.slice(0, 5).map((reason) => `<li>${escapeHtml(String(reason || ""))}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function suspendedPracticeApprovalMarkup(practice = {}) {
+  if (!practice.approval_status) return '<mark class="approval-status approval-cancelled">Non richiesta</mark>';
+  const meta = approvalStatusMeta(practice.approval_status);
+  return `<mark class="approval-status ${meta.className}">${escapeHtml(meta.label)}</mark>`;
+}
+
+function canDeleteSuspendedPracticeUi(practice = {}) {
+  const role = normalizeRole(state.currentUser?.ruolo);
+  if (role === "founder") return true;
+  return role === "responsabile" && (practice.store === state.currentUser?.negozio || practice.negozio === state.currentUser?.negozio);
+}
+
+function renderSuspendedPractices() {
+  if (!suspendedPracticesList) return;
+  const practices = state.suspendedPractices || [];
+  if (!practices.length) {
+    suspendedPracticesList.innerHTML = '<div class="empty-state">Nessuna pratica sospesa visibile per il tuo ruolo.</div>';
+  } else {
+    suspendedPracticesList.innerHTML = `
+      <div class="table-row head"><span>Pratica</span><span>Cliente</span><span>Negozio</span><span>Motivi</span><span>Rischio</span><span>Autorizzazione</span><span>Azioni</span></div>
+      ${practices.map((practice) => {
+        const shield = practice.aurumShield || { score: practice.risk_score, risk_level: practice.risk_level };
+        const canDelete = canDeleteSuspendedPracticeUi(practice);
+        return `
+          <div class="table-row suspended-practice-row">
+            <span>
+              <strong>${escapeHtml(practice.practiceNumber || practice.numero_atto || "")}</strong>
+              <small>${escapeHtml(formatDateTime(practice.suspended_at || practice.suspendedAt || practice.created_at))}</small>
+            </span>
+            <span>
+              <strong>${escapeHtml(practice.cliente || `${practice.name || ""} ${practice.surname || ""}`.trim() || "Cliente non indicato")}</strong>
+              <small>${escapeHtml(practice.operatore || practice.operatorName || practice.operatorUsername || "Operatore non indicato")}</small>
+            </span>
+            <span>${escapeHtml(practice.negozio || practice.store || "Dato non inserito")}</span>
+            <span>${suspendedPracticeReasonsMarkup(practice.motivi || practice.suspendedReasons)}</span>
+            <span>${aurumShieldBadgeMarkup(shield)}</span>
+            <span>${suspendedPracticeApprovalMarkup(practice)}</span>
+            <div class="row-actions">
+              <button type="button" data-open-suspended="${escapeHtml(String(practice.id || ""))}">Apri</button>
+              <button type="button" data-edit-suspended="${escapeHtml(String(practice.id || practice.practiceNumber || ""))}">Modifica / Riapri</button>
+              <button class="ghost-button" type="button" data-resolve-suspended="${escapeHtml(String(practice.id || ""))}">Risolvi controlli</button>
+              <button class="primary-button" type="button" data-approval-suspended="${escapeHtml(String(practice.id || ""))}">Richiedi autorizzazione</button>
+              <button class="danger-button" type="button" data-delete-suspended="${escapeHtml(String(practice.id || ""))}" ${canDelete ? "" : "disabled"}>Elimina</button>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    `;
+  }
+  if (suspendedPracticesPageInfo) {
+    const pagination = state.suspendedPagination || { page: 1, limit: 50, total: 0 };
+    const totalPages = Math.max(1, Math.ceil(Number(pagination.total || 0) / Number(pagination.limit || 50)));
+    suspendedPracticesPageInfo.textContent = `Pagina ${pagination.page || 1} di ${totalPages} - ${pagination.total || 0} pratiche`;
+  }
+  if (suspendedPracticesPrev) suspendedPracticesPrev.disabled = Number(state.suspendedPagination?.page || 1) <= 1;
+  if (suspendedPracticesNext) {
+    const pagination = state.suspendedPagination || { page: 1, limit: 50, total: 0 };
+    suspendedPracticesNext.disabled = Number(pagination.page || 1) >= Math.max(1, Math.ceil(Number(pagination.total || 0) / Number(pagination.limit || 50)));
+  }
+}
+
+async function loadSuspendedPractices(page = state.suspendedPagination?.page || 1) {
+  if (!suspendedPracticesList) return;
+  suspendedPracticesList.innerHTML = '<div class="empty-state">Caricamento pratiche sospese...</div>';
+  try {
+    const params = suspendedPracticeParams(page);
+    const data = await apiRequest(`/suspended-practices${params ? `?${params}` : ""}`);
+    state.suspendedPractices = data.practices || [];
+    state.suspendedPagination = data.pagination || { page, limit: 50, total: state.suspendedPractices.length };
+    renderSuspendedPractices();
+  } catch (error) {
+    suspendedPracticesList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Pratiche sospese non caricate.")}</div>`;
+  }
+}
+
+async function viewSuspendedPractice(id) {
+  try {
+    const data = await apiRequest(`/suspended-practices/${encodeURIComponent(id)}`);
+    const practice = data.practice || {};
+    const act = data.act || practice;
+    previewTitle.textContent = `Pratica sospesa · ${practice.practiceNumber || act.practiceNumber || id}`;
+    previewBody.innerHTML = `
+      <section class="approval-detail">
+        <div class="audit-detail-grid">
+          <div><span>Cliente</span><strong>${escapeHtml(practice.cliente || `${act.name || ""} ${act.surname || ""}`.trim() || "Dato non inserito")}</strong></div>
+          <div><span>Negozio</span><strong>${escapeHtml(practice.negozio || act.store || "Dato non inserito")}</strong></div>
+          <div><span>Operatore</span><strong>${escapeHtml(practice.operatore || act.operatorName || act.operatorUsername || "Dato non inserito")}</strong></div>
+          <div><span>Stato</span><strong>${escapeHtml(workflowStatusListLabel(practice.stato || act.status))}</strong></div>
+          <div><span>Risk score</span><strong>${escapeHtml(String(practice.risk_score || act.aurumShield?.score || 0))}/100</strong></div>
+          <div><span>Autorizzazione</span><strong>${escapeHtml(practice.approvalStatusLabel || "")}</strong></div>
+        </div>
+        <h4>Motivi sospensione</h4>
+        ${suspendedPracticeReasonsMarkup(practice.motivi || act.suspendedReasons)}
+        ${auditDataBlock("Controllo Qualità", act.qualityCheck || practice.quality_check || {})}
+        ${auditDataBlock("Aurum Shield", act.aurumShield || {})}
+        ${auditDataBlock("Pagamento", { metodo: act.paymentMethod, importo: act.amount, iban: act.iban ? "presente" : "" })}
+        <h4>Log sospensione</h4>
+        ${(data.logs || []).length ? `<div class="archive-table users-table">${data.logs.map((log) => `
+          <div class="table-row">
+            <span>${escapeHtml(formatDateTime(log.created_at))}</span>
+            <strong>${escapeHtml(log.action || "")}</strong>
+            <span>${escapeHtml(log.userName || "Sistema")}</span>
+            <small>${escapeHtml(log.reason || "")}</small>
+          </div>
+        `).join("")}</div>` : '<div class="empty-state">Nessun log sospensione registrato.</div>'}
+      </section>
+    `;
+    previewModal.hidden = false;
+  } catch (error) {
+    showToast(error.message || "Impossibile aprire la pratica sospesa.", "error");
+  }
+}
+
+async function editSuspendedPractice(id) {
+  try {
+    const data = await apiRequest(`/suspended-practices/${encodeURIComponent(id)}`);
+    const practiceNumber = data.act?.practiceNumber || data.practice?.practiceNumber || data.practice?.numero_atto;
+    if (!practiceNumber) throw new Error("Numero pratica non disponibile.");
+    await loadActForEdit(practiceNumber);
+    showToast("Pratica sospesa riaperta: correggi i controlli evidenziati.", "success");
+  } catch (error) {
+    showToast(error.message || "Impossibile riaprire la pratica sospesa.", "error");
+  }
+}
+
+async function resolveSuspendedPractice(id) {
+  try {
+    const data = await apiRequest(`/suspended-practices/${encodeURIComponent(id)}/resolve-check`, { method: "POST" });
+    showToast(data.message || "Controlli pratica sospesa aggiornati.", data.resolved ? "success" : "warning");
+    await loadSuspendedPractices();
+    await loadArchiveScreenData({ force: true, silent: true }).catch(() => {});
+    renderArchiveGroups();
+    if (shouldShowAurumMascot()) {
+      showAurumTip(data.resolved ? "La pratica ora può essere completata." : "La pratica resta sospesa: controlla i motivi aggiornati.");
+    }
+  } catch (error) {
+    showToast(error.message || "Controlli pratica sospesa non aggiornati.", "error");
+  }
+}
+
+async function requestSuspendedPracticeApproval(id) {
+  try {
+    const data = await apiRequest(`/suspended-practices/${encodeURIComponent(id)}`);
+    const practice = data.practice || {};
+    const reasons = (practice.motivi || []).map((message) => ({ type: "suspended_practice", severity: "warning", message }));
+    const response = await apiRequest("/approvals/request", {
+      method: "POST",
+      body: JSON.stringify({
+        sale_deed_id: data.act?.id || practice.id || id,
+        requester_note: "Richiesta da Pratiche sospese",
+        reasons,
+        risk_score: practice.risk_score || data.act?.aurumShield?.score || 0,
+        risk_level: practice.risk_level || data.act?.aurumShield?.risk_level || "",
+        quality_check: data.act?.qualityCheck || {},
+        aurum_shield: data.act?.aurumShield || {}
+      })
+    });
+    showToast(response.message || "Richiesta autorizzazione inviata.", "success");
+    await Promise.all([
+      loadSuspendedPractices(),
+      loadApprovals().catch(() => {}),
+      loadNotificationCount().catch(() => {})
+    ]);
+  } catch (error) {
+    showToast(error.message || "Richiesta autorizzazione non inviata.", "error");
+  }
+}
+
+async function deleteSuspendedPractice(id) {
+  if (!window.confirm("Sei sicuro di voler eliminare definitivamente questa pratica sospesa dai flussi operativi?")) return;
+  try {
+    await apiRequest(`/suspended-practices/${encodeURIComponent(id)}`, { method: "DELETE" });
+    showToast("Pratica sospesa eliminata.", "success");
+    await Promise.all([
+      loadSuspendedPractices(),
+      loadArchiveScreenData({ force: true, silent: true }).catch(() => {}),
+      loadNotificationCount().catch(() => {})
+    ]);
+    renderArchiveGroups();
+  } catch (error) {
+    showToast(error.message || "Impossibile eliminare la pratica sospesa.", "error");
+  }
+}
+
+async function saveCurrentPracticeAsSuspended(options = {}) {
+  if (!fieldValue("#practiceNumber")) await updatePracticeNumber();
+  if (!fieldValue("#practiceNumber")) {
+    showToast("Numerazione atto momentaneamente non disponibile.");
+    return false;
+  }
+  const quality = options.quality || state.guidedQualityCheck || await validateQualityChecklist({ status: "completed", silent: true });
+  const shield = options.shield || quality?.aurum_shield || state.aurumShield || await evaluateAurumShield({ status: "completed", silent: true });
+  const reasons = frontendSuspensionReasons({ quality, shield, reasons: options.reasons });
+  if (!reasons.length) reasons.push(options.manual ? "Pratica sospesa manualmente dall'operatore." : "Controlli operativi da completare.");
+  const wasEditing = Boolean(state.editingPracticeNumber || state.editingActId);
+  let act = currentActSnapshot("suspended");
+  act.suspendedReasons = reasons;
+  act.suspendedReason = reasons[0] || "";
+  act.qualityCheck = quality || act.qualityCheck;
+  act.aurumShield = shield || act.aurumShield;
+  try {
+    const saved = await saveActRecord(act, wasEditing ? "PUT" : "POST");
+    state.editingActId = saved.id || state.editingActId;
+    state.editingPracticeNumber = saved.practiceNumber || state.editingPracticeNumber;
+    state.editingOriginalStatus = normalizeWorkflowStatus(saved.status || "suspended");
+    showToast(options.message || "Pratica salvata tra le pratiche sospese.", "success");
+    await loadSuspendedPractices().catch(() => {});
+    await loadArchiveScreenData({ force: true, silent: true }).catch(() => {});
+    renderArchiveGroups();
+    if (!options.stayOnPractice) setScreen("suspendedPractices");
+    if (shouldShowAurumMascot()) showAurumTip(`Pratica sospesa: ${reasons[0]}`);
+    return true;
+  } catch (error) {
+    showToast(error.message || "Impossibile salvare la pratica sospesa.", "error");
+    return false;
+  }
+}
+
 function aurumShieldLevelMeta(level = "basso") {
   return {
     basso: { label: "Pratica sicura", className: "risk-low" },
@@ -4980,6 +5252,31 @@ function frontendApprovalReasons({ quality = null, shield = null } = {}) {
     seen.add(key);
     return true;
   });
+}
+
+function frontendSuspensionReasons({ quality = null, shield = null, reasons = [] } = {}) {
+  const messages = [];
+  const add = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach(add);
+      return;
+    }
+    if (typeof value === "object") {
+      add(value.message || value.action || value.label || value.title || value.description);
+      return;
+    }
+    const text = String(value || "").trim();
+    if (text && !messages.includes(text)) messages.push(text);
+  };
+  add(reasons);
+  add(quality?.blocking_errors);
+  add(quality?.required_actions);
+  add(quality?.warnings);
+  add(shield?.factors);
+  if (shield && Number(shield.score || 0) >= 61) add(shield.summary || `Aurum Shield ${Number(shield.score || 0)}/100`);
+  if (state.amlCashCheck?.ok === false) add(state.amlCashCheck.messaggio || cashPaymentLimitMessage());
+  return messages.slice(0, 20);
 }
 
 function approvalPromptText({ reasons = [], shield = null, quality = null } = {}) {
@@ -5239,6 +5536,12 @@ async function ensureGuidedQualityAllows(action = "complete", options = {}) {
   if (status === "non_completabile") {
     showToast("Non puoi completare questa pratica. Risolvi prima i controlli obbligatori evidenziati.", "error");
     showAurumQualityGuidance(quality);
+    await saveCurrentPracticeAsSuspended({
+      quality,
+      shield: quality.aurum_shield || state.aurumShield,
+      stayOnPractice: true,
+      message: "Pratica salvata tra le sospese: correggi i controlli obbligatori."
+    });
     return false;
   }
   if (status === "attenzione") {
@@ -6454,6 +6757,7 @@ function normalizeWorkflowStatus(status = "Archiviata") {
   if (["pending_approval", "in_attesa_autorizzazione", "in attesa autorizzazione", "attesa autorizzazione"].includes(normalized)) return "In attesa autorizzazione";
   if (["approval_approved", "autorizzazione_approvata", "autorizzazione approvata"].includes(normalized)) return "Autorizzazione approvata";
   if (["approval_rejected", "autorizzazione_rifiutata", "autorizzazione rifiutata"].includes(normalized)) return "Autorizzazione rifiutata";
+  if (["suspended", "sospesa", "sospeso", "pratica sospesa"].includes(normalized)) return "Sospesa";
   if (["deleted", "eliminato", "eliminata"].includes(normalized)) return "Eliminato";
   if (["abandoned", "abbandonato", "abbandonata"].includes(normalized)) return "Abbandonato";
   return "Archiviata";
@@ -6468,6 +6772,7 @@ function workflowStatusCode(status = "") {
   if (label === "In attesa autorizzazione") return "pending_approval";
   if (label === "Autorizzazione approvata") return "approval_approved";
   if (label === "Autorizzazione rifiutata") return "approval_rejected";
+  if (label === "Sospesa") return "suspended";
   if (label === "Eliminato") return "deleted";
   if (label === "Abbandonato") return "abandoned";
   return "archived_incomplete";
@@ -6479,6 +6784,7 @@ function workflowStatusListLabel(status = "") {
   if (code === "pending_approval") return "In attesa autorizzazione";
   if (code === "approval_approved") return "Autorizzazione approvata";
   if (code === "approval_rejected") return "Autorizzazione rifiutata";
+  if (code === "suspended") return "Sospesa";
   if (code === "deleted") return "Eliminato";
   return "Archiviato";
 }
@@ -6495,6 +6801,7 @@ function statusClass(status = "") {
   if (normalized === "pending_approval") return "status-pending-approval";
   if (normalized === "approval_approved") return "status-approval-approved";
   if (normalized === "approval_rejected") return "status-approval-rejected";
+  if (normalized === "suspended") return "status-suspended";
   if (normalized === "deleted" || normalized === "abandoned") return "status-deleted";
   return "";
 }
@@ -6817,6 +7124,8 @@ function currentActSnapshot(status = "Archiviata") {
     captures,
     approvalStatus: state.editingApprovalStatus || "",
     approvalRequestId: state.editingApprovalRequestId || null,
+    suspendedReasons: frontendSuspensionReasons({ quality: state.guidedQualityCheck, shield: state.aurumShield }),
+    suspendedReason: frontendSuspensionReasons({ quality: state.guidedQualityCheck, shield: state.aurumShield })[0] || "",
     status: workflowStatusCode(status)
   };
 }
@@ -6869,7 +7178,9 @@ function archiveVisibleActs() {
   return demoActs.filter((act) => {
     const storeMatches = selectedStore === "Tutti" || act.store === selectedStore;
     const keywordMatches = !keyword || archiveSearchValue(act, field).includes(keyword);
-    return storeMatches && keywordMatches;
+    const status = workflowStatusCode(act.status);
+    const operativeStatus = !["suspended", "pending_approval", "approval_approved", "approval_rejected"].includes(status);
+    return storeMatches && keywordMatches && operativeStatus;
   });
 }
 
@@ -8035,6 +8346,7 @@ function renderFusionGroups() {
   const selectedStore = document.getElementById("fusionStoreFilter")?.value || "Tutti";
 
   const acts = demoActs
+    .filter((act) => isCompletedWorkflowStatus(act.status))
     .map((act) => ({ ...act, daysElapsed: daysFromPurchase(act.date), fusionDate: addDays(act.date, 10) }))
     .sort((first, second) => dateValue(second.date) - dateValue(first.date));
 
@@ -9364,7 +9676,14 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
     showToast("Numerazione atto momentaneamente non disponibile.");
     return false;
   }
-  if (normalizeWorkflowStatus(status) !== "Bozza" && notifyCashPaymentLimitIfNeeded({ force: true }) && !currentUserNeedsApprovalForRisk()) return false;
+  if (normalizeWorkflowStatus(status) !== "Bozza" && notifyCashPaymentLimitIfNeeded({ force: true }) && !currentUserNeedsApprovalForRisk()) {
+    await saveCurrentPracticeAsSuspended({
+      reasons: [cashPaymentLimitMessage()],
+      stayOnPractice: true,
+      message: "Pratica sospesa: limite contanti da verificare."
+    });
+    return false;
+  }
   const review = currentQualityReview();
   if (review?.status === "negative" && !review.feedback) {
     showToast("Inserisci il feedback scritto per il controllo qualità negativo.");
@@ -9516,6 +9835,11 @@ async function completeCurrentPractice() {
   }
 
   showToast(validationMessage(missing, "la pratica"));
+  await saveCurrentPracticeAsSuspended({
+    reasons: missing.map((item) => `Dato mancante: ${item}`),
+    stayOnPractice: true,
+    message: "Pratica salvata tra le sospese: completa i dati mancanti."
+  });
   return false;
 }
 
@@ -9832,6 +10156,26 @@ approvalsList?.addEventListener("click", (event) => {
   if (reject) rejectApprovalRequest(reject.dataset.rejectApproval);
   if (cancel) cancelApprovalRequest(cancel.dataset.cancelApproval);
 });
+refreshSuspendedPractices?.addEventListener("click", () => loadSuspendedPractices(state.suspendedPagination?.page || 1));
+suspendedPracticeFilters?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  loadSuspendedPractices(1);
+});
+suspendedPracticeFilters?.addEventListener("change", () => loadSuspendedPractices(1));
+suspendedPracticesPrev?.addEventListener("click", () => loadSuspendedPractices(Math.max(1, Number(state.suspendedPagination?.page || 1) - 1)));
+suspendedPracticesNext?.addEventListener("click", () => loadSuspendedPractices(Number(state.suspendedPagination?.page || 1) + 1));
+suspendedPracticesList?.addEventListener("click", (event) => {
+  const open = event.target.closest("[data-open-suspended]");
+  const edit = event.target.closest("[data-edit-suspended]");
+  const resolve = event.target.closest("[data-resolve-suspended]");
+  const approval = event.target.closest("[data-approval-suspended]");
+  const remove = event.target.closest("[data-delete-suspended]");
+  if (open) viewSuspendedPractice(open.dataset.openSuspended);
+  if (edit) editSuspendedPractice(edit.dataset.editSuspended);
+  if (resolve) resolveSuspendedPractice(resolve.dataset.resolveSuspended);
+  if (approval) requestSuspendedPracticeApproval(approval.dataset.approvalSuspended);
+  if (remove) deleteSuspendedPractice(remove.dataset.deleteSuspended);
+});
 document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
   refreshBullionVaultPrices({ notify: true });
   initBullionVaultChart();
@@ -10016,6 +10360,7 @@ document.getElementById("printCustomerCopySummary").addEventListener("click", pr
 document.getElementById("printCompanyCopySummary").addEventListener("click", printCompanyCopy);
 
 document.getElementById("archivePractice").addEventListener("click", () => archiveCurrentPractice("Archiviata"));
+saveSuspendedPracticeButton?.addEventListener("click", () => saveCurrentPracticeAsSuspended({ manual: true }));
 
 document.getElementById("addCededItem").addEventListener("click", () => {
   markPracticeDirty();

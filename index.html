@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260528-notifications-1">
+  <link rel="stylesheet" href="styles.css?v=20260528-suspended-practices-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -61,6 +61,7 @@
             <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
+            <button type="button" data-section="suspendedPractices">Pratiche sospese</button>
             <button class="approval-section-only" type="button" data-section="approvals">Richieste autorizzazione</button>
             <button type="button" data-section="fusion">Giacenza</button>
           </div>
@@ -126,6 +127,7 @@
             <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
             <button type="button" data-section="practice">Nuovo atto di vendita</button>
             <button type="button" data-section="archive">Elenco</button>
+            <button type="button" data-section="suspendedPractices">Pratiche sospese</button>
             <button class="approval-section-only" type="button" data-section="approvals">Richieste autorizzazione</button>
             <button type="button" data-section="fusion">Giacenza</button>
           </div>
@@ -581,6 +583,7 @@
               <strong id="sidePracticeNumber">OA-BUSTO-2026-000184</strong>
               <p>Atto archiviabile per completamento successivo</p>
               <button class="warning-button practice-archive-button" type="button" id="archivePractice">Chiudi e archivia</button>
+              <button class="ghost-button practice-suspend-button" type="button" id="saveSuspendedPractice">Salva come pratica sospesa</button>
               <button class="danger-button practice-delete-button" type="button" id="deleteCurrentPractice">Elimina atto</button>
               <div class="quality-review-panel" id="qualityReviewPanel" hidden>
                 <span>Controllo qualità atto</span>
@@ -654,6 +657,61 @@
         <div class="archive-groups" id="archiveGroups"></div>
       </section>
 
+      <section id="suspendedPractices" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Atti di vendita</p>
+            <h2>Pratiche sospese</h2>
+            <p class="muted">Qui trovi le pratiche non ancora completabili, con motivi di blocco, controlli e autorizzazioni collegate.</p>
+          </div>
+          <button class="primary-button" type="button" id="refreshSuspendedPractices">Aggiorna</button>
+        </div>
+        <form class="settings-list suspended-practice-filters" id="suspendedPracticeFilters">
+          <label>Negozio
+            <select name="store">
+              <option value="Tutti">Tutti</option>
+              <option value="Busto Arsizio">Busto Arsizio</option>
+              <option value="Cassano Magnago">Cassano Magnago</option>
+              <option value="Legnano">Legnano</option>
+            </select>
+          </label>
+          <label>Operatore
+            <input name="operator_id" placeholder="ID operatore">
+          </label>
+          <label>Motivo sospensione
+            <input name="reason" placeholder="Firma, contabile, documento...">
+          </label>
+          <label>Risk score minimo
+            <input name="risk_score_min" type="number" min="0" max="100" placeholder="0">
+          </label>
+          <label>Autorizzazione
+            <select name="approval_status">
+              <option value="">Tutte</option>
+              <option value="pending">In attesa</option>
+              <option value="approved">Approvata</option>
+              <option value="rejected">Rifiutata</option>
+            </select>
+          </label>
+          <label>Dal
+            <input name="date_from" type="date">
+          </label>
+          <label>Al
+            <input name="date_to" type="date">
+          </label>
+          <label>Ricerca
+            <input name="search" placeholder="Numero atto, cliente, negozio">
+          </label>
+          <button type="submit">Filtra</button>
+        </form>
+        <div class="archive-table users-table suspended-practices-table" id="suspendedPracticesList" aria-live="polite"></div>
+        <div class="audit-pagination">
+          <button class="ghost-button" type="button" id="suspendedPracticesPrev">Indietro</button>
+          <span id="suspendedPracticesPageInfo">Pagina 1</span>
+          <button class="ghost-button" type="button" id="suspendedPracticesNext">Avanti</button>
+        </div>
+      </section>
+
       <section id="approvals" class="screen approval-section-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
@@ -697,6 +755,9 @@
               <option value="academy_course_assigned">Academy</option>
               <option value="academy_course_completed">Academy completati</option>
               <option value="aurum_support_request">Supporto Aurum</option>
+              <option value="suspended_practice_created">Pratiche sospese</option>
+              <option value="suspended_practice_resolved">Pratiche risolte</option>
+              <option value="suspended_practice_deleted">Pratiche eliminate</option>
               <option value="system">Sistema</option>
             </select>
           </label>
@@ -1342,6 +1403,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260528-notifications-1"></script>
+  <script src="app.js?v=20260528-suspended-practices-1"></script>
 </body>
 </html>

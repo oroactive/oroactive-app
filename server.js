@@ -476,6 +476,11 @@ function auditActionLabel(action = "") {
     approval_unauthorized_attempt: "Tentativo autorizzazione non consentito",
     sale_deed_completed_after_approval: "Atto completato dopo autorizzazione",
     sale_deed_modified_after_approval_request: "Modifica atto dopo richiesta autorizzazione",
+    sale_deed_suspended: "Pratica sospesa",
+    suspended_practice_reopened: "Pratica sospesa riaperta",
+    suspended_practice_resolved: "Controlli pratica sospesa risolti",
+    suspended_practice_deleted: "Pratica sospesa eliminata",
+    sale_deed_completed_after_suspension: "Atto completato dopo sospensione",
     notification_created: "Notifica creata",
     notification_read: "Notifica letta",
     notification_action_opened: "Apertura notifica"
@@ -1019,6 +1024,7 @@ function normalizeWorkflowStatus(status = "archived_incomplete") {
   if (["pending_approval", "in_attesa_autorizzazione", "in attesa autorizzazione", "attesa autorizzazione"].includes(normalized)) return "pending_approval";
   if (["approval_approved", "autorizzazione_approvata", "autorizzazione approvata"].includes(normalized)) return "approval_approved";
   if (["approval_rejected", "autorizzazione_rifiutata", "autorizzazione rifiutata"].includes(normalized)) return "approval_rejected";
+  if (["suspended", "sospesa", "sospeso", "pratica sospesa", "pratiche sospese"].includes(normalized)) return "suspended";
   if (["draft", "bozza", "in bozza"].includes(normalized)) return "draft";
   if (["archived_incomplete", "archived", "archiviato", "archiviata", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "archived_incomplete";
   if (["deleted", "eliminato", "eliminata", "cancellato", "cancellata"].includes(normalized)) return "deleted";
@@ -1055,6 +1061,8 @@ function visibleRealActStatusSql(alias = "") {
       OR COALESCE(${prefix}status, '') ILIKE 'autorizzazione_approvata'
       OR COALESCE(${prefix}status, '') ILIKE 'approval_rejected'
       OR COALESCE(${prefix}status, '') ILIKE 'autorizzazione_rifiutata'
+      OR COALESCE(${prefix}status, '') ILIKE 'suspended'
+      OR COALESCE(${prefix}status, '') ILIKE 'sospesa'
     )`;
 }
 
@@ -2649,7 +2657,7 @@ function isCashPaymentMethod(method = "") {
 
 function isDraftLikeStatus(status = "") {
   const normalized = normalizeWorkflowStatus(status).toLowerCase();
-  return ["draft", "pending_approval", "approval_approved", "approval_rejected", "annullata", "deleted", "abandoned"].includes(normalized);
+  return ["draft", "suspended", "pending_approval", "approval_approved", "approval_rejected", "annullata", "deleted", "abandoned"].includes(normalized);
 }
 
 function amlMessage(ok) {
@@ -2819,6 +2827,12 @@ function rowToAct(row, options = {}) {
     archivedAt: row.archived_at || payload.archivedAt || null,
     deletedAt: row.deleted_at || payload.deletedAt || null,
     deletedBy: row.deleted_by || payload.deletedBy || null,
+    suspendedReason: row.suspended_reason || payload.suspendedReason || "",
+    suspendedReasons: Array.isArray(row.suspended_reasons) ? row.suspended_reasons : payload.suspendedReasons || [],
+    suspendedAt: row.suspended_at || payload.suspendedAt || null,
+    suspendedBy: row.suspended_by || payload.suspendedBy || null,
+    resumedAt: row.resumed_at || payload.resumedAt || null,
+    resumedBy: row.resumed_by || payload.resumedBy || null,
     approvalStatus: row.approval_status || payload.approvalStatus || "",
     approvalRequestId: row.approval_request_id || payload.approvalRequestId || null,
     approvalRequiredAt: row.approval_required_at || payload.approvalRequiredAt || null,
@@ -3588,15 +3602,28 @@ async function visibleStoreWhere(user = {}, values = [], alias = "a") {
   return ` AND (${alias}.negozio_id = $${values.length - 1}::bigint OR ${alias}.store = $${values.length}::text)`;
 }
 
-function buildActsQuery({ store, field, q, fusionEligible, includeDrafts } = {}, user = null) {
+function buildActsQuery({ store, field, q, fusionEligible, includeDrafts, includeSuspended } = {}, user = null) {
   const where = [];
   const values = [];
   const shouldIncludeDrafts = includeDrafts === true || includeDrafts === "true";
+  const shouldIncludeSuspended = includeSuspended === true || includeSuspended === "true";
 
   if (shouldIncludeDrafts) {
     where.push("deleted_at IS NULL AND COALESCE(status, '') NOT ILIKE 'deleted' AND COALESCE(status, '') NOT ILIKE 'Deleted' AND COALESCE(status, '') NOT ILIKE 'abandoned' AND COALESCE(status, '') NOT ILIKE 'Abandoned'");
   } else {
     where.push(visibleRealActStatusSql());
+  }
+  if (!shouldIncludeSuspended) {
+    where.push(`COALESCE(status, '') NOT ILIKE 'suspended'
+      AND COALESCE(status, '') NOT ILIKE 'sospesa'
+      AND COALESCE(status, '') NOT ILIKE 'sospeso'
+      AND COALESCE(status, '') NOT ILIKE 'pending_approval'
+      AND COALESCE(status, '') NOT ILIKE 'in_attesa_autorizzazione'
+      AND COALESCE(status, '') NOT ILIKE 'approval_approved'
+      AND COALESCE(status, '') NOT ILIKE 'autorizzazione_approvata'
+      AND COALESCE(status, '') NOT ILIKE 'approval_rejected'
+      AND COALESCE(status, '') NOT ILIKE 'autorizzazione_rifiutata'
+      AND NOT (suspended_at IS NOT NULL AND resumed_at IS NULL)`);
   }
 
   const effectiveStore = roleSeesAllStores(user?.ruolo) ? store : user?.negozio;
@@ -4107,6 +4134,10 @@ async function dashboardKpis(user = {}) {
     console.error("APPROVAL SUMMARY ERROR", error);
     return { pending: 0, risky_pending: 0, latest: [] };
   });
+  const suspendedSummary = await dashboardSuspendedPracticeStats(user).catch((error) => {
+    console.error("SUSPENDED PRACTICES SUMMARY ERROR", error);
+    return { total: 0, today: 0, latest: [], top_reasons: [] };
+  });
   return {
     kpi: {
       fatturato_giornaliero: sum(dailyActs, (act) => act.amount),
@@ -4137,6 +4168,7 @@ async function dashboardKpis(user = {}) {
     ranking_operatori: Object.values(byOperator).sort((a, b) => b.fatturato - a.fatturato),
     aurum_shield: aurumShield,
     approval_summary: approvalSummary,
+    suspended_practices: suspendedSummary,
     audit_summary: auditSummary
   };
 }
@@ -5279,6 +5311,572 @@ async function persistQualityCheckForAct(saleDeedRow, user = {}) {
   return saveQualityCheckResult({ sale_deed_id: saleDeedRow.id, draft_data: rowToAct(saleDeedRow) }, user);
 }
 
+function suspensionReasonText(reason = {}) {
+  if (typeof reason === "string") return reason.trim();
+  return String(reason.message || reason.action || reason.label || reason.title || reason.description || "").trim();
+}
+
+function normalizeSuspensionReasons(...sources) {
+  const reasons = [];
+  const add = (value) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach(add);
+      return;
+    }
+    if (typeof value === "object") {
+      if (Array.isArray(value.blocking_errors)) add(value.blocking_errors);
+      if (Array.isArray(value.required_actions)) add(value.required_actions);
+      if (Array.isArray(value.warnings)) add(value.warnings);
+      if (Array.isArray(value.factors)) add(value.factors);
+    }
+    const text = suspensionReasonText(value);
+    if (text && !reasons.includes(text)) reasons.push(text);
+  };
+  sources.forEach(add);
+  return reasons.slice(0, 20);
+}
+
+function suspendedPracticeSummary(reasons = []) {
+  return reasons[0] || "Pratica sospesa: controlli operativi da completare.";
+}
+
+function suspensionDataFromInput(input = {}, quality = null, shield = null) {
+  const reasons = normalizeSuspensionReasons(
+    input.suspendedReasons,
+    input.suspended_reasons,
+    input.reasons,
+    input.reason,
+    input.motivi,
+    input.quality_check || input.qualityCheck || quality,
+    input.aurum_shield || input.aurumShield || shield
+  );
+  return {
+    reason: String(input.suspendedReason || input.suspended_reason || suspendedPracticeSummary(reasons)).trim(),
+    reasons
+  };
+}
+
+function suspensionDataFromAct(act = {}) {
+  return suspensionDataFromInput(act, act.qualityCheck, act.aurumShield);
+}
+
+async function writeSuspendedPracticeLog({ saleDeedId, user = {}, action, reason = "", reasons = [], metadata = {} } = {}) {
+  try {
+    if (!saleDeedId || !action) return null;
+    const result = await pool.query(
+      `INSERT INTO suspended_practice_logs
+        (sale_deed_id, user_id, action, reason, reasons, metadata)
+       VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::jsonb,$6::jsonb)
+       RETURNING *`,
+      [
+        saleDeedId,
+        user?.id || null,
+        action,
+        reason || suspendedPracticeSummary(reasons),
+        sanitizeForPostgres(reasons || []),
+        sanitizeForPostgres(metadata || {})
+      ]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error("SUSPENDED PRACTICE LOG ERROR", error.message || error);
+    return null;
+  }
+}
+
+function suspendedStatusWhere(alias = "a") {
+  return `(
+    COALESCE(${alias}.status, '') ILIKE 'suspended'
+    OR COALESCE(${alias}.status, '') ILIKE 'sospesa'
+    OR COALESCE(${alias}.status, '') ILIKE 'pending_approval'
+    OR COALESCE(${alias}.status, '') ILIKE 'in_attesa_autorizzazione'
+    OR COALESCE(${alias}.status, '') ILIKE 'approval_rejected'
+    OR COALESCE(${alias}.status, '') ILIKE 'autorizzazione_rifiutata'
+    OR (${alias}.suspended_at IS NOT NULL AND ${alias}.resumed_at IS NULL)
+  )`;
+}
+
+async function addSuspendedPracticeVisibilityWhere(user = {}, where = [], values = []) {
+  const role = normalizeRole(user.ruolo);
+  if (role === "founder") return;
+  if (role === "supervisore") {
+    where.push("LOWER(COALESCE(u.ruolo, '')) <> 'founder'");
+    return;
+  }
+  if (role === "responsabile" || role === "commesso") {
+    const store = await storeForUser(user);
+    if (!store) {
+      where.push("1 = 0");
+      return;
+    }
+    values.push(store.id, store.nome);
+    const storeIdParam = `$${values.length - 1}::bigint`;
+    const storeNameParam = `$${values.length}::text`;
+    if (role === "responsabile") {
+      where.push(`(a.negozio_id = ${storeIdParam} OR a.store = ${storeNameParam})`);
+      return;
+    }
+    values.push(user.id || null);
+    where.push(`((a.negozio_id = ${storeIdParam} OR a.store = ${storeNameParam}) OR a.operatore_id = $${values.length}::bigint)`);
+    return;
+  }
+  values.push(user.id || null);
+  where.push(`a.operatore_id = $${values.length}::bigint`);
+}
+
+function suspendedPracticeSelectSql() {
+  return `a.*,
+          u.username AS operator_username,
+          u.nome AS operator_nome,
+          u.cognome AS operator_cognome,
+          u.ruolo AS operator_role,
+          shield.score AS shield_score,
+          shield.risk_level AS shield_risk_level,
+          shield.summary AS shield_summary,
+          shield.factors AS shield_factors,
+          shield.updated_at AS shield_updated_at,
+          approval.id AS latest_approval_id,
+          approval.status AS latest_approval_status,
+          approval.risk_score AS latest_approval_risk_score,
+          approval.risk_level AS latest_approval_risk_level,
+          approval.reasons AS latest_approval_reasons,
+          qc.status AS latest_quality_status,
+          qc.score AS latest_quality_score,
+          qc.blocking_errors AS latest_quality_blocking_errors,
+          qc.warnings AS latest_quality_warnings,
+          qc.required_actions AS latest_quality_required_actions`;
+}
+
+function suspendedPracticeFromRow(row = {}) {
+  const act = rowToAct(row, { full: false });
+  const reasons = normalizeSuspensionReasons(
+    row.suspended_reasons,
+    row.latest_quality_blocking_errors,
+    row.latest_quality_required_actions,
+    row.latest_approval_reasons,
+    row.shield_factors
+  );
+  const approvalStatus = row.latest_approval_status || act.approvalStatus || "";
+  return {
+    ...act,
+    numero_atto: act.practiceNumber,
+    cliente: [act.name, act.surname].filter(Boolean).join(" ") || "Cliente non indicato",
+    negozio: act.store || "",
+    operatore: act.operatorName || act.operatorUsername || "",
+    stato: normalizeWorkflowStatus(row.status || act.status || "suspended"),
+    motivi: reasons.length ? reasons : normalizeSuspensionReasons(row.suspended_reason || act.suspendedReason),
+    risk_score: Number(row.shield_score ?? row.latest_approval_risk_score ?? act.aurumShield?.score ?? 0),
+    risk_level: row.shield_risk_level || row.latest_approval_risk_level || act.aurumShield?.risk_level || "",
+    approval_status: approvalStatus,
+    approvalStatusLabel: approvalStatusLabel(approvalStatus),
+    quality_status: row.latest_quality_status || act.qualityCheck?.status || "",
+    quality_score: Number(row.latest_quality_score ?? act.qualityCheck?.score ?? 0),
+    created_at: row.created_at || act.createdAt || null,
+    suspended_at: row.suspended_at || act.suspendedAt || row.updated_at || null
+  };
+}
+
+async function listSuspendedPractices(query = {}, user = {}) {
+  const values = [];
+  const where = ["a.deleted_at IS NULL", suspendedStatusWhere("a")];
+  await addSuspendedPracticeVisibilityWhere(user, where, values);
+
+  const store = String(query.store || query.negozio || "").trim();
+  if (store && store !== "Tutti") {
+    values.push(store);
+    where.push(`a.store = $${values.length}::text`);
+  }
+  const operatorId = query.operator_id || query.operatore_id || "";
+  if (operatorId) {
+    values.push(operatorId);
+    where.push(`a.operatore_id::text = $${values.length}::text`);
+  }
+  const reason = String(query.reason || query.motivo || "").trim().toLowerCase();
+  if (reason) {
+    values.push(`%${reason}%`);
+    where.push(`LOWER(COALESCE(a.suspended_reason, '') || ' ' || COALESCE(a.suspended_reasons::text, '') || ' ' || COALESCE(qc.blocking_errors::text, '')) LIKE $${values.length}::text`);
+  }
+  const minRiskScore = Number(query.risk_score_min || query.risk_score || 0);
+  if (Number.isFinite(minRiskScore) && minRiskScore > 0) {
+    values.push(minRiskScore);
+    where.push(`COALESCE(shield.score, approval.risk_score, 0) >= $${values.length}::integer`);
+  }
+  const approvalStatus = String(query.approval_status || "").trim();
+  if (approvalStatus) {
+    values.push(approvalStatus);
+    where.push(`COALESCE(approval.status, '') = $${values.length}::text`);
+  }
+  if (query.date_from) {
+    values.push(query.date_from);
+    where.push(`COALESCE(a.suspended_at, a.updated_at, a.created_at) >= $${values.length}::timestamptz`);
+  }
+  if (query.date_to) {
+    values.push(query.date_to);
+    where.push(`COALESCE(a.suspended_at, a.updated_at, a.created_at) <= ($${values.length}::date + INTERVAL '1 day')`);
+  }
+  const search = String(query.q || query.search || "").trim().toLowerCase();
+  if (search) {
+    values.push(`%${search}%`);
+    const parameter = `$${values.length}::text`;
+    where.push(`(
+      LOWER(COALESCE(a.practice_number, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(a.cliente_nome, '') || ' ' || COALESCE(a.cliente_cognome, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(a.store, '')) LIKE ${parameter}
+      OR LOWER(COALESCE(u.username, '') || ' ' || COALESCE(u.nome, '') || ' ' || COALESCE(u.cognome, '')) LIKE ${parameter}
+    )`);
+  }
+
+  const page = Math.max(1, Number.parseInt(query.page || "1", 10) || 1);
+  const limit = Math.min(50, Math.max(1, Number.parseInt(query.limit || "50", 10) || 50));
+  const offset = (page - 1) * limit;
+  const fromSql = `FROM ${actsTable} a
+     LEFT JOIN utenti u ON u.id = a.operatore_id
+     LEFT JOIN LATERAL (
+       SELECT score, risk_level, summary, factors, updated_at
+       FROM aurum_shield_scores
+       WHERE sale_deed_id = a.id
+       ORDER BY updated_at DESC
+       LIMIT 1
+     ) shield ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT id, status, risk_score, risk_level, reasons
+       FROM approval_requests
+       WHERE sale_deed_id = a.id
+       ORDER BY created_at DESC
+       LIMIT 1
+     ) approval ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT status, score, blocking_errors, warnings, required_actions
+       FROM quality_checks
+       WHERE sale_deed_id = a.id
+       ORDER BY updated_at DESC, created_at DESC
+       LIMIT 1
+     ) qc ON TRUE`;
+  const whereSql = where.join(" AND ");
+  const totalResult = await pool.query(`SELECT COUNT(*)::int AS total ${fromSql} WHERE ${whereSql}`, values);
+  const listValues = [...values, limit, offset];
+  const result = await pool.query(
+    `SELECT ${suspendedPracticeSelectSql()}
+     ${fromSql}
+     WHERE ${whereSql}
+     ORDER BY COALESCE(a.suspended_at, a.updated_at, a.created_at) DESC
+     LIMIT $${listValues.length - 1}::integer OFFSET $${listValues.length}::integer`,
+    listValues
+  );
+  return {
+    ok: true,
+    practices: result.rows.map(suspendedPracticeFromRow),
+    pagination: { page, limit, total: Number(totalResult.rows[0]?.total || 0) }
+  };
+}
+
+async function getSuspendedPractice(id, user = {}) {
+  const values = [String(id || "")];
+  const where = ["a.deleted_at IS NULL", "(a.id::text = $1::text OR a.practice_number = $1::text)"];
+  await addSuspendedPracticeVisibilityWhere(user, where, values);
+  const result = await pool.query(
+    `SELECT ${suspendedPracticeSelectSql()}
+     FROM ${actsTable} a
+     LEFT JOIN utenti u ON u.id = a.operatore_id
+     LEFT JOIN LATERAL (
+       SELECT score, risk_level, summary, factors, updated_at
+       FROM aurum_shield_scores
+       WHERE sale_deed_id = a.id
+       ORDER BY updated_at DESC
+       LIMIT 1
+     ) shield ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT id, status, risk_score, risk_level, reasons
+       FROM approval_requests
+       WHERE sale_deed_id = a.id
+       ORDER BY created_at DESC
+       LIMIT 1
+     ) approval ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT status, score, blocking_errors, warnings, required_actions
+       FROM quality_checks
+       WHERE sale_deed_id = a.id
+       ORDER BY updated_at DESC, created_at DESC
+       LIMIT 1
+     ) qc ON TRUE
+     WHERE ${where.join(" AND ")}
+     LIMIT 1`,
+    values
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  const logs = await pool.query(
+    `SELECT spl.*, u.username, u.nome, u.cognome
+     FROM suspended_practice_logs spl
+     LEFT JOIN utenti u ON u.id = spl.user_id
+     WHERE spl.sale_deed_id = $1::bigint
+     ORDER BY spl.created_at DESC
+     LIMIT 100`,
+    [row.id]
+  );
+  return {
+    practice: suspendedPracticeFromRow(row),
+    act: rowToAct(row),
+    logs: logs.rows.map((log) => ({
+      ...log,
+      userName: [log.nome, log.cognome].filter(Boolean).join(" ") || log.username || ""
+    }))
+  };
+}
+
+async function notifySuspendedPractice(row = {}, user = {}, action = "created", reasons = [], req = null) {
+  const practiceNumber = row.practice_number || row.practiceNumber || row.id;
+  const map = {
+    created: {
+      title: "Pratica sospesa",
+      message: `La pratica ${practiceNumber} è stata spostata tra le pratiche sospese.`,
+      type: "suspended_practice_created",
+      severity: "warning"
+    },
+    resolved: {
+      title: "Pratica sospesa risolta",
+      message: `La pratica ${practiceNumber} può tornare al flusso operativo.`,
+      type: "suspended_practice_resolved",
+      severity: "success"
+    },
+    deleted: {
+      title: "Pratica sospesa eliminata",
+      message: `La pratica sospesa ${practiceNumber} è stata eliminata dai flussi operativi.`,
+      type: "suspended_practice_deleted",
+      severity: "danger"
+    }
+  };
+  const notification = map[action] || map.created;
+  const input = {
+    ...notification,
+    entityType: "atto",
+    entityId: row.id,
+    actionUrl: "#suspendedPractices",
+    metadata: { practice_number: practiceNumber, reasons: reasons.slice(0, 6), store_id: row.negozio_id || null },
+    createdBy: user?.id || null,
+    actor: user,
+    req
+  };
+  void createNotification({ ...input, targetRole: "founder" });
+  if (row.negozio_id) void createNotification({ ...input, targetRole: "responsabile", storeId: row.negozio_id });
+}
+
+async function suspendPractice(id, input = {}, user = {}, req = null) {
+  const row = await findExisting(id);
+  if (!row) return null;
+  if (!canAccessAct(row, user) || !canEditAct(row, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const quality = input.quality_check || input.qualityCheck || await validateQualityChecklist({
+    sale_deed_id: row.id,
+    draft_data: input.draft_data || input.draftData || rowToAct(row)
+  }, user).catch(() => null);
+  const shield = input.aurum_shield || input.aurumShield || quality?.aurum_shield || await calculateAurumShieldRisk({
+    sale_deed_id: row.id,
+    draft_data: input.draft_data || input.draftData || rowToAct(row)
+  }, user).catch(() => null);
+  const suspension = suspensionDataFromInput(input, quality, shield);
+  const beforeAct = rowToAct(row, { full: false });
+  const result = await pool.query(
+    `UPDATE ${actsTable}
+     SET status = 'suspended',
+         suspended_reason = $2::text,
+         suspended_reasons = $3::jsonb,
+         suspended_at = COALESCE(suspended_at, NOW()),
+         suspended_by = COALESCE(suspended_by, $4::bigint),
+         resumed_at = NULL,
+         resumed_by = NULL,
+         payload = COALESCE(payload, '{}'::jsonb) || $5::jsonb,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [
+      row.id,
+      suspension.reason,
+      sanitizeForPostgres(suspension.reasons),
+      user?.id || null,
+      sanitizeForPostgres({
+        suspendedReason: suspension.reason,
+        suspendedReasons: suspension.reasons,
+        suspendedAt: new Date().toISOString(),
+        suspendedBy: user?.id || null,
+        qualityCheck: quality || undefined,
+        aurumShield: shield || undefined
+      })
+    ]
+  );
+  const updated = result.rows[0];
+  const finalAct = rowToAct(updated, { full: false });
+  await writeSuspendedPracticeLog({
+    saleDeedId: updated.id,
+    user,
+    action: normalizeWorkflowStatus(row.status) === "suspended" ? "updated" : "suspended",
+    reason: suspension.reason,
+    reasons: suspension.reasons,
+    metadata: { quality_status: quality?.quality_status || quality?.status || "", risk_score: shield?.score || 0, risk_level: shield?.risk_level || "" }
+  });
+  void writeAuditLog({
+    req,
+    user,
+    action: "sale_deed_suspended",
+    entityType: "atto",
+    entityId: updated.id,
+    entityLabel: updated.practice_number || "",
+    beforeData: beforeAct,
+    afterData: finalAct,
+    metadata: { reasons: suspension.reasons, critical: true, store_id: updated.negozio_id || null }
+  });
+  notifySuspendedPractice(updated, user, "created", suspension.reasons, req);
+  return suspendedPracticeFromRow({
+    ...updated,
+    shield_score: shield?.score ?? updated.aurum_shield_score,
+    shield_risk_level: shield?.risk_level ?? updated.aurum_shield_risk_level,
+    shield_summary: shield?.summary ?? updated.aurum_shield_summary,
+    shield_factors: shield?.factors ?? updated.aurum_shield_factors,
+    latest_quality_status: quality?.quality_status || quality?.status || updated.quality_check_status,
+    latest_quality_score: quality?.score || updated.quality_check_score
+  });
+}
+
+async function resumeSuspendedPractice(id, input = {}, user = {}, req = null) {
+  const row = await findExisting(id);
+  if (!row) return null;
+  if (!canAccessAct(row, user) || !canEditAct(row, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const beforeAct = rowToAct(row, { full: false });
+  const nextStatus = normalizeWorkflowStatus(input.status || "draft");
+  const safeStatus = ["completed", "archived_completed", "deleted"].includes(nextStatus) ? "draft" : nextStatus;
+  const result = await pool.query(
+    `UPDATE ${actsTable}
+     SET status = $2::text,
+         resumed_at = COALESCE(resumed_at, NOW()),
+         resumed_by = COALESCE(resumed_by, $3::bigint),
+         payload = COALESCE(payload, '{}'::jsonb) || $4::jsonb,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [
+      row.id,
+      safeStatus,
+      user?.id || null,
+      sanitizeForPostgres({ resumedAt: new Date().toISOString(), resumedBy: user?.id || null, status: safeStatus })
+    ]
+  );
+  const updated = result.rows[0];
+  const finalAct = rowToAct(updated, { full: false });
+  await writeSuspendedPracticeLog({
+    saleDeedId: updated.id,
+    user,
+    action: "resumed",
+    reason: input.reason || "Pratica riaperta dopo controllo.",
+    reasons: normalizeSuspensionReasons(input.reasons || input.reason),
+    metadata: { status: safeStatus }
+  });
+  void writeAuditLog({
+    req,
+    user,
+    action: "suspended_practice_resolved",
+    entityType: "atto",
+    entityId: updated.id,
+    entityLabel: updated.practice_number || "",
+    beforeData: beforeAct,
+    afterData: finalAct,
+    metadata: { status: safeStatus, store_id: updated.negozio_id || null }
+  });
+  notifySuspendedPractice(updated, user, "resolved", [], req);
+  return suspendedPracticeFromRow(updated);
+}
+
+async function resolveSuspendedPractice(id, input = {}, user = {}, req = null) {
+  const row = await findExisting(id);
+  if (!row) return null;
+  if (!canAccessAct(row, user) || !canEditAct(row, user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const draftData = input.draft_data || input.draftData || rowToAct(row);
+  const quality = await validateQualityChecklist({ sale_deed_id: row.id, draft_data: draftData }, user);
+  const shield = quality.aurum_shield || await calculateAurumShieldRisk({ sale_deed_id: row.id, draft_data: draftData }, user).catch(() => null);
+  const riskScore = Number(shield?.score || 0);
+  const riskLevel = String(shield?.risk_level || "").toLowerCase();
+  const stillBlocked = (quality.quality_status || quality.status) === "non_completabile"
+    || riskScore >= 61
+    || ["alto", "critico"].includes(riskLevel);
+  if (stillBlocked) {
+    const practice = await suspendPractice(row.id, { ...input, quality_check: quality, aurum_shield: shield }, user, req);
+    return {
+      ok: true,
+      resolved: false,
+      message: "La pratica resta sospesa. Mancano ancora controlli da risolvere.",
+      practice,
+      quality_check: quality,
+      aurum_shield: shield
+    };
+  }
+  const approvedRequest = await findApprovedApprovalForAct(row.id);
+  const practice = await resumeSuspendedPractice(row.id, { status: approvedRequest ? "approval_approved" : "draft", reason: "Controlli risolti." }, user, req);
+  await writeSuspendedPracticeLog({
+    saleDeedId: row.id,
+    user,
+    action: "completed_after_resolution",
+    reason: "Controlli risolti: pratica completabile.",
+    reasons: [],
+    metadata: { quality_status: quality.quality_status || quality.status, risk_score: riskScore, risk_level: riskLevel }
+  });
+  return {
+    ok: true,
+    resolved: true,
+    message: "La pratica ora può essere completata.",
+    practice,
+    quality_check: quality,
+    aurum_shield: shield
+  };
+}
+
+async function deleteSuspendedPractice(id, user = {}, req = null) {
+  const row = await findExisting(id);
+  if (!row) return false;
+  const role = normalizeRole(user.ruolo);
+  const sameStore = row.store === user.negozio;
+  if (!(role === "founder" || (role === "responsabile" && sameStore))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const deleted = await deleteAct(row.id, user, req);
+  if (deleted) {
+    const reasons = normalizeSuspensionReasons(row.suspended_reasons, row.suspended_reason);
+    await writeSuspendedPracticeLog({
+      saleDeedId: row.id,
+      user,
+      action: "deleted",
+      reason: "Pratica sospesa eliminata.",
+      reasons,
+      metadata: { practice_number: row.practice_number || "" }
+    });
+    void writeAuditLog({
+      req,
+      user,
+      action: "suspended_practice_deleted",
+      entityType: "atto",
+      entityId: row.id,
+      entityLabel: row.practice_number || "",
+      beforeData: rowToAct(row, { full: false }),
+      afterData: { status: "deleted" },
+      metadata: { reasons, critical: true, store_id: row.negozio_id || null }
+    });
+    notifySuspendedPractice(row, user, "deleted", reasons, req);
+  }
+  return deleted;
+}
+
 function approvalStatusLabel(status = "pending") {
   return {
     pending: "In attesa",
@@ -5397,6 +5995,10 @@ function normalizeNotificationType(type = "system") {
     "academy_course_assigned",
     "academy_course_completed",
     "aurum_support_request",
+    "suspended_practice_created",
+    "suspended_practice_resolved",
+    "suspended_practice_deleted",
+    "suspended_practice_pending_too_long",
     "system"
   ].includes(normalized) ? normalized : "system";
 }
@@ -5757,6 +6359,29 @@ async function dashboardApprovalStats(user = {}) {
     pending: Number(result.rows[0]?.pending || 0),
     risky_pending: Number(result.rows[0]?.risky_pending || 0),
     latest: latest.slice(0, 10)
+  };
+}
+
+async function dashboardSuspendedPracticeStats(user = {}) {
+  const data = await listSuspendedPractices({ page: 1, limit: 10 }, user).catch(() => ({
+    practices: [],
+    pagination: { total: 0 }
+  }));
+  const today = new Date().toISOString().slice(0, 10);
+  const latest = data.practices || [];
+  const todayCount = latest.filter((practice) => String(practice.suspended_at || practice.suspendedAt || "").slice(0, 10) === today).length;
+  const reasonCounts = new Map();
+  latest.forEach((practice) => {
+    (practice.motivi || practice.suspendedReasons || []).forEach((reason) => {
+      const key = String(reason || "").trim();
+      if (key) reasonCounts.set(key, (reasonCounts.get(key) || 0) + 1);
+    });
+  });
+  return {
+    total: Number(data.pagination?.total || latest.length || 0),
+    today: todayCount,
+    latest,
+    top_reasons: [...reasonCounts.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 5)
   };
 }
 
@@ -8113,6 +8738,16 @@ async function saveAct(input, user, req = null) {
   const act = await enrichActStore(normalizeAct(protectedInput, existing), user);
   const nowIso = new Date().toISOString();
   const statusCode = normalizeWorkflowStatus(act.status);
+  const suspension = statusCode === "suspended" ? suspensionDataFromAct(act) : { reason: "", reasons: [] };
+  if (statusCode === "suspended") {
+    act.payload = {
+      ...(act.payload || {}),
+      suspendedReason: suspension.reason,
+      suspendedReasons: suspension.reasons,
+      suspendedAt: nowIso,
+      suspendedBy: user?.id || null
+    };
+  }
   const approvalCheck = ["completed", "archived_completed"].includes(statusCode)
     ? await assertApprovalAllowsFinalSave({ saleDeedId: null, draftData: { ...act.payload, status: statusCode }, user, req })
     : { approved: false };
@@ -8122,6 +8757,8 @@ async function saveAct(input, user, req = null) {
   }
   const completedAt = ["completed", "archived_completed"].includes(statusCode) ? nowIso : null;
   const archivedAt = ["archived_incomplete", "archived_completed"].includes(statusCode) ? nowIso : null;
+  const suspendedAt = statusCode === "suspended" ? nowIso : null;
+  const suspendedBy = statusCode === "suspended" ? user?.id || null : null;
   const result = await pool.query(
     `INSERT INTO ${actsTable} (
       cliente_nome, cliente_cognome, codice_fiscale, telefono,
@@ -8129,14 +8766,16 @@ async function saveAct(input, user, req = null) {
       practice_number, store, store_code, act_year, act_number,
       payment_method, status, iban, payload,
       negozio_id, codice_negozio, numero_atto_negozio, operatore_id,
-      completed_at, archived_at
+      completed_at, archived_at,
+      suspended_reason, suspended_reasons, suspended_at, suspended_by, resumed_at, resumed_by
     ) VALUES (
       $1::text,$2::text,$3::text,$4::text,
       $5::numeric,$6::numeric,$7::numeric,$8::date,
       $9::text,$10::text,$11::text,$12::integer,$13::integer,
       $14::text,$15::text,$16::text,$17::jsonb,
       $18::bigint,$19::text,$20::integer,$21::bigint,
-      $22::timestamptz,$23::timestamptz
+      $22::timestamptz,$23::timestamptz,
+      $24::text,$25::jsonb,$26::timestamptz,$27::bigint,$28::timestamptz,$29::bigint
     )
     RETURNING *`,
     [
@@ -8162,7 +8801,13 @@ async function saveAct(input, user, req = null) {
       act.numeroAttoNegozio,
       nullIfEmpty(act.operatoreId),
       completedAt,
-      archivedAt
+      archivedAt,
+      nullIfEmpty(suspension.reason),
+      sanitizeForPostgres(suspension.reasons),
+      suspendedAt,
+      suspendedBy,
+      null,
+      null
     ]
   );
   void logUserActivity({
@@ -8172,7 +8817,9 @@ async function saveAct(input, user, req = null) {
       ? "complete_act"
       : statusCode === "archived_incomplete"
         ? "archive_act"
-        : "create_act",
+        : statusCode === "suspended"
+          ? "sale_deed_suspended"
+          : "create_act",
     entityType: "atto",
     entityId: result.rows[0].id,
     description: `Atto ${act.practiceNumber} salvato`,
@@ -8211,6 +8858,8 @@ async function saveAct(input, user, req = null) {
       ? "complete_act"
       : statusCode === "archived_incomplete"
         ? "archive_act"
+        : statusCode === "suspended"
+          ? "sale_deed_suspended"
         : isDraftLikeStatus(statusCode)
           ? "save_draft"
           : "create_act",
@@ -8227,6 +8876,20 @@ async function saveAct(input, user, req = null) {
       store_name: finalRow.store || null
     }
   });
+  if (statusCode === "suspended") {
+    await writeSuspendedPracticeLog({
+      saleDeedId: finalRow.id,
+      user,
+      action: "suspended",
+      reason: suspension.reason,
+      reasons: suspension.reasons,
+      metadata: {
+        practice_number: finalAct.practiceNumber || "",
+        store_id: finalRow.negozio_id || null
+      }
+    });
+    notifySuspendedPractice(finalRow, user, "created", suspension.reasons, req);
+  }
   if (approvalCheck.approved) {
     void writeAuditLog({
       req,
@@ -8280,6 +8943,16 @@ async function updateAct(identifier, input, user, req = null) {
   const beforeAct = rowToAct(existing, { full: false });
   const act = await enrichActStore(normalizeAct(enforceActStore(input, user), existing), user);
   const normalizedStatus = normalizeWorkflowStatus(act.status);
+  const suspension = normalizedStatus === "suspended" ? suspensionDataFromAct(act) : { reason: "", reasons: [] };
+  if (normalizedStatus === "suspended") {
+    act.payload = {
+      ...(act.payload || {}),
+      suspendedReason: suspension.reason,
+      suspendedReasons: suspension.reasons,
+      suspendedAt: beforeAct.suspendedAt || new Date().toISOString(),
+      suspendedBy: beforeAct.suspendedBy || user?.id || null
+    };
+  }
   const approvalCheck = ["completed", "archived_completed"].includes(normalizedStatus)
     ? await assertApprovalAllowsFinalSave({ saleDeedId: existing.id, draftData: { ...act.payload, status: normalizedStatus }, user, req })
     : { approved: false };
@@ -8309,7 +8982,10 @@ async function updateAct(identifier, input, user, req = null) {
     nullIfEmpty(act.codiceNegozio),
     act.numeroAttoNegozio,
     nullIfEmpty(act.operatoreId),
-    normalizedStatus
+    normalizedStatus,
+    user?.id || null,
+    nullIfEmpty(suspension.reason),
+    sanitizeForPostgres(suspension.reasons)
   ];
   await enforceCashAntiMoneyLaundering(act, user, existing, { allowApproved: Boolean(approvalCheck.approved) });
   console.log("UPDATE PAYLOAD", redactedActPayloadForLog(act));
@@ -8355,6 +9031,30 @@ async function updateAct(identifier, input, user, req = null) {
           WHEN $23::text = 'abandoned' THEN COALESCE(abandoned_at, NOW())
           ELSE abandoned_at
         END,
+        suspended_reason = CASE
+          WHEN $23::text = 'suspended' THEN $25::text
+          ELSE suspended_reason
+        END,
+        suspended_reasons = CASE
+          WHEN $23::text = 'suspended' THEN $26::jsonb
+          ELSE suspended_reasons
+        END,
+        suspended_at = CASE
+          WHEN $23::text = 'suspended' THEN COALESCE(suspended_at, NOW())
+          ELSE suspended_at
+        END,
+        suspended_by = CASE
+          WHEN $23::text = 'suspended' THEN COALESCE(suspended_by, $24::bigint)
+          ELSE suspended_by
+        END,
+        resumed_at = CASE
+          WHEN $23::text <> 'suspended' AND suspended_at IS NOT NULL AND resumed_at IS NULL THEN NOW()
+          ELSE resumed_at
+        END,
+        resumed_by = CASE
+          WHEN $23::text <> 'suspended' AND suspended_at IS NOT NULL AND resumed_by IS NULL THEN $24::bigint
+          ELSE resumed_by
+        END,
         updated_at = NOW()
        WHERE id = $1::bigint
        RETURNING *`,
@@ -8372,7 +9072,9 @@ async function updateAct(identifier, input, user, req = null) {
       ? "complete_act"
       : normalizedStatus === "archived_incomplete"
         ? "archive_act"
-        : "update_act",
+        : normalizedStatus === "suspended"
+          ? "sale_deed_suspended"
+          : "update_act",
     entityType: "atto",
     entityId: result.rows[0].id,
     description: `Atto ${act.practiceNumber} aggiornato`,
@@ -8408,6 +9110,8 @@ async function updateAct(identifier, input, user, req = null) {
     ? "complete_act"
     : normalizedStatus === "archived_incomplete"
       ? "archive_act"
+      : normalizedStatus === "suspended"
+        ? "sale_deed_suspended"
       : "update_act";
   void writeAuditLog({
     req,
@@ -8443,6 +9147,62 @@ async function updateAct(identifier, input, user, req = null) {
         store_id: finalRow.negozio_id || null,
         critical: true
       }
+    });
+  }
+  if (normalizedStatus === "suspended") {
+    await writeSuspendedPracticeLog({
+      saleDeedId: finalRow.id,
+      user,
+      action: normalizeWorkflowStatus(existing.status) === "suspended" ? "updated" : "suspended",
+      reason: suspension.reason,
+      reasons: suspension.reasons,
+      metadata: {
+        practice_number: finalAct.practiceNumber || "",
+        store_id: finalRow.negozio_id || null
+      }
+    });
+    notifySuspendedPractice(finalRow, user, "created", suspension.reasons, req);
+  }
+  if (normalizeWorkflowStatus(existing.status) === "suspended" && ["completed", "archived_completed"].includes(normalizedStatus)) {
+    await writeSuspendedPracticeLog({
+      saleDeedId: finalRow.id,
+      user,
+      action: "completed_after_resolution",
+      reason: "Pratica completata dopo sospensione.",
+      reasons: [],
+      metadata: { practice_number: finalAct.practiceNumber || "", status: normalizedStatus }
+    });
+    void writeAuditLog({
+      req,
+      user,
+      action: "sale_deed_completed_after_suspension",
+      entityType: "atto",
+      entityId: finalRow.id,
+      entityLabel: finalAct.practiceNumber || "",
+      beforeData: beforeAct,
+      afterData: finalAct,
+      metadata: { status: normalizedStatus, store_id: finalRow.negozio_id || null, critical: true }
+    });
+    notifySuspendedPractice(finalRow, user, "resolved", [], req);
+  } else if (normalizeWorkflowStatus(existing.status) === "suspended" && normalizedStatus !== "suspended") {
+    await writeSuspendedPracticeLog({
+      saleDeedId: finalRow.id,
+      user,
+      action: "resumed",
+      reason: "Pratica riaperta per correzione.",
+      reasons: [],
+      metadata: { practice_number: finalAct.practiceNumber || "", status: normalizedStatus }
+    });
+    void writeAuditLog({
+      req,
+      user,
+      action: "suspended_practice_reopened",
+      entityType: "atto",
+      entityId: finalRow.id,
+      entityLabel: finalAct.practiceNumber || "",
+      beforeData: beforeAct,
+      afterData: finalAct,
+      metadata: { status: normalizedStatus, store_id: finalRow.negozio_id || null }
     });
   }
   if (["completed", "archived_completed"].includes(normalizedStatus) && Number(shield?.score || 0) > 60) {
@@ -9597,6 +10357,64 @@ app.put("/api/antifrode/:id", async (request, response, next) => {
     const alert = await updateAntifraudAlert(request.params.id, request.body, request.user);
     if (!alert) return response.status(404).json({ error: "Alert non trovato" });
     response.json(alert);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/suspended-practices", async (request, response, next) => {
+  try {
+    response.json(await listSuspendedPractices(request.query, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/suspended-practices/:id", async (request, response, next) => {
+  try {
+    const detail = await getSuspendedPractice(request.params.id, request.user);
+    if (!detail) return response.status(404).json({ error: "Pratica sospesa non trovata" });
+    response.json({ ok: true, ...detail });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/suspended-practices/:id/suspend", async (request, response, next) => {
+  try {
+    const practice = await suspendPractice(request.params.id, request.body || {}, request.user, request);
+    if (!practice) return response.status(404).json({ error: "Atto non trovato" });
+    response.json({ ok: true, message: "Pratica spostata tra le pratiche sospese.", practice });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/suspended-practices/:id/resume", async (request, response, next) => {
+  try {
+    const practice = await resumeSuspendedPractice(request.params.id, request.body || {}, request.user, request);
+    if (!practice) return response.status(404).json({ error: "Pratica sospesa non trovata" });
+    response.json({ ok: true, message: "Pratica riaperta per correzione.", practice });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/suspended-practices/:id/resolve-check", async (request, response, next) => {
+  try {
+    const result = await resolveSuspendedPractice(request.params.id, request.body || {}, request.user, request);
+    if (!result) return response.status(404).json({ error: "Pratica sospesa non trovata" });
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/suspended-practices/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteSuspendedPractice(request.params.id, request.user, request);
+    if (!deleted) return response.status(404).json({ error: "Pratica sospesa non trovata" });
+    response.json({ ok: true, message: "Pratica sospesa eliminata." });
   } catch (error) {
     next(error);
   }

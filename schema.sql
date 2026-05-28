@@ -68,6 +68,12 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS quality_check_updated_at TIMES
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS approval_status TEXT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS approval_request_id BIGINT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS approval_required_at TIMESTAMPTZ;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS suspended_reason TEXT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS suspended_reasons JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS suspended_by BIGINT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS resumed_at TIMESTAMPTZ;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS resumed_by BIGINT;
 
 UPDATE atti_vendita
 SET completed_at = COALESCE(completed_at, updated_at, created_at, NOW())
@@ -104,6 +110,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS atti_vendita_practice_number_active_unique
       OR COALESCE(status, '') ILIKE 'archived_incomplete'
       OR COALESCE(status, '') ILIKE 'Archiviata'
       OR COALESCE(status, '') ILIKE 'pending_approval'
+      OR COALESCE(status, '') ILIKE 'suspended'
+      OR COALESCE(status, '') ILIKE 'sospesa'
       OR COALESCE(status, '') ILIKE 'approval_approved'
       OR COALESCE(status, '') ILIKE 'approval_rejected'
     );
@@ -129,6 +137,14 @@ CREATE INDEX IF NOT EXISTS atti_vendita_store_code_idx
 CREATE INDEX IF NOT EXISTS atti_vendita_status_idx
   ON atti_vendita (status);
 
+CREATE INDEX IF NOT EXISTS atti_vendita_suspended_status_idx
+  ON atti_vendita (status, suspended_at DESC)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS atti_vendita_suspended_store_idx
+  ON atti_vendita (negozio_id, suspended_at DESC)
+  WHERE deleted_at IS NULL;
+
 CREATE INDEX IF NOT EXISTS atti_vendita_completed_real_idx
   ON atti_vendita (store_code, act_year, act_number)
   WHERE deleted_at IS NULL
@@ -150,6 +166,26 @@ CREATE INDEX IF NOT EXISTS atti_vendita_operatore_id_idx
 
 CREATE INDEX IF NOT EXISTS atti_vendita_payload_idx
   ON atti_vendita USING GIN (payload);
+
+CREATE TABLE IF NOT EXISTS suspended_practice_logs (
+  id BIGSERIAL PRIMARY KEY,
+  sale_deed_id BIGINT NOT NULL REFERENCES atti_vendita(id) ON DELETE CASCADE,
+  user_id BIGINT NULL,
+  action TEXT NOT NULL,
+  reason TEXT,
+  reasons JSONB DEFAULT '[]'::jsonb,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_suspended_practice_logs_sale_deed_id
+  ON suspended_practice_logs (sale_deed_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_suspended_practice_logs_action
+  ON suspended_practice_logs (action);
+
+CREATE INDEX IF NOT EXISTS idx_suspended_practice_logs_created_at
+  ON suspended_practice_logs (created_at DESC);
 
 CREATE TABLE IF NOT EXISTS negozi (
   id BIGSERIAL PRIMARY KEY,
