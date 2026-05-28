@@ -666,7 +666,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /trust-pack-1/);
+  assert.match(worker, /training-mode-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -719,7 +719,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /trust-pack-1/);
+  assert.match(worker, /training-mode-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -771,7 +771,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /trust-pack-1/);
+  assert.match(worker, /training-mode-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -841,9 +841,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260528-trust-pack-1/);
-  assert.match(index, /styles\.css\?v=20260528-trust-pack-1/);
-  assert.match(worker, /trust-pack-1/);
+  assert.match(index, /app\.js\?v=20260528-training-mode-1/);
+  assert.match(index, /styles\.css\?v=20260528-training-mode-1/);
+  assert.match(worker, /training-mode-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -950,7 +950,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /trust-pack-1/);
+  assert.match(worker, /training-mode-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -1001,9 +1001,86 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260528-trust-pack-1/);
-  assert.match(index, /styles\.css\?v=20260528-trust-pack-1/);
-  assert.match(worker, /trust-pack-1/);
+  assert.match(index, /app\.js\?v=20260528-training-mode-1/);
+  assert.match(index, /styles\.css\?v=20260528-training-mode-1/);
+  assert.match(worker, /training-mode-1/);
+});
+
+test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
+  const [index, app, server, schema, migration, styles, worker] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260528_operator_training_mode.sql"),
+    file("styles.css"),
+    file("service-worker.js")
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS training_scenarios/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS training_sessions/);
+  assert.match(schema, /user_id BIGINT NOT NULL/);
+  assert.match(schema, /idx_training_sessions_user_id/);
+  assert.match(schema, /idx_training_sessions_started_at/);
+  assert.match(migration, /cliente_standard/);
+  assert.match(migration, /documento_scaduto/);
+  assert.match(migration, /contabile_mancante/);
+  assert.match(migration, /limite_contanti/);
+  assert.match(migration, /alto_rischio/);
+  assert.match(migration, /firme_mancanti/);
+  assert.match(migration, /preziosi_incompleti/);
+  assert.match(migration, /training_completo/);
+
+  assert.match(server, /operatorTrainingScenarioBlueprints/);
+  assert.match(server, /async function startOperatorTrainingSession/);
+  assert.match(server, /function evaluateTrainingSession/);
+  assert.match(server, /async function completeOperatorTrainingSession/);
+  assert.match(server, /app\.get\("\/api\/training\/scenarios"/);
+  assert.match(server, /app\.post\("\/api\/training\/start"/);
+  assert.match(server, /app\.get\("\/api\/training\/session\/:id"/);
+  assert.match(server, /app\.post\("\/api\/training\/session\/:id\/save-progress"/);
+  assert.match(server, /app\.post\("\/api\/training\/session\/:id\/complete"/);
+  assert.match(server, /app\.get\("\/api\/training\/my-results"/);
+  assert.match(server, /app\.get\("\/api\/training\/team-results"/);
+  assert.match(server, /app\.get\("\/api\/training\/results\/:id"/);
+  assert.match(server, /training_started/);
+  assert.match(server, /training_completed/);
+  assert.match(server, /training_passed/);
+  assert.match(server, /training_failed/);
+  assert.match(server, /academy_practical_training: true/);
+  assert.match(server, /no_real_sale_deed: true/);
+  assert.match(server, /no_crm_update: true/);
+  assert.match(server, /no_stock_update: true/);
+  assert.match(server, /no_real_trust_pack: true/);
+  const trainingBackendStart = server.indexOf("async function startOperatorTrainingSession");
+  const trainingBackendEnd = server.indexOf("async function crmClients", trainingBackendStart);
+  const trainingBackendBlock = server.slice(trainingBackendStart, trainingBackendEnd);
+  assert.doesNotMatch(trainingBackendBlock, /INSERT INTO atti_vendita|INSERT INTO clienti|INSERT INTO fusion/i);
+  assert.doesNotMatch(trainingBackendBlock, /generateCustomerTrustPack|completeSaleDeed|updateStock/i);
+
+  assert.match(index, /data-course-tab="operatorTraining">Training Operatore/);
+  assert.match(index, /data-course-tab-shortcut="operatorTraining"/);
+  assert.match(app, /operatorTrainingResults: \[\]/);
+  assert.match(app, /function renderOperatorTraining/);
+  assert.match(app, /function currentTrainingFormData/);
+  assert.match(app, /async function startOperatorTraining/);
+  assert.match(app, /async function saveOperatorTrainingProgress/);
+  assert.match(app, /async function completeOperatorTraining/);
+  assert.match(app, /async function openOperatorTrainingResult/);
+  assert.match(app, /apiRequest\("\/training\/start"/);
+  assert.match(app, /apiRequest\("\/training\/scenarios"/);
+  assert.match(app, /apiRequest\("\/training\/my-results"/);
+  assert.match(app, /apiRequest\("\/training\/team-results"/);
+  assert.match(app, /data-start-operator-training/);
+  assert.match(app, /data-complete-operator-training/);
+  assert.match(app, /MODALITÀ TRAINING — dati simulati/);
+  assert.match(app, /Questa pratica non crea atti reali, clienti CRM, giacenza, fusioni, PDF cliente o Trust Pack reali/);
+
+  assert.match(styles, /\.operator-training-shell/);
+  assert.match(styles, /\.training-mode-badge/);
+  assert.match(styles, /\.operator-training-live/);
+  assert.match(styles, /\.operator-training-result\.passed/);
+  assert.match(worker, /training-mode-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {

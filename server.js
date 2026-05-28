@@ -495,7 +495,11 @@ function auditActionLabel(action = "") {
     customer_trust_pack_downloaded: "Download Customer Trust Pack",
     customer_trust_pack_sent_email: "Customer Trust Pack inviato email",
     customer_trust_pack_sent_whatsapp: "Customer Trust Pack WhatsApp preparato",
-    customer_trust_pack_regenerated: "Customer Trust Pack rigenerato"
+    customer_trust_pack_regenerated: "Customer Trust Pack rigenerato",
+    training_started: "Training operatore avviato",
+    training_completed: "Training operatore completato",
+    training_passed: "Training operatore superato",
+    training_failed: "Training operatore non superato"
   }[action] || activityLabel(action) || "Attività";
 }
 
@@ -7337,6 +7341,9 @@ function normalizeNotificationType(type = "system") {
     "audit_critical",
     "academy_course_assigned",
     "academy_course_completed",
+    "training_completed",
+    "training_passed",
+    "training_failed",
     "aurum_support_request",
     "suspended_practice_created",
     "suspended_practice_resolved",
@@ -9772,6 +9779,527 @@ async function saveTrainingResult(input = {}, user = {}) {
     status: input.completed ? "completato" : "in corso",
     materials_completed: input.payload?.materials_completed || 0
   }, user);
+}
+
+function trainingDatePlus(days = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + Number(days || 0));
+  return date.toISOString().slice(0, 10);
+}
+
+const operatorTrainingScenarioBlueprints = {
+  cliente_standard: {
+    title: "Cliente standard — atto semplice",
+    description: "Cliente demo completo, documento valido, bonifico e rischio basso.",
+    difficulty: "base",
+    duration: "12 min",
+    objective: "Esercitarsi su una pratica lineare senza errori bloccanti.",
+    aurumTip: "Scenario semplice: controlla comunque documento, contabile e firme prima di completare.",
+    demoData: {
+      name: "Mario Demo",
+      surname: "Rossi Training",
+      fiscalCode: "RSSMRA80A01H501U",
+      birthDate: "1980-01-01",
+      birthPlace: "Roma",
+      birthProvince: "RM",
+      address: "Via Formazione 1",
+      residenceProvince: "VA",
+      phone: "3330000000",
+      documentType: "Carta identità demo",
+      documentNumber: "DEMO123456",
+      documentExpiry: trainingDatePlus(365),
+      paymentMethod: "Bonifico",
+      amount: 320,
+      receiptUploaded: true,
+      preciousDescription: "Anello demo",
+      metal: "Oro",
+      title: "18kt",
+      weight: 5.2,
+      signaturesComplete: true,
+      qualityCheckDone: false,
+      riskAcknowledged: false,
+      authorizationRequested: false,
+      trustPackDemoPrepared: false
+    }
+  },
+  documento_scaduto: {
+    title: "Documento scaduto",
+    description: "Documento demo con scadenza passata: l’operatore deve correggerlo prima di completare.",
+    difficulty: "intermedio",
+    duration: "10 min",
+    objective: "Riconoscere un documento scaduto e bloccare o correggere la pratica.",
+    aurumTip: "Il rischio nascosto è nella scadenza documento: non completare finché non è valida.",
+    demoData: { documentExpiry: trainingDatePlus(-45), paymentMethod: "Bonifico", amount: 280, receiptUploaded: true, signaturesComplete: true }
+  },
+  contabile_mancante: {
+    title: "Contabile mancante",
+    description: "Pagamento bonifico senza contabile: il controllo qualità deve bloccare finché non viene caricata.",
+    difficulty: "intermedio",
+    duration: "10 min",
+    objective: "Gestire correttamente la prova di pagamento tracciabile.",
+    aurumTip: "Bonifico senza contabile non è completabile: carica una contabile demo prima di chiudere.",
+    demoData: { paymentMethod: "Bonifico", amount: 450, receiptUploaded: false, signaturesComplete: true }
+  },
+  limite_contanti: {
+    title: "Limite contanti",
+    description: "Pagamento contanti vicino o sopra soglia con warning Aurum Shield demo.",
+    difficulty: "avanzato",
+    duration: "15 min",
+    objective: "Riconoscere limiti contanti e warning compliance.",
+    aurumTip: "Controlla il limite contanti configurato: se sei vicino o sopra soglia serve attenzione superiore.",
+    demoData: { paymentMethod: "Contanti", amount: 520, receiptUploaded: false, signaturesComplete: true, riskAcknowledged: false }
+  },
+  alto_rischio: {
+    title: "Pratica ad alto rischio",
+    description: "Cliente demo con operazioni ravvicinate simulate e richiesta autorizzazione formativa.",
+    difficulty: "avanzato",
+    duration: "18 min",
+    objective: "Gestire Aurum Shield alto rischio e autorizzazione simulata.",
+    aurumTip: "Questo scenario richiede autorizzazione simulata: non trattarlo come una pratica normale.",
+    demoData: { paymentMethod: "Contanti", amount: 490, receiptUploaded: false, signaturesComplete: true, riskAcknowledged: false, authorizationRequested: false }
+  },
+  firme_mancanti: {
+    title: "Firme mancanti",
+    description: "Atto quasi completo con firme cliente mancanti.",
+    difficulty: "base",
+    duration: "8 min",
+    objective: "Controllare tutte le firme prima del completamento.",
+    aurumTip: "Le firme sono il punto centrale di questo caso: completa firma vendita, dichiarazioni e privacy.",
+    demoData: { paymentMethod: "Bonifico", amount: 260, receiptUploaded: true, signaturesComplete: false }
+  },
+  preziosi_incompleti: {
+    title: "Preziosi incompleti",
+    description: "Oggetto prezioso demo senza peso o caratura.",
+    difficulty: "intermedio",
+    duration: "10 min",
+    objective: "Completare descrizione, metallo, titolo e peso degli oggetti.",
+    aurumTip: "Un prezioso senza peso o titolo non alimenta correttamente la pratica, nemmeno in training.",
+    demoData: { paymentMethod: "Bonifico", amount: 350, receiptUploaded: true, title: "", weight: 0, signaturesComplete: true }
+  },
+  training_completo: {
+    title: "Training completo",
+    description: "Percorso end-to-end con cliente, documenti, preziosi, pagamento, firme, qualità e Trust Pack demo.",
+    difficulty: "master",
+    duration: "25 min",
+    objective: "Simulare una pratica completa senza effetti reali.",
+    aurumTip: "Completa tutto e prepara solo il Trust Pack demo: nessun PDF o invio reale viene creato.",
+    demoData: { paymentMethod: "Bonifico", amount: 680, receiptUploaded: false, signaturesComplete: false, trustPackDemoPrepared: false }
+  }
+};
+
+function operatorTrainingBaseDemoData() {
+  return {
+    trainingMode: true,
+    practiceNumber: "TRAINING-DEMO-NON-REALE",
+    store: "Negozio Training",
+    name: "Mario Demo",
+    surname: "Rossi Training",
+    fiscalCode: "RSSMRA80A01H501U",
+    birthDate: "1980-01-01",
+    birthPlace: "Roma",
+    birthProvince: "RM",
+    address: "Via Formazione 1",
+    residenceProvince: "VA",
+    phone: "3330000000",
+    documentType: "Carta identità demo",
+    documentNumber: "DEMO123456",
+    documentExpiry: trainingDatePlus(365),
+    paymentMethod: "Bonifico",
+    amount: 300,
+    receiptUploaded: true,
+    preciousDescription: "Bracciale demo",
+    metal: "Oro",
+    title: "18kt",
+    weight: 6,
+    signaturesComplete: true,
+    qualityCheckDone: false,
+    riskAcknowledged: false,
+    authorizationRequested: false,
+    trustPackDemoPrepared: false
+  };
+}
+
+function operatorTrainingScenario(id = "") {
+  const scenario = operatorTrainingScenarioBlueprints[id] || operatorTrainingScenarioBlueprints.cliente_standard;
+  return {
+    id: Object.keys(operatorTrainingScenarioBlueprints).includes(id) ? id : "cliente_standard",
+    ...scenario,
+    demoData: { ...operatorTrainingBaseDemoData(), ...(scenario.demoData || {}) }
+  };
+}
+
+function publicTrainingSession(row = {}) {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    store_id: row.store_id || null,
+    scenario_id: row.scenario_id,
+    scenario_title: row.scenario_title,
+    status: row.status || "started",
+    score: Number(row.score || 0),
+    max_score: Number(row.max_score || 100),
+    passed: Boolean(row.passed),
+    started_at: row.started_at || null,
+    completed_at: row.completed_at || null,
+    duration_seconds: Number(row.duration_seconds || 0),
+    feedback: row.feedback || {},
+    mistakes: row.mistakes || [],
+    completed_steps: row.completed_steps || [],
+    metadata: row.metadata || {},
+    user_name: [row.user_nome, row.user_cognome].filter(Boolean).join(" ") || row.username || "",
+    store_name: row.store_name || row.negozio || ""
+  };
+}
+
+async function listOperatorTrainingScenarios() {
+  const result = await pool.query(
+    "SELECT * FROM training_scenarios WHERE active = TRUE ORDER BY CASE difficulty WHEN 'base' THEN 1 WHEN 'intermedio' THEN 2 WHEN 'avanzato' THEN 3 WHEN 'master' THEN 4 ELSE 5 END, title ASC"
+  );
+  if (result.rowCount) {
+    return result.rows.map((row) => {
+      const blueprint = operatorTrainingScenario(row.id);
+      return {
+        id: row.id,
+        title: row.title,
+        description: row.description || blueprint.description,
+        difficulty: row.difficulty || blueprint.difficulty,
+        expected_steps: row.expected_steps || [],
+        duration: blueprint.duration,
+        objective: blueprint.objective,
+        aurum_tip: blueprint.aurumTip
+      };
+    });
+  }
+  return Object.entries(operatorTrainingScenarioBlueprints).map(([id, scenario]) => ({
+    id,
+    title: scenario.title,
+    description: scenario.description,
+    difficulty: scenario.difficulty,
+    expected_steps: [],
+    duration: scenario.duration,
+    objective: scenario.objective,
+    aurum_tip: scenario.aurumTip
+  }));
+}
+
+async function startOperatorTrainingSession(input = {}, user = {}, req = null) {
+  const scenario = operatorTrainingScenario(input.scenario_id || input.scenarioId);
+  const store = await storeForUser(user).catch(() => null);
+  const result = await pool.query(
+    `INSERT INTO training_sessions (
+      user_id, store_id, scenario_id, scenario_title, status, metadata
+    ) VALUES (
+      $1::bigint,$2::bigint,$3::text,$4::text,'started',$5::jsonb
+    )
+    RETURNING *`,
+    [
+      user.id,
+      store?.id || null,
+      scenario.id,
+      scenario.title,
+      sanitizeForPostgres({
+        training_mode: true,
+        demo_only: true,
+        no_real_sale_deed: true,
+        no_crm_update: true,
+        no_stock_update: true,
+        no_real_trust_pack: true,
+        scenario_objective: scenario.objective,
+        aurum_tip: scenario.aurumTip,
+        draft_data: scenario.demoData
+      })
+    ]
+  );
+  void writeAuditLog({
+    req,
+    user,
+    action: "training_started",
+    entityType: "training_session",
+    entityId: result.rows[0].id,
+    entityLabel: scenario.title,
+    metadata: { scenario_id: scenario.id, store_id: store?.id || null }
+  });
+  return { training_session: publicTrainingSession(result.rows[0]), demo_data: scenario.demoData };
+}
+
+function addTrainingMistake(mistakes, type, message, severity, points) {
+  mistakes.push({ type, message, severity, points });
+  return Number(points || 0);
+}
+
+function evaluateTrainingSession(session = {}, demoAttoData = {}) {
+  const data = { ...(session.metadata?.draft_data || {}), ...(demoAttoData || {}) };
+  const mistakes = [];
+  const strengths = [];
+  const improvements = [];
+  let penalty = 0;
+  let bonus = 0;
+  const missingClient = ["name", "surname", "fiscalCode", "birthDate", "birthPlace", "address"].filter((key) => !String(data[key] || "").trim());
+  if (missingClient.length) {
+    penalty += addTrainingMistake(mistakes, "missing_client_data", "Dati cliente demo incompleti.", "medium", 10);
+    improvements.push("Completa sempre anagrafica, nascita e residenza prima di procedere.");
+  } else {
+    strengths.push("Scheda cliente demo completa.");
+  }
+  if (!isValidItalianFiscalCode(data.fiscalCode || "")) {
+    penalty += addTrainingMistake(mistakes, "invalid_fiscal_code", "Codice fiscale demo mancante o non valido.", "medium", 10);
+  }
+  const expiry = data.documentExpiry ? new Date(data.documentExpiry) : null;
+  if (!expiry || Number.isNaN(expiry.getTime())) {
+    penalty += addTrainingMistake(mistakes, "missing_document_expiry", "Scadenza documento non inserita.", "high", 15);
+  } else if (expiry < new Date(new Date().toISOString().slice(0, 10))) {
+    penalty += addTrainingMistake(mistakes, "expired_document_not_fixed", "Documento scaduto non corretto prima del completamento.", "high", 25);
+    improvements.push("Blocca la pratica o aggiorna il documento quando la scadenza è passata.");
+  } else {
+    strengths.push("Documento demo valido.");
+  }
+  const paymentMethod = String(data.paymentMethod || "").toLowerCase();
+  const amount = numberFrom(data.amount);
+  if (!paymentMethod || amount <= 0) {
+    penalty += addTrainingMistake(mistakes, "invalid_payment", "Pagamento demo mancante o importo non valido.", "medium", 15);
+  }
+  if (paymentMethod.includes("bonifico") && !data.receiptUploaded) {
+    penalty += addTrainingMistake(mistakes, "missing_receipt", "Hai dimenticato la contabile del bonifico.", "medium", 15);
+    improvements.push("Quando il pagamento è bonifico, carica sempre la contabile prima di completare.");
+  }
+  if (paymentMethod.includes("contanti") && amount >= CASH_PAYMENT_LIMIT && !data.riskAcknowledged && !data.authorizationRequested) {
+    penalty += addTrainingMistake(mistakes, "cash_limit_ignored", "Limite contanti o warning compliance non gestito.", "high", 20);
+    improvements.push("Davanti a un warning contanti, riconosci il rischio o richiedi verifica superiore.");
+  }
+  if (!String(data.preciousDescription || "").trim() || !String(data.metal || "").trim() || !String(data.title || "").trim() || numberFrom(data.weight) <= 0) {
+    penalty += addTrainingMistake(mistakes, "incomplete_precious_item", "Oggetto prezioso demo incompleto: descrizione, metallo, titolo o peso mancanti.", "medium", 15);
+  } else {
+    strengths.push("Oggetto prezioso demo completo.");
+  }
+  if (!data.signaturesComplete) {
+    penalty += addTrainingMistake(mistakes, "missing_signature", "Firme demo mancanti.", "high", 20);
+  } else {
+    strengths.push("Firme demo complete.");
+  }
+  if (["alto_rischio", "limite_contanti"].includes(session.scenario_id) && !data.riskAcknowledged) {
+    penalty += addTrainingMistake(mistakes, "aurum_risk_ignored", "Aurum Shield demo non è stato considerato.", "high", 20);
+  }
+  if (session.scenario_id === "alto_rischio" && !data.authorizationRequested) {
+    penalty += addTrainingMistake(mistakes, "missing_training_approval", "Richiesta autorizzazione simulata non inviata per pratica ad alto rischio.", "high", 20);
+  }
+  if (data.qualityCheckDone) {
+    bonus += 5;
+    strengths.push("Controllo qualità demo eseguito correttamente.");
+  } else {
+    improvements.push("Esegui sempre il controllo qualità prima del completamento.");
+  }
+  if (!mistakes.some((mistake) => mistake.severity === "high")) bonus += 5;
+  if (data.aurumHelpUsed) bonus += 5;
+  if (session.scenario_id === "training_completo" && data.trustPackDemoPrepared) {
+    bonus += 3;
+    strengths.push("Trust Pack demo preparato senza generare documenti reali.");
+  }
+  const score = Math.max(0, Math.min(100, 100 - penalty + bonus));
+  const passed = score >= 75;
+  return {
+    score,
+    passed,
+    mistakes,
+    completed_steps: [
+      data.qualityCheckDone ? "controllo_qualita_demo" : null,
+      data.riskAcknowledged ? "aurum_shield_demo" : null,
+      data.authorizationRequested ? "autorizzazione_simulata" : null,
+      data.trustPackDemoPrepared ? "trust_pack_demo" : null
+    ].filter(Boolean),
+    feedback: {
+      summary: passed
+        ? `Training superato con ${score}/100.`
+        : `Training non superato: punteggio ${score}/100. Ripeti lo scenario dopo le correzioni.`,
+      strengths,
+      improvements: improvements.length ? improvements : ["Mantieni lo stesso livello di attenzione anche nelle pratiche reali."],
+      aurum: passed
+        ? `Training completato. Hai ottenuto ${score}/100: buona gestione della pratica demo.`
+        : `Training completato con ${score}/100. Rivedi gli errori indicati prima di riprovare.`
+    },
+    sanitized_demo_data: sanitizeForPostgres({
+      training_mode: true,
+      scenario_id: session.scenario_id,
+      fields_checked: Object.keys(data).filter((key) => !/fiscal|documentNumber|phone/i.test(key)),
+      demo_only: true
+    })
+  };
+}
+
+async function trainingSessionById(id, user = {}) {
+  const result = await pool.query(
+    `SELECT ts.*, u.nome AS user_nome, u.cognome AS user_cognome, u.username, u.negozio, n.nome AS store_name
+     FROM training_sessions ts
+     LEFT JOIN utenti u ON u.id = ts.user_id
+     LEFT JOIN negozi n ON n.id = ts.store_id
+     WHERE ts.id::text = $1::text
+     LIMIT 1`,
+    [String(id || "")]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  if (!(await canViewAcademyUser(row.user_id, user))) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  return row;
+}
+
+async function saveOperatorTrainingProgress(id, input = {}, user = {}) {
+  const row = await trainingSessionById(id, user);
+  if (!row) return null;
+  if (String(row.user_id) !== String(user.id)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const metadata = {
+    ...(row.metadata || {}),
+    draft_data: sanitizeForPostgres(input.demo_data || input.demoData || {}),
+    last_progress_at: new Date().toISOString(),
+    demo_only: true,
+    no_real_sale_deed: true
+  };
+  const result = await pool.query(
+    `UPDATE training_sessions
+     SET status = 'in_progress',
+         completed_steps = $2::jsonb,
+         metadata = $3::jsonb
+     WHERE id = $1::uuid
+     RETURNING *`,
+    [row.id, sanitizeForPostgres(input.completed_steps || input.completedSteps || []), sanitizeForPostgres(metadata)]
+  );
+  return publicTrainingSession(result.rows[0]);
+}
+
+async function completeOperatorTrainingSession(id, input = {}, user = {}, req = null) {
+  const row = await trainingSessionById(id, user);
+  if (!row) return null;
+  if (String(row.user_id) !== String(user.id)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const evaluation = evaluateTrainingSession(row, input.demo_data || input.demoData || {});
+  const completedAt = new Date();
+  const durationSeconds = Math.max(0, Math.round((completedAt.getTime() - new Date(row.started_at).getTime()) / 1000));
+  const result = await pool.query(
+    `UPDATE training_sessions
+     SET status = $2::text,
+         score = $3::integer,
+         passed = $4::boolean,
+         completed_at = NOW(),
+         duration_seconds = $5::integer,
+         feedback = $6::jsonb,
+         mistakes = $7::jsonb,
+         completed_steps = $8::jsonb,
+         metadata = COALESCE(metadata, '{}'::jsonb) || $9::jsonb
+     WHERE id = $1::uuid
+     RETURNING *`,
+    [
+      row.id,
+      evaluation.passed ? "completed" : "failed",
+      evaluation.score,
+      evaluation.passed,
+      durationSeconds,
+      sanitizeForPostgres(evaluation.feedback),
+      sanitizeForPostgres(evaluation.mistakes),
+      sanitizeForPostgres(evaluation.completed_steps),
+      sanitizeForPostgres({ evaluation: evaluation.sanitized_demo_data, academy_practical_training: true })
+    ]
+  );
+  await pool.query(
+    `INSERT INTO training_results (user_id, course_id, score, completed, completed_at, payload)
+     VALUES ($1::bigint,NULL,$2::numeric,$3::boolean,NOW(),$4::jsonb)`,
+    [
+      user.id,
+      evaluation.score,
+      evaluation.passed,
+      sanitizeForPostgres({
+        operator_training_session_id: row.id,
+        scenario_id: row.scenario_id,
+        scenario_title: row.scenario_title,
+        academy_practical_training: true,
+        demo_only: true
+      })
+    ]
+  ).catch(() => null);
+  void writeAuditLog({
+    req,
+    user,
+    action: "training_completed",
+    entityType: "training_session",
+    entityId: row.id,
+    entityLabel: row.scenario_title,
+    metadata: { scenario_id: row.scenario_id, score: evaluation.score, passed: evaluation.passed }
+  });
+  void writeAuditLog({
+    req,
+    user,
+    action: evaluation.passed ? "training_passed" : "training_failed",
+    entityType: "training_session",
+    entityId: row.id,
+    entityLabel: row.scenario_title,
+    metadata: { scenario_id: row.scenario_id, score: evaluation.score, passed: evaluation.passed }
+  });
+  void createNotification({
+    userId: user.id,
+    title: evaluation.passed ? "Training superato" : "Training da ripetere",
+    message: `${row.scenario_title}: ${evaluation.score}/100.`,
+    type: evaluation.passed ? "training_passed" : "training_failed",
+    severity: evaluation.passed ? "success" : "warning",
+    entityType: "training_session",
+    entityId: row.id,
+    actionUrl: "#training",
+    createdBy: user.id,
+    actor: user,
+    req,
+    metadata: { scenario_id: row.scenario_id, score: evaluation.score, passed: evaluation.passed }
+  });
+  if (!evaluation.passed && row.store_id) {
+    void createNotification({
+      targetRole: "responsabile",
+      storeId: row.store_id,
+      title: "Training operatore non superato",
+      message: `${auditUserName(user)} ha completato ${row.scenario_title} con ${evaluation.score}/100.`,
+      type: "training_failed",
+      severity: "warning",
+      entityType: "training_session",
+      entityId: row.id,
+      actionUrl: "#training",
+      createdBy: user.id,
+      actor: user,
+      req,
+      metadata: { scenario_id: row.scenario_id, score: evaluation.score, passed: false }
+    });
+  }
+  return publicTrainingSession({ ...result.rows[0], user_nome: user.nome, user_cognome: user.cognome, username: user.username });
+}
+
+async function listOperatorTrainingResults(user = {}, query = {}) {
+  const values = [];
+  const where = [];
+  const role = normalizeRole(user.ruolo);
+  if (query.mine === true || query.mine === "true" || !["founder", "supervisore", "responsabile"].includes(role)) {
+    values.push(user.id);
+    where.push(`ts.user_id = $${values.length}::bigint`);
+  } else if (role === "responsabile") {
+    const store = await storeForUser(user);
+    if (!store) return [];
+    values.push(store.id);
+    where.push(`ts.store_id = $${values.length}::bigint`);
+  }
+  const result = await pool.query(
+    `SELECT ts.*, u.nome AS user_nome, u.cognome AS user_cognome, u.username, u.negozio, n.nome AS store_name
+     FROM training_sessions ts
+     LEFT JOIN utenti u ON u.id = ts.user_id
+     LEFT JOIN negozi n ON n.id = ts.store_id
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY ts.started_at DESC
+     LIMIT 100`,
+    values
+  );
+  return result.rows.map(publicTrainingSession);
 }
 
 async function crmClients(user = {}, query = {}) {
@@ -12847,6 +13375,79 @@ app.get("/api/corsi/certificati/:id/pdf", async (request, response, next) => {
   }
 });
 
+app.get("/api/training/scenarios", async (_request, response, next) => {
+  try {
+    response.json({ ok: true, scenarios: await listOperatorTrainingScenarios() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/training/start", async (request, response, next) => {
+  try {
+    const training = await startOperatorTrainingSession(request.body || {}, request.user, request);
+    response.status(201).json({ ok: true, ...training });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/training/session/:id", async (request, response, next) => {
+  try {
+    const row = await trainingSessionById(request.params.id, request.user);
+    if (!row) return response.status(404).json({ error: "Training non trovato" });
+    response.json({ ok: true, training_session: publicTrainingSession(row), demo_data: row.metadata?.draft_data || null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/training/session/:id/save-progress", async (request, response, next) => {
+  try {
+    const session = await saveOperatorTrainingProgress(request.params.id, request.body || {}, request.user);
+    if (!session) return response.status(404).json({ error: "Training non trovato" });
+    response.json({ ok: true, training_session: session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/training/session/:id/complete", async (request, response, next) => {
+  try {
+    const session = await completeOperatorTrainingSession(request.params.id, request.body || {}, request.user, request);
+    if (!session) return response.status(404).json({ error: "Training non trovato" });
+    response.json({ ok: true, training_session: session, feedback: session.feedback, mistakes: session.mistakes });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/training/my-results", async (request, response, next) => {
+  try {
+    response.json({ ok: true, results: await listOperatorTrainingResults(request.user, { mine: true }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/training/team-results", async (request, response, next) => {
+  try {
+    response.json({ ok: true, results: await listOperatorTrainingResults(request.user, { team: true }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/training/results/:id", async (request, response, next) => {
+  try {
+    const row = await trainingSessionById(request.params.id, request.user);
+    if (!row) return response.status(404).json({ error: "Training non trovato" });
+    response.json({ ok: true, result: publicTrainingSession(row) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/training", async (request, response, next) => {
   try {
     response.json(await listTraining(request.user));
@@ -14363,6 +14964,7 @@ function friendlyDatabaseError(error, request) {
   if (/\/api\/(utenti|users)/.test(url)) return "Errore database durante il salvataggio dell'utente.";
   if (url.includes("/api/aurum")) return "Errore database durante il salvataggio Aurum.";
   if (url.includes("/api/atti") || url.includes("/api/acts")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
+  if (url.includes("/api/training")) return "Errore database durante il Training Operatore.";
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Errore database durante il salvataggio Academy.";
   if (url.includes("/api/crm")) return "Errore database durante il salvataggio CRM.";
   if (url.includes("/api/customer-trust-pack")) return "Errore database durante il Customer Trust Pack.";
@@ -14387,6 +14989,7 @@ function safeRouteErrorMessage(request) {
   if (url.includes("/api/customer-trust-pack")) return "Customer Trust Pack non completato.";
   if (url.includes("/api/founder-daily-report")) return "Founder Daily Report non completato.";
   if (url.includes("/api/backups")) return "Operazione backup non completata.";
+  if (url.includes("/api/training")) return "Training Operatore non completato.";
   if (url.includes("/api/store-health")) return "Salute Negozio non caricata.";
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Operazione Academy non completata.";
   if (url.includes("/api/crm") || url.includes("/api/clienti")) return "Operazione CRM non completata.";

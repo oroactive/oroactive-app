@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260528-trust-pack-1";
+const STATIC_CACHE = "oroactive-static-v20260528-training-mode-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260528-trust-pack-1",
-  "/app.js?v=20260528-trust-pack-1",
+  "/styles.css?v=20260528-training-mode-1",
+  "/app.js?v=20260528-training-mode-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

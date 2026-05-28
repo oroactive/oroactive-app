@@ -52,6 +52,11 @@ const state = {
   founderReport: null,
   antifraudAlerts: [],
   trainingCourses: [],
+  trainingScenarios: [],
+  operatorTrainingResults: [],
+  operatorTeamTrainingResults: [],
+  activeTrainingSession: null,
+  activeTrainingData: null,
   courseFaculties: [],
   courseCategories: [],
   courseSections: [],
@@ -275,6 +280,16 @@ const OROACTIVE_APP_GUIDE = {
     checks: ["materiali validi", "corso attivo", "permesso gestione Academy"],
     commonErrors: ["file non valido", "corso non trovato", "permesso insufficiente"],
     permissions: ["commesso", "responsabile", "supervisore", "founder"]
+  },
+  training_operatore: {
+    title: "Training Operatore",
+    description: "Ambiente demo per esercitarsi nella compilazione di un atto senza creare dati reali.",
+    fields: ["scenario", "atto demo", "controllo qualità demo", "Aurum Shield demo", "punteggio", "feedback"],
+    actions: ["avvia training", "salva progresso demo", "completa training", "rivedi errori"],
+    steps: ["Scegli uno scenario", "Avvia training", "Correggi i dati demo", "Esegui controllo qualità", "Gestisci rischio demo", "Completa e leggi feedback Aurum"],
+    checks: ["nessun atto reale", "nessun CRM reale", "nessuna giacenza reale", "nessun Trust Pack reale"],
+    commonErrors: ["documento scaduto non corretto", "contabile mancante", "firme mancanti", "rischio ignorato"],
+    permissions: ["aiuto_commesso", "commesso", "responsabile", "supervisore", "founder"]
   },
   backup: {
     title: "Backup",
@@ -722,6 +737,7 @@ const trainingList = document.getElementById("trainingList");
 const courseSummary = document.getElementById("courseSummary");
 const courseSearch = document.getElementById("courseSearch");
 const courseCategoryFilter = document.getElementById("courseCategoryFilter");
+const courseToolbar = document.querySelector(".course-toolbar");
 const trainingCourseReset = document.getElementById("trainingCourseReset");
 const trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
 const trainingCourseFile = document.getElementById("trainingCourseFile");
@@ -1122,6 +1138,7 @@ function apiErrorFallback(path = "", status = 0) {
   if (/\/store-health/.test(path)) return "Salute Negozio non caricata.";
   if (/\/founder-daily-report/.test(path)) return "Founder Daily Report non completato.";
   if (/\/backups/.test(path)) return "Operazione backup non completata.";
+  if (/\/training/.test(path)) return "Training Operatore non completato.";
   if (/\/academy|\/corsi/.test(path)) return "Operazione Academy non completata.";
   if (/\/crm|\/clienti/.test(path)) return "Operazione CRM non completata.";
   if (/\/aurum-shield|\/quality-check/.test(path)) return "Controllo pratica non completato.";
@@ -4989,6 +5006,10 @@ function auditActionLabel(action = "") {
     customer_trust_pack_sent_email: "Customer Trust Pack inviato email",
     customer_trust_pack_sent_whatsapp: "Customer Trust Pack WhatsApp preparato",
     customer_trust_pack_regenerated: "Customer Trust Pack rigenerato",
+    training_started: "Training operatore avviato",
+    training_completed: "Training operatore completato",
+    training_passed: "Training operatore superato",
+    training_failed: "Training operatore non superato",
     api_request_error: "Errore API"
   }[action] || action.replace(/_/g, " ") || "Attività";
 }
@@ -6678,15 +6699,195 @@ function renderCourseSummary() {
   courseSummary.innerHTML = `<span>Livello ${escapeHtml(operatorAcademyLevel())}</span><strong>${average}%</strong><small>Completamento medio</small>`;
 }
 
+function trainingDifficultyLabel(difficulty = "") {
+  return {
+    base: "Base",
+    intermedio: "Intermedio",
+    avanzato: "Avanzato",
+    master: "Master"
+  }[String(difficulty || "").toLowerCase()] || "Base";
+}
+
+function renderTrainingScenarioCard(scenario = {}) {
+  return `
+    <article class="operator-training-card">
+      <div>
+        <span class="training-mode-badge">${escapeHtml(trainingDifficultyLabel(scenario.difficulty))}</span>
+        <h3>${escapeHtml(scenario.title || "Scenario Training")}</h3>
+        <p>${escapeHtml(scenario.description || "")}</p>
+        <small>Durata stimata ${escapeHtml(scenario.duration || "10 min")} · ${escapeHtml(scenario.objective || "Esercitazione operativa")}</small>
+      </div>
+      <div class="training-card-actions">
+        <button class="primary-button" type="button" data-start-operator-training="${escapeHtml(scenario.id)}">Avvia training</button>
+      </div>
+    </article>
+  `;
+}
+
+function trainingResultRow(result = {}) {
+  const passed = result.passed === true;
+  return `
+    <article class="operator-training-result ${passed ? "passed" : "failed"}">
+      <span>${escapeHtml(formatDateTime(result.completed_at || result.started_at || ""))}</span>
+      <strong>${escapeHtml(result.scenario_title || "Training Operatore")}</strong>
+      <em>${Number(result.score || 0)}/${Number(result.max_score || 100)} · ${passed ? "Superato" : "Da ripetere"}</em>
+      <button type="button" data-open-training-result="${escapeHtml(String(result.id))}">Dettaglio</button>
+    </article>
+  `;
+}
+
+function trainingFormValue(name) {
+  const element = document.querySelector(`[data-training-field="${name}"]`);
+  if (!element) return "";
+  if (element.type === "checkbox") return element.checked;
+  return element.value;
+}
+
+function currentTrainingFormData() {
+  return {
+    name: trainingFormValue("name"),
+    surname: trainingFormValue("surname"),
+    fiscalCode: trainingFormValue("fiscalCode"),
+    birthDate: trainingFormValue("birthDate"),
+    birthPlace: trainingFormValue("birthPlace"),
+    birthProvince: trainingFormValue("birthProvince"),
+    address: trainingFormValue("address"),
+    residenceProvince: trainingFormValue("residenceProvince"),
+    documentType: trainingFormValue("documentType"),
+    documentNumber: trainingFormValue("documentNumber"),
+    documentExpiry: trainingFormValue("documentExpiry"),
+    paymentMethod: trainingFormValue("paymentMethod"),
+    amount: Number(trainingFormValue("amount") || 0),
+    receiptUploaded: trainingFormValue("receiptUploaded"),
+    preciousDescription: trainingFormValue("preciousDescription"),
+    metal: trainingFormValue("metal"),
+    title: trainingFormValue("title"),
+    weight: Number(trainingFormValue("weight") || 0),
+    signaturesComplete: trainingFormValue("signaturesComplete"),
+    qualityCheckDone: trainingFormValue("qualityCheckDone"),
+    riskAcknowledged: trainingFormValue("riskAcknowledged"),
+    authorizationRequested: trainingFormValue("authorizationRequested"),
+    aurumHelpUsed: trainingFormValue("aurumHelpUsed"),
+    trustPackDemoPrepared: trainingFormValue("trustPackDemoPrepared")
+  };
+}
+
+function renderActiveOperatorTraining() {
+  const session = state.activeTrainingSession;
+  const data = state.activeTrainingData || {};
+  if (!session) return "";
+  return `
+    <section class="operator-training-live" data-training-session="${escapeHtml(String(session.id))}">
+      <div class="training-live-header">
+        <span class="training-mode-badge">MODALITÀ TRAINING — dati simulati</span>
+        <div>
+          <h3>${escapeHtml(session.scenario_title || "Training Operatore")}</h3>
+          <p>Questa pratica non crea atti reali, clienti CRM, giacenza, fusioni, PDF cliente o Trust Pack reali.</p>
+        </div>
+      </div>
+      <div class="operator-training-grid">
+        <label>Nome demo <input data-training-field="name" value="${escapeHtml(data.name || "")}"></label>
+        <label>Cognome demo <input data-training-field="surname" value="${escapeHtml(data.surname || "")}"></label>
+        <label>Codice fiscale demo <input data-training-field="fiscalCode" value="${escapeHtml(data.fiscalCode || "")}"></label>
+        <label>Data nascita <input type="date" data-training-field="birthDate" value="${escapeHtml(data.birthDate || "")}"></label>
+        <label>Luogo nascita <input data-training-field="birthPlace" value="${escapeHtml(data.birthPlace || "")}"></label>
+        <label>Provincia nascita <input data-training-field="birthProvince" value="${escapeHtml(data.birthProvince || "")}"></label>
+        <label>Residenza <input data-training-field="address" value="${escapeHtml(data.address || "")}"></label>
+        <label>Provincia residenza <input data-training-field="residenceProvince" value="${escapeHtml(data.residenceProvince || "")}"></label>
+        <label>Tipo documento <input data-training-field="documentType" value="${escapeHtml(data.documentType || "")}"></label>
+        <label>Numero documento demo <input data-training-field="documentNumber" value="${escapeHtml(data.documentNumber || "")}"></label>
+        <label>Scadenza documento <input type="date" data-training-field="documentExpiry" value="${escapeHtml(data.documentExpiry || "")}"></label>
+        <label>Metodo pagamento
+          <select data-training-field="paymentMethod">
+            ${["Bonifico", "Contanti", "Assegno"].map((method) => `<option ${String(data.paymentMethod || "") === method ? "selected" : ""}>${method}</option>`).join("")}
+          </select>
+        </label>
+        <label>Importo demo <input type="number" min="0" step="0.01" data-training-field="amount" value="${escapeHtml(String(data.amount || 0))}"></label>
+        <label>Oggetto prezioso <input data-training-field="preciousDescription" value="${escapeHtml(data.preciousDescription || "")}"></label>
+        <label>Metallo <input data-training-field="metal" value="${escapeHtml(data.metal || "")}"></label>
+        <label>Titolo/caratura <input data-training-field="title" value="${escapeHtml(data.title || "")}"></label>
+        <label>Peso grammi <input type="number" min="0" step="0.01" data-training-field="weight" value="${escapeHtml(String(data.weight || 0))}"></label>
+      </div>
+      <div class="operator-training-checks">
+        <label class="inline-check"><input type="checkbox" data-training-field="receiptUploaded" ${data.receiptUploaded ? "checked" : ""}> Contabile demo caricata</label>
+        <label class="inline-check"><input type="checkbox" data-training-field="signaturesComplete" ${data.signaturesComplete ? "checked" : ""}> Firme demo complete</label>
+        <label class="inline-check"><input type="checkbox" data-training-field="qualityCheckDone" ${data.qualityCheckDone ? "checked" : ""}> Controllo qualità demo eseguito</label>
+        <label class="inline-check"><input type="checkbox" data-training-field="riskAcknowledged" ${data.riskAcknowledged ? "checked" : ""}> Warning Aurum Shield demo gestito</label>
+        <label class="inline-check"><input type="checkbox" data-training-field="authorizationRequested" ${data.authorizationRequested ? "checked" : ""}> Autorizzazione superiore simulata richiesta</label>
+        <label class="inline-check"><input type="checkbox" data-training-field="aurumHelpUsed" ${data.aurumHelpUsed ? "checked" : ""}> Ho usato i suggerimenti Aurum</label>
+        <label class="inline-check"><input type="checkbox" data-training-field="trustPackDemoPrepared" ${data.trustPackDemoPrepared ? "checked" : ""}> Trust Pack demo preparato senza invio reale</label>
+      </div>
+      <div class="operator-training-aurum">
+        <strong>Aurum</strong>
+        <span>${escapeHtml(session.metadata?.aurum_tip || "Controlla i dati demo e completa solo quando la pratica è coerente.")}</span>
+      </div>
+      <div class="training-card-actions">
+        <button type="button" data-save-operator-training="${escapeHtml(String(session.id))}">Salva progresso demo</button>
+        <button class="primary-button" type="button" data-complete-operator-training="${escapeHtml(String(session.id))}">Completa training</button>
+        <button type="button" data-cancel-operator-training>Chiudi training</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderOperatorTraining() {
+  const ownResults = state.operatorTrainingResults || [];
+  const teamResults = state.operatorTeamTrainingResults || [];
+  const average = ownResults.length ? Math.round(ownResults.reduce((sum, item) => sum + Number(item.score || 0), 0) / ownResults.length) : 0;
+  trainingList.innerHTML = `
+    <section class="operator-training-shell">
+      <div class="operator-training-header">
+        <div>
+          <span class="training-mode-badge">TRAINING — nessun effetto reale</span>
+          <h3>Training Operatore</h3>
+          <p>Simula pratiche di vendita, qualità, Aurum Shield e Trust Pack demo senza creare atti reali o modificare dashboard, CRM, giacenza e fusioni.</p>
+        </div>
+        <div class="operator-training-score">
+          <span>Punteggio medio</span>
+          <strong>${average}/100</strong>
+          <small>${ownResults.length} training svolti</small>
+        </div>
+      </div>
+      ${renderActiveOperatorTraining()}
+      <div class="operator-training-section">
+        <h4>Scenari disponibili</h4>
+        <div class="operator-training-scenarios">
+          ${(state.trainingScenarios || []).map(renderTrainingScenarioCard).join("") || '<div class="empty-state">Nessuno scenario training disponibile.</div>'}
+        </div>
+      </div>
+      <div class="operator-training-results-grid">
+        <section>
+          <h4>Il mio storico training</h4>
+          <div class="operator-training-results">
+            ${ownResults.length ? ownResults.map(trainingResultRow).join("") : '<div class="empty-state">Non hai ancora completato training.</div>'}
+          </div>
+        </section>
+        <section class="control-only">
+          <h4>Risultati team</h4>
+          <div class="operator-training-results">
+            ${teamResults.length ? teamResults.map(trainingResultRow).join("") : '<div class="empty-state">Nessun risultato team disponibile.</div>'}
+          </div>
+        </section>
+      </div>
+    </section>
+  `;
+}
+
 function renderTraining() {
   if (!trainingList) return;
   renderCourseSummary();
   if (trainingCourseForm) {
     trainingCourseForm.hidden = !(state.courseActiveTab === "management" && canManageCoursesUi());
   }
+  if (courseToolbar) courseToolbar.hidden = state.courseActiveTab === "operatorTraining";
   document.querySelectorAll("[data-course-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.courseTab === state.courseActiveTab);
   });
+
+  if (state.courseActiveTab === "operatorTraining") {
+    renderOperatorTraining();
+    return;
+  }
 
   const search = String(courseSearch?.value || "").trim().toLowerCase();
   const category = String(courseCategoryFilter?.value || "").trim();
@@ -6844,7 +7045,12 @@ function renderCourseCard(course) {
 }
 
 async function loadTraining() {
-  const data = await apiRequest("/corsi");
+  const [data, scenarioData, myResultsData, teamResultsData] = await Promise.all([
+    apiRequest("/corsi"),
+    apiRequest("/training/scenarios"),
+    apiRequest("/training/my-results"),
+    apiRequest("/training/team-results")
+  ]);
   state.courseFaculties = data.faculties || [];
   state.trainingCourses = data.courses || [];
   state.courseCategories = data.categories || [];
@@ -6852,6 +7058,9 @@ async function loadTraining() {
   state.courseProgress = data.progress || [];
   state.courseCertificates = data.certificates || [];
   state.courseBadges = data.badges || [];
+  state.trainingScenarios = scenarioData.scenarios || [];
+  state.operatorTrainingResults = myResultsData.results || [];
+  state.operatorTeamTrainingResults = teamResultsData.results || [];
   renderTraining();
 }
 
@@ -7056,6 +7265,77 @@ async function downloadCourseCertificate(certificateId) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+async function startOperatorTraining(scenarioId) {
+  const data = await apiRequest("/training/start", {
+    method: "POST",
+    body: JSON.stringify({ scenario_id: scenarioId })
+  });
+  state.activeTrainingSession = data.training_session || null;
+  state.activeTrainingData = data.demo_data || {};
+  state.courseActiveTab = "operatorTraining";
+  renderTraining();
+  showToast("Training Operatore avviato in modalità demo.", "success");
+}
+
+async function saveOperatorTrainingProgress(sessionId) {
+  const demoData = currentTrainingFormData();
+  const data = await apiRequest(`/training/session/${encodeURIComponent(sessionId)}/save-progress`, {
+    method: "POST",
+    body: JSON.stringify({ demo_data: demoData })
+  });
+  state.activeTrainingSession = data.training_session || state.activeTrainingSession;
+  state.activeTrainingData = demoData;
+  showToast("Progresso training salvato senza creare dati reali.", "success");
+}
+
+async function completeOperatorTraining(sessionId) {
+  const demoData = currentTrainingFormData();
+  const data = await apiRequest(`/training/session/${encodeURIComponent(sessionId)}/complete`, {
+    method: "POST",
+    body: JSON.stringify({ demo_data: demoData })
+  });
+  const session = data.training_session || {};
+  state.activeTrainingSession = null;
+  state.activeTrainingData = null;
+  await loadTraining();
+  previewTitle.textContent = "Risultato Training Operatore";
+  previewBody.innerHTML = trainingResultDetailMarkup(session);
+  previewModal.hidden = false;
+  showToast(session.passed ? "Training superato." : "Training da ripetere.", session.passed ? "success" : "warning");
+}
+
+function trainingResultDetailMarkup(result = {}) {
+  const feedback = result.feedback || {};
+  const mistakes = result.mistakes || [];
+  return `
+    <section class="operator-training-detail">
+      <span class="training-mode-badge">Risultato formativo</span>
+      <h3>${escapeHtml(result.scenario_title || "Training Operatore")}</h3>
+      <div class="operator-training-score large">
+        <span>Punteggio</span>
+        <strong>${Number(result.score || 0)}/${Number(result.max_score || 100)}</strong>
+        <small>${result.passed ? "Superato" : "Da ripetere"}</small>
+      </div>
+      <p>${escapeHtml(feedback.summary || "Feedback non disponibile.")}</p>
+      <h4>Aurum</h4>
+      <p>${escapeHtml(feedback.aurum || "Rivedi i passaggi e riprova lo scenario.")}</p>
+      <h4>Errori rilevati</h4>
+      ${mistakes.length ? `<ul>${mistakes.map((mistake) => `<li><strong>${escapeHtml(mistake.message)}</strong><span>${escapeHtml(mistake.severity || "")} · -${Number(mistake.points || 0)} punti</span></li>`).join("")}</ul>` : "<p>Nessun errore bloccante rilevato.</p>"}
+      <h4>Punti forti</h4>
+      ${(feedback.strengths || []).length ? `<ul>${feedback.strengths.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<p>Nessun punto forte registrato.</p>"}
+      <h4>Miglioramenti</h4>
+      ${(feedback.improvements || []).length ? `<ul>${feedback.improvements.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<p>Continua ad allenarti con scenari diversi.</p>"}
+    </section>
+  `;
+}
+
+async function openOperatorTrainingResult(id) {
+  const data = await apiRequest(`/training/results/${encodeURIComponent(id)}`);
+  previewTitle.textContent = "Dettaglio Training Operatore";
+  previewBody.innerHTML = trainingResultDetailMarkup(data.result || {});
+  previewModal.hidden = false;
 }
 
 function renderCrmClients() {
@@ -10630,7 +10910,10 @@ async function completeCurrentPractice() {
 }
 
 navItems.forEach((item) => {
-  item.addEventListener("click", () => setScreen(item.dataset.section));
+  item.addEventListener("click", () => {
+    if (item.dataset.courseTabShortcut) state.courseActiveTab = item.dataset.courseTabShortcut;
+    setScreen(item.dataset.section);
+  });
 });
 
 loginForm.addEventListener("submit", handleLogin);
@@ -10802,6 +11085,11 @@ document.querySelectorAll("[data-course-tab]").forEach((button) => {
   });
 });
 trainingList?.addEventListener("click", async (event) => {
+  const startOperator = event.target.closest("[data-start-operator-training]");
+  const saveOperator = event.target.closest("[data-save-operator-training]");
+  const completeOperator = event.target.closest("[data-complete-operator-training]");
+  const cancelOperator = event.target.closest("[data-cancel-operator-training]");
+  const openTrainingResult = event.target.closest("[data-open-training-result]");
   const progress = event.target.closest("[data-course-progress]");
   const exam = event.target.closest("[data-course-exam]");
   const edit = event.target.closest("[data-edit-course]");
@@ -10815,18 +11103,28 @@ trainingList?.addEventListener("click", async (event) => {
   const editFaculty = event.target.closest("[data-edit-academy-faculty]");
   const deleteFaculty = event.target.closest("[data-delete-academy-faculty]");
   try {
-    if (progress) await updateCourseProgress(progress.dataset.courseProgress);
-    if (exam) await markCourseExamPassed(exam.dataset.courseExam);
-    if (edit) editCourse(edit.dataset.editCourse);
-    if (deleteCourseButton) await deleteCourse(deleteCourseButton.dataset.deleteCourse);
-    if (deleteMaterialButton) await deleteCourseMaterial(deleteMaterialButton.dataset.deleteCourseMaterial);
-    if (deleteSectionButton) await deleteCourseSection(deleteSectionButton.dataset.deleteCourseSection);
-    if (certificate) await downloadCourseCertificate(certificate.dataset.downloadCertificate);
-    if (noteButton) await saveAcademyNote(noteButton.dataset.saveAcademyNote, noteButton.dataset.academyLesson);
-    if (aiButton) askCourseAi(aiButton.dataset.courseAi);
-    if (createFaculty) await createAcademyFaculty();
-    if (editFaculty) await editAcademyFaculty(editFaculty.dataset.editAcademyFaculty);
-    if (deleteFaculty) await deleteAcademyFaculty(deleteFaculty.dataset.deleteAcademyFaculty);
+    if (startOperator) return await withButtonBusy(startOperator, "Avvio...", () => startOperatorTraining(startOperator.dataset.startOperatorTraining));
+    if (saveOperator) return await withButtonBusy(saveOperator, "Salvo...", () => saveOperatorTrainingProgress(saveOperator.dataset.saveOperatorTraining));
+    if (completeOperator) return await withButtonBusy(completeOperator, "Valuto...", () => completeOperatorTraining(completeOperator.dataset.completeOperatorTraining));
+    if (cancelOperator) {
+      state.activeTrainingSession = null;
+      state.activeTrainingData = null;
+      renderTraining();
+      return;
+    }
+    if (openTrainingResult) return await openOperatorTrainingResult(openTrainingResult.dataset.openTrainingResult);
+    if (progress) return await updateCourseProgress(progress.dataset.courseProgress);
+    if (exam) return await markCourseExamPassed(exam.dataset.courseExam);
+    if (edit) return editCourse(edit.dataset.editCourse);
+    if (deleteCourseButton) return await deleteCourse(deleteCourseButton.dataset.deleteCourse);
+    if (deleteMaterialButton) return await deleteCourseMaterial(deleteMaterialButton.dataset.deleteCourseMaterial);
+    if (deleteSectionButton) return await deleteCourseSection(deleteSectionButton.dataset.deleteCourseSection);
+    if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
+    if (noteButton) return await saveAcademyNote(noteButton.dataset.saveAcademyNote, noteButton.dataset.academyLesson);
+    if (aiButton) return askCourseAi(aiButton.dataset.courseAi);
+    if (createFaculty) return await createAcademyFaculty();
+    if (editFaculty) return await editAcademyFaculty(editFaculty.dataset.editAcademyFaculty);
+    if (deleteFaculty) return await deleteAcademyFaculty(deleteFaculty.dataset.deleteAcademyFaculty);
   } catch (error) {
     showToast(error.message || "Operazione corso non riuscita.");
   }
