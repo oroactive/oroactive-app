@@ -475,7 +475,10 @@ function auditActionLabel(action = "") {
     approval_required_blocked_completion: "Completamento bloccato per autorizzazione",
     approval_unauthorized_attempt: "Tentativo autorizzazione non consentito",
     sale_deed_completed_after_approval: "Atto completato dopo autorizzazione",
-    sale_deed_modified_after_approval_request: "Modifica atto dopo richiesta autorizzazione"
+    sale_deed_modified_after_approval_request: "Modifica atto dopo richiesta autorizzazione",
+    notification_created: "Notifica creata",
+    notification_read: "Notifica letta",
+    notification_action_opened: "Apertura notifica"
   }[action] || activityLabel(action) || "Attività";
 }
 
@@ -2241,6 +2244,22 @@ async function createAurumSupportRequest(input = {}, user = {}) {
     entityType: "aurum_support_request",
     entityId: result.rows[0]?.id,
     description: `Messaggio Aurum inviato a utente ${recipientUserId}`
+  });
+  void createNotification({
+    userId: recipientUserId,
+    title: "Richiesta supporto Aurum",
+    message: "L'utente ha richiesto supporto tramite Aurum.",
+    type: "aurum_support_request",
+    severity: "warning",
+    entityType: "aurum_support_request",
+    entityId: result.rows[0]?.id,
+    actionUrl: "#users",
+    metadata: {
+      request_id: result.rows[0]?.id,
+      sender_id: user.id
+    },
+    createdBy: user.id,
+    actor: user
   });
   return publicAurumSupportRequest({
     ...result.rows[0],
@@ -4849,6 +4868,23 @@ async function syncAurumShieldAlert({ saleDeedRow, shield, user = {} }) {
         severity: shield.risk_level
       }
     });
+    if (["alto", "critico"].includes(String(shield.risk_level || "").toLowerCase())) {
+      const notificationSeverity = String(shield.risk_level).toLowerCase() === "critico" ? "critical" : "danger";
+      const notificationInput = {
+        title: "Aurum Shield: pratica ad alto rischio",
+        message: `La pratica ${saleDeedRow.practice_number || saleDeedRow.id} richiede verifica.`,
+        type: "aurum_shield_alert",
+        severity: notificationSeverity,
+        entityType: "aurum_shield_alert",
+        entityId: result.rows[0].id,
+        actionUrl: "#antifraud",
+        metadata: { sale_deed_id: saleDeedRow.id, practice_number: saleDeedRow.practice_number || "", risk_score: shield.score, risk_level: shield.risk_level },
+        createdBy: user?.id || null,
+        actor: user
+      };
+      void createNotification({ ...notificationInput, targetRole: "founder" });
+      void createNotification({ ...notificationInput, targetRole: "responsabile", storeId: saleDeedRow.negozio_id || null });
+    }
   }
   return result.rows[0] || null;
 }
@@ -5330,26 +5366,270 @@ async function canApproveApprovalRequest(row = {}, user = {}) {
     || String(row.store || "") === String(store.nome);
 }
 
-async function createInternalNotification(input = {}) {
+function notificationRoles(targetRole = "") {
+  if (Array.isArray(targetRole)) return targetRole.map(normalizeRole).filter(Boolean);
+  return String(targetRole || "")
+    .split(/[,\s|/]+/)
+    .map(normalizeRole)
+    .filter(Boolean);
+}
+
+function cleanNotificationText(value = "", fallback = "") {
+  const text = String(value || fallback || "").replace(/\s+/g, " ").trim();
+  return text.slice(0, 600);
+}
+
+function normalizeNotificationType(type = "system") {
+  const normalized = String(type || "system").trim().toLowerCase();
+  return [
+    "approval_request",
+    "approval_approved",
+    "approval_rejected",
+    "aurum_shield_alert",
+    "quality_check_failed",
+    "document_expired",
+    "backup_created",
+    "backup_failed",
+    "deed_deleted",
+    "deed_completed",
+    "user_updated",
+    "audit_critical",
+    "academy_course_assigned",
+    "academy_course_completed",
+    "aurum_support_request",
+    "system"
+  ].includes(normalized) ? normalized : "system";
+}
+
+function normalizeNotificationSeverity(severity = "info") {
+  const normalized = String(severity || "info").trim().toLowerCase();
+  return ["info", "success", "warning", "danger", "critical"].includes(normalized) ? normalized : "info";
+}
+
+async function notificationRecipientIds({ userId = null, targetRole = null, storeId = null } = {}) {
+  if (userId) return [Number(userId)].filter(Number.isFinite);
+  const roles = notificationRoles(targetRole);
+  const finalRoles = roles.length ? roles : ["founder"];
+  const values = [finalRoles];
+  const where = ["COALESCE(attivo, TRUE) = TRUE", `LOWER(COALESCE(ruolo, '')) = ANY($1::text[])`];
+  if (storeId && !finalRoles.includes("founder")) {
+    values.push(storeId);
+    where.push(`(negozio_id = $${values.length}::bigint OR negozio = (SELECT nome FROM negozi WHERE id = $${values.length}::bigint LIMIT 1))`);
+  }
+  const result = await pool.query(
+    `SELECT id FROM utenti WHERE ${where.join(" AND ")} ORDER BY id ASC LIMIT 200`,
+    values
+  );
+  return [...new Set(result.rows.map((row) => Number(row.id)).filter(Number.isFinite))];
+}
+
+function publicNotification(row = {}) {
+  return {
+    id: row.id,
+    user_id: row.user_id || null,
+    target_role: row.target_role || "",
+    store_id: row.store_id || null,
+    title: row.title || "Notifica OroActive",
+    message: row.message || "",
+    type: row.type || "system",
+    severity: row.severity || "info",
+    entity_type: row.entity_type || "",
+    entity_id: row.entity_id || "",
+    action_url: row.action_url || "",
+    metadata: row.metadata || {},
+    read_at: row.read_at || null,
+    read: Boolean(row.read_at),
+    created_by: row.created_by || null,
+    created_at: row.created_at || null,
+    expires_at: row.expires_at || null
+  };
+}
+
+async function createNotification(input = {}) {
   try {
-    const table = await pool.query("SELECT to_regclass('public.notifications') AS name");
-    if (table.rows[0]?.name) {
-      await pool.query(
-        `INSERT INTO notifications (user_id, title, message, payload, created_at)
-         VALUES ($1::bigint,$2::text,$3::text,$4::jsonb,NOW())`,
+    const type = normalizeNotificationType(input.type);
+    const severity = normalizeNotificationSeverity(input.severity);
+    const title = cleanNotificationText(input.title, "Notifica OroActive");
+    const message = cleanNotificationText(input.message, "Hai una nuova notifica OroActive.");
+    const storeId = input.storeId || input.store_id || null;
+    const targetRole = input.targetRole || input.target_role || null;
+    const recipients = await notificationRecipientIds({
+      userId: input.userId || input.user_id || null,
+      targetRole,
+      storeId
+    });
+    if (!recipients.length) return [];
+    const created = [];
+    for (const recipientId of recipients) {
+      const result = await pool.query(
+        `INSERT INTO notifications (
+          user_id, target_role, store_id, title, message, type, severity,
+          entity_type, entity_id, action_url, metadata, created_by, expires_at
+        ) VALUES (
+          $1::bigint,$2::text,$3::bigint,$4::text,$5::text,$6::text,$7::text,
+          $8::text,$9::text,$10::text,$11::jsonb,$12::bigint,$13::timestamptz
+        )
+        RETURNING *`,
         [
-          input.user_id || input.userId || null,
-          input.title || "Notifica OroActive",
-          input.message || "",
-          sanitizeForPostgres(input.payload || {})
+          recipientId,
+          targetRole ? normalizeRole(targetRole) : null,
+          storeId || null,
+          title,
+          message,
+          type,
+          severity,
+          input.entityType || input.entity_type || null,
+          input.entityId ?? input.entity_id ?? null,
+          input.actionUrl || input.action_url || null,
+          sanitizeForPostgres(compactAuditPayload(input.metadata || input.payload || {})),
+          input.createdBy || input.created_by || input.actor?.id || null,
+          input.expiresAt || input.expires_at || null
         ]
       );
-    } else {
-      console.log("INTERNAL NOTIFICATION", compactAuditPayload(input));
+      created.push(publicNotification(result.rows[0]));
     }
+    if (input.audit !== false && (["warning", "danger", "critical"].includes(severity) || input.metadata?.critical)) {
+      void writeAuditLog({
+        req: input.req || null,
+        user: input.actor || null,
+        action: "notification_created",
+        entityType: "notification",
+        entityId: created[0]?.id || null,
+        entityLabel: title,
+        afterData: { title, message, type, severity, recipients: created.length },
+        metadata: { type, severity, recipient_count: created.length, entity_type: input.entityType || input.entity_type || "" }
+      });
+    }
+    return created;
   } catch (error) {
-    console.error("INTERNAL NOTIFICATION ERROR", error.message || error);
+    console.error("NOTIFICATION ERROR", error.message || error);
+    return [];
   }
+}
+
+async function createInternalNotification(input = {}) {
+  return createNotification(input);
+}
+
+function addNotificationVisibilityWhere(user = {}, where = [], values = [], alias = "n") {
+  const role = normalizeRole(user?.ruolo);
+  const clauses = [];
+  values.push(user?.id || null);
+  clauses.push(`${alias}.user_id = $${values.length}::bigint`);
+  values.push(role);
+  clauses.push(`(${alias}.user_id IS NULL AND LOWER(COALESCE(${alias}.target_role, '')) = $${values.length}::text)`);
+  if (role === "founder") {
+    clauses.push(`LOWER(COALESCE(${alias}.target_role, '')) = 'founder'`);
+    clauses.push(`${alias}.severity = 'critical'`);
+  }
+  if (role === "responsabile" && user?.negozio_id) {
+    values.push(user.negozio_id);
+    clauses.push(`(${alias}.user_id IS NULL AND LOWER(COALESCE(${alias}.target_role, '')) = 'responsabile' AND ${alias}.store_id = $${values.length}::bigint)`);
+  }
+  where.push(`(${clauses.join(" OR ")})`);
+  where.push(`(${alias}.expires_at IS NULL OR ${alias}.expires_at > NOW())`);
+}
+
+async function notificationUnreadCount(user = {}) {
+  const values = [];
+  const where = ["n.read_at IS NULL"];
+  addNotificationVisibilityWhere(user, where, values, "n");
+  const result = await pool.query(`SELECT COUNT(*)::int AS total FROM notifications n WHERE ${where.join(" AND ")}`, values);
+  return Number(result.rows[0]?.total || 0);
+}
+
+async function listNotifications(query = {}, user = {}) {
+  const page = Math.max(1, Number(query.page || 1));
+  const limit = Math.min(50, Math.max(1, Number(query.limit || 20)));
+  const offset = (page - 1) * limit;
+  const values = [];
+  const where = [];
+  addNotificationVisibilityWhere(user, where, values, "n");
+  if (String(query.unread || "").toLowerCase() === "true") where.push("n.read_at IS NULL");
+  if (query.type) {
+    values.push(normalizeNotificationType(query.type));
+    where.push(`n.type = $${values.length}::text`);
+  }
+  if (query.severity) {
+    values.push(normalizeNotificationSeverity(query.severity));
+    where.push(`n.severity = $${values.length}::text`);
+  }
+  if (query.search) {
+    values.push(`%${String(query.search).trim()}%`);
+    where.push(`(n.title ILIKE $${values.length} OR n.message ILIKE $${values.length} OR n.type ILIKE $${values.length})`);
+  }
+  const whereSql = where.join(" AND ");
+  const total = await pool.query(`SELECT COUNT(*)::int AS total FROM notifications n WHERE ${whereSql}`, values);
+  const result = await pool.query(
+    `SELECT n.*
+     FROM notifications n
+     WHERE ${whereSql}
+     ORDER BY n.created_at DESC, n.id DESC
+     LIMIT $${values.push(limit)}::integer OFFSET $${values.push(offset)}::integer`,
+    values
+  );
+  return {
+    ok: true,
+    notifications: result.rows.map(publicNotification),
+    unread_count: await notificationUnreadCount(user),
+    pagination: { page, limit, total: Number(total.rows[0]?.total || 0) }
+  };
+}
+
+async function markNotificationRead(id, user = {}, req = null, opened = false) {
+  const values = [id];
+  const where = ["n.id = $1::bigint"];
+  addNotificationVisibilityWhere(user, where, values, "n");
+  const result = await pool.query(
+    `UPDATE notifications n
+     SET read_at = COALESCE(read_at, NOW())
+     WHERE ${where.join(" AND ")}
+     RETURNING n.*`,
+    values
+  );
+  const notification = result.rows[0] ? publicNotification(result.rows[0]) : null;
+  if (notification) {
+    void writeAuditLog({
+      req,
+      user,
+      action: opened ? "notification_action_opened" : "notification_read",
+      entityType: "notification",
+      entityId: notification.id,
+      entityLabel: notification.title,
+      metadata: { type: notification.type, severity: notification.severity }
+    });
+  }
+  return notification;
+}
+
+async function markAllNotificationsRead(user = {}, req = null) {
+  const values = [];
+  const where = ["n.read_at IS NULL"];
+  addNotificationVisibilityWhere(user, where, values, "n");
+  const result = await pool.query(
+    `UPDATE notifications n
+     SET read_at = NOW()
+     WHERE ${where.join(" AND ")}
+     RETURNING n.id`,
+    values
+  );
+  void writeAuditLog({
+    req,
+    user,
+    action: "notification_read",
+    entityType: "notification",
+    entityLabel: "Segna tutte come lette",
+    metadata: { count: result.rowCount }
+  });
+  return result.rowCount;
+}
+
+async function deleteNotification(id, user = {}) {
+  const values = [id];
+  const where = ["n.id = $1::bigint"];
+  addNotificationVisibilityWhere(user, where, values, "n");
+  const result = await pool.query(`DELETE FROM notifications n WHERE ${where.join(" AND ")} RETURNING n.id`, values);
+  return result.rowCount > 0;
 }
 
 function reasonFromText(type, severity, message) {
@@ -5565,10 +5845,34 @@ async function createApprovalRequest(input = {}, user = {}, req = null) {
       })
     ]
   );
-  void createInternalNotification({
+  void createNotification({
+    targetRole: "responsabile",
+    storeId: row.negozio_id || store?.id || null,
     title: "Nuova richiesta autorizzazione",
-    message: `Richiesta autorizzazione per ${row.practice_number || `atto ${row.id}`}`,
-    payload: { approval_request_id: approval.id, sale_deed_id: row.id, risk_score: riskScore, risk_level: riskLevel }
+    message: "Un operatore ha richiesto autorizzazione per una pratica ad alto rischio.",
+    type: "approval_request",
+    severity: "warning",
+    entityType: "approval_request",
+    entityId: approval.id,
+    actionUrl: "#approvals",
+    metadata: { approval_request_id: approval.id, sale_deed_id: row.id, practice_number: row.practice_number || "", risk_score: riskScore, risk_level: riskLevel },
+    createdBy: user.id,
+    actor: user,
+    req
+  });
+  void createNotification({
+    targetRole: "founder",
+    title: "Nuova richiesta autorizzazione",
+    message: "Un operatore ha richiesto autorizzazione per una pratica ad alto rischio.",
+    type: "approval_request",
+    severity: "warning",
+    entityType: "approval_request",
+    entityId: approval.id,
+    actionUrl: "#approvals",
+    metadata: { approval_request_id: approval.id, sale_deed_id: row.id, practice_number: row.practice_number || "", risk_score: riskScore, risk_level: riskLevel },
+    createdBy: user.id,
+    actor: user,
+    req
   });
   void writeAuditLog({
     req,
@@ -5650,7 +5954,7 @@ async function reviewApprovalRequest(id, input = {}, user = {}, req = null, targ
       })
     ]
   );
-  void createInternalNotification({
+  void createNotification({
     user_id: row.requested_by,
     title: targetStatus === "approved" ? "Autorizzazione approvata" : targetStatus === "rejected" ? "Autorizzazione rifiutata" : "Autorizzazione annullata",
     message: targetStatus === "approved"
@@ -5658,7 +5962,15 @@ async function reviewApprovalRequest(id, input = {}, user = {}, req = null, targ
       : targetStatus === "rejected"
         ? "Autorizzazione rifiutata. Correggere la pratica prima di procedere."
         : "Richiesta autorizzazione annullata.",
-    payload: { approval_request_id: row.id, sale_deed_id: row.sale_deed_id }
+    type: targetStatus === "approved" ? "approval_approved" : targetStatus === "rejected" ? "approval_rejected" : "system",
+    severity: targetStatus === "approved" ? "success" : targetStatus === "rejected" ? "danger" : "info",
+    entityType: "approval_request",
+    entityId: row.id,
+    actionUrl: "#approvals",
+    metadata: { approval_request_id: row.id, sale_deed_id: row.sale_deed_id, practice_number: row.practice_number || "" },
+    createdBy: user.id,
+    actor: user,
+    req
   });
   const auditAction = targetStatus === "approved" ? "approval_approved" : targetStatus === "rejected" ? "approval_rejected" : "approval_cancelled";
   void writeAuditLog({
@@ -7932,6 +8244,23 @@ async function saveAct(input, user, req = null) {
       }
     });
   }
+  if (["completed", "archived_completed"].includes(statusCode) && Number(shield?.score || 0) > 60) {
+    void createNotification({
+      targetRole: "responsabile",
+      storeId: finalRow.negozio_id || null,
+      title: "Pratica completata con rischio elevato",
+      message: `La pratica ${finalAct.practiceNumber || finalRow.id} è stata completata dopo verifica rischio.`,
+      type: "deed_completed",
+      severity: "warning",
+      entityType: "atto",
+      entityId: finalRow.id,
+      actionUrl: "#archive",
+      metadata: { practice_number: finalAct.practiceNumber || "", risk_score: shield?.score || 0, risk_level: shield?.risk_level || "" },
+      createdBy: user?.id || null,
+      actor: user,
+      req
+    });
+  }
   return { ...finalAct, aurumShield: shield || finalAct.aurumShield, qualityCheck: quality || finalAct.qualityCheck };
 }
 
@@ -8116,6 +8445,23 @@ async function updateAct(identifier, input, user, req = null) {
       }
     });
   }
+  if (["completed", "archived_completed"].includes(normalizedStatus) && Number(shield?.score || 0) > 60) {
+    void createNotification({
+      targetRole: "responsabile",
+      storeId: finalRow.negozio_id || null,
+      title: "Pratica completata con rischio elevato",
+      message: `La pratica ${finalAct.practiceNumber || finalRow.id} è stata completata dopo verifica rischio.`,
+      type: "deed_completed",
+      severity: "warning",
+      entityType: "atto",
+      entityId: finalRow.id,
+      actionUrl: "#archive",
+      metadata: { practice_number: finalAct.practiceNumber || "", risk_score: shield?.score || 0, risk_level: shield?.risk_level || "" },
+      createdBy: user?.id || null,
+      actor: user,
+      req
+    });
+  }
   if (["pending_approval", "approval_approved", "approval_rejected"].includes(normalizeWorkflowStatus(existing.status)) && !["completed", "archived_completed"].includes(normalizedStatus)) {
     void writeAuditLog({
       req,
@@ -8232,6 +8578,21 @@ async function deleteAct(identifier, user, req = null) {
         critical: true
       }
     });
+    const notificationInput = {
+      title: "Atto eliminato",
+      message: `La pratica ${existing.practice_number || existing.id} è stata eliminata dai flussi operativi.`,
+      type: "deed_deleted",
+      severity: "danger",
+      entityType: "atto",
+      entityId: existing.id,
+      actionUrl: "#archive",
+      metadata: { practice_number: existing.practice_number || "", store_id: existing.negozio_id || null },
+      createdBy: user?.id || null,
+      actor: user,
+      req
+    };
+    void createNotification({ ...notificationInput, targetRole: "founder" });
+    void createNotification({ ...notificationInput, targetRole: "responsabile", storeId: existing.negozio_id || null });
   }
   return result.rowCount > 0;
 }
@@ -8347,6 +8708,20 @@ async function createUser(input, actor, req = null) {
     entityLabel: auditUserName(createdUser),
     afterData: createdUser,
     metadata: { target_user_id: result.rows[0].id, role: finalRole, store: finalStore, store_id: store?.id || null, store_name: finalStore }
+  });
+  void createNotification({
+    targetRole: "founder",
+    title: "Utente creato",
+    message: `Creato nuovo utente con ruolo ${finalRole}.`,
+    type: "user_updated",
+    severity: "info",
+    entityType: "utente",
+    entityId: result.rows[0].id,
+    actionUrl: "#users",
+    metadata: { target_user_id: result.rows[0].id, role: finalRole, store: finalStore },
+    createdBy: actor?.id || null,
+    actor,
+    req
   });
   return createdUser;
 }
@@ -8532,6 +8907,20 @@ async function updateUser(id, input, actor, req = null) {
         afterData: { ruolo: updatedUser.ruolo },
         metadata: { target_user_id: result.rows[0].id, critical: true }
       });
+      void createNotification({
+        targetRole: "founder",
+        title: "Ruolo utente modificato",
+        message: "Un ruolo utente è stato modificato in OroActive.",
+        type: "user_updated",
+        severity: "warning",
+        entityType: "utente",
+        entityId: result.rows[0].id,
+        actionUrl: "#users",
+        metadata: { target_user_id: result.rows[0].id, before_role: beforeUser.ruolo, after_role: updatedUser.ruolo, critical: true },
+        createdBy: actor?.id || null,
+        actor,
+        req
+      });
     }
     if (String(beforeUser.negozio_id || beforeUser.negozio || "") !== String(updatedUser.negozio_id || updatedUser.negozio || "")) {
       void writeAuditLog({
@@ -8546,6 +8935,21 @@ async function updateUser(id, input, actor, req = null) {
         metadata: { target_user_id: result.rows[0].id }
       });
     }
+    void createNotification({
+      targetRole: "founder",
+      title: "Utente aggiornato",
+      message: "Dati utente aggiornati in OroActive.",
+      type: "user_updated",
+      severity: "info",
+      entityType: "utente",
+      entityId: result.rows[0].id,
+      actionUrl: "#users",
+      metadata: { target_user_id: result.rows[0].id, changed_fields: changedFields },
+      createdBy: actor?.id || null,
+      actor,
+      req,
+      audit: false
+    });
   }
   return result.rowCount ? publicUser(result.rows[0]) : null;
 }
@@ -8902,6 +9306,51 @@ app.get("/api/audit-logs/:id", async (request, response, next) => {
   }
 });
 
+app.get("/api/notifications", async (request, response, next) => {
+  try {
+    response.json(await listNotifications(request.query, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/notifications/unread-count", async (request, response, next) => {
+  try {
+    response.json({ ok: true, unread_count: await notificationUnreadCount(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/notifications/read-all", async (request, response, next) => {
+  try {
+    const updated = await markAllNotificationsRead(request.user, request);
+    response.json({ ok: true, updated, unread_count: await notificationUnreadCount(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/notifications/:id/read", async (request, response, next) => {
+  try {
+    const notification = await markNotificationRead(request.params.id, request.user, request, Boolean(request.body?.opened));
+    if (!notification) return response.status(404).json({ error: "Notifica non trovata" });
+    response.json({ ok: true, notification, unread_count: await notificationUnreadCount(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/notifications/:id", async (request, response, next) => {
+  try {
+    const deleted = await deleteNotification(request.params.id, request.user);
+    if (!deleted) return response.status(404).json({ error: "Notifica non trovata" });
+    response.json({ ok: true, unread_count: await notificationUnreadCount(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/intelligence/insights", async (request, response, next) => {
   try {
     response.json(await oroActiveIntelligence(request.user));
@@ -8931,6 +9380,22 @@ app.post("/api/backups/create", requireBackupManager, async (request, response, 
       afterData: backup,
       metadata: { backup_code: backup?.backup_code || backup?.backupCode || "", status: backup?.status }
     });
+    void createNotification({
+      targetRole: "founder",
+      title: backup?.status === "failed" ? "Backup fallito" : "Backup creato",
+      message: backup?.status === "failed"
+        ? "Un backup OroActive non è stato completato correttamente."
+        : "Backup OroActive creato correttamente.",
+      type: backup?.status === "failed" ? "backup_failed" : "backup_created",
+      severity: backup?.status === "failed" ? "danger" : "success",
+      entityType: "backup",
+      entityId: backup?.id,
+      actionUrl: "#backups",
+      metadata: { backup_code: backup?.backup_code || backup?.backupCode || "", status: backup?.status },
+      createdBy: request.user?.id,
+      actor: request.user,
+      req: request
+    });
     response.status(201).json({ backup });
   } catch (error) {
     next(error);
@@ -8949,6 +9414,22 @@ app.post("/api/backups/run", requireBackupManager, async (request, response, nex
       entityLabel: backup?.backup_code || backup?.backupCode || "",
       afterData: backup,
       metadata: { backup_code: backup?.backup_code || backup?.backupCode || "", status: backup?.status }
+    });
+    void createNotification({
+      targetRole: "founder",
+      title: backup?.status === "failed" ? "Backup fallito" : "Backup creato",
+      message: backup?.status === "failed"
+        ? "Un backup OroActive non è stato completato correttamente."
+        : "Backup OroActive creato correttamente.",
+      type: backup?.status === "failed" ? "backup_failed" : "backup_created",
+      severity: backup?.status === "failed" ? "danger" : "success",
+      entityType: "backup",
+      entityId: backup?.id,
+      actionUrl: "#backups",
+      metadata: { backup_code: backup?.backup_code || backup?.backupCode || "", status: backup?.status },
+      createdBy: request.user?.id,
+      actor: request.user,
+      req: request
     });
     response.status(201).json({ backup });
   } catch (error) {
@@ -8980,6 +9461,22 @@ app.post("/api/backups/:id/verify", requireBackupManager, async (request, respon
       afterData: { verification_status: backup.verification_status || backup.verificationStatus, checksum_sha256: backup.checksum_sha256 || backup.checksumSha256 },
       metadata: { backup_code: backup.backup_code || backup.backupCode || "", status: backup.status }
     });
+    if ((backup.verification_status || backup.verificationStatus) === "verified") {
+      void createNotification({
+        targetRole: "founder",
+        title: "Backup verificato",
+        message: "Verifica integrità backup completata correttamente.",
+        type: "system",
+        severity: "success",
+        entityType: "backup",
+        entityId: backup.id || request.params.id,
+        actionUrl: "#backups",
+        metadata: { backup_code: backup.backup_code || backup.backupCode || "" },
+        createdBy: request.user?.id,
+        actor: request.user,
+        req: request
+      });
+    }
     response.json({ backup });
   } catch (error) {
     next(error);
@@ -9230,6 +9727,38 @@ app.post("/api/quality-check/save", async (request, response, next) => {
       afterData: quality,
       metadata: { sale_deed_id: request.body?.sale_deed_id || request.body?.atto_id || null }
     });
+    if (quality.quality_status === "non_completabile" || quality.status === "non_completabile") {
+      const saleDeedId = request.body?.sale_deed_id || request.body?.atto_id || null;
+      void createNotification({
+        userId: request.user?.id,
+        title: "Controllo qualità non superato",
+        message: "Controllo qualità non superato: mancano dati o documenti obbligatori.",
+        type: "quality_check_failed",
+        severity: "warning",
+        entityType: "quality_check",
+        entityId: quality.id || saleDeedId,
+        actionUrl: "#practice",
+        metadata: { sale_deed_id: saleDeedId, quality_status: quality.quality_status || quality.status },
+        createdBy: request.user?.id,
+        actor: request.user,
+        req: request
+      });
+      void createNotification({
+        targetRole: "responsabile",
+        storeId: request.user?.negozio_id || null,
+        title: "Controllo qualità non superato",
+        message: "Una pratica richiede verifica qualità prima del completamento.",
+        type: "quality_check_failed",
+        severity: "danger",
+        entityType: "quality_check",
+        entityId: quality.id || saleDeedId,
+        actionUrl: "#approvals",
+        metadata: { sale_deed_id: saleDeedId, quality_status: quality.quality_status || quality.status },
+        createdBy: request.user?.id,
+        actor: request.user,
+        req: request
+      });
+    }
     response.status(201).json(quality);
   } catch (error) {
     next(error);
@@ -9592,7 +10121,22 @@ app.get("/api/academy/users/:userId/progress", async (request, response, next) =
 
 app.post("/api/academy/progress/start-course", async (request, response, next) => {
   try {
-    response.status(201).json(await startAcademyCourse(request.body.course_id || request.body.courseId, request.user));
+    const progress = await startAcademyCourse(request.body.course_id || request.body.courseId, request.user);
+    void createNotification({
+      userId: request.user.id,
+      title: "Corso Academy assegnato",
+      message: "Un corso OroActive Academy è disponibile nel tuo percorso formazione.",
+      type: "academy_course_assigned",
+      severity: "info",
+      entityType: "academy_course",
+      entityId: progress?.course_id || request.body.course_id || request.body.courseId || null,
+      actionUrl: "#training",
+      metadata: { course_id: progress?.course_id || request.body.course_id || request.body.courseId || null },
+      createdBy: request.user.id,
+      actor: request.user,
+      audit: false
+    });
+    response.status(201).json(progress);
   } catch (error) {
     next(error);
   }
@@ -9611,6 +10155,38 @@ app.post("/api/academy/progress/complete-lesson", async (request, response, next
       afterData: progress,
       metadata: { course_id: request.body.course_id || request.body.courseId || progress?.course_id || null }
     });
+    if (Number(progress?.percentuale || 0) >= 100 || String(progress?.status || "").toLowerCase() === "completed") {
+      void createNotification({
+        userId: request.user.id,
+        title: "Corso Academy completato",
+        message: "Hai completato un corso OroActive Academy.",
+        type: "academy_course_completed",
+        severity: "success",
+        entityType: "academy_course",
+        entityId: progress?.course_id || request.body.course_id || request.body.courseId || null,
+        actionUrl: "#training",
+        metadata: { course_id: progress?.course_id || request.body.course_id || request.body.courseId || null },
+        createdBy: request.user.id,
+        actor: request.user
+      });
+      if (request.user?.negozio_id) {
+        void createNotification({
+          targetRole: "responsabile",
+          storeId: request.user.negozio_id,
+          title: "Corso Academy completato",
+          message: "Un operatore del negozio ha completato un corso Academy.",
+          type: "academy_course_completed",
+          severity: "success",
+          entityType: "academy_course",
+          entityId: progress?.course_id || request.body.course_id || request.body.courseId || null,
+          actionUrl: "#training",
+          metadata: { user_id: request.user.id, course_id: progress?.course_id || request.body.course_id || request.body.courseId || null },
+          createdBy: request.user.id,
+          actor: request.user,
+          audit: false
+        });
+      }
+    }
     response.status(201).json(progress);
   } catch (error) {
     next(error);
@@ -9717,6 +10293,19 @@ app.post("/api/academy/certificates/generate", async (request, response, next) =
       entityLabel: certificate?.certificate_code || "Certificazione Academy",
       afterData: certificate
     });
+    void createNotification({
+      userId: certificate?.user_id,
+      title: "Certificazione Academy assegnata",
+      message: "Hai ricevuto una certificazione OroActive Academy.",
+      type: "academy_course_completed",
+      severity: "success",
+      entityType: "academy_certificate",
+      entityId: certificate?.id,
+      actionUrl: "#training",
+      metadata: { course_id: certificate?.course_id, certificate_code: certificate?.certificate_code },
+      createdBy: request.user.id,
+      actor: request.user
+    });
     response.status(201).json(certificate);
   } catch (error) {
     next(error);
@@ -9760,6 +10349,19 @@ app.post("/api/academy/badges/assign", async (request, response, next) => {
       entityId: badge?.id,
       entityLabel: badge?.badge_name || badge?.name || "Badge Academy",
       afterData: badge
+    });
+    void createNotification({
+      userId: badge?.user_id,
+      title: "Badge Academy assegnato",
+      message: "Hai ricevuto un nuovo badge OroActive Academy.",
+      type: "academy_course_completed",
+      severity: "success",
+      entityType: "academy_badge",
+      entityId: badge?.id,
+      actionUrl: "#training",
+      metadata: { course_id: badge?.course_id, badge_name: badge?.badge_name },
+      createdBy: request.user.id,
+      actor: request.user
     });
     response.status(201).json(badge);
   } catch (error) {

@@ -666,7 +666,60 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /approval-workflow-1/);
+  assert.match(worker, /notifications-1/);
+});
+
+test("notifiche interne hanno schema API UI e polling leggero", async () => {
+  const [index, app, server, schema, migration, styles, worker] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260528_internal_notifications.sql"),
+    file("styles.css"),
+    file("service-worker.js")
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS notifications/);
+  assert.match(schema, /idx_notifications_user_id/);
+  assert.match(schema, /idx_notifications_read_at/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS notifications/);
+  assert.match(migration, /idx_notifications_created_at/);
+
+  assert.match(server, /async function createNotification/);
+  assert.match(server, /async function listNotifications/);
+  assert.match(server, /async function notificationUnreadCount/);
+  assert.match(server, /app\.get\("\/api\/notifications"/);
+  assert.match(server, /app\.get\("\/api\/notifications\/unread-count"/);
+  assert.match(server, /app\.put\("\/api\/notifications\/read-all"/);
+  assert.match(server, /app\.put\("\/api\/notifications\/:id\/read"/);
+  assert.match(server, /app\.delete\("\/api\/notifications\/:id"/);
+  assert.match(server, /notification_created/);
+  assert.match(server, /approval_request/);
+  assert.match(server, /aurum_shield_alert/);
+  assert.match(server, /quality_check_failed/);
+  assert.match(server, /backup_created/);
+  assert.match(server, /deed_deleted/);
+  assert.match(server, /aurum_support_request/);
+  assert.match(server, /academy_course_assigned/);
+
+  assert.match(index, /id="notificationCenter"/);
+  assert.match(index, /id="notificationBell"/);
+  assert.match(index, /id="notificationDropdown"/);
+  assert.match(index, /id="notifications"/);
+  assert.match(index, /data-section="notifications"/);
+  assert.match(app, /NOTIFICATION_POLL_INTERVAL_MS = 60000/);
+  assert.match(app, /async function loadNotificationDropdown/);
+  assert.match(app, /async function loadNotificationsPage/);
+  assert.match(app, /function renderNotificationsPage/);
+  assert.match(app, /apiRequest\("\/notifications\/unread-count"/);
+  assert.match(app, /apiRequest\(`\/notifications\?\$\{notificationFilterParams/);
+  assert.match(app, /setScreen\("notifications"\)/);
+  assert.match(styles, /\.notification-center/);
+  assert.match(styles, /\.notification-bell/);
+  assert.match(styles, /\.notification-dropdown/);
+  assert.match(styles, /\.notifications-table/);
+  assert.match(worker, /notifications-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {

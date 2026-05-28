@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260528-approval-workflow-1">
+  <link rel="stylesheet" href="styles.css?v=20260528-notifications-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -71,6 +71,7 @@
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
             <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
             <button class="founder-only" type="button" data-section="auditTrail">Audit Trail</button>
+            <button type="button" data-section="notifications">Notifiche</button>
             <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
@@ -92,6 +93,21 @@
     </div>
     <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
   </section>
+
+  <div class="notification-center" id="notificationCenter" hidden>
+    <button class="notification-bell" id="notificationBell" type="button" aria-expanded="false" aria-controls="notificationDropdown" aria-label="Notifiche OroActive">
+      <span aria-hidden="true">🔔</span>
+      <strong id="notificationUnreadBadge" hidden>0</strong>
+    </button>
+    <div class="notification-dropdown" id="notificationDropdown" hidden>
+      <div class="notification-dropdown-heading">
+        <strong>Notifiche</strong>
+        <button class="ghost-button small-button" type="button" id="markAllNotificationsRead">Segna tutte come lette</button>
+      </div>
+      <div class="notification-dropdown-list" id="notificationDropdownList" aria-live="polite"></div>
+      <button class="ghost-button notification-view-all" type="button" id="viewAllNotifications">Visualizza tutte</button>
+    </div>
+  </div>
 
   <div class="app-shell">
     <div class="session-username" id="sessionUsername"></div>
@@ -118,6 +134,7 @@
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
             <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
             <button class="founder-only" type="button" data-section="auditTrail">Audit Trail</button>
+            <button type="button" data-section="notifications">Notifiche</button>
             <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
             <button class="founder-only" type="button" data-section="stores">Negozi</button>
@@ -648,6 +665,63 @@
           <button class="primary-button" type="button" id="refreshApprovals">Aggiorna</button>
         </div>
         <div class="archive-table users-table approvals-table" id="approvalsList" aria-live="polite"></div>
+      </section>
+
+      <section id="notifications" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header">
+          <div>
+            <p class="eyebrow">Centro notifiche</p>
+            <h2>Notifiche</h2>
+            <p class="muted">Avvisi interni su autorizzazioni, backup, alert operativi, Academy e attività importanti.</p>
+          </div>
+          <button class="primary-button" type="button" id="refreshNotifications">Aggiorna</button>
+        </div>
+        <form class="settings-list notification-filters" id="notificationFilters">
+          <label>Vista
+            <select name="unread">
+              <option value="">Tutte</option>
+              <option value="true">Non lette</option>
+            </select>
+          </label>
+          <label>Tipo
+            <select name="type">
+              <option value="">Tutti i tipi</option>
+              <option value="approval_request">Richieste autorizzazione</option>
+              <option value="aurum_shield_alert">Alert Aurum Shield</option>
+              <option value="quality_check_failed">Controllo Qualità</option>
+              <option value="backup_created">Backup creati</option>
+              <option value="backup_failed">Backup falliti</option>
+              <option value="deed_deleted">Atti eliminati</option>
+              <option value="user_updated">Utenti</option>
+              <option value="academy_course_assigned">Academy</option>
+              <option value="academy_course_completed">Academy completati</option>
+              <option value="aurum_support_request">Supporto Aurum</option>
+              <option value="system">Sistema</option>
+            </select>
+          </label>
+          <label>Gravità
+            <select name="severity">
+              <option value="">Tutte</option>
+              <option value="info">Info</option>
+              <option value="success">Successo</option>
+              <option value="warning">Attenzione</option>
+              <option value="danger">Pericolo</option>
+              <option value="critical">Critica</option>
+            </select>
+          </label>
+          <label>Ricerca
+            <input name="search" placeholder="Cerca titolo o testo">
+          </label>
+          <button type="submit">Filtra</button>
+          <button class="ghost-button" type="button" id="clearNotificationFilters">Cancella</button>
+        </form>
+        <div class="archive-table users-table notifications-table" id="notificationsList" aria-live="polite"></div>
+        <div class="audit-pagination notification-pagination">
+          <button class="ghost-button" type="button" id="notificationsPrev">Indietro</button>
+          <span id="notificationsPageInfo">Pagina 1</span>
+          <button class="ghost-button" type="button" id="notificationsNext">Avanti</button>
+        </div>
       </section>
 
       <section id="fusion" class="screen">
@@ -1268,6 +1342,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260528-approval-workflow-1"></script>
+  <script src="app.js?v=20260528-notifications-1"></script>
 </body>
 </html>

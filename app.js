@@ -64,6 +64,10 @@ const state = {
   approvals: [],
   auditLogs: [],
   auditPagination: { page: 1, limit: 50, total: 0 },
+  notifications: [],
+  notificationUnreadCount: 0,
+  notificationPagination: { page: 1, limit: 20, total: 0 },
+  notificationTimer: null,
   clockTimer: null,
   aurumSettings: null,
   aurumCurrentSection: "menu",
@@ -596,6 +600,13 @@ const faceIdLoginButton = document.getElementById("faceIdLoginButton");
 const registerFaceIdButton = document.getElementById("registerFaceIdButton");
 const loggedUserName = document.getElementById("loggedUserName");
 const sessionUsername = document.getElementById("sessionUsername");
+const notificationCenter = document.getElementById("notificationCenter");
+const notificationBell = document.getElementById("notificationBell");
+const notificationUnreadBadge = document.getElementById("notificationUnreadBadge");
+const notificationDropdown = document.getElementById("notificationDropdown");
+const notificationDropdownList = document.getElementById("notificationDropdownList");
+const markAllNotificationsRead = document.getElementById("markAllNotificationsRead");
+const viewAllNotifications = document.getElementById("viewAllNotifications");
 const loadingIndicator = document.getElementById("loadingIndicator");
 const appShell = document.querySelector(".app-shell");
 const tutorialOverlay = document.getElementById("tutorialOverlay");
@@ -690,6 +701,13 @@ const auditTrailList = document.getElementById("auditTrailList");
 const auditTrailPageInfo = document.getElementById("auditTrailPageInfo");
 const auditTrailPrev = document.getElementById("auditTrailPrev");
 const auditTrailNext = document.getElementById("auditTrailNext");
+const notificationFilters = document.getElementById("notificationFilters");
+const notificationsList = document.getElementById("notificationsList");
+const notificationsPageInfo = document.getElementById("notificationsPageInfo");
+const notificationsPrev = document.getElementById("notificationsPrev");
+const notificationsNext = document.getElementById("notificationsNext");
+const refreshNotifications = document.getElementById("refreshNotifications");
+const clearNotificationFilters = document.getElementById("clearNotificationFilters");
 const titleOptionsByMetal = {
   Oro: ["24 kt", "22 kt", "21 kt", "18 kt", "14 kt", "12 kt", "9 kt", "6 kt"],
   Argento: ["999", "925", "800"],
@@ -776,6 +794,7 @@ const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
 const API_RETRY_ATTEMPTS = 3;
+const NOTIFICATION_POLL_INTERVAL_MS = 60000;
 const QUALITY_FLAG_POINTS = 1;
 const ROLE_LEVELS = [
   { role: "aiuto_commesso", label: "Commesso OroActive", points: 1000 },
@@ -1346,12 +1365,19 @@ function showLogin() {
   if (loggedUserName) loggedUserName.textContent = "";
   if (sessionUsername) sessionUsername.textContent = "";
   state.actsCache.clear();
+  state.notifications = [];
+  state.notificationUnreadCount = 0;
   demoActs.splice(0, demoActs.length);
+  stopNotificationPolling();
+  closeNotificationDropdown();
+  renderNotificationBadge();
+  if (notificationCenter) notificationCenter.hidden = true;
   loginScreen.hidden = false;
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = true;
   closeMainMenuDropdowns();
   closeMainUserMenu();
+  closeNotificationDropdown();
   updateAurumMascotVisibility();
   appShell.hidden = true;
   if (state.syncTimer) window.clearInterval(state.syncTimer);
@@ -2009,6 +2035,7 @@ function applyRolePermissions() {
   document.querySelectorAll(".control-only").forEach((element) => {
     element.hidden = !canViewControlSectionsUi();
   });
+  if (notificationCenter) notificationCenter.hidden = !state.currentUser;
 
   const storeCode = document.getElementById("storeCode");
   const archiveStore = document.getElementById("archiveStoreFilter");
@@ -2083,6 +2110,8 @@ async function startAuthenticatedApp() {
   if (canViewUsersDirectory()) loadUsers();
   await loadAurumMemories();
   await loadAurumSupportRequests();
+  await loadNotificationCount();
+  startNotificationPolling();
   if (isFounder()) await loadAurumAllMemories();
   maybeShowAurumDailyGreeting();
   maybeShowLevelUnlockMessage();
@@ -2329,6 +2358,7 @@ async function handleScreenDataLoad(id) {
   }
   if (id === "backups") await loadBackups();
   if (id === "approvals") await loadApprovals();
+  if (id === "notifications") await loadNotificationsPage(1);
   if (id === "stores") await loadStores();
   if (id === "antifraud") await loadAntifraud();
   if (id === "aurumShield") await loadAurumShieldAdmin();
@@ -4370,6 +4400,261 @@ async function viewAuditLog(id) {
   }
 }
 
+function notificationTypeLabel(type = "system") {
+  return {
+    approval_request: "Autorizzazione",
+    approval_approved: "Approvata",
+    approval_rejected: "Rifiutata",
+    aurum_shield_alert: "Aurum Shield",
+    quality_check_failed: "Qualità",
+    document_expired: "Documento",
+    backup_created: "Backup",
+    backup_failed: "Backup",
+    deed_deleted: "Atto eliminato",
+    deed_completed: "Atto completato",
+    user_updated: "Utenti",
+    audit_critical: "Audit",
+    academy_course_assigned: "Academy",
+    academy_course_completed: "Academy",
+    aurum_support_request: "Aurum",
+    system: "Sistema"
+  }[String(type || "system")] || "Sistema";
+}
+
+function notificationSeverityMeta(severity = "info") {
+  return {
+    info: { label: "Info", className: "notification-info" },
+    success: { label: "Successo", className: "notification-success" },
+    warning: { label: "Attenzione", className: "notification-warning" },
+    danger: { label: "Pericolo", className: "notification-danger" },
+    critical: { label: "Critica", className: "notification-critical" }
+  }[String(severity || "info").toLowerCase()] || { label: "Info", className: "notification-info" };
+}
+
+function renderNotificationBadge() {
+  const count = Number(state.notificationUnreadCount || 0);
+  if (notificationUnreadBadge) {
+    notificationUnreadBadge.hidden = count <= 0;
+    notificationUnreadBadge.textContent = count > 99 ? "99+" : String(count);
+  }
+  if (notificationBell) {
+    notificationBell.classList.toggle("has-unread", count > 0);
+  }
+}
+
+function notificationCardMarkup(notification = {}, compact = false) {
+  const meta = notificationSeverityMeta(notification.severity);
+  const isUnread = !notification.read_at && !notification.read;
+  return `
+    <article class="notification-item ${meta.className} ${isUnread ? "is-unread" : "is-read"}">
+      <div class="notification-item-main">
+        <div class="notification-item-title">
+          <strong>${escapeHtml(notification.title || "Notifica OroActive")}</strong>
+          <mark>${escapeHtml(notificationTypeLabel(notification.type))}</mark>
+        </div>
+        <p>${escapeHtml(notification.message || "")}</p>
+        <small>${escapeHtml(formatDateTime(notification.created_at))} · ${escapeHtml(meta.label)}</small>
+      </div>
+      <div class="notification-item-actions">
+        <button type="button" data-open-notification="${escapeHtml(String(notification.id || ""))}">Apri</button>
+        ${isUnread ? `<button class="ghost-button" type="button" data-read-notification="${escapeHtml(String(notification.id || ""))}">Letta</button>` : ""}
+        ${compact ? "" : `<button class="ghost-button" type="button" data-delete-notification="${escapeHtml(String(notification.id || ""))}">Elimina</button>`}
+      </div>
+    </article>
+  `;
+}
+
+function closeNotificationDropdown() {
+  if (notificationDropdown) notificationDropdown.hidden = true;
+  if (notificationBell) notificationBell.setAttribute("aria-expanded", "false");
+}
+
+async function loadNotificationCount() {
+  if (!state.currentUser || !notificationCenter) return;
+  try {
+    const data = await apiRequest("/notifications/unread-count", { retries: 1 });
+    state.notificationUnreadCount = Number(data.unread_count || 0);
+    renderNotificationBadge();
+  } catch {
+    renderNotificationBadge();
+  }
+}
+
+function startNotificationPolling() {
+  if (state.notificationTimer || !state.currentUser) return;
+  state.notificationTimer = window.setInterval(loadNotificationCount, NOTIFICATION_POLL_INTERVAL_MS);
+}
+
+function stopNotificationPolling() {
+  if (state.notificationTimer) window.clearInterval(state.notificationTimer);
+  state.notificationTimer = null;
+}
+
+function notificationFilterParams(page = 1, limit = 20) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (!notificationFilters) return params;
+  const formData = new FormData(notificationFilters);
+  for (const [key, value] of formData.entries()) {
+    const text = String(value || "").trim();
+    if (text) params.set(key, text);
+  }
+  return params;
+}
+
+async function loadNotificationDropdown() {
+  if (!state.currentUser || !notificationDropdownList) return;
+  notificationDropdownList.innerHTML = '<div class="empty-state">Caricamento notifiche...</div>';
+  try {
+    const data = await apiRequest("/notifications?limit=6&page=1", { retries: 1 });
+    state.notificationUnreadCount = Number(data.unread_count || 0);
+    renderNotificationBadge();
+    const notifications = data.notifications || [];
+    notificationDropdownList.innerHTML = notifications.length
+      ? notifications.map((notification) => notificationCardMarkup(notification, true)).join("")
+      : '<div class="empty-state">Nessuna notifica al momento.</div>';
+  } catch (error) {
+    notificationDropdownList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Notifiche non caricate.")}</div>`;
+  }
+}
+
+async function loadNotificationsPage(page = 1) {
+  if (!state.currentUser || !notificationsList) return;
+  notificationsList.innerHTML = '<div class="empty-state">Caricamento notifiche...</div>';
+  try {
+    const data = await apiRequest(`/notifications?${notificationFilterParams(page, 20).toString()}`);
+    state.notifications = data.notifications || [];
+    state.notificationUnreadCount = Number(data.unread_count || 0);
+    state.notificationPagination = data.pagination || { page, limit: 20, total: state.notifications.length };
+    renderNotificationBadge();
+    renderNotificationsPage();
+  } catch (error) {
+    notificationsList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Notifiche non caricate.")}</div>`;
+  }
+}
+
+function renderNotificationsPage() {
+  if (!notificationsList) return;
+  const notifications = state.notifications || [];
+  if (!notifications.length) {
+    notificationsList.innerHTML = '<div class="empty-state">Nessuna notifica trovata con questi filtri.</div>';
+  } else {
+    notificationsList.innerHTML = `
+      <div class="table-row head">
+        <span>Notifica</span><span>Tipo</span><span>Gravità</span><span>Data</span><span>Azioni</span>
+      </div>
+      ${notifications.map((notification) => {
+        const meta = notificationSeverityMeta(notification.severity);
+        const isUnread = !notification.read_at && !notification.read;
+        return `
+          <div class="table-row notification-row ${isUnread ? "is-unread" : "is-read"} ${meta.className}">
+            <span>
+              <strong>${escapeHtml(notification.title || "Notifica OroActive")}</strong>
+              <small>${escapeHtml(notification.message || "")}</small>
+            </span>
+            <span>${escapeHtml(notificationTypeLabel(notification.type))}</span>
+            <span><mark>${escapeHtml(meta.label)}</mark></span>
+            <span>${escapeHtml(formatDateTime(notification.created_at))}</span>
+            <span class="row-actions">
+              <button type="button" data-open-notification="${escapeHtml(String(notification.id || ""))}">Apri</button>
+              ${isUnread ? `<button class="ghost-button" type="button" data-read-notification="${escapeHtml(String(notification.id || ""))}">Segna letta</button>` : ""}
+              <button class="ghost-button" type="button" data-delete-notification="${escapeHtml(String(notification.id || ""))}">Elimina</button>
+            </span>
+          </div>
+        `;
+      }).join("")}
+    `;
+  }
+  const pagination = state.notificationPagination || { page: 1, limit: 20, total: 0 };
+  const totalPages = Math.max(1, Math.ceil(Number(pagination.total || 0) / Number(pagination.limit || 20)));
+  if (notificationsPageInfo) notificationsPageInfo.textContent = `Pagina ${pagination.page || 1} di ${totalPages} · ${pagination.total || 0} notifiche`;
+  if (notificationsPrev) notificationsPrev.disabled = Number(pagination.page || 1) <= 1;
+  if (notificationsNext) notificationsNext.disabled = Number(pagination.page || 1) >= totalPages;
+}
+
+function sectionFromNotificationAction(actionUrl = "") {
+  const target = String(actionUrl || "").trim();
+  if (!target.startsWith("#")) return "";
+  return target.replace(/^#/, "") || "";
+}
+
+function findNotificationById(id) {
+  const needle = String(id || "");
+  return [
+    ...(state.notifications || [])
+  ].find((notification) => String(notification.id || "") === needle) || null;
+}
+
+async function markNotificationReadById(id, options = {}) {
+  const data = await apiRequest(`/notifications/${encodeURIComponent(id)}/read`, {
+    method: "PUT",
+    body: JSON.stringify({ opened: Boolean(options.opened) })
+  });
+  state.notificationUnreadCount = Number(data.unread_count || 0);
+  renderNotificationBadge();
+  return data.notification || null;
+}
+
+async function openNotificationById(id) {
+  try {
+    const known = findNotificationById(id);
+    const notification = await markNotificationReadById(id, { opened: true }) || known;
+    closeNotificationDropdown();
+    const section = sectionFromNotificationAction(notification?.action_url || known?.action_url || "");
+    if (section) {
+      if (mainMenuScreen) mainMenuScreen.hidden = true;
+      updateAurumMascotVisibility();
+      setScreen(section);
+    } else {
+      showToast("Notifica segnata come letta.", "success");
+    }
+    await loadNotificationCount();
+  } catch (error) {
+    showToast(error.message || "Notifica non aperta.", "error");
+  }
+}
+
+async function readNotificationById(id) {
+  try {
+    await markNotificationReadById(id);
+    await loadNotificationDropdown();
+    if (document.getElementById("notifications")?.classList.contains("active-screen")) {
+      await loadNotificationsPage(state.notificationPagination?.page || 1);
+    }
+  } catch (error) {
+    showToast(error.message || "Notifica non aggiornata.", "error");
+  }
+}
+
+async function markAllNotificationsAsRead() {
+  try {
+    const data = await apiRequest("/notifications/read-all", { method: "PUT", body: JSON.stringify({}) });
+    state.notificationUnreadCount = Number(data.unread_count || 0);
+    renderNotificationBadge();
+    await loadNotificationDropdown();
+    if (document.getElementById("notifications")?.classList.contains("active-screen")) {
+      await loadNotificationsPage(state.notificationPagination?.page || 1);
+    }
+    showToast("Notifiche segnate come lette.", "success");
+  } catch (error) {
+    showToast(error.message || "Notifiche non aggiornate.", "error");
+  }
+}
+
+async function deleteNotificationById(id) {
+  if (!window.confirm("Vuoi eliminare questa notifica?")) return;
+  try {
+    const data = await apiRequest(`/notifications/${encodeURIComponent(id)}`, { method: "DELETE" });
+    state.notificationUnreadCount = Number(data.unread_count || 0);
+    renderNotificationBadge();
+    await loadNotificationDropdown();
+    if (document.getElementById("notifications")?.classList.contains("active-screen")) {
+      await loadNotificationsPage(state.notificationPagination?.page || 1);
+    }
+  } catch (error) {
+    showToast(error.message || "Notifica non eliminata.", "error");
+  }
+}
+
 function approvalStatusMeta(status = "pending") {
   return {
     pending: { label: "In attesa", className: "approval-pending" },
@@ -4504,6 +4789,7 @@ async function approveApprovalRequest(id) {
     });
     showToast(data.message || "Autorizzazione approvata. La pratica può essere completata.", "success");
     await loadApprovals();
+    await loadNotificationCount();
     await loadArchiveScreenData({ force: true, silent: true }).catch(() => {});
     renderArchiveGroups();
   } catch (error) {
@@ -4524,6 +4810,7 @@ async function rejectApprovalRequest(id) {
     });
     showToast(data.message || "Autorizzazione rifiutata. Correggere la pratica prima di procedere.", "success");
     await loadApprovals();
+    await loadNotificationCount();
     await loadArchiveScreenData({ force: true, silent: true }).catch(() => {});
     renderArchiveGroups();
   } catch (error) {
@@ -4537,6 +4824,7 @@ async function cancelApprovalRequest(id) {
     const data = await apiRequest(`/approvals/${encodeURIComponent(id)}/cancel`, { method: "POST" });
     showToast(data.message || "Richiesta autorizzazione annullata.", "success");
     await loadApprovals();
+    await loadNotificationCount();
     await loadArchiveScreenData({ force: true, silent: true }).catch(() => {});
     renderArchiveGroups();
   } catch (error) {
@@ -4773,6 +5061,7 @@ async function requestApprovalForCurrentPractice(options = {}) {
     }
     await Promise.all([
       loadApprovals().catch(() => {}),
+      loadNotificationCount().catch(() => {}),
       loadArchiveScreenData({ force: true, silent: true }).catch(() => {})
     ]);
     renderArchiveGroups();
@@ -9479,6 +9768,55 @@ auditTrailNext?.addEventListener("click", () => {
   const page = Number(state.auditPagination?.page || 1) + 1;
   loadAuditTrail(page);
 });
+notificationBell?.addEventListener("click", async (event) => {
+  event.stopPropagation();
+  const opening = notificationDropdown?.hidden !== false;
+  if (notificationDropdown) notificationDropdown.hidden = !opening;
+  if (notificationBell) notificationBell.setAttribute("aria-expanded", opening ? "true" : "false");
+  if (opening) await loadNotificationDropdown();
+});
+notificationDropdown?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const open = event.target.closest("[data-open-notification]");
+  const read = event.target.closest("[data-read-notification]");
+  const remove = event.target.closest("[data-delete-notification]");
+  if (open) openNotificationById(open.dataset.openNotification);
+  if (read) readNotificationById(read.dataset.readNotification);
+  if (remove) deleteNotificationById(remove.dataset.deleteNotification);
+});
+markAllNotificationsRead?.addEventListener("click", markAllNotificationsAsRead);
+viewAllNotifications?.addEventListener("click", () => {
+  closeNotificationDropdown();
+  if (mainMenuScreen) mainMenuScreen.hidden = true;
+  updateAurumMascotVisibility();
+  setScreen("notifications");
+});
+notificationFilters?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  loadNotificationsPage(1);
+});
+notificationFilters?.addEventListener("change", () => loadNotificationsPage(1));
+clearNotificationFilters?.addEventListener("click", () => {
+  notificationFilters?.reset();
+  loadNotificationsPage(1);
+});
+refreshNotifications?.addEventListener("click", () => loadNotificationsPage(state.notificationPagination?.page || 1));
+notificationsList?.addEventListener("click", (event) => {
+  const open = event.target.closest("[data-open-notification]");
+  const read = event.target.closest("[data-read-notification]");
+  const remove = event.target.closest("[data-delete-notification]");
+  if (open) openNotificationById(open.dataset.openNotification);
+  if (read) readNotificationById(read.dataset.readNotification);
+  if (remove) deleteNotificationById(remove.dataset.deleteNotification);
+});
+notificationsPrev?.addEventListener("click", () => {
+  const page = Math.max(1, Number(state.notificationPagination?.page || 1) - 1);
+  loadNotificationsPage(page);
+});
+notificationsNext?.addEventListener("click", () => {
+  const page = Number(state.notificationPagination?.page || 1) + 1;
+  loadNotificationsPage(page);
+});
 refreshApprovals?.addEventListener("click", loadApprovals);
 approvalsList?.addEventListener("click", (event) => {
   const open = event.target.closest("[data-open-approval-act]");
@@ -9636,6 +9974,7 @@ brandDropdown.querySelectorAll("button").forEach((button) => {
 document.addEventListener("click", (event) => {
   if (!brandDropdown.hidden && !event.target.closest(".brand-wrap")) closeBrandMenu();
   if (mainUserDropdown && !mainUserDropdown.hidden && !event.target.closest(".main-user-menu")) closeMainUserMenu();
+  if (notificationDropdown && !notificationDropdown.hidden && !event.target.closest(".notification-center")) closeNotificationDropdown();
   if (mainMenuScreen && !mainMenuScreen.hidden && !event.target.closest(".main-menu-group")) closeMainMenuDropdowns();
 });
 
