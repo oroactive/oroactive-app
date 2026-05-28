@@ -48,6 +48,8 @@ const state = {
   aiFeedback: [],
   stores: [],
   dashboard: null,
+  founderReports: [],
+  founderReport: null,
   antifraudAlerts: [],
   trainingCourses: [],
   courseFaculties: [],
@@ -667,6 +669,14 @@ const aiFeedbackList = document.getElementById("aiFeedbackList");
 const resetKnowledgeNoteButton = document.getElementById("resetKnowledgeNoteForm");
 const dashboardGrid = document.getElementById("dashboardGrid");
 const dashboardPanels = document.getElementById("dashboardPanels");
+const founderReportDate = document.getElementById("founderReportDate");
+const founderReportStatus = document.getElementById("founderReportStatus");
+const founderReportCards = document.getElementById("founderReportCards");
+const founderReportBody = document.getElementById("founderReportBody");
+const founderReportHistory = document.getElementById("founderReportHistory");
+const generateFounderReportButton = document.getElementById("generateFounderReport");
+const downloadFounderReportPdfButton = document.getElementById("downloadFounderReportPdf");
+const sendFounderReportButton = document.getElementById("sendFounderReport");
 const aurumShieldCard = document.getElementById("aurumShieldCard");
 const aurumShieldScore = document.getElementById("aurumShieldScore");
 const aurumShieldLevel = document.getElementById("aurumShieldLevel");
@@ -1083,6 +1093,7 @@ function apiErrorFallback(path = "", status = 0) {
   if (/\/suspended-practices/.test(path)) return "Operazione pratica sospesa non completata.";
   if (/\/approvals/.test(path)) return "Operazione autorizzazione non completata.";
   if (/\/notifications/.test(path)) return "Operazione notifiche non completata.";
+  if (/\/founder-daily-report/.test(path)) return "Founder Daily Report non completato.";
   if (/\/backups/.test(path)) return "Operazione backup non completata.";
   if (/\/academy|\/corsi/.test(path)) return "Operazione Academy non completata.";
   if (/\/crm|\/clienti/.test(path)) return "Operazione CRM non completata.";
@@ -2393,6 +2404,10 @@ function setScreen(id) {
     showToast("OroActive Audit Trail è riservato al Founder.");
     return;
   }
+  if (id === "founderDailyReport" && !isFounder()) {
+    showToast("Founder Daily Report è riservato al Founder.");
+    return;
+  }
   if (id === "backups" && !canManageBackupsUi()) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
@@ -2432,6 +2447,7 @@ function sectionLoadErrorMessage(id, error) {
     antifraud: "Antifrode non caricato.",
     aurumShield: "Aurum Shield non caricato.",
     auditTrail: "Audit Trail non caricato.",
+    founderDailyReport: "Founder Daily Report non caricato.",
     training: "Academy non caricata.",
     crm: "CRM non caricato.",
     assistant: "Assistente IA non caricato.",
@@ -2465,6 +2481,7 @@ async function handleScreenDataLoad(id) {
   if (id === "antifraud") await loadAntifraud();
   if (id === "aurumShield") await loadAurumShieldAdmin();
   if (id === "auditTrail") await loadAuditTrail();
+  if (id === "founderDailyReport") await loadFounderDailyReport();
   if (id === "training") await loadTraining();
   if (id === "crm") await loadCrmClients();
   if (id === "assistant") {
@@ -4360,6 +4377,239 @@ async function loadDashboard() {
   }
 }
 
+function todayDateInputValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function selectedFounderReportDate() {
+  return founderReportDate?.value || todayDateInputValue();
+}
+
+function formatGrams(value = 0) {
+  return `${Number(value || 0).toFixed(2)} gr`;
+}
+
+function founderReportRow(label, value, detail = "") {
+  return `
+    <div class="dashboard-rank-row">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(String(value ?? 0))}</strong>
+      ${detail ? `<em>${escapeHtml(detail)}</em>` : ""}
+    </div>
+  `;
+}
+
+function renderFounderReportHistory() {
+  if (!founderReportHistory) return;
+  if (!state.founderReports.length) {
+    founderReportHistory.innerHTML = '<div class="empty-state">Nessun report precedente.</div>';
+    return;
+  }
+  founderReportHistory.innerHTML = state.founderReports.slice(0, 12).map((report) => `
+    <button class="founder-report-history-item" type="button" data-founder-report-date="${escapeHtml(report.report_date || "")}">
+      <strong>${escapeHtml(report.report_date || "Data non disponibile")}</strong>
+      <span>${escapeHtml(report.status || "generated")} · ${escapeHtml(String(report.summary?.acts_completed_today || 0))} atti completati</span>
+    </button>
+  `).join("");
+}
+
+function renderFounderDailyReport() {
+  const report = state.founderReport;
+  if (!founderReportCards || !founderReportBody || !founderReportStatus) return;
+  if (!report) {
+    founderReportStatus.textContent = "Report non generato per la data selezionata.";
+    founderReportCards.innerHTML = "";
+    founderReportBody.innerHTML = '<div class="empty-state">Genera il report o scegli una data già disponibile.</div>';
+    return;
+  }
+  const summary = report.summary || {};
+  const risks = report.risks_data || {};
+  const backup = report.backup_data || {};
+  const payments = summary.payments || {};
+  const metals = summary.metals?.totals || {};
+  founderReportStatus.textContent = `Report ${report.report_date} · stato ${report.status || "generated"} · aggiornato ${formatDateTime(report.updated_at)}`;
+  founderReportCards.innerHTML = [
+    metricCard("Atti completati", summary.acts_completed_today || 0),
+    metricCard("Pratiche sospese", report.suspended_data?.current_total || summary.suspended_total || 0),
+    metricCard("Alert Shield critici", risks.critical_count || 0),
+    metricCard("Contanti erogati", formatEuro(payments.contanti_amount || 0)),
+    metricCard("Oro acquistato", formatGrams(metals.Oro || 0)),
+    metricCard("Backup status", backup.failed_today ? "Da verificare" : "Regolare")
+  ].join("");
+
+  const storeRows = (report.stores_data || []).slice(0, 10).map((store) => founderReportRow(
+    store.negozio || "Negozio",
+    `${store.atti_completati || 0} atti`,
+    `${formatGrams(store.oro_acquistato || 0)} oro · ${store.atti_sospesi || 0} sospese · ${store.aurum_shield_alerts || 0} alert`
+  )).join("") || '<div class="empty-state">Nessun dato negozio.</div>';
+  const operatorRows = (report.operators_data || []).slice(0, 10).map((operator) => founderReportRow(
+    operator.user_name || "Utente",
+    operator.total_activity || 0,
+    `${roleLabel(operator.user_role || "")} · ${operator.acts_created || 0} creati · ${operator.acts_completed || 0} completati · ${operator.relevant_alerts || 0} alert`
+  )).join("") || '<div class="empty-state">Nessuna attività operatore.</div>';
+  const suspendedRows = (report.suspended_data?.open_practices || []).slice(0, 8).map((practice) => founderReportRow(
+    practice.practice_number || "Pratica sospesa",
+    `${practice.risk_score || 0}/100`,
+    `${practice.negozio || "Negozio"} · ${(practice.motivi || [])[0]?.message || (practice.motivi || [])[0] || "Motivo da verificare"}`
+  )).join("") || '<div class="empty-state">Nessuna pratica sospesa aperta.</div>';
+  const riskRows = [
+    founderReportRow("Rischio basso", risks.low_count || 0),
+    founderReportRow("Rischio medio", risks.medium_count || 0),
+    founderReportRow("Rischio alto", risks.high_count || 0),
+    founderReportRow("Rischio critico", risks.critical_count || 0)
+  ].join("") + ((risks.recurring_reasons || []).slice(0, 5).map((item) => founderReportRow(item.reason, item.total, "Motivo ricorrente")).join("") || "");
+  const qualityRows = [
+    founderReportRow("Qualità superata", report.quality_data?.passed_today || 0),
+    founderReportRow("Qualità con attenzione", report.quality_data?.warning_today || 0),
+    founderReportRow("Qualità non superata", report.quality_data?.failed_today || 0)
+  ].join("") + ((report.quality_data?.recurring_missing_data || []).slice(0, 5).map((item) => founderReportRow(item.reason, item.total, "Dato mancante ricorrente")).join("") || "");
+  const approvalRows = [
+    founderReportRow("Richieste create", report.approvals_data?.created_today || 0),
+    founderReportRow("Approvate", report.approvals_data?.approved_today || 0),
+    founderReportRow("Rifiutate", report.approvals_data?.rejected_today || 0),
+    founderReportRow("Pendenti", report.approvals_data?.pending || 0),
+    founderReportRow("Tempo medio", `${Number(report.approvals_data?.average_approval_minutes || 0).toFixed(1)} min`)
+  ].join("");
+  const auditRows = [
+    founderReportRow("Azioni registrate", report.audit_data?.actions_today || 0),
+    founderReportRow("Atti eliminati", report.audit_data?.deleted_acts || 0),
+    founderReportRow("Utenti modificati", report.audit_data?.updated_users || 0),
+    founderReportRow("Download backup", report.audit_data?.backup_downloads || 0),
+    founderReportRow("Cambio ruoli", report.audit_data?.role_changes || 0)
+  ].join("") + ((report.audit_data?.latest_critical_events || []).slice(0, 5).map((item) => founderReportRow(
+    item.label || auditActionLabel(item.action),
+    formatDateTime(item.created_at),
+    item.userName || item.actor || ""
+  )).join("") || "");
+  const backupRows = [
+    founderReportRow("Backup creati", backup.created_today || 0),
+    founderReportRow("Backup verificati", backup.verified_today || 0),
+    founderReportRow("Backup falliti", backup.failed_today || 0),
+    founderReportRow("Ultimo backup", backup.latest_backup?.backup_code || "Dato non disponibile", backup.latest_backup?.status || ""),
+    founderReportRow("Ultimo test restore", backup.latest_restore_test_status || "not_tested")
+  ].join("");
+  const academyRows = [
+    founderReportRow("Corsi completati", report.academy_data?.courses_completed_today || 0),
+    founderReportRow("Certificazioni", report.academy_data?.certificates_issued_today || 0),
+    founderReportRow("Badge", report.academy_data?.badges_assigned_today || 0),
+    founderReportRow("Corsi in sospeso", report.academy_data?.pending_courses || 0),
+    founderReportRow("Progresso medio", `${Number(report.academy_data?.average_progress || 0).toFixed(1)}%`)
+  ].join("");
+  const aiRows = [
+    founderReportRow("Domande ad Aurum", report.ai_data?.aurum_questions_today || 0),
+    founderReportRow("Richieste supporto", report.ai_data?.support_requests_today || 0)
+  ].join("");
+  const actionRows = (report.actions_recommended || []).map((item, index) => founderReportRow(`Azione ${index + 1}`, item)).join("") || '<div class="empty-state">Nessuna azione consigliata.</div>';
+
+  founderReportBody.innerHTML = `
+    <section class="dashboard-panel"><h3>Riepilogo generale</h3>
+      ${founderReportRow("Atti creati oggi", summary.acts_created_today || 0)}
+      ${founderReportRow("Atti completati oggi", summary.acts_completed_today || 0)}
+      ${founderReportRow("Atti archiviati oggi", summary.acts_archived_today || 0)}
+      ${founderReportRow("Atti eliminati oggi", summary.acts_deleted_today || 0)}
+      ${founderReportRow("Fusioni create oggi", summary.fusions_today || 0)}
+    </section>
+    <section class="dashboard-panel"><h3>Metalli e pagamenti</h3>
+      ${founderReportRow("Oro", formatGrams(metals.Oro || 0), `Var. ${formatGrams(summary.metals_variation_vs_previous_day?.Oro || 0)}`)}
+      ${founderReportRow("Argento", formatGrams(metals.Argento || 0), `Var. ${formatGrams(summary.metals_variation_vs_previous_day?.Argento || 0)}`)}
+      ${founderReportRow("Platino", formatGrams(metals.Platino || 0), `Var. ${formatGrams(summary.metals_variation_vs_previous_day?.Platino || 0)}`)}
+      ${founderReportRow("Contanti", formatEuro(payments.contanti_amount || 0), `${payments.contanti_count || 0} pratiche`)}
+      ${founderReportRow("Bonifici", formatEuro(payments.bonifico_amount || 0), `${payments.bonifico_count || 0} pratiche`)}
+      ${founderReportRow("Contabili mancanti", payments.missing_receipts || 0)}
+    </section>
+    <section class="dashboard-panel"><h3>Negozi</h3>${storeRows}</section>
+    <section class="dashboard-panel"><h3>Operatori</h3>${operatorRows}</section>
+    <section class="dashboard-panel"><h3>Aurum Shield</h3>${riskRows}</section>
+    <section class="dashboard-panel"><h3>Controllo Qualità</h3>${qualityRows}</section>
+    <section class="dashboard-panel"><h3>Pratiche sospese</h3>${suspendedRows}</section>
+    <section class="dashboard-panel"><h3>Autorizzazioni</h3>${approvalRows}</section>
+    <section class="dashboard-panel"><h3>Notifiche</h3>
+      ${founderReportRow("Notifiche create", report.notifications_data?.created_today || 0)}
+      ${founderReportRow("Critiche", report.notifications_data?.critical_today || 0)}
+      ${founderReportRow("Non lette", report.notifications_data?.unread_today || 0)}
+      ${founderReportRow("Autorizzazioni", report.notifications_data?.approval_notifications || 0)}
+      ${founderReportRow("Backup", report.notifications_data?.backup_notifications || 0)}
+      ${founderReportRow("Rischio", report.notifications_data?.risk_notifications || 0)}
+    </section>
+    <section class="dashboard-panel"><h3>Audit Trail</h3>${auditRows}</section>
+    <section class="dashboard-panel"><h3>Backup</h3>${backupRows}</section>
+    <section class="dashboard-panel"><h3>Academy</h3>${academyRows}</section>
+    <section class="dashboard-panel"><h3>AI / Aurum</h3>${aiRows}</section>
+    <section class="dashboard-panel"><h3>Azioni consigliate</h3>${actionRows}</section>
+  `;
+}
+
+async function loadFounderDailyReport(date = selectedFounderReportDate()) {
+  if (!isFounder()) return;
+  if (founderReportDate && !founderReportDate.value) founderReportDate.value = todayDateInputValue();
+  try {
+    const history = await apiRequest("/founder-daily-report");
+    state.founderReports = history.reports || [];
+    renderFounderReportHistory();
+  } catch {
+    state.founderReports = [];
+    renderFounderReportHistory();
+  }
+  try {
+    const data = await apiRequest(`/founder-daily-report/${encodeURIComponent(date)}`);
+    state.founderReport = data.report || null;
+  } catch (error) {
+    if (error.status !== 404) showToast(error.message || "Founder Daily Report non caricato.", "error");
+    state.founderReport = null;
+  }
+  renderFounderDailyReport();
+}
+
+async function generateFounderDailyReport() {
+  if (!isFounder()) return;
+  const date = todayDateInputValue();
+  if (founderReportDate) founderReportDate.value = date;
+  const data = await apiRequest("/founder-daily-report/generate", {
+    method: "POST",
+    body: JSON.stringify({ date }),
+    timeoutMs: 60000
+  });
+  state.founderReport = data.report || null;
+  await loadFounderDailyReport(date);
+  showToast("Founder Daily Report generato.", "success");
+}
+
+async function downloadFounderDailyReportPdf() {
+  if (!isFounder()) return;
+  const date = selectedFounderReportDate();
+  const response = await fetch(`${apiBase}/founder-daily-report/${encodeURIComponent(date)}/pdf`, {
+    headers: state.authToken ? { Authorization: `Bearer ${state.authToken}` } : {},
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(cleanUserMessage(body.error, "PDF Founder Daily Report non disponibile."));
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `founder-daily-report-${date}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function sendFounderDailyReport() {
+  if (!isFounder()) return;
+  const date = selectedFounderReportDate();
+  const data = await apiRequest(`/founder-daily-report/${encodeURIComponent(date)}/send`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+  showToast(data.message || "Invio report non configurato.", data.ok ? "success" : "warning");
+}
+
 function auditActionLabel(action = "") {
   return {
     login: "Login",
@@ -4421,6 +4671,10 @@ function auditActionLabel(action = "") {
     assign_badge: "Assegnazione badge",
     revoke_badge: "Revoca badge",
     create_fusion_lot: "Creazione lotto fusione",
+    founder_daily_report_generated: "Founder Daily Report generato",
+    founder_daily_report_downloaded: "Download Founder Daily Report",
+    founder_daily_report_sent: "Invio Founder Daily Report",
+    founder_daily_report_failed: "Errore Founder Daily Report",
     api_request_error: "Errore API"
   }[action] || action.replace(/_/g, " ") || "Attività";
 }
@@ -10174,6 +10428,22 @@ backupsList?.addEventListener("click", (event) => {
   if (deleteButton) withButtonBusy(deleteButton, "Elimino...", () => deleteBackup(deleteButton.dataset.deleteBackup));
   if (verify) withButtonBusy(verify, "Verifico...", () => verifyBackup(verify.dataset.verifyBackup));
   if (restore) withButtonBusy(restore, "Test...", () => testRestoreBackup(restore.dataset.testRestoreBackup));
+});
+founderReportDate?.addEventListener("change", () => loadFounderDailyReport(selectedFounderReportDate()));
+generateFounderReportButton?.addEventListener("click", (event) => {
+  withButtonBusy(event.currentTarget, "Genero...", () => generateFounderDailyReport());
+});
+downloadFounderReportPdfButton?.addEventListener("click", (event) => {
+  withButtonBusy(event.currentTarget, "Scarico...", () => downloadFounderDailyReportPdf());
+});
+sendFounderReportButton?.addEventListener("click", (event) => {
+  withButtonBusy(event.currentTarget, "Invio...", () => sendFounderDailyReport());
+});
+founderReportHistory?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-founder-report-date]");
+  if (!button) return;
+  if (founderReportDate) founderReportDate.value = button.dataset.founderReportDate;
+  loadFounderDailyReport(button.dataset.founderReportDate);
 });
 auditTrailFilters?.addEventListener("submit", (event) => {
   event.preventDefault();

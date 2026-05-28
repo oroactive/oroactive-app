@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260528-total-quality-1">
+  <link rel="stylesheet" href="styles.css?v=20260528-founder-report-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -72,6 +72,7 @@
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
             <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
             <button class="founder-only" type="button" data-section="auditTrail">Audit Trail</button>
+            <button class="founder-only" type="button" data-section="founderDailyReport">Founder Daily Report</button>
             <button type="button" data-section="notifications">Notifiche</button>
             <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
@@ -136,6 +137,7 @@
             <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
             <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
             <button class="founder-only" type="button" data-section="auditTrail">Audit Trail</button>
+            <button class="founder-only" type="button" data-section="founderDailyReport">Founder Daily Report</button>
             <button type="button" data-section="notifications">Notifiche</button>
             <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
             <button type="button" data-section="crm">CRM Clienti</button>
@@ -822,6 +824,32 @@
         <div class="dashboard-panels" id="dashboardPanels"></div>
       </section>
 
+      <section id="founderDailyReport" class="screen founder-only">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="archive-header founder-report-header">
+          <div>
+            <p class="eyebrow">Founder</p>
+            <h2>Founder Daily Report</h2>
+            <p class="muted">Report operativo giornaliero su atti, negozi, operatori, rischi, backup, Academy e Audit Trail.</p>
+          </div>
+          <div class="founder-report-actions">
+            <label>Data report
+              <input id="founderReportDate" type="date">
+            </label>
+            <button class="primary-button" type="button" id="generateFounderReport">Genera report di oggi</button>
+            <button class="ghost-button" type="button" id="downloadFounderReportPdf">Scarica PDF</button>
+            <button class="ghost-button" type="button" id="sendFounderReport">Invia report</button>
+          </div>
+        </div>
+        <div class="founder-report-status" id="founderReportStatus" aria-live="polite">Seleziona una data o genera il report di oggi.</div>
+        <div class="dashboard-grid founder-report-cards" id="founderReportCards"></div>
+        <div class="dashboard-panels founder-report-body" id="founderReportBody"></div>
+        <section class="dashboard-panel founder-report-history-panel">
+          <h3>Report precedenti</h3>
+          <div class="founder-report-history" id="founderReportHistory" aria-live="polite"></div>
+        </section>
+      </section>
+
       <section id="quotazione" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
@@ -1407,6 +1435,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260528-total-quality-1"></script>
+  <script src="app.js?v=20260528-founder-report-1"></script>
 </body>
 </html>

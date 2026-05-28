@@ -666,7 +666,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /total-quality-1/);
+  assert.match(worker, /founder-report-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -719,7 +719,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /total-quality-1/);
+  assert.match(worker, /founder-report-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -771,7 +771,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /total-quality-1/);
+  assert.match(worker, /founder-report-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -841,12 +841,61 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260528-total-quality-1/);
-  assert.match(index, /styles\.css\?v=20260528-total-quality-1/);
-  assert.match(worker, /total-quality-1/);
+  assert.match(index, /app\.js\?v=20260528-founder-report-1/);
+  assert.match(index, /styles\.css\?v=20260528-founder-report-1/);
+  assert.match(worker, /founder-report-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
+});
+
+test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
+  const [index, app, server, schema, migration, styles] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260528_founder_daily_report.sql"),
+    file("styles.css")
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS founder_daily_reports/);
+  assert.match(schema, /UNIQUE\(report_date\)/);
+  assert.match(schema, /quality_data JSONB/);
+  assert.match(migration, /idx_founder_daily_reports_date/);
+  assert.match(migration, /idx_founder_daily_reports_status/);
+  assert.match(server, /async function generateFounderDailyReport/);
+  assert.match(server, /function writeFounderDailyReportPdf/);
+  assert.match(server, /realCompletedStatusSql\("a"\)/);
+  assert.match(server, /suspendedStatusWhere\("a"\)/);
+  assert.match(server, /app\.get\("\/api\/founder-daily-report", requireFounder/);
+  assert.match(server, /app\.get\("\/api\/founder-daily-report\/:date", requireFounder/);
+  assert.match(server, /app\.post\("\/api\/founder-daily-report\/generate", requireFounder/);
+  assert.match(server, /app\.get\("\/api\/founder-daily-report\/:date\/pdf", requireFounder/);
+  assert.match(server, /app\.post\("\/api\/founder-daily-report\/:date\/send", requireFounder/);
+  assert.match(server, /founder_daily_report_generated/);
+  assert.match(server, /founder_daily_report_downloaded/);
+  assert.match(server, /Founder Daily Report generato/);
+  assert.match(server, /Invio email non configurato/);
+  assert.match(server, /actionUrl: "#founderDailyReport"/);
+  assert.match(server, /Controllo pratica non completato|Founder Daily Report non completato/);
+  assert.match(index, /id="founderDailyReport" class="screen founder-only"/);
+  assert.match(index, /data-section="founderDailyReport">Founder Daily Report/);
+  assert.match(index, /id="generateFounderReport"/);
+  assert.match(index, /id="downloadFounderReportPdf"/);
+  assert.match(index, /id="sendFounderReport"/);
+  assert.match(app, /founderReports: \[\]/);
+  assert.match(app, /founderReport: null/);
+  assert.match(app, /Founder Daily Report è riservato al Founder/);
+  assert.match(app, /async function loadFounderDailyReport/);
+  assert.match(app, /async function generateFounderDailyReport/);
+  assert.match(app, /async function downloadFounderDailyReportPdf/);
+  assert.match(app, /async function sendFounderDailyReport/);
+  assert.match(app, /apiRequest\("\/founder-daily-report\/generate"/);
+  assert.match(app, /founder-daily-report\/\$\{encodeURIComponent\(date\)\}\/pdf/);
+  assert.match(app, /Founder Daily Report generato\./);
+  assert.match(styles, /founder-report-actions/);
+  assert.match(styles, /founder-report-history-item/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {

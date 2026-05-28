@@ -483,7 +483,11 @@ function auditActionLabel(action = "") {
     sale_deed_completed_after_suspension: "Atto completato dopo sospensione",
     notification_created: "Notifica creata",
     notification_read: "Notifica letta",
-    notification_action_opened: "Apertura notifica"
+    notification_action_opened: "Apertura notifica",
+    founder_daily_report_generated: "Founder Daily Report generato",
+    founder_daily_report_downloaded: "Download Founder Daily Report",
+    founder_daily_report_sent: "Invio Founder Daily Report",
+    founder_daily_report_failed: "Errore Founder Daily Report"
   }[action] || activityLabel(action) || "Attività";
 }
 
@@ -4179,6 +4183,787 @@ async function dashboardKpis(user = {}) {
     suspended_practices: suspendedSummary,
     audit_summary: auditSummary
   };
+}
+
+function founderReportDate(value = new Date()) {
+  const raw = value instanceof Date ? value.toISOString().slice(0, 10) : String(value || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const error = new Error("Data report non valida.");
+    error.status = 400;
+    throw error;
+  }
+  return raw;
+}
+
+function reportNumber(value = 0) {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function reportArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+async function reportQuery(sql, values = [], fallback = []) {
+  try {
+    const result = await pool.query(sql, values);
+    return result.rows;
+  } catch (error) {
+    console.error("FOUNDER DAILY REPORT QUERY ERROR", error.message || error);
+    return fallback;
+  }
+}
+
+function normalizeReportMetal(value = "") {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("argento")) return "Argento";
+  if (text.includes("platino")) return "Platino";
+  return "Oro";
+}
+
+function normalizeReportTitle(metal = "Oro", title = "") {
+  const text = String(title || "").toLowerCase().replace(/\s+/g, "");
+  const numeric = text.match(/\d+/)?.[0] || "";
+  if (metal === "Oro") {
+    const allowed = ["6", "9", "12", "14", "18", "21", "22", "24"];
+    return allowed.includes(numeric) ? `${numeric}kt` : "Altro";
+  }
+  if (metal === "Argento") {
+    return ["800", "925", "999"].includes(numeric) ? numeric : "Altro";
+  }
+  if (metal === "Platino") {
+    return ["850", "900", "950"].includes(numeric) ? numeric : "Altro";
+  }
+  return "Altro";
+}
+
+function founderReportMaterials(acts = []) {
+  const initial = {
+    totals: { Oro: 0, Argento: 0, Platino: 0 },
+    oro_by_title: { "6kt": 0, "9kt": 0, "12kt": 0, "14kt": 0, "18kt": 0, "21kt": 0, "22kt": 0, "24kt": 0, Altro: 0 },
+    argento_by_title: { 800: 0, 925: 0, 999: 0, Altro: 0 },
+    platino_by_title: { 850: 0, 900: 0, 950: 0, Altro: 0 }
+  };
+  acts.flatMap(materialLotsFromAct).forEach((lot) => {
+    const metal = normalizeReportMetal(lot.metal);
+    const grams = reportNumber(lot.weight);
+    const title = normalizeReportTitle(metal, lot.title);
+    initial.totals[metal] = reportNumber(initial.totals[metal]) + grams;
+    if (metal === "Oro") initial.oro_by_title[title] = reportNumber(initial.oro_by_title[title]) + grams;
+    if (metal === "Argento") initial.argento_by_title[title] = reportNumber(initial.argento_by_title[title]) + grams;
+    if (metal === "Platino") initial.platino_by_title[title] = reportNumber(initial.platino_by_title[title]) + grams;
+  });
+  return initial;
+}
+
+function normalizeReportPayment(method = "") {
+  const text = String(method || "").toLowerCase();
+  if (text.includes("bonifico")) return "bonifico";
+  if (text.includes("assegno")) return "assegno";
+  if (text.includes("contant")) return "contanti";
+  return "altro";
+}
+
+function hasPaymentReceipt(act = {}) {
+  const attachmentGroups = [
+    act.captureAttachments,
+    act.fiscalDocumentAttachments,
+    act.paymentAttachments,
+    act.attachments
+  ].filter(Array.isArray).flat();
+  return attachmentGroups.some((attachment) => /contabile|bonifico|assegno|ricevuta/i.test(String(attachment?.key || attachment?.name || attachment?.label || "")));
+}
+
+function founderReportPayments(acts = []) {
+  return acts.reduce((summary, act) => {
+    const key = normalizeReportPayment(act.paymentMethod);
+    const amount = reportNumber(act.amount);
+    summary[`${key}_amount`] = reportNumber(summary[`${key}_amount`]) + amount;
+    summary[`${key}_count`] = reportNumber(summary[`${key}_count`]) + 1;
+    if (key === "bonifico" && !hasPaymentReceipt(act)) {
+      summary.missing_receipts += 1;
+    }
+    return summary;
+  }, {
+    contanti_amount: 0,
+    bonifico_amount: 0,
+    assegno_amount: 0,
+    altro_amount: 0,
+    contanti_count: 0,
+    bonifico_count: 0,
+    assegno_count: 0,
+    altro_count: 0,
+    missing_receipts: 0,
+    cash_limit_alerts: 0
+  });
+}
+
+function groupReportActsByStore(acts = [], suspendedRows = [], shieldAlerts = []) {
+  const groups = new Map();
+  const ensure = (key, extra = {}) => {
+    const label = key || "Negozio non indicato";
+    if (!groups.has(label)) {
+      groups.set(label, {
+        negozio: label,
+        store_id: extra.store_id || null,
+        atti_completati: 0,
+        atti_sospesi: 0,
+        oro_acquistato: 0,
+        argento_acquistato: 0,
+        platino_acquistato: 0,
+        contanti_erogati: 0,
+        bonifici: 0,
+        aurum_shield_alerts: 0,
+        operatore_piu_attivo: "Dato non disponibile",
+        stato_operativo: "Regolare"
+      });
+    }
+    return groups.get(label);
+  };
+  const operatorsByStore = new Map();
+  acts.forEach((act) => {
+    const row = ensure(act.store, { store_id: act.storeId });
+    row.atti_completati += 1;
+    const payment = normalizeReportPayment(act.paymentMethod);
+    if (payment === "contanti") row.contanti_erogati += reportNumber(act.amount);
+    if (payment === "bonifico") row.bonifici += reportNumber(act.amount);
+    materialLotsFromAct(act).forEach((lot) => {
+      const metal = normalizeReportMetal(lot.metal);
+      const grams = reportNumber(lot.weight);
+      if (metal === "Oro") row.oro_acquistato += grams;
+      if (metal === "Argento") row.argento_acquistato += grams;
+      if (metal === "Platino") row.platino_acquistato += grams;
+    });
+    const operator = act.operatorName || act.operatorUsername || "Operatore non indicato";
+    const opKey = `${row.negozio}|${operator}`;
+    operatorsByStore.set(opKey, reportNumber(operatorsByStore.get(opKey)) + 1);
+  });
+  suspendedRows.forEach((item) => {
+    ensure(item.store || item.negozio || item.store_name, { store_id: item.negozio_id || item.store_id }).atti_sospesi += 1;
+  });
+  shieldAlerts.forEach((item) => {
+    const row = ensure(item.store_name || item.store || item.negozio || "Negozio non indicato", { store_id: item.store_id });
+    row.aurum_shield_alerts += 1;
+  });
+  for (const row of groups.values()) {
+    let best = { name: "Dato non disponibile", total: 0 };
+    for (const [key, total] of operatorsByStore.entries()) {
+      const [store, operator] = key.split("|");
+      if (store === row.negozio && total > best.total) best = { name: operator, total };
+    }
+    row.operatore_piu_attivo = best.name;
+    if (row.aurum_shield_alerts || row.atti_sospesi) row.stato_operativo = "Da verificare";
+  }
+  return [...groups.values()].sort((a, b) => b.atti_completati - a.atti_completati || a.negozio.localeCompare(b.negozio));
+}
+
+function reportActionSuggestions(report = {}) {
+  const suggestions = [];
+  const suspended = report.suspended_data?.current_total || 0;
+  const critical = report.risks_data?.critical_count || 0;
+  const failedBackups = report.backup_data?.failed_today || 0;
+  const qualityFailed = report.quality_data?.failed_today || 0;
+  if (suspended) suggestions.push("Verificare le pratiche sospese e assegnare priorità a quelle più vecchie.");
+  if (critical) suggestions.push("Controllare gli alert Aurum Shield critici prima della chiusura giornata.");
+  if (failedBackups) suggestions.push("Ripetere o verificare il backup fallito.");
+  if (qualityFailed) suggestions.push("Analizzare i motivi ricorrenti dei controlli qualità non superati.");
+  if (!suggestions.length) suggestions.push("Nessuna criticità rilevante: mantenere il controllo standard su atti, backup e giacenza.");
+  return suggestions;
+}
+
+function publicFounderDailyReport(row = {}) {
+  if (!row) return null;
+  const summary = row.summary || {};
+  return {
+    id: row.id,
+    report_date: row.report_date ? new Date(row.report_date).toISOString().slice(0, 10) : null,
+    status: row.status || "generated",
+    generated_by: row.generated_by || null,
+    summary,
+    stores_data: reportArray(row.stores_data),
+    operators_data: reportArray(row.operators_data),
+    risks_data: row.risks_data || {},
+    quality_data: row.quality_data || {},
+    suspended_data: row.suspended_data || {},
+    approvals_data: row.approvals_data || {},
+    notifications_data: row.notifications_data || {},
+    audit_data: row.audit_data || {},
+    backup_data: row.backup_data || {},
+    academy_data: row.academy_data || {},
+    ai_data: row.ai_data || {},
+    pdf_path: row.pdf_path || null,
+    error_message: row.error_message || "",
+    actions_recommended: summary.actions_recommended || [],
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+async function listFounderDailyReports(limit = 30) {
+  const rows = await reportQuery(
+    `SELECT *
+     FROM founder_daily_reports
+     ORDER BY report_date DESC
+     LIMIT $1::integer`,
+    [Math.min(100, Math.max(1, Number(limit || 30)))]
+  );
+  return rows.map(publicFounderDailyReport);
+}
+
+async function getFounderDailyReport(date) {
+  const reportDate = founderReportDate(date);
+  const rows = await reportQuery(
+    `SELECT * FROM founder_daily_reports WHERE report_date = $1::date LIMIT 1`,
+    [reportDate]
+  );
+  return rows[0] ? publicFounderDailyReport(rows[0]) : null;
+}
+
+async function generateFounderDailyReport(date = new Date(), generatedBy = null, req = null) {
+  const reportDate = founderReportDate(date);
+  try {
+    const [createdRows, completedRows, archivedRows, deletedRows, suspendedRows, suspendedTodayRows, shieldAlertRows, cashAlertRows] = await Promise.all([
+      reportQuery(
+        `SELECT COUNT(*)::int AS total
+         FROM ${actsTable} a
+         WHERE a.created_at >= $1::date
+           AND a.created_at < ($1::date + INTERVAL '1 day')
+           AND a.deleted_at IS NULL`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome
+         FROM ${actsTable} a
+         LEFT JOIN utenti u ON u.id = a.operatore_id
+         WHERE ${realCompletedStatusSql("a")}
+           AND COALESCE(a.completed_at, a.archived_at, a.data_atto::timestamptz, a.updated_at, a.created_at) >= $1::date
+           AND COALESCE(a.completed_at, a.archived_at, a.data_atto::timestamptz, a.updated_at, a.created_at) < ($1::date + INTERVAL '1 day')
+         ORDER BY COALESCE(a.completed_at, a.archived_at, a.created_at) DESC`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT COUNT(*)::int AS total
+         FROM ${actsTable} a
+         WHERE ${realCompletedStatusSql("a")}
+           AND a.archived_at >= $1::date
+           AND a.archived_at < ($1::date + INTERVAL '1 day')`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT COUNT(*)::int AS total
+         FROM ${actsTable} a
+         WHERE a.deleted_at >= $1::date
+           AND a.deleted_at < ($1::date + INTERVAL '1 day')`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome,
+                shield.score AS risk_score, shield.risk_level
+         FROM ${actsTable} a
+         LEFT JOIN utenti u ON u.id = a.operatore_id
+         LEFT JOIN aurum_shield_scores shield ON shield.sale_deed_id = a.id
+         WHERE ${suspendedStatusWhere("a")}
+         ORDER BY a.suspended_at DESC NULLS LAST, a.updated_at DESC
+         LIMIT 100`,
+        []
+      ),
+      reportQuery(
+        `SELECT COUNT(*)::int AS total
+         FROM ${actsTable} a
+         WHERE ${suspendedStatusWhere("a")}
+           AND a.suspended_at >= $1::date
+           AND a.suspended_at < ($1::date + INTERVAL '1 day')`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT asa.*, n.nome AS store_name, a.practice_number
+         FROM aurum_shield_alerts asa
+         LEFT JOIN negozi n ON n.id = asa.store_id
+         LEFT JOIN ${actsTable} a ON a.id = asa.sale_deed_id
+         WHERE asa.created_at >= $1::date
+           AND asa.created_at < ($1::date + INTERVAL '1 day')
+         ORDER BY asa.created_at DESC
+         LIMIT 100`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT COUNT(*)::int AS total
+         FROM aurum_shield_alerts
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')
+           AND (alert_type ILIKE '%cash%' OR alert_type ILIKE '%contanti%' OR description ILIKE '%contanti%')`,
+        [reportDate]
+      )
+    ]);
+
+    const completedActs = completedRows.map((row) => ({
+      ...rowToAct(row),
+      storeId: row.negozio_id || null
+    }));
+    const previousCompletedRows = await reportQuery(
+      `SELECT a.*
+       FROM ${actsTable} a
+       WHERE ${realCompletedStatusSql("a")}
+         AND COALESCE(a.completed_at, a.archived_at, a.data_atto::timestamptz, a.updated_at, a.created_at) >= ($1::date - INTERVAL '1 day')
+         AND COALESCE(a.completed_at, a.archived_at, a.data_atto::timestamptz, a.updated_at, a.created_at) < $1::date`,
+      [reportDate]
+    );
+    const metals = founderReportMaterials(completedActs);
+    const previousMetals = founderReportMaterials(previousCompletedRows.map((row) => rowToAct(row)));
+    const payments = founderReportPayments(completedActs);
+    payments.cash_limit_alerts = Number(cashAlertRows[0]?.total || 0);
+
+    const [riskCounts, riskTopRows, qualityCounts, qualityRows, approvalsRows, approvalStats, notificationsRows, auditActionRows, criticalAuditRows, operatorRows, backupsRows, academyRows, aiRows, fusionRows] = await Promise.all([
+      reportQuery(
+        `SELECT LOWER(COALESCE(risk_level, 'basso')) AS risk_level, COUNT(*)::int AS total
+         FROM aurum_shield_scores
+         WHERE updated_at >= $1::date
+           AND updated_at < ($1::date + INTERVAL '1 day')
+         GROUP BY LOWER(COALESCE(risk_level, 'basso'))`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT s.score, s.risk_level, s.summary, s.factors, a.practice_number, a.store
+         FROM aurum_shield_scores s
+         LEFT JOIN ${actsTable} a ON a.id = s.sale_deed_id
+         WHERE s.updated_at >= $1::date
+           AND s.updated_at < ($1::date + INTERVAL '1 day')
+         ORDER BY s.score DESC, s.updated_at DESC
+         LIMIT 10`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT LOWER(COALESCE(status, '')) AS status, COUNT(*)::int AS total
+         FROM quality_checks
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')
+         GROUP BY LOWER(COALESCE(status, ''))`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT status, blocking_errors, warnings, required_actions, created_at
+         FROM quality_checks
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')
+         ORDER BY created_at DESC
+         LIMIT 50`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT ar.*, a.practice_number, a.store, u.username, u.nome, u.cognome
+         FROM approval_requests ar
+         LEFT JOIN ${actsTable} a ON a.id = ar.sale_deed_id
+         LEFT JOIN utenti u ON u.id = ar.requested_by
+         WHERE ar.created_at >= $1::date
+           AND ar.created_at < ($1::date + INTERVAL '1 day')
+         ORDER BY ar.created_at DESC
+         LIMIT 50`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT
+           COUNT(*) FILTER (WHERE created_at >= $1::date AND created_at < ($1::date + INTERVAL '1 day'))::int AS created_today,
+           COUNT(*) FILTER (WHERE status = 'approved' AND reviewed_at >= $1::date AND reviewed_at < ($1::date + INTERVAL '1 day'))::int AS approved_today,
+           COUNT(*) FILTER (WHERE status = 'rejected' AND reviewed_at >= $1::date AND reviewed_at < ($1::date + INTERVAL '1 day'))::int AS rejected_today,
+           COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+           ROUND(AVG(EXTRACT(EPOCH FROM (reviewed_at - created_at)) / 60) FILTER (WHERE reviewed_at IS NOT NULL), 1) AS average_minutes
+         FROM approval_requests`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT type, severity, read_at, COUNT(*)::int AS total
+         FROM notifications
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')
+         GROUP BY type, severity, read_at`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT action, COUNT(*)::int AS total
+         FROM audit_logs
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')
+         GROUP BY action`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT *
+         FROM audit_logs
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')
+           AND (
+             COALESCE(metadata->>'critical', '') = 'true'
+             OR action IN ('delete_act','download_backup','change_user_role','delete_user','approval_required_blocked_completion','backup_failed','founder_daily_report_failed')
+           )
+         ORDER BY created_at DESC
+         LIMIT 10`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT
+           COALESCE(user_id, 0) AS user_id,
+           COALESCE(user_name, 'Utente') AS user_name,
+           COALESCE(user_role, '') AS user_role,
+           COALESCE(store_name, '') AS store_name,
+           COUNT(*) FILTER (WHERE action = 'login')::int AS logins,
+           COUNT(*) FILTER (WHERE action IN ('create_act','save_draft'))::int AS acts_created,
+           COUNT(*) FILTER (WHERE action = 'complete_act')::int AS acts_completed,
+           COUNT(*) FILTER (WHERE action = 'update_act')::int AS acts_updated,
+           COUNT(*) FILTER (WHERE action = 'delete_act')::int AS acts_deleted,
+           COUNT(*) FILTER (WHERE action = 'print_customer_copy')::int AS customer_prints,
+           COUNT(*) FILTER (WHERE action = 'sale_deed_suspended')::int AS suspended_created,
+           COUNT(*) FILTER (WHERE action = 'approval_requested')::int AS approvals_requested,
+           COUNT(*) FILTER (WHERE action IN ('api_request_error','quality_check_failed','aurum_shield_alert_created'))::int AS relevant_alerts,
+           COUNT(*)::int AS total_activity
+         FROM audit_logs
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')
+           AND user_id IS NOT NULL
+         GROUP BY user_id, user_name, user_role, store_name
+         ORDER BY total_activity DESC
+         LIMIT 30`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT *
+         FROM backups
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')
+         ORDER BY created_at DESC`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT
+           (SELECT COUNT(*)::int FROM academy_user_progress WHERE completed_at >= $1::date AND completed_at < ($1::date + INTERVAL '1 day')) AS courses_completed,
+           (SELECT COUNT(*)::int FROM academy_certificates WHERE issued_at >= $1::date AND issued_at < ($1::date + INTERVAL '1 day')) AS certificates_issued,
+           (SELECT COUNT(*)::int FROM academy_badges WHERE assigned_at >= $1::date AND assigned_at < ($1::date + INTERVAL '1 day')) AS badges_assigned,
+           (SELECT COUNT(*)::int FROM academy_user_progress WHERE COALESCE(status, '') NOT ILIKE 'completato') AS pending_courses,
+           (SELECT ROUND(AVG(COALESCE(percentuale, 0)), 1) FROM academy_user_progress) AS average_progress`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT
+           (SELECT COUNT(*)::int FROM audit_logs WHERE action = 'ask_aurum' AND created_at >= $1::date AND created_at < ($1::date + INTERVAL '1 day')) AS aurum_questions,
+           (SELECT COUNT(*)::int FROM aurum_support_requests WHERE created_at >= $1::date AND created_at < ($1::date + INTERVAL '1 day')) AS support_requests`,
+        [reportDate]
+      ),
+      reportQuery(
+        `SELECT COUNT(*)::int AS lots_created, COALESCE(SUM(peso_totale), 0)::numeric AS total_weight
+         FROM fusion_lots
+         WHERE created_at >= $1::date
+           AND created_at < ($1::date + INTERVAL '1 day')`,
+        [reportDate]
+      )
+    ]);
+
+    const byRisk = Object.fromEntries(riskCounts.map((row) => [String(row.risk_level || "basso").toLowerCase(), Number(row.total || 0)]));
+    const byQuality = Object.fromEntries(qualityCounts.map((row) => [String(row.status || "").toLowerCase(), Number(row.total || 0)]));
+    const qualityReasons = {};
+    qualityRows.forEach((row) => {
+      [...reportArray(row.blocking_errors), ...reportArray(row.warnings), ...reportArray(row.required_actions)].forEach((item) => {
+        const label = String(item?.label || item?.message || item || "").slice(0, 120);
+        if (label) qualityReasons[label] = reportNumber(qualityReasons[label]) + 1;
+      });
+    });
+    const factorFrequency = {};
+    riskTopRows.forEach((row) => {
+      reportArray(row.factors).forEach((factor) => {
+        const label = String(factor?.type || factor?.message || factor || "fattore_rischio").slice(0, 120);
+        factorFrequency[label] = reportNumber(factorFrequency[label]) + 1;
+      });
+    });
+    const notificationTotal = notificationsRows.reduce((sum, row) => sum + Number(row.total || 0), 0);
+    const notificationCritical = notificationsRows
+      .filter((row) => ["danger", "critical"].includes(String(row.severity || "").toLowerCase()))
+      .reduce((sum, row) => sum + Number(row.total || 0), 0);
+    const notificationUnread = notificationsRows
+      .filter((row) => !row.read_at)
+      .reduce((sum, row) => sum + Number(row.total || 0), 0);
+    const auditByAction = Object.fromEntries(auditActionRows.map((row) => [row.action, Number(row.total || 0)]));
+    const latestBackupRows = await reportQuery(
+      `SELECT *
+       FROM backups
+       WHERE status <> 'deleted'
+       ORDER BY created_at DESC
+       LIMIT 1`
+    );
+    const summary = {
+      report_date: reportDate,
+      generated_at: new Date().toISOString(),
+      acts_created_today: Number(createdRows[0]?.total || 0),
+      acts_completed_today: completedActs.length,
+      acts_archived_today: Number(archivedRows[0]?.total || 0),
+      acts_deleted_today: Number(deletedRows[0]?.total || 0),
+      suspended_total: suspendedRows.length,
+      suspended_today: Number(suspendedTodayRows[0]?.total || 0),
+      approvals_approved_today: Number(approvalStats[0]?.approved_today || 0),
+      approvals_rejected_today: Number(approvalStats[0]?.rejected_today || 0),
+      fusions_today: Number(fusionRows[0]?.lots_created || 0),
+      metals,
+      metals_variation_vs_previous_day: {
+        Oro: reportNumber(metals.totals.Oro) - reportNumber(previousMetals.totals.Oro),
+        Argento: reportNumber(metals.totals.Argento) - reportNumber(previousMetals.totals.Argento),
+        Platino: reportNumber(metals.totals.Platino) - reportNumber(previousMetals.totals.Platino)
+      },
+      payments,
+      actions_recommended: []
+    };
+
+    const reportPayload = {
+      summary,
+      stores_data: groupReportActsByStore(completedActs, suspendedRows, shieldAlertRows),
+      operators_data: operatorRows,
+      risks_data: {
+        low_count: byRisk.basso || byRisk.low || 0,
+        medium_count: byRisk.medio || byRisk.medium || 0,
+        high_count: byRisk.alto || byRisk.high || 0,
+        critical_count: byRisk.critico || byRisk.critical || 0,
+        alerts_today: shieldAlertRows.length,
+        top_risky_practices: riskTopRows,
+        recurring_reasons: Object.entries(factorFrequency).map(([reason, total]) => ({ reason, total })).sort((a, b) => b.total - a.total).slice(0, 10),
+        main_alerts: shieldAlertRows.slice(0, 10)
+      },
+      quality_data: {
+        passed_today: byQuality.completabile || byQuality.ok || byQuality.passed || 0,
+        failed_today: byQuality.non_completabile || byQuality.failed || 0,
+        warning_today: byQuality.attenzione || byQuality.warning || 0,
+        recurring_missing_data: Object.entries(qualityReasons).map(([reason, total]) => ({ reason, total })).sort((a, b) => b.total - a.total).slice(0, 10)
+      },
+      suspended_data: {
+        created_today: Number(suspendedTodayRows[0]?.total || 0),
+        current_total: suspendedRows.length,
+        older_than_24h: suspendedRows.filter((row) => row.suspended_at && Date.now() - new Date(row.suspended_at).getTime() > 24 * 60 * 60 * 1000).length,
+        older_than_48h: suspendedRows.filter((row) => row.suspended_at && Date.now() - new Date(row.suspended_at).getTime() > 48 * 60 * 60 * 1000).length,
+        open_practices: suspendedRows.slice(0, 15).map((row) => ({
+          id: row.id,
+          practice_number: row.practice_number,
+          cliente: [row.cliente_nome, row.cliente_cognome].filter(Boolean).join(" "),
+          negozio: row.store,
+          operatore: [row.operator_nome, row.operator_cognome].filter(Boolean).join(" ") || row.operator_username,
+          motivi: reportArray(row.suspended_reasons),
+          risk_score: Number(row.risk_score || 0),
+          risk_level: row.risk_level || "",
+          suspended_at: row.suspended_at
+        }))
+      },
+      approvals_data: {
+        created_today: Number(approvalStats[0]?.created_today || 0),
+        approved_today: Number(approvalStats[0]?.approved_today || 0),
+        rejected_today: Number(approvalStats[0]?.rejected_today || 0),
+        pending: Number(approvalStats[0]?.pending || 0),
+        average_approval_minutes: Number(approvalStats[0]?.average_minutes || 0),
+        latest: approvalsRows.slice(0, 10)
+      },
+      notifications_data: {
+        created_today: notificationTotal,
+        critical_today: notificationCritical,
+        unread_today: notificationUnread,
+        approval_notifications: notificationsRows.filter((row) => String(row.type || "").startsWith("approval")).reduce((sum, row) => sum + Number(row.total || 0), 0),
+        backup_notifications: notificationsRows.filter((row) => String(row.type || "").includes("backup")).reduce((sum, row) => sum + Number(row.total || 0), 0),
+        risk_notifications: notificationsRows.filter((row) => String(row.type || "").includes("shield")).reduce((sum, row) => sum + Number(row.total || 0), 0)
+      },
+      audit_data: {
+        actions_today: auditActionRows.reduce((sum, row) => sum + Number(row.total || 0), 0),
+        critical_actions: criticalAuditRows.map(publicAuditLog),
+        deleted_acts: auditByAction.delete_act || 0,
+        updated_users: auditByAction.update_user || 0,
+        backup_downloads: auditByAction.download_backup || 0,
+        role_changes: auditByAction.change_user_role || 0,
+        unauthorized_accesses: auditByAction.approval_unauthorized_attempt || 0,
+        latest_critical_events: criticalAuditRows.map(publicAuditLog)
+      },
+      backup_data: {
+        created_today: backupsRows.length,
+        verified_today: backupsRows.filter((row) => row.verification_status === "verified").length,
+        failed_today: backupsRows.filter((row) => row.status === "failed").length,
+        latest_backup: latestBackupRows[0] || null,
+        latest_restore_test_status: latestBackupRows[0]?.restore_test_status || "not_tested"
+      },
+      academy_data: {
+        courses_completed_today: Number(academyRows[0]?.courses_completed || 0),
+        certificates_issued_today: Number(academyRows[0]?.certificates_issued || 0),
+        badges_assigned_today: Number(academyRows[0]?.badges_assigned || 0),
+        pending_courses: Number(academyRows[0]?.pending_courses || 0),
+        average_progress: Number(academyRows[0]?.average_progress || 0)
+      },
+      ai_data: {
+        aurum_questions_today: Number(aiRows[0]?.aurum_questions || 0),
+        support_requests_today: Number(aiRows[0]?.support_requests || 0),
+        main_topics: criticalAuditRows
+          .filter((row) => row.action === "ask_aurum")
+          .map((row) => row.entity_label || row.metadata?.question || "Domanda Aurum")
+          .slice(0, 8)
+      }
+    };
+    reportPayload.summary.actions_recommended = reportActionSuggestions(reportPayload);
+
+    const result = await pool.query(
+      `INSERT INTO founder_daily_reports (
+        report_date, status, generated_by, summary, stores_data, operators_data, risks_data,
+        quality_data, suspended_data, approvals_data, notifications_data, audit_data,
+        backup_data, academy_data, ai_data, error_message, updated_at
+      ) VALUES (
+        $1::date,'generated',$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,
+        $7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,$11::jsonb,
+        $12::jsonb,$13::jsonb,$14::jsonb,NULL,NOW()
+      )
+      ON CONFLICT (report_date) DO UPDATE SET
+        status = 'generated',
+        generated_by = EXCLUDED.generated_by,
+        summary = EXCLUDED.summary,
+        stores_data = EXCLUDED.stores_data,
+        operators_data = EXCLUDED.operators_data,
+        risks_data = EXCLUDED.risks_data,
+        quality_data = EXCLUDED.quality_data,
+        suspended_data = EXCLUDED.suspended_data,
+        approvals_data = EXCLUDED.approvals_data,
+        notifications_data = EXCLUDED.notifications_data,
+        audit_data = EXCLUDED.audit_data,
+        backup_data = EXCLUDED.backup_data,
+        academy_data = EXCLUDED.academy_data,
+        ai_data = EXCLUDED.ai_data,
+        error_message = NULL,
+        updated_at = NOW()
+      RETURNING *`,
+      [
+        reportDate,
+        generatedBy?.id || generatedBy || null,
+        sanitizeForPostgres(reportPayload.summary),
+        sanitizeForPostgres(reportPayload.stores_data),
+        sanitizeForPostgres(reportPayload.operators_data),
+        sanitizeForPostgres(reportPayload.risks_data),
+        sanitizeForPostgres(reportPayload.quality_data),
+        sanitizeForPostgres(reportPayload.suspended_data),
+        sanitizeForPostgres(reportPayload.approvals_data),
+        sanitizeForPostgres(reportPayload.notifications_data),
+        sanitizeForPostgres(reportPayload.audit_data),
+        sanitizeForPostgres(reportPayload.backup_data),
+        sanitizeForPostgres(reportPayload.academy_data),
+        sanitizeForPostgres(reportPayload.ai_data)
+      ]
+    );
+    const report = publicFounderDailyReport(result.rows[0]);
+    void writeAuditLog({
+      req,
+      user: generatedBy,
+      action: "founder_daily_report_generated",
+      entityType: "founder_daily_report",
+      entityId: report.id,
+      entityLabel: report.report_date,
+      afterData: { report_date: report.report_date, summary: report.summary },
+      metadata: { critical_alerts: report.risks_data?.critical_count || 0 }
+    });
+    void createNotification({
+      targetRole: "founder",
+      title: "Founder Daily Report generato",
+      message: `Il report operativo del ${report.report_date} è disponibile.`,
+      type: "system",
+      severity: report.risks_data?.critical_count || report.backup_data?.failed_today ? "warning" : "success",
+      entityType: "founder_daily_report",
+      entityId: report.id,
+      actionUrl: "#founderDailyReport",
+      metadata: { report_date: report.report_date, critical_alerts: report.risks_data?.critical_count || 0 },
+      createdBy: generatedBy?.id || null,
+      actor: generatedBy,
+      req
+    });
+    return report;
+  } catch (error) {
+    await pool.query(
+      `INSERT INTO founder_daily_reports (report_date, status, generated_by, error_message, updated_at)
+       VALUES ($1::date,'error',$2::bigint,$3::text,NOW())
+       ON CONFLICT (report_date) DO UPDATE SET
+         status = 'error',
+         generated_by = EXCLUDED.generated_by,
+         error_message = EXCLUDED.error_message,
+         updated_at = NOW()`,
+      [reportDate, generatedBy?.id || generatedBy || null, String(error.message || "Errore generazione report").slice(0, 500)]
+    ).catch(() => {});
+    void writeAuditLog({
+      req,
+      user: generatedBy,
+      action: "founder_daily_report_failed",
+      entityType: "founder_daily_report",
+      entityLabel: reportDate,
+      metadata: { error: error.message, critical: true }
+    });
+    throw error;
+  }
+}
+
+function pdfLine(doc, label, value) {
+  doc.font("Helvetica-Bold").text(`${label}: `, { continued: true });
+  doc.font("Helvetica").text(String(value ?? "Dato non disponibile"));
+}
+
+function pdfSection(doc, title) {
+  doc.moveDown(0.8);
+  doc.font("Helvetica-Bold").fontSize(13).fillColor("#c86a17").text(title);
+  doc.fillColor("#151515").font("Helvetica").fontSize(10);
+}
+
+function writeFounderDailyReportPdf(response, report) {
+  const doc = new PDFDocument({ margin: 42, size: "A4" });
+  response.setHeader("Content-Type", "application/pdf");
+  response.setHeader("Content-Disposition", `attachment; filename="founder-daily-report-${report.report_date}.pdf"`);
+  doc.pipe(response);
+  doc.font("Helvetica-Bold").fontSize(20).fillColor("#151515").text("Founder Daily Report");
+  doc.font("Helvetica").fontSize(11).fillColor("#c86a17").text("OroActive");
+  doc.moveDown(0.4).fillColor("#151515");
+  pdfLine(doc, "Data report", report.report_date);
+  pdfLine(doc, "Stato", report.status);
+
+  const summary = report.summary || {};
+  pdfSection(doc, "Riepilogo generale");
+  [
+    ["Atti creati oggi", summary.acts_created_today],
+    ["Atti completati oggi", summary.acts_completed_today],
+    ["Atti archiviati oggi", summary.acts_archived_today],
+    ["Atti eliminati oggi", summary.acts_deleted_today],
+    ["Pratiche sospese", summary.suspended_total],
+    ["Autorizzazioni approvate", summary.approvals_approved_today],
+    ["Autorizzazioni rifiutate", summary.approvals_rejected_today]
+  ].forEach(([label, value]) => pdfLine(doc, label, value));
+
+  pdfSection(doc, "Metalli e pagamenti");
+  pdfLine(doc, "Oro acquistato", `${reportNumber(summary.metals?.totals?.Oro).toFixed(2)} gr`);
+  pdfLine(doc, "Argento acquistato", `${reportNumber(summary.metals?.totals?.Argento).toFixed(2)} gr`);
+  pdfLine(doc, "Platino acquistato", `${reportNumber(summary.metals?.totals?.Platino).toFixed(2)} gr`);
+  pdfLine(doc, "Contanti erogati", `${reportNumber(summary.payments?.contanti_amount).toFixed(2)} EUR`);
+  pdfLine(doc, "Bonifici", `${reportNumber(summary.payments?.bonifico_amount).toFixed(2)} EUR`);
+  pdfLine(doc, "Assegni", `${reportNumber(summary.payments?.assegno_amount).toFixed(2)} EUR`);
+
+  pdfSection(doc, "Negozi");
+  reportArray(report.stores_data).slice(0, 12).forEach((store) => {
+    doc.text(`${store.negozio}: ${store.atti_completati} atti, ${reportNumber(store.oro_acquistato).toFixed(2)} gr oro, ${store.atti_sospesi} sospese, ${store.aurum_shield_alerts} alert`);
+  });
+  if (!reportArray(report.stores_data).length) doc.text("Nessun dato negozio disponibile.");
+
+  pdfSection(doc, "Operatori");
+  reportArray(report.operators_data).slice(0, 12).forEach((operator) => {
+    doc.text(`${operator.user_name}: ${operator.total_activity} attività, ${operator.acts_created} atti creati, ${operator.acts_completed} completati`);
+  });
+  if (!reportArray(report.operators_data).length) doc.text("Nessuna attività operatore disponibile.");
+
+  pdfSection(doc, "Aurum Shield, qualità e sospese");
+  pdfLine(doc, "Rischio alto", report.risks_data?.high_count || 0);
+  pdfLine(doc, "Rischio critico", report.risks_data?.critical_count || 0);
+  pdfLine(doc, "Controlli qualità non superati", report.quality_data?.failed_today || 0);
+  pdfLine(doc, "Pratiche sospese aperte", report.suspended_data?.current_total || 0);
+
+  pdfSection(doc, "Backup, Academy, Audit");
+  pdfLine(doc, "Backup creati", report.backup_data?.created_today || 0);
+  pdfLine(doc, "Backup falliti", report.backup_data?.failed_today || 0);
+  pdfLine(doc, "Corsi completati", report.academy_data?.courses_completed_today || 0);
+  pdfLine(doc, "Azioni audit", report.audit_data?.actions_today || 0);
+
+  pdfSection(doc, "Azioni consigliate");
+  reportArray(report.actions_recommended).forEach((item, index) => {
+    doc.text(`${index + 1}. ${item}`);
+  });
+
+  doc.moveDown(1.2).fontSize(9).fillColor("#777").text("Report generato automaticamente da OroActive.");
+  doc.end();
 }
 
 async function oroActiveIntelligence(user = {}) {
@@ -10085,6 +10870,71 @@ app.get("/api/dashboard", async (request, response, next) => {
   }
 });
 
+app.get("/api/founder-daily-report", requireFounder, async (request, response, next) => {
+  try {
+    response.json({ ok: true, reports: await listFounderDailyReports(request.query.limit || 30) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/founder-daily-report/:date", requireFounder, async (request, response, next) => {
+  try {
+    const report = await getFounderDailyReport(request.params.date);
+    if (!report) return response.status(404).json({ error: "Report non generato per la data selezionata." });
+    response.json({ ok: true, report });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/founder-daily-report/generate", requireFounder, async (request, response, next) => {
+  try {
+    const report = await generateFounderDailyReport(request.body?.date || new Date(), request.user, request);
+    response.status(201).json({ ok: true, message: "Founder Daily Report generato", report });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/founder-daily-report/:date/pdf", requireFounder, async (request, response, next) => {
+  try {
+    const report = await getFounderDailyReport(request.params.date);
+    if (!report) return response.status(404).json({ error: "Report non generato per la data selezionata." });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "founder_daily_report_downloaded",
+      entityType: "founder_daily_report",
+      entityId: report.id,
+      entityLabel: report.report_date,
+      metadata: { report_date: report.report_date, critical: false }
+    });
+    writeFounderDailyReportPdf(response, report);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/founder-daily-report/:date/send", requireFounder, async (request, response, next) => {
+  try {
+    const report = await getFounderDailyReport(request.params.date);
+    if (!report) return response.status(404).json({ error: "Report non generato per la data selezionata." });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "founder_daily_report_sent",
+      entityType: "founder_daily_report",
+      entityId: report.id,
+      entityLabel: report.report_date,
+      metadata: { report_date: report.report_date, email_configured: false }
+    });
+    response.json({ ok: false, message: "Invio email non configurato." });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/audit-logs", async (request, response, next) => {
   try {
     response.json(await listAuditLogs(request.query, request.user));
@@ -12408,6 +13258,7 @@ function friendlyDatabaseError(error, request) {
   if (url.includes("/api/atti") || url.includes("/api/acts")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Errore database durante il salvataggio Academy.";
   if (url.includes("/api/crm")) return "Errore database durante il salvataggio CRM.";
+  if (url.includes("/api/founder-daily-report")) return "Errore database durante il Founder Daily Report.";
   if (url.includes("/api/backups")) return "Errore database durante il backup.";
   if (url.includes("/api/quotes") || url.includes("/api/quotazioni")) return "Errore database durante il salvataggio quotazioni.";
   return "Errore database: operazione non completata.";
@@ -12424,6 +13275,7 @@ function safeRouteErrorMessage(request) {
   if (url.includes("/api/suspended-practices")) return "Operazione pratica sospesa non completata.";
   if (url.includes("/api/approvals")) return "Operazione autorizzazione non completata.";
   if (url.includes("/api/notifications")) return "Operazione notifiche non completata.";
+  if (url.includes("/api/founder-daily-report")) return "Founder Daily Report non completato.";
   if (url.includes("/api/backups")) return "Operazione backup non completata.";
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Operazione Academy non completata.";
   if (url.includes("/api/crm") || url.includes("/api/clienti")) return "Operazione CRM non completata.";

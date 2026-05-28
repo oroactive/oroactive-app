@@ -1461,6 +1461,88 @@ textarea {
   margin: 0 0 12px;
 }
 
+.founder-report-header {
+  align-items: flex-start;
+}
+
+.founder-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: 720px;
+}
+
+.founder-report-actions label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 800;
+  min-width: 160px;
+}
+
+.founder-report-actions input {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  font: inherit;
+}
+
+.founder-report-status {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #f0d7c2;
+  border-radius: 8px;
+  background: #fff8f0;
+  color: #7c3b07;
+  font-weight: 800;
+}
+
+.founder-report-cards {
+  margin-top: 10px;
+}
+
+.founder-report-body {
+  align-items: start;
+}
+
+.founder-report-history-panel {
+  margin-top: 14px;
+}
+
+.founder-report-history {
+  display: grid;
+  gap: 8px;
+}
+
+.founder-report-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.founder-report-history-item:hover {
+  border-color: var(--orange);
+  box-shadow: 0 8px 22px rgba(232, 119, 34, 0.12);
+}
+
+.founder-report-history-item span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .dashboard-rank-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
