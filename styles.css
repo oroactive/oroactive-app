@@ -6058,6 +6058,142 @@ button.quality-review-badge {
   text-align: justify;
 }
 
+/* Header sezioni interne: contrasto alto su sfondo dark tech OroActive. */
+.oa-section-header,
+.archive-header,
+.course-hero,
+.settings-grid > div:first-child,
+.assistant-chat-card > .panel-heading,
+.aurum-management-panel > div:first-child {
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 24px 28px;
+  border: 1px solid rgba(255, 106, 0, 0.28);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 106, 0, 0.14), rgba(0, 0, 0, 0.65)),
+    rgba(12, 12, 12, 0.92);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  color: var(--oa-text-light);
+}
+
+.archive-header,
+.course-hero,
+.assistant-chat-card > .panel-heading,
+.aurum-management-panel > div:first-child {
+  align-items: center;
+}
+
+.oa-section-header-content,
+.archive-header > div:first-child,
+.course-hero > div:first-child,
+.settings-grid > div:first-child,
+.assistant-chat-card > .panel-heading > div,
+.aurum-management-panel > div:first-child {
+  min-width: 0;
+}
+
+.oa-section-kicker,
+.oa-section-header .eyebrow,
+.archive-header .eyebrow,
+.course-hero .eyebrow,
+.settings-grid > div:first-child .eyebrow,
+.assistant-chat-card > .panel-heading .eyebrow,
+.aurum-management-panel > div:first-child .eyebrow {
+  margin: 0 0 8px;
+  color: var(--oa-orange);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.oa-section-title,
+.oa-section-header h1,
+.oa-section-header h2,
+.archive-header h1,
+.archive-header h2,
+.course-hero h1,
+.course-hero h2,
+.settings-grid > div:first-child h1,
+.settings-grid > div:first-child h2,
+.assistant-chat-card > .panel-heading h1,
+.assistant-chat-card > .panel-heading h2,
+.aurum-management-panel > div:first-child h1,
+.aurum-management-panel > div:first-child h2 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 950;
+  line-height: 1.05;
+  letter-spacing: 0;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.65);
+}
+
+.oa-section-subtitle,
+.oa-section-header p:not(.eyebrow),
+.archive-header .muted,
+.archive-header p:not(.eyebrow),
+.course-hero .muted,
+.course-hero p:not(.eyebrow),
+.settings-grid > div:first-child .muted,
+.settings-grid > div:first-child p:not(.eyebrow),
+.assistant-chat-card > .panel-heading .muted,
+.assistant-chat-card > .panel-heading p:not(.eyebrow),
+.aurum-management-panel > div:first-child .muted,
+.aurum-management-panel > div:first-child p:not(.eyebrow) {
+  margin-top: 12px;
+  max-width: 760px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.oa-section-actions,
+.archive-header > :not(div:first-child),
+.course-hero > :not(div:first-child) {
+  flex-shrink: 0;
+}
+
+.archive-header label,
+.founder-report-actions label,
+.store-health-filters label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.archive-header input,
+.archive-header select,
+.course-hero input,
+.course-hero select,
+.founder-report-actions input,
+.store-health-filters input,
+.store-health-filters select {
+  border-color: rgba(255, 106, 0, 0.32);
+  background: #fff;
+  color: var(--oa-text-main);
+}
+
+.archive-header .primary-button,
+.course-hero .primary-button,
+.oa-header-button-primary {
+  border: 0;
+  border-radius: 14px;
+  background: var(--oa-orange);
+  color: #fff;
+  font-weight: 900;
+}
+
+.archive-header .ghost-button,
+.course-hero .ghost-button,
+.oa-header-button-secondary {
+  border: 1px solid rgba(255, 106, 0, 0.35);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--oa-orange-dark);
+  font-weight: 900;
+}
+
 /* OroActive internal sections phase 2: tema operativo coerente e leggibile. */
 .workspace {
   min-height: 100vh;
@@ -6172,6 +6308,38 @@ label,
   color: var(--oa-text-main);
   font-size: 13px;
   font-weight: 900;
+}
+
+.archive-header h1,
+.archive-header h2,
+.course-hero h1,
+.course-hero h2,
+.settings-grid > div:first-child h1,
+.settings-grid > div:first-child h2,
+.assistant-chat-card > .panel-heading h1,
+.assistant-chat-card > .panel-heading h2,
+.aurum-management-panel > div:first-child h1,
+.aurum-management-panel > div:first-child h2 {
+  color: #fff;
+}
+
+.archive-header label,
+.founder-report-actions label,
+.store-health-filters label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.archive-header .muted,
+.archive-header p:not(.eyebrow),
+.course-hero .muted,
+.course-hero p:not(.eyebrow),
+.settings-grid > div:first-child .muted,
+.settings-grid > div:first-child p:not(.eyebrow),
+.assistant-chat-card > .panel-heading .muted,
+.assistant-chat-card > .panel-heading p:not(.eyebrow),
+.aurum-management-panel > div:first-child .muted,
+.aurum-management-panel > div:first-child p:not(.eyebrow) {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 input,
@@ -6410,6 +6578,60 @@ input.document-expired {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .oa-section-header,
+  .archive-header,
+  .course-hero,
+  .settings-grid > div:first-child,
+  .assistant-chat-card > .panel-heading,
+  .aurum-management-panel > div:first-child {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .oa-section-title,
+  .oa-section-header h1,
+  .oa-section-header h2,
+  .archive-header h1,
+  .archive-header h2,
+  .course-hero h1,
+  .course-hero h2,
+  .settings-grid > div:first-child h1,
+  .settings-grid > div:first-child h2,
+  .assistant-chat-card > .panel-heading h1,
+  .assistant-chat-card > .panel-heading h2,
+  .aurum-management-panel > div:first-child h1,
+  .aurum-management-panel > div:first-child h2 {
+    font-size: 28px;
+  }
+
+  .oa-section-subtitle,
+  .oa-section-header p:not(.eyebrow),
+  .archive-header .muted,
+  .archive-header p:not(.eyebrow),
+  .course-hero .muted,
+  .course-hero p:not(.eyebrow),
+  .settings-grid > div:first-child .muted,
+  .settings-grid > div:first-child p:not(.eyebrow),
+  .assistant-chat-card > .panel-heading .muted,
+  .assistant-chat-card > .panel-heading p:not(.eyebrow),
+  .aurum-management-panel > div:first-child .muted,
+  .aurum-management-panel > div:first-child p:not(.eyebrow) {
+    font-size: 15px;
+  }
+
+  .oa-section-actions,
+  .archive-header > :not(div:first-child),
+  .course-hero > :not(div:first-child),
+  .founder-report-actions,
+  .store-health-filters {
+    width: 100%;
+    margin-top: 16px;
   }
 }
 
