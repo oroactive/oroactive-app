@@ -678,7 +678,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /tech-menu-1/);
+  assert.match(worker, /internal-ui-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -731,7 +731,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /tech-menu-1/);
+  assert.match(worker, /internal-ui-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -783,7 +783,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /tech-menu-1/);
+  assert.match(worker, /internal-ui-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -853,12 +853,50 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260529-tech-menu-1/);
-  assert.match(index, /styles\.css\?v=20260529-tech-menu-1/);
-  assert.match(worker, /tech-menu-1/);
+  assert.match(index, /app\.js\?v=20260529-internal-ui-1/);
+  assert.match(index, /styles\.css\?v=20260529-internal-ui-1/);
+  assert.match(worker, /internal-ui-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
+});
+
+test("design system OroActive centralizza tema componenti e stati UI", async () => {
+  const [index, styles, worker] = await Promise.all([
+    file("index.html"),
+    file("styles.css"),
+    file("service-worker.js")
+  ]);
+
+  assert.match(styles, /OroActive Design System/);
+  assert.match(styles, /--oa-black: #050505/);
+  assert.match(styles, /--oa-bg-main: #050505/);
+  assert.match(styles, /--oa-card-soft: #f8f6f2/i);
+  assert.match(styles, /--oa-orange-soft: rgba\(255, 106, 0, 0\.12\)/);
+  assert.match(styles, /--oa-orange: #ff6a00/i);
+  assert.match(styles, /--oa-gold: #d4af37/i);
+  assert.match(styles, /--oa-radius-lg: 16px/);
+  assert.match(styles, /--oa-shadow-panel:/);
+  assert.match(styles, /--orange: var\(--oa-orange\)/);
+  assert.match(styles, /--muted: var\(--oa-muted\)/);
+  assert.match(styles, /:where\(button, input, select, textarea, a, \[role="button"\]\):focus-visible/);
+  assert.match(styles, /\.oa-glass-panel/);
+  assert.match(styles, /\.oa-chip/);
+  assert.match(styles, /\.oa-status\.danger/);
+  assert.match(styles, /\.primary-button \{[\s\S]*var\(--oa-orange\)[\s\S]*var\(--oa-orange-2\)/);
+  assert.match(styles, /\.form-panel,[\s\S]*\.side-panel > div \{[\s\S]*border-radius: var\(--oa-radius-md\)/);
+  assert.match(styles, /\.dashboard-card,[\s\S]*\.dashboard-panel \{[\s\S]*border-radius: var\(--oa-radius-md\)/);
+  assert.match(styles, /\.toast\.error \{[\s\S]*background: var\(--oa-danger\)/);
+  assert.match(styles, /OroActive internal sections phase 2/);
+  assert.match(styles, /\.workspace \{[\s\S]*var\(--oa-bg-main\)/);
+  assert.match(styles, /\.topbar \{[\s\S]*linear-gradient\(135deg, rgba\(17, 17, 17, 0\.98\)/);
+  assert.match(styles, /\.practice-meta,[\s\S]*\.notification-filters \{[\s\S]*linear-gradient\(180deg, #fffaf6 0%, #fff4ec 100%\)/);
+  assert.match(styles, /input:focus,[\s\S]*\.date-input-frame:focus-within \{[\s\S]*border-color: var\(--oa-orange\)/);
+  assert.match(styles, /\.table-row\.head \{[\s\S]*linear-gradient\(135deg, #17110d 0%, #23160e 100%\)/);
+  assert.match(styles, /\.preview-dialog \{[\s\S]*max-height: calc\(100dvh - 32px/);
+  assert.match(styles, /@media \(max-width: 560px\)[\s\S]*\.settings-list button \{[\s\S]*width: 100%/);
+  assert.match(index, /styles\.css\?v=20260529-internal-ui-1/);
+  assert.match(worker, /internal-ui-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -915,7 +953,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /tech-menu-1/);
+  assert.match(worker, /internal-ui-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -1019,7 +1057,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /tech-menu-1/);
+  assert.match(worker, /internal-ui-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -1070,9 +1108,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260529-tech-menu-1/);
-  assert.match(index, /styles\.css\?v=20260529-tech-menu-1/);
-  assert.match(worker, /tech-menu-1/);
+  assert.match(index, /app\.js\?v=20260529-internal-ui-1/);
+  assert.match(index, /styles\.css\?v=20260529-internal-ui-1/);
+  assert.match(worker, /internal-ui-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -1149,7 +1187,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /tech-menu-1/);
+  assert.match(worker, /internal-ui-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {

@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260529-tech-menu-1";
+const STATIC_CACHE = "oroactive-static-v20260529-internal-ui-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260529-tech-menu-1",
-  "/app.js?v=20260529-tech-menu-1",
+  "/styles.css?v=20260529-internal-ui-1",
+  "/app.js?v=20260529-internal-ui-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",
