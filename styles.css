@@ -553,11 +553,12 @@ textarea:disabled {
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  width: min(100%, 1240px);
+  width: 100%;
+  max-width: 1440px;
   margin: 0 auto;
   min-height: calc(100dvh - 64px);
   height: auto;
-  padding: max(18px, env(safe-area-inset-top)) 22px max(58px, calc(env(safe-area-inset-bottom) + 58px));
+  padding: max(18px, env(safe-area-inset-top)) clamp(18px, 3vw, 36px) max(58px, calc(env(safe-area-inset-bottom) + 58px));
 }
 
 .main-menu-screen::before {
@@ -692,6 +693,7 @@ textarea:disabled {
 
 .main-menu-inner {
   min-width: 0;
+  width: 100%;
   min-height: 0;
   display: grid;
   grid-template-rows: auto;
@@ -924,14 +926,14 @@ textarea:disabled {
 }
 
 .main-menu-actions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
   gap: 12px;
   align-items: start;
   overflow: visible;
 }
 
 .main-menu-quick-actions {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   gap: 10px;
 }
 
@@ -2625,9 +2627,13 @@ textarea:disabled {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
   display: grid;
   grid-template-columns: 264px 1fr;
   background: var(--oa-app-bg);
+  overflow-x: hidden;
 }
 
 .sidebar {
@@ -2857,8 +2863,11 @@ textarea:disabled {
 }
 
 .workspace {
-  padding: 28px;
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: clamp(14px, 2.4vw, 28px);
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -3165,10 +3174,13 @@ textarea:disabled {
 
 .screen {
   display: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .active-screen {
   display: block;
+  width: 100%;
 }
 
 .software-footer {
@@ -7012,17 +7024,19 @@ input.document-expired {
 
 @media (max-width: 1100px) {
   .main-menu-control-shell {
-    grid-template-columns: 206px minmax(0, 1fr);
-    gap: 14px;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: none;
+    gap: 0;
     padding: max(14px, env(safe-area-inset-top)) 14px max(52px, calc(env(safe-area-inset-bottom) + 52px));
   }
 
   .main-menu-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   }
 
   .main-menu-quick-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   }
 
   .main-menu-hero {
@@ -7090,6 +7104,8 @@ input.document-expired {
 @media (max-width: 920px) {
   .main-menu-control-shell {
     grid-template-columns: 1fr;
+    width: 100%;
+    max-width: none;
     overflow: visible;
   }
 
@@ -7349,6 +7365,8 @@ input.document-expired {
   }
 
   .main-menu-control-shell {
+    width: 100%;
+    max-width: none;
     height: auto;
     min-height: 100%;
     padding: max(10px, env(safe-area-inset-top)) 8px max(46px, calc(env(safe-area-inset-bottom) + 46px));
