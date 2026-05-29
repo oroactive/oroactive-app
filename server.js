@@ -46,6 +46,8 @@ const backupDirectory = process.env.BACKUP_DIR || "/data/oroactive/backups";
 const academyUploadDirectory = process.env.ACADEMY_UPLOAD_DIR || path.join(__dirname, "private_uploads", "academy");
 const trustPackDirectory = process.env.CUSTOMER_TRUST_PACK_DIR || path.join(__dirname, "private_uploads", "customer-trust-packs");
 const oroactiveSiteUrl = process.env.OROACTIVE_SITE_URL || "http://wcfme33owxz0wfkr0ysnzthy.188.213.161.151.sslip.io/";
+const privacyPolicyVersion = "v1.0";
+const privacyPolicyUpdatedAt = "2026-05-29";
 const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const pgRestorePath = process.env.PG_RESTORE_PATH || "pg_restore";
 const backupIntervalMs = 24 * 60 * 60 * 1000;
@@ -73,6 +75,118 @@ const defaultStores = [
   { nome: "Cassano Magnago", codice: "CASSANO", citta: "Cassano Magnago", provincia: "VA" },
   { nome: "Legnano", codice: "LEGNANO", citta: "Legnano", provincia: "MI" }
 ];
+
+const defaultPrivacyPolicyContent = {
+  version: privacyPolicyVersion,
+  updated_at: privacyPolicyUpdatedAt,
+  title: "Privacy Policy e Informativa sul trattamento dei dati personali — OroActive",
+  subtitle: "Informativa ai sensi del Regolamento UE 2016/679 (GDPR) e della normativa applicabile in materia di protezione dei dati personali.",
+  note: "Questa informativa descrive come OroActive tratta i dati personali all'interno dell'app gestionale e nei processi collegati agli atti di vendita, alla gestione clienti, alla formazione, alla sicurezza operativa e alle funzionalità AI.",
+  controller: {
+    company_name: "[INSERIRE RAGIONE SOCIALE]",
+    legal_address: "[INSERIRE INDIRIZZO]",
+    privacy_email: "[INSERIRE EMAIL PRIVACY]",
+    pec: "[INSERIRE PEC]",
+    vat: "[INSERIRE DATI]",
+    status: "Da completare"
+  },
+  sections: [
+    {
+      id: "utenti-app",
+      tab: "Informativa utenti app",
+      title: "1. Titolare del trattamento",
+      badge: "Da completare",
+      paragraphs: [
+        "Il Titolare del trattamento è [INSERIRE RAGIONE SOCIALE], con sede legale in [INSERIRE INDIRIZZO]. Email privacy: [INSERIRE EMAIL PRIVACY]. PEC: [INSERIRE PEC]. P.IVA / C.F.: [INSERIRE DATI].",
+        "I dati sopra indicati devono essere completati dal Founder o dal consulente privacy prima dell'utilizzo definitivo."
+      ]
+    },
+    {
+      id: "clienti-atti",
+      tab: "Informativa clienti / atti di vendita",
+      title: "2. Quali dati trattiamo",
+      paragraphs: [
+        "L'app OroActive può trattare dati degli utenti dell'app, dati dei clienti collegati agli atti di vendita, dati tecnici e dati relativi alle funzionalità AI e Aurum."
+      ],
+      groups: [
+        { title: "Dati degli utenti dell'app", items: ["nome e cognome", "username/email", "ruolo operativo", "negozio assegnato", "telefono se inserito", "stato online/offline", "attività svolte nell'app", "log accessi", "autorizzazioni, notifiche e audit trail", "risultati formazione Academy", "badge e certificazioni interne"] },
+        { title: "Dati dei clienti negli atti di vendita", items: ["nome e cognome", "codice fiscale", "data e luogo di nascita", "indirizzo di residenza", "telefono/email se richiesti", "dati documento di identità", "immagini documento/tessera sanitaria se acquisite", "firme", "dati relativi agli oggetti preziosi ceduti", "foto preziosi", "dati pagamento", "IBAN o contabili se necessari", "numero pratica / atto di vendita", "storico operazioni collegate al cliente"] },
+        { title: "Dati tecnici e di sicurezza", items: ["indirizzo IP", "browser/dispositivo", "data e ora accesso", "log di sistema", "audit log", "attività utente", "errori applicativi", "notifiche operative", "stato sessione"] },
+        { title: "Dati relativi ad AI e Aurum", items: ["domande inviate all'assistente", "risposte generate", "contesto operativo non sensibile", "memorie salvate solo se l'utente ha dato consenso", "preferenze operative condivise volontariamente dall'utente"] }
+      ],
+      closing: "OroActive non deve utilizzare l'AI per trattare dati sensibili non necessari o documenti personali senza specifica necessità operativa e senza adeguate misure di protezione."
+    },
+    {
+      id: "dati-trattati",
+      tab: "Dati trattati",
+      title: "3. Perché trattiamo i dati",
+      items: ["gestione degli utenti dell'app", "autenticazione e controllo accessi", "gestione ruoli e permessi", "compilazione e conservazione degli atti di vendita", "identificazione del cliente", "adempimenti normativi e amministrativi", "gestione pagamenti", "generazione PDF e copie cliente/azienda", "gestione CRM clienti", "controllo qualità pratica", "sicurezza operativa", "prevenzione errori, frodi e anomalie", "gestione giacenza e fusioni", "gestione backup", "audit trail e tracciamento attività", "notifiche interne", "formazione interna OroActive Academy", "supporto operativo tramite Aurum/AI", "generazione Customer Trust Pack", "statistiche interne autorizzate per Founder/Responsabili"]
+    },
+    {
+      id: "basi-giuridiche",
+      tab: "Finalità e basi giuridiche",
+      title: "4. Base giuridica del trattamento",
+      paragraphs: ["Il trattamento può fondarsi, a seconda dei casi, su esecuzione di misure contrattuali o precontrattuali, adempimento di obblighi legali, legittimo interesse del Titolare alla sicurezza, organizzazione, controllo qualità, tutela aziendale e prevenzione di abusi, consenso dell'interessato quando richiesto, e necessità di accertare, esercitare o difendere un diritto in sede competente."],
+      closing: "Le basi giuridiche devono essere verificate e confermate dal consulente privacy in base al modello operativo definitivo."
+    },
+    {
+      id: "modalita",
+      tab: "Conservazione dati",
+      title: "5. Come vengono trattati i dati",
+      paragraphs: ["I dati sono trattati con strumenti informatici e telematici, mediante accesso autenticato all'app OroActive. L'accesso è regolato da ruoli e permessi, in modo che ogni utente possa vedere solo le informazioni necessarie alla propria funzione.", "L'app può registrare attività operative, modifiche, salvataggi, eliminazioni, stampe, accessi, autorizzazioni e altre azioni rilevanti per garantire sicurezza, tracciabilità e controllo interno."]
+    },
+    {
+      id: "conservazione",
+      tab: "Conservazione dati",
+      title: "6. Per quanto tempo conserviamo i dati",
+      paragraphs: ["I dati sono conservati per il tempo necessario alle finalità per cui sono stati raccolti, agli obblighi normativi applicabili, alla tutela dei diritti del Titolare e alla corretta gestione delle pratiche aziendali."],
+      items: ["atti di vendita e documenti collegati: secondo obblighi normativi e policy aziendale", "dati utenti: per tutta la durata del rapporto operativo e successivamente per esigenze di sicurezza/audit", "audit log: per esigenze di tracciabilità e sicurezza", "backup: secondo policy interna di conservazione e verifica", "dati Academy: per mantenere storico formativo e certificazioni interne", "memorie Aurum: fino a cancellazione da parte dell'utente o disattivazione memoria"],
+      closing: "Le tempistiche definitive devono essere confermate dal consulente privacy."
+    },
+    {
+      id: "comunicazione",
+      tab: "Sicurezza",
+      title: "7. A chi possono essere comunicati i dati",
+      items: ["personale autorizzato OroActive", "Founder, responsabili e supervisori secondo permessi", "fornitori tecnici dell'app", "hosting provider", "fornitori backup/storage", "consulenti fiscali/legali/amministrativi", "autorità competenti quando previsto dalla legge", "servizi di pagamento o strumenti collegati se necessari", "fornitori AI solo nei limiti tecnici e con minimizzazione dei dati"],
+      closing: "Non vengono comunicati dati personali a soggetti non autorizzati."
+    },
+    {
+      id: "ai-aurum",
+      tab: "AI, Aurum e automazioni",
+      title: "8. Funzionalità AI e Aurum",
+      paragraphs: ["OroActive può includere funzionalità di assistenza AI tramite Aurum, assistente operativo interno. Aurum può aiutare l'utente a comprendere sezioni, compilare correttamente le pratiche, consultare procedure e ricevere suggerimenti operativi."],
+      items: ["Aurum non sostituisce il giudizio umano", "Aurum non deve trattare dati cliente non necessari", "dati sensibili, documenti, firme, IBAN e codici fiscali devono essere minimizzati", "le memorie personali dell'utente vengono salvate solo se l'utente conferma esplicitamente", "l'utente può visualizzare e cancellare le memorie Aurum", "eventuali domande e risposte possono essere registrate per sicurezza, miglioramento e tracciabilità nel rispetto delle policy interne"]
+    },
+    {
+      id: "sicurezza",
+      tab: "Sicurezza",
+      title: "9. Misure di sicurezza",
+      paragraphs: ["OroActive adotta misure tecniche e organizzative per proteggere i dati personali."],
+      items: ["accesso con credenziali", "ruoli e permessi", "tracciamento attività tramite Audit Trail", "backup", "controllo qualità", "autorizzazioni superiori per pratiche rischiose", "protezione file e documenti", "limitazione accessi in base al ruolo", "registrazione eventi critici", "controlli su operazioni anomale"],
+      closing: "La sicurezza viene migliorata progressivamente in base all'evoluzione dell'app e delle esigenze operative."
+    },
+    {
+      id: "diritti",
+      tab: "Diritti privacy",
+      title: "10. Diritti privacy",
+      paragraphs: ["L'interessato può esercitare, nei limiti previsti dalla normativa, i diritti di accesso, rettifica, cancellazione, limitazione del trattamento, opposizione, portabilità ove applicabile, revoca del consenso ove il trattamento sia basato sul consenso e reclamo all'Autorità Garante per la protezione dei dati personali.", "Per esercitare i diritti: Email [INSERIRE EMAIL PRIVACY] - PEC [INSERIRE PEC]."]
+    },
+    {
+      id: "cookie-pwa",
+      tab: "Cookie / PWA / log tecnici",
+      title: "11. Cookie, PWA e dati tecnici",
+      paragraphs: ["L'app OroActive può utilizzare strumenti tecnici necessari al funzionamento, come cookie tecnici, localStorage, sessionStorage, service worker/PWA e log tecnici."],
+      items: ["mantenere la sessione", "migliorare la navigazione", "salvare preferenze utente", "abilitare funzionalità PWA", "gestire aggiornamenti applicativi", "garantire sicurezza e continuità operativa"],
+      closing: "Se in futuro verranno utilizzati strumenti di analytics, marketing o profilazione, dovrà essere predisposta informativa e consenso specifico ove richiesto."
+    },
+    {
+      id: "versione",
+      tab: "Versione documento",
+      title: "12. Aggiornamenti della Privacy Policy",
+      paragraphs: ["La presente informativa può essere aggiornata nel tempo. In caso di modifiche rilevanti, l'app potrà mostrare una richiesta di presa visione agli utenti al successivo accesso."]
+    }
+  ]
+};
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -503,7 +617,11 @@ function auditActionLabel(action = "") {
     training_started: "Training operatore avviato",
     training_completed: "Training operatore completato",
     training_passed: "Training operatore superato",
-    training_failed: "Training operatore non superato"
+    training_failed: "Training operatore non superato",
+    privacy_policy_viewed: "Privacy Policy visualizzata",
+    privacy_policy_accepted: "Privacy Policy accettata",
+    privacy_policy_version_created: "Versione Privacy Policy creata",
+    customer_privacy_notice_viewed: "Informativa privacy cliente visualizzata"
   }[action] || activityLabel(action) || "Attività";
 }
 
@@ -2911,12 +3029,181 @@ function rowToAct(row, options = {}) {
   };
 }
 
+function publicPrivacyPolicy(row = {}) {
+  const content = row.content && Object.keys(row.content || {}).length ? row.content : defaultPrivacyPolicyContent;
+  return {
+    ...defaultPrivacyPolicyContent,
+    ...content,
+    version: row.version || content.version || privacyPolicyVersion,
+    title: row.title || content.title || defaultPrivacyPolicyContent.title,
+    updated_at: content.updated_at || privacyPolicyUpdatedAt,
+    created_at: row.created_at || null,
+    is_active: row.is_active !== false
+  };
+}
+
+function publicPrivacyAcceptance(row = {}) {
+  if (!row?.id) return null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    policy_version: row.policy_version,
+    accepted_at: row.accepted_at,
+    user_name: row.user_name || "",
+    user_role: row.user_role || "",
+    username: row.username || ""
+  };
+}
+
+async function bootstrapPrivacyPolicy() {
+  await pool.query(
+    `INSERT INTO privacy_policy_versions (version, title, content, is_active, created_at)
+     VALUES ($1::text, $2::text, $3::jsonb, TRUE, NOW())
+     ON CONFLICT (version) DO UPDATE
+     SET title = EXCLUDED.title,
+         content = EXCLUDED.content`,
+    [privacyPolicyVersion, defaultPrivacyPolicyContent.title, sanitizeForPostgres(defaultPrivacyPolicyContent)]
+  );
+  const active = await pool.query("SELECT id FROM privacy_policy_versions WHERE is_active = TRUE LIMIT 1");
+  if (!active.rowCount) {
+    await pool.query("UPDATE privacy_policy_versions SET is_active = TRUE WHERE version = $1::text", [privacyPolicyVersion]);
+  }
+}
+
+async function currentPrivacyPolicy() {
+  const result = await pool.query(
+    "SELECT * FROM privacy_policy_versions WHERE is_active = TRUE ORDER BY created_at DESC, id DESC LIMIT 1"
+  );
+  if (result.rowCount) return publicPrivacyPolicy(result.rows[0]);
+  return publicPrivacyPolicy({ version: privacyPolicyVersion, title: defaultPrivacyPolicyContent.title, content: defaultPrivacyPolicyContent, is_active: true });
+}
+
+async function listPrivacyPolicyVersions() {
+  const result = await pool.query(
+    `SELECT id, version, title, is_active, created_by, created_at
+     FROM privacy_policy_versions
+     ORDER BY is_active DESC, created_at DESC, id DESC`
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    version: row.version,
+    title: row.title,
+    is_active: row.is_active !== false,
+    created_by: row.created_by || null,
+    created_at: row.created_at
+  }));
+}
+
+async function getPrivacyAcceptance(user = {}, version = "") {
+  if (!user?.id) return null;
+  const policyVersion = version || (await currentPrivacyPolicy()).version;
+  const result = await pool.query(
+    `SELECT ppa.*
+     FROM privacy_policy_acceptances ppa
+     WHERE ppa.user_id = $1::bigint
+       AND ppa.policy_version = $2::text
+     ORDER BY ppa.accepted_at DESC
+     LIMIT 1`,
+    [user.id, policyVersion]
+  );
+  return publicPrivacyAcceptance(result.rows[0] || null);
+}
+
+async function acceptPrivacyPolicy(input = {}, user = {}, req = null) {
+  const policy = await currentPrivacyPolicy();
+  const version = String(input.version || policy.version || privacyPolicyVersion).trim();
+  if (!version) {
+    const error = new Error("Versione privacy non valida");
+    error.status = 400;
+    throw error;
+  }
+  const result = await pool.query(
+    `INSERT INTO privacy_policy_acceptances (user_id, policy_version, accepted_at, ip_address, user_agent)
+     VALUES ($1::bigint, $2::text, NOW(), $3::text, $4::text)
+     ON CONFLICT (user_id, policy_version) DO UPDATE
+     SET accepted_at = NOW(),
+         ip_address = EXCLUDED.ip_address,
+         user_agent = EXCLUDED.user_agent
+     RETURNING *`,
+    [user.id, version, auditRequestIp(req), req?.headers?.["user-agent"] || ""]
+  );
+  void writeAuditLog({
+    req,
+    user,
+    action: "privacy_policy_accepted",
+    entityType: "privacy_policy",
+    entityId: version,
+    entityLabel: `Privacy Policy ${version}`,
+    metadata: { policy_version: version }
+  });
+  return {
+    ok: true,
+    message: "Presa visione registrata correttamente",
+    acceptance: publicPrivacyAcceptance(result.rows[0])
+  };
+}
+
+async function listPrivacyPolicyAcceptances(user = {}) {
+  if (normalizeRole(user?.ruolo) !== "founder") {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const result = await pool.query(
+    `SELECT ppa.*,
+            CONCAT_WS(' ', u.nome, u.cognome) AS user_name,
+            u.ruolo AS user_role,
+            COALESCE(u.username, u.email) AS username
+     FROM privacy_policy_acceptances ppa
+     LEFT JOIN utenti u ON u.id = ppa.user_id
+     ORDER BY ppa.accepted_at DESC
+     LIMIT 200`
+  );
+  return result.rows.map(publicPrivacyAcceptance);
+}
+
+function writePrivacyPolicyPdf(response, policy) {
+  const doc = new PDFDocument({ size: "A4", margin: 42 });
+  response.setHeader("Content-Type", "application/pdf");
+  response.setHeader("Content-Disposition", `attachment; filename="privacy-policy-oroactive-${policy.version || privacyPolicyVersion}.pdf"`);
+  doc.pipe(response);
+  doc.fillColor("#111").font("Helvetica-Bold").fontSize(18).text("Centro Privacy OroActive", { align: "center" });
+  doc.moveDown(0.4);
+  doc.fillColor("#ff6a00").fontSize(13).text(policy.title || defaultPrivacyPolicyContent.title, { align: "center" });
+  doc.moveDown(0.4);
+  doc.fillColor("#555").font("Helvetica").fontSize(9).text(`Versione ${policy.version || privacyPolicyVersion} - Aggiornamento ${policy.updated_at || privacyPolicyUpdatedAt}`, { align: "center" });
+  doc.moveDown();
+  doc.fontSize(10).fillColor("#333").text(policy.note || defaultPrivacyPolicyContent.note, { lineGap: 2 });
+  (policy.sections || []).forEach((section) => {
+    doc.moveDown(0.8);
+    if (doc.y > 710) doc.addPage();
+    doc.fillColor("#111").font("Helvetica-Bold").fontSize(12).text(section.title || section.tab || "Sezione privacy");
+    (section.paragraphs || []).forEach((paragraph) => {
+      doc.fillColor("#444").font("Helvetica").fontSize(9).text(paragraph, { lineGap: 2 });
+    });
+    (section.items || []).slice(0, 18).forEach((item) => {
+      doc.fillColor("#444").font("Helvetica").fontSize(8.5).text(`• ${item}`, { indent: 10, lineGap: 1 });
+    });
+    (section.groups || []).forEach((group) => {
+      doc.fillColor("#111").font("Helvetica-Bold").fontSize(9).text(group.title || "");
+      (group.items || []).slice(0, 16).forEach((item) => {
+        doc.fillColor("#444").font("Helvetica").fontSize(8.2).text(`• ${item}`, { indent: 10, lineGap: 1 });
+      });
+    });
+    if (section.closing) doc.fillColor("#555").font("Helvetica-Oblique").fontSize(8.5).text(section.closing, { lineGap: 2 });
+  });
+  doc.moveDown();
+  doc.fillColor("#777").fontSize(8).text("Documento generato digitalmente dal gestionale OroActive. Bozza da far revisionare al consulente privacy.", { align: "center" });
+  doc.end();
+}
+
 async function initDatabase() {
   const schema = await fs.readFile(path.join(__dirname, "schema.sql"), "utf8");
   await pool.query(schema);
   await setupAiVectorStorage();
   await bootstrapStores();
   await bootstrapAdminUser();
+  await bootstrapPrivacyPolicy();
 }
 
 function backupTimestamp(date = new Date()) {
@@ -12205,6 +12492,96 @@ app.get("/api/audit-logs/:id", async (request, response, next) => {
   }
 });
 
+app.get("/api/privacy-policy/current", async (request, response, next) => {
+  try {
+    const policy = await currentPrivacyPolicy();
+    if (request.query.audit === "true") {
+      void writeAuditLog({
+        req: request,
+        user: request.user,
+        action: "privacy_policy_viewed",
+        entityType: "privacy_policy",
+        entityId: policy.version,
+        entityLabel: policy.title,
+        metadata: { policy_version: policy.version }
+      });
+    }
+    response.json({ ok: true, policy, acceptance: await getPrivacyAcceptance(request.user, policy.version) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/privacy-policy/current/pdf", async (request, response, next) => {
+  try {
+    const policy = await currentPrivacyPolicy();
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "privacy_policy_viewed",
+      entityType: "privacy_policy",
+      entityId: policy.version,
+      entityLabel: `${policy.title} PDF`,
+      metadata: { policy_version: policy.version, format: "pdf" }
+    });
+    writePrivacyPolicyPdf(response, policy);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/privacy-policy/customer-notice/viewed", async (request, response, next) => {
+  try {
+    const policy = await currentPrivacyPolicy();
+    const practiceNumber = String(request.body?.practice_number || request.body?.practiceNumber || "").trim();
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "customer_privacy_notice_viewed",
+      entityType: "privacy_policy",
+      entityId: policy.version,
+      entityLabel: practiceNumber ? `Informativa cliente ${practiceNumber}` : "Informativa privacy cliente",
+      metadata: { policy_version: policy.version, practice_number: practiceNumber || null }
+    });
+    response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/privacy-policy/versions", async (_request, response, next) => {
+  try {
+    response.json({ ok: true, versions: await listPrivacyPolicyVersions() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/privacy-policy/my-acceptance", async (request, response, next) => {
+  try {
+    const policy = await currentPrivacyPolicy();
+    response.json({ ok: true, acceptance: await getPrivacyAcceptance(request.user, policy.version), policy_version: policy.version });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/privacy-policy/acceptances", requireFounder, async (request, response, next) => {
+  try {
+    response.json({ ok: true, acceptances: await listPrivacyPolicyAcceptances(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/privacy-policy/accept", async (request, response, next) => {
+  try {
+    response.json(await acceptPrivacyPolicy(request.body, request.user, request));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/notifications", async (request, response, next) => {
   try {
     response.json(await listNotifications(request.query, request.user));
@@ -15075,6 +15452,7 @@ function friendlyDatabaseError(error, request) {
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Errore database durante il salvataggio Academy.";
   if (url.includes("/api/crm")) return "Errore database durante il salvataggio CRM.";
   if (url.includes("/api/customer-trust-pack")) return "Errore database durante il Customer Trust Pack.";
+  if (url.includes("/api/privacy-policy")) return "Errore database durante il Centro Privacy.";
   if (url.includes("/api/store-health")) return "Errore database durante il calcolo Salute Negozio.";
   if (url.includes("/api/founder-daily-report")) return "Errore database durante il Founder Daily Report.";
   if (url.includes("/api/backups")) return "Errore database durante il backup.";
@@ -15094,6 +15472,7 @@ function safeRouteErrorMessage(request) {
   if (url.includes("/api/approvals")) return "Operazione autorizzazione non completata.";
   if (url.includes("/api/notifications")) return "Operazione notifiche non completata.";
   if (url.includes("/api/customer-trust-pack")) return "Customer Trust Pack non completato.";
+  if (url.includes("/api/privacy-policy")) return "Centro Privacy non caricato.";
   if (url.includes("/api/founder-daily-report")) return "Founder Daily Report non completato.";
   if (url.includes("/api/backups")) return "Operazione backup non completata.";
   if (url.includes("/api/training")) return "Training Operatore non completato.";

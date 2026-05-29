@@ -81,6 +81,11 @@ const state = {
   notificationUnreadCount: 0,
   notificationPagination: { page: 1, limit: 20, total: 0 },
   notificationTimer: null,
+  privacyPolicy: null,
+  privacyAcceptance: null,
+  privacyVersions: [],
+  privacyAcceptances: [],
+  privacyNoticeShown: false,
   clockTimer: null,
   aurumSettings: null,
   aurumCurrentSection: "menu",
@@ -117,6 +122,40 @@ const state = {
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
 const OROACTIVE_WEBSITE_URL = "http://wcfme33owxz0wfkr0ysnzthy.188.213.161.151.sslip.io/";
+const PRIVACY_POLICY_FALLBACK = {
+  version: "v1.0",
+  updated_at: "2026-05-29",
+  title: "Privacy Policy e Informativa sul trattamento dei dati personali — OroActive",
+  subtitle: "Informativa ai sensi del Regolamento UE 2016/679 (GDPR) e della normativa applicabile in materia di protezione dei dati personali.",
+  note: "Questa informativa descrive come OroActive tratta i dati personali all'interno dell'app gestionale e nei processi collegati agli atti di vendita, alla gestione clienti, alla formazione, alla sicurezza operativa e alle funzionalità AI.",
+  controller: {
+    company_name: "[INSERIRE RAGIONE SOCIALE]",
+    legal_address: "[INSERIRE INDIRIZZO]",
+    privacy_email: "[INSERIRE EMAIL PRIVACY]",
+    pec: "[INSERIRE PEC]",
+    vat: "[INSERIRE DATI]",
+    status: "Da completare"
+  },
+  sections: [
+    { id: "utenti-app", tab: "Informativa utenti app", title: "1. Titolare del trattamento", badge: "Da completare", paragraphs: ["Il Titolare del trattamento è [INSERIRE RAGIONE SOCIALE], con sede legale in [INSERIRE INDIRIZZO]. Email privacy: [INSERIRE EMAIL PRIVACY]. PEC: [INSERIRE PEC]. P.IVA / C.F.: [INSERIRE DATI].", "I dati sopra indicati devono essere completati dal Founder o dal consulente privacy prima dell'utilizzo definitivo."] },
+    { id: "clienti-atti", tab: "Informativa clienti / atti di vendita", title: "2. Quali dati trattiamo", paragraphs: ["L'app OroActive può trattare dati degli utenti dell'app, dati dei clienti collegati agli atti di vendita, dati tecnici e dati relativi alle funzionalità AI e Aurum."], groups: [
+      { title: "Dati degli utenti dell'app", items: ["nome e cognome", "username/email", "ruolo operativo", "negozio assegnato", "telefono se inserito", "stato online/offline", "attività svolte nell'app", "log accessi", "autorizzazioni, notifiche e audit trail", "risultati formazione Academy", "badge e certificazioni interne"] },
+      { title: "Dati dei clienti negli atti di vendita", items: ["nome e cognome", "codice fiscale", "data e luogo di nascita", "indirizzo di residenza", "telefono/email se richiesti", "dati documento di identità", "immagini documento/tessera sanitaria se acquisite", "firme", "dati relativi agli oggetti preziosi ceduti", "foto preziosi", "dati pagamento", "IBAN o contabili se necessari", "numero pratica / atto di vendita", "storico operazioni collegate al cliente"] },
+      { title: "Dati tecnici e di sicurezza", items: ["indirizzo IP", "browser/dispositivo", "data e ora accesso", "log di sistema", "audit log", "attività utente", "errori applicativi", "notifiche operative", "stato sessione"] },
+      { title: "Dati relativi ad AI e Aurum", items: ["domande inviate all'assistente", "risposte generate", "contesto operativo non sensibile", "memorie salvate solo se l'utente ha dato consenso", "preferenze operative condivise volontariamente dall'utente"] }
+    ], closing: "OroActive non deve utilizzare l'AI per trattare dati sensibili non necessari o documenti personali senza specifica necessità operativa e senza adeguate misure di protezione." },
+    { id: "finalita", tab: "Dati trattati", title: "3. Perché trattiamo i dati", items: ["gestione degli utenti dell'app", "autenticazione e controllo accessi", "gestione ruoli e permessi", "compilazione e conservazione degli atti di vendita", "identificazione del cliente", "adempimenti normativi e amministrativi", "gestione pagamenti", "generazione PDF e copie cliente/azienda", "gestione CRM clienti", "controllo qualità pratica", "sicurezza operativa", "prevenzione errori, frodi e anomalie", "gestione giacenza e fusioni", "gestione backup", "audit trail e tracciamento attività", "notifiche interne", "formazione interna OroActive Academy", "supporto operativo tramite Aurum/AI", "generazione Customer Trust Pack", "statistiche interne autorizzate per Founder/Responsabili"] },
+    { id: "basi-giuridiche", tab: "Finalità e basi giuridiche", title: "4. Base giuridica del trattamento", paragraphs: ["Il trattamento può fondarsi su esecuzione di misure contrattuali o precontrattuali, adempimento di obblighi legali, legittimo interesse del Titolare alla sicurezza, organizzazione, controllo qualità, tutela aziendale e prevenzione di abusi, consenso dell'interessato quando richiesto, e necessità di accertare, esercitare o difendere un diritto in sede competente."], closing: "Le basi giuridiche devono essere verificate e confermate dal consulente privacy in base al modello operativo definitivo." },
+    { id: "modalita", tab: "Conservazione dati", title: "5. Come vengono trattati i dati", paragraphs: ["I dati sono trattati con strumenti informatici e telematici, mediante accesso autenticato all'app OroActive. L'accesso è regolato da ruoli e permessi, in modo che ogni utente possa vedere solo le informazioni necessarie alla propria funzione.", "L'app può registrare attività operative, modifiche, salvataggi, eliminazioni, stampe, accessi, autorizzazioni e altre azioni rilevanti per garantire sicurezza, tracciabilità e controllo interno."] },
+    { id: "conservazione", tab: "Conservazione dati", title: "6. Per quanto tempo conserviamo i dati", paragraphs: ["I dati sono conservati per il tempo necessario alle finalità per cui sono stati raccolti, agli obblighi normativi applicabili, alla tutela dei diritti del Titolare e alla corretta gestione delle pratiche aziendali."], items: ["atti di vendita e documenti collegati: secondo obblighi normativi e policy aziendale", "dati utenti: per tutta la durata del rapporto operativo e successivamente per esigenze di sicurezza/audit", "audit log: per esigenze di tracciabilità e sicurezza", "backup: secondo policy interna di conservazione e verifica", "dati Academy: per mantenere storico formativo e certificazioni interne", "memorie Aurum: fino a cancellazione da parte dell'utente o disattivazione memoria"], closing: "Le tempistiche definitive devono essere confermate dal consulente privacy." },
+    { id: "comunicazione", tab: "Sicurezza", title: "7. A chi possono essere comunicati i dati", items: ["personale autorizzato OroActive", "Founder, responsabili e supervisori secondo permessi", "fornitori tecnici dell'app", "hosting provider", "fornitori backup/storage", "consulenti fiscali/legali/amministrativi", "autorità competenti quando previsto dalla legge", "servizi di pagamento o strumenti collegati se necessari", "fornitori AI solo nei limiti tecnici e con minimizzazione dei dati"], closing: "Non vengono comunicati dati personali a soggetti non autorizzati." },
+    { id: "ai-aurum", tab: "AI, Aurum e automazioni", title: "8. Funzionalità AI e Aurum", paragraphs: ["OroActive può includere funzionalità di assistenza AI tramite Aurum, assistente operativo interno. Aurum può aiutare l'utente a comprendere sezioni, compilare correttamente le pratiche, consultare procedure e ricevere suggerimenti operativi."], items: ["Aurum non sostituisce il giudizio umano", "Aurum non deve trattare dati cliente non necessari", "dati sensibili, documenti, firme, IBAN e codici fiscali devono essere minimizzati", "le memorie personali dell'utente vengono salvate solo se l'utente conferma esplicitamente", "l'utente può visualizzare e cancellare le memorie Aurum", "eventuali domande e risposte possono essere registrate per sicurezza, miglioramento e tracciabilità nel rispetto delle policy interne"] },
+    { id: "sicurezza", tab: "Sicurezza", title: "9. Misure di sicurezza", paragraphs: ["OroActive adotta misure tecniche e organizzative per proteggere i dati personali."], items: ["accesso con credenziali", "ruoli e permessi", "tracciamento attività tramite Audit Trail", "backup", "controllo qualità", "autorizzazioni superiori per pratiche rischiose", "protezione file e documenti", "limitazione accessi in base al ruolo", "registrazione eventi critici", "controlli su operazioni anomale"], closing: "La sicurezza viene migliorata progressivamente in base all'evoluzione dell'app e delle esigenze operative." },
+    { id: "diritti", tab: "Diritti privacy", title: "10. Diritti privacy", paragraphs: ["L'interessato può esercitare, nei limiti previsti dalla normativa, i diritti di accesso, rettifica, cancellazione, limitazione del trattamento, opposizione, portabilità ove applicabile, revoca del consenso ove il trattamento sia basato sul consenso e reclamo all'Autorità Garante per la protezione dei dati personali.", "Per esercitare i diritti: Email [INSERIRE EMAIL PRIVACY] - PEC [INSERIRE PEC]."] },
+    { id: "cookie-pwa", tab: "Cookie / PWA / log tecnici", title: "11. Cookie, PWA e dati tecnici", paragraphs: ["L'app OroActive può utilizzare strumenti tecnici necessari al funzionamento, come cookie tecnici, localStorage, sessionStorage, service worker/PWA e log tecnici."], items: ["mantenere la sessione", "migliorare la navigazione", "salvare preferenze utente", "abilitare funzionalità PWA", "gestire aggiornamenti applicativi", "garantire sicurezza e continuità operativa"], closing: "Se in futuro verranno utilizzati strumenti di analytics, marketing o profilazione, dovrà essere predisposta informativa e consenso specifico ove richiesto." },
+    { id: "versione", tab: "Versione documento", title: "12. Aggiornamenti della Privacy Policy", paragraphs: ["La presente informativa può essere aggiornata nel tempo. In caso di modifiche rilevanti, l'app potrà mostrare una richiesta di presa visione agli utenti al successivo accesso."] }
+  ]
+};
 const ENABLE_AURUM_MASCOT = true;
 const AURUM_SETTINGS_KEY = "oroactive-aurum-settings";
 const AURUM_DEFAULT_SETTINGS = {
@@ -1147,6 +1186,7 @@ function apiErrorFallback(path = "", status = 0) {
   if (/\/approvals/.test(path)) return "Operazione autorizzazione non completata.";
   if (/\/notifications/.test(path)) return "Operazione notifiche non completata.";
   if (/\/customer-trust-pack/.test(path)) return "Customer Trust Pack non completato.";
+  if (/\/privacy-policy/.test(path)) return "Centro Privacy non caricato.";
   if (/\/store-health/.test(path)) return "Salute Negozio non caricata.";
   if (/\/founder-daily-report/.test(path)) return "Founder Daily Report non completato.";
   if (/\/backups/.test(path)) return "Operazione backup non completata.";
@@ -1492,6 +1532,8 @@ function showLogin() {
   state.actsCache.clear();
   state.notifications = [];
   state.notificationUnreadCount = 0;
+  state.privacyAcceptance = null;
+  state.privacyNoticeShown = false;
   demoActs.splice(0, demoActs.length);
   stopNotificationPolling();
   closeNotificationDropdown();
@@ -2202,8 +2244,9 @@ const MENU_GROUPS = [
       { id: "users", label: "Utenti e permessi", description: "Ruoli e profili.", icon: "UT", order: 10, section: "users", roles: MENU_ROLES.administration, condition: "userDirectory", keywords: "utenti permessi ruoli profili" },
       { id: "stores", label: "Negozi", description: "Sedi e configurazioni.", icon: "NG", order: 20, section: "stores", roles: MENU_ROLES.founder, condition: "founder", keywords: "negozi sedi amministrazione" },
       { id: "aurum-admin", label: "Gestione Aurum", description: "Memorie e impostazioni Aurum.", icon: "GA", order: 30, section: "aurumAdmin", roles: MENU_ROLES.founder, condition: "founder", keywords: "gestione aurum impostazioni memoria" },
-      { id: "oroactive-website", label: "Sito web OroActive", description: "Apri il sito ufficiale.", icon: "SW", order: 40, action: "website", roles: MENU_ROLES.all, keywords: "sito web oroactive dominio" },
-      { id: "profile", label: "Profilo utente", description: "Dati del tuo account.", icon: "PR", order: 50, section: "profile", roles: MENU_ROLES.all, keywords: "profilo dati utente account" }
+      { id: "privacy-center", label: "Centro Privacy", description: "Privacy Policy e dati personali.", icon: "PV", order: 40, section: "privacyCenter", roles: MENU_ROLES.all, keywords: "privacy dati personali informativa gdpr policy" },
+      { id: "oroactive-website", label: "Sito web OroActive", description: "Apri il sito ufficiale.", icon: "SW", order: 50, action: "website", roles: MENU_ROLES.all, keywords: "sito web oroactive dominio" },
+      { id: "profile", label: "Profilo utente", description: "Dati del tuo account.", icon: "PR", order: 60, section: "profile", roles: MENU_ROLES.all, keywords: "profilo dati utente account" }
     ]
   }
 ];
@@ -2521,6 +2564,7 @@ async function startAuthenticatedApp() {
   await loadNotificationCount();
   startNotificationPolling();
   if (isFounder()) await loadAurumAllMemories();
+  void maybeShowPrivacyPolicyNotice();
   maybeShowAurumDailyGreeting();
   maybeShowLevelUnlockMessage();
   await flushPendingSync();
@@ -2797,6 +2841,7 @@ function sectionLoadErrorMessage(id, error) {
     assistant: "Assistente IA non caricato.",
     aurumAdmin: "Gestione Aurum non caricata.",
     knowledgeNotes: "Conoscenze OroActive non caricate.",
+    privacyCenter: "Centro Privacy non caricato.",
     users: "Utenti non caricati."
   };
   return cleanUserMessage(error?.message, labels[id] || "Sezione non caricata.");
@@ -2849,6 +2894,9 @@ async function handleScreenDataLoad(id) {
   if (id === "profile") {
     renderProfileCard();
   }
+  if (id === "privacyCenter") {
+    await loadPrivacyPolicyState({ audit: true });
+  }
   if (id === "users") {
     await loadUsers();
     await loadAurumSupportRequests();
@@ -2876,6 +2924,202 @@ function renderProfileCard() {
     </div>
   `;
   document.getElementById("profileRegisterFaceId")?.addEventListener("click", registerFaceId);
+}
+
+function activePrivacyPolicy() {
+  return state.privacyPolicy || PRIVACY_POLICY_FALLBACK;
+}
+
+function privacyAcceptanceMatches(policy = activePrivacyPolicy()) {
+  return Boolean(state.privacyAcceptance?.policy_version && state.privacyAcceptance.policy_version === policy.version);
+}
+
+function privacyStatusMarkup(policy = activePrivacyPolicy()) {
+  const accepted = privacyAcceptanceMatches(policy);
+  return `
+    <div>
+      <span class="privacy-badge ${accepted ? "accepted" : "pending"}">${accepted ? "Presa visione registrata" : "Presa visione da registrare"}</span>
+      <strong>${accepted ? "Informativa letta" : "Privacy Policy disponibile"}</strong>
+      <p>${accepted ? `Versione ${escapeHtml(policy.version)} letta il ${escapeHtml(formatDateTime(state.privacyAcceptance.accepted_at))}.` : "Apri le sezioni, consulta l'informativa e registra la presa visione quando hai terminato."}</p>
+    </div>
+    <small>Versione ${escapeHtml(policy.version || "v1.0")} · Aggiornamento ${escapeHtml(policy.updated_at || "2026-05-29")}</small>
+  `;
+}
+
+function privacySectionMarkup(section = {}, index = 0) {
+  const paragraphs = (section.paragraphs || [])
+    .map((text) => `<p>${escapeHtml(text)}</p>`)
+    .join("");
+  const items = (section.items || [])
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  const groups = (section.groups || [])
+    .map((group) => `
+      <div class="privacy-group">
+        <h4>${escapeHtml(group.title || "Dati trattati")}</h4>
+        <ul>${(group.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </div>
+    `)
+    .join("");
+  return `
+    <details class="privacy-accordion-section" ${index < 3 ? "open" : ""}>
+      <summary>
+        <span>${escapeHtml(section.tab || `Sezione ${index + 1}`)}</span>
+        ${section.badge ? `<mark>${escapeHtml(section.badge)}</mark>` : ""}
+      </summary>
+      <div class="privacy-accordion-body">
+        <h3>${escapeHtml(section.title || section.tab || "Informativa")}</h3>
+        ${paragraphs}
+        ${items ? `<ul>${items}</ul>` : ""}
+        ${groups}
+        ${section.closing ? `<p class="privacy-note">${escapeHtml(section.closing)}</p>` : ""}
+      </div>
+    </details>
+  `;
+}
+
+function privacyPolicyDocumentMarkup(policy = activePrivacyPolicy(), options = {}) {
+  const sections = (policy.sections || PRIVACY_POLICY_FALLBACK.sections || [])
+    .map((section, index) => privacySectionMarkup(section, index))
+    .join("");
+  return `
+    <article class="privacy-policy-document ${options.compact ? "compact" : ""}">
+      <div class="privacy-document-meta">
+        <span>GDPR</span>
+        <strong>${escapeHtml(policy.version || "v1.0")}</strong>
+        <em>${escapeHtml(policy.updated_at || "2026-05-29")}</em>
+      </div>
+      <h2>${escapeHtml(policy.title || PRIVACY_POLICY_FALLBACK.title)}</h2>
+      <p>${escapeHtml(policy.subtitle || PRIVACY_POLICY_FALLBACK.subtitle)}</p>
+      <div class="privacy-warning">
+        <strong>Bozza professionale interna</strong>
+        <span>${escapeHtml(policy.note || PRIVACY_POLICY_FALLBACK.note)}</span>
+      </div>
+      <div class="privacy-accordion">${sections}</div>
+    </article>
+  `;
+}
+
+function renderPrivacyCenter() {
+  const policy = activePrivacyPolicy();
+  const content = document.getElementById("privacyPolicyContent");
+  const status = document.getElementById("privacyStatusCard");
+  const summary = document.getElementById("privacySummaryCards");
+  const founderPanel = document.getElementById("privacyFounderPanel");
+  const versionsList = document.getElementById("privacyVersionsList");
+  const acceptancesList = document.getElementById("privacyAcceptancesList");
+  const acceptButton = document.getElementById("privacyAcceptButton");
+  if (status) status.innerHTML = privacyStatusMarkup(policy);
+  if (summary) {
+    summary.innerHTML = [
+      ["Informativa utenti app", "Ruoli, accessi, attività, Academy e notifiche."],
+      ["Informativa clienti", "Atti di vendita, documenti, firme e pagamenti."],
+      ["AI e Aurum", "Minimizzazione dati, memoria e assistenza operativa."],
+      ["Diritti privacy", "Accesso, rettifica, cancellazione, opposizione e reclamo."]
+    ].map(([title, text]) => `
+      <article class="privacy-summary-card">
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(text)}</span>
+      </article>
+    `).join("");
+  }
+  if (content) content.innerHTML = privacyPolicyDocumentMarkup(policy);
+  if (acceptButton) {
+    acceptButton.disabled = privacyAcceptanceMatches(policy);
+    acceptButton.textContent = privacyAcceptanceMatches(policy) ? "Presa visione registrata" : "Ho letto l'informativa";
+  }
+  if (founderPanel) founderPanel.hidden = !isFounder();
+  if (versionsList) {
+    versionsList.innerHTML = (state.privacyVersions || []).map((version) => `
+      <article class="privacy-admin-row">
+        <strong>${escapeHtml(version.version || "")}${version.is_active ? " · attiva" : ""}</strong>
+        <span>${escapeHtml(version.title || "Privacy Policy OroActive")}</span>
+        <small>${escapeHtml(formatDateTime(version.created_at))}</small>
+      </article>
+    `).join("") || '<div class="empty-state">Nessuna versione privacy trovata.</div>';
+  }
+  if (acceptancesList) {
+    acceptancesList.innerHTML = (state.privacyAcceptances || []).map((acceptance) => `
+      <article class="privacy-admin-row">
+        <strong>${escapeHtml(acceptance.user_name || acceptance.username || "Utente")}</strong>
+        <span>${escapeHtml(roleLabel(acceptance.user_role || ""))} · ${escapeHtml(acceptance.policy_version || "")}</span>
+        <small>${escapeHtml(formatDateTime(acceptance.accepted_at))}</small>
+      </article>
+    `).join("") || '<div class="empty-state">Nessuna presa visione registrata.</div>';
+  }
+}
+
+async function loadPrivacyPolicyState(options = {}) {
+  const { audit = false, silent = false } = options;
+  try {
+    const suffix = audit ? "?audit=true" : "";
+    const data = await apiRequest(`/privacy-policy/current${suffix}`);
+    state.privacyPolicy = data.policy || PRIVACY_POLICY_FALLBACK;
+    state.privacyAcceptance = data.acceptance || null;
+    const versions = await apiRequest("/privacy-policy/versions").catch(() => ({ versions: [] }));
+    state.privacyVersions = versions.versions || [];
+    if (isFounder()) {
+      const acceptances = await apiRequest("/privacy-policy/acceptances").catch(() => ({ acceptances: [] }));
+      state.privacyAcceptances = acceptances.acceptances || [];
+    } else {
+      state.privacyAcceptances = [];
+    }
+  } catch (error) {
+    state.privacyPolicy = PRIVACY_POLICY_FALLBACK;
+    if (!silent) showToast(error.message || "Centro Privacy non caricato.", "error");
+  } finally {
+    renderPrivacyCenter();
+  }
+}
+
+async function acceptPrivacyPolicy() {
+  const policy = activePrivacyPolicy();
+  const data = await apiRequest("/privacy-policy/accept", {
+    method: "POST",
+    body: JSON.stringify({ version: policy.version })
+  });
+  state.privacyAcceptance = data.acceptance || state.privacyAcceptance;
+  await loadPrivacyPolicyState({ silent: true });
+  showToast(data.message || "Presa visione registrata correttamente.", "success");
+}
+
+async function downloadPrivacyPolicyPdf() {
+  const policy = activePrivacyPolicy();
+  await downloadProtectedFile("/privacy-policy/current/pdf", `privacy-policy-oroactive-${policy.version || "v1.0"}.pdf`, "Preparo informativa privacy...");
+  showToast("Informativa privacy scaricata.", "success");
+}
+
+async function openPrivacyNoticePreview(options = {}) {
+  if (state.authToken && !state.privacyPolicy) await loadPrivacyPolicyState({ audit: !options.login, silent: true });
+  const policy = activePrivacyPolicy();
+  previewTitle.textContent = options.customer ? "Informativa privacy cliente" : "Privacy Policy OroActive";
+  previewBody.innerHTML = `
+    <div class="privacy-preview">
+      ${options.customer ? `
+        <div class="privacy-warning">
+          <strong>Informativa privacy cliente</strong>
+          <span>Prima della conclusione della pratica il cliente deve poter consultare l'informativa sul trattamento dei dati personali.</span>
+        </div>
+      ` : ""}
+      ${privacyPolicyDocumentMarkup(policy, { compact: true })}
+      ${state.authToken && !options.customer ? `
+        <div class="privacy-preview-actions">
+          <button class="primary-button" type="button" data-accept-privacy-policy ${privacyAcceptanceMatches(policy) ? "disabled" : ""}>${privacyAcceptanceMatches(policy) ? "Presa visione registrata" : "Ho letto"}</button>
+          <button class="ghost-button" type="button" data-open-privacy-center>Apri Centro Privacy</button>
+        </div>
+      ` : ""}
+    </div>
+  `;
+  previewModal.hidden = false;
+}
+
+async function maybeShowPrivacyPolicyNotice() {
+  if (!state.currentUser || state.privacyNoticeShown) return;
+  state.privacyNoticeShown = true;
+  await loadPrivacyPolicyState({ silent: true });
+  if (!privacyAcceptanceMatches()) {
+    await openPrivacyNoticePreview();
+  }
 }
 
 function closeMainMenuDropdowns() {
@@ -5340,6 +5584,10 @@ function auditActionLabel(action = "") {
     training_completed: "Training operatore completato",
     training_passed: "Training operatore superato",
     training_failed: "Training operatore non superato",
+    privacy_policy_viewed: "Privacy Policy visualizzata",
+    privacy_policy_accepted: "Privacy Policy accettata",
+    privacy_policy_version_created: "Versione Privacy Policy creata",
+    customer_privacy_notice_viewed: "Informativa privacy cliente visualizzata",
     api_request_error: "Errore API"
   }[action] || action.replace(/_/g, " ") || "Attività";
 }
@@ -8490,6 +8738,7 @@ function currentActSnapshot(status = "Archiviata") {
     items,
     materialAmounts: materialAmountRows(),
     printWeightCustomer: shouldPrintWeightOnCustomerCopy(),
+    customerPrivacyAcknowledged: Boolean(document.getElementById("customerPrivacyAcknowledged")?.checked),
     amount: fieldValue("#saleTotal"),
     paymentMethod: fieldValue("#paymentMethod"),
     iban: paymentRequiresIban() ? fieldValue("#paymentIban") : "",
@@ -9249,6 +9498,8 @@ async function loadActForEdit(practiceNumber) {
   items.forEach((item) => cededItemsTable.insertAdjacentHTML("beforeend", cededItemRowMarkup(item)));
 
   document.getElementById("printWeightCustomer").checked = Boolean(act.printWeightCustomer);
+  const customerPrivacyAcknowledged = document.getElementById("customerPrivacyAcknowledged");
+  if (customerPrivacyAcknowledged) customerPrivacyAcknowledged.checked = Boolean(act.customerPrivacyAcknowledged);
   state.signatures = normalizeSignatureArray(act.signatures, true);
   restoreCaptureStateFromAct(act);
   state.step = 0;
@@ -11770,12 +12021,22 @@ mainUserMenuButton?.addEventListener("click", (event) => {
   toggleMainUserMenu();
 });
 
+document.querySelectorAll("[data-login-privacy]").forEach((button) => {
+  button.addEventListener("click", () => openPrivacyNoticePreview({ login: true }));
+});
+
 mainUserDropdown?.addEventListener("click", (event) => {
   event.stopPropagation();
   if (event.target.closest("[data-user-profile]")) {
     mainMenuScreen.hidden = true;
     updateAurumMascotVisibility();
     setScreen("profile");
+    return;
+  }
+  if (event.target.closest("[data-user-privacy]")) {
+    mainMenuScreen.hidden = true;
+    updateAurumMascotVisibility();
+    setScreen("privacyCenter");
     return;
   }
   if (event.target.closest("[data-user-users]")) {
@@ -11875,6 +12136,17 @@ document.getElementById("previousStep").addEventListener("click", () => {
 
 document.getElementById("deleteCurrentPractice").addEventListener("click", deleteCurrentPractice);
 document.getElementById("saveQualityReview").addEventListener("click", saveQualityReview);
+document.getElementById("privacyAcceptButton")?.addEventListener("click", () => withButtonBusy(document.getElementById("privacyAcceptButton"), "Registro...", acceptPrivacyPolicy));
+document.getElementById("privacyPdfButton")?.addEventListener("click", () => withButtonBusy(document.getElementById("privacyPdfButton"), "Scarico...", downloadPrivacyPolicyPdf));
+document.querySelector("[data-open-customer-privacy]")?.addEventListener("click", async () => {
+  await openPrivacyNoticePreview({ customer: true });
+  if (state.authToken) {
+    apiRequest("/privacy-policy/customer-notice/viewed", {
+      method: "POST",
+      body: JSON.stringify({ practice_number: fieldValue("#practiceNumber") })
+    }).catch(() => null);
+  }
+});
 guidedQualityList?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-quality-target]");
   if (button) focusQualityTarget(button.dataset.qualityTarget);
@@ -12121,6 +12393,18 @@ document.getElementById("fusionGroups").addEventListener("click", (event) => {
 });
 
 previewBody.addEventListener("click", async (event) => {
+  const acceptPrivacy = event.target.closest("[data-accept-privacy-policy]");
+  if (acceptPrivacy) {
+    await withButtonBusy(acceptPrivacy, "Registro...", acceptPrivacyPolicy);
+    previewModal.hidden = true;
+    return;
+  }
+  if (event.target.closest("[data-open-privacy-center]")) {
+    previewModal.hidden = true;
+    mainMenuScreen.hidden = true;
+    setScreen("privacyCenter");
+    return;
+  }
   const triggerCapture = event.target.closest("[data-trigger-capture-key]");
   if (triggerCapture) {
     const input = document.querySelector(`.capture-card[data-capture-key="${cssEscape(triggerCapture.dataset.triggerCaptureKey)}"] input`);

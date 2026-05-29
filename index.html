@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260529-user-permissions-1">
+  <link rel="stylesheet" href="styles.css?v=20260529-privacy-center-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -30,6 +30,10 @@
       <button class="ghost-button" type="button" id="faceIdLoginButton">Accedi con Face ID</button>
       <p class="login-message" id="loginMessage"></p>
     </form>
+    <footer class="login-privacy-links" aria-label="Informative privacy OroActive">
+      <button type="button" data-login-privacy>Privacy Policy</button>
+      <button type="button" data-login-privacy>Informativa dati personali</button>
+    </footer>
   </section>
 
   <section class="splash-screen" id="splashScreen" aria-label="Accesso OroActive">
@@ -72,6 +76,7 @@
               <button class="main-user-button" id="mainUserMenuButton" type="button" aria-expanded="false" aria-controls="mainUserDropdown">Elite</button>
               <div class="main-user-dropdown" id="mainUserDropdown" hidden>
                 <button type="button" data-user-profile>Dati utente</button>
+                <button type="button" data-user-privacy>Privacy e dati personali</button>
                 <button class="user-directory-only" type="button" data-user-users>Utenti</button>
                 <button type="button" data-user-logout>Logout</button>
               </div>
@@ -394,6 +399,18 @@
 
               <section class="legal-text" aria-label="Testo dichiarazioni cliente">
                 <p>Gli oggetti venduti sopra descritti sono usati e/o in cattivo stato di conservazione. Autorizzo la loro ulteriore alterazione per poter eseguire il test di verifica del metallo, determinarne il titolo e calcolarne il prezzo. Dichiaro inoltre che gli stessi sopra indicati oggetti non sono di illecita provenienza, di essere in possesso di tutti i diritti atti alla vendita degli stessi e di accettare e consentire il trattamento dei propri dati personali (Legge 196/03). La presente vale quale ricevuta e saldo per la somma riportata alla voce prezzo complessivo. Il venditore si obbliga fin da ora a restituire il ricavato della vendita qualora, a seguito di controlli di verifica, risulti che gli oggetti consegnati non siano corrispondenti nel valore e nella qualità a quelli dichiarati al momento della vendita e/o risultino di non essere di metallo prezioso. Dichiaro infine di aver letto attentamente quanto sopra riportato e che ai sensi e per gli effetti degli art. 1341 e 1342 del c.c. approvo incondizionatamente.</p>
+              </section>
+
+              <section class="customer-privacy-box" aria-label="Informativa privacy cliente">
+                <div>
+                  <p class="eyebrow">Privacy cliente</p>
+                  <h3>Informativa privacy cliente</h3>
+                  <p>Prima della conclusione della pratica, il cliente deve poter consultare l'informativa sul trattamento dei dati personali.</p>
+                </div>
+                <div class="customer-privacy-actions">
+                  <button class="ghost-button" type="button" data-open-customer-privacy>Visualizza informativa</button>
+                  <label class="inline-check"><input id="customerPrivacyAcknowledged" type="checkbox"> Cliente informato / presa visione</label>
+                </div>
               </section>
 
               <div class="signature-grid">
@@ -1249,6 +1266,44 @@
         </section>
       </section>
 
+      <section id="privacyCenter" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="privacy-center-layout">
+          <header class="oa-section-header privacy-center-header">
+            <div class="oa-section-header-content">
+              <p class="oa-section-kicker">Centro Privacy</p>
+              <h2 class="oa-section-title">Centro Privacy OroActive</h2>
+              <p class="oa-section-subtitle">Informazioni chiare su dati, sicurezza e diritti privacy.</p>
+            </div>
+            <div class="oa-section-actions privacy-center-actions">
+              <button class="primary-button" type="button" id="privacyAcceptButton">Ho letto l'informativa</button>
+              <button class="ghost-button" type="button" id="privacyPdfButton">Scarica informativa PDF</button>
+            </div>
+          </header>
+          <div class="privacy-status-card" id="privacyStatusCard" aria-live="polite"></div>
+          <div class="privacy-summary-grid" id="privacySummaryCards"></div>
+          <div class="privacy-content-card" id="privacyPolicyContent"></div>
+          <section class="privacy-founder-panel founder-only" id="privacyFounderPanel" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Founder</p>
+                <h3>Gestione e prese visione privacy</h3>
+              </div>
+            </div>
+            <div class="privacy-admin-grid">
+              <div>
+                <h4>Versioni documento</h4>
+                <div id="privacyVersionsList" class="privacy-admin-list"></div>
+              </div>
+              <div>
+                <h4>Ultime prese visione</h4>
+                <div id="privacyAcceptancesList" class="privacy-admin-list"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
       <section id="profile" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="settings-grid">
@@ -1451,6 +1506,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260529-user-permissions-1"></script>
+  <script src="app.js?v=20260529-privacy-center-1"></script>
 </body>
 </html>

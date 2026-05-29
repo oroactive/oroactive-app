@@ -693,7 +693,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(worker, /privacy-center-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -746,7 +746,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(worker, /privacy-center-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -798,7 +798,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(worker, /privacy-center-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -868,9 +868,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260529-user-permissions-1/);
-  assert.match(index, /styles\.css\?v=20260529-user-permissions-1/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(index, /app\.js\?v=20260529-privacy-center-1/);
+  assert.match(index, /styles\.css\?v=20260529-privacy-center-1/);
+  assert.match(worker, /privacy-center-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -916,8 +916,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260529-user-permissions-1/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(index, /styles\.css\?v=20260529-privacy-center-1/);
+  assert.match(worker, /privacy-center-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -974,7 +974,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(worker, /privacy-center-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -1078,7 +1078,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(worker, /privacy-center-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -1129,9 +1129,68 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260529-user-permissions-1/);
-  assert.match(index, /styles\.css\?v=20260529-user-permissions-1/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(index, /app\.js\?v=20260529-privacy-center-1/);
+  assert.match(index, /styles\.css\?v=20260529-privacy-center-1/);
+  assert.match(worker, /privacy-center-1/);
+});
+
+test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
+  const [index, app, server, schema, migration, styles, worker] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("schema.sql"),
+    file("migrations/20260529_privacy_center.sql"),
+    file("styles.css"),
+    file("service-worker.js")
+  ]);
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS privacy_policy_versions/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS privacy_policy_acceptances/);
+  assert.match(schema, /idx_privacy_policy_versions_version/);
+  assert.match(schema, /idx_privacy_policy_acceptances_user_id/);
+  assert.match(schema, /idx_privacy_policy_acceptances_user_version/);
+  assert.match(migration, /privacy_policy_versions/);
+  assert.match(migration, /privacy_policy_acceptances/);
+
+  assert.match(server, /const privacyPolicyVersion = "v1\.0"/);
+  assert.match(server, /async function bootstrapPrivacyPolicy/);
+  assert.match(server, /function writePrivacyPolicyPdf/);
+  assert.match(server, /app\.get\("\/api\/privacy-policy\/current"/);
+  assert.match(server, /app\.get\("\/api\/privacy-policy\/versions"/);
+  assert.match(server, /app\.post\("\/api\/privacy-policy\/accept"/);
+  assert.match(server, /app\.get\("\/api\/privacy-policy\/my-acceptance"/);
+  assert.match(server, /app\.get\("\/api\/privacy-policy\/current\/pdf"/);
+  assert.match(server, /app\.post\("\/api\/privacy-policy\/customer-notice\/viewed"/);
+  assert.match(server, /app\.get\("\/api\/privacy-policy\/acceptances", requireFounder/);
+  assert.match(server, /privacy_policy_viewed/);
+  assert.match(server, /privacy_policy_accepted/);
+  assert.match(server, /customer_privacy_notice_viewed/);
+
+  assert.match(app, /PRIVACY_POLICY_FALLBACK/);
+  assert.match(app, /label: "Centro Privacy"[\s\S]*section: "privacyCenter"/);
+  assert.match(app, /async function loadPrivacyPolicyState/);
+  assert.match(app, /async function acceptPrivacyPolicy/);
+  assert.match(app, /async function downloadPrivacyPolicyPdf/);
+  assert.match(app, /async function maybeShowPrivacyPolicyNotice/);
+  assert.match(app, /data-user-privacy/);
+  assert.match(app, /data-login-privacy/);
+  assert.match(app, /data-open-customer-privacy/);
+  assert.match(app, /customerPrivacyAcknowledged/);
+
+  assert.match(index, /id="privacyCenter"/);
+  assert.match(index, /Centro Privacy OroActive/);
+  assert.match(index, /data-user-privacy/);
+  assert.match(index, /data-login-privacy/);
+  assert.match(index, /Informativa privacy cliente/);
+  assert.match(index, /id="customerPrivacyAcknowledged"/);
+
+  assert.match(styles, /\.privacy-center-layout/);
+  assert.match(styles, /\.privacy-accordion/);
+  assert.match(styles, /\.customer-privacy-box/);
+  assert.match(index, /app\.js\?v=20260529-privacy-center-1/);
+  assert.match(index, /styles\.css\?v=20260529-privacy-center-1/);
+  assert.match(worker, /privacy-center-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -1208,7 +1267,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /user-permissions-1/);
+  assert.match(worker, /privacy-center-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
