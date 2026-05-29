@@ -81,6 +81,7 @@ const state = {
   notificationUnreadCount: 0,
   notificationPagination: { page: 1, limit: 20, total: 0 },
   notificationTimer: null,
+  fusionView: "stock",
   privacyPolicy: null,
   privacyAcceptance: null,
   privacyVersions: [],
@@ -237,6 +238,8 @@ const AURUM_SECTION_MAP = {
   practice: "nuovo_atto_vendita",
   archive: "elenco_atti",
   fusion: "giacenza",
+  giacenza: "giacenza",
+  fusioni: "fusioni",
   crm: "crm_clienti",
   users: "utenti",
   training: "academy",
@@ -547,20 +550,20 @@ const AURUM_LIVE_TUTORIALS = {
     title: "Sezione Giacenza",
     intro: "Ti guido nella lettura della giacenza per metallo, titolo e negozio.",
     steps: [
-      { title: "Filtro negozio", text: "Scegli il negozio o Tutti se il tuo ruolo lo consente.", screen: "fusion", selector: "#fusionStoreFilter" },
-      { title: "Metallo e titolo", text: "Leggi grammi separati per metallo e caratura/titolo.", screen: "fusion", selector: "#fusionGroups" },
-      { title: "Atti validi", text: "La giacenza deve includere solo atti completati e non eliminati.", screen: "fusion", selector: "#fusionGroups" },
-      { title: "Preparazione fusione", text: "Usa questi dati per preparare lotti coerenti e senza duplicazioni.", screen: "fusion", selector: "#fusionGroups" }
+      { title: "Filtro negozio", text: "Scegli il negozio o Tutti se il tuo ruolo lo consente.", screen: "giacenza", selector: "#fusionStoreFilter" },
+      { title: "Metallo e titolo", text: "Leggi grammi separati per metallo e caratura/titolo.", screen: "giacenza", selector: "#fusionGroups" },
+      { title: "Atti validi", text: "La giacenza deve includere solo atti completati e non eliminati.", screen: "giacenza", selector: "#fusionGroups" },
+      { title: "Preparazione fusione", text: "Usa questi dati per preparare lotti coerenti e senza duplicazioni.", screen: "giacenza", selector: "#fusionGroups" }
     ]
   },
   tutorial_fusioni: {
     title: "Sezione Fusioni",
     intro: "Ti spiego come ragionare sui lotti fusione partendo dalla giacenza valida.",
     steps: [
-      { title: "Controlla giacenza", text: "Prima di fondere verifica metallo, caratura, grammi e negozio.", screen: "fusion", selector: "#fusionGroups" },
-      { title: "Separa materiale", text: "Non mischiare carature o materiali diversi nello stesso controllo operativo.", screen: "fusion", selector: "#fusionGroups" },
-      { title: "Genera lotto", text: "Crea il lotto solo quando gli atti sono completati, non eliminati e non già stornati.", screen: "fusion", selector: "#fusionGroups" },
-      { title: "PDF e storico", text: "Salva PDF fusione e aggiorna lo storico raffineria quando previsto.", screen: "fusion", selector: "#fusionGroups" }
+      { title: "Controlla giacenza", text: "Prima di fondere verifica metallo, caratura, grammi e negozio.", screen: "fusioni", selector: "#fusionGroups" },
+      { title: "Separa materiale", text: "Non mischiare carature o materiali diversi nello stesso controllo operativo.", screen: "fusioni", selector: "#fusionGroups" },
+      { title: "Genera lotto", text: "Crea il lotto solo quando gli atti sono completati, non eliminati e non già stornati.", screen: "fusioni", selector: "#fusionGroups" },
+      { title: "PDF e storico", text: "Salva PDF fusione e aggiorna lo storico raffineria quando previsto.", screen: "fusioni", selector: "#fusionGroups" }
     ]
   },
   tutorial_crm: {
@@ -2165,8 +2168,8 @@ const MENU_GROUPS = [
       { id: "new-sale-deed", label: "Nuovo atto di vendita", description: "Avvia una pratica operativa.", icon: "NV", order: 10, section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita pratica nuovo compilazione" },
       { id: "sale-deeds-list", label: "Elenco atti", description: "Apri, modifica o gestisci atti validi.", icon: "EA", order: 20, section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti archivio customer trust pack copia cliente" },
       { id: "suspended-practices", label: "Pratiche sospese", description: "Correggi pratiche non completabili.", icon: "PS", order: 30, section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "sospese incomplete autorizzazione qualità" },
-      { id: "stock", label: "Giacenza", description: "Controlla materiali e titoli.", icon: "GI", order: 40, section: "fusion", roles: MENU_ROLES.controls, keywords: "giacenza metalli oro argento platino" },
-      { id: "melting", label: "Fusioni", description: "Prepara e verifica i lotti.", icon: "FU", order: 50, section: "fusion", roles: MENU_ROLES.controls, keywords: "fusioni lotti raffineria metalli" },
+      { id: "stock", label: "Giacenza", description: "Controlla materiali e titoli.", icon: "GI", order: 40, section: "giacenza", roles: MENU_ROLES.controls, keywords: "giacenza metalli oro argento platino" },
+      { id: "melting", label: "Fusioni", description: "Prepara e verifica i lotti.", icon: "FU", order: 50, section: "fusioni", roles: MENU_ROLES.controls, keywords: "fusioni lotti raffineria metalli" },
       { id: "quotes", label: "Quotazioni", description: "Consulta prezzi e quotazioni.", icon: "QT", order: 60, section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro argento platino prezzi" }
     ]
   },
@@ -2289,6 +2292,17 @@ function menuItemMatchesSearch(item = {}, search = "") {
 
 function sortedMenuItems(items = []) {
   return [...items].sort((a, b) => Number(a.order || 999) - Number(b.order || 999));
+}
+
+const SECTION_ROUTE_ALIASES = {
+  fusion: { screen: "fusion", fusionView: "stock" },
+  giacenza: { screen: "fusion", fusionView: "stock" },
+  fusioni: { screen: "fusion", fusionView: "melting" }
+};
+
+function resolveSectionRoute(section = "") {
+  const key = String(section || "").trim();
+  return SECTION_ROUTE_ALIASES[key] || { screen: key };
 }
 
 function menuButtonMarkup(item = {}, extraClass = "") {
@@ -2759,6 +2773,10 @@ async function handleLogout() {
 }
 
 function setScreen(id) {
+  const requestedSection = id;
+  const route = resolveSectionRoute(id);
+  if (route.fusionView) state.fusionView = route.fusionView;
+  id = route.screen;
   if (id === "users" && !canViewUsersDirectory()) {
     showToast("Sezione non disponibile per il tuo ruolo.");
     return;
@@ -2814,7 +2832,7 @@ function setScreen(id) {
     bullionVaultChart.innerHTML = "";
     state.bullionChartLoaded = false;
   }
-  setAurumSection(id);
+  setAurumSection(requestedSection);
   void handleScreenDataLoad(id).catch((error) => {
     showToast(sectionLoadErrorMessage(id, error), "error");
   });
@@ -3210,11 +3228,13 @@ function showMainMenuFromSplash() {
 }
 
 async function enterSectionFromMainMenu(section) {
+  const route = resolveSectionRoute(section);
+  if (route.fusionView) state.fusionView = route.fusionView;
   mainMenuScreen.hidden = true;
   setAurumSection(section);
   updateAurumMascotVisibility();
-  if (section === "practice") {
-    setScreen(section);
+  if (route.screen === "practice") {
+    setScreen(route.screen);
     await clearPracticeForFreshStart({ deferPracticeNumber: true });
     return;
   }
@@ -10093,9 +10113,46 @@ function fusionActRows(acts, options = {}) {
   `;
 }
 
+function fusionScreenMeta(view = state.fusionView) {
+  return view === "melting"
+    ? {
+      kicker: "Fusioni",
+      title: "Fusioni",
+      subtitle: "Prepara lotti fusione, seleziona materiale fondibile e consulta lo storico raffineria."
+    }
+    : {
+      kicker: "Giacenza",
+      title: "Giacenza",
+      subtitle: "Materiale prezioso in giacenza e calendario fusioni, suddiviso per negozio."
+    };
+}
+
+function updateFusionScreenCopy() {
+  const meta = fusionScreenMeta();
+  const screen = document.getElementById("fusion");
+  if (!screen) return;
+  screen.dataset.fusionView = state.fusionView;
+  const header = screen.querySelector(".archive-header");
+  const kicker = header?.querySelector(".eyebrow");
+  const title = header?.querySelector("h2");
+  const subtitle = header?.querySelector(".muted");
+  if (kicker) kicker.textContent = meta.kicker;
+  if (title) title.textContent = meta.title;
+  if (subtitle) subtitle.textContent = meta.subtitle;
+}
+
+function focusFusionViewAnchor() {
+  if (state.fusionView !== "melting") return;
+  window.requestAnimationFrame(() => {
+    const target = document.querySelector("#fusion .fusion-batch-actions, #fusion .fusion-history, #fusionGroups");
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 function renderFusionGroups() {
   const container = document.getElementById("fusionGroups");
   if (!container) return;
+  updateFusionScreenCopy();
   const selectedStore = document.getElementById("fusionStoreFilter")?.value || "Tutti";
 
   const acts = demoActs
@@ -10105,6 +10162,7 @@ function renderFusionGroups() {
 
   if (!acts.length) {
     container.innerHTML = '<div class="empty-state">Nessuna giacenza disponibile per i negozi autorizzati.</div>';
+    focusFusionViewAnchor();
     return;
   }
 
@@ -10182,6 +10240,7 @@ function renderFusionGroups() {
         </section>
       `;
     }).join("") || '<div class="empty-state">Nessuna giacenza disponibile per il negozio selezionato.</div>';
+  focusFusionViewAnchor();
 }
 
 function clearActSearch() {
