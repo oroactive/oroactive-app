@@ -1184,26 +1184,36 @@ function normalizeWorkflowStatus(status = "archived_incomplete") {
   if (typeof status !== "string") return "archived_incomplete";
   const normalized = status.trim().toLowerCase();
   if (["completed", "complete", "completato", "completata"].includes(normalized)) return "completed";
-  if (["archived_completed", "archiviato completato", "archiviata completata"].includes(normalized)) return "archived_completed";
+  if (["archived_completed", "archived", "archiviato", "archiviata", "archiviato completato", "archiviata completata"].includes(normalized)) return "archived_completed";
   if (["pending_approval", "in_attesa_autorizzazione", "in attesa autorizzazione", "attesa autorizzazione"].includes(normalized)) return "pending_approval";
   if (["approval_approved", "autorizzazione_approvata", "autorizzazione approvata"].includes(normalized)) return "approval_approved";
   if (["approval_rejected", "autorizzazione_rifiutata", "autorizzazione rifiutata"].includes(normalized)) return "approval_rejected";
   if (["suspended", "sospesa", "sospeso", "pratica sospesa", "pratiche sospese"].includes(normalized)) return "suspended";
   if (["draft", "bozza", "in bozza"].includes(normalized)) return "draft";
-  if (["archived_incomplete", "archived", "archiviato", "archiviata", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "archived_incomplete";
+  if (["archived_incomplete", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "archived_incomplete";
   if (["deleted", "eliminato", "eliminata", "cancellato", "cancellata"].includes(normalized)) return "deleted";
   if (["abandoned", "abbandonato", "abbandonata"].includes(normalized)) return "abandoned";
   return "archived_incomplete";
 }
 
+function normalizeSaleDeedStatus(status = "archived_incomplete") {
+  return normalizeWorkflowStatus(status);
+}
+
 function realCompletedStatusSql(alias = "") {
   const prefix = alias ? `${alias}.` : "";
   return `(COALESCE(${prefix}status, '') ILIKE 'completed'
+      OR COALESCE(${prefix}status, '') ILIKE 'complete'
       OR COALESCE(${prefix}status, '') ILIKE 'Completato'
+      OR COALESCE(${prefix}status, '') ILIKE 'Completata'
       OR COALESCE(${prefix}status, '') ILIKE 'archived_completed'
-      OR (COALESCE(${prefix}status, '') ILIKE 'Archiviata' AND ${prefix}completed_at IS NOT NULL))
-    AND ${prefix}deleted_at IS NULL
-    AND ${prefix}completed_at IS NOT NULL`;
+      OR COALESCE(${prefix}status, '') ILIKE 'archiviato completato'
+      OR COALESCE(${prefix}status, '') ILIKE 'archiviata completata'
+      OR ((COALESCE(${prefix}status, '') ILIKE 'archived'
+          OR COALESCE(${prefix}status, '') ILIKE 'Archiviato'
+          OR COALESCE(${prefix}status, '') ILIKE 'Archiviata')
+        AND ${prefix}completed_at IS NOT NULL))
+    AND ${prefix}deleted_at IS NULL`;
 }
 
 function visibleRealActStatusSql(alias = "") {
@@ -1224,7 +1234,10 @@ function reservedActNumberStatusSql(alias = "") {
     AND (
       ${realCompletedStatusSql(alias)}
       OR COALESCE(${prefix}status, '') ILIKE 'archived_incomplete'
-      OR (COALESCE(${prefix}status, '') ILIKE 'Archiviata' AND ${prefix}completed_at IS NULL)
+      OR ((COALESCE(${prefix}status, '') ILIKE 'archived'
+          OR COALESCE(${prefix}status, '') ILIKE 'Archiviato'
+          OR COALESCE(${prefix}status, '') ILIKE 'Archiviata')
+        AND ${prefix}completed_at IS NULL)
       OR COALESCE(${prefix}status, '') ILIKE 'pending_approval'
       OR COALESCE(${prefix}status, '') ILIKE 'in_attesa_autorizzazione'
       OR COALESCE(${prefix}status, '') ILIKE 'approval_approved'
@@ -2977,6 +2990,13 @@ function rowToAct(row, options = {}) {
   const shieldScore = row.shield_score ?? row.aurum_shield_score ?? null;
   const shieldRiskLevel = row.shield_risk_level || row.aurum_shield_risk_level || "";
   const shieldFactors = row.shield_factors || row.aurum_shield_factors || [];
+  const rawStatus = row.status || payload.status || "archived_incomplete";
+  const normalizedStatus = normalizeWorkflowStatus(rawStatus);
+  const effectiveStatus = normalizedStatus === "archived_completed"
+    && !row.completed_at
+    && /^(archived|archiviato|archiviata)$/i.test(String(rawStatus || "").trim())
+      ? "suspended"
+      : normalizedStatus;
   return {
     ...payload,
     id: row.id,
@@ -2991,7 +3011,7 @@ function rowToAct(row, options = {}) {
     weight: payload.weight ?? row.peso_oro,
     amount: payload.amount ?? row.totale,
     paymentMethod: row.payment_method || payload.paymentMethod || "",
-    status: normalizeWorkflowStatus(row.status || payload.status || "archived_incomplete"),
+    status: effectiveStatus,
     createdAt: row.created_at || payload.createdAt || null,
     completedAt: row.completed_at || payload.completedAt || null,
     archivedAt: row.archived_at || payload.archivedAt || null,
@@ -6689,6 +6709,11 @@ async function validateQualityChecklist(input = {}, user = {}) {
 
   const draft = input.draft_data || input.draftData || input.atto || input;
   const act = normalizeAurumShieldAct(draft, saleDeedRow);
+  const approvalOverride = Boolean(
+    input.allow_approved
+    || input.allowApproved
+    || ["approved", "approval_approved", "autorizzazione_approvata"].includes(String(act.approvalStatus || act.approval_status || "").toLowerCase())
+  );
   const checks = [];
   const addCheck = (id, label, status, message, action, target = "") => {
     checks.push({ id, label, status, message: message || label, action: action || message || label, target });
@@ -6868,7 +6893,7 @@ async function validateQualityChecklist(input = {}, user = {}) {
 
   const shield = await calculateAurumShieldRisk({ sale_deed_id: saleDeedId, draft_data: { ...act, status: "completed" } }, user).catch(() => null);
   if (shield) {
-    if (shield.risk_level === "critico" && shield.block_critical_practices && !["founder", "responsabile"].includes(normalizeRole(user.ruolo))) {
+    if (shield.risk_level === "critico" && shield.block_critical_practices && !approvalOverride && !["founder", "responsabile"].includes(normalizeRole(user.ruolo))) {
       addCheck("aurum_shield", "Aurum Shield", "error", "Aurum Shield rileva rischio critico.", "Richiedi autorizzazione a Responsabile o Founder.", "#aurumShieldCard");
     } else if (["alto", "critico"].includes(shield.risk_level)) {
       addCheck("aurum_shield", "Aurum Shield", "warning", `${shield.summary}.`, "Verifica i fattori rischio prima di completare.", "#aurumShieldCard");
@@ -6917,8 +6942,8 @@ async function validateQualityChecklist(input = {}, user = {}) {
 }
 
 async function assertQualityAllowsFinalSave(input = {}, user = {}, options = {}) {
-  const quality = await validateQualityChecklist(input, user);
-  if (quality.quality_status === "non_completabile" && !options.allowApproved) {
+  const quality = await validateQualityChecklist({ ...input, allow_approved: Boolean(options.allowApproved) }, user);
+  if (quality.quality_status === "non_completabile") {
     const error = new Error(`Pratica non completabile: ${(quality.blocking_errors || []).slice(0, 3).join("; ") || "controlli obbligatori mancanti"}`);
     error.status = 400;
     error.quality = quality;
@@ -7055,6 +7080,13 @@ function suspendedStatusWhere(alias = "a") {
     COALESCE(${prefix}status, '') ILIKE 'suspended'
     OR COALESCE(${prefix}status, '') ILIKE 'sospesa'
     OR COALESCE(${prefix}status, '') ILIKE 'sospeso'
+    OR COALESCE(${prefix}status, '') ILIKE 'archived_incomplete'
+    OR COALESCE(${prefix}status, '') ILIKE 'archiviato incompleto'
+    OR COALESCE(${prefix}status, '') ILIKE 'archiviata incompleta'
+    OR ((COALESCE(${prefix}status, '') ILIKE 'archived'
+        OR COALESCE(${prefix}status, '') ILIKE 'Archiviato'
+        OR COALESCE(${prefix}status, '') ILIKE 'Archiviata')
+      AND ${prefix}completed_at IS NULL)
     OR COALESCE(${prefix}status, '') ILIKE 'pending_approval'
     OR COALESCE(${prefix}status, '') ILIKE 'in_attesa_autorizzazione'
     OR (${prefix}suspended_at IS NOT NULL AND ${prefix}resumed_at IS NULL)
@@ -11249,6 +11281,7 @@ async function updateAct(identifier, input, user, req = null) {
         END,
         deleted_at = CASE
           WHEN $23::text = 'deleted' THEN COALESCE(deleted_at, NOW())
+          WHEN $23::text IN ('completed', 'archived_completed', 'suspended', 'pending_approval') THEN NULL
           ELSE deleted_at
         END,
         abandoned_at = CASE
@@ -11257,25 +11290,31 @@ async function updateAct(identifier, input, user, req = null) {
         END,
         suspended_reason = CASE
           WHEN $23::text = 'suspended' THEN $25::text
+          WHEN $23::text IN ('completed', 'archived_completed') THEN NULL
           ELSE suspended_reason
         END,
         suspended_reasons = CASE
           WHEN $23::text = 'suspended' THEN $26::jsonb
+          WHEN $23::text IN ('completed', 'archived_completed') THEN '[]'::jsonb
           ELSE suspended_reasons
         END,
         suspended_at = CASE
           WHEN $23::text = 'suspended' THEN COALESCE(suspended_at, NOW())
+          WHEN $23::text IN ('completed', 'archived_completed') THEN NULL
           ELSE suspended_at
         END,
         suspended_by = CASE
           WHEN $23::text = 'suspended' THEN COALESCE(suspended_by, $24::bigint)
+          WHEN $23::text IN ('completed', 'archived_completed') THEN NULL
           ELSE suspended_by
         END,
         resumed_at = CASE
+          WHEN $23::text IN ('completed', 'archived_completed') AND suspended_at IS NOT NULL THEN COALESCE(resumed_at, NOW())
           WHEN $23::text <> 'suspended' AND suspended_at IS NOT NULL AND resumed_at IS NULL THEN NOW()
           ELSE resumed_at
         END,
         resumed_by = CASE
+          WHEN $23::text IN ('completed', 'archived_completed') AND suspended_at IS NOT NULL THEN COALESCE(resumed_by, $24::bigint)
           WHEN $23::text <> 'suspended' AND suspended_at IS NOT NULL AND resumed_by IS NULL THEN $24::bigint
           ELSE resumed_by
         END,
@@ -14029,7 +14068,7 @@ app.post("/api/ai/controlla-atto", async (request, response, next) => {
     response.json(await checkActWithOpenAi(request.body.atto || request.body.act || request.body));
   } catch (error) {
     if (!error.status) error.status = 502;
-    if (!error.message) error.message = "Controllo AI atto non disponibile.";
+    if (!error.message) error.message = "Aurum Shield e Controllo Qualità non disponibili.";
     next(error);
   }
 });

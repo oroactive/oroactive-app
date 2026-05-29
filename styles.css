@@ -4231,6 +4231,29 @@ input.document-expired {
   gap: 8px;
 }
 
+.quality-decision-modal {
+  display: grid;
+  gap: 16px;
+}
+
+.quality-decision-modal p {
+  margin: 0;
+  color: var(--oa-text-main, #111111);
+  font-weight: 700;
+}
+
+.quality-modal-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--oa-text-main, #111111);
+}
+
+.quality-modal-list li {
+  overflow-wrap: anywhere;
+}
+
 .document-preview h3,
 .document-preview p,
 .checklist h3,

@@ -6773,43 +6773,141 @@ function showAurumQualityGuidance(quality) {
   if (firstAction) showAurumTip(`Aurum ha controllato la pratica: ${firstAction}`);
 }
 
+function saleDeedValidationStatus(quality = {}) {
+  return String(quality.quality_status || quality.status || "non_completabile").toLowerCase();
+}
+
+function saleDeedValidationItems(quality = {}, status = saleDeedValidationStatus(quality)) {
+  const source = status === "non_completabile"
+    ? (quality.blocking_errors || quality.required_actions || [])
+    : (quality.warnings || []);
+  return source.map((item) => {
+    if (typeof item === "object") return item.message || item.action || item.label || item.title || "";
+    return String(item || "");
+  }).filter(Boolean);
+}
+
+function completionActionVerb(action = "complete") {
+  if (action === "archive") return "archiviare";
+  if (action === "print") return "stampare";
+  return "completare";
+}
+
+function saleDeedValidationListMarkup(items = []) {
+  return items.length
+    ? `<ul class="quality-modal-list">${items.slice(0, 10).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : '<p class="muted">Controlli operativi da verificare.</p>';
+}
+
+function showSaleDeedValidationModal(quality = {}, action = "complete") {
+  const status = saleDeedValidationStatus(quality);
+  const items = saleDeedValidationItems(quality, status);
+  return new Promise((resolve) => {
+    if (!previewModal || !previewBody || !previewTitle) {
+      if (status === "attenzione") {
+        resolve(window.confirm(`Pratica completabile con attenzione.\n\n- ${items.slice(0, 6).join("\n- ")}\n\nVuoi ${completionActionVerb(action)} comunque?`) ? "proceed" : "cancel");
+      } else {
+        resolve(window.confirm(`Pratica non completabile.\n\n- ${items.slice(0, 6).join("\n- ")}\n\nVuoi salvarla come pratica sospesa?`) ? "suspend" : "back");
+      }
+      return;
+    }
+
+    const isBlocked = status === "non_completabile";
+    previewTitle.textContent = isBlocked ? "Pratica non completabile" : "Pratica completabile con attenzione";
+    previewBody.innerHTML = isBlocked
+      ? `
+        <section class="quality-decision-modal quality-error">
+          <p>Prima di completare la pratica devi correggere questi punti:</p>
+          ${saleDeedValidationListMarkup(items)}
+          <div class="preview-action-stack">
+            <button class="ghost-button" type="button" data-quality-completion-choice="back">Torna alla pratica</button>
+            <button class="warning-button" type="button" data-quality-completion-choice="suspend">Salva come pratica sospesa</button>
+          </div>
+        </section>
+      `
+      : `
+        <section class="quality-decision-modal quality-warning">
+          <p>Sono presenti avvisi non bloccanti. Verifica i punti indicati prima di procedere.</p>
+          ${saleDeedValidationListMarkup(items)}
+          <div class="preview-action-stack">
+            <button class="ghost-button" type="button" data-quality-completion-choice="cancel">Annulla</button>
+            <button class="primary-button" type="button" data-quality-completion-choice="proceed">${action === "archive" ? "Archivia comunque" : "Completa comunque"}</button>
+          </div>
+        </section>
+      `;
+    previewModal.hidden = false;
+
+    const closeButton = document.getElementById("closePreview");
+    const cleanup = () => {
+      previewBody.removeEventListener("click", onChoice);
+      closeButton?.removeEventListener("click", onClose);
+    };
+    const finish = (choice) => {
+      cleanup();
+      previewModal.hidden = true;
+      resolve(choice);
+    };
+    function onChoice(event) {
+      const button = event.target.closest("[data-quality-completion-choice]");
+      if (!button) return;
+      finish(button.dataset.qualityCompletionChoice || "back");
+    }
+    function onClose() {
+      finish(isBlocked ? "back" : "cancel");
+    }
+
+    previewBody.addEventListener("click", onChoice);
+    closeButton?.addEventListener("click", onClose, { once: true });
+  });
+}
+
+async function validateSaleDeedForCompletion(atto = null, options = {}) {
+  const quality = await validateQualityChecklist({
+    status: options.status || atto?.status || "completed",
+    silent: options.silent || false,
+    draftData: atto || options.draftData,
+    saleDeedId: options.saleDeedId
+  });
+  if (!quality) return null;
+  const status = saleDeedValidationStatus(quality);
+  return {
+    ...quality,
+    status,
+    quality_status: status,
+    blockingErrors: quality.blocking_errors || quality.blockingErrors || [],
+    warnings: quality.warnings || [],
+    checks: quality.checks || [],
+    requiredActions: quality.required_actions || quality.requiredActions || []
+  };
+}
+
 async function ensureGuidedQualityAllows(action = "complete", options = {}) {
-  const quality = await validateQualityChecklist({ status: options.status || "completed", silent: false, draftData: options.draftData });
+  const quality = await validateSaleDeedForCompletion(options.draftData || null, {
+    status: options.status || "completed",
+    silent: false,
+    saleDeedId: options.saleDeedId
+  });
   if (!quality) return false;
-  const status = quality.quality_status || quality.status;
-  if (shouldRequestApprovalForQuality(quality, action)) {
-    showAurumQualityGuidance(quality);
-    await requestApprovalForCurrentPractice({
-      action,
-      targetStatus: options.status || "completed",
-      draftData: options.draftData || qualityCheckDraftData(options.status || "completed"),
-      quality,
-      shield: quality.aurum_shield || state.aurumShield,
-      reasons: frontendApprovalReasons({ quality, shield: quality.aurum_shield || state.aurumShield })
-    });
-    return false;
-  }
-  if (status === "non_completabile" && hasApprovedApprovalForCurrentAct()) {
-    showAurumQualityGuidance(quality);
-    const preview = (quality.blocking_errors || quality.required_actions || []).slice(0, 6).join("\n- ");
-    return window.confirm(`Autorizzazione approvata per questa pratica.\n\nRestano punti da controllare:\n- ${preview || "verifica superiore ricevuta"}\n\nVuoi procedere comunque?`);
-  }
+  const status = saleDeedValidationStatus(quality);
   if (status === "non_completabile") {
-    showToast("Non puoi completare questa pratica. Risolvi prima i controlli obbligatori evidenziati.", "error");
     showAurumQualityGuidance(quality);
-    await saveCurrentPracticeAsSuspended({
-      quality,
-      shield: quality.aurum_shield || state.aurumShield,
-      stayOnPractice: true,
-      message: "Pratica salvata tra le sospese: correggi i controlli obbligatori."
-    });
+    const choice = await showSaleDeedValidationModal(quality, action);
+    if (choice === "suspend") {
+      await saveCurrentPracticeAsSuspended({
+        quality,
+        shield: quality.aurum_shield || state.aurumShield,
+        stayOnPractice: false,
+        message: "Pratica salvata come sospesa"
+      });
+    } else {
+      showToast("Impossibile completare: correggi i controlli obbligatori.", "error");
+    }
     return false;
   }
   if (status === "attenzione") {
     showAurumQualityGuidance(quality);
-    const preview = (quality.warnings || []).slice(0, 5).join("\n- ");
-    const label = action === "print" ? "stampare" : action === "archive" ? "archiviare" : "completare";
-    return window.confirm(`Controllo Qualità: pratica completabile con attenzione.\n\n- ${preview}\n\nVuoi ${label} comunque dopo aver verificato i punti indicati?`);
+    const choice = await showSaleDeedValidationModal(quality, action);
+    return choice === "proceed";
   }
   if (shouldShowAurumMascot()) showAurumTip("La pratica è pronta. Hai completato tutti i controlli principali.");
   return true;
@@ -8280,9 +8378,9 @@ function normalizeWorkflowStatus(status = "Archiviata") {
   if (typeof status !== "string") return "Archiviata";
   const normalized = status.trim().toLowerCase();
   if (["completed", "completato", "completata"].includes(normalized)) return "Completato";
-  if (["archived_completed", "archiviato completato", "archiviata completata"].includes(normalized)) return "Archiviato completato";
+  if (["archived_completed", "archived", "archiviato", "archiviata", "archiviato completato", "archiviata completata"].includes(normalized)) return "Archiviato completato";
   if (["draft", "bozza"].includes(normalized)) return "Bozza";
-  if (["archived_incomplete", "archived", "archiviato", "archiviata", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "Archiviato incompleto";
+  if (["archived_incomplete", "archiviato incompleto", "archiviata incompleta"].includes(normalized)) return "Archiviato incompleto";
   if (["pending_approval", "in_attesa_autorizzazione", "in attesa autorizzazione", "attesa autorizzazione"].includes(normalized)) return "In attesa autorizzazione";
   if (["approval_approved", "autorizzazione_approvata", "autorizzazione approvata"].includes(normalized)) return "Autorizzazione approvata";
   if (["approval_rejected", "autorizzazione_rifiutata", "autorizzazione rifiutata"].includes(normalized)) return "Autorizzazione rifiutata";
@@ -8307,9 +8405,14 @@ function workflowStatusCode(status = "") {
   return "archived_incomplete";
 }
 
+function normalizeSaleDeedStatus(status = "") {
+  return workflowStatusCode(status);
+}
+
 function workflowStatusListLabel(status = "") {
   const code = workflowStatusCode(status);
-  if (code === "completed" || code === "archived_completed") return "Completato";
+  if (code === "completed") return "Completato";
+  if (code === "archived_completed") return "Archiviato";
   if (code === "pending_approval") return "In attesa autorizzazione";
   if (code === "approval_approved") return "Autorizzazione approvata";
   if (code === "approval_rejected") return "Autorizzazione rifiutata";
@@ -11327,32 +11430,25 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
     showToast("Numerazione atto momentaneamente non disponibile.");
     return false;
   }
-  if (normalizeWorkflowStatus(status) !== "Bozza" && notifyCashPaymentLimitIfNeeded({ force: true }) && !currentUserNeedsApprovalForRisk()) {
-    await saveCurrentPracticeAsSuspended({
-      reasons: [cashPaymentLimitMessage()],
-      stayOnPractice: true,
-      message: "Pratica sospesa: limite contanti da verificare."
-    });
-    return false;
-  }
   const review = currentQualityReview();
   if (review?.status === "negative" && !review.feedback) {
     showToast("Inserisci il feedback scritto per il controllo qualità negativo.");
     return false;
   }
   const requestedStatus = workflowStatusCode(status);
-  const hasCompleteData = validatePrintScope("company").length === 0;
-  const targetStatus = requestedStatus === "completed"
-    ? "completed"
-    : requestedStatus === "archived_completed"
-      ? "archived_completed"
-      : requestedStatus === "draft"
-        ? "draft"
-        : hasCompleteData
+  const wantsFinalSave = requestedStatus === "completed"
+    || requestedStatus === "archived_completed"
+    || (requestedStatus === "archived_incomplete" && !options.destination);
+  const targetStatus = requestedStatus === "draft"
+    ? "draft"
+    : requestedStatus === "suspended"
+      ? "suspended"
+      : requestedStatus === "completed"
+        ? "completed"
+        : wantsFinalSave
           ? "archived_completed"
-          : "suspended";
+          : requestedStatus;
   const isCompletion = ["completed", "archived_completed"].includes(targetStatus);
-  const missing = isCompletion ? validatePrintScope("company") : [];
   if (requestedStatus !== "draft" && !options.skipQualityCheck) {
     const qualityDraft = currentActSnapshot(isCompletion ? targetStatus : "archived_completed");
     const allowed = await ensureGuidedQualityAllows(isCompletion ? "complete" : "archive", {
@@ -11360,10 +11456,6 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
       draftData: qualityDraft
     });
     if (!allowed) return false;
-  }
-  if (isCompletion && missing.length && !options.skipValidation && !hasApprovedApprovalForCurrentAct()) {
-    showToast(validationMessage(missing, "la copia aziendale"));
-    return false;
   }
   const wasEditing = Boolean(state.editingPracticeNumber);
   const originalAct = wasEditing
@@ -11452,7 +11544,7 @@ function compactActForAi(act = {}) {
 
 async function runAiActCheck(act) {
   try {
-    showLoading("Controllo AI pratica...");
+    showLoading("Aurum Shield e Controllo Qualità...");
     return await apiRequest("/ai/controlla-atto", {
       method: "POST",
       timeoutMs: 45000,
@@ -11466,34 +11558,7 @@ async function runAiActCheck(act) {
 }
 
 async function completeCurrentPractice() {
-  if (!(await ensureGuidedQualityAllows("complete", { status: "completed" }))) return false;
-  const missing = validatePrintScope("company");
-  if (!missing.length || hasApprovedApprovalForCurrentAct()) {
-    const act = currentActSnapshot("Completato");
-    const aiCheck = await runAiActCheck(act);
-    const aiProblems = [
-      ...(aiCheck?.errori || []),
-      ...(aiCheck?.campi_mancanti || []),
-      ...(aiCheck?.incongruenze || [])
-    ];
-    if (aiCheck && !aiCheck.ok && aiProblems.length) {
-      const preview = aiProblems.slice(0, 6).join(", ");
-      const proceed = window.confirm(`Controllo AI: ${preview}. Vuoi completare comunque la pratica?`);
-      if (!proceed) {
-        if (aiCheck.suggerimenti?.length) showToast(`Suggerimento AI: ${aiCheck.suggerimenti[0]}`);
-        return false;
-      }
-    }
-    return archiveCurrentPractice("completed", { skipQualityCheck: true, skipValidation: hasApprovedApprovalForCurrentAct() });
-  }
-
-  showToast(validationMessage(missing, "la pratica"));
-  await saveCurrentPracticeAsSuspended({
-    reasons: missing.map((item) => `Dato mancante: ${item}`),
-    stayOnPractice: true,
-    message: "Pratica salvata tra le sospese: completa i dati mancanti."
-  });
-  return false;
+  return archiveCurrentPractice("completed");
 }
 
 navItems.forEach((item) => {
