@@ -2379,8 +2379,17 @@ function canEditUserRow(user = {}) {
   return isAdmin() && user.visibility !== "minimal" && user.canEdit !== false;
 }
 
+function canCreateUsersUi() {
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+}
+
 function canDeleteUserRow(user = {}) {
-  return canEditUserRow(user) && user.canDelete !== false && String(user.id) !== String(state.currentUser?.id);
+  return isFounder()
+    && user?.id
+    && user.visibility !== "minimal"
+    && user.canDelete !== false
+    && user.attivo !== false
+    && String(user.id) !== String(state.currentUser?.id);
 }
 
 function currentUserStoreCode() {
@@ -3071,11 +3080,19 @@ function resetUserForm() {
 }
 
 function configureUserFormPermissions() {
+  const form = document.getElementById("userForm");
   const roleSelect = document.getElementById("userRole");
   const storeSelect = document.getElementById("userStore");
   const emailLabel = document.getElementById("userEmailLabel");
   const emailInput = document.getElementById("userEmail");
+  const saveButton = document.getElementById("saveUserButton");
+  const resetButton = document.getElementById("resetUserForm");
+  const canUseForm = canCreateUsersUi();
+  if (form) form.hidden = !canUseForm;
+  if (saveButton) saveButton.disabled = !canUseForm;
+  if (resetButton) resetButton.hidden = !canUseForm;
   if (!roleSelect || !storeSelect) return;
+  if (!canUseForm) return;
   const editingUserId = document.getElementById("userId")?.value;
   const editingUser = (state.users || []).find((user) => String(user.id) === String(editingUserId));
   const editingFounder = isFounder() && normalizeRole(editingUser?.ruolo) === "founder";
@@ -3128,7 +3145,7 @@ function renderUsers(users) {
     const actions = [
       canViewActivity ? `<button type="button" data-user-activity="${escapeHtml(String(user.id))}">Attività</button>` : "",
       canEdit ? `<button type="button" data-edit-user="${escapeHtml(String(user.id))}">Modifica</button>` : "",
-      canDelete ? `<button class="danger-button" type="button" data-delete-user="${escapeHtml(String(user.id))}">Disattiva</button>` : ""
+      canDelete ? `<button class="danger-button" type="button" data-delete-user="${escapeHtml(String(user.id))}">Elimina utente</button>` : ""
     ].filter(Boolean);
     return `
       <div class="table-row">
@@ -3211,10 +3228,20 @@ async function showUserActivity(id) {
 
 async function saveUser(event) {
   event.preventDefault();
-  if (!isAdmin()) return;
+  if (!canCreateUsersUi()) {
+    showToast("Non autorizzato.", "error");
+    return;
+  }
   if (state.savingUser) return;
   const id = document.getElementById("userId").value;
   const isEditing = Boolean(id);
+  if (isEditing) {
+    const editingUser = (state.users || []).find((user) => String(user.id) === String(id));
+    if (!editingUser || !canEditUserRow(editingUser)) {
+      showToast("Non autorizzato.", "error");
+      return;
+    }
+  }
   const saveButton = document.getElementById("saveUserButton");
   const role = normalizeRole(document.getElementById("userRole").value);
   const payload = {
@@ -3295,17 +3322,18 @@ async function deleteUser(id) {
   const user = (state.users || []).find((item) => String(item.id) === String(id));
   if (!user) return;
   if (!canDeleteUserRow(user)) {
-    showToast("Sezione non disponibile per il tuo ruolo.");
+    showToast("Non autorizzato.", "error");
     return;
   }
-  const confirmed = window.confirm(`Vuoi disattivare l'utente ${displayUserFullName(user)}?`);
+  const confirmed = window.confirm("Sei sicuro di voler eliminare questo utente? L'azione non sarà disponibile agli altri ruoli.");
   if (!confirmed) return;
   try {
-    await apiRequest(`/utenti/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const result = await apiRequest(`/utenti/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (String(document.getElementById("userId")?.value || "") === String(id)) resetUserForm();
     await loadUsers();
-    showToast("Utente disattivato correttamente.", "success");
+    showToast(result?.message || "Utente eliminato correttamente.", "success");
   } catch (error) {
-    showToast(error.message || "Utente non disattivato.");
+    showToast(error.message || "Impossibile eliminare l'utente.", "error");
   }
 }
 
@@ -5259,6 +5287,10 @@ function auditActionLabel(action = "") {
     update_user: "Modifica utente",
     change_user_role: "Cambio ruolo utente",
     change_user_store: "Cambio negozio utente",
+    user_deleted: "Eliminazione utente",
+    user_deactivated: "Disattivazione utente",
+    unauthorized_user_delete_attempt: "Tentativo eliminazione utente non autorizzato",
+    unauthorized_user_create_attempt: "Tentativo creazione utente non autorizzato",
     deactivate_user: "Disattivazione utente",
     view_user_activity: "Visualizzazione attività utente",
     update_crm_client: "Modifica cliente CRM",

@@ -344,7 +344,7 @@ function publicUserForActor(row, actor) {
   user.canEdit = actorRole === "founder"
     ? true
     : canManageAccess(actor) && managedRolesForActor(actor).includes(targetRole) && targetRole !== "founder";
-  user.canDelete = user.canEdit && !self;
+  user.canDelete = actorRole === "founder" && !self && user.attivo !== false;
   user.canViewActivity = canViewUserActivity(actor, row);
   return user;
 }
@@ -439,6 +439,10 @@ function auditActionLabel(action = "") {
     update_user: "Modifica utente",
     change_user_role: "Cambio ruolo utente",
     change_user_store: "Cambio negozio utente",
+    user_deleted: "Eliminazione utente",
+    user_deactivated: "Disattivazione utente",
+    unauthorized_user_delete_attempt: "Tentativo eliminazione utente non autorizzato",
+    unauthorized_user_create_attempt: "Tentativo creazione utente non autorizzato",
     deactivate_user: "Disattivazione utente",
     delete_user: "Eliminazione utente",
     view_user_activity: "Visualizzazione attività utente",
@@ -848,6 +852,7 @@ async function authenticate(request, response, next) {
     const decoded = jwt.verify(token, jwtSecret);
     const user = await findUserById(decoded.sub);
     if (!user) return response.status(401).json({ error: "Utente non trovato" });
+    if (user.attivo === false) return response.status(403).json({ ok: false, error: "Utente non attivo" });
     await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
     user.last_seen = new Date();
     request.user = user;
@@ -865,7 +870,32 @@ async function authenticate(request, response, next) {
 
 function requireAdmin(request, response, next) {
   if (!canManageAccess(request.user)) {
-    return response.status(403).json({ error: "Non autorizzato" });
+    const route = request.originalUrl || request.path || "";
+    if (request.method === "POST" && /^\/api\/(utenti|users)(\?|$)/.test(route)) {
+      void writeAuditLog({
+        req: request,
+        user: request.user,
+        action: "unauthorized_user_create_attempt",
+        entityType: "utente",
+        entityLabel: "Tentativo creazione utente",
+        metadata: {
+          attempted_role: request.body?.ruolo || request.body?.role || "",
+          critical: true
+        }
+      });
+    }
+    if (request.method === "DELETE" && /^\/api\/(utenti|users)\/[^/?]+/.test(route)) {
+      void writeAuditLog({
+        req: request,
+        user: request.user,
+        action: "unauthorized_user_delete_attempt",
+        entityType: "utente",
+        entityId: request.params?.id || null,
+        entityLabel: "Tentativo eliminazione utente",
+        metadata: { target_user_id: request.params?.id || null, critical: true }
+      });
+    }
+    return response.status(403).json({ ok: false, error: "Non autorizzato" });
   }
   next();
 }
@@ -11306,6 +11336,18 @@ async function createUser(input, actor, req = null) {
   const passwordHash = await bcrypt.hash(password, 12);
   const allowedRoles = managedRolesForActor(actor);
   if (!allowedRoles.includes(role)) {
+    void writeAuditLog({
+      req,
+      user: actor,
+      action: "unauthorized_user_create_attempt",
+      entityType: "utente",
+      entityLabel: "Tentativo creazione utente",
+      metadata: {
+        attempted_role: role,
+        actor_role: actorRole,
+        critical: true
+      }
+    });
     const error = new Error("Non autorizzato");
     error.status = 403;
     throw error;
@@ -11622,7 +11664,9 @@ async function updateUser(id, input, actor, req = null) {
 }
 
 async function listUsers(options = {}) {
-  const where = options.includeFounder ? "" : "WHERE ruolo <> 'founder'";
+  const where = options.includeFounder
+    ? "WHERE COALESCE(attivo, TRUE) = TRUE"
+    : "WHERE COALESCE(attivo, TRUE) = TRUE AND ruolo <> 'founder'";
   const result = await pool.query(
     `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti ${where} ORDER BY data_creazione DESC`
   );
@@ -11633,13 +11677,13 @@ async function listUsersForActor(actor) {
   const actorRole = normalizeRole(actor?.ruolo);
   if (actorRole === "founder") {
     const result = await pool.query(
-      "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti ORDER BY data_creazione DESC"
+      "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti WHERE COALESCE(attivo, TRUE) = TRUE ORDER BY data_creazione DESC"
     );
     return result.rows.map((row) => publicUserForActor(row, actor));
   }
   if (actorRole === "supervisore") {
     const result = await pool.query(
-      "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti WHERE ruolo <> 'founder' ORDER BY data_creazione DESC"
+      "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti WHERE COALESCE(attivo, TRUE) = TRUE AND ruolo <> 'founder' ORDER BY data_creazione DESC"
     );
     return result.rows.map((row) => publicUserForActor(row, actor));
   }
@@ -11647,7 +11691,8 @@ async function listUsersForActor(actor) {
     const result = await pool.query(
       `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen
        FROM utenti
-       WHERE ruolo = ANY($1::text[])
+       WHERE COALESCE(attivo, TRUE) = TRUE
+         AND ruolo = ANY($1::text[])
          AND (negozio_id = $2::bigint OR negozio = $3::text)
        ORDER BY data_creazione DESC`,
       [["commesso", "aiuto_commesso"], actor.negozio_id || null, actor.negozio || ""]
@@ -11658,12 +11703,15 @@ async function listUsersForActor(actor) {
     const result = await pool.query(
       `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen
        FROM utenti
-       WHERE id = $1::bigint
+       WHERE COALESCE(attivo, TRUE) = TRUE
+         AND (
+          id = $1::bigint
           OR (
             ruolo = ANY($2::text[])
             AND (negozio_id = $3::bigint OR negozio = $4::text)
             AND last_seen >= NOW() - INTERVAL '2 minutes'
           )
+         )
        ORDER BY (id = $1::bigint) DESC, last_seen DESC NULLS LAST, data_creazione DESC`,
       [actor.id, ["commesso", "aiuto_commesso"], actor.negozio_id || null, actor.negozio || ""]
     );
@@ -11672,7 +11720,8 @@ async function listUsersForActor(actor) {
   const result = await pool.query(
     `SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen
      FROM utenti
-     WHERE id = $1::bigint
+     WHERE COALESCE(attivo, TRUE) = TRUE
+       AND id = $1::bigint
      ORDER BY data_creazione DESC`,
     [actor.id]
   );
@@ -11710,21 +11759,48 @@ async function listUserActivitiesForActor(id, actor) {
 }
 
 async function deleteUser(id, actor, req = null) {
+  const actorRole = normalizeRole(actor?.ruolo);
+  if (actorRole !== "founder") {
+    void writeAuditLog({
+      req,
+      user: actor,
+      action: "unauthorized_user_delete_attempt",
+      entityType: "utente",
+      entityId: id,
+      entityLabel: "Tentativo eliminazione utente",
+      metadata: { target_user_id: id, actor_role: actorRole, critical: true }
+    });
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
   if (String(actor.id) === String(id)) {
-    const error = new Error("Non puoi disattivare il tuo stesso accesso");
+    const error = new Error("Non puoi eliminare il tuo stesso utente.");
     error.status = 400;
     throw error;
   }
   const target = await findUserRawById(id);
-  if (!target) return false;
+  if (!target || target.attivo === false) return false;
   if (normalizeRole(target.ruolo) === "founder") {
-    const error = new Error("Il Founder non puo essere disattivato");
-    error.status = 403;
-    throw error;
+    const activeFounders = await pool.query(
+      "SELECT COUNT(*)::int AS total FROM utenti WHERE LOWER(COALESCE(ruolo, '')) = 'founder' AND COALESCE(attivo, TRUE) = TRUE"
+    );
+    if (Number(activeFounders.rows[0]?.total || 0) <= 1) {
+      const error = new Error("Non puoi eliminare l'unico Founder attivo.");
+      error.status = 400;
+      throw error;
+    }
   }
-  assertCanManageTarget(actor, target);
-  const result = await pool.query("UPDATE utenti SET attivo = FALSE, updated_at = NOW() WHERE id = $1::bigint RETURNING id", [id]);
+  const result = await pool.query(
+    `UPDATE utenti
+     SET attivo = FALSE,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen`,
+    [id]
+  );
   if (result.rowCount) {
+    const updatedUser = publicUser(result.rows[0]);
     void logUserActivity({
       userId: id,
       actorId: actor?.id,
@@ -11736,13 +11812,38 @@ async function deleteUser(id, actor, req = null) {
     void writeAuditLog({
       req,
       user: actor,
-      action: "deactivate_user",
+      action: "user_deleted",
       entityType: "utente",
       entityId: id,
       entityLabel: auditUserName(target),
       beforeData: publicUser(target),
+      afterData: updatedUser,
+      metadata: { target_user_id: id, soft_delete: true, critical: true }
+    });
+    void writeAuditLog({
+      req,
+      user: actor,
+      action: "user_deactivated",
+      entityType: "utente",
+      entityId: id,
+      entityLabel: auditUserName(target),
+      beforeData: { attivo: target.attivo !== false },
       afterData: { attivo: false },
-      metadata: { target_user_id: id, critical: true }
+      metadata: { target_user_id: id, soft_delete: true, critical: true }
+    });
+    void createNotification({
+      targetRole: "founder",
+      title: "Utente eliminato",
+      message: "Un utente è stato eliminato dalla lista operativa OroActive.",
+      type: "user_updated",
+      severity: "warning",
+      entityType: "utente",
+      entityId: id,
+      actionUrl: "#users",
+      metadata: { target_user_id: id, target_role: normalizeRole(target.ruolo), soft_delete: true },
+      createdBy: actor?.id || null,
+      actor,
+      req
     });
   }
   return result.rowCount > 0;
@@ -11817,6 +11918,11 @@ async function loginWithFaceId(identifier, credentialId, req = null) {
   if (!user) {
     const error = new Error("Face ID non registrato per questo utente");
     error.status = 401;
+    throw error;
+  }
+  if (user.attivo === false) {
+    const error = new Error("Utente non attivo");
+    error.status = 403;
     throw error;
   }
   await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
@@ -13892,7 +13998,7 @@ app.delete(["/api/utenti/:id", "/api/users/:id"], requireAdmin, async (request, 
   try {
     const deleted = await deleteUser(request.params.id, request.user, request);
     if (!deleted) return response.status(404).json({ error: "Utente non trovato" });
-    response.json({ ok: true, id: request.params.id });
+    response.json({ ok: true, id: request.params.id, message: "Utente eliminato correttamente" });
   } catch (error) {
     next(error);
   }
