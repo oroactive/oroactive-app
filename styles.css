@@ -552,11 +552,13 @@ textarea:disabled {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(220px, 258px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
   min-height: calc(100dvh - 64px);
   height: auto;
-  padding: max(18px, env(safe-area-inset-top)) 22px max(58px, calc(env(safe-area-inset-bottom) + 58px));
+  padding: max(18px, env(safe-area-inset-top)) clamp(18px, 3vw, 36px) max(58px, calc(env(safe-area-inset-bottom) + 58px));
 }
 
 .main-menu-screen::before {
@@ -571,7 +573,6 @@ textarea:disabled {
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent 88%);
 }
 
-.main-menu-control-sidebar,
 .main-menu-inner,
 .main-menu-hero,
 .main-menu-quick-section,
@@ -692,6 +693,7 @@ textarea:disabled {
 
 .main-menu-inner {
   min-width: 0;
+  width: 100%;
   min-height: 0;
   display: grid;
   grid-template-rows: auto;
@@ -924,14 +926,14 @@ textarea:disabled {
 }
 
 .main-menu-actions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
   gap: 12px;
   align-items: start;
   overflow: visible;
 }
 
 .main-menu-quick-actions {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   gap: 10px;
 }
 
@@ -1174,9 +1176,9 @@ textarea:disabled {
 
 .aurum-mascot-root {
   position: fixed;
-  right: max(22px, env(safe-area-inset-right));
-  bottom: max(92px, calc(env(safe-area-inset-bottom) + 92px));
-  z-index: 34;
+  right: calc(24px + env(safe-area-inset-right));
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 9000;
   display: grid;
   justify-items: end;
   gap: 12px;
@@ -1200,9 +1202,9 @@ textarea:disabled {
   transition: none;
 }
 
-.main-menu-screen:not([hidden]) ~ .aurum-mascot-root:not(.aurum-panel-open) {
-  z-index: 28;
-  opacity: 0;
+.main-menu-screen:not([hidden]) ~ .aurum-mascot-root {
+  z-index: 9000;
+  opacity: 1;
   pointer-events: none;
 }
 
@@ -1331,7 +1333,7 @@ textarea:disabled {
   position: fixed;
   right: calc(16px + env(safe-area-inset-right));
   bottom: calc(16px + env(safe-area-inset-bottom));
-  z-index: 44;
+  z-index: 9001;
   width: min(420px, calc(100vw - 32px));
   max-width: min(420px, calc(100vw - 32px));
   max-height: min(720px, calc(100vh - 32px));
@@ -2625,9 +2627,13 @@ textarea:disabled {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
   display: grid;
   grid-template-columns: 264px 1fr;
   background: var(--oa-app-bg);
+  overflow-x: hidden;
 }
 
 .sidebar {
@@ -2857,8 +2863,11 @@ textarea:disabled {
 }
 
 .workspace {
-  padding: 28px;
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: clamp(14px, 2.4vw, 28px);
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -3165,10 +3174,13 @@ textarea:disabled {
 
 .screen {
   display: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .active-screen {
   display: block;
+  width: 100%;
 }
 
 .software-footer {
@@ -5554,7 +5566,7 @@ button.quality-review-badge {
 .tutorial-overlay {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 10020;
   pointer-events: none;
 }
 
@@ -5621,7 +5633,7 @@ button.quality-review-badge {
 
 .tutorial-highlight {
   position: relative;
-  z-index: 91;
+  z-index: 10021;
   outline: 4px solid rgba(255, 115, 28, 0.82);
   outline-offset: 5px;
   border-radius: var(--oa-radius-sm);
@@ -6027,7 +6039,7 @@ button.quality-review-badge {
 .preview-modal {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 10000;
   background: rgba(23, 19, 13, 0.64);
   padding: 26px;
 }
@@ -7012,17 +7024,19 @@ input.document-expired {
 
 @media (max-width: 1100px) {
   .main-menu-control-shell {
-    grid-template-columns: 206px minmax(0, 1fr);
-    gap: 14px;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: none;
+    gap: 0;
     padding: max(14px, env(safe-area-inset-top)) 14px max(52px, calc(env(safe-area-inset-bottom) + 52px));
   }
 
   .main-menu-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   }
 
   .main-menu-quick-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   }
 
   .main-menu-hero {
@@ -7090,6 +7104,8 @@ input.document-expired {
 @media (max-width: 920px) {
   .main-menu-control-shell {
     grid-template-columns: 1fr;
+    width: 100%;
+    max-width: none;
     overflow: visible;
   }
 
@@ -7349,6 +7365,8 @@ input.document-expired {
   }
 
   .main-menu-control-shell {
+    width: 100%;
+    max-width: none;
     height: auto;
     min-height: 100%;
     padding: max(10px, env(safe-area-inset-top)) 8px max(46px, calc(env(safe-area-inset-bottom) + 46px));
