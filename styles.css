@@ -552,8 +552,9 @@ textarea:disabled {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(220px, 258px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+  width: min(100%, 1240px);
+  margin: 0 auto;
   min-height: calc(100dvh - 64px);
   height: auto;
   padding: max(18px, env(safe-area-inset-top)) 22px max(58px, calc(env(safe-area-inset-bottom) + 58px));
@@ -571,7 +572,6 @@ textarea:disabled {
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent 88%);
 }
 
-.main-menu-control-sidebar,
 .main-menu-inner,
 .main-menu-hero,
 .main-menu-quick-section,

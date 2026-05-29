@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260529-fusioni-route-1";
+const STATIC_CACHE = "oroactive-static-v20260529-main-menu-no-sidebar-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260529-fusioni-route-1",
-  "/app.js?v=20260529-fusioni-route-1",
+  "/styles.css?v=20260529-main-menu-no-sidebar-1",
+  "/app.js?v=20260529-main-menu-no-sidebar-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",
