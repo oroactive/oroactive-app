@@ -214,6 +214,7 @@ textarea {
   z-index: 29;
   display: grid;
   place-items: center;
+  overflow: auto;
   background: #050505;
   color: var(--gold);
 }
@@ -468,10 +469,12 @@ textarea {
 }
 
 .main-menu-inner {
-  width: min(720px, calc(100vw - 42px));
+  width: min(920px, calc(100vw - 42px));
   display: grid;
   justify-items: center;
-  gap: 34px;
+  gap: 22px;
+  max-height: calc(100vh - 126px);
+  overflow: visible;
 }
 
 .main-menu-logo-button {
@@ -547,12 +550,46 @@ textarea {
 
 .main-menu-actions {
   display: grid;
-  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
   width: 100%;
-  justify-items: center;
+  align-items: start;
 }
 
-.main-menu-actions button {
+.main-menu-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.main-menu-search {
+  display: grid;
+  gap: 6px;
+  width: min(520px, 100%);
+  color: #ffb063;
+  font-family: var(--apple-font);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.main-menu-search input {
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff7ef;
+  padding: 0 14px;
+  font-size: 16px;
+}
+
+.main-menu-search input::placeholder {
+  color: rgba(255, 247, 239, 0.58);
+}
+
+.main-menu-actions button,
+.main-menu-quick-actions button {
   font-family: "Courier New", Courier, monospace;
   border: 0;
   background: transparent;
@@ -563,28 +600,39 @@ textarea {
   transition: transform 0.18s ease, color 0.18s ease;
 }
 
-.main-menu-actions button:hover {
+.main-menu-actions button:hover,
+.main-menu-quick-actions button:hover {
   transform: scale(1.045);
   color: #ff9656;
+}
+
+.main-menu-quick-button {
+  min-height: 48px;
+  border: 1px solid rgba(255, 115, 28, 0.55) !important;
+  border-radius: 8px;
+  background: rgba(255, 115, 28, 0.14) !important;
+  color: #fff7ef !important;
+  font-size: 15px !important;
 }
 
 .main-menu-group {
   position: relative;
   display: grid;
-  justify-items: center;
-  width: min(420px, 100%);
+  justify-items: stretch;
+  width: 100%;
 }
 
 .main-menu-group-button {
   border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 8px;
-  padding: 11px 18px;
+  padding: 11px 14px;
+  width: 100%;
 }
 
 .main-menu-submenu {
   display: grid;
   gap: 8px;
-  width: min(360px, calc(100vw - 54px));
+  width: 100%;
   margin-top: 10px;
   padding: 10px;
   border: 1px solid rgba(255, 115, 28, 0.38);
@@ -611,6 +659,17 @@ textarea {
   background: #22150f;
   transform: none;
   color: #fff;
+}
+
+.main-menu-empty {
+  grid-column: 1 / -1;
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(255, 115, 28, 0.38);
+  border-radius: 8px;
+  color: #ffc9a8;
+  font-weight: 900;
 }
 
 .aurum-mascot-root {
@@ -5714,6 +5773,8 @@ button.quality-review-badge {
   .main-menu-inner {
     gap: 26px;
     padding-top: 54px;
+    max-height: calc(100vh - 104px);
+    overflow-y: auto;
   }
 
   .main-menu-logo,
@@ -5723,12 +5784,18 @@ button.quality-review-badge {
   }
 
   .main-menu-actions {
+    grid-template-columns: 1fr;
     gap: 12px;
   }
 
-  .main-menu-actions button {
-    font-size: 20px;
-    min-height: 56px;
+  .main-menu-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .main-menu-actions button,
+  .main-menu-quick-actions button {
+    font-size: 17px;
+    min-height: 52px;
   }
 
   .aurum-mascot-root {

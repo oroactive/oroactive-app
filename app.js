@@ -624,6 +624,9 @@ const mainUserMenuButton = document.getElementById("mainUserMenuButton");
 const mainUserDropdown = document.getElementById("mainUserDropdown");
 const mainMenuClock = document.getElementById("mainMenuClock");
 const mainMenuLogoRefresh = document.getElementById("mainMenuLogoRefresh");
+const mainMenuQuickActions = document.getElementById("mainMenuQuickActions");
+const mainMenuActions = document.getElementById("mainMenuActions");
+const mainMenuSearch = document.getElementById("mainMenuSearch");
 const installHint = document.getElementById("installHint");
 const quoteDashboard = document.getElementById("quoteDashboard");
 const bullionVaultChart = document.getElementById("bullionVaultChart");
@@ -2071,7 +2074,7 @@ function isAdmin() {
 }
 
 function canViewUsersDirectory() {
-  return Boolean(state.currentUser);
+  return ["founder", "supervisore", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
 function isFounder() {
@@ -2088,6 +2091,185 @@ function canViewControlSectionsUi() {
 
 function canReviewActs(user = state.currentUser) {
   return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
+}
+
+const MENU_ROLES = {
+  all: ["founder", "supervisore", "responsabile", "commesso", "aiuto_commesso"],
+  operators: ["founder", "supervisore", "responsabile", "commesso"],
+  controls: ["founder", "supervisore", "responsabile"],
+  founder: ["founder"],
+  backup: ["founder", "responsabile"],
+  administration: ["founder", "supervisore", "responsabile"]
+};
+
+const MENU_GROUPS = [
+  {
+    id: "operativita",
+    label: "Operatività",
+    roles: MENU_ROLES.all,
+    items: [
+      { id: "new-sale-deed", label: "Nuovo atto di vendita", section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita pratica nuovo compilazione" },
+      { id: "sale-deeds-list", label: "Elenco atti", section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti archivio customer trust pack copia cliente" },
+      { id: "suspended-practices", label: "Pratiche sospese", section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "sospese incomplete autorizzazione qualità" },
+      { id: "stock", label: "Giacenza", section: "fusion", roles: MENU_ROLES.controls, keywords: "giacenza metalli oro argento platino" },
+      { id: "melting", label: "Fusioni", section: "fusion", roles: MENU_ROLES.controls, keywords: "fusioni lotti raffineria metalli" },
+      { id: "quotes", label: "Quotazioni", section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro argento platino prezzi" }
+    ]
+  },
+  {
+    id: "clienti",
+    label: "Clienti",
+    roles: MENU_ROLES.operators,
+    items: [
+      { id: "crm", label: "CRM Clienti", section: "crm", roles: MENU_ROLES.operators, keywords: "crm clienti ricerca cliente storico" },
+      { id: "trust-pack", label: "Customer Trust Pack", section: "archive", roles: MENU_ROLES.operators, keywords: "trust pack copia cliente pdf trasparenza" },
+      { id: "customer-search", label: "Ricerca cliente", section: "crm", roles: MENU_ROLES.operators, keywords: "ricerca cliente anagrafica codice fiscale" }
+    ]
+  },
+  {
+    id: "formazione",
+    label: "Formazione",
+    roles: MENU_ROLES.all,
+    items: [
+      { id: "academy", label: "OroActive Academy", section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo corsi" },
+      { id: "my-courses", label: "I miei corsi", section: "training", courseTabShortcut: "mine", roles: MENU_ROLES.all, keywords: "miei corsi formazione" },
+      { id: "certifications", label: "Certificazioni", section: "training", courseTabShortcut: "certifications", roles: MENU_ROLES.all, keywords: "certificazioni attestati" },
+      { id: "badges", label: "Badge", section: "training", courseTabShortcut: "badges", roles: MENU_ROLES.all, keywords: "badge riconoscimenti" },
+      { id: "training-history", label: "Storico formazione", section: "training", courseTabShortcut: "history", roles: MENU_ROLES.all, keywords: "storico formazione progressi" },
+      { id: "operator-training", label: "Training Operatore", section: "training", courseTabShortcut: "operatorTraining", roles: MENU_ROLES.all, keywords: "training operatore demo pratica simulazione" },
+      { id: "knowledge", label: "Nuova conoscenza", section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
+      { id: "aurum-assistant", label: "Assistente IA / Aurum", section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
+      { id: "app-tutorial", label: "Tutorial app", action: "tutorial", roles: MENU_ROLES.all, keywords: "tutorial guida aiuto" }
+    ]
+  },
+  {
+    id: "controllo",
+    label: "Controllo e sicurezza",
+    roles: MENU_ROLES.all,
+    items: [
+      { id: "antifraud", label: "Antifrode AI", section: "antifraud", roles: MENU_ROLES.controls, condition: "control", keywords: "antifrode rischio alert" },
+      { id: "aurum-shield", label: "Aurum Shield", section: "aurumShield", roles: MENU_ROLES.founder, condition: "founder", keywords: "shield rischio score compliance" },
+      { id: "quality-check", label: "Controllo Qualità", section: "practice", roles: MENU_ROLES.operators, keywords: "controllo qualità checklist pratica" },
+      { id: "approvals", label: "Autorizzazioni", section: "approvals", roles: MENU_ROLES.all, condition: "approval", keywords: "richieste autorizzazione approva rifiuta" },
+      { id: "notifications", label: "Notifiche", section: "notifications", roles: MENU_ROLES.all, keywords: "notifiche campanella avvisi" },
+      { id: "audit", label: "Audit Trail", section: "auditTrail", roles: MENU_ROLES.founder, condition: "founder", keywords: "audit log attività sicurezza" },
+      { id: "backup", label: "Backup", section: "backups", roles: MENU_ROLES.backup, condition: "backup", keywords: "backup verifica download restore" }
+    ]
+  },
+  {
+    id: "direzione",
+    label: "Direzione",
+    roles: MENU_ROLES.founder,
+    condition: "founder",
+    items: [
+      { id: "founder-dashboard", label: "Dashboard Founder / KPI rete", section: "dashboard", roles: MENU_ROLES.founder, condition: "founder", keywords: "dashboard founder kpi rete statistiche" },
+      { id: "daily-report", label: "Founder Daily Report", section: "founderDailyReport", roles: MENU_ROLES.founder, condition: "founder", keywords: "report giornaliero founder" },
+      { id: "store-health", label: "Salute Negozio / Performance negozi", section: "storeHealth", roles: MENU_ROLES.founder, condition: "founder", keywords: "salute negozio store health performance" }
+    ]
+  },
+  {
+    id: "amministrazione",
+    label: "Amministrazione",
+    roles: MENU_ROLES.all,
+    items: [
+      { id: "users", label: "Utenti e permessi", section: "users", roles: MENU_ROLES.administration, condition: "userDirectory", keywords: "utenti permessi ruoli profili" },
+      { id: "stores", label: "Negozi", section: "stores", roles: MENU_ROLES.founder, condition: "founder", keywords: "negozi sedi amministrazione" },
+      { id: "aurum-admin", label: "Gestione Aurum", section: "aurumAdmin", roles: MENU_ROLES.founder, condition: "founder", keywords: "gestione aurum impostazioni memoria" },
+      { id: "oroactive-website", label: "Sito web OroActive", action: "website", roles: MENU_ROLES.all, keywords: "sito web oroactive dominio" },
+      { id: "profile", label: "Profilo utente", section: "profile", roles: MENU_ROLES.all, keywords: "profilo dati utente account" }
+    ]
+  }
+];
+
+const MENU_QUICK_ACTIONS = [
+  { id: "quick-new-sale-deed", label: "Nuovo atto", section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita nuovo" },
+  { id: "quick-archive", label: "Elenco atti", section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti" },
+  { id: "quick-suspended", label: "Sospese", section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "pratiche sospese" },
+  { id: "quick-aurum", label: "Aurum", section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente" },
+  { id: "quick-notifications", label: "Notifiche", section: "notifications", roles: MENU_ROLES.all, keywords: "notifiche" }
+];
+
+function menuRoleAllowed(item = {}) {
+  const role = normalizeRole(state.currentUser?.ruolo);
+  return !item.roles || item.roles.includes(role);
+}
+
+function menuConditionAllowed(condition = "") {
+  if (!condition) return true;
+  return {
+    founder: isFounder,
+    backup: canManageBackupsUi,
+    knowledge: canManageKnowledgeUi,
+    userDirectory: canViewUsersDirectory,
+    control: canViewControlSectionsUi,
+    approval: canUseApprovalSectionUi
+  }[condition]?.() ?? true;
+}
+
+function isMenuItemVisible(item = {}) {
+  return Boolean(state.currentUser) && menuRoleAllowed(item) && menuConditionAllowed(item.condition);
+}
+
+function menuItemMatchesSearch(item = {}, search = "") {
+  if (!search) return true;
+  const haystack = `${item.label || ""} ${item.keywords || ""} ${item.section || ""}`.toLowerCase();
+  return haystack.includes(search);
+}
+
+function menuButtonMarkup(item = {}, extraClass = "") {
+  const attributes = [
+    `type="button"`,
+    `data-menu-item="${escapeHtml(item.id)}"`
+  ];
+  if (item.section) attributes.push(`data-section="${escapeHtml(item.section)}"`);
+  if (item.courseTabShortcut) attributes.push(`data-course-tab-shortcut="${escapeHtml(item.courseTabShortcut)}"`);
+  if (item.action) attributes.push(`data-menu-action="${escapeHtml(item.action)}"`);
+  return `<button class="${escapeHtml(extraClass)}" ${attributes.join(" ")}>${escapeHtml(item.label)}</button>`;
+}
+
+function visibleMenuItems(items = [], search = "") {
+  return items.filter((item) => isMenuItemVisible(item) && menuItemMatchesSearch(item, search));
+}
+
+function renderRoleBasedMenus() {
+  const search = String(mainMenuSearch?.value || "").trim().toLowerCase();
+  if (mainMenuQuickActions) {
+    mainMenuQuickActions.innerHTML = visibleMenuItems(MENU_QUICK_ACTIONS)
+      .map((item) => menuButtonMarkup(item, "main-menu-quick-button"))
+      .join("");
+  }
+  if (mainMenuActions) {
+    const groups = MENU_GROUPS
+      .filter((group) => isMenuItemVisible(group))
+      .map((group) => ({ ...group, items: visibleMenuItems(group.items, search) }))
+      .filter((group) => group.items.length);
+    mainMenuActions.innerHTML = groups.length
+      ? groups.map((group) => `
+        <div class="main-menu-group" data-menu-group="${escapeHtml(group.id)}">
+          <button class="main-menu-group-button" type="button" data-main-menu-toggle="${escapeHtml(`mainMenu-${group.id}`)}" aria-expanded="false">
+            ${escapeHtml(group.label)}
+          </button>
+          <div class="main-menu-submenu" id="${escapeHtml(`mainMenu-${group.id}`)}" hidden>
+            ${group.items.map((item) => menuButtonMarkup(item)).join("")}
+          </div>
+        </div>
+      `).join("")
+      : '<div class="main-menu-empty">Nessuna funzione disponibile per questa ricerca.</div>';
+  }
+  if (brandDropdown) {
+    const groups = MENU_GROUPS
+      .filter((group) => isMenuItemVisible(group))
+      .map((group) => ({ ...group, items: visibleMenuItems(group.items) }))
+      .filter((group) => group.items.length);
+    brandDropdown.innerHTML = groups.map((group) => `
+      <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="${escapeHtml(`brandMenu-${group.id}`)}" aria-expanded="false">
+        ${escapeHtml(group.label)}
+      </button>
+      <div class="brand-submenu" id="${escapeHtml(`brandMenu-${group.id}`)}" hidden>
+        ${group.items.map((item) => menuButtonMarkup(item, "user-menu-button")).join("")}
+      </div>
+    `).join("");
+  }
 }
 
 function currentUserNeedsApprovalForRisk() {
@@ -2127,6 +2309,7 @@ function canUseApprovalSectionUi() {
 }
 
 function applyRolePermissions() {
+  renderRoleBasedMenus();
   document.querySelectorAll(".user-directory-only").forEach((element) => {
     element.hidden = !canViewUsersDirectory();
   });
@@ -2428,7 +2611,11 @@ function setScreen(id) {
     showToast("Sezione riservata a Founder o Responsabile.");
     return;
   }
-  if (["dashboard", "antifraud", "storeHealth"].includes(id) && !canViewControlSectionsUi()) {
+  if (id === "dashboard" && !isFounder()) {
+    showToast("Dashboard Founder è riservata al Founder.");
+    return;
+  }
+  if (["antifraud", "storeHealth"].includes(id) && !canViewControlSectionsUi()) {
     showToast("Sezione riservata a Founder, Supervisore o Responsabile.");
     return;
   }
@@ -11334,6 +11521,56 @@ assistantChat?.addEventListener("click", (event) => {
   sendAssistantFeedback(wrapper?.dataset.assistantFeedbackIndex, button.dataset.aiFeedback);
 });
 
+function applyMenuButtonShortcut(button) {
+  if (button?.dataset?.courseTabShortcut) state.courseActiveTab = button.dataset.courseTabShortcut;
+}
+
+async function openMainMenuItem(button) {
+  if (!button) return;
+  if (button.dataset.mainMenuToggle) {
+    toggleMainMenuDropdown(button.dataset.mainMenuToggle);
+    return;
+  }
+  applyMenuButtonShortcut(button);
+  if (button.dataset.menuAction === "website") {
+    openOroActiveWebsite();
+    closeMainMenuDropdowns();
+    return;
+  }
+  if (button.dataset.menuAction === "tutorial") {
+    closeMainMenuDropdowns();
+    updateAurumMascotVisibility();
+    startTutorial({ firstRun: false });
+    return;
+  }
+  if (button.dataset.section) await enterSectionFromMainMenu(button.dataset.section);
+}
+
+async function openBrandMenuItem(button) {
+  if (!button) return;
+  if (button.dataset.brandSubmenuToggle) {
+    toggleBrandSubmenu(button.dataset.brandSubmenuToggle);
+    return;
+  }
+  applyMenuButtonShortcut(button);
+  if (button.dataset.menuAction === "website") {
+    openOroActiveWebsite();
+    closeBrandMenu();
+    return;
+  }
+  if (button.dataset.menuAction === "tutorial") {
+    closeBrandMenu();
+    mainMenuScreen.hidden = true;
+    updateAurumMascotVisibility();
+    startTutorial({ firstRun: false });
+    return;
+  }
+  if (!button.dataset.section) return;
+  setScreen(button.dataset.section);
+  if (button.dataset.section === "practice") await resetCurrentPractice({ deferPracticeNumber: true });
+  closeBrandMenu();
+}
+
 brandMenuButton.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleBrandMenu();
@@ -11341,21 +11578,22 @@ brandMenuButton.addEventListener("click", (event) => {
 
 enterSoftware.addEventListener("click", showMainMenuFromSplash);
 
-document.querySelectorAll(".main-menu-actions button").forEach((button) => {
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (button.dataset.mainMenuToggle) {
-      toggleMainMenuDropdown(button.dataset.mainMenuToggle);
-      return;
-    }
-    if (button.matches("[data-open-oroactive-website]")) {
-      openOroActiveWebsite();
-      closeMainMenuDropdowns();
-      return;
-    }
-    if (button.matches("[data-start-tutorial]")) return;
-    if (button.dataset.section) enterSectionFromMainMenu(button.dataset.section);
-  });
+mainMenuQuickActions?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  event.stopPropagation();
+  void openMainMenuItem(button);
+});
+
+mainMenuActions?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  event.stopPropagation();
+  void openMainMenuItem(button);
+});
+
+mainMenuSearch?.addEventListener("input", () => {
+  renderRoleBasedMenus();
 });
 
 mainUserMenuButton?.addEventListener("click", (event) => {
@@ -11420,24 +11658,11 @@ document.querySelectorAll("[data-return-menu]").forEach((button) => {
   button.addEventListener("click", returnToMainMenu);
 });
 
-brandDropdown.querySelectorAll("button").forEach((button) => {
-  button.addEventListener("click", async (event) => {
-    event.stopPropagation();
-    if (button.dataset.brandSubmenuToggle) {
-      toggleBrandSubmenu(button.dataset.brandSubmenuToggle);
-      return;
-    }
-    if (button.matches("[data-open-oroactive-website]")) {
-      openOroActiveWebsite();
-      closeBrandMenu();
-      return;
-    }
-    if (button.matches("[data-start-tutorial]")) return;
-    if (!button.dataset.section) return;
-    setScreen(button.dataset.section);
-    if (button.dataset.section === "practice") await resetCurrentPractice({ deferPracticeNumber: true });
-    closeBrandMenu();
-  });
+brandDropdown?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  event.stopPropagation();
+  void openBrandMenuItem(button);
 });
 
 document.addEventListener("click", (event) => {

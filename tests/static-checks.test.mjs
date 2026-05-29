@@ -56,7 +56,7 @@ test("sezione OroActive Academy e certificazioni interne presenti", async () => 
     file("schema.sql")
   ]);
 
-  assert.match(index, /data-section="training">OroActive Academy/);
+  assert.match(app, /label: "OroActive Academy"[\s\S]*section: "training"/);
   assert.match(index, /Catalogo Academy/);
   assert.match(index, /I miei corsi/);
   assert.match(index, /Certificazioni/);
@@ -333,8 +333,10 @@ test("strumenti contiene collegamento verificabile al sito OroActive", async () 
     file("app.js")
   ]);
 
-  assert.equal((index.match(/data-open-oroactive-website/g) || []).length, 2);
-  assert.match(index, /Sito web OroActive/);
+  assert.match(index, /id="mainMenuActions"/);
+  assert.match(index, /id="brandDropdown"/);
+  assert.match(app, /label: "Sito web OroActive"[\s\S]*action: "website"/);
+  assert.match(app, /data-menu-action="\$\{escapeHtml\(item\.action\)\}"/);
   assert.match(app, /const OROACTIVE_WEBSITE_URL = "http:\/\/wcfme33owxz0wfkr0ysnzthy\.188\.213\.161\.151\.sslip\.io\/"/);
   assert.match(app, /function openOroActiveWebsite/);
   assert.match(app, /window\.open\(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer"\)/);
@@ -360,7 +362,7 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(index, /Mascotte AI ufficiale/);
   assert.match(index, /id="aurumManagementPanel"/);
   assert.match(index, /Gestione Aurum/);
-  assert.match(index, /data-section="aurumAdmin"/);
+  assert.match(app, /label: "Gestione Aurum"[\s\S]*section: "aurumAdmin"/);
   assert.match(index, /id="userMessagesPanel"/);
   assert.match(index, /id="userMessageRecipient"/);
   assert.match(index, /id="aurumMessageRecipient"/);
@@ -501,7 +503,7 @@ test("Aurum Shield calcola risk score e integra atti dashboard antifrode CRM", a
 
   assert.match(index, /id="aurumShieldCard"/);
   assert.match(index, /id="aurumShieldSettingsForm"/);
-  assert.match(index, /data-section="aurumShield"/);
+  assert.match(app, /label: "Aurum Shield"[\s\S]*section: "aurumShield"/);
   assert.match(app, /function scheduleAurumShieldEvaluation/);
   assert.match(app, /function confirmAurumShieldBeforeFinalSave/);
   assert.match(app, /apiRequest\("\/aurum-shield\/evaluate"/);
@@ -609,7 +611,7 @@ test("OroActive Audit Trail traccia azioni utenti e ha UI Founder", async () => 
   assert.match(server, /audit_summary: auditSummary/);
 
   assert.match(index, /id="auditTrail"/);
-  assert.match(index, /data-section="auditTrail"/);
+  assert.match(app, /label: "Audit Trail"[\s\S]*section: "auditTrail"/);
   assert.match(index, /id="auditTrailFilters"/);
   assert.match(index, /id="auditTrailList"/);
   assert.match(app, /async function loadAuditTrail/);
@@ -653,7 +655,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(server, /sale_deed_completed_after_approval/);
 
   assert.match(index, /id="approvals"/);
-  assert.match(index, /data-section="approvals"/);
+  assert.match(app, /label: "Autorizzazioni"[\s\S]*section: "approvals"/);
   assert.match(index, /id="approvalsList"/);
   assert.match(app, /async function loadApprovals/);
   assert.match(app, /function renderApprovals/);
@@ -666,7 +668,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /training-mode-1/);
+  assert.match(worker, /menu-macro-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -707,7 +709,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(index, /id="notificationBell"/);
   assert.match(index, /id="notificationDropdown"/);
   assert.match(index, /id="notifications"/);
-  assert.match(index, /data-section="notifications"/);
+  assert.match(app, /label: "Notifiche"[\s\S]*section: "notifications"/);
   assert.match(app, /NOTIFICATION_POLL_INTERVAL_MS = 60000/);
   assert.match(app, /async function loadNotificationDropdown/);
   assert.match(app, /async function loadNotificationsPage/);
@@ -719,7 +721,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /training-mode-1/);
+  assert.match(worker, /menu-macro-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -757,7 +759,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(server, /dashboardSuspendedPracticeStats/);
 
   assert.match(index, /id="suspendedPractices"/);
-  assert.match(index, /data-section="suspendedPractices">Pratiche sospese/);
+  assert.match(app, /label: "Pratiche sospese"[\s\S]*section: "suspendedPractices"/);
   assert.match(index, /id="archiveIncludeSuspended"/);
   assert.match(index, /id="saveSuspendedPractice"/);
   assert.match(index, /id="suspendedPracticesList"/);
@@ -771,7 +773,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /training-mode-1/);
+  assert.match(worker, /menu-macro-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -841,12 +843,51 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260528-training-mode-1/);
-  assert.match(index, /styles\.css\?v=20260528-training-mode-1/);
-  assert.match(worker, /training-mode-1/);
+  assert.match(index, /app\.js\?v=20260529-menu-macro-1/);
+  assert.match(index, /styles\.css\?v=20260529-menu-macro-1/);
+  assert.match(worker, /menu-macro-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
+});
+
+test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
+  const [index, app, server, styles, worker] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("styles.css"),
+    file("service-worker.js")
+  ]);
+
+  assert.match(index, /id="mainMenuQuickActions"/);
+  assert.match(index, /id="mainMenuSearch"/);
+  assert.match(index, /id="mainMenuActions"/);
+  assert.match(index, /id="brandDropdown" hidden><\/div>/);
+  assert.match(app, /const MENU_GROUPS = \[/);
+  assert.match(app, /label: "Operatività"/);
+  assert.match(app, /label: "Clienti"/);
+  assert.match(app, /label: "Formazione"/);
+  assert.match(app, /label: "Controllo e sicurezza"/);
+  assert.match(app, /label: "Direzione"[\s\S]*roles: MENU_ROLES\.founder/);
+  assert.match(app, /label: "Amministrazione"/);
+  assert.match(app, /const MENU_QUICK_ACTIONS = \[/);
+  assert.match(app, /label: "Nuovo atto"[\s\S]*section: "practice"/);
+  assert.match(app, /label: "Elenco atti"[\s\S]*section: "archive"/);
+  assert.match(app, /label: "Sospese"[\s\S]*section: "suspendedPractices"/);
+  assert.match(app, /label: "Aurum"[\s\S]*section: "assistant"/);
+  assert.match(app, /label: "Notifiche"[\s\S]*section: "notifications"/);
+  assert.match(app, /function renderRoleBasedMenus/);
+  assert.match(app, /menuItemMatchesSearch/);
+  assert.match(app, /data-main-menu-toggle="\$\{escapeHtml\(`mainMenu-\$\{group\.id\}`\)\}"/);
+  assert.match(app, /data-brand-submenu-toggle="\$\{escapeHtml\(`brandMenu-\$\{group\.id\}`\)\}"/);
+  assert.match(app, /return \["founder", "supervisore", "responsabile"\]\.includes\(normalizeRole\(state\.currentUser\?\.ruolo\)\)/);
+  assert.match(app, /Dashboard Founder è riservata al Founder/);
+  assert.match(server, /app\.get\("\/api\/dashboard"[\s\S]*normalizeRole\(request\.user\?\.ruolo\) !== "founder"[\s\S]*Non autorizzato/);
+  assert.match(styles, /\.main-menu-quick-actions/);
+  assert.match(styles, /\.main-menu-search/);
+  assert.match(styles, /\.main-menu-empty/);
+  assert.match(worker, /menu-macro-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -880,7 +921,7 @@ test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () 
   assert.match(server, /actionUrl: "#founderDailyReport"/);
   assert.match(server, /Controllo pratica non completato|Founder Daily Report non completato/);
   assert.match(index, /id="founderDailyReport" class="screen founder-only"/);
-  assert.match(index, /data-section="founderDailyReport">Founder Daily Report/);
+  assert.match(app, /label: "Founder Daily Report"[\s\S]*section: "founderDailyReport"/);
   assert.match(index, /id="generateFounderReport"/);
   assert.match(index, /id="downloadFounderReportPdf"/);
   assert.match(index, /id="sendFounderReport"/);
@@ -933,7 +974,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(server, /Salute Negozio non caricata/);
 
   assert.match(index, /id="storeHealth" class="screen control-only"/);
-  assert.match(index, /data-section="storeHealth">Salute Negozio/);
+  assert.match(app, /label: "Salute Negozio \/ Performance negozi"[\s\S]*section: "storeHealth"/);
   assert.match(index, /id="storeHealthFilters"/);
   assert.match(index, /id="storeHealthSummary"/);
   assert.match(index, /id="storeHealthList"/);
@@ -950,7 +991,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /training-mode-1/);
+  assert.match(worker, /menu-macro-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -1001,9 +1042,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260528-training-mode-1/);
-  assert.match(index, /styles\.css\?v=20260528-training-mode-1/);
-  assert.match(worker, /training-mode-1/);
+  assert.match(index, /app\.js\?v=20260529-menu-macro-1/);
+  assert.match(index, /styles\.css\?v=20260529-menu-macro-1/);
+  assert.match(worker, /menu-macro-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -1059,7 +1100,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.doesNotMatch(trainingBackendBlock, /generateCustomerTrustPack|completeSaleDeed|updateStock/i);
 
   assert.match(index, /data-course-tab="operatorTraining">Training Operatore/);
-  assert.match(index, /data-course-tab-shortcut="operatorTraining"/);
+  assert.match(app, /label: "Training Operatore"[\s\S]*courseTabShortcut: "operatorTraining"/);
   assert.match(app, /operatorTrainingResults: \[\]/);
   assert.match(app, /function renderOperatorTraining/);
   assert.match(app, /function currentTrainingFormData/);
@@ -1080,7 +1121,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /training-mode-1/);
+  assert.match(worker, /menu-macro-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {

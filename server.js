@@ -11949,6 +11949,7 @@ app.get("/api/antiriciclaggio/contanti-check", async (request, response, next) =
 
 app.get("/api/dashboard", async (request, response, next) => {
   try {
+    if (normalizeRole(request.user?.ruolo) !== "founder") return response.status(403).json({ error: "Non autorizzato" });
     response.json(await dashboardKpis(request.user));
   } catch (error) {
     next(error);

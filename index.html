@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260528-training-mode-1">
+  <link rel="stylesheet" href="styles.css?v=20260529-menu-macro-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -54,46 +54,12 @@
       <button class="main-menu-logo-button" id="mainMenuLogoRefresh" type="button" aria-label="Aggiorna app OroActive">
         <img class="main-menu-logo" src="oroactive-logo.png" alt="OroActive Compro Oro">
       </button>
-      <nav class="main-menu-actions">
-        <div class="main-menu-group">
-          <button class="main-menu-group-button" type="button" data-main-menu-toggle="salesSubmenu" aria-expanded="false">Atti di vendita</button>
-          <div class="main-menu-submenu" id="salesSubmenu" hidden>
-            <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
-            <button class="control-only" type="button" data-section="storeHealth">Salute Negozio</button>
-            <button type="button" data-section="practice">Nuovo atto di vendita</button>
-            <button type="button" data-section="archive">Elenco</button>
-            <button type="button" data-section="suspendedPractices">Pratiche sospese</button>
-            <button class="approval-section-only" type="button" data-section="approvals">Richieste autorizzazione</button>
-            <button type="button" data-section="fusion">Giacenza</button>
-          </div>
-        </div>
-        <div class="main-menu-group">
-          <button class="main-menu-group-button" type="button" data-main-menu-toggle="toolsSubmenu" aria-expanded="false">Strumenti</button>
-          <div class="main-menu-submenu" id="toolsSubmenu" hidden>
-            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
-            <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
-            <button class="founder-only" type="button" data-section="auditTrail">Audit Trail</button>
-            <button class="founder-only" type="button" data-section="founderDailyReport">Founder Daily Report</button>
-            <button type="button" data-section="notifications">Notifiche</button>
-            <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
-            <button type="button" data-section="crm">CRM Clienti</button>
-            <button class="founder-only" type="button" data-section="stores">Negozi</button>
-            <button type="button" data-section="quotazione">Quotazione</button>
-            <button type="button" data-open-oroactive-website>Sito web OroActive</button>
-          </div>
-        </div>
-        <div class="main-menu-group">
-          <button class="main-menu-group-button" type="button" data-main-menu-toggle="trainingSubmenu" aria-expanded="false">Formazione</button>
-          <div class="main-menu-submenu" id="trainingSubmenu" hidden>
-            <button type="button" data-section="assistant">Assistente IA OroActive</button>
-            <button class="knowledge-editor-only" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-            <button class="founder-only" type="button" data-section="aurumAdmin">Gestione Aurum</button>
-            <button type="button" data-section="training">OroActive Academy</button>
-            <button type="button" data-section="training" data-course-tab-shortcut="operatorTraining">Training Operatore</button>
-            <button type="button" data-start-tutorial>Tutorial</button>
-          </div>
-        </div>
-      </nav>
+      <div class="main-menu-quick-actions" id="mainMenuQuickActions" aria-label="Azioni rapide OroActive"></div>
+      <label class="main-menu-search" for="mainMenuSearch">
+        <span>Cerca funzione</span>
+        <input id="mainMenuSearch" type="search" autocomplete="off" placeholder="Cerca funzione...">
+      </label>
+      <nav class="main-menu-actions" id="mainMenuActions" aria-label="Macroaree menu OroActive"></nav>
     </div>
     <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
   </section>
@@ -124,40 +90,7 @@
             <span>Compro Oro</span>
           </div>
         </button>
-        <div class="brand-dropdown" id="brandDropdown" hidden>
-          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandSalesSubmenu" aria-expanded="false">Atti di vendita</button>
-          <div class="brand-submenu" id="brandSalesSubmenu" hidden>
-            <button class="control-only" type="button" data-section="dashboard">Dashboard</button>
-            <button class="control-only" type="button" data-section="storeHealth">Salute Negozio</button>
-            <button type="button" data-section="practice">Nuovo atto di vendita</button>
-            <button type="button" data-section="archive">Elenco</button>
-            <button type="button" data-section="suspendedPractices">Pratiche sospese</button>
-            <button class="approval-section-only" type="button" data-section="approvals">Richieste autorizzazione</button>
-            <button type="button" data-section="fusion">Giacenza</button>
-          </div>
-          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandToolsSubmenu" aria-expanded="false">Strumenti</button>
-          <div class="brand-submenu" id="brandToolsSubmenu" hidden>
-            <button class="control-only" type="button" data-section="antifraud">Antifrode</button>
-            <button class="founder-only" type="button" data-section="aurumShield">Aurum Shield</button>
-            <button class="founder-only" type="button" data-section="auditTrail">Audit Trail</button>
-            <button class="founder-only" type="button" data-section="founderDailyReport">Founder Daily Report</button>
-            <button type="button" data-section="notifications">Notifiche</button>
-            <button class="backup-manager-only" type="button" data-section="backups">Backup</button>
-            <button type="button" data-section="crm">CRM Clienti</button>
-            <button class="founder-only" type="button" data-section="stores">Negozi</button>
-            <button type="button" data-section="quotazione">Quotazione</button>
-            <button type="button" data-open-oroactive-website>Sito web OroActive</button>
-          </div>
-          <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="brandTrainingSubmenu" aria-expanded="false">Formazione</button>
-          <div class="brand-submenu" id="brandTrainingSubmenu" hidden>
-            <button type="button" data-section="assistant">Assistente IA OroActive</button>
-            <button class="knowledge-editor-only user-menu-button" type="button" data-section="knowledgeNotes">Nuova conoscenza OroActive</button>
-            <button class="founder-only user-menu-button" type="button" data-section="aurumAdmin">Gestione Aurum</button>
-            <button type="button" data-section="training">OroActive Academy</button>
-            <button type="button" data-section="training" data-course-tab-shortcut="operatorTraining">Training Operatore</button>
-            <button type="button" data-start-tutorial>Tutorial</button>
-          </div>
-        </div>
+        <div class="brand-dropdown" id="brandDropdown" hidden></div>
       </div>
       <div class="operator">
         <span>Accesso</span>
@@ -815,7 +748,7 @@
         <div class="fusion-groups" id="fusionGroups" aria-live="polite"></div>
       </section>
 
-      <section id="dashboard" class="screen control-only">
+      <section id="dashboard" class="screen founder-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
           <div>
@@ -1471,6 +1404,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260528-training-mode-1"></script>
+  <script src="app.js?v=20260529-menu-macro-1"></script>
 </body>
 </html>
