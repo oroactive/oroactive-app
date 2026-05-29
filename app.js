@@ -626,7 +626,16 @@ const mainMenuClock = document.getElementById("mainMenuClock");
 const mainMenuLogoRefresh = document.getElementById("mainMenuLogoRefresh");
 const mainMenuQuickActions = document.getElementById("mainMenuQuickActions");
 const mainMenuActions = document.getElementById("mainMenuActions");
+const mainMenuSidebarActions = document.getElementById("mainMenuSidebarActions");
 const mainMenuSearch = document.getElementById("mainMenuSearch");
+const mainMenuQuickJump = document.getElementById("mainMenuQuickJump");
+const mainMenuAurumButton = document.getElementById("mainMenuAurumButton");
+const mainMenuWelcome = document.getElementById("mainMenuWelcome");
+const mainMenuHeroRole = document.getElementById("mainMenuHeroRole");
+const mainMenuHeroStore = document.getElementById("mainMenuHeroStore");
+const mainMenuSidebarUserName = document.getElementById("mainMenuSidebarUserName");
+const mainMenuSidebarUserRole = document.getElementById("mainMenuSidebarUserRole");
+const mainMenuFounderKpis = document.getElementById("mainMenuFounderKpis");
 const installHint = document.getElementById("installHint");
 const quoteDashboard = document.getElementById("quoteDashboard");
 const bullionVaultChart = document.getElementById("bullionVaultChart");
@@ -1543,7 +1552,7 @@ function isFounderUser(user = {}) {
 
 function displayMenuUserName(user = {}) {
   if (isFounderUser(user)) return "Elite";
-  return displayUsername(user) || [user.nome, user.cognome].filter(Boolean).join(" ").trim() || "Utente OroActive";
+  return [user.nome, user.cognome].filter(Boolean).join(" ").trim() || displayUsername(user) || user.email || "Operatore OroActive";
 }
 
 function displayUserFullName(user = {}) {
@@ -2106,87 +2115,106 @@ const MENU_GROUPS = [
   {
     id: "operativita",
     label: "Operatività",
+    description: "Gestisci atti, pratiche, giacenza, fusioni e quotazioni.",
+    icon: "OP",
+    order: 10,
     roles: MENU_ROLES.all,
     items: [
-      { id: "new-sale-deed", label: "Nuovo atto di vendita", section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita pratica nuovo compilazione" },
-      { id: "sale-deeds-list", label: "Elenco atti", section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti archivio customer trust pack copia cliente" },
-      { id: "suspended-practices", label: "Pratiche sospese", section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "sospese incomplete autorizzazione qualità" },
-      { id: "stock", label: "Giacenza", section: "fusion", roles: MENU_ROLES.controls, keywords: "giacenza metalli oro argento platino" },
-      { id: "melting", label: "Fusioni", section: "fusion", roles: MENU_ROLES.controls, keywords: "fusioni lotti raffineria metalli" },
-      { id: "quotes", label: "Quotazioni", section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro argento platino prezzi" }
+      { id: "new-sale-deed", label: "Nuovo atto di vendita", description: "Avvia una pratica operativa.", icon: "NV", order: 10, section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita pratica nuovo compilazione" },
+      { id: "sale-deeds-list", label: "Elenco atti", description: "Apri, modifica o gestisci atti validi.", icon: "EA", order: 20, section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti archivio customer trust pack copia cliente" },
+      { id: "suspended-practices", label: "Pratiche sospese", description: "Correggi pratiche non completabili.", icon: "PS", order: 30, section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "sospese incomplete autorizzazione qualità" },
+      { id: "stock", label: "Giacenza", description: "Controlla materiali e titoli.", icon: "GI", order: 40, section: "fusion", roles: MENU_ROLES.controls, keywords: "giacenza metalli oro argento platino" },
+      { id: "melting", label: "Fusioni", description: "Prepara e verifica i lotti.", icon: "FU", order: 50, section: "fusion", roles: MENU_ROLES.controls, keywords: "fusioni lotti raffineria metalli" },
+      { id: "quotes", label: "Quotazioni", description: "Consulta prezzi e quotazioni.", icon: "QT", order: 60, section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro argento platino prezzi" }
     ]
   },
   {
     id: "clienti",
     label: "Clienti",
+    description: "CRM, clienti e strumenti per la fiducia.",
+    icon: "CL",
+    order: 20,
     roles: MENU_ROLES.operators,
     items: [
-      { id: "crm", label: "CRM Clienti", section: "crm", roles: MENU_ROLES.operators, keywords: "crm clienti ricerca cliente storico" },
-      { id: "trust-pack", label: "Customer Trust Pack", section: "archive", roles: MENU_ROLES.operators, keywords: "trust pack copia cliente pdf trasparenza" },
-      { id: "customer-search", label: "Ricerca cliente", section: "crm", roles: MENU_ROLES.operators, keywords: "ricerca cliente anagrafica codice fiscale" }
+      { id: "crm", label: "CRM Clienti", description: "Storico e anagrafiche cliente.", icon: "CR", order: 10, section: "crm", roles: MENU_ROLES.operators, keywords: "crm clienti ricerca cliente storico" },
+      { id: "trust-pack", label: "Customer Trust Pack", description: "Pacchetto trasparenza cliente.", icon: "TP", order: 20, section: "archive", roles: MENU_ROLES.operators, keywords: "trust pack copia cliente pdf trasparenza" },
+      { id: "customer-search", label: "Ricerca cliente", description: "Trova rapidamente un cliente.", icon: "RC", order: 30, section: "crm", roles: MENU_ROLES.operators, keywords: "ricerca cliente anagrafica codice fiscale" }
     ]
   },
   {
     id: "formazione",
     label: "Formazione",
+    description: "Academy, corsi, certificazioni e crescita continua.",
+    icon: "AC",
+    order: 30,
     roles: MENU_ROLES.all,
     items: [
-      { id: "academy", label: "OroActive Academy", section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo corsi" },
-      { id: "my-courses", label: "I miei corsi", section: "training", courseTabShortcut: "mine", roles: MENU_ROLES.all, keywords: "miei corsi formazione" },
-      { id: "certifications", label: "Certificazioni", section: "training", courseTabShortcut: "certifications", roles: MENU_ROLES.all, keywords: "certificazioni attestati" },
-      { id: "badges", label: "Badge", section: "training", courseTabShortcut: "badges", roles: MENU_ROLES.all, keywords: "badge riconoscimenti" },
-      { id: "training-history", label: "Storico formazione", section: "training", courseTabShortcut: "history", roles: MENU_ROLES.all, keywords: "storico formazione progressi" },
-      { id: "operator-training", label: "Training Operatore", section: "training", courseTabShortcut: "operatorTraining", roles: MENU_ROLES.all, keywords: "training operatore demo pratica simulazione" },
-      { id: "knowledge", label: "Nuova conoscenza", section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
-      { id: "aurum-assistant", label: "Assistente IA / Aurum", section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
-      { id: "app-tutorial", label: "Tutorial app", action: "tutorial", roles: MENU_ROLES.all, keywords: "tutorial guida aiuto" }
+      { id: "academy", label: "OroActive Academy", description: "Catalogo corsi e materiali.", icon: "OA", order: 10, section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo corsi" },
+      { id: "my-courses", label: "I miei corsi", description: "Percorsi personali.", icon: "MC", order: 20, section: "training", courseTabShortcut: "mine", roles: MENU_ROLES.all, keywords: "miei corsi formazione" },
+      { id: "certifications", label: "Certificazioni", description: "Attestati e qualifiche.", icon: "CF", order: 30, section: "training", courseTabShortcut: "certifications", roles: MENU_ROLES.all, keywords: "certificazioni attestati" },
+      { id: "badges", label: "Badge", description: "Progressi e riconoscimenti.", icon: "BD", order: 40, section: "training", courseTabShortcut: "badges", roles: MENU_ROLES.all, keywords: "badge riconoscimenti" },
+      { id: "training-history", label: "Storico formazione", description: "Cronologia formativa.", icon: "SF", order: 50, section: "training", courseTabShortcut: "history", roles: MENU_ROLES.all, keywords: "storico formazione progressi" },
+      { id: "operator-training", label: "Training Operatore", description: "Simulazioni senza dati reali.", icon: "TR", order: 60, section: "training", courseTabShortcut: "operatorTraining", roles: MENU_ROLES.all, keywords: "training operatore demo pratica simulazione" },
+      { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "NC", order: 70, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
+      { id: "aurum-assistant", label: "Assistente IA / Aurum", description: "Tutor e assistente operativo.", icon: "AI", order: 80, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
+      { id: "app-tutorial", label: "Tutorial app", description: "Guida rapida all'app.", icon: "TU", order: 90, action: "tutorial", roles: MENU_ROLES.all, keywords: "tutorial guida aiuto" }
     ]
   },
   {
     id: "controllo",
     label: "Controllo e sicurezza",
+    description: "Sicurezza, qualità, autorizzazioni e audit.",
+    icon: "CS",
+    order: 40,
     roles: MENU_ROLES.all,
     items: [
-      { id: "antifraud", label: "Antifrode AI", section: "antifraud", roles: MENU_ROLES.controls, condition: "control", keywords: "antifrode rischio alert" },
-      { id: "aurum-shield", label: "Aurum Shield", section: "aurumShield", roles: MENU_ROLES.founder, condition: "founder", keywords: "shield rischio score compliance" },
-      { id: "quality-check", label: "Controllo Qualità", section: "practice", roles: MENU_ROLES.operators, keywords: "controllo qualità checklist pratica" },
-      { id: "approvals", label: "Autorizzazioni", section: "approvals", roles: MENU_ROLES.all, condition: "approval", keywords: "richieste autorizzazione approva rifiuta" },
-      { id: "notifications", label: "Notifiche", section: "notifications", roles: MENU_ROLES.all, keywords: "notifiche campanella avvisi" },
-      { id: "audit", label: "Audit Trail", section: "auditTrail", roles: MENU_ROLES.founder, condition: "founder", keywords: "audit log attività sicurezza" },
-      { id: "backup", label: "Backup", section: "backups", roles: MENU_ROLES.backup, condition: "backup", keywords: "backup verifica download restore" }
+      { id: "antifraud", label: "Antifrode AI", description: "Alert e controlli rischio.", icon: "AF", order: 10, section: "antifraud", roles: MENU_ROLES.controls, condition: "control", keywords: "antifrode rischio alert" },
+      { id: "aurum-shield", label: "Aurum Shield", description: "Risk score e compliance.", icon: "SH", order: 20, section: "aurumShield", roles: MENU_ROLES.founder, condition: "founder", keywords: "shield rischio score compliance" },
+      { id: "quality-check", label: "Controllo Qualità", description: "Checklist pratica.", icon: "CQ", order: 30, section: "practice", roles: MENU_ROLES.operators, keywords: "controllo qualità checklist pratica" },
+      { id: "approvals", label: "Autorizzazioni", description: "Richieste e approvazioni.", icon: "AU", order: 40, section: "approvals", roles: MENU_ROLES.all, condition: "approval", keywords: "richieste autorizzazione approva rifiuta" },
+      { id: "notifications", label: "Notifiche", description: "Avvisi interni.", icon: "NO", order: 50, section: "notifications", roles: MENU_ROLES.all, keywords: "notifiche campanella avvisi" },
+      { id: "audit", label: "Audit Trail", description: "Tracciamento azioni.", icon: "AT", order: 60, section: "auditTrail", roles: MENU_ROLES.founder, condition: "founder", keywords: "audit log attività sicurezza" },
+      { id: "backup", label: "Backup", description: "Backup e verifica.", icon: "BK", order: 70, section: "backups", roles: MENU_ROLES.backup, condition: "backup", keywords: "backup verifica download restore" }
     ]
   },
   {
     id: "direzione",
     label: "Direzione",
+    description: "Dashboard, KPI, report e statistiche strategiche.",
+    icon: "DI",
+    order: 50,
     roles: MENU_ROLES.founder,
     condition: "founder",
     items: [
-      { id: "founder-dashboard", label: "Dashboard Founder / KPI rete", section: "dashboard", roles: MENU_ROLES.founder, condition: "founder", keywords: "dashboard founder kpi rete statistiche" },
-      { id: "daily-report", label: "Founder Daily Report", section: "founderDailyReport", roles: MENU_ROLES.founder, condition: "founder", keywords: "report giornaliero founder" },
-      { id: "store-health", label: "Salute Negozio / Performance negozi", section: "storeHealth", roles: MENU_ROLES.founder, condition: "founder", keywords: "salute negozio store health performance" }
+      { id: "founder-dashboard", label: "Dashboard Founder / KPI rete", description: "Controllo globale.", icon: "DF", order: 10, section: "dashboard", roles: MENU_ROLES.founder, condition: "founder", keywords: "dashboard founder kpi rete statistiche" },
+      { id: "daily-report", label: "Founder Daily Report", description: "Report operativo giornaliero.", icon: "FR", order: 20, section: "founderDailyReport", roles: MENU_ROLES.founder, condition: "founder", keywords: "report giornaliero founder" },
+      { id: "store-health", label: "Salute Negozio / Performance negozi", description: "Health score punti vendita.", icon: "SN", order: 30, section: "storeHealth", roles: MENU_ROLES.founder, condition: "founder", keywords: "salute negozio store health performance" }
     ]
   },
   {
     id: "amministrazione",
     label: "Amministrazione",
+    description: "Utenti, negozi, impostazioni e permessi.",
+    icon: "AM",
+    order: 60,
     roles: MENU_ROLES.all,
     items: [
-      { id: "users", label: "Utenti e permessi", section: "users", roles: MENU_ROLES.administration, condition: "userDirectory", keywords: "utenti permessi ruoli profili" },
-      { id: "stores", label: "Negozi", section: "stores", roles: MENU_ROLES.founder, condition: "founder", keywords: "negozi sedi amministrazione" },
-      { id: "aurum-admin", label: "Gestione Aurum", section: "aurumAdmin", roles: MENU_ROLES.founder, condition: "founder", keywords: "gestione aurum impostazioni memoria" },
-      { id: "oroactive-website", label: "Sito web OroActive", action: "website", roles: MENU_ROLES.all, keywords: "sito web oroactive dominio" },
-      { id: "profile", label: "Profilo utente", section: "profile", roles: MENU_ROLES.all, keywords: "profilo dati utente account" }
+      { id: "users", label: "Utenti e permessi", description: "Ruoli e profili.", icon: "UT", order: 10, section: "users", roles: MENU_ROLES.administration, condition: "userDirectory", keywords: "utenti permessi ruoli profili" },
+      { id: "stores", label: "Negozi", description: "Sedi e configurazioni.", icon: "NG", order: 20, section: "stores", roles: MENU_ROLES.founder, condition: "founder", keywords: "negozi sedi amministrazione" },
+      { id: "aurum-admin", label: "Gestione Aurum", description: "Memorie e impostazioni Aurum.", icon: "GA", order: 30, section: "aurumAdmin", roles: MENU_ROLES.founder, condition: "founder", keywords: "gestione aurum impostazioni memoria" },
+      { id: "oroactive-website", label: "Sito web OroActive", description: "Apri il sito ufficiale.", icon: "SW", order: 40, action: "website", roles: MENU_ROLES.all, keywords: "sito web oroactive dominio" },
+      { id: "profile", label: "Profilo utente", description: "Dati del tuo account.", icon: "PR", order: 50, section: "profile", roles: MENU_ROLES.all, keywords: "profilo dati utente account" }
     ]
   }
 ];
 
 const MENU_QUICK_ACTIONS = [
-  { id: "quick-new-sale-deed", label: "Nuovo atto", section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita nuovo" },
-  { id: "quick-archive", label: "Elenco atti", section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti" },
-  { id: "quick-suspended", label: "Sospese", section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "pratiche sospese" },
-  { id: "quick-aurum", label: "Aurum", section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente" },
-  { id: "quick-notifications", label: "Notifiche", section: "notifications", roles: MENU_ROLES.all, keywords: "notifiche" }
+  { id: "quick-new-sale-deed", label: "Nuovo atto", description: "Crea subito", icon: "NV", order: 10, section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita nuovo" },
+  { id: "quick-archive", label: "Elenco atti", description: "Archivio", icon: "EA", order: 20, section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti" },
+  { id: "quick-suspended", label: "Sospese", description: "Da correggere", icon: "PS", order: 30, section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "pratiche sospese" },
+  { id: "quick-quotes", label: "Quotazioni", description: "Prezzi", icon: "QT", order: 40, section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro prezzi" },
+  { id: "quick-aurum", label: "Aurum", description: "Assistente", icon: "AI", order: 50, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente" },
+  { id: "quick-notifications", label: "Notifiche", description: "Avvisi", icon: "NO", order: 60, section: "notifications", roles: MENU_ROLES.all, keywords: "notifiche" }
 ];
 
 function menuRoleAllowed(item = {}) {
@@ -2216,6 +2244,10 @@ function menuItemMatchesSearch(item = {}, search = "") {
   return haystack.includes(search);
 }
 
+function sortedMenuItems(items = []) {
+  return [...items].sort((a, b) => Number(a.order || 999) - Number(b.order || 999));
+}
+
 function menuButtonMarkup(item = {}, extraClass = "") {
   const attributes = [
     `type="button"`,
@@ -2224,11 +2256,74 @@ function menuButtonMarkup(item = {}, extraClass = "") {
   if (item.section) attributes.push(`data-section="${escapeHtml(item.section)}"`);
   if (item.courseTabShortcut) attributes.push(`data-course-tab-shortcut="${escapeHtml(item.courseTabShortcut)}"`);
   if (item.action) attributes.push(`data-menu-action="${escapeHtml(item.action)}"`);
-  return `<button class="${escapeHtml(extraClass)}" ${attributes.join(" ")}>${escapeHtml(item.label)}</button>`;
+  return `
+    <button class="main-menu-item-button ${escapeHtml(extraClass)}" ${attributes.join(" ")} aria-label="${escapeHtml(item.label || "Funzione OroActive")}">
+      <span class="main-menu-item-icon" aria-hidden="true">${escapeHtml(item.icon || "OA")}</span>
+      <span class="main-menu-item-copy">
+        <strong>${escapeHtml(item.label || "")}</strong>
+        ${item.description ? `<small>${escapeHtml(item.description)}</small>` : ""}
+      </span>
+    </button>
+  `;
 }
 
 function visibleMenuItems(items = [], search = "") {
-  return items.filter((item) => isMenuItemVisible(item) && menuItemMatchesSearch(item, search));
+  return sortedMenuItems(items).filter((item) => isMenuItemVisible(item) && menuItemMatchesSearch(item, search));
+}
+
+function visibleMenuGroups(search = "") {
+  return sortedMenuItems(MENU_GROUPS)
+    .filter((group) => isMenuItemVisible(group))
+    .map((group) => ({ ...group, items: visibleMenuItems(group.items, search) }))
+    .filter((group) => group.items.length);
+}
+
+function menuGroupMarkup(group = {}, area = "main") {
+  const submenuId = `${area === "sidebar" ? "mainMenuSidebar" : "mainMenu"}-${group.id}`;
+  return `
+    <div class="main-menu-group ${area === "sidebar" ? "main-menu-sidebar-group" : ""}" data-menu-group="${escapeHtml(group.id)}">
+      <button class="main-menu-group-button" type="button" data-main-menu-toggle="${escapeHtml(submenuId)}" aria-expanded="false">
+        <span class="main-menu-group-icon" aria-hidden="true">${escapeHtml(group.icon || "OA")}</span>
+        <span class="main-menu-group-copy">
+          <strong>${escapeHtml(group.label || "")}</strong>
+          ${group.description ? `<small>${escapeHtml(group.description)}</small>` : ""}
+        </span>
+        <span class="main-menu-group-arrow" aria-hidden="true">›</span>
+      </button>
+      <div class="main-menu-submenu" id="${escapeHtml(submenuId)}" hidden>
+        ${group.items.map((item) => menuButtonMarkup(item)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function mainMenuKpiValue(path = []) {
+  return path.reduce((value, key) => value?.[key], state.dashboard) ?? null;
+}
+
+function renderFounderMenuKpis() {
+  if (!mainMenuFounderKpis) return;
+  mainMenuFounderKpis.hidden = !isFounder();
+  if (!isFounder()) {
+    mainMenuFounderKpis.innerHTML = "";
+    return;
+  }
+  const healthScore = mainMenuKpiValue(["store_health", "average_score"]);
+  const dailyActs = mainMenuKpiValue(["kpi", "numero_atti_giornalieri"]);
+  const suspended = mainMenuKpiValue(["suspended_practices", "total"]);
+  const unread = Number(state.notificationUnreadCount || 0);
+  const kpis = [
+    { label: "Store Health medio", value: healthScore === null ? "—" : `${Number(healthScore || 0)}/100` },
+    { label: "Atti oggi", value: dailyActs === null ? "—" : dailyActs },
+    { label: "Pratiche sospese", value: suspended === null ? "—" : suspended },
+    { label: "Notifiche non lette", value: unread || "—" }
+  ];
+  mainMenuFounderKpis.innerHTML = `
+    <div class="main-menu-founder-kpi-list">
+      ${kpis.map((kpi) => `<article><span>${escapeHtml(kpi.label)}</span><strong>${escapeHtml(String(kpi.value))}</strong></article>`).join("")}
+    </div>
+    <button class="main-menu-dashboard-link" type="button" data-section="dashboard">Vai alla Dashboard</button>
+  `;
 }
 
 function renderRoleBasedMenus() {
@@ -2238,30 +2333,21 @@ function renderRoleBasedMenus() {
       .map((item) => menuButtonMarkup(item, "main-menu-quick-button"))
       .join("");
   }
+  const groups = visibleMenuGroups(search);
   if (mainMenuActions) {
-    const groups = MENU_GROUPS
-      .filter((group) => isMenuItemVisible(group))
-      .map((group) => ({ ...group, items: visibleMenuItems(group.items, search) }))
-      .filter((group) => group.items.length);
     mainMenuActions.innerHTML = groups.length
-      ? groups.map((group) => `
-        <div class="main-menu-group" data-menu-group="${escapeHtml(group.id)}">
-          <button class="main-menu-group-button" type="button" data-main-menu-toggle="${escapeHtml(`mainMenu-${group.id}`)}" aria-expanded="false">
-            ${escapeHtml(group.label)}
-          </button>
-          <div class="main-menu-submenu" id="${escapeHtml(`mainMenu-${group.id}`)}" hidden>
-            ${group.items.map((item) => menuButtonMarkup(item)).join("")}
-          </div>
-        </div>
-      `).join("")
+      ? groups.map((group) => menuGroupMarkup(group)).join("")
       : '<div class="main-menu-empty">Nessuna funzione disponibile per questa ricerca.</div>';
   }
+  if (mainMenuSidebarActions) {
+    const sidebarGroups = visibleMenuGroups();
+    mainMenuSidebarActions.innerHTML = sidebarGroups.length
+      ? sidebarGroups.map((group) => menuGroupMarkup(group, "sidebar")).join("")
+      : '<div class="main-menu-empty">Nessuna funzione disponibile.</div>';
+  }
   if (brandDropdown) {
-    const groups = MENU_GROUPS
-      .filter((group) => isMenuItemVisible(group))
-      .map((group) => ({ ...group, items: visibleMenuItems(group.items) }))
-      .filter((group) => group.items.length);
-    brandDropdown.innerHTML = groups.map((group) => `
+    const brandGroups = visibleMenuGroups();
+    brandDropdown.innerHTML = brandGroups.map((group) => `
       <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="${escapeHtml(`brandMenu-${group.id}`)}" aria-expanded="false">
         ${escapeHtml(group.label)}
       </button>
@@ -2270,6 +2356,7 @@ function renderRoleBasedMenus() {
       </div>
     `).join("");
   }
+  renderFounderMenuKpis();
 }
 
 function currentUserNeedsApprovalForRisk() {
@@ -2364,6 +2451,21 @@ function applyRolePermissions() {
   if (loggedUserName && state.currentUser) {
     loggedUserName.textContent = `${displayMenuUserName(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
   }
+  if (mainMenuWelcome && state.currentUser) {
+    mainMenuWelcome.textContent = `Bentornato, ${displayMenuUserName(state.currentUser)}`;
+  }
+  if (mainMenuHeroRole && state.currentUser) {
+    mainMenuHeroRole.textContent = roleLabel(state.currentUser.ruolo);
+  }
+  if (mainMenuHeroStore && state.currentUser) {
+    mainMenuHeroStore.textContent = userSeesAllStores() ? "Tutti i negozi" : (state.currentUser.negozio || "Negozio assegnato");
+  }
+  if (mainMenuSidebarUserName && state.currentUser) {
+    mainMenuSidebarUserName.textContent = displayMenuUserName(state.currentUser);
+  }
+  if (mainMenuSidebarUserRole && state.currentUser) {
+    mainMenuSidebarUserRole.textContent = `${roleLabel(state.currentUser.ruolo)} · ${userSeesAllStores() ? "Tutti i negozi" : (state.currentUser.negozio || "Negozio")}`;
+  }
   const operatorStoreName = document.getElementById("operatorStoreName");
   if (operatorStoreName && state.currentUser && userSeesAllStores()) {
     operatorStoreName.textContent = "Negozio Tutti";
@@ -2379,6 +2481,7 @@ function applyRolePermissions() {
   configureUserFormPermissions();
   renderAurumManagementPanel();
   updateAurumMascotVisibility();
+  renderFounderMenuKpis();
 }
 
 async function startAuthenticatedApp() {
@@ -2841,6 +2944,7 @@ function openOroActiveWebsite() {
 
 function showMainMenuFromSplash() {
   splashScreen.classList.add("hidden");
+  renderRoleBasedMenus();
   mainMenuScreen.hidden = false;
   setAurumSection("menu");
   updateAurumMascotVisibility();
@@ -2898,6 +3002,7 @@ async function returnToMainMenu() {
   }
   closeBrandMenu();
   clearActSearch();
+  renderRoleBasedMenus();
   mainMenuScreen.hidden = false;
   setAurumSection("menu");
   updateAurumMascotVisibility();
@@ -4568,6 +4673,7 @@ function renderDashboard() {
     metricCard("Argento mensile", `${Number(kpi.grammi_mensili?.Argento || 0).toFixed(2)} gr`),
     metricCard("Platino mensile", `${Number(kpi.grammi_mensili?.Platino || 0).toFixed(2)} gr`)
   ].join("");
+  renderFounderMenuKpis();
   const ranking = (rows = [], labelKey = "negozio") => rows.slice(0, 8).map((row, index) => `
     <div class="dashboard-rank-row">
       <span>${index + 1}. ${escapeHtml(row[labelKey] || "Dato non inserito")}</span>
@@ -5340,6 +5446,7 @@ function renderNotificationBadge() {
   if (notificationBell) {
     notificationBell.classList.toggle("has-unread", count > 0);
   }
+  renderFounderMenuKpis();
 }
 
 function notificationCardMarkup(notification = {}, compact = false) {
@@ -11595,6 +11702,31 @@ mainMenuActions?.addEventListener("click", (event) => {
   if (!button) return;
   event.stopPropagation();
   void openMainMenuItem(button);
+});
+
+mainMenuSidebarActions?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  event.stopPropagation();
+  void openMainMenuItem(button);
+});
+
+mainMenuFounderKpis?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  event.stopPropagation();
+  void openMainMenuItem(button);
+});
+
+mainMenuQuickJump?.addEventListener("click", () => {
+  mainMenuQuickActions?.scrollIntoView({ behavior: "smooth", block: "center" });
+});
+
+mainMenuAurumButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setAurumSection("menu");
+  updateAurumMascotVisibility();
+  openAurumChat();
 });
 
 mainMenuSearch?.addEventListener("input", () => {
