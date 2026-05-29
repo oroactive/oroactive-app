@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260529-privacy-center-1";
+const STATIC_CACHE = "oroactive-static-v20260529-menu-overlap-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260529-privacy-center-1",
-  "/app.js?v=20260529-privacy-center-1",
+  "/styles.css?v=20260529-menu-overlap-1",
+  "/app.js?v=20260529-menu-overlap-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

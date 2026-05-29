@@ -341,9 +341,12 @@ textarea:disabled {
   inset: 0;
   z-index: 29;
   display: block;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--oa-dark-bg);
   color: #fff;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .splash-screen .dark-footer,
@@ -358,6 +361,16 @@ textarea:disabled {
 
 .main-menu-screen[hidden] {
   display: none;
+}
+
+.main-menu-screen > .dark-footer {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: 0;
+  margin: 0 22px max(18px, env(safe-area-inset-bottom));
+  pointer-events: none;
 }
 
 .notification-center[hidden] {
@@ -541,7 +554,8 @@ textarea:disabled {
   display: grid;
   grid-template-columns: minmax(220px, 258px) minmax(0, 1fr);
   gap: 18px;
-  height: 100%;
+  min-height: calc(100dvh - 64px);
+  height: auto;
   padding: max(18px, env(safe-area-inset-top)) 22px max(58px, calc(env(safe-area-inset-bottom) + 58px));
 }
 
@@ -680,9 +694,10 @@ textarea:disabled {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto;
+  align-content: start;
   gap: 14px;
-  overflow: auto;
+  overflow: visible;
   border-radius: 18px;
   padding: 16px;
 }
@@ -877,10 +892,16 @@ textarea:disabled {
 .main-menu-quick-section,
 .main-menu-macro-section,
 .main-menu-founder-kpis {
+  position: relative;
   display: grid;
   gap: 12px;
   border-radius: 18px;
   padding: 14px;
+}
+
+.main-menu-macro-section {
+  z-index: 3;
+  overflow: visible;
 }
 
 .main-menu-section-heading {
@@ -906,6 +927,7 @@ textarea:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   align-items: start;
+  overflow: visible;
 }
 
 .main-menu-quick-actions {
@@ -1022,9 +1044,16 @@ textarea:disabled {
 
 .main-menu-group {
   position: relative;
+  z-index: 4;
   display: grid;
   justify-items: stretch;
   width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.main-menu-group:has(.main-menu-submenu:not([hidden])) {
+  z-index: 6;
 }
 
 .main-menu-group-button {
@@ -1046,6 +1075,8 @@ textarea:disabled {
 }
 
 .main-menu-submenu {
+  position: relative;
+  z-index: 7;
   display: grid;
   gap: 8px;
   width: 100%;
@@ -1055,6 +1086,8 @@ textarea:disabled {
   border-radius: 14px;
   background: rgba(5, 5, 5, 0.64);
   animation: menu-panel-in 0.18s ease;
+  overflow: visible;
+  scroll-margin-bottom: 150px;
 }
 
 .main-menu-submenu[hidden] {
@@ -1106,6 +1139,9 @@ textarea:disabled {
 }
 
 .main-menu-founder-kpis {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
 }
@@ -1162,6 +1198,12 @@ textarea:disabled {
 .aurum-mascot-root.aurum-panel-open {
   transform: none;
   transition: none;
+}
+
+.main-menu-screen:not([hidden]) ~ .aurum-mascot-root:not(.aurum-panel-open) {
+  z-index: 28;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .aurum-mascot-button {
@@ -6969,6 +7011,9 @@ input.document-expired {
   }
 
   .main-menu-founder-kpis {
+    position: relative !important;
+    bottom: auto !important;
+    margin-top: 24px;
     grid-template-columns: 1fr;
   }
 
@@ -7022,7 +7067,7 @@ input.document-expired {
 @media (max-width: 920px) {
   .main-menu-control-shell {
     grid-template-columns: 1fr;
-    overflow-y: auto;
+    overflow: visible;
   }
 
   .main-menu-control-sidebar {
@@ -7297,6 +7342,11 @@ input.document-expired {
     overflow: visible;
   }
 
+  .main-menu-founder-kpis {
+    grid-template-columns: 1fr;
+    margin-top: 18px;
+  }
+
   .main-menu-sidebar-brand {
     gap: 9px;
   }
@@ -7491,6 +7541,11 @@ input.document-expired {
     bottom: 14px;
     font-size: 11px;
     line-height: 1.35;
+  }
+
+  .main-menu-screen > .dark-footer {
+    bottom: auto;
+    margin: 0 12px max(14px, env(safe-area-inset-bottom));
   }
 
   .workspace {

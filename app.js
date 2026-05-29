@@ -3140,6 +3140,11 @@ function toggleMainMenuDropdown(id) {
   [...document.querySelectorAll("[data-main-menu-toggle]")]
     .find((button) => button.dataset.mainMenuToggle === id)
     ?.setAttribute("aria-expanded", String(willOpen));
+  if (willOpen) {
+    window.requestAnimationFrame(() => {
+      submenu.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  }
 }
 
 function closeMainUserMenu() {
