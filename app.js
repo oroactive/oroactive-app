@@ -3518,6 +3518,7 @@ function updateAurumMascotVisibility() {
     stopAurumTips();
     stopAurumMovement();
     if (aurumChatPanel) aurumChatPanel.hidden = true;
+    aurumMascotRoot?.classList.remove("aurum-panel-open");
     return;
   }
   updateAurumMovement();
@@ -3566,7 +3567,7 @@ function setAurumSection(section = "menu") {
 function updateAurumMovement() {
   window.clearTimeout(state.aurumMovementTimer);
   const settings = loadAurumSettings();
-  const canRoam = shouldShowAurumMascot() && settings.movement && mainMenuScreen && !mainMenuScreen.hidden;
+  const canRoam = shouldShowAurumMascot() && settings.movement && mainMenuScreen && !mainMenuScreen.hidden && (!aurumChatPanel || aurumChatPanel.hidden);
   if (!canRoam) {
     stopAurumMovement();
     return;
@@ -3613,6 +3614,8 @@ function openAurumChat() {
   if (!shouldShowAurumMascot()) return;
   closeMainMenuDropdowns();
   closeMainUserMenu();
+  stopAurumMovement();
+  aurumMascotRoot?.classList.add("aurum-panel-open");
   if (aurumChatPanel) aurumChatPanel.hidden = false;
   if (aurumTipBubble) aurumTipBubble.hidden = true;
   renderAurumMessages();
@@ -3634,7 +3637,9 @@ function resetAurumVisibleChat() {
 
 function closeAurumChat() {
   if (aurumChatPanel) aurumChatPanel.hidden = true;
+  aurumMascotRoot?.classList.remove("aurum-panel-open");
   resetAurumVisibleChat();
+  updateAurumMovement();
 }
 
 function showAurumTip(text = "") {
@@ -3736,7 +3741,7 @@ function renderAurumMemoryLists() {
       <small>${escapeHtml(aurumMemoryTypeLabel(memory.memory_type))} · ${escapeHtml(formatDateTime(memory.updated_at || memory.created_at))}</small>
       <button class="ghost-button" type="button" data-delete-aurum-memory="${escapeHtml(memory.id || "")}">Elimina</button>
     </article>
-  `).join("") : '<div class="empty-state">Aurum non ha memorie salvate per questo utente.</div>';
+  `).join("") : '<div class="empty-state">Nessuna memoria salvata al momento.</div>';
   if (aurumUserMemories) aurumUserMemories.innerHTML = markup;
   renderFounderAurumMemories();
 }
@@ -11670,6 +11675,11 @@ document.addEventListener("click", (event) => {
   if (mainUserDropdown && !mainUserDropdown.hidden && !event.target.closest(".main-user-menu")) closeMainUserMenu();
   if (notificationDropdown && !notificationDropdown.hidden && !event.target.closest(".notification-center")) closeNotificationDropdown();
   if (mainMenuScreen && !mainMenuScreen.hidden && !event.target.closest(".main-menu-group")) closeMainMenuDropdowns();
+  if (aurumChatPanel && !aurumChatPanel.hidden && !event.target.closest("#aurumChatPanel") && !event.target.closest("#aurumMascotButton")) closeAurumChat();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && aurumChatPanel && !aurumChatPanel.hidden) closeAurumChat();
 });
 
 steps.forEach((step) => {

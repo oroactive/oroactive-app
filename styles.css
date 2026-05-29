@@ -695,6 +695,11 @@ textarea {
   will-change: transform;
 }
 
+.aurum-mascot-root.aurum-panel-open {
+  transform: none;
+  transition: none;
+}
+
 .aurum-mascot-button {
   width: 96px;
   height: 96px;
@@ -817,12 +822,21 @@ textarea {
 }
 
 .aurum-chat-panel {
-  width: min(360px, calc(100vw - 34px));
-  display: grid;
-  gap: 12px;
-  padding: 14px;
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 44;
+  width: min(420px, calc(100vw - 32px));
+  max-width: min(420px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+  max-height: min(720px, calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid rgba(255, 181, 72, 0.52);
-  border-radius: 8px;
+  border-radius: 18px;
   background: rgba(12, 9, 6, 0.94);
   color: #fff8ed;
   box-shadow: 0 26px 72px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -831,10 +845,29 @@ textarea {
 }
 
 .aurum-chat-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
+  flex-shrink: 0;
   gap: 10px;
   justify-content: space-between;
   align-items: flex-start;
+  padding: 14px;
+  border-bottom: 1px solid rgba(255, 181, 72, 0.22);
+  background: rgba(12, 9, 6, 0.98);
+}
+
+.aurum-chat-header > div {
+  min-width: 0;
+}
+
+.aurum-chat-header button {
+  flex: 0 0 auto;
+}
+
+.aurum-chat-panel > :not(.aurum-chat-header) {
+  min-width: 0;
 }
 
 .aurum-chat-header h2 {
@@ -844,9 +877,13 @@ textarea {
 }
 
 .aurum-chat-log {
-  min-height: 130px;
-  max-height: 260px;
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 108px;
+  max-height: min(260px, 28vh);
+  margin: 12px 12px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: grid;
   align-content: start;
   gap: 8px;
@@ -875,8 +912,10 @@ textarea {
 }
 
 .aurum-chat-form {
+  flex: 0 0 auto;
   display: grid;
   gap: 10px;
+  margin: 0 12px 12px;
 }
 
 .aurum-chat-form label {
@@ -905,8 +944,14 @@ textarea {
 }
 
 .aurum-tutor-toolbar {
+  flex: 0 1 auto;
   display: grid;
   gap: 8px;
+  max-height: 128px;
+  margin: 12px 12px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid rgba(255, 181, 72, 0.24);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -946,6 +991,12 @@ textarea {
 .aurum-consent-panel,
 .aurum-support-actions,
 .aurum-memory-details {
+  flex: 0 1 auto;
+  margin: 12px 12px 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid rgba(255, 181, 72, 0.28);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.07);
@@ -964,10 +1015,20 @@ textarea {
   gap: 8px;
 }
 
+.aurum-memory-details {
+  max-height: clamp(140px, calc(100vh - 360px), 260px);
+  margin-bottom: 12px;
+}
+
 .aurum-memory-details summary {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   cursor: pointer;
   color: #ffd696;
   font-weight: 800;
+  background: rgba(24, 16, 9, 0.98);
+  padding-bottom: 8px;
 }
 
 .aurum-settings-grid {
@@ -980,9 +1041,18 @@ textarea {
   gap: 8px;
 }
 
+#aurumUserMemories {
+  max-height: min(230px, 34vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
 .aurum-list-row {
   display: grid;
   gap: 6px;
+  min-width: 0;
   padding: 10px;
   border: 1px solid rgba(255, 181, 72, 0.22);
   border-radius: 8px;
@@ -992,7 +1062,16 @@ textarea {
 .aurum-list-row span,
 .aurum-list-row small {
   min-width: 0;
+  word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.aurum-list-row span {
+  max-height: 7.2em;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  line-height: 1.45;
+  -webkit-overflow-scrolling: touch;
 }
 
 .aurum-list-row textarea {
@@ -5808,9 +5887,53 @@ button.quality-review-badge {
     height: 78px;
   }
 
-  .aurum-chat-panel,
+  .aurum-chat-panel {
+    right: calc(8px + env(safe-area-inset-right));
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: 14px;
+  }
+
   .aurum-tip {
     width: min(330px, calc(100vw - 24px));
+  }
+
+  .aurum-chat-header {
+    padding: 12px;
+  }
+
+  .aurum-chat-log {
+    min-height: 84px;
+    max-height: 22vh;
+    margin: 10px 10px 0;
+  }
+
+  .aurum-tutor-toolbar {
+    max-height: 112px;
+    margin: 10px 10px 0;
+  }
+
+  .aurum-consent-panel,
+  .aurum-support-actions,
+  .aurum-memory-details,
+  .aurum-chat-form {
+    margin-right: 10px;
+    margin-left: 10px;
+  }
+
+  .aurum-chat-form textarea {
+    min-height: 72px;
+  }
+
+  .aurum-memory-details {
+    max-height: min(220px, 32vh);
+  }
+
+  #aurumUserMemories {
+    max-height: min(180px, 28vh);
   }
 
   .dashboard-grid,
