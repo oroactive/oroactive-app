@@ -829,6 +829,7 @@ const aurumBlocksGameOver = document.getElementById("aurumBlocksGameOver");
 const aurumBlocksMyScores = document.getElementById("aurumBlocksMyScores");
 const aurumBlocksLeaderboard = document.getElementById("aurumBlocksLeaderboard");
 const aurumBlocksBadges = document.getElementById("aurumBlocksBadges");
+const aurumBlocksScreen = document.getElementById("aurumBlocks");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
@@ -2937,7 +2938,10 @@ function setScreen(id) {
     bullionVaultChart.innerHTML = "";
     state.bullionChartLoaded = false;
   }
-  if (id !== "aurumBlocks") stopAurumBlocksLoop();
+  if (id !== "aurumBlocks") {
+    stopAurumBlocksLoop();
+    updateAurumBlocksUiState(true);
+  }
   setAurumSection(requestedSection);
   void handleScreenDataLoad(id).catch((error) => {
     showToast(sectionLoadErrorMessage(id, error), "error");
@@ -8040,6 +8044,24 @@ function aurumBlocksLockPiece() {
   renderAurumBlocksHud();
 }
 
+function updateAurumBlocksUiState(forceInactive = false) {
+  const game = state.aurumBlocksGame;
+  const screenActive = aurumBlocksScreen?.classList.contains("active-screen");
+  const playing = !forceInactive && Boolean(game && !game.over && screenActive);
+  const paused = playing && Boolean(game.paused);
+  const gameOver = !forceInactive && Boolean(game?.over && screenActive);
+  aurumBlocksShell?.classList.toggle("is-playing", playing);
+  aurumBlocksShell?.classList.toggle("is-paused", paused);
+  aurumBlocksShell?.classList.toggle("is-game-over", gameOver);
+  aurumBlocksGame?.classList.toggle("is-paused", paused);
+  document.body.classList.toggle("aurum-blocks-playing", playing);
+  document.body.classList.toggle("aurum-blocks-paused", paused);
+  aurumBlocksShell?.querySelectorAll("[data-aurum-blocks-pause]").forEach((button) => {
+    button.textContent = paused ? "Riprendi" : "Pausa";
+    button.setAttribute("aria-pressed", paused ? "true" : "false");
+  });
+}
+
 function renderAurumBlocksBoard() {
   if (!aurumBlocksBoard) return;
   const game = state.aurumBlocksGame;
@@ -8082,6 +8104,7 @@ function renderAurumBlocksHud() {
       </span>
     `).join("");
   }
+  updateAurumBlocksUiState();
 }
 
 function showAurumBlocksCoach(message = "") {
@@ -8274,6 +8297,7 @@ async function startAurumBlocks(mode = "arcade") {
     : "Partita avviata: incastra i lingotti e cerca linee pulite.");
   renderAurumBlocksBoard();
   renderAurumBlocksHud();
+  updateAurumBlocksUiState();
   state.aurumBlocksLoop = window.requestAnimationFrame(aurumBlocksTick);
 }
 
@@ -8282,12 +8306,14 @@ function pauseAurumBlocks() {
   if (!game || game.over) return;
   game.paused = !game.paused;
   showAurumBlocksCoach(game.paused ? "Pausa attiva. Riprendi quando hai spazio mentale." : "Si riparte: metodo e precisione.");
+  updateAurumBlocksUiState();
 }
 
 async function endAurumBlocksGame() {
   const game = state.aurumBlocksGame;
   if (!game || game.over) return;
   game.over = true;
+  updateAurumBlocksUiState();
   stopAurumBlocksLoop();
   const duration = Math.max(0, Math.round((Date.now() - Number(game.startedAt || Date.now())) / 1000));
   let badges = [];
@@ -8329,6 +8355,7 @@ async function endAurumBlocksGame() {
     `;
   }
   showAurumBlocksCoach(`Training completato: ${Math.round(game.score || 0)} punti, livello ${game.level || 1}.`);
+  updateAurumBlocksUiState();
 }
 
 function exitAurumBlocksGame() {
@@ -8342,6 +8369,7 @@ function exitAurumBlocksGame() {
   }
   if (aurumBlocksGameOver) aurumBlocksGameOver.hidden = true;
   renderAurumBlocksBoard();
+  updateAurumBlocksUiState(true);
 }
 
 async function createTrainingCourse(event) {
@@ -12462,9 +12490,11 @@ aurumBlocksShell?.addEventListener("click", (event) => {
   }
 });
 aurumBlocksBoard?.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
   state.aurumBlocksTouchStart = { x: event.clientX, y: event.clientY, at: Date.now() };
 });
 aurumBlocksBoard?.addEventListener("pointerup", (event) => {
+  event.preventDefault();
   const start = state.aurumBlocksTouchStart;
   state.aurumBlocksTouchStart = null;
   if (!start) return;

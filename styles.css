@@ -2108,8 +2108,12 @@ textarea:disabled {
 
 .aurum-blocks-shell {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   padding-bottom: 24px;
+  --ab-orange: #ff6a00;
+  --ab-gold: #d4af37;
+  --ab-panel: rgba(17, 17, 17, 0.94);
+  --ab-panel-soft: rgba(255, 255, 255, 0.065);
 }
 
 .aurum-blocks-hero,
@@ -2127,12 +2131,18 @@ textarea:disabled {
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
 }
 
+.aurum-blocks-game[hidden],
+.aurum-blocks-question[hidden],
+.aurum-blocks-game-over[hidden] {
+  display: none !important;
+}
+
 .aurum-blocks-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 24px;
+  gap: 14px;
+  padding: 16px 18px;
   overflow: hidden;
   position: relative;
 }
@@ -2149,16 +2159,17 @@ textarea:disabled {
 
 .aurum-blocks-hero h2 {
   position: relative;
-  margin: 6px 0 8px;
+  margin: 4px 0 6px;
   color: #fff;
-  font-size: clamp(34px, 6vw, 58px);
+  font-size: clamp(30px, 4.4vw, 46px);
   line-height: 1;
 }
 
 .aurum-blocks-hero .muted {
   position: relative;
   color: rgba(255, 255, 255, 0.78);
-  max-width: 760px;
+  max-width: 680px;
+  margin: 0;
 }
 
 .aurum-blocks-hero-actions,
@@ -2170,15 +2181,31 @@ textarea:disabled {
   z-index: 1;
 }
 
+.aurum-blocks-pause-hero {
+  display: none;
+}
+
+.aurum-blocks-shell.is-playing .aurum-blocks-hero {
+  padding-block: 12px;
+}
+
+.aurum-blocks-shell.is-playing .aurum-blocks-hero .muted {
+  display: none;
+}
+
+.aurum-blocks-shell.is-playing .aurum-blocks-pause-hero {
+  display: inline-flex;
+}
+
 .aurum-blocks-menu {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .aurum-blocks-menu button {
-  min-height: 112px;
-  padding: 18px;
+  min-height: 96px;
+  padding: 14px 16px;
   border: 1px solid rgba(255, 106, 0, 0.24);
   border-radius: 16px;
   background: linear-gradient(145deg, rgba(255, 106, 0, 0.16), rgba(17, 17, 17, 0.94));
@@ -2197,9 +2224,28 @@ textarea:disabled {
 
 .aurum-blocks-menu span {
   display: block;
-  margin-bottom: 8px;
-  font-size: 18px;
+  margin-bottom: 6px;
+  font-size: 17px;
   font-weight: 950;
+}
+
+.aurum-blocks-shell.is-playing .aurum-blocks-menu {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.aurum-blocks-shell.is-playing .aurum-blocks-menu button {
+  min-height: 48px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.aurum-blocks-shell.is-playing .aurum-blocks-menu span {
+  margin: 0;
+  font-size: 14px;
+}
+
+.aurum-blocks-shell.is-playing .aurum-blocks-menu small {
+  display: none;
 }
 
 .aurum-blocks-menu small,
@@ -2210,24 +2256,32 @@ textarea:disabled {
 
 .aurum-blocks-game {
   display: grid;
-  grid-template-columns: minmax(150px, 210px) minmax(250px, 1fr) minmax(170px, 240px);
-  gap: 18px;
+  grid-template-columns: minmax(300px, 1fr) minmax(230px, 320px);
+  grid-template-areas:
+    "board hud"
+    "board side";
+  gap: 14px;
   align-items: start;
-  padding: 18px;
+  justify-content: center;
+  padding: 14px;
+  overflow: visible;
 }
 
 .aurum-blocks-hud {
   display: grid;
-  gap: 10px;
+  grid-area: hud;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  align-content: start;
 }
 
 .aurum-blocks-hud article,
 .aurum-blocks-next,
 .aurum-blocks-coach {
-  padding: 12px;
+  padding: 10px 11px;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--ab-panel-soft);
 }
 
 .aurum-blocks-hud span,
@@ -2239,58 +2293,113 @@ textarea:disabled {
   font-weight: 900;
 }
 
+.aurum-blocks-hud article {
+  min-height: 72px;
+}
+
 .aurum-blocks-hud strong {
   display: block;
   margin-top: 4px;
   color: #fff;
-  font-size: 26px;
+  font-size: clamp(24px, 3.2vw, 34px);
+  line-height: 1;
+}
+
+.aurum-blocks-next {
+  grid-column: 1 / -1;
 }
 
 .aurum-blocks-next div {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   margin-top: 8px;
 }
 
 .aurum-blocks-next div span {
-  min-height: 34px;
-  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 7px 8px;
   border-radius: 10px;
   color: #111;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.aurum-blocks-next div span strong {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  min-height: 24px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  font-size: 11px;
 }
 
 .aurum-blocks-board-wrap {
   display: grid;
+  grid-area: board;
   justify-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   touch-action: none;
 }
 
 .aurum-blocks-mode {
-  min-height: 32px;
-  padding: 7px 12px;
+  min-height: 30px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: rgba(255, 106, 0, 0.16);
   color: #ffb063;
   font-weight: 950;
+  line-height: 1.2;
 }
 
 .aurum-blocks-board {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  width: min(56vh, 440px, calc(100vw - 48px));
+  gap: 2px;
+  width: clamp(320px, 38vw, 460px);
+  max-width: 100%;
   aspect-ratio: 10 / 20;
   padding: 8px;
-  border: 1px solid rgba(255, 106, 0, 0.38);
+  position: relative;
+  border: 1px solid rgba(255, 106, 0, 0.62);
   border-radius: 18px;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(255, 106, 0, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 106, 0, 0.06) 1px, transparent 1px),
     #050505;
   background-size: 10% 5%, 10% 5%, auto;
-  box-shadow: inset 0 0 24px rgba(255, 106, 0, 0.12), 0 16px 34px rgba(0, 0, 0, 0.32);
+  box-shadow:
+    0 0 0 1px rgba(255, 106, 0, 0.18),
+    0 0 34px rgba(255, 106, 0, 0.18),
+    inset 0 0 24px rgba(255, 106, 0, 0.12),
+    0 16px 34px rgba(0, 0, 0, 0.32);
+  touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+.aurum-blocks-game.is-paused .aurum-blocks-board::after {
+  content: "PAUSA";
+  position: absolute;
+  inset: 38% 12%;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 106, 0, 0.52);
+  border-radius: 18px;
+  background: rgba(5, 5, 5, 0.78);
+  color: #fff;
+  font-size: clamp(30px, 5vw, 48px);
+  font-weight: 950;
+  text-shadow: 0 0 18px rgba(255, 106, 0, 0.48);
+  z-index: 3;
 }
 
 .aurum-blocks-cell {
@@ -2298,47 +2407,66 @@ textarea:disabled {
   place-items: center;
   min-width: 0;
   min-height: 0;
-  margin: 2px;
   border-radius: 7px;
   color: transparent;
-  font-size: clamp(8px, 1.35vw, 11px);
+  font-size: clamp(9px, 0.9vw, 12px);
   font-weight: 950;
   line-height: 1;
+  letter-spacing: 0;
 }
 
 .aurum-blocks-cell.filled {
-  color: rgba(17, 17, 17, 0.84);
+  color: rgba(17, 17, 17, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 5px 12px rgba(0, 0, 0, 0.22);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.38),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.2),
+    0 5px 12px rgba(0, 0, 0, 0.24);
 }
 
-.metal-oro24 { background: linear-gradient(135deg, #ffe08a, #d4af37 45%, #ff7a00); }
-.metal-oro22 { background: linear-gradient(135deg, #ffd36c, #f0b22b 50%, #c98200); }
-.metal-oro18 { background: linear-gradient(135deg, #ffc85a, #ff9d22 52%, #b86400); }
-.metal-oro14 { background: linear-gradient(135deg, #f8d676, #eaa642 52%, #9f6418); }
-.metal-oro9 { background: linear-gradient(135deg, #f4e0a1, #d8b76b 52%, #a9792f); }
-.metal-arg999 { background: linear-gradient(135deg, #ffffff, #d9e3ea 55%, #9aa7b1); }
-.metal-arg925 { background: linear-gradient(135deg, #f2f6f8, #b9c4cc 55%, #7d8790); }
-.metal-arg800 { background: linear-gradient(135deg, #d7dde2, #9fa8af 55%, #6b7379); }
-.metal-pt950 { background: linear-gradient(135deg, #eef3f8, #b8c3d2 50%, #7c8696); }
+.metal-oro24 { background: linear-gradient(145deg, #fff0a8, #ffd86b 42%, #b87900); }
+.metal-oro22 { background: linear-gradient(145deg, #ffe194, #ffc247 48%, #a96f00); }
+.metal-oro18 { background: linear-gradient(145deg, #ffd06b, #ffb12b 45%, #ff6a00); }
+.metal-oro14 { background: linear-gradient(145deg, #ffe09a, #f6c15d 48%, #c47a16); }
+.metal-oro9 { background: linear-gradient(145deg, #fff0bd, #ffe6a5 48%, #c79d42); }
+.metal-arg999 { background: linear-gradient(145deg, #ffffff, #f1f5f9 48%, #94a3b8); }
+.metal-arg925 { background: linear-gradient(145deg, #f8fafc, #dbe4ec 48%, #8796a8); }
+.metal-arg800 { background: linear-gradient(145deg, #cbd5e1, #94a3b8 48%, #64748b); }
+.metal-pt950 { background: linear-gradient(145deg, #f4f4f5, #d4d4d8 48%, #71717a); }
+
+.aurum-blocks-cell.filled.metal-arg800 {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.44);
+}
 
 .aurum-blocks-touch-controls {
   display: grid;
   grid-template-columns: repeat(5, minmax(48px, 1fr));
-  gap: 8px;
-  width: min(520px, 100%);
+  gap: 10px;
+  width: min(560px, 100%);
 }
 
 .aurum-blocks-touch-controls button,
 .aurum-blocks-actions button,
 .aurum-blocks-question-options button {
-  min-height: 46px;
-  border: 1px solid rgba(255, 106, 0, 0.32);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.09);
+  min-height: 52px;
+  border: 1px solid rgba(255, 106, 0, 0.44);
+  border-radius: 14px;
+  background: rgba(255, 106, 0, 0.14);
   color: #fff;
   font-weight: 950;
   cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+
+.aurum-blocks-touch-controls button:hover,
+.aurum-blocks-touch-controls button:focus-visible,
+.aurum-blocks-actions button:hover,
+.aurum-blocks-actions button:focus-visible {
+  border-color: rgba(255, 106, 0, 0.74);
+  background: rgba(255, 106, 0, 0.22);
 }
 
 .aurum-blocks-touch-controls button:active,
@@ -2346,9 +2474,18 @@ textarea:disabled {
   transform: translateY(1px);
 }
 
+.aurum-blocks-keyboard-hint {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
 .aurum-blocks-side {
   display: grid;
+  grid-area: side;
   gap: 12px;
+  align-content: start;
 }
 
 .aurum-blocks-coach strong {
@@ -2359,7 +2496,7 @@ textarea:disabled {
 
 .aurum-blocks-question,
 .aurum-blocks-game-over {
-  padding: 18px;
+  padding: 16px;
 }
 
 .aurum-blocks-question h3,
@@ -2444,14 +2581,61 @@ textarea:disabled {
   white-space: nowrap;
 }
 
-@media (max-width: 1180px) {
+body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) {
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 7600;
+  transform: scale(0.78);
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+body.aurum-blocks-playing .aurum-mascot-root.aurum-panel-open {
+  transform: none;
+}
+
+body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-tip {
+  max-width: 240px;
+}
+
+body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-mascot-button {
+  width: 72px;
+  height: 72px;
+}
+
+@media (max-width: 860px) {
   .aurum-blocks-game {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "hud"
+      "board"
+      "side";
+    padding: 12px;
+  }
+
+  .aurum-blocks-hud {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .aurum-blocks-next {
+    grid-column: 1 / -1;
+  }
+
+  .aurum-blocks-next div {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .aurum-blocks-next div span {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .aurum-blocks-side {
     grid-template-columns: 1fr;
   }
 
-  .aurum-blocks-hud,
-  .aurum-blocks-side {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  .aurum-blocks-board {
+    width: min(420px, calc(100vw - 72px));
   }
 
   .aurum-blocks-results-grid {
@@ -2460,15 +2644,24 @@ textarea:disabled {
 }
 
 @media (max-width: 720px) {
+  .aurum-blocks-shell {
+    gap: 12px;
+  }
+
   .aurum-blocks-hero {
     align-items: stretch;
     flex-direction: column;
-    padding: 18px;
+    padding: 14px;
+  }
+
+  .aurum-blocks-hero h2 {
+    font-size: 30px;
   }
 
   .aurum-blocks-hero-actions,
   .aurum-blocks-actions {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .aurum-blocks-hero-actions button,
@@ -2476,22 +2669,87 @@ textarea:disabled {
     width: 100%;
   }
 
+  .aurum-blocks-menu,
+  .aurum-blocks-shell.is-playing .aurum-blocks-menu {
+    grid-template-columns: 1fr;
+  }
+
+  .aurum-blocks-shell.is-playing .aurum-blocks-menu {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scroll-snap-type: x proximity;
+  }
+
+  .aurum-blocks-shell.is-playing .aurum-blocks-menu button {
+    flex: 0 0 132px;
+    min-height: 44px;
+    scroll-snap-align: start;
+  }
+
+  .aurum-blocks-hud {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aurum-blocks-hud article {
+    min-height: 66px;
+  }
+
+  .aurum-blocks-hud strong {
+    font-size: 26px;
+  }
+
+  .aurum-blocks-next div {
+    grid-template-columns: 1fr;
+  }
+
   .aurum-blocks-board {
-    width: min(82vw, 360px);
+    width: min(360px, calc(100vw - 32px));
     padding: 6px;
   }
 
   .aurum-blocks-touch-controls {
     grid-template-columns: repeat(5, minmax(44px, 1fr));
+    gap: 7px;
+  }
+
+  .aurum-blocks-touch-controls button {
+    min-height: 50px;
+    padding-inline: 6px;
+    font-size: 12px;
   }
 
   .aurum-blocks-cell {
-    margin: 1.5px;
-    border-radius: 6px;
+    border-radius: 5px;
+    font-size: 8px;
+  }
+
+  .aurum-blocks-keyboard-hint {
+    display: none;
+  }
+
+  body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) {
+    right: calc(8px + env(safe-area-inset-right));
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    transform: scale(0.66);
   }
 
   .aurum-blocks-note {
     display: grid;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 820px) and (min-width: 861px) {
+  .aurum-blocks-shell.is-playing .aurum-blocks-hero {
+    padding-block: 10px;
+  }
+
+  .aurum-blocks-board {
+    width: min(400px, 36vw);
+  }
+
+  .aurum-blocks-touch-controls button {
+    min-height: 48px;
   }
 }
 
