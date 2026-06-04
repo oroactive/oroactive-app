@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260529-menu-sidebar-aurum-1">
+  <link rel="stylesheet" href="styles.css?v=20260604-aurum-blocks-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -1190,6 +1190,96 @@
         <div class="course-content" id="trainingList"></div>
       </section>
 
+      <section id="aurumBlocks" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="aurum-blocks-shell" id="aurumBlocksShell">
+          <header class="aurum-blocks-hero">
+            <div>
+              <p class="eyebrow">Arcade formativo OroActive</p>
+              <h2>Aurum Blocks</h2>
+              <p class="muted">Lingotti, metalli e carature in un allenamento leggero: gioca, completa righe, rispondi ai quiz e salva solo punteggi formativi.</p>
+            </div>
+            <div class="aurum-blocks-hero-actions">
+              <button class="ghost-button" type="button" data-aurum-blocks-go-training>Torna a Formazione</button>
+              <button class="primary-button" type="button" data-aurum-blocks-start="arcade">Gioca ora</button>
+            </div>
+          </header>
+
+          <section class="aurum-blocks-menu" aria-label="Modalità Aurum Blocks">
+            <button type="button" data-aurum-blocks-start="arcade">
+              <span>Arcade Libero</span>
+              <small>Righe, combo e Aurum Score personale.</small>
+            </button>
+            <button type="button" data-aurum-blocks-start="daily">
+              <span>Sfida Giornaliera</span>
+              <small>Seed unico del giorno per tutti gli operatori.</small>
+            </button>
+            <button type="button" data-aurum-blocks-start="training">
+              <span>Training Carature</span>
+              <small>Domande rapide su oro, argento e procedure.</small>
+            </button>
+          </section>
+
+          <section class="aurum-blocks-game" id="aurumBlocksGame" hidden>
+            <aside class="aurum-blocks-hud" aria-label="Statistiche partita">
+              <article><span>Aurum Score</span><strong id="aurumBlocksScore">0</strong></article>
+              <article><span>Livello</span><strong id="aurumBlocksLevel">1</strong></article>
+              <article><span>Righe</span><strong id="aurumBlocksLines">0</strong></article>
+              <article><span>Combo</span><strong id="aurumBlocksCombo">0</strong></article>
+              <div class="aurum-blocks-next">
+                <span>Prossimi lingotti</span>
+                <div id="aurumBlocksNext"></div>
+              </div>
+            </aside>
+            <div class="aurum-blocks-board-wrap">
+              <div class="aurum-blocks-mode" id="aurumBlocksModeLabel">Arcade Libero</div>
+              <div class="aurum-blocks-board" id="aurumBlocksBoard" role="application" aria-label="Griglia Aurum Blocks"></div>
+              <div class="aurum-blocks-touch-controls" aria-label="Controlli touch Aurum Blocks">
+                <button type="button" data-aurum-blocks-control="left" aria-label="Sposta a sinistra">◀</button>
+                <button type="button" data-aurum-blocks-control="rotate" aria-label="Ruota blocco">Ruota</button>
+                <button type="button" data-aurum-blocks-control="right" aria-label="Sposta a destra">▶</button>
+                <button type="button" data-aurum-blocks-control="down" aria-label="Caduta veloce">Giù</button>
+                <button type="button" data-aurum-blocks-control="drop" aria-label="Drop istantaneo">Drop</button>
+              </div>
+            </div>
+            <aside class="aurum-blocks-side">
+              <div class="aurum-blocks-coach" id="aurumBlocksCoach">
+                <strong>Aurum coach</strong>
+                <span>Completa righe con precisione e tieni d'occhio il metallo dei lingotti.</span>
+              </div>
+              <div class="aurum-blocks-actions">
+                <button type="button" data-aurum-blocks-pause>Pausa</button>
+                <button type="button" data-aurum-blocks-restart>Riavvia</button>
+                <button type="button" data-aurum-blocks-exit>Esci</button>
+              </div>
+            </aside>
+          </section>
+
+          <section class="aurum-blocks-question" id="aurumBlocksQuestion" hidden aria-live="polite"></section>
+          <section class="aurum-blocks-game-over" id="aurumBlocksGameOver" hidden aria-live="polite"></section>
+
+          <section class="aurum-blocks-results-grid">
+            <div>
+              <h3>I miei risultati</h3>
+              <div class="aurum-blocks-list" id="aurumBlocksMyScores" aria-live="polite"></div>
+            </div>
+            <div>
+              <h3>Classifica</h3>
+              <div class="aurum-blocks-list" id="aurumBlocksLeaderboard" aria-live="polite"></div>
+            </div>
+            <div>
+              <h3>Badge Aurum Blocks</h3>
+              <div class="aurum-blocks-list" id="aurumBlocksBadges" aria-live="polite"></div>
+            </div>
+          </section>
+
+          <section class="aurum-blocks-note">
+            <strong>Nota formazione</strong>
+            <span>Aurum Blocks è una funzione formativa e motivazionale interna. Non sostituisce corsi ed esami ufficiali OroActive Academy e non crea dati operativi reali.</span>
+          </section>
+        </div>
+      </section>
+
       <section id="crm" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="archive-header">
@@ -1506,6 +1596,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260529-menu-sidebar-aurum-1"></script>
+  <script src="app.js?v=20260604-aurum-blocks-1"></script>
 </body>
 </html>

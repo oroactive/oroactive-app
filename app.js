@@ -64,6 +64,16 @@ const state = {
   courseCertificates: [],
   courseBadges: [],
   courseActiveTab: "catalog",
+  aurumBlocksConfig: null,
+  aurumBlocksQuestions: [],
+  aurumBlocksSession: null,
+  aurumBlocksGame: null,
+  aurumBlocksLoop: null,
+  aurumBlocksScores: [],
+  aurumBlocksLeaderboard: [],
+  aurumBlocksBadges: [],
+  aurumBlocksQuestionOpen: false,
+  aurumBlocksTouchStart: null,
   users: [],
   userActivities: new Map(),
   crmClients: [],
@@ -198,6 +208,10 @@ const AURUM_SECTION_TIPS = {
     "Puoi completare i corsi e ottenere badge interni OroActive.",
     "La formazione funziona meglio a piccoli blocchi, ma costanti."
   ],
+  aurumBlocks: [
+    "Aurum Blocks allena precisione, carature e riflessi senza toccare dati reali.",
+    "Nel Training Carature rispondi alle domande rapide per ottenere bonus formativi."
+  ],
   users: [
     "Controlla ruoli e permessi prima di modificare un utente.",
     "Le attivita utente aiutano a capire cosa e successo senza confondere i reparti."
@@ -243,6 +257,7 @@ const AURUM_SECTION_MAP = {
   crm: "crm_clienti",
   users: "utenti",
   training: "academy",
+  aurumBlocks: "academy",
   backups: "backup",
   quotazione: "quotazioni",
   aurumAdmin: "assistente_ai",
@@ -799,6 +814,21 @@ const trainingCourseThumbnailFile = document.getElementById("trainingCourseThumb
 const trainingCourseVideoFile = document.getElementById("trainingCourseVideoFile");
 const trainingCoursePdfFile = document.getElementById("trainingCoursePdfFile");
 const trainingCourseFormPanel = document.getElementById("trainingCourseForm");
+const aurumBlocksShell = document.getElementById("aurumBlocksShell");
+const aurumBlocksGame = document.getElementById("aurumBlocksGame");
+const aurumBlocksBoard = document.getElementById("aurumBlocksBoard");
+const aurumBlocksScore = document.getElementById("aurumBlocksScore");
+const aurumBlocksLevel = document.getElementById("aurumBlocksLevel");
+const aurumBlocksLines = document.getElementById("aurumBlocksLines");
+const aurumBlocksCombo = document.getElementById("aurumBlocksCombo");
+const aurumBlocksNext = document.getElementById("aurumBlocksNext");
+const aurumBlocksModeLabel = document.getElementById("aurumBlocksModeLabel");
+const aurumBlocksCoach = document.getElementById("aurumBlocksCoach");
+const aurumBlocksQuestion = document.getElementById("aurumBlocksQuestion");
+const aurumBlocksGameOver = document.getElementById("aurumBlocksGameOver");
+const aurumBlocksMyScores = document.getElementById("aurumBlocksMyScores");
+const aurumBlocksLeaderboard = document.getElementById("aurumBlocksLeaderboard");
+const aurumBlocksBadges = document.getElementById("aurumBlocksBadges");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
@@ -829,6 +859,80 @@ const titleOptionsByMetal = {
   Platino: ["999", "950", "900", "850"]
 };
 const metalOrder = ["Oro", "Argento", "Platino"];
+const AURUM_BLOCKS_WIDTH = 10;
+const AURUM_BLOCKS_HEIGHT = 20;
+const AURUM_BLOCKS_LEVEL_LINES = 10;
+const AURUM_BLOCKS_MAX_LEVEL = 20;
+const AURUM_BLOCKS_DROP_BASE_MS = 900;
+const AURUM_BLOCKS_MODE_LABELS = {
+  arcade: "Arcade Libero",
+  daily: "Sfida Giornaliera",
+  training: "Training Carature"
+};
+const AURUM_BLOCKS_METALS = [
+  { id: "oro24", label: "Oro 24kt", short: "24K", className: "metal-oro24", valueBonus: 1.15, rarity: 5 },
+  { id: "oro22", label: "Oro 22kt", short: "22K", className: "metal-oro22", valueBonus: 1.12, rarity: 7 },
+  { id: "oro18", label: "Oro 18kt", short: "18K", className: "metal-oro18", valueBonus: 1.1, rarity: 12 },
+  { id: "oro14", label: "Oro 14kt", short: "14K", className: "metal-oro14", valueBonus: 1.05, rarity: 16 },
+  { id: "oro9", label: "Oro 9kt", short: "9K", className: "metal-oro9", valueBonus: 1.02, rarity: 18 },
+  { id: "arg999", label: "Argento 999", short: "AG999", className: "metal-arg999", valueBonus: 1.05, rarity: 12 },
+  { id: "arg925", label: "Argento 925", short: "AG925", className: "metal-arg925", valueBonus: 1.03, rarity: 16 },
+  { id: "arg800", label: "Argento 800", short: "AG800", className: "metal-arg800", valueBonus: 1, rarity: 20 },
+  { id: "pt950", label: "Platino 950", short: "PT950", className: "metal-pt950", valueBonus: 1.12, rarity: 4 }
+];
+const AURUM_BLOCKS_SHAPES = [
+  { id: "lingotto_lineare", name: "Lingotto Lineare", cells: [[0, 1], [1, 1], [2, 1], [3, 1]] },
+  { id: "blocco_bilancia", name: "Blocco Bilancia", cells: [[0, 0], [1, 0], [1, 1], [2, 1]] },
+  { id: "scudo_aurum", name: "Scudo Aurum", cells: [[1, 0], [0, 1], [1, 1], [2, 1]] },
+  { id: "barra_18kt", name: "Barra 18kt", cells: [[0, 0], [0, 1], [1, 1], [2, 1]] },
+  { id: "blocco_sigillo", name: "Blocco Sigillo", cells: [[0, 0], [1, 0], [0, 1], [1, 1]] },
+  { id: "gemma_quadrata", name: "Gemma Quadrata", cells: [[0, 0], [1, 0], [1, 1], [1, 2]] },
+  { id: "staffa_oroactive", name: "Staffa OroActive", cells: [[2, 0], [0, 1], [1, 1], [2, 1]] }
+];
+const AURUM_BLOCKS_FALLBACK_QUESTIONS = [
+  {
+    id: "kt18",
+    question: "Il 18kt contiene circa quale percentuale di oro puro?",
+    options: ["75%", "50%", "90%"],
+    correct_answer: "75%",
+    explanation: "18kt corrisponde a circa 75% di oro puro."
+  },
+  {
+    id: "ag925",
+    question: "Quale titolo argento è comunemente indicato come sterling?",
+    options: ["925", "800", "999"],
+    correct_answer: "925",
+    explanation: "L'argento sterling è comunemente indicato come 925."
+  },
+  {
+    id: "kt24",
+    question: "Il 24kt indica oro praticamente puro?",
+    options: ["Sì", "No"],
+    correct_answer: "Sì",
+    explanation: "24kt indica oro praticamente puro."
+  },
+  {
+    id: "archiviazione",
+    question: "Prima di archiviare un atto cosa va controllato?",
+    options: ["Documento, firme, pagamento", "Solo il peso", "Solo il nome cliente"],
+    correct_answer: "Documento, firme, pagamento",
+    explanation: "Documento, firme e pagamento sono controlli essenziali prima della chiusura."
+  },
+  {
+    id: "documento_scaduto",
+    question: "Se un documento è scaduto, cosa deve fare l'operatore?",
+    options: ["Fermarsi e verificare procedura", "Completare comunque", "Ignorare"],
+    correct_answer: "Fermarsi e verificare procedura",
+    explanation: "Un documento scaduto richiede verifica prima di procedere."
+  }
+];
+const AURUM_BLOCKS_COACH_MESSAGES = [
+  "Ottimo incastro: precisione da operatore OroActive.",
+  "Combo completata. Mantieni il ritmo senza perdere controllo.",
+  "Ricorda: 18kt significa circa 75% di oro puro.",
+  "Le righe pulite premiano metodo, non fretta.",
+  "Pausa intelligente: allenare precisione aiuta anche nel lavoro."
+];
 const COMUNI_ITALIANI = [
   { comune: "Busto Arsizio", provincia: "VA", codice: "B300" },
   { comune: "Cassano Magnago", provincia: "VA", codice: "C004" },
@@ -2200,9 +2304,10 @@ const MENU_GROUPS = [
       { id: "badges", label: "Badge", description: "Progressi e riconoscimenti.", icon: "BD", order: 40, section: "training", courseTabShortcut: "badges", roles: MENU_ROLES.all, keywords: "badge riconoscimenti" },
       { id: "training-history", label: "Storico formazione", description: "Cronologia formativa.", icon: "SF", order: 50, section: "training", courseTabShortcut: "history", roles: MENU_ROLES.all, keywords: "storico formazione progressi" },
       { id: "operator-training", label: "Training Operatore", description: "Simulazioni senza dati reali.", icon: "TR", order: 60, section: "training", courseTabShortcut: "operatorTraining", roles: MENU_ROLES.all, keywords: "training operatore demo pratica simulazione" },
-      { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "NC", order: 70, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
-      { id: "aurum-assistant", label: "Assistente IA / Aurum", description: "Tutor e assistente operativo.", icon: "AI", order: 80, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
-      { id: "app-tutorial", label: "Tutorial app", description: "Guida rapida all'app.", icon: "TU", order: 90, action: "tutorial", roles: MENU_ROLES.all, keywords: "tutorial guida aiuto" }
+      { id: "aurum-blocks", label: "Aurum Blocks", description: "Arcade formativo con lingotti e carature.", icon: "AB", order: 70, section: "aurumBlocks", roles: MENU_ROLES.all, keywords: "aurum blocks gioco arcade lingotti carature formazione punteggi" },
+      { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "NC", order: 80, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
+      { id: "aurum-assistant", label: "Assistente IA / Aurum", description: "Tutor e assistente operativo.", icon: "AI", order: 90, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
+      { id: "app-tutorial", label: "Tutorial app", description: "Guida rapida all'app.", icon: "TU", order: 100, action: "tutorial", roles: MENU_ROLES.all, keywords: "tutorial guida aiuto" }
     ]
   },
   {
@@ -2832,6 +2937,7 @@ function setScreen(id) {
     bullionVaultChart.innerHTML = "";
     state.bullionChartLoaded = false;
   }
+  if (id !== "aurumBlocks") stopAurumBlocksLoop();
   setAurumSection(requestedSection);
   void handleScreenDataLoad(id).catch((error) => {
     showToast(sectionLoadErrorMessage(id, error), "error");
@@ -2855,6 +2961,7 @@ function sectionLoadErrorMessage(id, error) {
     auditTrail: "Audit Trail non caricato.",
     founderDailyReport: "Founder Daily Report non caricato.",
     training: "Academy non caricata.",
+    aurumBlocks: "Aurum Blocks non caricato.",
     crm: "CRM non caricato.",
     assistant: "Assistente IA non caricato.",
     aurumAdmin: "Gestione Aurum non caricata.",
@@ -2891,6 +2998,7 @@ async function handleScreenDataLoad(id) {
   if (id === "auditTrail") await loadAuditTrail();
   if (id === "founderDailyReport") await loadFounderDailyReport();
   if (id === "training") await loadTraining();
+  if (id === "aurumBlocks") await loadAurumBlocks();
   if (id === "crm") await loadCrmClients();
   if (id === "assistant") {
     renderAssistantMessages();
@@ -7766,6 +7874,476 @@ async function loadTraining() {
   renderTraining();
 }
 
+function aurumBlocksSeededRandom(seed = "") {
+  let value = 2166136261;
+  String(seed || "aurum-blocks").split("").forEach((char) => {
+    value ^= char.charCodeAt(0);
+    value = Math.imul(value, 16777619);
+  });
+  return () => {
+    value += 0x6D2B79F5;
+    let t = value;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function aurumBlocksRandom() {
+  return state.aurumBlocksGame?.random?.() ?? Math.random();
+}
+
+function aurumBlocksWeightedMetal() {
+  const total = AURUM_BLOCKS_METALS.reduce((sum, metal) => sum + Number(metal.rarity || 1), 0);
+  let pick = aurumBlocksRandom() * total;
+  for (const metal of AURUM_BLOCKS_METALS) {
+    pick -= Number(metal.rarity || 1);
+    if (pick <= 0) return metal;
+  }
+  return AURUM_BLOCKS_METALS[AURUM_BLOCKS_METALS.length - 1];
+}
+
+function aurumBlocksEmptyBoard() {
+  return Array.from({ length: AURUM_BLOCKS_HEIGHT }, () => Array.from({ length: AURUM_BLOCKS_WIDTH }, () => null));
+}
+
+function aurumBlocksNormalizeCells(cells = []) {
+  const minX = Math.min(...cells.map(([x]) => x));
+  const minY = Math.min(...cells.map(([, y]) => y));
+  return cells.map(([x, y]) => [x - minX, y - minY]);
+}
+
+function aurumBlocksRotateCells(cells = []) {
+  const width = Math.max(...cells.map(([x]) => x)) + 1;
+  return aurumBlocksNormalizeCells(cells.map(([x, y]) => [y, width - 1 - x]));
+}
+
+function aurumBlocksCreatePiece() {
+  const shape = AURUM_BLOCKS_SHAPES[Math.floor(aurumBlocksRandom() * AURUM_BLOCKS_SHAPES.length)] || AURUM_BLOCKS_SHAPES[0];
+  const metal = aurumBlocksWeightedMetal();
+  const width = Math.max(...shape.cells.map(([x]) => x)) + 1;
+  return {
+    id: `${shape.id}-${Date.now()}-${Math.floor(aurumBlocksRandom() * 10000)}`,
+    shapeId: shape.id,
+    name: shape.name,
+    metal,
+    cells: shape.cells.map((cell) => [...cell]),
+    x: Math.floor((AURUM_BLOCKS_WIDTH - width) / 2),
+    y: 0
+  };
+}
+
+function aurumBlocksPieceCells(piece = {}) {
+  return (piece.cells || []).map(([x, y]) => ({ x: Number(piece.x || 0) + x, y: Number(piece.y || 0) + y, metal: piece.metal }));
+}
+
+function aurumBlocksCollides(piece = {}, board = state.aurumBlocksGame?.board || []) {
+  return aurumBlocksPieceCells(piece).some(({ x, y }) => (
+    x < 0 || x >= AURUM_BLOCKS_WIDTH || y >= AURUM_BLOCKS_HEIGHT || (y >= 0 && board[y]?.[x])
+  ));
+}
+
+function aurumBlocksMove(dx = 0, dy = 0) {
+  const game = state.aurumBlocksGame;
+  if (!game || game.over || game.paused || state.aurumBlocksQuestionOpen) return false;
+  const moved = { ...game.active, x: game.active.x + dx, y: game.active.y + dy };
+  if (aurumBlocksCollides(moved)) return false;
+  game.active = moved;
+  renderAurumBlocksBoard();
+  return true;
+}
+
+function aurumBlocksRotate() {
+  const game = state.aurumBlocksGame;
+  if (!game || game.over || game.paused || state.aurumBlocksQuestionOpen) return;
+  const rotated = { ...game.active, cells: aurumBlocksRotateCells(game.active.cells) };
+  const candidates = [rotated, { ...rotated, x: rotated.x - 1 }, { ...rotated, x: rotated.x + 1 }, { ...rotated, y: rotated.y - 1 }];
+  const valid = candidates.find((piece) => !aurumBlocksCollides(piece));
+  if (valid) {
+    game.active = valid;
+    renderAurumBlocksBoard();
+  }
+}
+
+function aurumBlocksHardDrop() {
+  const game = state.aurumBlocksGame;
+  if (!game || game.over || game.paused || state.aurumBlocksQuestionOpen) return;
+  let distance = 0;
+  while (aurumBlocksMove(0, 1)) distance += 1;
+  game.score += distance * 2;
+  aurumBlocksLockPiece();
+}
+
+function aurumBlocksSoftDrop() {
+  const game = state.aurumBlocksGame;
+  if (!game || game.over || game.paused || state.aurumBlocksQuestionOpen) return;
+  if (aurumBlocksMove(0, 1)) game.score += 1;
+  else aurumBlocksLockPiece();
+  renderAurumBlocksHud();
+}
+
+function aurumBlocksLineMultiplier(clearedRows = []) {
+  const metals = clearedRows.flat().filter(Boolean).map((cell) => cell.metalId || cell.id || "");
+  if (metals.includes("oro24")) return 1.15;
+  if (metals.includes("oro18")) return 1.1;
+  if (metals.includes("arg999")) return 1.05;
+  return 1;
+}
+
+function aurumBlocksClearLines() {
+  const game = state.aurumBlocksGame;
+  if (!game) return 0;
+  const fullRows = game.board.filter((row) => row.every(Boolean));
+  if (!fullRows.length) {
+    game.combo = 0;
+    return 0;
+  }
+  game.board = game.board.filter((row) => !row.every(Boolean));
+  while (game.board.length < AURUM_BLOCKS_HEIGHT) {
+    game.board.unshift(Array.from({ length: AURUM_BLOCKS_WIDTH }, () => null));
+  }
+  const lines = fullRows.length;
+  const base = [0, 100, 300, 500, 800][lines] || (800 + (lines - 4) * 250);
+  game.combo += 1;
+  game.bestCombo = Math.max(game.bestCombo, game.combo);
+  game.lines += lines;
+  game.level = Math.min(AURUM_BLOCKS_MAX_LEVEL, Math.floor(game.lines / AURUM_BLOCKS_LEVEL_LINES) + 1);
+  game.dropMs = Math.max(90, AURUM_BLOCKS_DROP_BASE_MS - (game.level - 1) * 38);
+  const cleanBoard = game.board.every((row) => row.every((cell) => !cell));
+  game.score += Math.round(base * game.level * aurumBlocksLineMultiplier(fullRows)) + (50 * game.combo) + (cleanBoard ? 500 : 0);
+  showAurumBlocksCoach(lines >= 3 ? "Combo importante: continua a lasciare spazio per i lingotti lunghi." : AURUM_BLOCKS_COACH_MESSAGES[Math.floor(aurumBlocksRandom() * AURUM_BLOCKS_COACH_MESSAGES.length)]);
+  maybeShowAurumBlocksQuestion();
+  return lines;
+}
+
+function aurumBlocksLockPiece() {
+  const game = state.aurumBlocksGame;
+  if (!game) return;
+  aurumBlocksPieceCells(game.active).forEach(({ x, y, metal }) => {
+    if (y >= 0 && y < AURUM_BLOCKS_HEIGHT && x >= 0 && x < AURUM_BLOCKS_WIDTH) {
+      game.board[y][x] = {
+        metalId: metal.id,
+        label: metal.label,
+        short: metal.short,
+        className: metal.className
+      };
+    }
+  });
+  aurumBlocksClearLines();
+  game.active = game.next.shift() || aurumBlocksCreatePiece();
+  game.next.push(aurumBlocksCreatePiece());
+  if (aurumBlocksCollides(game.active)) {
+    endAurumBlocksGame();
+    return;
+  }
+  renderAurumBlocksBoard();
+  renderAurumBlocksHud();
+}
+
+function renderAurumBlocksBoard() {
+  if (!aurumBlocksBoard) return;
+  const game = state.aurumBlocksGame;
+  if (!game) {
+    aurumBlocksBoard.innerHTML = "";
+    return;
+  }
+  const activeCells = new Map();
+  aurumBlocksPieceCells(game.active).forEach((cell) => {
+    if (cell.y >= 0) activeCells.set(`${cell.x}:${cell.y}`, {
+      metalId: cell.metal.id,
+      label: cell.metal.label,
+      short: cell.metal.short,
+      className: cell.metal.className
+    });
+  });
+  const cells = [];
+  for (let y = 0; y < AURUM_BLOCKS_HEIGHT; y += 1) {
+    for (let x = 0; x < AURUM_BLOCKS_WIDTH; x += 1) {
+      const cell = activeCells.get(`${x}:${y}`) || game.board[y][x];
+      cells.push(`<span class="aurum-blocks-cell ${cell ? `filled ${escapeHtml(cell.className || "")}` : ""}" aria-label="${cell ? escapeHtml(cell.label) : "vuoto"}">${cell ? escapeHtml(cell.short || "") : ""}</span>`);
+    }
+  }
+  aurumBlocksBoard.innerHTML = cells.join("");
+}
+
+function renderAurumBlocksHud() {
+  const game = state.aurumBlocksGame;
+  if (!game) return;
+  if (aurumBlocksScore) aurumBlocksScore.textContent = String(Math.max(0, Math.round(game.score || 0)));
+  if (aurumBlocksLevel) aurumBlocksLevel.textContent = String(game.level || 1);
+  if (aurumBlocksLines) aurumBlocksLines.textContent = String(game.lines || 0);
+  if (aurumBlocksCombo) aurumBlocksCombo.textContent = String(game.combo || 0);
+  if (aurumBlocksModeLabel) aurumBlocksModeLabel.textContent = AURUM_BLOCKS_MODE_LABELS[game.mode] || "Arcade Libero";
+  if (aurumBlocksNext) {
+    aurumBlocksNext.innerHTML = (game.next || []).slice(0, 3).map((piece) => `
+      <span class="${escapeHtml(piece.metal?.className || "")}">
+        <strong>${escapeHtml(piece.metal?.short || "")}</strong>
+        ${escapeHtml(piece.name || "Lingotto")}
+      </span>
+    `).join("");
+  }
+}
+
+function showAurumBlocksCoach(message = "") {
+  const game = state.aurumBlocksGame;
+  const now = Date.now();
+  if (game && game.lastCoachAt && now - game.lastCoachAt < 18000) return;
+  if (game) game.lastCoachAt = now;
+  if (!aurumBlocksCoach) return;
+  aurumBlocksCoach.innerHTML = `
+    <strong>Aurum coach</strong>
+    <span>${escapeHtml(message || "Precisione e metodo: una riga alla volta.")}</span>
+  `;
+}
+
+function aurumBlocksActiveQuestion() {
+  const questions = state.aurumBlocksQuestions.length ? state.aurumBlocksQuestions : AURUM_BLOCKS_FALLBACK_QUESTIONS;
+  const game = state.aurumBlocksGame;
+  const used = game?.usedQuestions || new Set();
+  const available = questions.filter((question) => !used.has(String(question.id || question.question)));
+  const pool = available.length ? available : questions;
+  const question = pool[Math.floor(aurumBlocksRandom() * pool.length)] || AURUM_BLOCKS_FALLBACK_QUESTIONS[0];
+  used.add(String(question.id || question.question));
+  if (game) game.usedQuestions = used;
+  return question;
+}
+
+function maybeShowAurumBlocksQuestion() {
+  const game = state.aurumBlocksGame;
+  if (!game || game.mode !== "training" || state.aurumBlocksQuestionOpen || !aurumBlocksQuestion) return;
+  if (!game.lines || game.lines % 4 !== 0 || game.lastQuestionLine === game.lines) return;
+  game.lastQuestionLine = game.lines;
+  const question = aurumBlocksActiveQuestion();
+  state.aurumBlocksQuestionOpen = true;
+  game.paused = true;
+  aurumBlocksQuestion.hidden = false;
+  aurumBlocksQuestion.innerHTML = `
+    <div>
+      <span class="training-mode-badge">Training Carature</span>
+      <h3>${escapeHtml(question.question || "Domanda Aurum Blocks")}</h3>
+      <div class="aurum-blocks-question-options">
+        ${(question.options || []).map((option) => `<button type="button" data-aurum-blocks-answer="${escapeHtml(String(option))}" data-correct-answer="${escapeHtml(String(question.correct_answer || ""))}" data-explanation="${escapeHtml(question.explanation || "")}">${escapeHtml(String(option))}</button>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function answerAurumBlocksQuestion(answerButton) {
+  const game = state.aurumBlocksGame;
+  if (!game || !answerButton) return;
+  const answer = String(answerButton.dataset.aurumBlocksAnswer || "");
+  const correct = String(answerButton.dataset.correctAnswer || "");
+  const explanation = String(answerButton.dataset.explanation || "");
+  const isCorrect = answer === correct;
+  if (isCorrect) {
+    game.score += 250;
+    game.trainingCorrect += 1;
+    showAurumBlocksCoach("Risposta corretta: bonus Aurum assegnato.");
+  } else {
+    game.trainingWrong += 1;
+    showAurumBlocksCoach(explanation || `Risposta da ripassare: quella corretta era ${correct}.`);
+  }
+  state.aurumBlocksQuestionOpen = false;
+  game.paused = false;
+  if (aurumBlocksQuestion) {
+    aurumBlocksQuestion.hidden = true;
+    aurumBlocksQuestion.innerHTML = "";
+  }
+  renderAurumBlocksHud();
+}
+
+function aurumBlocksTick(timestamp = 0) {
+  const game = state.aurumBlocksGame;
+  if (!game || game.over) return;
+  if (!document.getElementById("aurumBlocks")?.classList.contains("active-screen")) return;
+  if (!game.paused && !state.aurumBlocksQuestionOpen && timestamp - game.lastTick >= game.dropMs) {
+    game.lastTick = timestamp;
+    if (!aurumBlocksMove(0, 1)) aurumBlocksLockPiece();
+  }
+  state.aurumBlocksLoop = window.requestAnimationFrame(aurumBlocksTick);
+}
+
+function stopAurumBlocksLoop() {
+  if (state.aurumBlocksLoop) window.cancelAnimationFrame(state.aurumBlocksLoop);
+  state.aurumBlocksLoop = null;
+}
+
+async function loadAurumBlocks() {
+  const [configData, questionData, scoresData, leaderboardData, badgesData] = await Promise.all([
+    apiRequest("/aurum-blocks/config").catch(() => ({ config: null })),
+    apiRequest("/aurum-blocks/questions").catch(() => ({ questions: AURUM_BLOCKS_FALLBACK_QUESTIONS })),
+    apiRequest("/aurum-blocks/my-scores").catch(() => ({ scores: [] })),
+    apiRequest("/aurum-blocks/leaderboard").catch(() => ({ leaderboard: [] })),
+    apiRequest("/aurum-blocks/my-badges").catch(() => ({ badges: [] }))
+  ]);
+  state.aurumBlocksConfig = configData.config || null;
+  state.aurumBlocksQuestions = questionData.questions?.length ? questionData.questions : AURUM_BLOCKS_FALLBACK_QUESTIONS;
+  state.aurumBlocksScores = scoresData.scores || [];
+  state.aurumBlocksLeaderboard = leaderboardData.leaderboard || [];
+  state.aurumBlocksBadges = badgesData.badges || [];
+  renderAurumBlocksLists();
+  if (!state.aurumBlocksGame) renderAurumBlocksBoard();
+  if (state.aurumBlocksGame && !state.aurumBlocksGame.over && !state.aurumBlocksLoop) {
+    state.aurumBlocksLoop = window.requestAnimationFrame(aurumBlocksTick);
+  }
+}
+
+function renderAurumBlocksLists() {
+  if (aurumBlocksMyScores) {
+    aurumBlocksMyScores.innerHTML = (state.aurumBlocksScores || []).length
+      ? state.aurumBlocksScores.map((row) => `
+        <article>
+          <strong>${escapeHtml(String(row.score || 0))}</strong>
+          <span>${escapeHtml(AURUM_BLOCKS_MODE_LABELS[row.mode] || row.mode || "Arcade")} · livello ${escapeHtml(String(row.level || 1))}</span>
+          <small>${escapeHtml(formatDateTime(row.created_at))}</small>
+        </article>
+      `).join("")
+      : '<div class="empty-state">Nessuna partita salvata.</div>';
+  }
+  if (aurumBlocksLeaderboard) {
+    aurumBlocksLeaderboard.innerHTML = (state.aurumBlocksLeaderboard || []).length
+      ? state.aurumBlocksLeaderboard.map((row, index) => `
+        <article>
+          <strong>#${index + 1} · ${escapeHtml(String(row.score || 0))}</strong>
+          <span>${escapeHtml(row.user_name || row.username || "Operatore OroActive")} · ${escapeHtml(AURUM_BLOCKS_MODE_LABELS[row.mode] || row.mode || "Arcade")}</span>
+          <small>${escapeHtml(row.store_name || row.negozio || "Negozio non indicato")}</small>
+        </article>
+      `).join("")
+      : '<div class="empty-state">Classifica non ancora disponibile.</div>';
+  }
+  if (aurumBlocksBadges) {
+    aurumBlocksBadges.innerHTML = (state.aurumBlocksBadges || []).length
+      ? state.aurumBlocksBadges.map((badge) => `
+        <article>
+          <strong>${escapeHtml(badge.name || badge.badge_name || "Badge Aurum Blocks")}</strong>
+          <span>${escapeHtml(badge.description || "")}</span>
+          <small>${escapeHtml(formatDateTime(badge.awarded_at || badge.created_at))}</small>
+        </article>
+      `).join("")
+      : '<div class="empty-state">Nessun badge Aurum Blocks ancora ottenuto.</div>';
+  }
+}
+
+async function startAurumBlocks(mode = "arcade") {
+  stopAurumBlocksLoop();
+  const normalizedMode = ["arcade", "daily", "training"].includes(mode) ? mode : "arcade";
+  let session = null;
+  try {
+    const data = await apiRequest("/aurum-blocks/session/start", {
+      method: "POST",
+      body: JSON.stringify({ mode: normalizedMode })
+    });
+    session = data.session || null;
+  } catch (error) {
+    session = { id: `local-${Date.now()}`, mode: normalizedMode, daily_seed: new Date().toISOString().slice(0, 10) };
+    showToast("Partita avviata. Il salvataggio online verrà tentato a fine partita.", "warning");
+  }
+  const seed = normalizedMode === "daily" ? (session.daily_seed || new Date().toISOString().slice(0, 10)) : `${Date.now()}-${Math.random()}`;
+  const random = normalizedMode === "daily" ? aurumBlocksSeededRandom(seed) : Math.random;
+  state.aurumBlocksGame = {
+    sessionId: session.id,
+    mode: normalizedMode,
+    board: aurumBlocksEmptyBoard(),
+    active: null,
+    next: [],
+    score: 0,
+    level: 1,
+    lines: 0,
+    combo: 0,
+    bestCombo: 0,
+    dropMs: AURUM_BLOCKS_DROP_BASE_MS,
+    over: false,
+    paused: false,
+    lastTick: 0,
+    startedAt: Date.now(),
+    lastCoachAt: 0,
+    trainingCorrect: 0,
+    trainingWrong: 0,
+    usedQuestions: new Set(),
+    random
+  };
+  state.aurumBlocksGame.active = aurumBlocksCreatePiece();
+  state.aurumBlocksGame.next = [aurumBlocksCreatePiece(), aurumBlocksCreatePiece(), aurumBlocksCreatePiece()];
+  state.aurumBlocksSession = session;
+  state.aurumBlocksQuestionOpen = false;
+  if (aurumBlocksGame) aurumBlocksGame.hidden = false;
+  if (aurumBlocksGameOver) aurumBlocksGameOver.hidden = true;
+  if (aurumBlocksQuestion) aurumBlocksQuestion.hidden = true;
+  showAurumBlocksCoach(normalizedMode === "training"
+    ? "Training Carature attivo: completa righe e rispondi ai quiz Aurum."
+    : "Partita avviata: incastra i lingotti e cerca linee pulite.");
+  renderAurumBlocksBoard();
+  renderAurumBlocksHud();
+  state.aurumBlocksLoop = window.requestAnimationFrame(aurumBlocksTick);
+}
+
+function pauseAurumBlocks() {
+  const game = state.aurumBlocksGame;
+  if (!game || game.over) return;
+  game.paused = !game.paused;
+  showAurumBlocksCoach(game.paused ? "Pausa attiva. Riprendi quando hai spazio mentale." : "Si riparte: metodo e precisione.");
+}
+
+async function endAurumBlocksGame() {
+  const game = state.aurumBlocksGame;
+  if (!game || game.over) return;
+  game.over = true;
+  stopAurumBlocksLoop();
+  const duration = Math.max(0, Math.round((Date.now() - Number(game.startedAt || Date.now())) / 1000));
+  let badges = [];
+  if (game.sessionId && !String(game.sessionId).startsWith("local-")) {
+    try {
+      const data = await apiRequest(`/aurum-blocks/session/${encodeURIComponent(game.sessionId)}/finish`, {
+        method: "POST",
+        body: JSON.stringify({
+          score: Math.max(0, Math.round(game.score || 0)),
+          level: game.level || 1,
+          lines_cleared: game.lines || 0,
+          best_combo: game.bestCombo || 0,
+          duration_seconds: duration,
+          training_correct_answers: game.trainingCorrect || 0,
+          training_wrong_answers: game.trainingWrong || 0,
+          metadata: { mode_label: AURUM_BLOCKS_MODE_LABELS[game.mode] || game.mode }
+        })
+      });
+      badges = data.badges || [];
+      await loadAurumBlocks();
+    } catch (error) {
+      showToast(error.message || "Punteggio Aurum Blocks non salvato.", "warning");
+    }
+  }
+  if (aurumBlocksGameOver) {
+    aurumBlocksGameOver.hidden = false;
+    aurumBlocksGameOver.innerHTML = `
+      <div class="aurum-blocks-final-card">
+        <span class="training-mode-badge">Fine partita</span>
+        <h3>Aurum Score ${escapeHtml(String(Math.round(game.score || 0)))}</h3>
+        <p>Livello ${escapeHtml(String(game.level || 1))} · righe ${escapeHtml(String(game.lines || 0))} · combo migliore ${escapeHtml(String(game.bestCombo || 0))}</p>
+        ${badges.length ? `<div class="aurum-blocks-earned">${badges.map((badge) => `<strong>${escapeHtml(badge.name || badge.badge_name || "Badge ottenuto")}</strong>`).join("")}</div>` : ""}
+        <div class="aurum-blocks-actions">
+          <button class="primary-button" type="button" data-aurum-blocks-start="${escapeHtml(game.mode)}">Gioca ancora</button>
+          <button type="button" data-aurum-blocks-exit>Menu Aurum Blocks</button>
+          <button type="button" data-aurum-blocks-go-training>Torna a Formazione</button>
+        </div>
+      </div>
+    `;
+  }
+  showAurumBlocksCoach(`Training completato: ${Math.round(game.score || 0)} punti, livello ${game.level || 1}.`);
+}
+
+function exitAurumBlocksGame() {
+  stopAurumBlocksLoop();
+  state.aurumBlocksGame = null;
+  state.aurumBlocksQuestionOpen = false;
+  if (aurumBlocksGame) aurumBlocksGame.hidden = true;
+  if (aurumBlocksQuestion) {
+    aurumBlocksQuestion.hidden = true;
+    aurumBlocksQuestion.innerHTML = "";
+  }
+  if (aurumBlocksGameOver) aurumBlocksGameOver.hidden = true;
+  renderAurumBlocksBoard();
+}
+
 async function createTrainingCourse(event) {
   event.preventDefault();
   if (!canManageCoursesUi()) return;
@@ -11840,6 +12418,71 @@ trainingList?.addEventListener("click", async (event) => {
     showToast(error.message || "Operazione corso non riuscita.");
   }
 });
+aurumBlocksShell?.addEventListener("click", (event) => {
+  const start = event.target.closest("[data-aurum-blocks-start]");
+  const control = event.target.closest("[data-aurum-blocks-control]");
+  const answer = event.target.closest("[data-aurum-blocks-answer]");
+  const pause = event.target.closest("[data-aurum-blocks-pause]");
+  const restart = event.target.closest("[data-aurum-blocks-restart]");
+  const exit = event.target.closest("[data-aurum-blocks-exit]");
+  const training = event.target.closest("[data-aurum-blocks-go-training]");
+  if (start) {
+    withButtonBusy(start, "Avvio...", () => startAurumBlocks(start.dataset.aurumBlocksStart));
+    return;
+  }
+  if (answer) {
+    answerAurumBlocksQuestion(answer);
+    return;
+  }
+  if (control) {
+    const action = control.dataset.aurumBlocksControl;
+    if (action === "left") aurumBlocksMove(-1, 0);
+    if (action === "right") aurumBlocksMove(1, 0);
+    if (action === "rotate") aurumBlocksRotate();
+    if (action === "down") aurumBlocksSoftDrop();
+    if (action === "drop") aurumBlocksHardDrop();
+    return;
+  }
+  if (pause) {
+    pauseAurumBlocks();
+    return;
+  }
+  if (restart) {
+    startAurumBlocks(state.aurumBlocksGame?.mode || "arcade");
+    return;
+  }
+  if (exit) {
+    exitAurumBlocksGame();
+    return;
+  }
+  if (training) {
+    exitAurumBlocksGame();
+    state.courseActiveTab = "catalog";
+    setScreen("training");
+  }
+});
+aurumBlocksBoard?.addEventListener("pointerdown", (event) => {
+  state.aurumBlocksTouchStart = { x: event.clientX, y: event.clientY, at: Date.now() };
+});
+aurumBlocksBoard?.addEventListener("pointerup", (event) => {
+  const start = state.aurumBlocksTouchStart;
+  state.aurumBlocksTouchStart = null;
+  if (!start) return;
+  const dx = event.clientX - start.x;
+  const dy = event.clientY - start.y;
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  if (absX < 18 && absY < 18) {
+    aurumBlocksRotate();
+    return;
+  }
+  if (absY > absX && dy > 28) {
+    if (Date.now() - start.at < 240 || dy > 92) aurumBlocksHardDrop();
+    else aurumBlocksSoftDrop();
+    return;
+  }
+  if (absX > absY && absX > 24) aurumBlocksMove(dx > 0 ? 1 : -1, 0);
+});
 crmSearch?.addEventListener("input", () => {
   window.clearTimeout(state.crmSearchTimer);
   state.crmSearchTimer = window.setTimeout(loadCrmClients, 350);
@@ -12233,6 +12876,19 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (document.getElementById("aurumBlocks")?.classList.contains("active-screen") && state.aurumBlocksGame && !state.aurumBlocksGame.over) {
+    const handledKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Spacebar", "p", "P"];
+    if (handledKeys.includes(event.key)) {
+      event.preventDefault();
+      if (event.key === "ArrowLeft") aurumBlocksMove(-1, 0);
+      if (event.key === "ArrowRight") aurumBlocksMove(1, 0);
+      if (event.key === "ArrowUp") aurumBlocksRotate();
+      if (event.key === "ArrowDown") aurumBlocksSoftDrop();
+      if (event.key === " " || event.key === "Spacebar") aurumBlocksHardDrop();
+      if (event.key === "p" || event.key === "P") pauseAurumBlocks();
+      return;
+    }
+  }
   if (event.key === "Escape" && aurumChatPanel && !aurumChatPanel.hidden) closeAurumChat();
 });
 

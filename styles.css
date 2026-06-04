@@ -2106,6 +2106,395 @@ textarea:disabled {
   color: var(--ink);
 }
 
+.aurum-blocks-shell {
+  display: grid;
+  gap: 18px;
+  padding-bottom: 24px;
+}
+
+.aurum-blocks-hero,
+.aurum-blocks-game,
+.aurum-blocks-question,
+.aurum-blocks-game-over,
+.aurum-blocks-results-grid > div,
+.aurum-blocks-note {
+  border: 1px solid rgba(255, 106, 0, 0.24);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 106, 0, 0.12), rgba(5, 5, 5, 0.92)),
+    #101012;
+  color: #fff;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
+}
+
+.aurum-blocks-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.aurum-blocks-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -8% -45% 42%;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 106, 0, 0.34), transparent 68%);
+  pointer-events: none;
+}
+
+.aurum-blocks-hero h2 {
+  position: relative;
+  margin: 6px 0 8px;
+  color: #fff;
+  font-size: clamp(34px, 6vw, 58px);
+  line-height: 1;
+}
+
+.aurum-blocks-hero .muted {
+  position: relative;
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 760px;
+}
+
+.aurum-blocks-hero-actions,
+.aurum-blocks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.aurum-blocks-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.aurum-blocks-menu button {
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid rgba(255, 106, 0, 0.24);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255, 106, 0, 0.16), rgba(17, 17, 17, 0.94));
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.aurum-blocks-menu button:hover,
+.aurum-blocks-menu button:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(255, 106, 0, 0.72);
+  box-shadow: 0 18px 36px rgba(255, 106, 0, 0.14);
+}
+
+.aurum-blocks-menu span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.aurum-blocks-menu small,
+.aurum-blocks-note span {
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 800;
+}
+
+.aurum-blocks-game {
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) minmax(250px, 1fr) minmax(170px, 240px);
+  gap: 18px;
+  align-items: start;
+  padding: 18px;
+}
+
+.aurum-blocks-hud {
+  display: grid;
+  gap: 10px;
+}
+
+.aurum-blocks-hud article,
+.aurum-blocks-next,
+.aurum-blocks-coach {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.aurum-blocks-hud span,
+.aurum-blocks-next span,
+.aurum-blocks-coach span {
+  display: block;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.aurum-blocks-hud strong {
+  display: block;
+  margin-top: 4px;
+  color: #fff;
+  font-size: 26px;
+}
+
+.aurum-blocks-next div {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.aurum-blocks-next div span {
+  min-height: 34px;
+  padding: 8px;
+  border-radius: 10px;
+  color: #111;
+}
+
+.aurum-blocks-board-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  min-width: 0;
+  touch-action: none;
+}
+
+.aurum-blocks-mode {
+  min-height: 32px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 106, 0, 0.16);
+  color: #ffb063;
+  font-weight: 950;
+}
+
+.aurum-blocks-board {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  width: min(56vh, 440px, calc(100vw - 48px));
+  aspect-ratio: 10 / 20;
+  padding: 8px;
+  border: 1px solid rgba(255, 106, 0, 0.38);
+  border-radius: 18px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    #050505;
+  background-size: 10% 5%, 10% 5%, auto;
+  box-shadow: inset 0 0 24px rgba(255, 106, 0, 0.12), 0 16px 34px rgba(0, 0, 0, 0.32);
+  user-select: none;
+}
+
+.aurum-blocks-cell {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  margin: 2px;
+  border-radius: 7px;
+  color: transparent;
+  font-size: clamp(8px, 1.35vw, 11px);
+  font-weight: 950;
+  line-height: 1;
+}
+
+.aurum-blocks-cell.filled {
+  color: rgba(17, 17, 17, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 5px 12px rgba(0, 0, 0, 0.22);
+}
+
+.metal-oro24 { background: linear-gradient(135deg, #ffe08a, #d4af37 45%, #ff7a00); }
+.metal-oro22 { background: linear-gradient(135deg, #ffd36c, #f0b22b 50%, #c98200); }
+.metal-oro18 { background: linear-gradient(135deg, #ffc85a, #ff9d22 52%, #b86400); }
+.metal-oro14 { background: linear-gradient(135deg, #f8d676, #eaa642 52%, #9f6418); }
+.metal-oro9 { background: linear-gradient(135deg, #f4e0a1, #d8b76b 52%, #a9792f); }
+.metal-arg999 { background: linear-gradient(135deg, #ffffff, #d9e3ea 55%, #9aa7b1); }
+.metal-arg925 { background: linear-gradient(135deg, #f2f6f8, #b9c4cc 55%, #7d8790); }
+.metal-arg800 { background: linear-gradient(135deg, #d7dde2, #9fa8af 55%, #6b7379); }
+.metal-pt950 { background: linear-gradient(135deg, #eef3f8, #b8c3d2 50%, #7c8696); }
+
+.aurum-blocks-touch-controls {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(48px, 1fr));
+  gap: 8px;
+  width: min(520px, 100%);
+}
+
+.aurum-blocks-touch-controls button,
+.aurum-blocks-actions button,
+.aurum-blocks-question-options button {
+  min-height: 46px;
+  border: 1px solid rgba(255, 106, 0, 0.32);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.aurum-blocks-touch-controls button:active,
+.aurum-blocks-actions button:active {
+  transform: translateY(1px);
+}
+
+.aurum-blocks-side {
+  display: grid;
+  gap: 12px;
+}
+
+.aurum-blocks-coach strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #ffb063;
+}
+
+.aurum-blocks-question,
+.aurum-blocks-game-over {
+  padding: 18px;
+}
+
+.aurum-blocks-question h3,
+.aurum-blocks-game-over h3,
+.aurum-blocks-results-grid h3 {
+  margin: 8px 0 12px;
+  color: #fff;
+}
+
+.aurum-blocks-question-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.aurum-blocks-question-options button {
+  background: #fffaf4;
+  color: #111;
+}
+
+.aurum-blocks-final-card p {
+  color: rgba(255, 255, 255, 0.76);
+  font-weight: 850;
+}
+
+.aurum-blocks-earned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.aurum-blocks-earned strong {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 106, 0, 0.16);
+  color: #ffb063;
+}
+
+.aurum-blocks-results-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.aurum-blocks-results-grid > div {
+  padding: 16px;
+}
+
+.aurum-blocks-list {
+  display: grid;
+  gap: 10px;
+}
+
+.aurum-blocks-list article {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.aurum-blocks-list strong {
+  color: #fff;
+}
+
+.aurum-blocks-list span,
+.aurum-blocks-list small {
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 800;
+}
+
+.aurum-blocks-note {
+  display: flex;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.aurum-blocks-note strong {
+  color: #ffb063;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .aurum-blocks-game {
+    grid-template-columns: 1fr;
+  }
+
+  .aurum-blocks-hud,
+  .aurum-blocks-side {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .aurum-blocks-results-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .aurum-blocks-hero {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .aurum-blocks-hero-actions,
+  .aurum-blocks-actions {
+    flex-direction: column;
+  }
+
+  .aurum-blocks-hero-actions button,
+  .aurum-blocks-actions button {
+    width: 100%;
+  }
+
+  .aurum-blocks-board {
+    width: min(82vw, 360px);
+    padding: 6px;
+  }
+
+  .aurum-blocks-touch-controls {
+    grid-template-columns: repeat(5, minmax(44px, 1fr));
+  }
+
+  .aurum-blocks-cell {
+    margin: 1.5px;
+    border-radius: 6px;
+  }
+
+  .aurum-blocks-note {
+    display: grid;
+  }
+}
+
 .operator-training-result.passed {
   border-left: 4px solid #2f9e44;
 }

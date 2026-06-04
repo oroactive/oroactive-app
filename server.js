@@ -8561,6 +8561,347 @@ function canEvaluateCourses(user = {}) {
   return ["founder", "responsabile"].includes(normalizeRole(user.ruolo));
 }
 
+const aurumBlocksDefaultQuestions = [
+  {
+    question: "Il 18kt contiene circa quale percentuale di oro puro?",
+    options: ["75%", "50%", "90%"],
+    correct_answer: "75%",
+    explanation: "18kt corrisponde a circa 75% di oro puro.",
+    category: "carature",
+    difficulty: "base"
+  },
+  {
+    question: "Quale titolo argento è comunemente indicato come sterling?",
+    options: ["925", "800", "999"],
+    correct_answer: "925",
+    explanation: "L'argento sterling è comunemente indicato come 925.",
+    category: "argento",
+    difficulty: "base"
+  },
+  {
+    question: "Il 24kt indica oro praticamente puro?",
+    options: ["Sì", "No"],
+    correct_answer: "Sì",
+    explanation: "24kt indica oro praticamente puro.",
+    category: "carature",
+    difficulty: "base"
+  },
+  {
+    question: "Prima di archiviare un atto cosa va controllato?",
+    options: ["Documento, firme, pagamento", "Solo il peso", "Solo il nome cliente"],
+    correct_answer: "Documento, firme, pagamento",
+    explanation: "Documento, firme e pagamento sono controlli essenziali.",
+    category: "procedure",
+    difficulty: "intermedio"
+  },
+  {
+    question: "Se un documento è scaduto, cosa deve fare l'operatore?",
+    options: ["Fermarsi/verificare procedura", "Completare comunque", "Ignorare"],
+    correct_answer: "Fermarsi/verificare procedura",
+    explanation: "Un documento scaduto richiede verifica prima di procedere.",
+    category: "procedure",
+    difficulty: "intermedio"
+  }
+];
+
+const aurumBlocksDefaultBadges = [
+  { code: "primo_lingotto", name: "Primo Lingotto", description: "Prima partita Aurum Blocks completata.", condition: { first_game: true } },
+  { code: "linea_pulita", name: "Linea Pulita", description: "10 righe completate in una partita.", condition: { lines_cleared: 10 } },
+  { code: "maestro_18kt", name: "Maestro 18kt", description: "5 risposte corrette in Training Carature.", condition: { training_correct_answers: 5 } },
+  { code: "combo_oroactive", name: "Combo OroActive", description: "Combo 3+ in una partita.", condition: { best_combo: 3 } },
+  { code: "operatore_preciso", name: "Operatore Preciso", description: "Training Carature con almeno 80% di risposte corrette.", condition: { training_accuracy: 80 } },
+  { code: "aurum_arcade_pro", name: "Aurum Arcade Pro", description: "Aurum Score superiore a 10.000.", condition: { score: 10000 } }
+];
+
+function normalizeAurumBlocksMode(mode = "arcade") {
+  const value = String(mode || "arcade").trim().toLowerCase();
+  return ["arcade", "daily", "training"].includes(value) ? value : "arcade";
+}
+
+function aurumBlocksDailySeed(date = new Date()) {
+  return `AB-${date.toISOString().slice(0, 10)}`;
+}
+
+function publicAurumBlocksQuestion(row = {}) {
+  return {
+    id: row.id,
+    question: row.question,
+    options: Array.isArray(row.options) ? row.options : [],
+    correct_answer: row.correct_answer,
+    explanation: row.explanation || "",
+    category: row.category || "carature",
+    difficulty: row.difficulty || "base"
+  };
+}
+
+async function ensureAurumBlocksDefaults() {
+  for (const question of aurumBlocksDefaultQuestions) {
+    await pool.query(
+      `INSERT INTO aurum_blocks_training_questions
+        (question, options, correct_answer, explanation, category, difficulty, active)
+       SELECT $1::text, $2::jsonb, $3::text, $4::text, $5::text, $6::text, TRUE
+       WHERE NOT EXISTS (
+         SELECT 1 FROM aurum_blocks_training_questions WHERE question = $1::text
+       )`,
+      [
+        question.question,
+        JSON.stringify(question.options),
+        question.correct_answer,
+        question.explanation,
+        question.category,
+        question.difficulty
+      ]
+    );
+  }
+  for (const badge of aurumBlocksDefaultBadges) {
+    await pool.query(
+      `INSERT INTO aurum_blocks_badges (code, name, description, condition, active)
+       VALUES ($1::text, $2::text, $3::text, $4::jsonb, TRUE)
+       ON CONFLICT (code) DO UPDATE
+       SET name = EXCLUDED.name,
+           description = EXCLUDED.description,
+           condition = EXCLUDED.condition,
+           active = TRUE`,
+      [badge.code, badge.name, badge.description, sanitizeForPostgres(badge.condition)]
+    );
+  }
+}
+
+function aurumBlocksScoreIsSuspicious(input = {}) {
+  const score = Number(input.score || 0);
+  const duration = Math.max(1, Number(input.duration_seconds || 1));
+  const level = Number(input.level || 1);
+  if (score < 0 || duration < 0 || level < 1 || level > 20) return true;
+  return score > Math.max(50000, duration * 1800 + level * 6000);
+}
+
+async function startAurumBlocksSession(input = {}, user = {}, req = null) {
+  await ensureAurumBlocksDefaults();
+  const mode = normalizeAurumBlocksMode(input.mode);
+  const dailySeed = mode === "daily" ? aurumBlocksDailySeed() : "";
+  const result = await pool.query(
+    `INSERT INTO aurum_blocks_sessions
+      (user_id, store_id, mode, status, metadata)
+     VALUES ($1::bigint, $2::bigint, $3::text, 'started', $4::jsonb)
+     RETURNING *`,
+    [
+      user.id,
+      user.negozio_id || null,
+      mode,
+      sanitizeForPostgres({ daily_seed: dailySeed, user_role: normalizeRole(user.ruolo) })
+    ]
+  );
+  const session = { ...result.rows[0], daily_seed: dailySeed };
+  void writeAuditLog({
+    req,
+    user,
+    action: "aurum_blocks_started",
+    entityType: "aurum_blocks_session",
+    entityId: session.id,
+    entityLabel: `Aurum Blocks ${mode}`,
+    afterData: { mode, status: "started" },
+    metadata: { store_id: user.negozio_id || null, mode }
+  });
+  return session;
+}
+
+async function awardAurumBlocksBadges(session = {}, user = {}, req = null) {
+  await ensureAurumBlocksDefaults();
+  const score = Number(session.score || 0);
+  const lines = Number(session.lines_cleared || 0);
+  const combo = Number(session.best_combo || 0);
+  const correct = Number(session.training_correct_answers || 0);
+  const wrong = Number(session.training_wrong_answers || 0);
+  const answers = correct + wrong;
+  const accuracy = answers ? Math.round((correct / answers) * 100) : 0;
+  const totalScores = await pool.query(
+    "SELECT COUNT(*)::int AS total FROM aurum_blocks_scores WHERE user_id = $1::bigint",
+    [user.id]
+  );
+  const earnedCodes = [];
+  if (Number(totalScores.rows[0]?.total || 0) <= 1) earnedCodes.push("primo_lingotto");
+  if (lines >= 10) earnedCodes.push("linea_pulita");
+  if (correct >= 5) earnedCodes.push("maestro_18kt");
+  if (combo >= 3) earnedCodes.push("combo_oroactive");
+  if (session.mode === "training" && answers >= 3 && accuracy >= 80) earnedCodes.push("operatore_preciso");
+  if (score > 10000) earnedCodes.push("aurum_arcade_pro");
+  const awarded = [];
+  for (const code of earnedCodes) {
+    const badge = (await pool.query("SELECT * FROM aurum_blocks_badges WHERE code = $1::text AND active = TRUE", [code])).rows[0];
+    if (!badge) continue;
+    const result = await pool.query(
+      `INSERT INTO aurum_blocks_user_badges (user_id, badge_id, session_id)
+       VALUES ($1::bigint, $2::bigint, $3::bigint)
+       ON CONFLICT (user_id, badge_id) DO NOTHING
+       RETURNING *`,
+      [user.id, badge.id, session.id]
+    );
+    if (result.rowCount) {
+      const row = { ...badge, awarded_at: result.rows[0].awarded_at };
+      awarded.push(row);
+      void writeAuditLog({
+        req,
+        user,
+        action: "aurum_blocks_badge_awarded",
+        entityType: "aurum_blocks_badge",
+        entityId: badge.id,
+        entityLabel: badge.name,
+        afterData: { code: badge.code, name: badge.name },
+        metadata: { session_id: session.id, score, lines_cleared: lines }
+      });
+    }
+  }
+  if (awarded.length) {
+    void createNotification({
+      userId: user.id,
+      title: "Badge Aurum Blocks ottenuto",
+      message: `Hai ottenuto ${awarded.length} badge Aurum Blocks.`,
+      type: "academy_badge",
+      severity: "success",
+      entityType: "aurum_blocks_badge",
+      entityId: awarded[0]?.id || null,
+      actionUrl: "#aurumBlocks",
+      createdBy: user.id,
+      actor: user,
+      audit: false
+    });
+  }
+  return awarded;
+}
+
+async function finishAurumBlocksSession(id, input = {}, user = {}, req = null) {
+  const session = (await pool.query(
+    "SELECT * FROM aurum_blocks_sessions WHERE id = $1::bigint AND user_id = $2::bigint LIMIT 1",
+    [id, user.id]
+  )).rows[0];
+  if (!session) {
+    const error = new Error("Partita Aurum Blocks non trovata.");
+    error.status = 404;
+    throw error;
+  }
+  const score = Math.max(0, Math.round(Number(input.score || 0)));
+  const level = Math.max(1, Math.min(20, Math.round(Number(input.level || 1))));
+  const linesCleared = Math.max(0, Math.round(Number(input.lines_cleared || input.linesCleared || 0)));
+  const bestCombo = Math.max(0, Math.round(Number(input.best_combo || input.bestCombo || 0)));
+  const duration = Math.max(0, Math.round(Number(input.duration_seconds || input.durationSeconds || 0)));
+  const trainingCorrect = Math.max(0, Math.round(Number(input.training_correct_answers || 0)));
+  const trainingWrong = Math.max(0, Math.round(Number(input.training_wrong_answers || 0)));
+  const suspicious = aurumBlocksScoreIsSuspicious({ score, level, duration_seconds: duration });
+  const metadata = sanitizeForPostgres({
+    ...(input.metadata || {}),
+    suspicious,
+    validation: suspicious ? "score fuori soglia base" : "ok"
+  });
+  const updated = (await pool.query(
+    `UPDATE aurum_blocks_sessions
+     SET status = 'completed',
+         score = $2::integer,
+         level = $3::integer,
+         lines_cleared = $4::integer,
+         best_combo = $5::integer,
+         duration_seconds = $6::integer,
+         training_correct_answers = $7::integer,
+         training_wrong_answers = $8::integer,
+         ended_at = NOW(),
+         metadata = COALESCE(metadata, '{}'::jsonb) || $9::jsonb
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [id, score, level, linesCleared, bestCombo, duration, trainingCorrect, trainingWrong, metadata]
+  )).rows[0];
+  const scoreRow = (await pool.query(
+    `INSERT INTO aurum_blocks_scores
+      (session_id, user_id, store_id, mode, score, level, lines_cleared, best_combo, duration_seconds)
+     VALUES ($1::bigint, $2::bigint, $3::bigint, $4::text, $5::integer, $6::integer, $7::integer, $8::integer, $9::integer)
+     RETURNING *`,
+    [updated.id, user.id, user.negozio_id || null, updated.mode, score, level, linesCleared, bestCombo, duration]
+  )).rows[0];
+  const badges = await awardAurumBlocksBadges(updated, user, req);
+  void writeAuditLog({
+    req,
+    user,
+    action: "aurum_blocks_finished",
+    entityType: "aurum_blocks_session",
+    entityId: updated.id,
+    entityLabel: `Aurum Blocks ${updated.mode}`,
+    afterData: { score, level, lines_cleared: linesCleared, best_combo: bestCombo, suspicious },
+    metadata: { store_id: user.negozio_id || null, mode: updated.mode, suspicious }
+  });
+  return { session: updated, score: scoreRow, badges, suspicious };
+}
+
+function aurumBlocksPeriodWhere(period = "", values = [], alias = "s") {
+  const normalized = String(period || "week").toLowerCase();
+  if (normalized === "today") return `${alias}.created_at >= CURRENT_DATE`;
+  if (normalized === "month") return `${alias}.created_at >= date_trunc('month', NOW())`;
+  if (normalized === "all") return "TRUE";
+  return `${alias}.created_at >= NOW() - INTERVAL '7 days'`;
+}
+
+async function listAurumBlocksScores(query = {}, user = {}) {
+  const limit = Math.min(50, Math.max(1, Number(query.limit || 10)));
+  const mode = normalizeAurumBlocksMode(query.mode || "");
+  const values = [user.id];
+  const where = [`s.user_id = $1::bigint`];
+  if (query.mode) {
+    values.push(mode);
+    where.push(`s.mode = $${values.length}::text`);
+  }
+  where.push(aurumBlocksPeriodWhere(query.period, values, "s"));
+  const result = await pool.query(
+    `SELECT s.*, u.username, u.nome, u.cognome, u.negozio AS store_name
+     FROM aurum_blocks_scores s
+     LEFT JOIN utenti u ON u.id = s.user_id
+     WHERE ${where.join(" AND ")}
+     ORDER BY s.score DESC, s.created_at DESC
+     LIMIT $${values.push(limit)}::integer`,
+    values
+  );
+  return result.rows;
+}
+
+async function listAurumBlocksLeaderboard(query = {}, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const limit = Math.min(50, Math.max(1, Number(query.limit || 20)));
+  const values = [];
+  const where = [aurumBlocksPeriodWhere(query.period, values, "s")];
+  if (query.mode) {
+    values.push(normalizeAurumBlocksMode(query.mode));
+    where.push(`s.mode = $${values.length}::text`);
+  }
+  if (role === "responsabile") {
+    values.push(user.negozio_id || null);
+    where.push(`s.store_id = $${values.length}::bigint`);
+  } else if (!["founder", "supervisore"].includes(role)) {
+    values.push(user.id);
+    where.push(`s.user_id = $${values.length}::bigint`);
+  } else if (query.store_id) {
+    values.push(query.store_id);
+    where.push(`s.store_id = $${values.length}::bigint`);
+  }
+  const result = await pool.query(
+    `SELECT s.*, u.username, CONCAT_WS(' ', u.nome, u.cognome) AS user_name, u.negozio AS store_name
+     FROM aurum_blocks_scores s
+     LEFT JOIN utenti u ON u.id = s.user_id
+     WHERE ${where.join(" AND ")}
+     ORDER BY s.score DESC, s.created_at DESC
+     LIMIT $${values.push(limit)}::integer`,
+    values
+  );
+  return result.rows;
+}
+
+async function listAurumBlocksBadges(user = {}) {
+  const result = await pool.query(
+    `SELECT b.*, ub.awarded_at
+     FROM aurum_blocks_user_badges ub
+     JOIN aurum_blocks_badges b ON b.id = ub.badge_id
+     WHERE ub.user_id = $1::bigint
+     ORDER BY ub.awarded_at DESC`,
+    [user.id]
+  );
+  return result.rows;
+}
+
 function courseCode(prefix = "OA") {
   return `${prefix}-${crypto.randomBytes(5).toString("hex").toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 }
@@ -13206,6 +13547,97 @@ app.put("/api/aurum-shield/alerts/:id/resolve", async (request, response, next) 
   }
 });
 
+app.get("/api/aurum-blocks/config", async (request, response, next) => {
+  try {
+    await ensureAurumBlocksDefaults();
+    response.json({
+      ok: true,
+      config: {
+        width: 10,
+        height: 20,
+        modes: ["arcade", "daily", "training"],
+        scoring: { one_line: 100, two_lines: 300, three_lines: 500, four_lines: 800, combo: 50, clean_board: 500 },
+        daily_seed: aurumBlocksDailySeed(),
+        permissions: {
+          global_leaderboard: ["founder", "supervisore"].includes(normalizeRole(request.user.ruolo)),
+          store_leaderboard: ["founder", "supervisore", "responsabile"].includes(normalizeRole(request.user.ruolo))
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-blocks/questions", async (_request, response, next) => {
+  try {
+    await ensureAurumBlocksDefaults();
+    const result = await pool.query(
+      `SELECT *
+       FROM aurum_blocks_training_questions
+       WHERE active = TRUE
+       ORDER BY difficulty ASC, category ASC, created_at ASC
+       LIMIT 50`
+    );
+    response.json({ ok: true, questions: result.rows.map(publicAurumBlocksQuestion) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/aurum-blocks/session/start", async (request, response, next) => {
+  try {
+    const session = await startAurumBlocksSession(request.body || {}, request.user, request);
+    response.status(201).json({ ok: true, session, daily_seed: session.daily_seed || "" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/aurum-blocks/session/:id/finish", async (request, response, next) => {
+  try {
+    const result = await finishAurumBlocksSession(request.params.id, request.body || {}, request.user, request);
+    response.json({ ok: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-blocks/my-scores", async (request, response, next) => {
+  try {
+    response.json({ ok: true, scores: await listAurumBlocksScores(request.query, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-blocks/leaderboard", async (request, response, next) => {
+  try {
+    response.json({ ok: true, leaderboard: await listAurumBlocksLeaderboard(request.query, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-blocks/store-leaderboard", async (request, response, next) => {
+  try {
+    const role = normalizeRole(request.user.ruolo);
+    if (role === "aiuto_commesso") return response.json({ ok: true, leaderboard: await listAurumBlocksScores(request.query, request.user) });
+    response.json({ ok: true, leaderboard: await listAurumBlocksLeaderboard({ ...request.query, store_id: request.user.negozio_id || request.query.store_id }, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/aurum-blocks/my-badges", async (request, response, next) => {
+  try {
+    await ensureAurumBlocksDefaults();
+    response.json({ ok: true, badges: await listAurumBlocksBadges(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/corsi", async (request, response, next) => {
   try {
     response.json(await listCourses(request.user));
@@ -15485,6 +15917,7 @@ function friendlyDatabaseError(error, request) {
   if (error.code === "42P01") return "Schema database non aggiornato: manca una tabella richiesta.";
   if (error.code === "42804" || error.code === "42P18") return "Tipo dato non valido nel salvataggio: controlla importi, date e identificativi.";
   if (/\/api\/(utenti|users)/.test(url)) return "Errore database durante il salvataggio dell'utente.";
+  if (url.includes("/api/aurum-blocks")) return "Errore database durante Aurum Blocks.";
   if (url.includes("/api/aurum")) return "Errore database durante il salvataggio Aurum.";
   if (url.includes("/api/atti") || url.includes("/api/acts")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
   if (url.includes("/api/training")) return "Errore database durante il Training Operatore.";
@@ -15519,6 +15952,7 @@ function safeRouteErrorMessage(request) {
   if (url.includes("/api/academy") || url.includes("/api/corsi")) return "Operazione Academy non completata.";
   if (url.includes("/api/crm") || url.includes("/api/clienti")) return "Operazione CRM non completata.";
   if (url.includes("/api/aurum-shield") || url.includes("/api/quality-check")) return "Controllo pratica non completato.";
+  if (url.includes("/api/aurum-blocks")) return "Aurum Blocks non completato.";
   if (url.includes("/api/ai") || url.includes("/api/aurum")) return "Operazione Aurum non completata.";
   return "Operazione non completata. Riprova tra qualche secondo.";
 }
