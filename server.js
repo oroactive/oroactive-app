@@ -8792,6 +8792,15 @@ async function finishAurumBlocksSession(id, input = {}, user = {}, req = null) {
     suspicious,
     validation: suspicious ? "score fuori soglia base" : "ok"
   });
+  const previousBest = (await pool.query(
+    `SELECT score, level, lines_cleared, best_combo, duration_seconds, created_at
+     FROM aurum_blocks_scores
+     WHERE user_id = $1::bigint
+       AND mode = $2::text
+     ORDER BY score DESC, level DESC, lines_cleared DESC, duration_seconds ASC, created_at ASC
+     LIMIT 1`,
+    [user.id, session.mode]
+  )).rows[0] || null;
   const updated = (await pool.query(
     `UPDATE aurum_blocks_sessions
      SET status = 'completed',
@@ -8816,6 +8825,21 @@ async function finishAurumBlocksSession(id, input = {}, user = {}, req = null) {
     [updated.id, user.id, user.negozio_id || null, updated.mode, score, level, linesCleared, bestCombo, duration]
   )).rows[0];
   const badges = await awardAurumBlocksBadges(updated, user, req);
+  const previousScore = Number(previousBest?.score || 0);
+  const isNewPersonalRecord = Boolean(previousBest) && score > previousScore;
+  let personalRecord = {
+    is_new_personal_record: isNewPersonalRecord,
+    previous_score: previousScore,
+    new_score: score,
+    difference: isNewPersonalRecord ? score - previousScore : 0,
+    position: null,
+    mode: updated.mode
+  };
+  if (isNewPersonalRecord) {
+    const leaderboard = await listAurumBlocksLeaderboard({ mode: updated.mode, period: "all", limit: 50 }, user);
+    const ownRow = leaderboard.find((row) => String(row.user_id) === String(user.id));
+    personalRecord = { ...personalRecord, position: ownRow?.position || null };
+  }
   void writeAuditLog({
     req,
     user,
@@ -8824,13 +8848,13 @@ async function finishAurumBlocksSession(id, input = {}, user = {}, req = null) {
     entityId: updated.id,
     entityLabel: `Aurum Blocks ${updated.mode}`,
     afterData: { score, level, lines_cleared: linesCleared, best_combo: bestCombo, suspicious },
-    metadata: { store_id: user.negozio_id || null, mode: updated.mode, suspicious }
+    metadata: { store_id: user.negozio_id || null, mode: updated.mode, suspicious, personal_record: personalRecord }
   });
-  return { session: updated, score: scoreRow, badges, suspicious };
+  return { session: updated, score: scoreRow, badges, suspicious, personal_record: personalRecord };
 }
 
 function aurumBlocksPeriodWhere(period = "", values = [], alias = "s") {
-  const normalized = String(period || "week").toLowerCase();
+  const normalized = String(period || "all").toLowerCase();
   if (normalized === "today") return `${alias}.created_at >= CURRENT_DATE`;
   if (normalized === "month") return `${alias}.created_at >= date_trunc('month', NOW())`;
   if (normalized === "all") return "TRUE";
@@ -8847,16 +8871,26 @@ async function listAurumBlocksScores(query = {}, user = {}) {
     where.push(`s.mode = $${values.length}::text`);
   }
   where.push(aurumBlocksPeriodWhere(query.period, values, "s"));
-  const result = await pool.query(
+  const scores = (await pool.query(
     `SELECT s.*, u.username, u.nome, u.cognome, u.negozio AS store_name
      FROM aurum_blocks_scores s
      LEFT JOIN utenti u ON u.id = s.user_id
      WHERE ${where.join(" AND ")}
-     ORDER BY s.score DESC, s.created_at DESC
+     ORDER BY s.created_at DESC, s.score DESC
      LIMIT $${values.push(limit)}::integer`,
     values
-  );
-  return result.rows;
+  )).rows;
+  const bestValues = values.slice(0, -1);
+  const best = (await pool.query(
+    `SELECT s.*, u.username, u.nome, u.cognome, u.negozio AS store_name
+     FROM aurum_blocks_scores s
+     LEFT JOIN utenti u ON u.id = s.user_id
+     WHERE ${where.join(" AND ")}
+     ORDER BY s.score DESC, s.level DESC, s.lines_cleared DESC, s.duration_seconds ASC, s.created_at ASC
+     LIMIT 1`,
+    bestValues
+  )).rows[0] || null;
+  return { best_score: Number(best?.score || 0), best, scores };
 }
 
 async function listAurumBlocksLeaderboard(query = {}, user = {}) {
@@ -8868,23 +8902,49 @@ async function listAurumBlocksLeaderboard(query = {}, user = {}) {
     values.push(normalizeAurumBlocksMode(query.mode));
     where.push(`s.mode = $${values.length}::text`);
   }
-  if (role === "responsabile") {
-    values.push(user.negozio_id || null);
-    where.push(`s.store_id = $${values.length}::bigint`);
-  } else if (!["founder", "supervisore"].includes(role)) {
-    values.push(user.id);
-    where.push(`s.user_id = $${values.length}::bigint`);
+  if (role === "responsabile" || role === "commesso" || role === "aiuto_commesso") {
+    if (user.negozio_id) {
+      values.push(user.negozio_id);
+      const storeIdParam = values.length;
+      where.push(`COALESCE(s.store_id, u.negozio_id) = $${storeIdParam}::bigint`);
+    } else {
+      values.push(user.negozio || "");
+      where.push(`COALESCE(u.negozio, '') = $${values.length}::text`);
+    }
   } else if (query.store_id) {
     values.push(query.store_id);
-    where.push(`s.store_id = $${values.length}::bigint`);
+    where.push(`COALESCE(s.store_id, u.negozio_id) = $${values.length}::bigint`);
   }
+  const limitParam = values.push(limit);
   const result = await pool.query(
-    `SELECT s.*, u.username, CONCAT_WS(' ', u.nome, u.cognome) AS user_name, u.negozio AS store_name
-     FROM aurum_blocks_scores s
-     LEFT JOIN utenti u ON u.id = s.user_id
-     WHERE ${where.join(" AND ")}
-     ORDER BY s.score DESC, s.created_at DESC
-     LIMIT $${values.push(limit)}::integer`,
+    `WITH ranked_scores AS (
+       SELECT
+         s.*,
+         u.username,
+         u.ruolo AS role,
+         CONCAT_WS(' ', u.nome, u.cognome) AS user_name,
+         u.negozio AS store_name,
+         ROW_NUMBER() OVER (
+           PARTITION BY s.user_id
+           ORDER BY s.score DESC, s.level DESC, s.lines_cleared DESC, s.duration_seconds ASC, s.created_at ASC
+         ) AS user_score_rank
+       FROM aurum_blocks_scores s
+       LEFT JOIN utenti u ON u.id = s.user_id
+       WHERE ${where.join(" AND ")}
+     ),
+     best_scores AS (
+       SELECT *
+       FROM ranked_scores
+       WHERE user_score_rank = 1
+     )
+     SELECT
+       ROW_NUMBER() OVER (
+         ORDER BY score DESC, level DESC, lines_cleared DESC, duration_seconds ASC, created_at ASC
+       ) AS position,
+       *
+     FROM best_scores
+     ORDER BY score DESC, level DESC, lines_cleared DESC, duration_seconds ASC, created_at ASC
+     LIMIT $${limitParam}::integer`,
     values
   );
   return result.rows;
@@ -13605,7 +13665,8 @@ app.post("/api/aurum-blocks/session/:id/finish", async (request, response, next)
 
 app.get("/api/aurum-blocks/my-scores", async (request, response, next) => {
   try {
-    response.json({ ok: true, scores: await listAurumBlocksScores(request.query, request.user) });
+    const result = await listAurumBlocksScores(request.query, request.user);
+    response.json({ ok: true, ...result });
   } catch (error) {
     next(error);
   }
@@ -13621,8 +13682,6 @@ app.get("/api/aurum-blocks/leaderboard", async (request, response, next) => {
 
 app.get("/api/aurum-blocks/store-leaderboard", async (request, response, next) => {
   try {
-    const role = normalizeRole(request.user.ruolo);
-    if (role === "aiuto_commesso") return response.json({ ok: true, leaderboard: await listAurumBlocksScores(request.query, request.user) });
     response.json({ ok: true, leaderboard: await listAurumBlocksLeaderboard({ ...request.query, store_id: request.user.negozio_id || request.query.store_id }, request.user) });
   } catch (error) {
     next(error);

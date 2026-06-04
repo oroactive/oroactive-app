@@ -70,6 +70,8 @@ const state = {
   aurumBlocksGame: null,
   aurumBlocksLoop: null,
   aurumBlocksScores: [],
+  aurumBlocksBestScore: 0,
+  aurumBlocksBestScoreRow: null,
   aurumBlocksLeaderboard: [],
   aurumBlocksBadges: [],
   aurumBlocksQuestionOpen: false,
@@ -8319,6 +8321,8 @@ async function loadAurumBlocks() {
   state.aurumBlocksConfig = configData.config || null;
   state.aurumBlocksQuestions = questionData.questions?.length ? questionData.questions : AURUM_BLOCKS_FALLBACK_QUESTIONS;
   state.aurumBlocksScores = scoresData.scores || [];
+  state.aurumBlocksBestScore = Number(scoresData.best_score || scoresData.best?.score || 0);
+  state.aurumBlocksBestScoreRow = scoresData.best || null;
   state.aurumBlocksLeaderboard = leaderboardData.leaderboard || [];
   state.aurumBlocksBadges = badgesData.badges || [];
   renderAurumBlocksLists();
@@ -8330,23 +8334,31 @@ async function loadAurumBlocks() {
 
 function renderAurumBlocksLists() {
   if (aurumBlocksMyScores) {
+    const bestScore = Number(state.aurumBlocksBestScore || 0);
+    const bestRow = state.aurumBlocksBestScoreRow;
     aurumBlocksMyScores.innerHTML = (state.aurumBlocksScores || []).length
-      ? state.aurumBlocksScores.map((row) => `
+      ? `
+        <article class="aurum-blocks-best-score">
+          <strong>Record personale ${escapeHtml(String(bestScore))}</strong>
+          <span>${escapeHtml(AURUM_BLOCKS_MODE_LABELS[bestRow?.mode] || bestRow?.mode || "Miglior punteggio")}${bestRow?.level ? ` · livello ${escapeHtml(String(bestRow.level))}` : ""}</span>
+          <small>${bestRow?.created_at ? escapeHtml(formatDateTime(bestRow.created_at)) : "Storico personale"}</small>
+        </article>
+        ${state.aurumBlocksScores.map((row) => `
         <article>
           <strong>${escapeHtml(String(row.score || 0))}</strong>
-          <span>${escapeHtml(AURUM_BLOCKS_MODE_LABELS[row.mode] || row.mode || "Arcade")} · livello ${escapeHtml(String(row.level || 1))}</span>
+          <span>${escapeHtml(AURUM_BLOCKS_MODE_LABELS[row.mode] || row.mode || "Arcade")} · livello ${escapeHtml(String(row.level || 1))} · righe ${escapeHtml(String(row.lines_cleared || 0))}</span>
           <small>${escapeHtml(formatDateTime(row.created_at))}</small>
         </article>
-      `).join("")
+      `).join("")}`
       : '<div class="empty-state">Nessuna partita salvata.</div>';
   }
   if (aurumBlocksLeaderboard) {
     aurumBlocksLeaderboard.innerHTML = (state.aurumBlocksLeaderboard || []).length
       ? state.aurumBlocksLeaderboard.map((row, index) => `
-        <article>
-          <strong>#${index + 1} · ${escapeHtml(String(row.score || 0))}</strong>
+        <article class="${String(row.user_id || "") === String(state.currentUser?.id || "") ? "is-current-user" : ""}">
+          <strong>#${escapeHtml(String(row.position || index + 1))} · ${escapeHtml(String(row.score || 0))}</strong>
           <span>${escapeHtml(row.user_name || row.username || "Operatore OroActive")} · ${escapeHtml(AURUM_BLOCKS_MODE_LABELS[row.mode] || row.mode || "Arcade")}</span>
-          <small>${escapeHtml(row.store_name || row.negozio || "Negozio non indicato")}</small>
+          <small>${escapeHtml(row.store_name || row.negozio || "Negozio non indicato")} · livello ${escapeHtml(String(row.level || 1))} · righe ${escapeHtml(String(row.lines_cleared || 0))}</small>
         </article>
       `).join("")
       : '<div class="empty-state">Classifica non ancora disponibile.</div>';
@@ -8434,6 +8446,7 @@ async function endAurumBlocksGame() {
   stopAurumBlocksLoop();
   const duration = Math.max(0, Math.round((Date.now() - Number(game.startedAt || Date.now())) / 1000));
   let badges = [];
+  let personalRecord = null;
   if (game.sessionId && !String(game.sessionId).startsWith("local-")) {
     try {
       const data = await apiRequest(`/aurum-blocks/session/${encodeURIComponent(game.sessionId)}/finish`, {
@@ -8450,11 +8463,18 @@ async function endAurumBlocksGame() {
         })
       });
       badges = data.badges || [];
+      personalRecord = data.personal_record || null;
       await loadAurumBlocks();
     } catch (error) {
       showToast(error.message || "Punteggio Aurum Blocks non salvato.", "warning");
     }
   }
+  const personalRecordMarkup = personalRecord?.is_new_personal_record
+    ? `<div class="aurum-blocks-record-banner">
+        <strong>Nuovo record personale!</strong>
+        <span>${escapeHtml(String(personalRecord.new_score || Math.round(game.score || 0)))} punti · +${escapeHtml(String(personalRecord.difference || 0))} rispetto al precedente${personalRecord.position ? ` · posizione #${escapeHtml(String(personalRecord.position))}` : ""}</span>
+      </div>`
+    : "";
   if (aurumBlocksGameOver) {
     aurumBlocksGameOver.hidden = false;
     aurumBlocksGameOver.innerHTML = `
@@ -8462,6 +8482,7 @@ async function endAurumBlocksGame() {
         <span class="training-mode-badge">Fine partita</span>
         <h3>Aurum Score ${escapeHtml(String(Math.round(game.score || 0)))}</h3>
         <p>Livello ${escapeHtml(String(game.level || 1))} · righe ${escapeHtml(String(game.lines || 0))} · combo migliore ${escapeHtml(String(game.bestCombo || 0))}</p>
+        ${personalRecordMarkup}
         ${badges.length ? `<div class="aurum-blocks-earned">${badges.map((badge) => `<strong>${escapeHtml(badge.name || badge.badge_name || "Badge ottenuto")}</strong>`).join("")}</div>` : ""}
         <div class="aurum-blocks-actions">
           <button class="primary-button" type="button" data-aurum-blocks-start="${escapeHtml(game.mode)}">Gioca ancora</button>
