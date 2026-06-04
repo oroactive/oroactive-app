@@ -2402,6 +2402,263 @@ textarea:disabled {
   z-index: 3;
 }
 
+.aurum-board-gold-glow,
+.aurum-board-aurum-burst,
+.aurum-board-golden-cascade {
+  animation: aurumBoardPulse 820ms ease-out;
+}
+
+.aurum-board-gold-glow {
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 0, 0.45),
+    0 0 24px rgba(255, 170, 0, 0.35),
+    0 0 60px rgba(255, 106, 0, 0.22),
+    inset 0 0 28px rgba(255, 215, 0, 0.16),
+    0 16px 34px rgba(0, 0, 0, 0.32);
+}
+
+.aurum-board-aurum-burst {
+  animation-name: aurumBoardBurst;
+  box-shadow:
+    0 0 0 1px rgba(255, 215, 0, 0.58),
+    0 0 34px rgba(255, 193, 7, 0.42),
+    0 0 78px rgba(255, 106, 0, 0.3),
+    inset 0 0 34px rgba(255, 215, 0, 0.2),
+    0 16px 34px rgba(0, 0, 0, 0.32);
+}
+
+.aurum-board-golden-cascade {
+  animation-name: aurumBoardCascade;
+  animation-duration: 980ms;
+  box-shadow:
+    0 0 0 1px rgba(255, 241, 184, 0.72),
+    0 0 42px rgba(255, 215, 0, 0.5),
+    0 0 98px rgba(255, 106, 0, 0.36),
+    inset 0 0 42px rgba(255, 215, 0, 0.26),
+    0 16px 34px rgba(0, 0, 0, 0.32);
+}
+
+.aurum-effects-layer {
+  position: absolute;
+  inset: 8px;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 12px;
+  contain: layout paint;
+}
+
+.aurum-line-flash,
+.aurum-score-pop,
+.aurum-combo-pop,
+.aurum-bonus-banner,
+.aurum-gold-particle {
+  position: absolute;
+  pointer-events: none;
+}
+
+.aurum-line-flash {
+  left: 0;
+  right: 0;
+  top: var(--row-y);
+  height: max(4px, var(--row-h));
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 241, 184, 0.96), rgba(255, 176, 0, 0.92), transparent);
+  box-shadow:
+    0 0 18px rgba(255, 215, 0, 0.78),
+    0 0 34px rgba(255, 106, 0, 0.32);
+  animation: aurumLineGoldClear 620ms ease-out forwards;
+}
+
+.aurum-line-flash-2 {
+  animation-duration: 700ms;
+}
+
+.aurum-line-flash-3,
+.aurum-line-flash-4 {
+  animation-duration: 780ms;
+  box-shadow:
+    0 0 24px rgba(255, 215, 0, 0.9),
+    0 0 48px rgba(255, 106, 0, 0.42);
+}
+
+.aurum-score-pop {
+  left: 50%;
+  top: var(--pop-y);
+  transform: translate(-50%, -50%);
+  color: #fff1b8;
+  font-size: clamp(26px, 4vw, 46px);
+  font-weight: 950;
+  letter-spacing: 0;
+  text-shadow:
+    0 0 9px rgba(255, 215, 0, 0.86),
+    0 0 22px rgba(255, 106, 0, 0.52),
+    0 2px 0 rgba(0, 0, 0, 0.42);
+  animation: aurumScoreRise 880ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+}
+
+.aurum-score-pop-3,
+.aurum-score-pop-4 {
+  font-size: clamp(34px, 5vw, 58px);
+}
+
+.aurum-combo-pop {
+  left: 50%;
+  top: var(--combo-y);
+  transform: translate(-50%, -50%);
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 215, 0, 0.42);
+  border-radius: 999px;
+  background: rgba(5, 5, 5, 0.62);
+  color: #ffb000;
+  font-size: clamp(14px, 2.2vw, 22px);
+  font-weight: 950;
+  letter-spacing: 0;
+  text-shadow: 0 0 14px rgba(255, 106, 0, 0.58);
+  animation: aurumComboPulse 920ms ease-out forwards;
+}
+
+.aurum-bonus-banner {
+  left: 50%;
+  top: 20%;
+  transform: translate(-50%, -50%);
+  width: min(88%, 320px);
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 241, 184, 0.62);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 215, 0, 0.22), rgba(255, 106, 0, 0.16)),
+    rgba(5, 5, 5, 0.72);
+  color: #fff7c2;
+  font-size: clamp(20px, 3.8vw, 38px);
+  font-weight: 950;
+  text-align: center;
+  text-shadow:
+    0 0 12px rgba(255, 215, 0, 0.82),
+    0 0 28px rgba(255, 106, 0, 0.54);
+  animation: aurumBonusBanner 1050ms ease-out forwards;
+}
+
+.aurum-gold-particle {
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 999px;
+  background: radial-gradient(circle, #fff7c2 0 18%, #ffd700 42%, #ff6a00 100%);
+  box-shadow:
+    0 0 8px rgba(255, 215, 0, 0.9),
+    0 0 16px rgba(255, 106, 0, 0.42);
+  animation: aurumParticleRise var(--duration) ease-out var(--delay) forwards;
+  opacity: 0;
+}
+
+@keyframes aurumBoardPulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.012); }
+  100% { transform: scale(1); }
+}
+
+@keyframes aurumBoardBurst {
+  0% { transform: translateX(0) scale(1); }
+  20% { transform: translateX(-2px) scale(1.01); }
+  38% { transform: translateX(2px) scale(1.016); }
+  58% { transform: translateX(-1px) scale(1.006); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes aurumBoardCascade {
+  0% { transform: translateX(0) scale(1); filter: brightness(1); }
+  20% { transform: translateX(-2px) scale(1.014); filter: brightness(1.08); }
+  42% { transform: translateX(2px) scale(1.022); filter: brightness(1.16); }
+  68% { transform: translateX(-1px) scale(1.008); filter: brightness(1.08); }
+  100% { transform: translateX(0) scale(1); filter: brightness(1); }
+}
+
+@keyframes aurumLineGoldClear {
+  0% {
+    opacity: 0;
+    filter: brightness(1);
+    transform: scaleX(0.76) scaleY(0.82);
+  }
+  18% {
+    opacity: 1;
+    filter: brightness(1.65);
+    transform: scaleX(1.02) scaleY(1.08);
+  }
+  58% {
+    opacity: 0.92;
+    filter: brightness(2.15);
+    transform: scaleX(1) scaleY(1.18);
+  }
+  100% {
+    opacity: 0;
+    filter: brightness(2.2);
+    transform: scaleX(0.88) scaleY(0.66);
+  }
+}
+
+@keyframes aurumScoreRise {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.82); }
+  20% { opacity: 1; transform: translate(-50%, -10px) scale(1.08); }
+  100% { opacity: 0; transform: translate(-50%, -72px) scale(0.94); }
+}
+
+@keyframes aurumComboPulse {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  28% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  58% { opacity: 0.95; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -82%) scale(0.92); }
+}
+
+@keyframes aurumBonusBanner {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.78); }
+  22% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  72% { opacity: 1; transform: translate(-50%, -60%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -92%) scale(0.9); }
+}
+
+@keyframes aurumParticleRise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.72);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--dx), var(--dy), 0) scale(0.18);
+    opacity: 0;
+  }
+}
+
+.aurum-line-clearing {
+  animation: aurumLineGoldClear 550ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurum-board-gold-glow,
+  .aurum-board-aurum-burst,
+  .aurum-board-golden-cascade {
+    animation: none;
+  }
+
+  .aurum-line-flash {
+    animation-duration: 260ms;
+  }
+
+  .aurum-score-pop,
+  .aurum-combo-pop,
+  .aurum-bonus-banner {
+    animation-duration: 360ms;
+  }
+
+  .aurum-gold-particle {
+    display: none;
+  }
+}
+
 .aurum-blocks-cell {
   display: grid;
   place-items: center;
@@ -2706,6 +2963,10 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   .aurum-blocks-board {
     width: min(360px, calc(100vw - 32px));
     padding: 6px;
+  }
+
+  .aurum-effects-layer {
+    inset: 6px;
   }
 
   .aurum-blocks-touch-controls {

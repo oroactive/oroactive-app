@@ -934,6 +934,12 @@ const AURUM_BLOCKS_COACH_MESSAGES = [
   "Le righe pulite premiano metodo, non fretta.",
   "Pausa intelligente: allenare precisione aiuta anche nel lavoro."
 ];
+const AURUM_BLOCKS_LINE_EFFECTS = {
+  1: { name: "Gold Spark", label: "GOLD SPARK", particles: 12 },
+  2: { name: "Double Bullion", label: "DOUBLE BULLION", particles: 24 },
+  3: { name: "Aurum Burst", label: "AURUM BURST", particles: 36 },
+  4: { name: "Golden Cascade", label: "AURUM BONUS", particles: 60 }
+};
 const COMUNI_ITALIANI = [
   { comune: "Busto Arsizio", provincia: "VA", codice: "B300" },
   { comune: "Cassano Magnago", provincia: "VA", codice: "C004" },
@@ -7994,12 +8000,27 @@ function aurumBlocksLineMultiplier(clearedRows = []) {
   return 1;
 }
 
+function aurumBlocksLineClearCoachMessage(lineCount = 1) {
+  if (lineCount >= 4) return "Aurum Bonus! Mossa perfetta.";
+  if (lineCount === 3) return "Ottima precisione: hai acceso la board.";
+  if (lineCount === 2) return "Doppio lingotto!";
+  return "Linea pulita.";
+}
+
 function aurumBlocksClearLines() {
   const game = state.aurumBlocksGame;
   if (!game) return 0;
-  const fullRows = game.board.filter((row) => row.every(Boolean));
+  const fullRowIndexes = [];
+  const fullRows = [];
+  game.board.forEach((row, index) => {
+    if (row.every(Boolean)) {
+      fullRowIndexes.push(index);
+      fullRows.push(row);
+    }
+  });
   if (!fullRows.length) {
     game.combo = 0;
+    game.pendingLineEffect = null;
     return 0;
   }
   game.board = game.board.filter((row) => !row.every(Boolean));
@@ -8014,8 +8035,19 @@ function aurumBlocksClearLines() {
   game.level = Math.min(AURUM_BLOCKS_MAX_LEVEL, Math.floor(game.lines / AURUM_BLOCKS_LEVEL_LINES) + 1);
   game.dropMs = Math.max(90, AURUM_BLOCKS_DROP_BASE_MS - (game.level - 1) * 38);
   const cleanBoard = game.board.every((row) => row.every((cell) => !cell));
-  game.score += Math.round(base * game.level * aurumBlocksLineMultiplier(fullRows)) + (50 * game.combo) + (cleanBoard ? 500 : 0);
-  showAurumBlocksCoach(lines >= 3 ? "Combo importante: continua a lasciare spazio per i lingotti lunghi." : AURUM_BLOCKS_COACH_MESSAGES[Math.floor(aurumBlocksRandom() * AURUM_BLOCKS_COACH_MESSAGES.length)]);
+  const metalBonus = aurumBlocksLineMultiplier(fullRows);
+  const scoreGained = Math.round(base * game.level * metalBonus) + (50 * game.combo) + (cleanBoard ? 500 : 0);
+  game.score += scoreGained;
+  game.pendingLineEffect = {
+    clearedRows: fullRows,
+    rowIndexes: fullRowIndexes,
+    lineCount: lines,
+    scoreGained,
+    combo: game.combo,
+    metalBonus,
+    cleanBoard
+  };
+  showAurumBlocksCoach(aurumBlocksLineClearCoachMessage(lines), { force: lines >= 2 });
   maybeShowAurumBlocksQuestion();
   return lines;
 }
@@ -8042,6 +8074,10 @@ function aurumBlocksLockPiece() {
   }
   renderAurumBlocksBoard();
   renderAurumBlocksHud();
+  if (game.pendingLineEffect) {
+    triggerGoldLineClearEffect(game.pendingLineEffect);
+    game.pendingLineEffect = null;
+  }
 }
 
 function updateAurumBlocksUiState(forceInactive = false) {
@@ -8060,6 +8096,87 @@ function updateAurumBlocksUiState(forceInactive = false) {
     button.textContent = paused ? "Riprendi" : "Pausa";
     button.setAttribute("aria-pressed", paused ? "true" : "false");
   });
+}
+
+function triggerGoldLineClearEffect(effect = {}) {
+  if (!aurumBlocksBoard || !effect.lineCount) return;
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const lineCount = Math.max(1, Math.min(4, Number(effect.lineCount || 1)));
+  const tier = lineCount >= 4 ? 4 : lineCount;
+  const effectConfig = AURUM_BLOCKS_LINE_EFFECTS[tier] || AURUM_BLOCKS_LINE_EFFECTS[1];
+  const rows = (effect.rowIndexes || []).length ? effect.rowIndexes : [AURUM_BLOCKS_HEIGHT - 1];
+  const boardClass = tier >= 4 ? "aurum-board-golden-cascade" : tier >= 3 ? "aurum-board-aurum-burst" : "aurum-board-gold-glow";
+  aurumBlocksBoard.classList.remove("aurum-board-gold-glow", "aurum-board-aurum-burst", "aurum-board-golden-cascade");
+  void aurumBlocksBoard.offsetWidth;
+  aurumBlocksBoard.classList.add(boardClass);
+  window.setTimeout(() => {
+    aurumBlocksBoard?.classList.remove(boardClass);
+  }, reducedMotion ? 260 : 980);
+
+  let layer = aurumBlocksBoard.querySelector(".aurum-effects-layer");
+  if (!layer) {
+    layer = document.createElement("div");
+    layer.className = "aurum-effects-layer";
+    layer.setAttribute("aria-hidden", "true");
+    aurumBlocksBoard.appendChild(layer);
+  }
+  layer.innerHTML = "";
+
+  const averageRow = rows.reduce((sum, row) => sum + Number(row || 0), 0) / rows.length;
+  rows.forEach((row) => {
+    const flash = document.createElement("span");
+    flash.className = `aurum-line-flash aurum-line-flash-${tier}`;
+    flash.style.setProperty("--row-y", `${(Number(row || 0) / AURUM_BLOCKS_HEIGHT) * 100}%`);
+    flash.style.setProperty("--row-h", `${100 / AURUM_BLOCKS_HEIGHT}%`);
+    layer.appendChild(flash);
+  });
+
+  const scorePopup = document.createElement("span");
+  scorePopup.className = `aurum-score-pop aurum-score-pop-${tier}`;
+  scorePopup.textContent = `+${Math.max(0, Math.round(effect.scoreGained || 0))}`;
+  scorePopup.style.setProperty("--pop-y", `${Math.min(84, Math.max(8, ((averageRow + 0.5) / AURUM_BLOCKS_HEIGHT) * 100))}%`);
+  layer.appendChild(scorePopup);
+
+  if (Number(effect.combo || 0) > 1) {
+    const comboPopup = document.createElement("span");
+    comboPopup.className = "aurum-combo-pop";
+    comboPopup.textContent = `COMBO x${Math.max(2, Number(effect.combo || 2))}`;
+    comboPopup.style.setProperty("--combo-y", `${Math.min(78, Math.max(10, ((averageRow + 1.6) / AURUM_BLOCKS_HEIGHT) * 100))}%`);
+    layer.appendChild(comboPopup);
+  }
+
+  if (tier >= 4) {
+    const bonusBanner = document.createElement("span");
+    bonusBanner.className = "aurum-bonus-banner";
+    bonusBanner.textContent = effectConfig.label;
+    layer.appendChild(bonusBanner);
+  }
+
+  if (!reducedMotion) {
+    const particleCount = Math.min(60, effectConfig.particles || lineCount * 12);
+    for (let index = 0; index < particleCount; index += 1) {
+      const row = rows[index % rows.length] ?? averageRow;
+      const particle = document.createElement("span");
+      particle.className = "aurum-gold-particle";
+      const left = 4 + aurumBlocksRandom() * 92;
+      const top = ((Number(row || 0) + aurumBlocksRandom()) / AURUM_BLOCKS_HEIGHT) * 100;
+      const dx = (aurumBlocksRandom() - 0.5) * (tier >= 4 ? 190 : 130);
+      const dy = -36 - aurumBlocksRandom() * (tier >= 4 ? 120 : 76);
+      const size = 3 + aurumBlocksRandom() * (tier >= 3 ? 8 : 5);
+      particle.style.setProperty("--x", `${left}%`);
+      particle.style.setProperty("--y", `${top}%`);
+      particle.style.setProperty("--dx", `${dx}px`);
+      particle.style.setProperty("--dy", `${dy}px`);
+      particle.style.setProperty("--size", `${size}px`);
+      particle.style.setProperty("--delay", `${Math.round(aurumBlocksRandom() * 130)}ms`);
+      particle.style.setProperty("--duration", `${620 + Math.round(aurumBlocksRandom() * 320)}ms`);
+      layer.appendChild(particle);
+    }
+  }
+
+  window.setTimeout(() => {
+    if (layer?.isConnected) layer.remove();
+  }, reducedMotion ? 520 : 1180);
 }
 
 function renderAurumBlocksBoard() {
@@ -8085,7 +8202,7 @@ function renderAurumBlocksBoard() {
       cells.push(`<span class="aurum-blocks-cell ${cell ? `filled ${escapeHtml(cell.className || "")}` : ""}" aria-label="${cell ? escapeHtml(cell.label) : "vuoto"}">${cell ? escapeHtml(cell.short || "") : ""}</span>`);
     }
   }
-  aurumBlocksBoard.innerHTML = cells.join("");
+  aurumBlocksBoard.innerHTML = `${cells.join("")}<div class="aurum-effects-layer" aria-hidden="true"></div>`;
 }
 
 function renderAurumBlocksHud() {
@@ -8107,10 +8224,10 @@ function renderAurumBlocksHud() {
   updateAurumBlocksUiState();
 }
 
-function showAurumBlocksCoach(message = "") {
+function showAurumBlocksCoach(message = "", options = {}) {
   const game = state.aurumBlocksGame;
   const now = Date.now();
-  if (game && game.lastCoachAt && now - game.lastCoachAt < 18000) return;
+  if (!options.force && game && game.lastCoachAt && now - game.lastCoachAt < 18000) return;
   if (game) game.lastCoachAt = now;
   if (!aurumBlocksCoach) return;
   aurumBlocksCoach.innerHTML = `
