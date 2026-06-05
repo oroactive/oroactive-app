@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260605-aurum-ingots-1">
+  <link rel="stylesheet" href="styles.css?v=20260605-gold-prediction-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -906,6 +906,73 @@
             <p id="bullionVaultChartFallback" class="quote-fallback" hidden>Grafico BullionVault non incorporabile direttamente. <a href="https://www.bullionvault.com/gold-price-chart.do" target="_blank" rel="noopener">Apri grafico BullionVault</a>.</p>
           </div>
         </section>
+        <section class="gold-prediction-panel quote-section-panel" id="goldPredictionPanel" aria-label="Analisi Predittiva Oro">
+          <div class="gold-prediction-header">
+            <div>
+              <p class="eyebrow">Analisi Predittiva Oro</p>
+              <h3>Analisi Predittiva Oro</h3>
+              <p>Stima statistica del trend dell'oro basata su storico prezzi, volatilità e medie mobili.</p>
+            </div>
+            <div class="gold-prediction-actions">
+              <button class="ghost-button" type="button" id="syncGoldHistory">Sync storico prezzi</button>
+              <button class="primary-button" type="button" id="runGoldPrediction">Aggiorna previsione</button>
+              <button class="ghost-button" type="button" id="askAurumGoldPrediction">Chiedi ad Aurum</button>
+            </div>
+          </div>
+          <div class="gold-prediction-status" id="goldPredictionStatus" aria-live="polite">Caricamento analisi...</div>
+          <div class="gold-prediction-cards" id="goldPredictionCards"></div>
+          <div class="gold-prediction-grid">
+            <article class="gold-prediction-card">
+              <h4>Scenari previsionali</h4>
+              <div class="gold-prediction-list" id="goldPredictionList"></div>
+            </article>
+            <article class="gold-prediction-card">
+              <h4>Grafico storico + previsione</h4>
+              <div class="gold-prediction-chart" id="goldPredictionChart"></div>
+            </article>
+          </div>
+          <article class="gold-prediction-card">
+            <h4>Carature teoriche</h4>
+            <div id="goldPredictionKaratTable"></div>
+            <p class="gold-prediction-disclaimer">Valori teorici indicativi. Il prezzo di acquisto cliente è definito dalle policy OroActive.</p>
+          </article>
+          <article class="gold-prediction-card gold-prediction-explanation" id="goldPredictionExplanation"></article>
+          <details class="gold-prediction-settings founder-only" id="goldPredictionSettingsPanel" hidden>
+            <summary>Impostazioni Founder</summary>
+            <form class="gold-prediction-settings-form" id="goldPredictionSettingsForm">
+              <label>Provider prezzi
+                <select name="provider">
+                  <option value="manual">Manuale / demo</option>
+                  <option value="bullionvault">BullionVault</option>
+                  <option value="alphavantage">Alpha Vantage</option>
+                </select>
+              </label>
+              <label>Valuta
+                <select name="currency">
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+              <label>Giorni storico
+                <input name="history_days" type="number" min="10" max="365" value="90">
+              </label>
+              <label>Modello
+                <select name="model">
+                  <option value="ensemble">Ensemble</option>
+                  <option value="moving_average">Moving average</option>
+                  <option value="linear_regression">Regressione lineare</option>
+                </select>
+              </label>
+              <label class="gold-prediction-check">
+                <input name="demo_mode" type="checkbox"> Modalità demo
+              </label>
+              <label class="gold-prediction-settings-wide">Disclaimer
+                <textarea name="disclaimer" rows="3"></textarea>
+              </label>
+              <button class="primary-button" type="submit">Salva impostazioni</button>
+            </form>
+          </details>
+        </section>
       </section>
 
       <section id="stores" class="screen founder-only">
@@ -1656,6 +1723,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260605-aurum-ingots-1"></script>
+  <script src="app.js?v=20260605-gold-prediction-1"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260605-aurum-ingots-1";
+const STATIC_CACHE = "oroactive-static-v20260605-gold-prediction-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260605-aurum-ingots-1",
-  "/app.js?v=20260605-aurum-ingots-1",
+  "/styles.css?v=20260605-gold-prediction-1",
+  "/app.js?v=20260605-gold-prediction-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

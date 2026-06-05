@@ -42,6 +42,11 @@ const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
+const goldPriceProvider = String(process.env.GOLD_PRICE_PROVIDER || "manual").toLowerCase();
+const goldPriceBaseCurrency = String(process.env.GOLD_PRICE_BASE_CURRENCY || "EUR").toUpperCase();
+const goldPriceUpdateIntervalMinutes = Math.max(5, Number(process.env.GOLD_PRICE_UPDATE_INTERVAL_MINUTES || 15));
+const bullionVaultEnabled = String(process.env.BULLIONVAULT_ENABLED || "true").toLowerCase() !== "false";
+const alphaVantageApiKey = process.env.ALPHA_VANTAGE_API_KEY || "";
 const backupDirectory = process.env.BACKUP_DIR || "/data/oroactive/backups";
 const academyUploadDirectory = process.env.ACADEMY_UPLOAD_DIR || path.join(__dirname, "private_uploads", "academy");
 const trustPackDirectory = process.env.CUSTOMER_TRUST_PACK_DIR || path.join(__dirname, "private_uploads", "customer-trust-packs");
@@ -51,6 +56,7 @@ const privacyPolicyUpdatedAt = "2026-05-29";
 const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const pgRestorePath = process.env.PG_RESTORE_PATH || "pg_restore";
 const backupIntervalMs = 24 * 60 * 60 * 1000;
+const TROY_OUNCE_GRAMS = 31.1034768;
 const backupFolders = ["atti", "documenti", "preziosi", "contabili", "pdf", "firme", "utenti", "giacenza", "fusioni", "knowledge-base", "formazione", "antifrode", "crm"];
 const backupFileSources = [
   { source: "uploads", target: "files/uploads", section: "uploads" },
@@ -609,6 +615,9 @@ function auditActionLabel(action = "") {
     founder_daily_report_downloaded: "Download Founder Daily Report",
     founder_daily_report_sent: "Invio Founder Daily Report",
     founder_daily_report_failed: "Errore Founder Daily Report",
+    gold_price_sync: "Sync storico prezzo oro",
+    gold_prediction_run: "Analisi predittiva oro",
+    gold_prediction_settings_updated: "Impostazioni predizione oro aggiornate",
     customer_trust_pack_generated: "Customer Trust Pack generato",
     customer_trust_pack_downloaded: "Download Customer Trust Pack",
     customer_trust_pack_sent_email: "Customer Trust Pack inviato email",
@@ -1109,6 +1118,537 @@ async function fetchBullionVaultPrice(metal, market) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function normalizePredictionMetal(metal = "gold") {
+  const value = String(metal || "gold").trim().toLowerCase();
+  if (["oro", "gold", "au", "xau"].includes(value)) return "gold";
+  if (["argento", "silver", "ag"].includes(value)) return "silver";
+  if (["platino", "platinum", "pt"].includes(value)) return "platinum";
+  return "gold";
+}
+
+function normalizePredictionCurrency(currency = goldPriceBaseCurrency) {
+  const value = String(currency || goldPriceBaseCurrency || "EUR").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(value) ? value : "EUR";
+}
+
+function normalizePredictionHorizon(horizon = "24h") {
+  const value = String(horizon || "24h").trim().toLowerCase();
+  if (["24h", "1d", "day"].includes(value)) return "24h";
+  if (["7d", "week", "1w"].includes(value)) return "7d";
+  if (["30d", "month", "1m"].includes(value)) return "30d";
+  return "24h";
+}
+
+function predictionHorizonDays(horizon = "24h") {
+  return { "24h": 1, "7d": 7, "30d": 30 }[normalizePredictionHorizon(horizon)] || 1;
+}
+
+function goldPredictionDefaultSettings() {
+  return {
+    provider: goldPriceProvider,
+    currency: goldPriceBaseCurrency,
+    history_days: 90,
+    horizons: ["24h", "7d", "30d"],
+    model: "ensemble",
+    demo_mode: goldPriceProvider === "manual",
+    disclaimer: "Le previsioni sono stime statistiche indicative e non costituiscono consulenza finanziaria né garanzia di prezzo. Il prezzo finale applicato al cliente resta definito dalle policy OroActive e dal Founder."
+  };
+}
+
+function providerConfigured(provider = goldPriceProvider) {
+  const value = String(provider || "manual").toLowerCase();
+  if (value === "bullionvault") return bullionVaultEnabled;
+  if (value === "alphavantage") return Boolean(alphaVantageApiKey);
+  return false;
+}
+
+function providerStatus(provider = goldPriceProvider) {
+  const value = String(provider || "manual").toLowerCase();
+  return {
+    provider: value,
+    configured: providerConfigured(value),
+    currency: goldPriceBaseCurrency,
+    update_interval_minutes: goldPriceUpdateIntervalMinutes,
+    demo_mode: value === "manual" || !providerConfigured(value),
+    note: value === "manual" || !providerConfigured(value)
+      ? "Fonte dati non configurata. Modalità demo attiva se non esistono dati salvati."
+      : "Fonte dati configurata lato backend."
+  };
+}
+
+function publicMetalPriceHistory(row = {}) {
+  return {
+    id: row.id || null,
+    metal: row.metal || "gold",
+    currency: row.currency || "EUR",
+    price_per_ounce: Number(row.price_per_ounce || 0),
+    price_per_gram: Number(row.price_per_gram || 0),
+    source: row.source || "",
+    provider_timestamp: row.provider_timestamp || null,
+    created_at: row.created_at || null
+  };
+}
+
+function publicGoldPrediction(row = {}) {
+  return {
+    id: row.id || null,
+    metal: row.metal || "gold",
+    currency: row.currency || "EUR",
+    horizon: row.prediction_horizon || row.horizon || "24h",
+    prediction_horizon: row.prediction_horizon || row.horizon || "24h",
+    current_price_per_gram: Number(row.current_price_per_gram || 0),
+    predicted_price_per_gram: Number(row.predicted_price_per_gram || 0),
+    predicted_low_per_gram: Number(row.predicted_low_per_gram || 0),
+    predicted_high_per_gram: Number(row.predicted_high_per_gram || 0),
+    trend: row.trend || "laterale",
+    volatility: row.volatility || "media",
+    confidence: row.confidence || "bassa",
+    model_name: row.model_name || "ensemble",
+    features: row.features || {},
+    explanation: row.explanation || "",
+    created_at: row.created_at || null
+  };
+}
+
+async function loadGoldPredictionSettings() {
+  const defaults = goldPredictionDefaultSettings();
+  try {
+    const result = await pool.query("SELECT value FROM gold_prediction_settings WHERE key = 'default' LIMIT 1");
+    const saved = result.rows[0]?.value || {};
+    return { ...defaults, ...saved, provider: String(saved.provider || defaults.provider || "manual").toLowerCase() };
+  } catch {
+    return defaults;
+  }
+}
+
+async function updateGoldPredictionSettings(input = {}, user = {}, req = null) {
+  const current = await loadGoldPredictionSettings();
+  const requestedHorizons = Array.isArray(input.horizons) && input.horizons.length
+    ? input.horizons.map(normalizePredictionHorizon).filter((value, index, array) => array.indexOf(value) === index)
+    : [];
+  const next = {
+    ...current,
+    provider: ["manual", "bullionvault", "alphavantage"].includes(String(input.provider || "").toLowerCase())
+      ? String(input.provider).toLowerCase()
+      : current.provider,
+    currency: normalizePredictionCurrency(input.currency || current.currency),
+    history_days: Math.min(Math.max(Number(input.history_days || input.historyDays || current.history_days || 90), 10), 365),
+    horizons: requestedHorizons.length ? requestedHorizons : current.horizons,
+    model: ["ensemble", "moving_average", "linear_regression"].includes(String(input.model || "").toLowerCase())
+      ? String(input.model).toLowerCase()
+      : current.model,
+    demo_mode: Boolean(input.demo_mode ?? input.demoMode ?? current.demo_mode),
+    disclaimer: String(input.disclaimer || current.disclaimer || goldPredictionDefaultSettings().disclaimer).slice(0, 600)
+  };
+  const result = await pool.query(
+    `INSERT INTO gold_prediction_settings (key, value, updated_by, updated_at)
+     VALUES ('default', $1::jsonb, $2::bigint, NOW())
+     ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value,
+           updated_by = EXCLUDED.updated_by,
+           updated_at = NOW()
+     RETURNING *`,
+    [sanitizeForPostgres(next), user?.id || null]
+  );
+  void writeAuditLog({
+    req,
+    user,
+    action: "gold_prediction_settings_updated",
+    entityType: "gold_prediction",
+    entityLabel: "Impostazioni Analisi Predittiva Oro",
+    beforeData: current,
+    afterData: next,
+    metadata: { provider: next.provider, model: next.model }
+  });
+  return result.rows[0]?.value || next;
+}
+
+function demoGoldHistory(days = 60, currency = "EUR", base = 68.4) {
+  const count = Math.min(Math.max(Number(days || 60), 14), 365);
+  const rows = [];
+  const now = Date.now();
+  for (let index = count - 1; index >= 0; index -= 1) {
+    const age = count - 1 - index;
+    const wave = Math.sin(age / 5) * 0.72;
+    const slow = Math.cos(age / 11) * 0.38;
+    const trend = age * 0.018;
+    const pricePerGram = Math.max(1, base - trend + wave + slow);
+    rows.push(publicMetalPriceHistory({
+      id: `demo-${index}`,
+      metal: "gold",
+      currency,
+      price_per_gram: pricePerGram,
+      price_per_ounce: pricePerGram * TROY_OUNCE_GRAMS,
+      source: "demo",
+      provider_timestamp: new Date(now - index * 24 * 60 * 60 * 1000).toISOString(),
+      created_at: new Date(now - index * 24 * 60 * 60 * 1000).toISOString()
+    }));
+  }
+  return rows;
+}
+
+async function queryMetalPriceHistory({ metal = "gold", currency = "EUR", days = 90, limit = 365 } = {}) {
+  const normalizedMetal = normalizePredictionMetal(metal);
+  const normalizedCurrency = normalizePredictionCurrency(currency);
+  const safeDays = Math.min(Math.max(Number(days || 90), 1), 365);
+  const safeLimit = Math.min(Math.max(Number(limit || 365), 1), 365);
+  const result = await pool.query(
+    `SELECT *
+       FROM metal_price_history
+      WHERE metal = $1::text
+        AND currency = $2::text
+        AND created_at >= NOW() - ($3::int * INTERVAL '1 day')
+      ORDER BY created_at ASC
+      LIMIT $4::int`,
+    [normalizedMetal, normalizedCurrency, safeDays, safeLimit]
+  );
+  return result.rows.map(publicMetalPriceHistory);
+}
+
+async function latestMetalPriceHistory(metal = "gold", currency = "EUR") {
+  const result = await pool.query(
+    `SELECT *
+       FROM metal_price_history
+      WHERE metal = $1::text
+        AND currency = $2::text
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [normalizePredictionMetal(metal), normalizePredictionCurrency(currency)]
+  );
+  return result.rows[0] ? publicMetalPriceHistory(result.rows[0]) : null;
+}
+
+async function insertMetalPriceHistory(input = {}) {
+  const pricePerGram = Number(input.price_per_gram || input.pricePerGram || 0);
+  const pricePerOunce = Number(input.price_per_ounce || input.pricePerOunce || (pricePerGram * TROY_OUNCE_GRAMS));
+  if (!Number.isFinite(pricePerGram) || pricePerGram <= 0) throw new Error("Prezzo oro non valido");
+  const result = await pool.query(
+    `INSERT INTO metal_price_history (
+      metal, currency, price_per_ounce, price_per_gram, source, provider_timestamp
+    ) VALUES (
+      $1::text,$2::text,$3::numeric,$4::numeric,$5::text,$6::timestamptz
+    )
+    RETURNING *`,
+    [
+      normalizePredictionMetal(input.metal || "gold"),
+      normalizePredictionCurrency(input.currency || "EUR"),
+      pricePerOunce,
+      pricePerGram,
+      input.source || "manual",
+      input.provider_timestamp || input.providerTimestamp || null
+    ]
+  );
+  return publicMetalPriceHistory(result.rows[0]);
+}
+
+async function fetchAlphaVantageGoldPrice(currency = "EUR") {
+  if (!alphaVantageApiKey) throw new Error("Alpha Vantage API key non configurata");
+  const url = new URL("https://www.alphavantage.co/query");
+  url.searchParams.set("function", "CURRENCY_EXCHANGE_RATE");
+  url.searchParams.set("from_currency", "XAU");
+  url.searchParams.set("to_currency", normalizePredictionCurrency(currency));
+  url.searchParams.set("apikey", alphaVantageApiKey);
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`Alpha Vantage HTTP ${response.status}`);
+  const data = await response.json();
+  const exchange = data?.["Realtime Currency Exchange Rate"] || {};
+  const pricePerOunce = Number(exchange["5. Exchange Rate"]);
+  if (!Number.isFinite(pricePerOunce) || pricePerOunce <= 0) throw new Error("Prezzo Alpha Vantage non disponibile");
+  return {
+    metal: "gold",
+    currency: normalizePredictionCurrency(currency),
+    price_per_ounce: pricePerOunce,
+    price_per_gram: pricePerOunce / TROY_OUNCE_GRAMS,
+    source: "alphavantage",
+    provider_timestamp: exchange["6. Last Refreshed"] || new Date().toISOString()
+  };
+}
+
+async function fetchConfiguredGoldPrice(settings = {}) {
+  const provider = String(settings.provider || goldPriceProvider || "manual").toLowerCase();
+  const currency = normalizePredictionCurrency(settings.currency || goldPriceBaseCurrency);
+  if (provider === "bullionvault") {
+    if (!bullionVaultEnabled) throw new Error("BullionVault disabilitato");
+    if (currency !== "EUR") throw new Error("BullionVault configurato in EUR per OroActive");
+    const quote = await fetchBullionVaultPrice("Oro", bullionVaultMarkets.Oro);
+    const pricePerGram = Number(quote.value || 0) / 1000;
+    return {
+      metal: "gold",
+      currency: "EUR",
+      price_per_ounce: pricePerGram * TROY_OUNCE_GRAMS,
+      price_per_gram: pricePerGram,
+      source: "bullionvault",
+      provider_timestamp: quote.fetchedAt
+    };
+  }
+  if (provider === "alphavantage") return fetchAlphaVantageGoldPrice(currency);
+  throw new Error("Fonte dati non configurata");
+}
+
+async function syncGoldPriceHistory(user = {}, req = null) {
+  const settings = await loadGoldPredictionSettings();
+  try {
+    const price = await fetchConfiguredGoldPrice(settings);
+    const inserted = await insertMetalPriceHistory(price);
+    void writeAuditLog({
+      req,
+      user,
+      action: "gold_price_sync",
+      entityType: "gold_price_history",
+      entityId: inserted.id,
+      entityLabel: "Storico prezzo oro",
+      afterData: inserted,
+      metadata: { provider: settings.provider || goldPriceProvider }
+    });
+    return { ok: true, mode: "live", warning: "", price: inserted };
+  } catch (error) {
+    console.error("GOLD PRICE SYNC ERROR", error.message || error);
+    const latest = await latestMetalPriceHistory("gold", settings.currency || goldPriceBaseCurrency);
+    if (latest) {
+      return {
+        ok: true,
+        mode: "saved",
+        warning: "Provider non disponibile. Uso ultimo dato salvato.",
+        price: latest
+      };
+    }
+    const demo = demoGoldHistory(30, settings.currency || goldPriceBaseCurrency).at(-1);
+    return {
+      ok: true,
+      mode: "demo",
+      warning: "Fonte dati non configurata. Modalità demo attiva.",
+      price: demo
+    };
+  }
+}
+
+function average(values = []) {
+  const clean = values.filter((value) => Number.isFinite(Number(value)));
+  return clean.length ? clean.reduce((sum, value) => sum + Number(value), 0) / clean.length : 0;
+}
+
+function standardDeviation(values = []) {
+  const clean = values.filter((value) => Number.isFinite(Number(value)));
+  if (clean.length < 2) return 0;
+  const avg = average(clean);
+  return Math.sqrt(clean.reduce((sum, value) => sum + ((Number(value) - avg) ** 2), 0) / (clean.length - 1));
+}
+
+function movingAverage(values = [], period = 7) {
+  return average(values.slice(Math.max(0, values.length - period)));
+}
+
+function exponentialMovingAverage(values = [], period = 7) {
+  if (!values.length) return 0;
+  const k = 2 / (period + 1);
+  return values.reduce((ema, value, index) => index === 0 ? Number(value) : (Number(value) * k) + (ema * (1 - k)), Number(values[0]));
+}
+
+function linearSlope(values = []) {
+  const clean = values.map(Number).filter(Number.isFinite);
+  const n = clean.length;
+  if (n < 2) return 0;
+  const xAvg = (n - 1) / 2;
+  const yAvg = average(clean);
+  let numerator = 0;
+  let denominator = 0;
+  clean.forEach((y, x) => {
+    numerator += (x - xAvg) * (y - yAvg);
+    denominator += (x - xAvg) ** 2;
+  });
+  return denominator ? numerator / denominator : 0;
+}
+
+function classifyGoldTrend({ ma7 = 0, ma30 = 0, emaShort = 0, emaLong = 0, slope = 0, current = 0 } = {}) {
+  let score = 0;
+  if (ma7 > ma30 * 1.002) score += 1;
+  if (ma7 < ma30 * 0.998) score -= 1;
+  if (emaShort > emaLong * 1.002) score += 1;
+  if (emaShort < emaLong * 0.998) score -= 1;
+  if (slope > current * 0.001) score += 1;
+  if (slope < -current * 0.001) score -= 1;
+  if (score >= 2) return "rialzista";
+  if (score <= -2) return "ribassista";
+  return "laterale";
+}
+
+function classifyGoldVolatility(std = 0) {
+  if (std >= 0.018) return "alta";
+  if (std >= 0.007) return "media";
+  return "bassa";
+}
+
+function predictionConfidence(points = 0, volatility = "media", latestDate = null, demo = false) {
+  if (demo || points < 10) return "bassa";
+  const ageHours = latestDate ? (Date.now() - new Date(latestDate).getTime()) / 36e5 : 999;
+  if (ageHours > 72) return "bassa";
+  if (points < 30 || volatility === "alta") return "media/bassa";
+  return "media";
+}
+
+function calculateGoldPrediction(history = [], options = {}) {
+  const horizon = normalizePredictionHorizon(options.horizon || "24h");
+  const days = predictionHorizonDays(horizon);
+  const sorted = [...history]
+    .map(publicMetalPriceHistory)
+    .filter((row) => Number(row.price_per_gram) > 0)
+    .sort((first, second) => new Date(first.created_at) - new Date(second.created_at));
+  const prices = sorted.map((row) => Number(row.price_per_gram));
+  const current = prices.at(-1) || 0;
+  const ma7 = movingAverage(prices, 7);
+  const ma30 = movingAverage(prices, 30);
+  const emaShort = exponentialMovingAverage(prices, 7);
+  const emaLong = exponentialMovingAverage(prices, 30);
+  const slope = linearSlope(prices.slice(-45));
+  const returns = prices.slice(1).map((price, index) => prices[index] ? (price - prices[index]) / prices[index] : 0);
+  const volatilityStd = standardDeviation(returns);
+  const volatility = classifyGoldVolatility(volatilityStd);
+  const trend = classifyGoldTrend({ ma7, ma30, emaShort, emaLong, slope, current });
+  const linearProjection = current + (slope * days);
+  const emaProjection = current + ((emaShort - emaLong) * Math.min(days, 14) * 0.12);
+  const maProjection = current + ((ma7 - ma30) * Math.min(days, 14) * 0.08);
+  const predicted = Math.max(0, (linearProjection * 0.45) + (emaProjection * 0.25) + (maProjection * 0.15) + (current * 0.15));
+  const volatilityFactor = volatility === "alta" ? 2.15 : volatility === "media" ? 1.7 : 1.25;
+  const statisticalRange = current * Math.max(volatilityStd, 0.004) * Math.sqrt(days) * volatilityFactor;
+  const minimumRange = current * (horizon === "24h" ? 0.006 : horizon === "7d" ? 0.014 : 0.026);
+  const range = Math.max(statisticalRange, minimumRange);
+  const low = Math.max(0, predicted - range);
+  const high = predicted + range;
+  const confidence = predictionConfidence(sorted.length, volatility, sorted.at(-1)?.created_at, options.demo);
+  const modelName = options.model || "ensemble";
+  const stale = sorted.at(-1)?.created_at && ((Date.now() - new Date(sorted.at(-1).created_at).getTime()) / 36e5) > 72;
+  const explanation = [
+    `Stima ${horizon}: trend ${trend} con volatilità ${volatility}.`,
+    `Il modello combina media mobile 7/30 periodi, EMA breve/lunga, regressione lineare e range statistico.`,
+    stale ? "Attenzione: i dati disponibili non risultano aggiornati nelle ultime 72 ore." : "",
+    "La previsione è indicativa e non rappresenta un prezzo garantito."
+  ].filter(Boolean).join(" ");
+  return {
+    metal: normalizePredictionMetal(options.metal || "gold"),
+    currency: normalizePredictionCurrency(options.currency || "EUR"),
+    horizon,
+    prediction_horizon: horizon,
+    current_price_per_gram: current,
+    predicted_price_per_gram: predicted,
+    predicted_low_per_gram: low,
+    predicted_high_per_gram: high,
+    trend,
+    volatility,
+    confidence,
+    model_name: modelName,
+    features: {
+      data_points: sorted.length,
+      ma7,
+      ma30,
+      ema_short: emaShort,
+      ema_long: emaLong,
+      linear_slope_per_period: slope,
+      volatility_std: volatilityStd,
+      stale_data: Boolean(stale),
+      demo_mode: Boolean(options.demo)
+    },
+    explanation
+  };
+}
+
+async function insertGoldPrediction(prediction = {}) {
+  const result = await pool.query(
+    `INSERT INTO gold_price_predictions (
+      metal, currency, prediction_horizon,
+      current_price_per_gram, predicted_price_per_gram,
+      predicted_low_per_gram, predicted_high_per_gram,
+      trend, volatility, confidence, model_name, features, explanation
+    ) VALUES (
+      $1::text,$2::text,$3::text,$4::numeric,$5::numeric,$6::numeric,$7::numeric,
+      $8::text,$9::text,$10::text,$11::text,$12::jsonb,$13::text
+    )
+    RETURNING *`,
+    [
+      normalizePredictionMetal(prediction.metal),
+      normalizePredictionCurrency(prediction.currency),
+      normalizePredictionHorizon(prediction.prediction_horizon || prediction.horizon),
+      prediction.current_price_per_gram,
+      prediction.predicted_price_per_gram,
+      prediction.predicted_low_per_gram,
+      prediction.predicted_high_per_gram,
+      prediction.trend,
+      prediction.volatility,
+      prediction.confidence,
+      prediction.model_name || "ensemble",
+      sanitizeForPostgres(prediction.features || {}),
+      prediction.explanation || ""
+    ]
+  );
+  return publicGoldPrediction(result.rows[0]);
+}
+
+async function latestGoldPredictions({ metal = "gold", currency = "EUR", limit = 9 } = {}) {
+  const result = await pool.query(
+    `SELECT DISTINCT ON (prediction_horizon) *
+       FROM gold_price_predictions
+      WHERE metal = $1::text
+        AND currency = $2::text
+      ORDER BY prediction_horizon, created_at DESC
+      LIMIT $3::int`,
+    [normalizePredictionMetal(metal), normalizePredictionCurrency(currency), Math.min(Math.max(Number(limit || 9), 1), 12)]
+  );
+  const order = { "24h": 1, "7d": 2, "30d": 3 };
+  return result.rows.map(publicGoldPrediction).sort((a, b) => (order[a.horizon] || 9) - (order[b.horizon] || 9));
+}
+
+async function predictionHistoryForRequest({ metal = "gold", currency = "EUR", days = 90 } = {}) {
+  const history = await queryMetalPriceHistory({ metal, currency, days, limit: 365 });
+  if (history.length) return { history, demo: false, warning: "" };
+  return {
+    history: demoGoldHistory(days, currency),
+    demo: true,
+    warning: "Storico insufficiente o fonte dati non configurata. Modalità demo attiva."
+  };
+}
+
+async function runGoldPredictions(input = {}, user = {}, req = null) {
+  const settings = await loadGoldPredictionSettings();
+  const metal = normalizePredictionMetal(input.metal || "gold");
+  const currency = normalizePredictionCurrency(input.currency || settings.currency || goldPriceBaseCurrency);
+  const horizons = (Array.isArray(input.horizons) && input.horizons.length ? input.horizons : settings.horizons || ["24h", "7d", "30d"])
+    .map(normalizePredictionHorizon)
+    .filter((value, index, array) => array.indexOf(value) === index);
+  const days = Math.min(Math.max(Number(settings.history_days || 90), 10), 365);
+  const historyBundle = await predictionHistoryForRequest({ metal, currency, days });
+  const predictions = [];
+  for (const horizon of horizons) {
+    const prediction = calculateGoldPrediction(historyBundle.history, {
+      metal,
+      currency,
+      horizon,
+      model: settings.model || "ensemble",
+      demo: historyBundle.demo || settings.demo_mode || providerStatus(settings.provider).demo_mode
+    });
+    predictions.push(await insertGoldPrediction(prediction));
+  }
+  void writeAuditLog({
+    req,
+    user,
+    action: "gold_prediction_run",
+    entityType: "gold_prediction",
+    entityLabel: "Analisi Predittiva Oro",
+    afterData: { horizons, predictions },
+    metadata: { metal, currency, demo: historyBundle.demo, model: settings.model || "ensemble" }
+  });
+  return {
+    ok: true,
+    metal,
+    currency,
+    warning: historyBundle.warning,
+    disclaimer: settings.disclaimer || goldPredictionDefaultSettings().disclaimer,
+    predictions
+  };
+}
+
+function canSyncGoldPriceHistory(user = {}) {
+  return ["founder", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
 
 function materialWeight(input, metalName) {
@@ -14975,6 +15515,109 @@ app.get("/api/bullionvault/prices", async (_request, response, next) => {
   }
 });
 
+app.get("/api/quotazioni/gold-prediction/status", async (_request, response, next) => {
+  try {
+    const settings = await loadGoldPredictionSettings();
+    const currency = normalizePredictionCurrency(settings.currency || goldPriceBaseCurrency);
+    const latestPrice = await latestMetalPriceHistory("gold", currency);
+    const latestPredictions = await latestGoldPredictions({ metal: "gold", currency });
+    response.json({
+      ok: true,
+      status: providerStatus(settings.provider),
+      settings: {
+        currency,
+        history_days: settings.history_days,
+        horizons: settings.horizons || ["24h", "7d", "30d"],
+        model: settings.model || "ensemble",
+        disclaimer: settings.disclaimer || goldPredictionDefaultSettings().disclaimer
+      },
+      latest_price: latestPrice,
+      latest_predictions: latestPredictions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/gold-history", async (request, response, next) => {
+  try {
+    const metal = normalizePredictionMetal(request.query.metal || "gold");
+    const currency = normalizePredictionCurrency(request.query.currency || goldPriceBaseCurrency);
+    const days = Math.min(Math.max(Number(request.query.days || 30), 1), 365);
+    let history = await queryMetalPriceHistory({ metal, currency, days, limit: 365 });
+    let demo = false;
+    let warning = "";
+    if (!history.length) {
+      history = demoGoldHistory(days, currency);
+      demo = true;
+      warning = "Fonte dati non configurata. Modalità demo attiva.";
+    }
+    response.json({ ok: true, metal, currency, days, demo, warning, history });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/gold-history/sync", async (request, response, next) => {
+  try {
+    if (!canSyncGoldPriceHistory(request.user)) {
+      return response.status(403).json({ ok: false, error: "Non autorizzato" });
+    }
+    response.json(await syncGoldPriceHistory(request.user, request));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/gold-prediction/run", async (request, response, next) => {
+  try {
+    response.json(await runGoldPredictions(request.body || {}, request.user, request));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/gold-prediction/latest", async (request, response, next) => {
+  try {
+    const settings = await loadGoldPredictionSettings();
+    const metal = normalizePredictionMetal(request.query.metal || "gold");
+    const currency = normalizePredictionCurrency(request.query.currency || settings.currency || goldPriceBaseCurrency);
+    const predictions = await latestGoldPredictions({ metal, currency });
+    response.json({
+      ok: true,
+      metal,
+      currency,
+      predictions,
+      disclaimer: settings.disclaimer || goldPredictionDefaultSettings().disclaimer
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/gold-prediction/settings", requireFounder, async (_request, response, next) => {
+  try {
+    const settings = await loadGoldPredictionSettings();
+    response.json({ ok: true, settings, status: providerStatus(settings.provider) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/quotazioni/gold-prediction/settings", requireFounder, async (request, response, next) => {
+  try {
+    const settings = await updateGoldPredictionSettings(request.body || {}, request.user, request);
+    response.json({
+      ok: true,
+      settings,
+      status: providerStatus(settings.provider),
+      message: "Impostazioni Analisi Predittiva Oro aggiornate."
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/clienti/:codiceFiscale", async (request, response, next) => {
   try {
     const client = await getClientByFiscalCode(request.params.codiceFiscale);
@@ -16039,6 +16682,7 @@ function safeRouteErrorMessage(request) {
   if (url.includes("/api/aurum-shield") || url.includes("/api/quality-check")) return "Controllo pratica non completato.";
   if (url.includes("/api/aurum-blocks")) return "Aurum Blocks non completato.";
   if (url.includes("/api/gaming")) return "Gaming OroActive non completato.";
+  if (url.includes("/api/quotazioni")) return "Analisi quotazioni non completata.";
   if (url.includes("/api/ai") || url.includes("/api/aurum")) return "Operazione Aurum non completata.";
   return "Operazione non completata. Riprova tra qualche secondo.";
 }

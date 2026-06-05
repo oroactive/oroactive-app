@@ -34,6 +34,10 @@ const state = {
   guidedQualityTimer: null,
   guidedQualityLoading: false,
   bullionVaultPrices: {},
+  goldPredictionStatus: null,
+  goldPredictionHistory: [],
+  goldPredictionLatest: [],
+  goldPredictionSettings: null,
   lastActCaptureAttachments: [],
   loadedSignatureImages: [],
   saving: false,
@@ -735,6 +739,17 @@ const installHint = document.getElementById("installHint");
 const quoteDashboard = document.getElementById("quoteDashboard");
 const bullionVaultChart = document.getElementById("bullionVaultChart");
 const bullionVaultChartFallback = document.getElementById("bullionVaultChartFallback");
+const goldPredictionStatus = document.getElementById("goldPredictionStatus");
+const goldPredictionCards = document.getElementById("goldPredictionCards");
+const goldPredictionList = document.getElementById("goldPredictionList");
+const goldPredictionKaratTable = document.getElementById("goldPredictionKaratTable");
+const goldPredictionChart = document.getElementById("goldPredictionChart");
+const goldPredictionExplanation = document.getElementById("goldPredictionExplanation");
+const goldPredictionSettingsPanel = document.getElementById("goldPredictionSettingsPanel");
+const goldPredictionSettingsForm = document.getElementById("goldPredictionSettingsForm");
+const syncGoldHistoryButton = document.getElementById("syncGoldHistory");
+const runGoldPredictionButton = document.getElementById("runGoldPrediction");
+const askAurumGoldPredictionButton = document.getElementById("askAurumGoldPrediction");
 const profileCard = document.getElementById("profileCard");
 const practiceTopbar = document.getElementById("practiceTopbar");
 const loginScreen = document.getElementById("loginScreen");
@@ -1353,6 +1368,7 @@ function apiErrorFallback(path = "", status = 0) {
   if (/\/academy|\/corsi/.test(path)) return "Operazione Academy non completata.";
   if (/\/crm|\/clienti/.test(path)) return "Operazione CRM non completata.";
   if (/\/aurum-shield|\/quality-check/.test(path)) return "Controllo pratica non completato.";
+  if (/\/quotazioni/.test(path)) return "Analisi quotazioni non completata.";
   if (/\/ai|\/aurum/.test(path)) return "Operazione Aurum non completata.";
   return "Operazione non completata. Riprova tra qualche secondo.";
 }
@@ -3039,6 +3055,7 @@ async function handleScreenDataLoad(id) {
     renderQuoteDashboard();
     await refreshBullionVaultPrices();
     initBullionVaultChart();
+    await loadGoldPredictionPanel();
   }
   if (id === "backups") await loadBackups();
   if (id === "approvals") await loadApprovals();
@@ -6091,6 +6108,9 @@ function auditActionLabel(action = "") {
     founder_daily_report_downloaded: "Download Founder Daily Report",
     founder_daily_report_sent: "Invio Founder Daily Report",
     founder_daily_report_failed: "Errore Founder Daily Report",
+    gold_price_sync: "Sync storico prezzo oro",
+    gold_prediction_run: "Analisi predittiva oro",
+    gold_prediction_settings_updated: "Impostazioni predizione oro aggiornate",
     store_health_score_calculated: "Store Health Score ricalcolato",
     customer_trust_pack_generated: "Customer Trust Pack generato",
     customer_trust_pack_downloaded: "Download Customer Trust Pack",
@@ -11840,6 +11860,307 @@ async function refreshBullionVaultPrices(options = {}) {
   }
 }
 
+function formatGoldPerGram(value, currency = "EUR") {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return "Non disponibile";
+  return `${new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount)}/g`;
+}
+
+function goldPredictionHorizonLabel(horizon = "") {
+  return {
+    "24h": "24 ore",
+    "7d": "7 giorni",
+    "30d": "30 giorni"
+  }[String(horizon)] || horizon || "Scenario";
+}
+
+function goldPredictionTrendClass(value = "") {
+  const trend = String(value || "").toLowerCase();
+  if (trend.includes("rial")) return "up";
+  if (trend.includes("rib")) return "down";
+  return "flat";
+}
+
+function goldPredictionLatestPrice() {
+  const prediction = state.goldPredictionLatest?.[0];
+  const history = state.goldPredictionHistory || [];
+  return Number(prediction?.current_price_per_gram || history.at(-1)?.price_per_gram || 0);
+}
+
+function renderGoldPredictionStatus() {
+  if (!goldPredictionStatus) return;
+  const status = state.goldPredictionStatus?.status || {};
+  const warning = state.goldPredictionStatus?.warning || state.goldPredictionStatus?.historyWarning || "";
+  const latest = state.goldPredictionHistory?.at(-1);
+  const configured = status.configured ? "Fonte dati configurata lato backend" : "Fonte dati non configurata. Modalità demo attiva.";
+  const updated = latest?.created_at ? `Ultimo dato: ${formatDateTime(latest.created_at)}` : "Storico prezzi non ancora salvato";
+  goldPredictionStatus.innerHTML = `
+    <span>${escapeHtml(configured)}</span>
+    <strong>${escapeHtml(updated)}</strong>
+    ${warning ? `<em>${escapeHtml(warning)}</em>` : ""}
+  `;
+}
+
+function renderGoldPredictionCards() {
+  if (!goldPredictionCards) return;
+  const current = goldPredictionLatestPrice();
+  const primary = state.goldPredictionLatest?.[0] || {};
+  const status = state.goldPredictionStatus?.status || {};
+  const cards = [
+    { label: "Oro puro attuale", value: formatGoldPerGram(current, primary.currency || state.goldPredictionStatus?.settings?.currency || "EUR") },
+    { label: "Trend", value: primary.trend || "In attesa", className: goldPredictionTrendClass(primary.trend) },
+    { label: "Volatilità", value: primary.volatility || "In attesa", className: primary.volatility === "alta" ? "warning" : "" },
+    { label: "Confidence", value: primary.confidence || "Bassa" },
+    { label: "Provider", value: status.provider || "manual" }
+  ];
+  goldPredictionCards.innerHTML = cards.map((card) => `
+    <article class="gold-prediction-metric ${card.className || ""}">
+      <span>${escapeHtml(card.label)}</span>
+      <strong>${escapeHtml(card.value)}</strong>
+    </article>
+  `).join("");
+}
+
+function renderGoldPredictionList() {
+  if (!goldPredictionList) return;
+  const predictions = state.goldPredictionLatest || [];
+  if (!predictions.length) {
+    goldPredictionList.innerHTML = '<div class="empty-state">Nessuna previsione calcolata. Usa “Aggiorna previsione” per generare una stima indicativa.</div>';
+    return;
+  }
+  goldPredictionList.innerHTML = predictions.map((prediction) => `
+    <article class="gold-prediction-scenario ${goldPredictionTrendClass(prediction.trend)}">
+      <div>
+        <span>${escapeHtml(goldPredictionHorizonLabel(prediction.horizon || prediction.prediction_horizon))}</span>
+        <strong>${escapeHtml(formatGoldPerGram(prediction.predicted_price_per_gram, prediction.currency || "EUR"))}</strong>
+      </div>
+      <p>Range indicativo: ${escapeHtml(formatGoldPerGram(prediction.predicted_low_per_gram, prediction.currency || "EUR"))} - ${escapeHtml(formatGoldPerGram(prediction.predicted_high_per_gram, prediction.currency || "EUR"))}</p>
+      <p>Trend ${escapeHtml(prediction.trend || "laterale")} · volatilità ${escapeHtml(prediction.volatility || "media")} · confidence ${escapeHtml(prediction.confidence || "bassa")}</p>
+    </article>
+  `).join("");
+}
+
+function renderGoldPredictionKaratTable() {
+  if (!goldPredictionKaratTable) return;
+  const predictionsByHorizon = Object.fromEntries((state.goldPredictionLatest || []).map((prediction) => [prediction.horizon || prediction.prediction_horizon, prediction]));
+  const current = goldPredictionLatestPrice();
+  const currency = state.goldPredictionLatest?.[0]?.currency || state.goldPredictionStatus?.settings?.currency || "EUR";
+  const rows = [
+    { label: "Oro 24kt", factor: 24 / 24 },
+    { label: "Oro 22kt", factor: 22 / 24 },
+    { label: "Oro 18kt", factor: 18 / 24 },
+    { label: "Oro 14kt", factor: 14 / 24 },
+    { label: "Oro 9kt", factor: 9 / 24 }
+  ];
+  goldPredictionKaratTable.innerHTML = `
+    <div class="gold-prediction-table-wrap">
+      <table class="gold-prediction-table">
+        <thead>
+          <tr>
+            <th>Caratura</th>
+            <th>Attuale teorico</th>
+            <th>Stima 24h</th>
+            <th>Stima 7 giorni</th>
+            <th>Range 7 giorni</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => {
+            const day = predictionsByHorizon["24h"];
+            const week = predictionsByHorizon["7d"];
+            return `
+              <tr>
+                <th>${escapeHtml(row.label)}</th>
+                <td>${escapeHtml(formatGoldPerGram(current * row.factor, currency))}</td>
+                <td>${escapeHtml(formatGoldPerGram(Number(day?.predicted_price_per_gram || 0) * row.factor, currency))}</td>
+                <td>${escapeHtml(formatGoldPerGram(Number(week?.predicted_price_per_gram || 0) * row.factor, currency))}</td>
+                <td>${escapeHtml(formatGoldPerGram(Number(week?.predicted_low_per_gram || 0) * row.factor, currency))} - ${escapeHtml(formatGoldPerGram(Number(week?.predicted_high_per_gram || 0) * row.factor, currency))}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderGoldPredictionChart() {
+  if (!goldPredictionChart) return;
+  const history = (state.goldPredictionHistory || []).slice(-30);
+  const predictions = state.goldPredictionLatest || [];
+  const values = [
+    ...history.map((row) => Number(row.price_per_gram || 0)),
+    ...predictions.map((prediction) => Number(prediction.predicted_price_per_gram || 0))
+  ].filter((value) => Number.isFinite(value) && value > 0);
+  if (values.length < 2) {
+    goldPredictionChart.innerHTML = '<div class="empty-state">Storico insufficiente per disegnare il grafico.</div>';
+    return;
+  }
+  const width = 720;
+  const height = 260;
+  const padding = 28;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, 0.01);
+  const xStep = history.length > 1 ? (width - padding * 2) / (history.length - 1) : 1;
+  const toY = (value) => height - padding - ((value - min) / range) * (height - padding * 2);
+  const historyPoints = history.map((row, index) => `${padding + index * xStep},${toY(Number(row.price_per_gram || 0))}`).join(" ");
+  const currentX = padding + Math.max(0, history.length - 1) * xStep;
+  const futureStep = 46;
+  const predictionPoints = predictions.map((prediction, index) => `${currentX + (index + 1) * futureStep},${toY(Number(prediction.predicted_price_per_gram || 0))}`).join(" ");
+  const rangeAreas = predictions.map((prediction, index) => {
+    const x = currentX + (index + 1) * futureStep;
+    const high = toY(Number(prediction.predicted_high_per_gram || 0));
+    const low = toY(Number(prediction.predicted_low_per_gram || 0));
+    return `<line x1="${x}" y1="${high}" x2="${x}" y2="${low}" class="gold-prediction-range-line" />`;
+  }).join("");
+  goldPredictionChart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafico storico e previsione oro">
+      <defs>
+        <linearGradient id="goldPredictionArea" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#ff6a00" stop-opacity="0.34" />
+          <stop offset="100%" stop-color="#ff6a00" stop-opacity="0.02" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="${width}" height="${height}" rx="18" class="gold-prediction-chart-bg" />
+      <polyline points="${historyPoints}" class="gold-prediction-line" />
+      ${predictionPoints ? `<polyline points="${currentX},${toY(values[history.length - 1] || values.at(-1))} ${predictionPoints}" class="gold-prediction-line future" />` : ""}
+      ${rangeAreas}
+      <text x="${padding}" y="${padding - 8}" class="gold-prediction-axis">${escapeHtml(formatGoldPerGram(max, state.goldPredictionLatest?.[0]?.currency || "EUR"))}</text>
+      <text x="${padding}" y="${height - 8}" class="gold-prediction-axis">${escapeHtml(formatGoldPerGram(min, state.goldPredictionLatest?.[0]?.currency || "EUR"))}</text>
+    </svg>
+  `;
+}
+
+function renderGoldPredictionExplanation() {
+  if (!goldPredictionExplanation) return;
+  const prediction = state.goldPredictionLatest?.[0];
+  const disclaimer = state.goldPredictionStatus?.settings?.disclaimer || "Le previsioni sono stime statistiche indicative e non costituiscono consulenza finanziaria né garanzia di prezzo. Il prezzo finale applicato al cliente resta definito dalle policy OroActive e dal Founder.";
+  goldPredictionExplanation.innerHTML = `
+    <h4>Spiegazione modello</h4>
+    <p>${escapeHtml(prediction?.explanation || "Il modello usa medie mobili, EMA, regressione lineare semplice e volatilità storica. Calcola scenari indicativi e non modifica le logiche operative di acquisto.")}</p>
+    <p class="gold-prediction-disclaimer">${escapeHtml(disclaimer)}</p>
+  `;
+}
+
+function renderGoldPredictionSettings() {
+  if (!goldPredictionSettingsPanel || !goldPredictionSettingsForm) return;
+  goldPredictionSettingsPanel.hidden = !isFounder();
+  if (!isFounder()) return;
+  const settings = state.goldPredictionSettings || state.goldPredictionStatus?.settings || {};
+  goldPredictionSettingsForm.provider.value = settings.provider || state.goldPredictionStatus?.status?.provider || "manual";
+  goldPredictionSettingsForm.currency.value = settings.currency || "EUR";
+  goldPredictionSettingsForm.history_days.value = settings.history_days || 90;
+  goldPredictionSettingsForm.model.value = settings.model || "ensemble";
+  goldPredictionSettingsForm.demo_mode.checked = Boolean(settings.demo_mode || state.goldPredictionStatus?.status?.demo_mode);
+  goldPredictionSettingsForm.disclaimer.value = settings.disclaimer || state.goldPredictionStatus?.settings?.disclaimer || "";
+}
+
+function renderGoldPredictionPanel() {
+  renderGoldPredictionStatus();
+  renderGoldPredictionCards();
+  renderGoldPredictionList();
+  renderGoldPredictionKaratTable();
+  renderGoldPredictionChart();
+  renderGoldPredictionExplanation();
+  renderGoldPredictionSettings();
+  if (syncGoldHistoryButton) syncGoldHistoryButton.hidden = !["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
+}
+
+async function loadGoldPredictionPanel(options = {}) {
+  if (!goldPredictionStatus) return;
+  if (!options.silent) goldPredictionStatus.textContent = "Caricamento Analisi Predittiva Oro...";
+  try {
+    const statusData = await apiRequest("/quotazioni/gold-prediction/status");
+    const currency = encodeURIComponent(statusData.settings?.currency || "EUR");
+    const [historyData, latestData] = await Promise.all([
+      apiRequest(`/quotazioni/gold-history?metal=gold&days=30&currency=${currency}`),
+      apiRequest(`/quotazioni/gold-prediction/latest?metal=gold&currency=${currency}`)
+    ]);
+    state.goldPredictionStatus = {
+      ...statusData,
+      historyWarning: historyData.warning || ""
+    };
+    state.goldPredictionHistory = historyData.history || [];
+    state.goldPredictionLatest = latestData.predictions?.length ? latestData.predictions : (statusData.latest_predictions || []);
+    state.goldPredictionSettings = statusData.settings || null;
+    if (isFounder()) {
+      const settingsData = await apiRequest("/quotazioni/gold-prediction/settings").catch(() => null);
+      if (settingsData?.settings) state.goldPredictionSettings = settingsData.settings;
+    }
+    renderGoldPredictionPanel();
+  } catch (error) {
+    goldPredictionStatus.innerHTML = `<span>${escapeHtml(cleanUserMessage(error?.message, "Previsione non disponibile al momento."))}</span>`;
+  }
+}
+
+async function syncGoldHistory() {
+  const data = await apiRequest("/quotazioni/gold-history/sync", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+  showToast(data.warning || "Storico prezzo oro aggiornato.", data.warning ? "warning" : "success");
+  await loadGoldPredictionPanel({ silent: true });
+}
+
+async function runGoldPrediction() {
+  const currency = state.goldPredictionSettings?.currency || state.goldPredictionStatus?.settings?.currency || "EUR";
+  const data = await apiRequest("/quotazioni/gold-prediction/run", {
+    method: "POST",
+    body: JSON.stringify({ metal: "gold", currency, horizons: ["24h", "7d", "30d"] })
+  });
+  state.goldPredictionLatest = data.predictions || [];
+  state.goldPredictionStatus = {
+    ...(state.goldPredictionStatus || {}),
+    warning: data.warning || "",
+    settings: {
+      ...(state.goldPredictionStatus?.settings || {}),
+      disclaimer: data.disclaimer || state.goldPredictionStatus?.settings?.disclaimer
+    }
+  };
+  renderGoldPredictionPanel();
+  showToast(data.warning || "Analisi Predittiva Oro aggiornata.", data.warning ? "warning" : "success");
+  await loadGoldPredictionPanel({ silent: true });
+}
+
+async function saveGoldPredictionSettings(event) {
+  event.preventDefault();
+  if (!isFounder()) return;
+  const formData = new FormData(goldPredictionSettingsForm);
+  const payload = {
+    provider: formData.get("provider"),
+    currency: formData.get("currency"),
+    history_days: Number(formData.get("history_days") || 90),
+    model: formData.get("model"),
+    demo_mode: formData.get("demo_mode") === "on",
+    disclaimer: formData.get("disclaimer"),
+    horizons: ["24h", "7d", "30d"]
+  };
+  const data = await apiRequest("/quotazioni/gold-prediction/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+  state.goldPredictionSettings = data.settings || payload;
+  showToast(data.message || "Impostazioni Analisi Predittiva Oro aggiornate.", "success");
+  await loadGoldPredictionPanel({ silent: true });
+}
+
+function askAurumGoldPrediction() {
+  const prediction = state.goldPredictionLatest?.[0];
+  const currency = prediction?.currency || state.goldPredictionStatus?.settings?.currency || "EUR";
+  const message = prediction
+    ? `Analisi Predittiva Oro: il trend ${prediction.trend || "laterale"} indica una stima ${goldPredictionHorizonLabel(prediction.horizon)} a ${formatGoldPerGram(prediction.predicted_price_per_gram, currency)}, con range indicativo tra ${formatGoldPerGram(prediction.predicted_low_per_gram, currency)} e ${formatGoldPerGram(prediction.predicted_high_per_gram, currency)}. La volatilità è ${prediction.volatility || "media"} e la confidence è ${prediction.confidence || "bassa"}. Usa questo dato come supporto statistico, non come garanzia di prezzo.`
+    : "Analisi Predittiva Oro: prima aggiorna la previsione per vedere trend, volatilità e range indicativi. Le stime non sono consulenza finanziaria e non garantiscono il prezzo cliente.";
+  state.aurumMessages.push({ role: "assistant", content: message });
+  renderAurumMessages();
+  openAurumChat();
+}
+
 async function setPracticeMeta(options = {}) {
   const now = new Date();
   document.getElementById("practiceDate").value = now.toISOString().slice(0, 10);
@@ -13368,6 +13689,14 @@ suspendedPracticesList?.addEventListener("click", (event) => {
 document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
   refreshBullionVaultPrices({ notify: true });
   initBullionVaultChart();
+  loadGoldPredictionPanel({ silent: true });
+});
+syncGoldHistoryButton?.addEventListener("click", () => withButtonBusy(syncGoldHistoryButton, "Sincronizzo...", syncGoldHistory));
+runGoldPredictionButton?.addEventListener("click", () => withButtonBusy(runGoldPredictionButton, "Calcolo...", runGoldPrediction));
+askAurumGoldPredictionButton?.addEventListener("click", askAurumGoldPrediction);
+goldPredictionSettingsForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  withButtonBusy(event.submitter || goldPredictionSettingsForm.querySelector('button[type="submit"]'), "Salvo...", () => saveGoldPredictionSettings(event));
 });
 document.getElementById("dismissInstallHint")?.addEventListener("click", () => {
   localStorage.setItem("oroactive-install-hint-dismissed", "1");
