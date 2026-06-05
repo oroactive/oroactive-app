@@ -813,6 +813,7 @@ const antifraudList = document.getElementById("antifraudList");
 const trainingCourseForm = document.getElementById("trainingCourseForm");
 const trainingList = document.getElementById("trainingList");
 const courseSummary = document.getElementById("courseSummary");
+const courseCurrentLocation = document.getElementById("courseCurrentLocation");
 const courseSearch = document.getElementById("courseSearch");
 const courseCategoryFilter = document.getElementById("courseCategoryFilter");
 const courseToolbar = document.querySelector(".course-toolbar");
@@ -2318,12 +2319,7 @@ const MENU_GROUPS = [
     order: 30,
     roles: MENU_ROLES.all,
     items: [
-      { id: "academy", label: "OroActive Academy", description: "Catalogo corsi e materiali.", icon: "OA", order: 10, section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo corsi" },
-      { id: "my-courses", label: "I miei corsi", description: "Percorsi personali.", icon: "MC", order: 20, section: "training", courseTabShortcut: "mine", roles: MENU_ROLES.all, keywords: "miei corsi formazione" },
-      { id: "certifications", label: "Certificazioni", description: "Attestati e qualifiche.", icon: "CF", order: 30, section: "training", courseTabShortcut: "certifications", roles: MENU_ROLES.all, keywords: "certificazioni attestati" },
-      { id: "badges", label: "Badge", description: "Progressi e riconoscimenti.", icon: "BD", order: 40, section: "training", courseTabShortcut: "badges", roles: MENU_ROLES.all, keywords: "badge riconoscimenti" },
-      { id: "training-history", label: "Storico formazione", description: "Cronologia formativa.", icon: "SF", order: 50, section: "training", courseTabShortcut: "history", roles: MENU_ROLES.all, keywords: "storico formazione progressi" },
-      { id: "operator-training", label: "Training Operatore", description: "Simulazioni senza dati reali.", icon: "TR", order: 60, section: "training", courseTabShortcut: "operatorTraining", roles: MENU_ROLES.all, keywords: "training operatore demo pratica simulazione" },
+      { id: "academy", label: "OroActive Academy", description: "Ingresso unico a catalogo, corsi, certificazioni, badge, storico e training.", icon: "OA", order: 10, section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo academy corsi miei corsi certificazioni attestati badge storico formazione training operatore gestione academy" },
       { id: "gaming-oroactive", label: "Gaming OroActive", description: "Aurum Blocks arcade formativo.", icon: "GO", order: 70, section: "gaming", roles: MENU_ROLES.all, keywords: "gaming oroactive giochi arcade formazione punteggi carature" },
       { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "NC", order: 80, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
       { id: "aurum-assistant", label: "Assistente IA / Aurum", description: "Tutor e assistente operativo.", icon: "AI", order: 90, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
@@ -7534,6 +7530,21 @@ function renderCourseSummary() {
   courseSummary.innerHTML = `<span>Livello ${escapeHtml(operatorAcademyLevel())}</span><strong>${average}%</strong><small>Completamento medio</small>`;
 }
 
+const ACADEMY_TAB_LABELS = {
+  catalog: "Catalogo Academy",
+  mine: "I miei corsi",
+  certifications: "Certificazioni",
+  badges: "Badge",
+  history: "Storico formazione",
+  operatorTraining: "Training Operatore",
+  management: "Gestione Academy"
+};
+
+function updateAcademyLocation() {
+  if (!courseCurrentLocation) return;
+  courseCurrentLocation.textContent = `OroActive Academy / ${ACADEMY_TAB_LABELS[state.courseActiveTab] || ACADEMY_TAB_LABELS.catalog}`;
+}
+
 function trainingDifficultyLabel(difficulty = "") {
   return {
     base: "Base",
@@ -7711,6 +7722,7 @@ function renderOperatorTraining() {
 function renderTraining() {
   if (!trainingList) return;
   renderCourseSummary();
+  updateAcademyLocation();
   if (trainingCourseForm) {
     trainingCourseForm.hidden = !(state.courseActiveTab === "management" && canManageCoursesUi());
   }
