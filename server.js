@@ -8962,6 +8962,249 @@ async function listAurumBlocksBadges(user = {}) {
   return result.rows;
 }
 
+const goldRunDefaultSections = [
+  { code: "aurum_blocks", name: "Aurum Blocks", description: "Arcade formativo con lingotti, metalli e carature.", active: true },
+  { code: "gold_run", name: "La corsa all'oro", description: "Platform arcade OroActive con Elite, premi e boss originali.", active: true }
+];
+
+const goldRunDefaultAchievements = [
+  { code: "primo_lingotto", name: "Primo lingotto", description: "Prima raccolta nella Corsa all'oro.", condition: { rewards_collected: 1 } },
+  { code: "re_24kt", name: "Re del 24kt", description: "Raccogli 5 lingotti 24kt in una partita.", condition: { reward: "oro24", count: 5 } },
+  { code: "cacciatore_diamanti", name: "Cacciatore di diamanti", description: "Raccogli 3 diamanti certificati.", condition: { reward: "diamond", count: 3 } },
+  { code: "dieci_livelli", name: "10 livelli completati", description: "Completa la Fortezza dell'Oro.", condition: { level_reached: 10 } },
+  { code: "boss_hunter", name: "Boss Hunter", description: "Sconfiggi almeno un boss.", condition: { bosses_defeated: 1 } },
+  { code: "record_personale", name: "Record personale", description: "Supera il miglior punteggio personale.", condition: { personal_record: true } },
+  { code: "maestro_oroactive_arcade", name: "Maestro OroActive Arcade", description: "Supera 25.000 punti.", condition: { score: 25000 } }
+];
+
+function normalizeGamingPeriod(period = "") {
+  const normalized = String(period || "all").toLowerCase();
+  return ["today", "week", "month", "all"].includes(normalized) ? normalized : "week";
+}
+
+function gamingPeriodWhere(period = "", alias = "s") {
+  const normalized = normalizeGamingPeriod(period);
+  if (normalized === "today") return `${alias}.created_at >= CURRENT_DATE`;
+  if (normalized === "month") return `${alias}.created_at >= date_trunc('month', NOW())`;
+  if (normalized === "all") return "TRUE";
+  return `${alias}.created_at >= NOW() - INTERVAL '7 days'`;
+}
+
+function goldRunScoreIsSuspicious(input = {}) {
+  const score = Number(input.score || 0);
+  const duration = Math.max(1, Number(input.duration_seconds || 1));
+  const level = Number(input.level_reached || 1);
+  const rewards = Number(input.rewards_collected || 0);
+  if (score < 0 || duration < 0 || level < 1 || level > 10) return true;
+  return score > Math.max(60000, duration * 3200 + level * 9000 + rewards * 1500);
+}
+
+async function ensureGamingDefaults() {
+  for (const section of goldRunDefaultSections) {
+    await pool.query(
+      `INSERT INTO gaming_sections (code, name, description, active)
+       VALUES ($1::text, $2::text, $3::text, $4::boolean)
+       ON CONFLICT (code) DO UPDATE
+       SET name = EXCLUDED.name,
+           description = EXCLUDED.description,
+           active = EXCLUDED.active,
+           updated_at = NOW()`,
+      [section.code, section.name, section.description, section.active]
+    );
+  }
+  for (const achievement of goldRunDefaultAchievements) {
+    await pool.query(
+      `INSERT INTO gaming_achievements (code, name, description, condition, active)
+       VALUES ($1::text, $2::text, $3::text, $4::jsonb, TRUE)
+       ON CONFLICT (code) DO UPDATE
+       SET name = EXCLUDED.name,
+           description = EXCLUDED.description,
+           condition = EXCLUDED.condition,
+           active = TRUE,
+           updated_at = NOW()`,
+      [achievement.code, achievement.name, achievement.description, sanitizeForPostgres(achievement.condition)]
+    );
+  }
+}
+
+async function finishGoldRunSession(input = {}, user = {}, req = null) {
+  await ensureGamingDefaults();
+  const score = Math.max(0, Math.round(Number(input.score || 0)));
+  const levelReached = Math.max(1, Math.min(10, Math.round(Number(input.level_reached || input.levelReached || 1))));
+  const duration = Math.max(0, Math.round(Number(input.duration_seconds || input.durationSeconds || 0)));
+  const rewardsCollected = Math.max(0, Math.round(Number(input.rewards_collected || input.rewardsCollected || 0)));
+  const bossesDefeated = Math.max(0, Math.round(Number(input.bosses_defeated || input.bossesDefeated || 0)));
+  const characterName = "Elite";
+  const previousBest = (await pool.query(
+    `SELECT score, level_reached, duration_seconds, rewards_collected, bosses_defeated, created_at
+     FROM gaming_gold_run_scores
+     WHERE user_id = $1::bigint
+     ORDER BY score DESC, level_reached DESC, bosses_defeated DESC, duration_seconds ASC, created_at ASC
+     LIMIT 1`,
+    [user.id]
+  )).rows[0] || null;
+  const suspicious = goldRunScoreIsSuspicious({ score, level_reached: levelReached, duration_seconds: duration, rewards_collected: rewardsCollected });
+  const achievementsUnlocked = Array.isArray(input.achievements_unlocked) ? input.achievements_unlocked : [];
+  const rewardsUnlocked = Array.isArray(input.rewards_unlocked) ? input.rewards_unlocked : [];
+  const metadata = sanitizeForPostgres({
+    ...(input.metadata || {}),
+    suspicious,
+    status: input.status || "finished",
+    validation: suspicious ? "score fuori soglia base" : "ok"
+  });
+  const scoreRow = (await pool.query(
+    `INSERT INTO gaming_gold_run_scores
+      (user_id, store_id, score, level_reached, duration_seconds, rewards_collected, bosses_defeated, character_name, mode, metadata)
+     VALUES ($1::bigint, $2::bigint, $3::integer, $4::integer, $5::integer, $6::integer, $7::integer, $8::text, 'arcade', $9::jsonb)
+     RETURNING *`,
+    [user.id, user.negozio_id || null, score, levelReached, duration, rewardsCollected, bossesDefeated, characterName, metadata]
+  )).rows[0];
+  const previousScore = Number(previousBest?.score || 0);
+  const isNewPersonalRecord = Boolean(previousBest) ? score > previousScore : score > 0;
+  await pool.query(
+    `INSERT INTO gaming_user_progress
+      (user_id, store_id, game_type, best_score, total_score, level_reached, sessions_played, total_play_time, last_played_at, rewards_unlocked, achievements_unlocked)
+     VALUES ($1::bigint, $2::bigint, 'gold_run', $3::integer, $3::integer, $4::integer, 1, $5::integer, NOW(), $6::jsonb, $7::jsonb)
+     ON CONFLICT (user_id, game_type) DO UPDATE
+     SET store_id = COALESCE(EXCLUDED.store_id, gaming_user_progress.store_id),
+         best_score = GREATEST(gaming_user_progress.best_score, EXCLUDED.best_score),
+         total_score = gaming_user_progress.total_score + EXCLUDED.total_score,
+         level_reached = GREATEST(gaming_user_progress.level_reached, EXCLUDED.level_reached),
+         sessions_played = gaming_user_progress.sessions_played + 1,
+         total_play_time = gaming_user_progress.total_play_time + EXCLUDED.total_play_time,
+         last_played_at = NOW(),
+         rewards_unlocked = (
+           SELECT COALESCE(jsonb_agg(DISTINCT value), '[]'::jsonb)
+           FROM jsonb_array_elements(COALESCE(gaming_user_progress.rewards_unlocked, '[]'::jsonb) || EXCLUDED.rewards_unlocked) AS value
+         ),
+         achievements_unlocked = (
+           SELECT COALESCE(jsonb_agg(DISTINCT value), '[]'::jsonb)
+           FROM jsonb_array_elements(COALESCE(gaming_user_progress.achievements_unlocked, '[]'::jsonb) || EXCLUDED.achievements_unlocked) AS value
+         ),
+         updated_at = NOW()`,
+    [user.id, user.negozio_id || null, score, levelReached, duration, sanitizeForPostgres(rewardsUnlocked), sanitizeForPostgres(achievementsUnlocked)]
+  );
+  let personalRecord = {
+    is_new_personal_record: isNewPersonalRecord,
+    previous_score: previousScore,
+    new_score: score,
+    difference: isNewPersonalRecord ? score - previousScore : 0,
+    position: null
+  };
+  if (isNewPersonalRecord) {
+    const leaderboard = await listGoldRunLeaderboard({ period: "all", limit: 50 }, user);
+    const ownRow = leaderboard.find((row) => String(row.user_id) === String(user.id));
+    personalRecord = { ...personalRecord, position: ownRow?.position || null };
+  }
+  void writeAuditLog({
+    req,
+    user,
+    action: "gaming_gold_run_finished",
+    entityType: "gaming_gold_run_score",
+    entityId: scoreRow.id,
+    entityLabel: "La corsa all'oro",
+    afterData: { score, level_reached: levelReached, rewards_collected: rewardsCollected, bosses_defeated: bossesDefeated, character_name: characterName, suspicious },
+    metadata: { store_id: user.negozio_id || null, personal_record: personalRecord, suspicious }
+  });
+  return { score: scoreRow, suspicious, personal_record: personalRecord };
+}
+
+async function listGoldRunScores(query = {}, user = {}) {
+  const limit = Math.min(50, Math.max(1, Number(query.limit || 12)));
+  const scores = (await pool.query(
+    `SELECT s.*, u.username, CONCAT_WS(' ', u.nome, u.cognome) AS user_name, u.negozio AS store_name
+     FROM gaming_gold_run_scores s
+     LEFT JOIN utenti u ON u.id = s.user_id
+     WHERE s.user_id = $1::bigint
+     ORDER BY s.created_at DESC, s.score DESC
+     LIMIT $2::integer`,
+    [user.id, limit]
+  )).rows;
+  const best = (await pool.query(
+    `SELECT s.*, p.achievements_unlocked, p.rewards_unlocked, u.username, CONCAT_WS(' ', u.nome, u.cognome) AS user_name, u.negozio AS store_name
+     FROM gaming_gold_run_scores s
+     LEFT JOIN gaming_user_progress p ON p.user_id = s.user_id AND p.game_type = 'gold_run'
+     LEFT JOIN utenti u ON u.id = s.user_id
+     WHERE s.user_id = $1::bigint
+     ORDER BY s.score DESC, s.level_reached DESC, s.bosses_defeated DESC, s.duration_seconds ASC, s.created_at ASC
+     LIMIT 1`,
+    [user.id]
+  )).rows[0] || null;
+  return { best_score: Number(best?.score || 0), best, scores };
+}
+
+async function listGoldRunLeaderboard(query = {}, user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const limit = Math.min(50, Math.max(1, Number(query.limit || 20)));
+  const values = [];
+  const where = [gamingPeriodWhere(query.period, "s")];
+  if (role === "responsabile" || role === "commesso" || role === "aiuto_commesso") {
+    if (user.negozio_id) {
+      values.push(user.negozio_id);
+      where.push(`COALESCE(s.store_id, u.negozio_id) = $${values.length}::bigint`);
+    } else {
+      values.push(user.negozio || "");
+      where.push(`COALESCE(u.negozio, '') = $${values.length}::text`);
+    }
+  } else if (query.store_id) {
+    values.push(query.store_id);
+    where.push(`COALESCE(s.store_id, u.negozio_id) = $${values.length}::bigint`);
+  }
+  const limitParam = values.push(limit);
+  const result = await pool.query(
+    `WITH ranked_scores AS (
+       SELECT
+         s.*,
+         u.username,
+         u.ruolo AS role,
+         CONCAT_WS(' ', u.nome, u.cognome) AS user_name,
+         u.negozio AS store_name,
+         ROW_NUMBER() OVER (
+           PARTITION BY s.user_id
+           ORDER BY s.score DESC, s.level_reached DESC, s.bosses_defeated DESC, s.duration_seconds ASC, s.created_at ASC
+         ) AS user_score_rank
+       FROM gaming_gold_run_scores s
+       LEFT JOIN utenti u ON u.id = s.user_id
+       WHERE ${where.join(" AND ")}
+     ),
+     best_scores AS (
+       SELECT *
+       FROM ranked_scores
+       WHERE user_score_rank = 1
+     )
+     SELECT
+       ROW_NUMBER() OVER (
+         ORDER BY score DESC, level_reached DESC, bosses_defeated DESC, duration_seconds ASC, created_at ASC
+       ) AS position,
+       *
+     FROM best_scores
+     ORDER BY score DESC, level_reached DESC, bosses_defeated DESC, duration_seconds ASC, created_at ASC
+     LIMIT $${limitParam}::integer`,
+    values
+  );
+  return result.rows;
+}
+
+async function gamingOverview(user = {}) {
+  await ensureGamingDefaults();
+  const goldRun = await listGoldRunScores({ limit: 3 }, user);
+  const aurumBlocksBest = (await pool.query(
+    `SELECT score
+     FROM aurum_blocks_scores
+     WHERE user_id = $1::bigint
+     ORDER BY score DESC, level DESC, lines_cleared DESC, created_at ASC
+     LIMIT 1`,
+    [user.id]
+  )).rows[0] || null;
+  return {
+    games: [
+      { id: "aurum_blocks", title: "Aurum Blocks", section: "aurumBlocks", best_score: Number(aurumBlocksBest?.score || 0) },
+      { id: "gold_run", title: "La corsa all'oro", character_name: "Elite", best_score: Number(goldRun.best_score || 0) }
+    ],
+    gold_run: goldRun
+  };
+}
+
 function courseCode(prefix = "OA") {
   return `${prefix}-${crypto.randomBytes(5).toString("hex").toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 }
@@ -13697,6 +13940,41 @@ app.get("/api/aurum-blocks/my-badges", async (request, response, next) => {
   }
 });
 
+app.get("/api/gaming/overview", async (request, response, next) => {
+  try {
+    response.json({ ok: true, overview: await gamingOverview(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/gaming/gold-run/session/finish", async (request, response, next) => {
+  try {
+    const result = await finishGoldRunSession(request.body || {}, request.user, request);
+    response.json({ ok: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/gaming/gold-run/my-scores", async (request, response, next) => {
+  try {
+    await ensureGamingDefaults();
+    response.json({ ok: true, ...(await listGoldRunScores(request.query, request.user)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/gaming/gold-run/leaderboard", async (request, response, next) => {
+  try {
+    await ensureGamingDefaults();
+    response.json({ ok: true, leaderboard: await listGoldRunLeaderboard(request.query, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/corsi", async (request, response, next) => {
   try {
     response.json(await listCourses(request.user));
@@ -15977,6 +16255,7 @@ function friendlyDatabaseError(error, request) {
   if (error.code === "42804" || error.code === "42P18") return "Tipo dato non valido nel salvataggio: controlla importi, date e identificativi.";
   if (/\/api\/(utenti|users)/.test(url)) return "Errore database durante il salvataggio dell'utente.";
   if (url.includes("/api/aurum-blocks")) return "Errore database durante Aurum Blocks.";
+  if (url.includes("/api/gaming")) return "Errore database durante Gaming OroActive.";
   if (url.includes("/api/aurum")) return "Errore database durante il salvataggio Aurum.";
   if (url.includes("/api/atti") || url.includes("/api/acts")) return "Errore database durante il salvataggio dell'atto. Verifica negozio, data, pagamento e allegati.";
   if (url.includes("/api/training")) return "Errore database durante il Training Operatore.";
@@ -16012,6 +16291,7 @@ function safeRouteErrorMessage(request) {
   if (url.includes("/api/crm") || url.includes("/api/clienti")) return "Operazione CRM non completata.";
   if (url.includes("/api/aurum-shield") || url.includes("/api/quality-check")) return "Controllo pratica non completato.";
   if (url.includes("/api/aurum-blocks")) return "Aurum Blocks non completato.";
+  if (url.includes("/api/gaming")) return "Gaming OroActive non completato.";
   if (url.includes("/api/ai") || url.includes("/api/aurum")) return "Operazione Aurum non completata.";
   return "Operazione non completata. Riprova tra qualche secondo.";
 }

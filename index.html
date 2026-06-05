@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260604-aurum-blocks-leaderboard-1">
+  <link rel="stylesheet" href="styles.css?v=20260605-gaming-oroactive-2">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -1190,6 +1190,161 @@
         <div class="course-content" id="trainingList"></div>
       </section>
 
+      <section id="gaming" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="gaming-shell" id="gamingShell">
+          <header class="gaming-hero">
+            <div>
+              <p class="eyebrow">Formazione arcade</p>
+              <h2>Gaming OroActive</h2>
+              <p class="muted">Giochi interni, punteggi formativi e sfide leggere per allenare precisione, riflessi e cultura OroActive senza creare dati operativi reali.</p>
+            </div>
+            <div class="gaming-hero-badges">
+              <span>Mobile first</span>
+              <span>iPad / iPhone / Mac</span>
+              <span>Solo formazione</span>
+            </div>
+          </header>
+
+          <section class="gaming-games-grid" aria-label="Giochi Gaming OroActive">
+            <article class="gaming-game-card gaming-game-card-blocks">
+              <div class="gaming-game-visual" aria-hidden="true">
+                <span class="gaming-mini-block metal-oro24">24K</span>
+                <span class="gaming-mini-block metal-oro18">18K</span>
+                <span class="gaming-mini-block metal-arg925">AG925</span>
+              </div>
+              <div>
+                <p class="eyebrow">Arcade carature</p>
+                <h3>Aurum Blocks</h3>
+                <p>Gioco arcade formativo con lingotti, metalli e carature. Completa righe, fai combo e salva solo punteggi di allenamento.</p>
+              </div>
+              <div class="gaming-card-actions">
+                <button class="primary-button" type="button" data-gaming-open="aurumBlocks">Gioca ora</button>
+                <button class="ghost-button" type="button" data-gaming-open="aurumBlocks">Apri sezione</button>
+              </div>
+            </article>
+
+            <article class="gaming-game-card gaming-game-card-run">
+              <div class="gaming-game-visual gold-run-card-preview" aria-hidden="true">
+                <div class="gold-run-elite-preview">
+                  <span class="elite-head"></span>
+                  <span class="elite-body"></span>
+                  <span class="elite-leg elite-leg-left"></span>
+                  <span class="elite-leg elite-leg-right"></span>
+                </div>
+                <span class="gold-run-preview-ingot">24K</span>
+              </div>
+              <div>
+                <p class="eyebrow">Platform originale</p>
+                <h3>La corsa all'oro</h3>
+                <p>Guida Elite in un platform arcade OroActive con livelli, nemici originali, premi preziosi, boss fight e classifica interna.</p>
+              </div>
+              <div class="gaming-card-actions">
+                <button class="primary-button" type="button" data-gold-run-start>Gioca ora</button>
+                <button class="ghost-button" type="button" data-gaming-focus="goldRun">Apri sezione</button>
+              </div>
+            </article>
+          </section>
+
+          <section class="gaming-overview-grid">
+            <article>
+              <h3>Ranking rapido</h3>
+              <div class="gaming-list" id="gamingQuickRanking" aria-live="polite"></div>
+            </article>
+            <article>
+              <h3>Statistiche personali</h3>
+              <div class="gaming-list" id="gamingPersonalStats" aria-live="polite"></div>
+            </article>
+          </section>
+
+          <section class="gold-run-shell" id="goldRunShell" aria-label="La corsa all'oro">
+            <header class="gold-run-header">
+              <div>
+                <p class="eyebrow">La corsa all'oro</p>
+                <h3>Elite nel mondo OroActive</h3>
+                <p class="muted">Attraversa 10 ambientazioni, raccogli premi preziosi, evita errori operativi e affronta boss originali senza usare dati reali dell'app.</p>
+              </div>
+              <div class="gold-run-header-actions">
+                <button class="primary-button" type="button" data-gold-run-start>Gioca</button>
+                <button class="ghost-button" type="button" data-gold-run-pause>Pausa</button>
+                <button class="ghost-button" type="button" data-gold-run-reset>Riprova</button>
+              </div>
+            </header>
+
+            <div class="gold-run-layout">
+              <div class="gold-run-stage-wrap">
+                <div class="gold-run-stage" id="goldRunStage" role="application" aria-label="Gioco La corsa all'oro">
+                  <div class="gold-run-parallax gold-run-parallax-back"></div>
+                  <div class="gold-run-parallax gold-run-parallax-front"></div>
+                  <div class="gold-run-track"></div>
+                  <div class="gold-run-elite" id="goldRunElite" aria-label="Elite">
+                    <span class="elite-head"></span>
+                    <span class="elite-neck"></span>
+                    <span class="elite-arm elite-arm-left"></span>
+                    <span class="elite-arm elite-arm-right"></span>
+                    <span class="elite-body"></span>
+                    <span class="elite-leg elite-leg-left"></span>
+                    <span class="elite-leg elite-leg-right"></span>
+                    <span class="elite-shoe elite-shoe-left"></span>
+                    <span class="elite-shoe elite-shoe-right"></span>
+                  </div>
+                  <div class="gold-run-layer" id="goldRunLayer" aria-hidden="true"></div>
+                  <div class="gold-run-effect-layer" id="goldRunEffects" aria-hidden="true"></div>
+                  <div class="gold-run-overlay" id="goldRunOverlay">
+                    <strong>Guida Elite nella corsa all'oro.</strong>
+                    <span>Premi Gioca per iniziare.</span>
+                  </div>
+                </div>
+                <div class="gold-run-touch-controls" aria-label="Controlli touch La corsa all'oro">
+                  <button type="button" data-gold-run-control="left" aria-label="Muovi Elite a sinistra">◀</button>
+                  <button type="button" data-gold-run-control="right" aria-label="Muovi Elite a destra">▶</button>
+                  <button type="button" data-gold-run-control="jump" aria-label="Salto di Elite">Salta</button>
+                  <button type="button" data-gold-run-control="action" aria-label="Azione Aurum Shield">Azione</button>
+                  <button type="button" data-gold-run-pause aria-label="Pausa">Pausa</button>
+                </div>
+                <div class="gold-run-keyboard-hint">← → muovi Elite · spazio/↑ salta · P pausa · A azione</div>
+              </div>
+
+              <aside class="gold-run-hud" aria-label="Statistiche La corsa all'oro">
+                <article><span>Punteggio</span><strong id="goldRunScore">0</strong></article>
+                <article><span>Vite</span><strong id="goldRunLives">3</strong></article>
+                <article><span>Livello</span><strong id="goldRunLevel">1</strong></article>
+                <article><span>Premi</span><strong id="goldRunRewards">0</strong></article>
+                <article class="gold-run-boss-card" id="goldRunBossCard" hidden>
+                  <span>Boss</span>
+                  <strong id="goldRunBossName">Michele il Re dell'Oro</strong>
+                  <div class="gold-run-boss-bar"><i id="goldRunBossHp"></i></div>
+                </article>
+                <div class="gold-run-coach" id="goldRunCoach">
+                  <strong>Aurum coach</strong>
+                  <span>Aurum: Forza Elite, raccogli più lingotti possibile.</span>
+                </div>
+              </aside>
+            </div>
+
+            <section class="gold-run-levels" aria-label="Livelli La corsa all'oro">
+              <h3>10 livelli OroActive</h3>
+              <div id="goldRunLevels"></div>
+            </section>
+
+            <section class="gold-run-results-grid">
+              <article>
+                <h3>I miei risultati</h3>
+                <div class="gaming-list" id="goldRunMyScores" aria-live="polite"></div>
+              </article>
+              <article>
+                <h3>Classifica</h3>
+                <div class="gaming-list" id="goldRunLeaderboard" aria-live="polite"></div>
+              </article>
+              <article>
+                <h3>Premi e achievement</h3>
+                <div class="gaming-list" id="goldRunAchievements" aria-live="polite"></div>
+              </article>
+            </section>
+          </section>
+        </div>
+      </section>
+
       <section id="aurumBlocks" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="aurum-blocks-shell" id="aurumBlocksShell">
@@ -1598,6 +1753,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260604-aurum-blocks-leaderboard-1"></script>
+  <script src="app.js?v=20260605-gaming-oroactive-2"></script>
 </body>
 </html>

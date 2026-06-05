@@ -1824,3 +1824,116 @@ CREATE INDEX IF NOT EXISTS idx_aurum_blocks_sessions_store_id ON aurum_blocks_se
 CREATE INDEX IF NOT EXISTS idx_aurum_blocks_sessions_status ON aurum_blocks_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_aurum_blocks_questions_active ON aurum_blocks_training_questions(active);
 CREATE INDEX IF NOT EXISTS idx_aurum_blocks_user_badges_user_id ON aurum_blocks_user_badges(user_id);
+
+CREATE TABLE IF NOT EXISTS gaming_sections (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gaming_user_progress (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  store_id BIGINT NULL,
+  game_type TEXT NOT NULL,
+  best_score INTEGER DEFAULT 0,
+  total_score INTEGER DEFAULT 0,
+  level_reached INTEGER DEFAULT 1,
+  sessions_played INTEGER DEFAULT 0,
+  total_play_time INTEGER DEFAULT 0,
+  last_played_at TIMESTAMPTZ NULL,
+  rewards_unlocked JSONB DEFAULT '[]'::jsonb,
+  achievements_unlocked JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, game_type)
+);
+
+CREATE TABLE IF NOT EXISTS gaming_aurum_blocks_scores (
+  id BIGSERIAL PRIMARY KEY,
+  source_score_id BIGINT NULL,
+  user_id BIGINT NOT NULL,
+  store_id BIGINT NULL,
+  score INTEGER NOT NULL DEFAULT 0,
+  level INTEGER DEFAULT 1,
+  lines_cleared INTEGER DEFAULT 0,
+  mode TEXT DEFAULT 'arcade',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS gaming_gold_run_scores (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  store_id BIGINT NULL,
+  score INTEGER NOT NULL DEFAULT 0,
+  level_reached INTEGER DEFAULT 1,
+  duration_seconds INTEGER DEFAULT 0,
+  rewards_collected INTEGER DEFAULT 0,
+  bosses_defeated INTEGER DEFAULT 0,
+  character_name TEXT DEFAULT 'Elite',
+  mode TEXT DEFAULT 'arcade',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS gaming_daily_challenges (
+  id BIGSERIAL PRIMARY KEY,
+  game_type TEXT NOT NULL,
+  challenge_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  seed TEXT NOT NULL,
+  active BOOLEAN DEFAULT true,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(game_type, challenge_date)
+);
+
+CREATE TABLE IF NOT EXISTS gaming_rewards (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  game_type TEXT,
+  points INTEGER DEFAULT 0,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gaming_badges (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  game_type TEXT,
+  condition JSONB DEFAULT '{}'::jsonb,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gaming_achievements (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  game_type TEXT DEFAULT 'gold_run',
+  condition JSONB DEFAULT '{}'::jsonb,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_gaming_progress_user_id ON gaming_user_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_gaming_progress_store_id ON gaming_user_progress(store_id);
+CREATE INDEX IF NOT EXISTS idx_gaming_progress_game_type ON gaming_user_progress(game_type);
+CREATE INDEX IF NOT EXISTS idx_gaming_gold_run_scores_user_id ON gaming_gold_run_scores(user_id);
+CREATE INDEX IF NOT EXISTS idx_gaming_gold_run_scores_store_id ON gaming_gold_run_scores(store_id);
+CREATE INDEX IF NOT EXISTS idx_gaming_gold_run_scores_score ON gaming_gold_run_scores(score DESC);
+CREATE INDEX IF NOT EXISTS idx_gaming_gold_run_scores_created_at ON gaming_gold_run_scores(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_gaming_aurum_blocks_scores_user_id ON gaming_aurum_blocks_scores(user_id);
+CREATE INDEX IF NOT EXISTS idx_gaming_daily_challenges_date ON gaming_daily_challenges(challenge_date DESC);
