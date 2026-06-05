@@ -119,6 +119,12 @@ const state = {
   aurumSupportRequests: [],
   aurumActiveQuiz: null,
   aurumQuizIndex: 0,
+  aurumFloatingPosition: null,
+  aurumDragState: null,
+  aurumSuppressNextClick: false,
+  aurumAvoidActive: false,
+  aurumAutoMoved: false,
+  aurumAvoidFrame: null,
   bullionChartLoaded: false,
   pendingSync: [],
   syncingPending: false,
@@ -172,6 +178,29 @@ const PRIVACY_POLICY_FALLBACK = {
 };
 const ENABLE_AURUM_MASCOT = true;
 const AURUM_SETTINGS_KEY = "oroactive-aurum-settings";
+const AURUM_FLOATING_POSITION_KEY = "aurum_floating_position";
+const AURUM_AVOID_EVENT = "aurum:avoid-elements-updated";
+const AURUM_SAFE_MARGIN = 12;
+const AURUM_DEFAULT_OFFSET = 24;
+const AURUM_AVOID_SELECTORS = [
+  "[data-aurum-avoid='true']",
+  ".aurum-avoid",
+  ".autocomplete-list:not([hidden])",
+  ".suggestion-list:not([hidden])",
+  ".dropdown-menu:not([hidden])",
+  ".field-tooltip:not([hidden])",
+  ".field-error-popover:not([hidden])",
+  ".operator-perfect-tooltip:not([hidden])",
+  ".document-expiry-warning:not([hidden])",
+  ".aml-cash-alert:not([hidden])",
+  ".material-amount-panel:not([hidden])",
+  ".guided-quality-actions:not([hidden])",
+  ".quality-review-panel:not([hidden])",
+  ".brand-dropdown:not([hidden])",
+  ".main-user-dropdown:not([hidden])",
+  ".notification-dropdown:not([hidden])"
+];
+const AURUM_ACTIVE_FIELD_SELECTOR = "#practice input, #practice select, #practice textarea, #practice button, #practice canvas";
 const AURUM_DEFAULT_SETTINGS = {
   enabled: true,
   movement: true,
@@ -757,6 +786,7 @@ const aurumMessageRecipient = document.getElementById("aurumMessageRecipient");
 const aurumSendDirectMessage = document.getElementById("aurumSendDirectMessage");
 const aurumUserMemories = document.getElementById("aurumUserMemories");
 const aurumUserMemoryToggle = document.getElementById("aurumUserMemoryToggle");
+const aurumResetPosition = document.getElementById("aurumResetPosition");
 const aurumManagementPanel = document.getElementById("aurumManagementPanel");
 const aurumEnabledToggle = document.getElementById("aurumEnabledToggle");
 const aurumMovementToggle = document.getElementById("aurumMovementToggle");
@@ -1993,6 +2023,7 @@ function upgradeProvinceFields() {
     input.value = select.value || "";
     input.setAttribute("list", "provinceSuggestions");
     input.setAttribute("autocomplete", "off");
+    input.classList.add("aurum-field-avoid-anchor");
     input.placeholder = "Es. MI - Milano";
     select.replaceWith(input);
   });
@@ -4038,6 +4069,327 @@ function saveAurumSettings(settings = {}) {
   updateAurumMascotVisibility();
 }
 
+function safeViewportInset(name = "right") {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(`env(safe-area-inset-${name})`);
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function loadAurumFloatingPosition() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(AURUM_FLOATING_POSITION_KEY) || "null");
+    if (!saved || !Number.isFinite(Number(saved.x)) || !Number.isFinite(Number(saved.y))) return null;
+    return { x: Number(saved.x), y: Number(saved.y) };
+  } catch {
+    return null;
+  }
+}
+
+function saveAurumFloatingPosition(position) {
+  if (!position) return;
+  localStorage.setItem(AURUM_FLOATING_POSITION_KEY, JSON.stringify({
+    x: Math.round(position.x),
+    y: Math.round(position.y)
+  }));
+}
+
+function aurumViewportBounds(element = aurumMascotRoot) {
+  const rect = element?.getBoundingClientRect?.();
+  const width = Math.max(rect?.width || element?.offsetWidth || 96, 64);
+  const height = Math.max(rect?.height || element?.offsetHeight || 96, 64);
+  return {
+    minX: AURUM_SAFE_MARGIN + safeViewportInset("left"),
+    minY: AURUM_SAFE_MARGIN + safeViewportInset("top"),
+    maxX: Math.max(AURUM_SAFE_MARGIN, window.innerWidth - width - AURUM_SAFE_MARGIN - safeViewportInset("right")),
+    maxY: Math.max(AURUM_SAFE_MARGIN, window.innerHeight - height - AURUM_SAFE_MARGIN - safeViewportInset("bottom")),
+    width,
+    height
+  };
+}
+
+function clampAurumPosition(position = {}, element = aurumMascotRoot) {
+  const bounds = aurumViewportBounds(element);
+  const requestedX = Number(position.x);
+  const requestedY = Number(position.y);
+  return {
+    x: Math.min(Math.max(Number.isFinite(requestedX) ? requestedX : bounds.maxX, bounds.minX), bounds.maxX),
+    y: Math.min(Math.max(Number.isFinite(requestedY) ? requestedY : bounds.maxY, bounds.minY), bounds.maxY)
+  };
+}
+
+function defaultAurumPosition(element = aurumMascotRoot) {
+  const bounds = aurumViewportBounds(element);
+  return {
+    x: bounds.maxX - Math.max(0, AURUM_DEFAULT_OFFSET - AURUM_SAFE_MARGIN),
+    y: bounds.maxY - Math.max(0, AURUM_DEFAULT_OFFSET - AURUM_SAFE_MARGIN)
+  };
+}
+
+function applyAurumPosition(position, options = {}) {
+  if (!aurumMascotRoot || !position) return;
+  const clamped = clampAurumPosition(position);
+  state.aurumFloatingPosition = clamped;
+  aurumMascotRoot.style.setProperty("--aurum-left", `${clamped.x}px`);
+  aurumMascotRoot.style.setProperty("--aurum-top", `${clamped.y}px`);
+  aurumMascotRoot.classList.add("aurum-positioned");
+  if (options.save) {
+    state.aurumAutoMoved = false;
+    saveAurumFloatingPosition(clamped);
+  }
+}
+
+function restoreAurumFloatingPosition() {
+  if (!aurumMascotRoot || aurumMascotRoot.hidden) return;
+  const saved = loadAurumFloatingPosition();
+  const position = saved ? clampAurumPosition(saved) : defaultAurumPosition();
+  applyAurumPosition(position, { save: false });
+}
+
+function resetAurumFloatingPosition(options = {}) {
+  localStorage.removeItem(AURUM_FLOATING_POSITION_KEY);
+  state.aurumAutoMoved = false;
+  if (aurumChatPanel) {
+    aurumChatPanel.classList.remove("aurum-panel-positioned", "aurum-panel-dragging");
+    aurumChatPanel.style.removeProperty("left");
+    aurumChatPanel.style.removeProperty("top");
+    aurumChatPanel.style.removeProperty("right");
+    aurumChatPanel.style.removeProperty("bottom");
+  }
+  restoreAurumFloatingPosition();
+  constrainAurumPanelToViewport();
+  scheduleAurumAvoidance();
+  if (options.toast !== false) showToast("Posizione Aurum ripristinata", "success");
+}
+
+function aurumRectFromPosition(position, element = aurumMascotRoot) {
+  const bounds = aurumViewportBounds(element);
+  return {
+    left: position.x,
+    top: position.y,
+    right: position.x + bounds.width,
+    bottom: position.y + bounds.height,
+    width: bounds.width,
+    height: bounds.height
+  };
+}
+
+function rectsOverlap(first, second, margin = 8) {
+  return !(first.right + margin < second.left
+    || first.left - margin > second.right
+    || first.bottom + margin < second.top
+    || first.top - margin > second.bottom);
+}
+
+function expandedRect(rect, inset = 12) {
+  return {
+    left: Math.max(0, rect.left - inset),
+    top: Math.max(0, rect.top - inset),
+    right: Math.min(window.innerWidth, rect.right + inset),
+    bottom: Math.min(window.innerHeight, rect.bottom + inset),
+    width: Math.min(window.innerWidth, rect.right + inset) - Math.max(0, rect.left - inset),
+    height: Math.min(window.innerHeight, rect.bottom + inset) - Math.max(0, rect.top - inset)
+  };
+}
+
+function activePracticeAvoidRect() {
+  const active = document.activeElement;
+  if (!active?.matches?.(AURUM_ACTIVE_FIELD_SELECTOR) || !active.closest("#practice")) return null;
+  const rect = active.getBoundingClientRect();
+  const extraBottom = active.matches("input[list], select, textarea") ? 210 : 96;
+  return {
+    left: Math.max(0, rect.left - 18),
+    top: Math.max(0, rect.top - 18),
+    right: Math.min(window.innerWidth, rect.right + 18),
+    bottom: Math.min(window.innerHeight, rect.bottom + extraBottom),
+    width: Math.min(window.innerWidth, rect.right + 18) - Math.max(0, rect.left - 18),
+    height: Math.min(window.innerHeight, rect.bottom + extraBottom) - Math.max(0, rect.top - 18)
+  };
+}
+
+function visibleAurumAvoidRects() {
+  const rects = [];
+  document.querySelectorAll(AURUM_AVOID_SELECTORS.join(",")).forEach((element) => {
+    if (!element || element.closest("#aurumMascotRoot") || !elementIsVisible(element)) return;
+    const rect = element.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return;
+    rects.push(expandedRect(rect, 10));
+  });
+  const activeRect = activePracticeAvoidRect();
+  if (activeRect) rects.push(activeRect);
+  return rects;
+}
+
+function aurumPositionCandidates(element = aurumMascotRoot) {
+  const bounds = aurumViewportBounds(element);
+  const offset = AURUM_DEFAULT_OFFSET;
+  const maxX = bounds.maxX;
+  const maxY = bounds.maxY;
+  const minX = bounds.minX;
+  const minY = bounds.minY;
+  const centerY = Math.round((window.innerHeight - bounds.height) / 2);
+  return [
+    { x: maxX - Math.max(0, offset - AURUM_SAFE_MARGIN), y: maxY - Math.max(0, offset - AURUM_SAFE_MARGIN) },
+    { x: minX + offset, y: maxY - Math.max(0, offset - AURUM_SAFE_MARGIN) },
+    { x: maxX - Math.max(0, offset - AURUM_SAFE_MARGIN), y: minY + offset },
+    { x: minX + offset, y: minY + offset },
+    { x: maxX - Math.max(0, offset - AURUM_SAFE_MARGIN), y: centerY },
+    { x: minX + offset, y: centerY }
+  ].map((position) => clampAurumPosition(position, element));
+}
+
+function findFreeAurumPosition(avoidRects = []) {
+  const current = state.aurumFloatingPosition || defaultAurumPosition();
+  const currentRect = aurumRectFromPosition(current);
+  if (!avoidRects.some((rect) => rectsOverlap(currentRect, rect, 10))) return current;
+  return aurumPositionCandidates().find((position) => {
+    const candidateRect = aurumRectFromPosition(position);
+    return !avoidRects.some((rect) => rectsOverlap(candidateRect, rect, 10));
+  }) || current;
+}
+
+function scheduleAurumAvoidance() {
+  if (state.aurumAvoidFrame) cancelAnimationFrame(state.aurumAvoidFrame);
+  state.aurumAvoidFrame = requestAnimationFrame(updateAurumAvoidance);
+}
+
+function updateAurumAvoidance() {
+  state.aurumAvoidFrame = null;
+  if (!aurumMascotRoot || aurumMascotRoot.hidden || !shouldShowAurumMascot()) return;
+  const avoidRects = visibleAurumAvoidRects();
+  const avoidActive = avoidRects.length > 0;
+  const compact = avoidActive && Boolean(document.getElementById("practice")?.classList.contains("active-screen"));
+  state.aurumAvoidActive = avoidActive;
+  aurumMascotRoot.classList.toggle("aurum-avoid-active", avoidActive);
+  aurumMascotRoot.classList.toggle("aurum-compact", compact);
+  if (compact && aurumTipBubble) aurumTipBubble.hidden = true;
+  if (!avoidActive && state.aurumAutoMoved) {
+    restoreAurumFloatingPosition();
+    state.aurumAutoMoved = false;
+    return;
+  }
+  if (!avoidActive || !aurumChatPanel?.hidden) return;
+  const nextPosition = findFreeAurumPosition(avoidRects);
+  const current = state.aurumFloatingPosition || defaultAurumPosition();
+  if (Math.abs(nextPosition.x - current.x) > 1 || Math.abs(nextPosition.y - current.y) > 1) {
+    state.aurumAutoMoved = true;
+    applyAurumPosition(nextPosition, { save: false });
+  }
+}
+
+function markAurumAvoidElements() {
+  [
+    "#documentExpiryWarning",
+    "#amlCashAlert",
+    "#materialAmountPanel",
+    "#guidedQualityActions",
+    "#qualityReviewPanel",
+    ".bottom-actions",
+    ".practice-card",
+    ".customer-privacy-actions",
+    ".signature-grid",
+    ".capture-grid",
+    ".capture-actions",
+    ".document-scan-actions",
+    ".notification-dropdown",
+    ".brand-dropdown",
+    ".main-user-dropdown"
+  ].forEach((selector) => {
+    document.querySelectorAll(selector).forEach((element) => {
+      element.dataset.aurumAvoid = "true";
+    });
+  });
+  document.querySelectorAll("#practice input[list], #practice select, #practice textarea").forEach((element) => {
+    element.classList.add("aurum-field-avoid-anchor");
+  });
+}
+
+function dispatchAurumAvoidanceUpdate() {
+  window.dispatchEvent(new CustomEvent(AURUM_AVOID_EVENT));
+}
+
+function constrainAurumPanelToViewport() {
+  if (!aurumChatPanel || aurumChatPanel.hidden) return;
+  const rect = aurumChatPanel.getBoundingClientRect();
+  const minX = AURUM_SAFE_MARGIN;
+  const minY = AURUM_SAFE_MARGIN;
+  const maxX = Math.max(minX, window.innerWidth - rect.width - AURUM_SAFE_MARGIN);
+  const maxY = Math.max(minY, window.innerHeight - rect.height - AURUM_SAFE_MARGIN);
+  if (rect.left < minX || rect.top < minY || rect.right > window.innerWidth - AURUM_SAFE_MARGIN || rect.bottom > window.innerHeight - AURUM_SAFE_MARGIN) {
+    aurumChatPanel.classList.add("aurum-panel-positioned");
+    aurumChatPanel.style.left = `${Math.min(Math.max(rect.left, minX), maxX)}px`;
+    aurumChatPanel.style.top = `${Math.min(Math.max(rect.top, minY), maxY)}px`;
+    aurumChatPanel.style.right = "auto";
+    aurumChatPanel.style.bottom = "auto";
+  }
+}
+
+function applyAurumPanelPosition(position) {
+  if (!aurumChatPanel) return;
+  const rect = aurumChatPanel.getBoundingClientRect();
+  const x = Math.min(Math.max(position.x, AURUM_SAFE_MARGIN), Math.max(AURUM_SAFE_MARGIN, window.innerWidth - rect.width - AURUM_SAFE_MARGIN));
+  const y = Math.min(Math.max(position.y, AURUM_SAFE_MARGIN), Math.max(AURUM_SAFE_MARGIN, window.innerHeight - rect.height - AURUM_SAFE_MARGIN));
+  aurumChatPanel.classList.add("aurum-panel-positioned");
+  aurumChatPanel.style.left = `${x}px`;
+  aurumChatPanel.style.top = `${y}px`;
+  aurumChatPanel.style.right = "auto";
+  aurumChatPanel.style.bottom = "auto";
+}
+
+function handleAurumPointerDown(event) {
+  if (!shouldShowAurumMascot()) return;
+  const headerHandle = event.target.closest?.(".aurum-chat-header");
+  const mascotHandle = event.target.closest?.("#aurumMascotButton");
+  if (!headerHandle && !mascotHandle) return;
+  if (headerHandle && event.target.closest("button, input, textarea, select")) return;
+  if (event.button !== undefined && event.button !== 0) return;
+  const element = headerHandle ? aurumChatPanel : aurumMascotRoot;
+  if (!element) return;
+  const rect = element.getBoundingClientRect();
+  state.aurumDragState = {
+    pointerId: event.pointerId,
+    element: headerHandle ? "panel" : "mascot",
+    originX: rect.left,
+    originY: rect.top,
+    startX: event.clientX,
+    startY: event.clientY,
+    moved: false
+  };
+  element.classList.add(headerHandle ? "aurum-panel-dragging" : "aurum-dragging");
+  element.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+}
+
+function handleAurumPointerMove(event) {
+  const drag = state.aurumDragState;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  event.preventDefault();
+  const dx = event.clientX - drag.startX;
+  const dy = event.clientY - drag.startY;
+  if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+  if (drag.element === "panel") {
+    applyAurumPanelPosition({ x: drag.originX + dx, y: drag.originY + dy });
+  } else {
+    applyAurumPosition({ x: drag.originX + dx, y: drag.originY + dy }, { save: false });
+  }
+}
+
+function handleAurumPointerUp(event) {
+  const drag = state.aurumDragState;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  const element = drag.element === "panel" ? aurumChatPanel : aurumMascotRoot;
+  element?.classList.remove(drag.element === "panel" ? "aurum-panel-dragging" : "aurum-dragging");
+  element?.releasePointerCapture?.(event.pointerId);
+  if (drag.element === "mascot" && drag.moved) {
+    state.aurumSuppressNextClick = true;
+    saveAurumFloatingPosition(state.aurumFloatingPosition || defaultAurumPosition());
+    window.setTimeout(() => {
+      state.aurumSuppressNextClick = false;
+    }, 80);
+  }
+  state.aurumDragState = null;
+  scheduleAurumAvoidance();
+}
+
 function shouldShowAurumMascot() {
   const settings = loadAurumSettings();
   return Boolean(ENABLE_AURUM_MASCOT && settings.enabled && state.currentUser);
@@ -4053,8 +4405,10 @@ function updateAurumMascotVisibility() {
     aurumMascotRoot?.classList.remove("aurum-panel-open");
     return;
   }
+  restoreAurumFloatingPosition();
   updateAurumMovement();
   scheduleAurumTips();
+  scheduleAurumAvoidance();
 }
 
 function aurumUserLabel(user = state.currentUser) {
@@ -4088,6 +4442,8 @@ function sectionTipPool(section = state.aurumCurrentSection) {
 function setAurumSection(section = "menu") {
   state.aurumCurrentSection = section || "menu";
   updateAurumMovement();
+  markAurumAvoidElements();
+  scheduleAurumAvoidance();
   if (shouldShowAurumMascot()) {
     window.clearTimeout(state.aurumTipHideTimer);
     const tips = sectionTipPool();
@@ -4151,6 +4507,7 @@ function openAurumChat() {
   if (aurumChatPanel) aurumChatPanel.hidden = false;
   if (aurumTipBubble) aurumTipBubble.hidden = true;
   renderAurumMessages();
+  window.setTimeout(constrainAurumPanelToViewport, 0);
   window.setTimeout(() => aurumQuestion?.focus(), 60);
   updateAurumMascotVisibility();
 }
@@ -4172,10 +4529,15 @@ function closeAurumChat() {
   aurumMascotRoot?.classList.remove("aurum-panel-open");
   resetAurumVisibleChat();
   updateAurumMovement();
+  scheduleAurumAvoidance();
 }
 
 function showAurumTip(text = "") {
   if (!shouldShowAurumMascot() || !aurumTipBubble || !aurumTipText || !text && aurumChatPanel && !aurumChatPanel.hidden) return;
+  if (state.aurumAvoidActive && aurumChatPanel?.hidden) {
+    aurumTipBubble.hidden = true;
+    return;
+  }
   const tips = sectionTipPool();
   const message = text || tips[state.aurumTipIndex % tips.length] || AURUM_TIPS[state.aurumTipIndex % AURUM_TIPS.length];
   state.aurumTipIndex += 1;
@@ -11190,6 +11552,8 @@ function renderStep() {
   nextStepButton.textContent = isFinalStep ? "Completa pratica" : "Avanti";
   nextStepButton.classList.toggle("complete-practice-button", isFinalStep);
   if (isFinalStep) scheduleQualityCheckValidation();
+  markAurumAvoidElements();
+  dispatchAurumAvoidanceUpdate();
 }
 
 function updateSignatureState() {
@@ -12576,12 +12940,21 @@ mainMenuLogoRefresh?.addEventListener("keydown", (event) => {
   triggerLogoRefresh();
 });
 assistantForm?.addEventListener("submit", askAssistant);
+aurumMascotRoot?.addEventListener("pointerdown", handleAurumPointerDown);
+window.addEventListener("pointermove", handleAurumPointerMove, { passive: false });
+window.addEventListener("pointerup", handleAurumPointerUp);
+window.addEventListener("pointercancel", handleAurumPointerUp);
 aurumMascotButton?.addEventListener("click", () => {
+  if (state.aurumSuppressNextClick) {
+    state.aurumSuppressNextClick = false;
+    return;
+  }
   aurumMascotButton.classList.add("aurum-clicked");
   window.setTimeout(() => aurumMascotButton.classList.remove("aurum-clicked"), 220);
   openAurumChat();
 });
 aurumChatClose?.addEventListener("click", closeAurumChat);
+aurumResetPosition?.addEventListener("click", () => resetAurumFloatingPosition());
 aurumTipClose?.addEventListener("click", () => {
   if (aurumTipBubble) aurumTipBubble.hidden = true;
 });
@@ -13204,6 +13577,35 @@ brandDropdown?.addEventListener("click", (event) => {
   void openBrandMenuItem(button);
 });
 
+window.addEventListener("resize", () => {
+  restoreAurumFloatingPosition();
+  constrainAurumPanelToViewport();
+  scheduleAurumAvoidance();
+});
+window.addEventListener("scroll", scheduleAurumAvoidance, { passive: true });
+document.addEventListener("scroll", scheduleAurumAvoidance, { passive: true, capture: true });
+window.addEventListener(AURUM_AVOID_EVENT, scheduleAurumAvoidance);
+
+document.addEventListener("focusin", (event) => {
+  if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR) || event.target.closest?.(AURUM_AVOID_SELECTORS.join(","))) {
+    dispatchAurumAvoidanceUpdate();
+  }
+});
+
+document.addEventListener("focusout", (event) => {
+  if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR) || event.target.closest?.(AURUM_AVOID_SELECTORS.join(","))) {
+    window.setTimeout(dispatchAurumAvoidanceUpdate, 80);
+  }
+});
+
+document.addEventListener("input", (event) => {
+  if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR)) dispatchAurumAvoidanceUpdate();
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR)) dispatchAurumAvoidanceUpdate();
+});
+
 document.addEventListener("click", (event) => {
   if (!brandDropdown.hidden && !event.target.closest(".brand-wrap")) closeBrandMenu();
   if (mainUserDropdown && !mainUserDropdown.hidden && !event.target.closest(".main-user-menu")) closeMainUserMenu();
@@ -13824,6 +14226,7 @@ async function initializeApp() {
   removeLegacySearchMenu();
   upgradeProvinceFields();
   populateAutocompleteLists();
+  markAurumAvoidElements();
   startMainMenuClock();
   appShell.hidden = true;
   await restoreSession();

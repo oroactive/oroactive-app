@@ -1174,15 +1174,22 @@ textarea:disabled {
 
 .aurum-mascot-root {
   position: fixed;
+  left: var(--aurum-left, auto);
+  top: var(--aurum-top, auto);
   right: calc(24px + env(safe-area-inset-right));
   bottom: calc(24px + env(safe-area-inset-bottom));
-  z-index: 9000;
+  z-index: 8000;
   display: grid;
   justify-items: end;
   gap: 12px;
   pointer-events: none;
-  transform: translate3d(var(--aurum-x, 0), var(--aurum-y, 0), 0);
-  transition: transform 9s ease-in-out;
+  transition: left 0.18s ease, top 0.18s ease, right 0.18s ease, bottom 0.18s ease, opacity 0.18s ease;
+  touch-action: none;
+}
+
+.aurum-mascot-root.aurum-positioned {
+  right: auto;
+  bottom: auto;
 }
 
 .aurum-mascot-root[hidden],
@@ -1192,16 +1199,21 @@ textarea:disabled {
 }
 
 .aurum-mascot-root.aurum-roaming {
-  will-change: transform;
+  will-change: left, top;
 }
 
 .aurum-mascot-root.aurum-panel-open {
-  transform: none;
   transition: none;
 }
 
+.aurum-mascot-root.aurum-dragging {
+  cursor: grabbing;
+  transition: none;
+  user-select: none;
+}
+
 .main-menu-screen:not([hidden]) ~ .aurum-mascot-root {
-  z-index: 9000;
+  z-index: 8000;
   opacity: 1;
   pointer-events: none;
 }
@@ -1219,9 +1231,30 @@ textarea:disabled {
   pointer-events: auto;
   padding: 8px;
   transform-origin: center;
+  touch-action: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   animation: aurum-breath 4.4s ease-in-out infinite;
   will-change: transform;
+}
+
+.aurum-mascot-root.aurum-dragging .aurum-mascot-button {
+  cursor: grabbing;
+  transform: scale(1.04);
+}
+
+.aurum-mascot-root.aurum-compact:not(.aurum-panel-open) {
+  gap: 6px;
+}
+
+.aurum-mascot-root.aurum-compact:not(.aurum-panel-open) .aurum-mascot-button {
+  width: 68px;
+  height: 68px;
+  padding: 6px;
+}
+
+.aurum-mascot-root.aurum-compact:not(.aurum-panel-open) .aurum-tip,
+.aurum-mascot-root.aurum-avoid-active:not(.aurum-panel-open) .aurum-tip {
+  display: none;
 }
 
 .aurum-mascot-button:hover,
@@ -1331,7 +1364,7 @@ textarea:disabled {
   position: fixed;
   right: calc(16px + env(safe-area-inset-right));
   bottom: calc(16px + env(safe-area-inset-bottom));
-  z-index: 9001;
+  z-index: 8001;
   width: min(420px, calc(100vw - 32px));
   max-width: min(420px, calc(100vw - 32px));
   max-height: min(720px, calc(100vh - 32px));
@@ -1350,6 +1383,16 @@ textarea:disabled {
   pointer-events: auto;
 }
 
+.aurum-chat-panel.aurum-panel-positioned {
+  right: auto;
+  bottom: auto;
+}
+
+.aurum-chat-panel.aurum-panel-dragging {
+  transition: none;
+  user-select: none;
+}
+
 .aurum-chat-header {
   position: sticky;
   top: 0;
@@ -1362,6 +1405,12 @@ textarea:disabled {
   padding: 14px;
   border-bottom: 1px solid rgba(255, 181, 72, 0.22);
   background: rgba(12, 9, 6, 0.98);
+  cursor: grab;
+  touch-action: none;
+}
+
+.aurum-chat-panel.aurum-panel-dragging .aurum-chat-header {
+  cursor: grabbing;
 }
 
 .aurum-chat-header > div {
@@ -1526,6 +1575,15 @@ textarea:disabled {
   margin-bottom: 12px;
 }
 
+.aurum-reset-position-button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  margin: 0 12px 12px;
+  border-color: rgba(255, 181, 72, 0.42);
+  color: #ffd696;
+  font-weight: 900;
+}
+
 .aurum-memory-details summary {
   position: sticky;
   top: 0;
@@ -1553,6 +1611,26 @@ textarea:disabled {
   overscroll-behavior: contain;
   padding-right: 4px;
   -webkit-overflow-scrolling: touch;
+}
+
+.aurum-avoid,
+[data-aurum-avoid="true"],
+.autocomplete-list,
+.suggestion-list,
+.dropdown-menu,
+.field-tooltip,
+.field-error-popover,
+.operator-perfect-tooltip {
+  position: relative;
+  z-index: 9000;
+}
+
+.modal,
+.dialog,
+.confirmation-popup,
+.preview-modal,
+.tutorial-overlay {
+  z-index: 10000;
 }
 
 .aurum-list-row {
@@ -3195,12 +3273,18 @@ textarea:disabled {
   white-space: nowrap;
 }
 
-body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) {
+body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open):not(.aurum-positioned) {
   right: calc(12px + env(safe-area-inset-right));
   bottom: calc(12px + env(safe-area-inset-bottom));
   z-index: 7600;
   transform: scale(0.78);
   transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+body.aurum-blocks-playing .aurum-mascot-root.aurum-positioned:not(.aurum-panel-open) {
+  right: auto;
+  bottom: auto;
+  z-index: 7600;
 }
 
 body.aurum-blocks-playing .aurum-mascot-root.aurum-panel-open {
@@ -3369,7 +3453,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
     display: none;
   }
 
-  body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) {
+  body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open):not(.aurum-positioned) {
     right: calc(8px + env(safe-area-inset-right));
     bottom: calc(8px + env(safe-area-inset-bottom));
     transform: scale(0.66);
@@ -8931,7 +9015,7 @@ input.document-expired {
     width: 100%;
   }
 
-  .aurum-mascot-root {
+  .aurum-mascot-root:not(.aurum-positioned) {
     right: 12px;
     bottom: max(84px, calc(env(safe-area-inset-bottom) + 84px));
   }
@@ -8949,6 +9033,11 @@ input.document-expired {
     max-height: calc(100vh - 16px);
     max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     border-radius: 14px;
+  }
+
+  .aurum-chat-panel.aurum-panel-positioned {
+    right: auto;
+    bottom: auto;
   }
 
   .aurum-tip {
