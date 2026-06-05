@@ -834,6 +834,7 @@ const aurumBlocksCombo = document.getElementById("aurumBlocksCombo");
 const aurumBlocksNext = document.getElementById("aurumBlocksNext");
 const aurumBlocksModeLabel = document.getElementById("aurumBlocksModeLabel");
 const aurumBlocksCoach = document.getElementById("aurumBlocksCoach");
+const aurumBlocksLegend = document.getElementById("aurumBlocksLegend");
 const aurumBlocksQuestion = document.getElementById("aurumBlocksQuestion");
 const aurumBlocksGameOver = document.getElementById("aurumBlocksGameOver");
 const aurumBlocksMyScores = document.getElementById("aurumBlocksMyScores");
@@ -885,15 +886,15 @@ const AURUM_BLOCKS_MODE_LABELS = {
   training: "Training Carature"
 };
 const AURUM_BLOCKS_METALS = [
-  { id: "oro24", label: "Oro 24kt", short: "24K", className: "metal-oro24", valueBonus: 1.15, rarity: 5 },
-  { id: "oro22", label: "Oro 22kt", short: "22K", className: "metal-oro22", valueBonus: 1.12, rarity: 7 },
-  { id: "oro18", label: "Oro 18kt", short: "18K", className: "metal-oro18", valueBonus: 1.1, rarity: 12 },
-  { id: "oro14", label: "Oro 14kt", short: "14K", className: "metal-oro14", valueBonus: 1.05, rarity: 16 },
-  { id: "oro9", label: "Oro 9kt", short: "9K", className: "metal-oro9", valueBonus: 1.02, rarity: 18 },
-  { id: "arg999", label: "Argento 999", short: "AG999", className: "metal-arg999", valueBonus: 1.05, rarity: 12 },
-  { id: "arg925", label: "Argento 925", short: "AG925", className: "metal-arg925", valueBonus: 1.03, rarity: 16 },
-  { id: "arg800", label: "Argento 800", short: "AG800", className: "metal-arg800", valueBonus: 1, rarity: 20 },
-  { id: "pt950", label: "Platino 950", short: "PT950", className: "metal-pt950", valueBonus: 1.12, rarity: 4 }
+  { id: "oro24", label: "Oro 24kt", full: "ORO 24K", short: "24K", className: "metal-oro24 aurum-ingot-gold-24k", valueBonus: 1.15, rarity: 5 },
+  { id: "oro22", label: "Oro 22kt", full: "ORO 22K", short: "22K", className: "metal-oro22 aurum-ingot-gold-22k", valueBonus: 1.12, rarity: 7 },
+  { id: "oro18", label: "Oro 18kt", full: "ORO 18K", short: "18K", className: "metal-oro18 aurum-ingot-gold-18k", valueBonus: 1.1, rarity: 12 },
+  { id: "oro14", label: "Oro 14kt", full: "ORO 14K", short: "14K", className: "metal-oro14 aurum-ingot-gold-14k", valueBonus: 1.05, rarity: 16 },
+  { id: "oro9", label: "Oro 9kt", full: "ORO 9K", short: "9K", className: "metal-oro9 aurum-ingot-gold-9k", valueBonus: 1.02, rarity: 18 },
+  { id: "arg999", label: "Argento 999", full: "AG 999", short: "AG999", className: "metal-arg999 aurum-ingot-silver-999", valueBonus: 1.05, rarity: 12 },
+  { id: "arg925", label: "Argento 925", full: "AG 925", short: "AG925", className: "metal-arg925 aurum-ingot-silver-925", valueBonus: 1.03, rarity: 16 },
+  { id: "arg800", label: "Argento 800", full: "AG 800", short: "AG800", className: "metal-arg800 aurum-ingot-silver-800", valueBonus: 1, rarity: 20 },
+  { id: "pt950", label: "Platino 950", full: "PT 950", short: "PT950", className: "metal-pt950 aurum-ingot-platinum-950", valueBonus: 1.12, rarity: 4 }
 ];
 const AURUM_BLOCKS_SHAPES = [
   { id: "lingotto_lineare", name: "Lingotto Lineare", cells: [[0, 1], [1, 1], [2, 1], [3, 1]] },
@@ -949,10 +950,10 @@ const AURUM_BLOCKS_COACH_MESSAGES = [
   "Pausa intelligente: allenare precisione aiuta anche nel lavoro."
 ];
 const AURUM_BLOCKS_LINE_EFFECTS = {
-  1: { name: "Gold Spark", label: "GOLD SPARK", particles: 12 },
-  2: { name: "Double Bullion", label: "DOUBLE BULLION", particles: 24 },
-  3: { name: "Aurum Burst", label: "AURUM BURST", particles: 36 },
-  4: { name: "Golden Cascade", label: "AURUM BONUS", particles: 60 }
+  1: { name: "Gold Spark", label: "LINEA PULITA", particles: 16 },
+  2: { name: "Double Bullion", label: "FUSIONE D'ORO", particles: 30 },
+  3: { name: "Aurum Burst", label: "COLPO DA MAESTRO", particles: 45 },
+  4: { name: "Golden Cascade", label: "AURUM BONUS", particles: 70 }
 };
 const COMUNI_ITALIANI = [
   { comune: "Busto Arsizio", provincia: "VA", codice: "B300" },
@@ -8019,15 +8020,36 @@ function aurumBlocksSoftDrop() {
   renderAurumBlocksHud();
 }
 
-function aurumBlocksLineMultiplier(clearedRows = []) {
-  const metals = clearedRows.flat().filter(Boolean).map((cell) => cell.metalId || cell.id || "");
-  if (metals.includes("oro24")) return 1.15;
-  if (metals.includes("oro18")) return 1.1;
-  if (metals.includes("arg999")) return 1.05;
-  return 1;
+function aurumBlocksMetalById(id = "") {
+  return AURUM_BLOCKS_METALS.find((metal) => metal.id === id) || null;
 }
 
-function aurumBlocksLineClearCoachMessage(lineCount = 1) {
+function aurumBlocksMetalCellData(metal = {}) {
+  const meta = aurumBlocksMetalById(metal.metalId || metal.id) || metal;
+  return {
+    metalId: meta.id || metal.metalId || "",
+    label: meta.label || metal.label || "Lingotto OroActive",
+    full: meta.full || metal.full || meta.label || metal.label || "Lingotto",
+    short: meta.short || metal.short || "",
+    className: meta.className || metal.className || ""
+  };
+}
+
+function aurumBlocksLineBonus(clearedRows = []) {
+  const metals = clearedRows.flat().filter(Boolean).map((cell) => cell.metalId || cell.id || "");
+  if (metals.includes("oro24")) return { multiplier: 1.15, label: "BONUS 24K +15%", className: "aurum-bonus-24k" };
+  if (metals.includes("oro18")) return { multiplier: 1.1, label: "BONUS 18K +10%", className: "aurum-bonus-18k" };
+  if (metals.includes("arg999")) return { multiplier: 1.05, label: "BONUS ARGENTO +5%", className: "aurum-bonus-silver" };
+  return { multiplier: 1, label: "", className: "" };
+}
+
+function aurumBlocksLineMultiplier(clearedRows = []) {
+  return aurumBlocksLineBonus(clearedRows).multiplier;
+}
+
+function aurumBlocksLineClearCoachMessage(lineCount = 1, effect = {}) {
+  if (effect.cleanBoard) return "Fusione d'oro perfetta: board pulita.";
+  if (effect.metalBonusLabel) return `${effect.metalBonusLabel}: colpo da maestro.`;
   if (lineCount >= 4) return "Aurum Bonus! Mossa perfetta.";
   if (lineCount === 3) return "Ottima precisione: hai acceso la board.";
   if (lineCount === 2) return "Doppio lingotto!";
@@ -8062,8 +8084,8 @@ function aurumBlocksClearLines() {
   game.level = Math.min(AURUM_BLOCKS_MAX_LEVEL, Math.floor(game.lines / AURUM_BLOCKS_LEVEL_LINES) + 1);
   game.dropMs = Math.max(90, AURUM_BLOCKS_DROP_BASE_MS - (game.level - 1) * 38);
   const cleanBoard = game.board.every((row) => row.every((cell) => !cell));
-  const metalBonus = aurumBlocksLineMultiplier(fullRows);
-  const scoreGained = Math.round(base * game.level * metalBonus) + (50 * game.combo) + (cleanBoard ? 500 : 0);
+  const metalBonus = aurumBlocksLineBonus(fullRows);
+  const scoreGained = Math.round(base * game.level * metalBonus.multiplier) + (50 * game.combo) + (cleanBoard ? 500 : 0);
   game.score += scoreGained;
   game.pendingLineEffect = {
     clearedRows: fullRows,
@@ -8071,10 +8093,14 @@ function aurumBlocksClearLines() {
     lineCount: lines,
     scoreGained,
     combo: game.combo,
-    metalBonus,
+    metalBonus: metalBonus.multiplier,
+    metalBonusLabel: metalBonus.label,
+    metalBonusClass: metalBonus.className,
     cleanBoard
   };
-  showAurumBlocksCoach(aurumBlocksLineClearCoachMessage(lines), { force: lines >= 2 });
+  showAurumBlocksCoach(aurumBlocksLineClearCoachMessage(lines, game.pendingLineEffect), {
+    force: lines >= 2 || Boolean(metalBonus.label) || cleanBoard
+  });
   maybeShowAurumBlocksQuestion();
   return lines;
 }
@@ -8084,11 +8110,10 @@ function aurumBlocksLockPiece() {
   if (!game) return;
   aurumBlocksPieceCells(game.active).forEach(({ x, y, metal }) => {
     if (y >= 0 && y < AURUM_BLOCKS_HEIGHT && x >= 0 && x < AURUM_BLOCKS_WIDTH) {
+      const metalData = aurumBlocksMetalCellData(metal);
       game.board[y][x] = {
-        metalId: metal.id,
-        label: metal.label,
-        short: metal.short,
-        className: metal.className
+        ...metalData,
+        landedAt: Date.now()
       };
     }
   });
@@ -8156,6 +8181,11 @@ function triggerGoldLineClearEffect(effect = {}) {
     flash.style.setProperty("--row-y", `${(Number(row || 0) / AURUM_BLOCKS_HEIGHT) * 100}%`);
     flash.style.setProperty("--row-h", `${100 / AURUM_BLOCKS_HEIGHT}%`);
     layer.appendChild(flash);
+    const sweep = document.createElement("span");
+    sweep.className = `aurum-molten-sweep aurum-molten-sweep-${tier}`;
+    sweep.style.setProperty("--row-y", `${(Number(row || 0) / AURUM_BLOCKS_HEIGHT) * 100}%`);
+    sweep.style.setProperty("--row-h", `${100 / AURUM_BLOCKS_HEIGHT}%`);
+    layer.appendChild(sweep);
   });
 
   const scorePopup = document.createElement("span");
@@ -8172,31 +8202,44 @@ function triggerGoldLineClearEffect(effect = {}) {
     layer.appendChild(comboPopup);
   }
 
-  if (tier >= 4) {
+  const bonusText = effect.cleanBoard
+    ? "LINEA PERFETTA"
+    : (effect.metalBonusLabel || (tier >= 2 ? effectConfig.label : ""));
+  if (bonusText) {
     const bonusBanner = document.createElement("span");
-    bonusBanner.className = "aurum-bonus-banner";
-    bonusBanner.textContent = effectConfig.label;
+    bonusBanner.className = `aurum-bonus-banner ${escapeHtml(effect.metalBonusClass || "")} ${effect.cleanBoard ? "aurum-bonus-clean-board" : ""}`;
+    bonusBanner.textContent = bonusText;
     layer.appendChild(bonusBanner);
   }
 
   if (!reducedMotion) {
-    const particleCount = Math.min(60, effectConfig.particles || lineCount * 12);
+    const particleCount = Math.min(70, effectConfig.particles || lineCount * 16);
+    const particlePalettes = [
+      ["#fff7c2", "#ffd700", "#ff6a00"],
+      ["#ffffff", "#fff1b8", "#ffb000"],
+      ["#ffe28a", "#ff9f1c", "#b87900"]
+    ];
     for (let index = 0; index < particleCount; index += 1) {
       const row = rows[index % rows.length] ?? averageRow;
       const particle = document.createElement("span");
-      particle.className = "aurum-gold-particle";
+      const variant = index % 7 === 0 ? "aurum-gold-star" : index % 5 === 0 ? "aurum-gold-fragment" : "aurum-gold-spark";
+      particle.className = `aurum-gold-particle ${variant}`;
       const left = 4 + aurumBlocksRandom() * 92;
       const top = ((Number(row || 0) + aurumBlocksRandom()) / AURUM_BLOCKS_HEIGHT) * 100;
       const dx = (aurumBlocksRandom() - 0.5) * (tier >= 4 ? 190 : 130);
       const dy = -36 - aurumBlocksRandom() * (tier >= 4 ? 120 : 76);
       const size = 3 + aurumBlocksRandom() * (tier >= 3 ? 8 : 5);
+      const palette = particlePalettes[Math.floor(aurumBlocksRandom() * particlePalettes.length)] || particlePalettes[0];
       particle.style.setProperty("--x", `${left}%`);
       particle.style.setProperty("--y", `${top}%`);
       particle.style.setProperty("--dx", `${dx}px`);
       particle.style.setProperty("--dy", `${dy}px`);
       particle.style.setProperty("--size", `${size}px`);
       particle.style.setProperty("--delay", `${Math.round(aurumBlocksRandom() * 130)}ms`);
-      particle.style.setProperty("--duration", `${620 + Math.round(aurumBlocksRandom() * 320)}ms`);
+      particle.style.setProperty("--duration", `${540 + Math.round(aurumBlocksRandom() * 410)}ms`);
+      particle.style.setProperty("--particle-start", palette[0]);
+      particle.style.setProperty("--particle-mid", palette[1]);
+      particle.style.setProperty("--particle-end", palette[2]);
       layer.appendChild(particle);
     }
   }
@@ -8216,20 +8259,44 @@ function renderAurumBlocksBoard() {
   const activeCells = new Map();
   aurumBlocksPieceCells(game.active).forEach((cell) => {
     if (cell.y >= 0) activeCells.set(`${cell.x}:${cell.y}`, {
-      metalId: cell.metal.id,
-      label: cell.metal.label,
-      short: cell.metal.short,
-      className: cell.metal.className
+      ...aurumBlocksMetalCellData(cell.metal),
+      active: true
     });
   });
   const cells = [];
+  const now = Date.now();
   for (let y = 0; y < AURUM_BLOCKS_HEIGHT; y += 1) {
     for (let x = 0; x < AURUM_BLOCKS_WIDTH; x += 1) {
       const cell = activeCells.get(`${x}:${y}`) || game.board[y][x];
-      cells.push(`<span class="aurum-blocks-cell ${cell ? `filled ${escapeHtml(cell.className || "")}` : ""}" aria-label="${cell ? escapeHtml(cell.label) : "vuoto"}">${cell ? escapeHtml(cell.short || "") : ""}</span>`);
+      if (!cell) {
+        cells.push('<span class="aurum-blocks-cell" aria-label="vuoto"></span>');
+        continue;
+      }
+      const cellData = aurumBlocksMetalCellData(cell);
+      const landed = !cell.active && Number(cell.landedAt || 0) && now - Number(cell.landedAt || 0) < 260;
+      const classNames = [
+        "filled",
+        "aurum-ingot-cell",
+        cellData.className,
+        cell.active ? "aurum-ingot-active" : "",
+        landed ? "aurum-ingot-landed" : ""
+      ].filter(Boolean).join(" ");
+      cells.push(`<span class="aurum-blocks-cell ${escapeHtml(classNames)}" aria-label="${escapeHtml(cellData.full || cellData.label)}" title="${escapeHtml(cellData.full || cellData.label)}"><span class="aurum-ingot-label">${escapeHtml(cellData.short || "")}</span></span>`);
     }
   }
   aurumBlocksBoard.innerHTML = `${cells.join("")}<div class="aurum-effects-layer" aria-hidden="true"></div>`;
+}
+
+function renderAurumBlocksLegend() {
+  if (!aurumBlocksLegend) return;
+  aurumBlocksLegend.innerHTML = AURUM_BLOCKS_METALS.map((metal) => `
+    <span class="aurum-metal-legend-item">
+      <span class="aurum-metal-swatch aurum-ingot-cell ${escapeHtml(metal.className)}" aria-hidden="true">
+        <span class="aurum-ingot-label">${escapeHtml(metal.short)}</span>
+      </span>
+      <span>${escapeHtml(metal.full || metal.label)}</span>
+    </span>
+  `).join("");
 }
 
 function renderAurumBlocksHud() {
@@ -8242,12 +8309,14 @@ function renderAurumBlocksHud() {
   if (aurumBlocksModeLabel) aurumBlocksModeLabel.textContent = AURUM_BLOCKS_MODE_LABELS[game.mode] || "Arcade Libero";
   if (aurumBlocksNext) {
     aurumBlocksNext.innerHTML = (game.next || []).slice(0, 3).map((piece) => `
-      <span class="${escapeHtml(piece.metal?.className || "")}">
+      <span class="aurum-next-ingot ${escapeHtml(piece.metal?.className || "")}">
         <strong>${escapeHtml(piece.metal?.short || "")}</strong>
-        ${escapeHtml(piece.name || "Lingotto")}
+        <small>${escapeHtml(piece.metal?.full || piece.metal?.label || "Lingotto")}</small>
+        <em>${escapeHtml(piece.name || "Lingotto")}</em>
       </span>
     `).join("");
   }
+  renderAurumBlocksLegend();
   updateAurumBlocksUiState();
 }
 
@@ -8350,6 +8419,7 @@ async function loadAurumBlocks() {
   state.aurumBlocksBestScoreRow = scoresData.best || null;
   state.aurumBlocksLeaderboard = leaderboardData.leaderboard || [];
   state.aurumBlocksBadges = badgesData.badges || [];
+  renderAurumBlocksLegend();
   renderAurumBlocksLists();
   if (!state.aurumBlocksGame) renderAurumBlocksBoard();
   if (state.aurumBlocksGame && !state.aurumBlocksGame.over && !state.aurumBlocksLoop) {
@@ -8449,6 +8519,7 @@ async function startAurumBlocks(mode = "arcade") {
   showAurumBlocksCoach(normalizedMode === "training"
     ? "Training Carature attivo: completa righe e rispondi ai quiz Aurum."
     : "Partita avviata: incastra i lingotti e cerca linee pulite.");
+  renderAurumBlocksLegend();
   renderAurumBlocksBoard();
   renderAurumBlocksHud();
   updateAurumBlocksUiState();
@@ -8495,7 +8566,7 @@ async function endAurumBlocksGame() {
     }
   }
   const personalRecordMarkup = personalRecord?.is_new_personal_record
-    ? `<div class="aurum-blocks-record-banner">
+    ? `<div class="aurum-blocks-record-banner aurum-blocks-record-burst">
         <strong>Nuovo record personale!</strong>
         <span>${escapeHtml(String(personalRecord.new_score || Math.round(game.score || 0)))} punti · +${escapeHtml(String(personalRecord.difference || 0))} rispetto al precedente${personalRecord.position ? ` · posizione #${escapeHtml(String(personalRecord.position))}` : ""}</span>
       </div>`

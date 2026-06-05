@@ -2332,29 +2332,55 @@ textarea:disabled {
   margin-top: 8px;
 }
 
-.aurum-blocks-next div span {
-  display: flex;
+.aurum-next-ingot {
+  display: grid;
+  grid-template-columns: 54px 1fr;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
+  min-height: 42px;
   padding: 7px 8px;
-  border-radius: 10px;
-  color: #111;
+  border: 1px solid rgba(255, 106, 0, 0.22);
+  border-radius: 12px;
+  color: #fff;
   font-size: 12px;
   font-weight: 950;
   line-height: 1.1;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  background-color: rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
-.aurum-blocks-next div span strong {
+.aurum-next-ingot strong {
   display: inline-grid;
   place-items: center;
-  min-width: 42px;
-  min-height: 24px;
+  min-width: 46px;
+  min-height: 28px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
-  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.22);
+  color: currentColor;
   font-size: 11px;
+  text-shadow: inherit;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.28),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.22);
+}
+
+.aurum-next-ingot small,
+.aurum-next-ingot em {
+  grid-column: 2;
+  color: rgba(255, 255, 255, 0.82);
+  font-style: normal;
+}
+
+.aurum-next-ingot small {
+  font-size: 12px;
+}
+
+.aurum-next-ingot em {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.58);
 }
 
 .aurum-blocks-board-wrap {
@@ -2466,6 +2492,7 @@ textarea:disabled {
 }
 
 .aurum-line-flash,
+.aurum-molten-sweep,
 .aurum-score-pop,
 .aurum-combo-pop,
 .aurum-bonus-banner,
@@ -2486,6 +2513,33 @@ textarea:disabled {
     0 0 18px rgba(255, 215, 0, 0.78),
     0 0 34px rgba(255, 106, 0, 0.32);
   animation: aurumLineGoldClear 620ms ease-out forwards;
+}
+
+.aurum-molten-sweep {
+  left: 0;
+  right: 0;
+  top: var(--row-y);
+  height: max(5px, var(--row-h));
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 106, 0, 0.2) 15%,
+      rgba(255, 215, 0, 0.96) 42%,
+      rgba(255, 255, 210, 1) 50%,
+      rgba(255, 170, 0, 0.82) 62%,
+      transparent 100%
+    );
+  filter: blur(1px);
+  mix-blend-mode: screen;
+  animation: aurumMoltenSweep 720ms ease-out forwards;
+}
+
+.aurum-molten-sweep-3,
+.aurum-molten-sweep-4 {
+  height: max(7px, calc(var(--row-h) * 1.18));
+  animation-duration: 820ms;
 }
 
 .aurum-line-flash-2 {
@@ -2557,18 +2611,56 @@ textarea:disabled {
   animation: aurumBonusBanner 1050ms ease-out forwards;
 }
 
+.aurum-bonus-banner.aurum-bonus-24k {
+  background:
+    linear-gradient(135deg, rgba(255, 241, 184, 0.36), rgba(255, 215, 0, 0.26)),
+    rgba(67, 42, 0, 0.78);
+  box-shadow: 0 0 34px rgba(255, 215, 0, 0.34);
+}
+
+.aurum-bonus-banner.aurum-bonus-18k {
+  background:
+    linear-gradient(135deg, rgba(255, 176, 0, 0.34), rgba(255, 106, 0, 0.28)),
+    rgba(62, 26, 0, 0.78);
+}
+
+.aurum-bonus-banner.aurum-bonus-silver {
+  color: #f8fafc;
+  background:
+    linear-gradient(135deg, rgba(248, 250, 252, 0.28), rgba(148, 163, 184, 0.2)),
+    rgba(15, 23, 42, 0.78);
+}
+
+.aurum-bonus-banner.aurum-bonus-clean-board {
+  width: min(92%, 360px);
+  border-color: rgba(255, 255, 210, 0.78);
+}
+
 .aurum-gold-particle {
   left: var(--x);
   top: var(--y);
   width: var(--size);
   height: var(--size);
   border-radius: 999px;
-  background: radial-gradient(circle, #fff7c2 0 18%, #ffd700 42%, #ff6a00 100%);
+  background: radial-gradient(circle, var(--particle-start, #fff7c2) 0 18%, var(--particle-mid, #ffd700) 42%, var(--particle-end, #ff6a00) 100%);
   box-shadow:
     0 0 8px rgba(255, 215, 0, 0.9),
     0 0 16px rgba(255, 106, 0, 0.42);
   animation: aurumParticleRise var(--duration) ease-out var(--delay) forwards;
   opacity: 0;
+}
+
+.aurum-gold-star {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 62% 36%, 100% 50%, 62% 64%, 50% 100%, 38% 64%, 0 50%, 38% 36%);
+  box-shadow:
+    0 0 10px rgba(255, 241, 184, 0.95),
+    0 0 20px rgba(255, 176, 0, 0.5);
+}
+
+.aurum-gold-fragment {
+  border-radius: 2px 6px;
+  transform: rotate(12deg);
 }
 
 @keyframes aurumBoardPulse {
@@ -2613,6 +2705,24 @@ textarea:disabled {
     opacity: 0;
     filter: brightness(2.2);
     transform: scaleX(0.88) scaleY(0.66);
+  }
+}
+
+@keyframes aurumMoltenSweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-115%) scaleX(0.82);
+  }
+  18% {
+    opacity: 1;
+  }
+  58% {
+    opacity: 0.96;
+    transform: translateX(8%) scaleX(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(115%) scaleX(0.86);
   }
 }
 
@@ -2665,9 +2775,15 @@ textarea:disabled {
     animation-duration: 260ms;
   }
 
+  .aurum-molten-sweep {
+    animation-duration: 120ms;
+  }
+
   .aurum-score-pop,
   .aurum-combo-pop,
-  .aurum-bonus-banner {
+  .aurum-bonus-banner,
+  .aurum-blocks-record-burst,
+  .aurum-blocks-record-burst::before {
     animation-duration: 360ms;
   }
 
@@ -2679,39 +2795,108 @@ textarea:disabled {
 .aurum-blocks-cell {
   display: grid;
   place-items: center;
+  position: relative;
+  isolation: isolate;
   min-width: 0;
   min-height: 0;
   border-radius: 7px;
   color: transparent;
-  font-size: clamp(9px, 0.9vw, 12px);
+  font-size: clamp(8px, 0.85vw, 12px);
   font-weight: 950;
   line-height: 1;
   letter-spacing: 0;
 }
 
-.aurum-blocks-cell.filled {
-  color: rgba(17, 17, 17, 0.9);
+.aurum-blocks-cell.filled.aurum-ingot-cell {
+  overflow: hidden;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.28);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #261500;
+  font-weight: 1000;
+  text-shadow:
+    0 1px 1px rgba(255, 255, 255, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.32);
   box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.38),
-    inset 0 -3px 8px rgba(0, 0, 0, 0.2),
-    0 5px 12px rgba(0, 0, 0, 0.24);
+    inset 0 2px 3px rgba(255, 255, 255, 0.48),
+    inset 0 -4px 7px rgba(0, 0, 0, 0.38),
+    inset 2px 0 4px rgba(255, 255, 255, 0.16),
+    0 4px 10px rgba(0, 0, 0, 0.28);
+  transform: translateZ(0);
 }
 
-.metal-oro24 { background: linear-gradient(145deg, #fff0a8, #ffd86b 42%, #b87900); }
-.metal-oro22 { background: linear-gradient(145deg, #ffe194, #ffc247 48%, #a96f00); }
-.metal-oro18 { background: linear-gradient(145deg, #ffd06b, #ffb12b 45%, #ff6a00); }
-.metal-oro14 { background: linear-gradient(145deg, #ffe09a, #f6c15d 48%, #c47a16); }
-.metal-oro9 { background: linear-gradient(145deg, #fff0bd, #ffe6a5 48%, #c79d42); }
-.metal-arg999 { background: linear-gradient(145deg, #ffffff, #f1f5f9 48%, #94a3b8); }
-.metal-arg925 { background: linear-gradient(145deg, #f8fafc, #dbe4ec 48%, #8796a8); }
-.metal-arg800 { background: linear-gradient(145deg, #cbd5e1, #94a3b8 48%, #64748b); }
-.metal-pt950 { background: linear-gradient(145deg, #f4f4f5, #d4d4d8 48%, #71717a); }
+.aurum-blocks-cell.filled.aurum-ingot-cell::before {
+  content: "";
+  position: absolute;
+  inset: 3px 4px auto;
+  height: 28%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.34);
+  filter: blur(1px);
+  pointer-events: none;
+  z-index: 1;
+}
 
-.aurum-blocks-cell.filled.metal-arg800 {
+.aurum-blocks-cell.filled.aurum-ingot-cell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.34), transparent 36%),
+    linear-gradient(315deg, rgba(0, 0, 0, 0.32), transparent 50%),
+    repeating-linear-gradient(105deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 5px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.aurum-ingot-label {
+  position: relative;
+  z-index: 2;
+  max-width: 100%;
+  padding: 0 1px;
+  font-size: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  transform: scaleX(0.94);
+}
+
+.aurum-ingot-active {
+  filter: brightness(1.08) saturate(1.08);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.52),
+    inset 0 -4px 7px rgba(0, 0, 0, 0.34),
+    0 5px 12px rgba(255, 106, 0, 0.2),
+    0 7px 15px rgba(0, 0, 0, 0.28);
+}
+
+.aurum-ingot-landed {
+  animation: aurumMetalLand 180ms ease-out;
+}
+
+.metal-oro24 { background: linear-gradient(145deg, #fff2a8 0%, #ffd700 28%, #b8860b 72%, #7a4b00 100%); }
+.metal-oro22 { background: linear-gradient(145deg, #ffe28a 0%, #ffc928 32%, #c47a00 75%, #6b3d00 100%); }
+.metal-oro18 { background: linear-gradient(145deg, #ffd18a 0%, #ff9f1c 35%, #d45a00 75%, #6e2c00 100%); }
+.metal-oro14 { background: linear-gradient(145deg, #f8d28a 0%, #e7a63b 36%, #a86412 78%, #513000 100%); }
+.metal-oro9 { background: linear-gradient(145deg, #f7e5b0 0%, #d3aa54 36%, #9a7130 78%, #4a3518 100%); }
+.metal-arg999 { background: linear-gradient(145deg, #ffffff 0%, #e5e7eb 34%, #94a3b8 74%, #475569 100%); }
+.metal-arg925 { background: linear-gradient(145deg, #f8fafc 0%, #cbd5e1 34%, #64748b 75%, #334155 100%); }
+.metal-arg800 { background: linear-gradient(145deg, #e2e8f0 0%, #94a3b8 36%, #475569 78%, #1e293b 100%); }
+.metal-pt950 { background: linear-gradient(145deg, #f4f4f5 0%, #d4d4d8 35%, #71717a 75%, #27272a 100%); }
+
+.aurum-blocks-cell.filled.metal-arg800,
+.aurum-blocks-cell.filled.metal-pt950 {
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.44);
+}
+
+.aurum-blocks-cell.filled.metal-arg925,
+.aurum-blocks-cell.filled.metal-arg999 {
+  color: #111827;
+}
+
+@keyframes aurumMetalLand {
+  0% { transform: translateY(-2px) scale(1.02); filter: brightness(1.22); }
+  56% { transform: translateY(1px) scale(0.985); filter: brightness(1.08); }
+  100% { transform: translateY(0) scale(1); filter: brightness(1); }
 }
 
 .aurum-blocks-touch-controls {
@@ -2768,6 +2953,100 @@ textarea:disabled {
   color: #ffb063;
 }
 
+.aurum-blocks-metal-legend {
+  padding: 12px;
+  border: 1px solid rgba(255, 106, 0, 0.22);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.aurum-blocks-metal-legend summary {
+  cursor: pointer;
+  color: #fff1b8;
+  font-size: 13px;
+  font-weight: 950;
+  list-style: none;
+}
+
+.aurum-blocks-metal-legend summary::-webkit-details-marker {
+  display: none;
+}
+
+.aurum-blocks-metal-legend summary::after {
+  content: "›";
+  display: inline-block;
+  margin-left: 8px;
+  color: #ff6a00;
+  transition: transform 160ms ease;
+}
+
+.aurum-blocks-metal-legend[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.aurum-blocks-metal-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.aurum-metal-legend-item {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.aurum-metal-swatch {
+  display: grid;
+  place-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  color: #261500;
+  font-size: 8px;
+  font-weight: 1000;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.34);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.42),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.28);
+}
+
+.aurum-metal-swatch::before {
+  content: "";
+  position: absolute;
+  inset: 3px 4px auto;
+  height: 26%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.34);
+  filter: blur(1px);
+  z-index: 1;
+}
+
+.aurum-metal-swatch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.28), transparent 38%),
+    linear-gradient(315deg, rgba(0, 0, 0, 0.26), transparent 48%);
+  z-index: 1;
+}
+
+.aurum-metal-swatch.metal-arg800,
+.aurum-metal-swatch.metal-pt950 {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.48);
+}
+
 .aurum-blocks-question,
 .aurum-blocks-game-over {
   padding: 16px;
@@ -2816,6 +3095,24 @@ textarea:disabled {
   box-shadow: 0 0 28px rgba(255, 106, 0, 0.12);
 }
 
+.aurum-blocks-record-burst {
+  position: relative;
+  overflow: hidden;
+  animation: aurumRecordBurst 1150ms ease-out;
+}
+
+.aurum-blocks-record-burst::before {
+  content: "";
+  position: absolute;
+  inset: -40% -20%;
+  background:
+    radial-gradient(circle, rgba(255, 255, 210, 0.8), transparent 16%),
+    conic-gradient(from 90deg, transparent, rgba(255, 215, 0, 0.34), transparent, rgba(255, 106, 0, 0.22), transparent);
+  opacity: 0;
+  animation: aurumRecordSweep 1200ms ease-out forwards;
+  pointer-events: none;
+}
+
 .aurum-blocks-record-banner strong {
   color: #fff1b8;
   font-size: 18px;
@@ -2831,6 +3128,18 @@ textarea:disabled {
   border-radius: 999px;
   background: rgba(255, 106, 0, 0.16);
   color: #ffb063;
+}
+
+@keyframes aurumRecordBurst {
+  0% { transform: scale(0.98); box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+  28% { transform: scale(1.012); box-shadow: 0 0 36px rgba(255, 215, 0, 0.28); }
+  100% { transform: scale(1); box-shadow: 0 0 28px rgba(255, 106, 0, 0.12); }
+}
+
+@keyframes aurumRecordSweep {
+  0% { opacity: 0; transform: rotate(0deg) scale(0.8); }
+  22% { opacity: 0.75; }
+  100% { opacity: 0; transform: rotate(28deg) scale(1.18); }
 }
 
 .aurum-blocks-results-grid {
@@ -2929,14 +3238,24 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .aurum-blocks-next div span {
+  .aurum-next-ingot {
     display: grid;
     justify-items: center;
+    grid-template-columns: 1fr;
     text-align: center;
+  }
+
+  .aurum-next-ingot small,
+  .aurum-next-ingot em {
+    grid-column: 1;
   }
 
   .aurum-blocks-side {
     grid-template-columns: 1fr;
+  }
+
+  .aurum-blocks-metal-legend-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .aurum-blocks-board {
@@ -3031,6 +3350,19 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   .aurum-blocks-cell {
     border-radius: 5px;
     font-size: 8px;
+  }
+
+  .aurum-ingot-label {
+    transform: scaleX(0.88);
+  }
+
+  .aurum-blocks-metal-legend-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aurum-metal-legend-item {
+    grid-template-columns: 38px 1fr;
+    font-size: 10px;
   }
 
   .aurum-blocks-keyboard-hint {
