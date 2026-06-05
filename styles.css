@@ -3057,13 +3057,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .gaming-hero,
 .gaming-game-card,
-.gaming-overview-grid > article,
-.gold-run-shell,
-.gold-run-stage,
-.gold-run-hud article,
-.gold-run-coach,
-.gold-run-levels,
-.gold-run-results-grid > article {
+.gaming-overview-grid > article {
   border: 1px solid rgba(255, 106, 0, 0.24);
   border-radius: 20px;
   background:
@@ -3100,15 +3094,13 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 }
 
 .gaming-hero .muted,
-.gold-run-header .muted,
 .gaming-game-card p {
   color: rgba(255, 255, 255, 0.76);
   font-weight: 800;
 }
 
 .gaming-hero-badges,
-.gaming-card-actions,
-.gold-run-header-actions {
+.gaming-card-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -3128,17 +3120,18 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .gaming-games-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 740px);
+  justify-content: center;
   gap: 16px;
 }
 
 .gaming-game-card {
   display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 16px;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 18px;
   align-items: center;
-  padding: 18px;
-  min-height: 250px;
+  padding: 22px;
+  min-height: 260px;
   overflow: hidden;
   position: relative;
 }
@@ -3153,18 +3146,22 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 }
 
 .gaming-game-card h3,
-.gold-run-header h3,
-.gold-run-levels h3,
-.gold-run-results-grid h3,
 .gaming-overview-grid h3 {
   margin: 6px 0 8px;
   color: #fff;
 }
 
+.gaming-game-card-featured {
+  border-color: rgba(255, 106, 0, 0.38);
+  background:
+    linear-gradient(135deg, rgba(255, 106, 0, 0.2), rgba(5, 5, 5, 0.94)),
+    #111111;
+}
+
 .gaming-game-visual {
   display: grid;
   place-items: center;
-  min-height: 140px;
+  min-height: 150px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
   background:
@@ -3178,8 +3175,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .gaming-mini-block {
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 34px;
+  width: 64px;
+  height: 38px;
   margin: 4px;
   border-radius: 9px;
   color: #111;
@@ -3190,16 +3187,13 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
     0 10px 20px rgba(0, 0, 0, 0.28);
 }
 
-.gaming-overview-grid,
-.gold-run-results-grid {
+.gaming-overview-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
-.gaming-overview-grid > article,
-.gold-run-results-grid > article,
-.gold-run-levels {
+.gaming-overview-grid > article {
   padding: 16px;
 }
 
@@ -3218,7 +3212,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 }
 
 .gaming-list article.is-current-user,
-.gaming-list article.gold-run-best-score {
+.gaming-list article.aurum-blocks-best-score {
   border-color: rgba(255, 106, 0, 0.52);
   background:
     linear-gradient(135deg, rgba(255, 106, 0, 0.16), rgba(255, 215, 0, 0.08)),
@@ -3235,538 +3229,14 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   font-weight: 800;
 }
 
-.gold-run-shell {
-  display: grid;
-  gap: 16px;
-  padding: 16px;
-}
-
-.gold-run-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.gold-run-layout {
-  display: grid;
-  grid-template-columns: minmax(420px, 1fr) minmax(240px, 330px);
-  gap: 16px;
-  align-items: start;
-}
-
-.gold-run-stage-wrap {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.gold-run-stage {
-  position: relative;
-  width: 100%;
-  min-height: 430px;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  background:
-    linear-gradient(180deg, rgba(255, 106, 0, 0.1), rgba(5, 5, 5, 0.18) 42%, rgba(5, 5, 5, 0.94)),
-    radial-gradient(circle at 72% 24%, rgba(255, 106, 0, 0.24), transparent 34%),
-    #050505;
-}
-
-.gold-run-stage::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, rgba(255, 106, 0, 0.08) 1px, transparent 1px),
-    linear-gradient(rgba(255, 106, 0, 0.05) 1px, transparent 1px);
-  background-size: 8% 100%, 100% 18%;
-  transform: translateX(calc(var(--run-progress, 0%) * -1));
-  opacity: 0.72;
-}
-
-.gold-run-track {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 11%;
-  height: 12%;
-  border-top: 1px solid rgba(255, 106, 0, 0.42);
-  background:
-    repeating-linear-gradient(90deg, rgba(255, 106, 0, 0.28) 0 28px, rgba(255, 255, 255, 0.04) 28px 54px),
-    linear-gradient(180deg, rgba(255, 106, 0, 0.2), rgba(12, 12, 12, 0.96));
-}
-
-.gold-run-parallax {
-  position: absolute;
-  inset: 12% 0 24%;
-  opacity: 0.38;
-  background:
-    linear-gradient(90deg, transparent 0 7%, rgba(255, 106, 0, 0.16) 7% 8%, transparent 8% 16%),
-    linear-gradient(180deg, transparent 72%, rgba(255, 215, 0, 0.12) 72% 74%, transparent 74%);
-  transform: translateX(calc(var(--run-progress, 0%) * -0.45));
-}
-
-.gold-run-parallax-front {
-  inset: 34% 0 18%;
-  opacity: 0.28;
-  transform: translateX(calc(var(--run-progress, 0%) * -0.85));
-}
-
-.gold-run-layer,
-.gold-run-effect-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.gold-run-elite,
-.gold-run-elite-preview {
-  position: absolute;
-  width: 58px;
-  height: 88px;
-  left: var(--elite-x, 10%);
-  bottom: var(--elite-y, 14%);
-  z-index: 4;
-  transform-origin: 50% 100%;
-  transition: filter 0.14s ease;
-}
-
-.gold-run-elite-preview {
-  position: relative;
-  left: auto;
-  bottom: auto;
-  transform: scale(0.88);
-}
-
-.gold-run-preview-ingot {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #fff1a8, #ffd86b 44%, #b87900);
-  color: #111;
-  font-size: 12px;
-  font-weight: 950;
-  box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.36),
-    0 12px 22px rgba(0, 0, 0, 0.28);
-}
-
-.elite-head,
-.elite-neck,
-.elite-body,
-.elite-arm,
-.elite-leg,
-.elite-shoe {
-  position: absolute;
-  display: block;
-}
-
-.elite-head {
-  left: 16px;
-  top: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50% 50% 44% 44%;
-  background: linear-gradient(145deg, #ffd0a6, #b9744b);
-  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.22);
-}
-
-.elite-head::before,
-.elite-head::after {
-  content: "";
-  position: absolute;
-  top: 11px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #111;
-}
-
-.elite-head::before { left: 7px; }
-.elite-head::after { right: 7px; }
-
-.elite-neck {
-  left: 25px;
-  top: 25px;
-  width: 10px;
-  height: 8px;
-  background: #c78459;
-}
-
-.elite-body {
-  left: 14px;
-  top: 31px;
-  width: 32px;
-  height: 28px;
-  border-radius: 9px 9px 12px 12px;
-  background:
-    linear-gradient(90deg, transparent 0 42%, rgba(255, 106, 0, 0.92) 42% 57%, transparent 57%),
-    linear-gradient(145deg, #171717, #050505);
-  border: 1px solid rgba(255, 106, 0, 0.28);
-}
-
-.elite-arm {
-  top: 34px;
-  width: 9px;
-  height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(#d28d63, #8f573c);
-}
-
-.elite-arm::after {
-  content: "";
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  top: 6px;
-  height: 14px;
-  border-top: 2px solid rgba(17, 17, 17, 0.82);
-  border-bottom: 2px solid rgba(17, 17, 17, 0.72);
-  transform: rotate(-18deg);
-}
-
-.elite-arm-left {
-  left: 6px;
-  transform: rotate(18deg);
-}
-
-.elite-arm-right {
-  right: 6px;
-  transform: rotate(-18deg);
-}
-
-.elite-leg {
-  top: 56px;
-  width: 11px;
-  height: 26px;
-  border-radius: 7px;
-  background: linear-gradient(#141414, #050505);
-}
-
-.elite-leg-left {
-  left: 18px;
-}
-
-.elite-leg-right {
-  right: 16px;
-}
-
-.elite-shoe {
-  bottom: 0;
-  width: 22px;
-  height: 9px;
-  border-radius: 9px 11px 5px 5px;
-  background:
-    linear-gradient(180deg, #ffffff 0 2px, transparent 2px),
-    #050505;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-}
-
-.elite-shoe-left { left: 11px; }
-.elite-shoe-right { right: 7px; }
-
-.gold-run-elite.is-running .elite-leg-left,
-.gold-run-elite.is-running .elite-arm-right {
-  animation: eliteRunA 260ms ease-in-out infinite alternate;
-}
-
-.gold-run-elite.is-running .elite-leg-right,
-.gold-run-elite.is-running .elite-arm-left {
-  animation: eliteRunB 260ms ease-in-out infinite alternate;
-}
-
-.gold-run-elite.is-jumping {
-  filter: drop-shadow(0 0 12px rgba(255, 106, 0, 0.44));
-}
-
-.gold-run-elite.is-hit {
-  animation: eliteHit 420ms ease-out;
-}
-
-.gold-run-elite.has-shield::after {
-  content: "";
-  position: absolute;
-  inset: -8px;
-  border: 2px solid rgba(255, 215, 0, 0.52);
-  border-radius: 999px;
-  box-shadow: 0 0 18px rgba(255, 215, 0, 0.42);
-}
-
-.gold-run-object {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  min-width: 42px;
-  min-height: 32px;
-  padding: 4px 7px;
-  border-radius: 11px;
-  z-index: 3;
-  font-size: 11px;
-  font-weight: 950;
-  line-height: 1;
-  text-align: center;
-  color: #111;
-  box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.34),
-    0 10px 22px rgba(0, 0, 0, 0.26);
-}
-
-.gold-run-object.reward {
-  border: 1px solid rgba(255, 255, 255, 0.24);
-}
-
-.gold-run-reward-coin { background: linear-gradient(145deg, #ffd86b, #ff6a00); }
-.gold-run-reward-oro9 { background: linear-gradient(145deg, #fff0bd, #c79d42); }
-.gold-run-reward-oro18 { background: linear-gradient(145deg, #ffcf66, #ff6a00); }
-.gold-run-reward-oro24 { background: linear-gradient(145deg, #fff1a8, #b87900); }
-.gold-run-reward-arg925 { background: linear-gradient(145deg, #f8fafc, #8796a8); }
-.gold-run-reward-diamond { background: linear-gradient(145deg, #ffffff, #67e8f9); }
-.gold-run-reward-badge { background: linear-gradient(145deg, #fcd34d, #7c2d12); color: #fff; }
-.gold-run-reward-shield { background: linear-gradient(145deg, #fef3c7, #16a34a); }
-.gold-run-reward-key { background: linear-gradient(145deg, #fde68a, #92400e); color: #fff; }
-
-.gold-run-object.enemy,
-.gold-run-object.boss {
-  min-width: 54px;
-  min-height: 44px;
-  color: #fff;
-  border: 1px solid rgba(220, 38, 38, 0.48);
-  background:
-    linear-gradient(145deg, rgba(220, 38, 38, 0.58), rgba(17, 17, 17, 0.96)),
-    #1f0d0d;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.58);
-}
-
-.gold-run-object.boss {
-  min-width: 92px;
-  min-height: 78px;
-  border-color: rgba(255, 106, 0, 0.62);
-  background:
-    linear-gradient(145deg, rgba(255, 106, 0, 0.44), rgba(44, 9, 9, 0.98)),
-    #140909;
-  box-shadow: 0 0 26px rgba(255, 106, 0, 0.22);
-}
-
-.gold-run-spark-burst {
-  position: absolute;
-  z-index: 8;
-  transform: translate(-50%, 50%);
-  color: #fff1b8;
-  font-size: 24px;
-  font-weight: 950;
-  text-shadow:
-    0 0 10px rgba(255, 215, 0, 0.86),
-    0 0 24px rgba(255, 106, 0, 0.5);
-  animation: goldRunSpark 780ms ease-out forwards;
-  pointer-events: none;
-}
-
-.gold-run-overlay {
-  position: absolute;
-  inset: 22% 12%;
-  z-index: 9;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 10px;
-  padding: 18px;
-  border: 1px solid rgba(255, 106, 0, 0.42);
-  border-radius: 20px;
-  background: rgba(5, 5, 5, 0.78);
-  text-align: center;
-}
-
-.gold-run-overlay[hidden] {
-  display: none;
-}
-
-.gold-run-overlay strong {
-  color: #fff;
-  font-size: clamp(24px, 4vw, 42px);
-}
-
-.gold-run-overlay span {
-  color: rgba(255, 255, 255, 0.78);
-  font-weight: 850;
-}
-
-.gold-run-hud {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.gold-run-hud article,
-.gold-run-coach {
-  padding: 12px;
-}
-
-.gold-run-hud article span,
-.gold-run-coach span {
-  display: block;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.gold-run-hud article strong {
-  display: block;
-  margin-top: 5px;
-  color: #fff;
-  font-size: 27px;
-  line-height: 1;
-}
-
-.gold-run-boss-card {
-  grid-column: 1 / -1;
-}
-
-.gold-run-boss-bar {
-  height: 9px;
-  margin-top: 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-}
-
-.gold-run-boss-bar i {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #dc2626, #ff6a00, #ffd700);
-}
-
-.gold-run-coach {
-  grid-column: 1 / -1;
-}
-
-.gold-run-coach strong {
-  display: block;
-  margin-bottom: 6px;
-  color: #ffb063;
-}
-
-.gold-run-touch-controls {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(50px, 1fr));
-  gap: 10px;
-}
-
-.gold-run-touch-controls button {
-  min-height: 54px;
-  border: 1px solid rgba(255, 106, 0, 0.45);
-  border-radius: 14px;
-  background: rgba(255, 106, 0, 0.15);
-  color: #fff;
-  font-weight: 950;
-  touch-action: manipulation;
-  cursor: pointer;
-}
-
-.gold-run-touch-controls button:active,
-.gold-run-touch-controls button:hover,
-.gold-run-touch-controls button:focus-visible {
-  background: rgba(255, 106, 0, 0.25);
-  border-color: rgba(255, 106, 0, 0.76);
-}
-
-.gold-run-keyboard-hint {
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 12px;
-  font-weight: 850;
-  text-align: center;
-}
-
-.gold-run-levels div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.gold-run-levels span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.74);
-  background: rgba(255, 255, 255, 0.06);
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.gold-run-levels span.is-current {
-  border-color: rgba(255, 106, 0, 0.58);
-  color: #fff;
-  background: rgba(255, 106, 0, 0.18);
-}
-
-.gold-run-levels strong {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: rgba(255, 106, 0, 0.22);
-  color: #ffb063;
-}
-
-body.gold-run-playing .aurum-mascot-root:not(.aurum-panel-open) {
-  right: calc(12px + env(safe-area-inset-right));
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  transform: scale(0.72);
-}
-
-@keyframes eliteRunA {
-  from { transform: rotate(-12deg) translateY(0); }
-  to { transform: rotate(18deg) translateY(3px); }
-}
-
-@keyframes eliteRunB {
-  from { transform: rotate(16deg) translateY(3px); }
-  to { transform: rotate(-14deg) translateY(0); }
-}
-
-@keyframes eliteHit {
-  0%, 100% { transform: translateX(0); filter: none; }
-  25% { transform: translateX(-4px); filter: brightness(1.8); }
-  50% { transform: translateX(4px); filter: brightness(1.4); }
-  75% { transform: translateX(-2px); filter: brightness(1.7); }
-}
-
-@keyframes goldRunSpark {
-  0% { opacity: 0; transform: translate(-50%, 16px) scale(0.78); }
-  24% { opacity: 1; transform: translate(-50%, -4px) scale(1.08); }
-  100% { opacity: 0; transform: translate(-50%, -48px) scale(0.86); }
-}
-
 @media (max-width: 1024px) {
-  .gaming-games-grid,
-  .gaming-overview-grid,
-  .gold-run-layout,
-  .gold-run-results-grid {
+  .gaming-overview-grid {
     grid-template-columns: 1fr;
-  }
-
-  .gold-run-stage {
-    min-height: 390px;
   }
 }
 
 @media (max-width: 720px) {
-  .gaming-hero,
-  .gold-run-header {
+  .gaming-hero {
     align-items: stretch;
     flex-direction: column;
   }
@@ -3780,49 +3250,13 @@ body.gold-run-playing .aurum-mascot-root:not(.aurum-panel-open) {
     min-height: 118px;
   }
 
-  .gaming-card-actions,
-  .gold-run-header-actions {
+  .gaming-card-actions {
     display: grid;
     grid-template-columns: 1fr;
   }
 
-  .gaming-card-actions button,
-  .gold-run-header-actions button {
+  .gaming-card-actions button {
     width: 100%;
-  }
-
-  .gold-run-stage {
-    min-height: 320px;
-    aspect-ratio: 4 / 3;
-  }
-
-  .gold-run-hud {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .gold-run-touch-controls {
-    grid-template-columns: repeat(5, minmax(42px, 1fr));
-    gap: 7px;
-  }
-
-  .gold-run-touch-controls button {
-    min-height: 52px;
-    padding-inline: 5px;
-    font-size: 12px;
-  }
-
-  .gold-run-keyboard-hint {
-    display: none;
-  }
-
-  .gold-run-elite {
-    transform: scale(0.82);
-  }
-
-  .gold-run-object {
-    min-width: 36px;
-    min-height: 28px;
-    font-size: 10px;
   }
 }
 

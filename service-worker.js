@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260605-gaming-oroactive-2";
+const STATIC_CACHE = "oroactive-static-v20260605-gaming-aurum-blocks-only-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260605-gaming-oroactive-2",
-  "/app.js?v=20260605-gaming-oroactive-2",
+  "/styles.css?v=20260605-gaming-aurum-blocks-only-1",
+  "/app.js?v=20260605-gaming-aurum-blocks-only-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

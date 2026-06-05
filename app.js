@@ -77,14 +77,6 @@ const state = {
   aurumBlocksQuestionOpen: false,
   aurumBlocksTouchStart: null,
   gamingOverview: null,
-  goldRunGame: null,
-  goldRunLoop: null,
-  goldRunScores: [],
-  goldRunBestScore: 0,
-  goldRunBestScoreRow: null,
-  goldRunLeaderboard: [],
-  goldRunKeys: { left: false, right: false },
-  goldRunTouchActions: new Set(),
   users: [],
   userActivities: new Map(),
   crmClients: [],
@@ -225,7 +217,7 @@ const AURUM_SECTION_TIPS = {
   ],
   gaming: [
     "Gaming OroActive e un'area formativa: gioca solo nei momenti consentiti dal tuo responsabile.",
-    "Nella Corsa all'oro Elite allena riflessi e attenzione senza creare dati operativi reali."
+    "Aurum Blocks e l'unico gioco attivo: allena carature, precisione e riflessi senza creare dati operativi reali."
   ],
   users: [
     "Controlla ruoli e permessi prima di modificare un utente.",
@@ -284,52 +276,6 @@ const AURUM_SECTION_MAP = {
   antifraud: "elenco_atti"
 };
 
-const GOLD_RUN_PLAYER_NAME = "Elite";
-const GOLD_RUN_LEVELS = [
-  { id: 1, title: "Banco Valutazione", theme: "Banco", boss: "Falsario", speed: 1, enemyRate: 0.9 },
-  { id: 2, title: "Negozio OroActive", theme: "Showroom", boss: "Cliente sospetto", speed: 1.08, enemyRate: 1 },
-  { id: 3, title: "Magazzino Preziosi", theme: "Magazzino", boss: "Documento scaduto", speed: 1.16, enemyRate: 1.08 },
-  { id: 4, title: "Laboratorio Analisi", theme: "Analisi", boss: "Truffatore del peso", speed: 1.24, enemyRate: 1.16 },
-  { id: 5, title: "Caveau OroActive", theme: "Caveau", boss: "Michele il Re dell'Oro", speed: 1.34, enemyRate: 1.28 },
-  { id: 6, title: "Mercato dell'Oro", theme: "Mercato", boss: "Bilancia impazzita", speed: 1.44, enemyRate: 1.38 },
-  { id: 7, title: "Distretto dei Compro Oro", theme: "Distretto", boss: "Mirko il Dio dell'Oro", speed: 1.54, enemyRate: 1.48 },
-  { id: 8, title: "Raffineria OroActive", theme: "Raffineria", boss: "Il Falsario Supremo", speed: 1.66, enemyRate: 1.62 },
-  { id: 9, title: "Accademia del Valore", theme: "Accademia", boss: "Il Collezionista Oscuro", speed: 1.78, enemyRate: 1.76 },
-  { id: 10, title: "Fortezza dell'Oro", theme: "Fortezza", boss: "Il Guardiano del Caveau", speed: 1.92, enemyRate: 1.95 }
-];
-
-const GOLD_RUN_REWARDS = [
-  { code: "coin", label: "Moneta OroActive", short: "OA", points: 100, weight: 28, className: "gold-run-reward-coin" },
-  { code: "oro9", label: "Lingotto 9kt", short: "9K", points: 150, weight: 18, className: "gold-run-reward-oro9" },
-  { code: "oro18", label: "Lingotto 18kt", short: "18K", points: 250, weight: 15, className: "gold-run-reward-oro18" },
-  { code: "oro24", label: "Lingotto 24kt", short: "24K", points: 500, weight: 8, className: "gold-run-reward-oro24" },
-  { code: "arg925", label: "Argento 925", short: "AG925", points: 120, weight: 18, className: "gold-run-reward-arg925" },
-  { code: "diamond", label: "Diamante certificato", short: "DIA", points: 1000, weight: 4, className: "gold-run-reward-diamond" },
-  { code: "badge", label: "Badge Academy", short: "BDG", points: 650, weight: 5, className: "gold-run-reward-badge" },
-  { code: "shield", label: "Scudo Aurum", short: "SH", points: 250, weight: 4, className: "gold-run-reward-shield", shield: true },
-  { code: "key", label: "Chiave caveau", short: "KEY", points: 350, weight: 5, className: "gold-run-reward-key" }
-];
-
-const GOLD_RUN_ENEMIES = [
-  { code: "falsario", label: "Falsario", className: "gold-run-enemy-falsario", damage: 1 },
-  { code: "cliente_sospetto", label: "Cliente sospetto", className: "gold-run-enemy-client", damage: 1 },
-  { code: "documento_scaduto", label: "Documento scaduto", className: "gold-run-enemy-doc", damage: 1 },
-  { code: "truffatore_peso", label: "Truffatore del peso", className: "gold-run-enemy-weight", damage: 1 },
-  { code: "bilancia_impazzita", label: "Bilancia impazzita", className: "gold-run-enemy-scale", damage: 1 },
-  { code: "errore_caratura", label: "Errore di caratura", className: "gold-run-enemy-karat", damage: 1 },
-  { code: "contanti_limite", label: "Busta contanti fuori limite", className: "gold-run-enemy-cash", damage: 1 },
-  { code: "ombra_lingotto", label: "Ombra del falso lingotto", className: "gold-run-enemy-shadow", damage: 1 }
-];
-
-const GOLD_RUN_ACHIEVEMENTS = [
-  { code: "primo_lingotto", name: "Primo lingotto", description: "Raccogli il primo premio nella Corsa all'oro." },
-  { code: "re_24kt", name: "Re del 24kt", description: "Raccogli almeno 5 lingotti 24kt in una partita." },
-  { code: "cacciatore_diamanti", name: "Cacciatore di diamanti", description: "Raccogli 3 diamanti certificati." },
-  { code: "dieci_livelli", name: "10 livelli completati", description: "Completa la Fortezza dell'Oro." },
-  { code: "boss_hunter", name: "Boss Hunter", description: "Sconfiggi almeno un boss." },
-  { code: "record_personale", name: "Record personale", description: "Supera il tuo miglior punteggio." },
-  { code: "maestro_arcade", name: "Maestro OroActive Arcade", description: "Supera 25.000 punti." }
-];
 const OROACTIVE_APP_GUIDE = {
   nuovo_atto_vendita: {
     title: "Nuovo Atto di Vendita",
@@ -896,24 +842,7 @@ const aurumBlocksScreen = document.getElementById("aurumBlocks");
 const gamingShell = document.getElementById("gamingShell");
 const gamingQuickRanking = document.getElementById("gamingQuickRanking");
 const gamingPersonalStats = document.getElementById("gamingPersonalStats");
-const goldRunShell = document.getElementById("goldRunShell");
-const goldRunStage = document.getElementById("goldRunStage");
-const goldRunElite = document.getElementById("goldRunElite");
-const goldRunLayer = document.getElementById("goldRunLayer");
-const goldRunEffects = document.getElementById("goldRunEffects");
-const goldRunOverlay = document.getElementById("goldRunOverlay");
-const goldRunScore = document.getElementById("goldRunScore");
-const goldRunLives = document.getElementById("goldRunLives");
-const goldRunLevel = document.getElementById("goldRunLevel");
-const goldRunRewards = document.getElementById("goldRunRewards");
-const goldRunBossCard = document.getElementById("goldRunBossCard");
-const goldRunBossName = document.getElementById("goldRunBossName");
-const goldRunBossHp = document.getElementById("goldRunBossHp");
-const goldRunCoach = document.getElementById("goldRunCoach");
-const goldRunLevels = document.getElementById("goldRunLevels");
-const goldRunMyScores = document.getElementById("goldRunMyScores");
-const goldRunLeaderboard = document.getElementById("goldRunLeaderboard");
-const goldRunAchievements = document.getElementById("goldRunAchievements");
+const gamingAurumBlocksBadges = document.getElementById("gamingAurumBlocksBadges");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
@@ -2395,8 +2324,7 @@ const MENU_GROUPS = [
       { id: "badges", label: "Badge", description: "Progressi e riconoscimenti.", icon: "BD", order: 40, section: "training", courseTabShortcut: "badges", roles: MENU_ROLES.all, keywords: "badge riconoscimenti" },
       { id: "training-history", label: "Storico formazione", description: "Cronologia formativa.", icon: "SF", order: 50, section: "training", courseTabShortcut: "history", roles: MENU_ROLES.all, keywords: "storico formazione progressi" },
       { id: "operator-training", label: "Training Operatore", description: "Simulazioni senza dati reali.", icon: "TR", order: 60, section: "training", courseTabShortcut: "operatorTraining", roles: MENU_ROLES.all, keywords: "training operatore demo pratica simulazione" },
-      { id: "gaming-oroactive", label: "Gaming OroActive", description: "Aurum Blocks e La corsa all'oro.", icon: "GO", order: 70, section: "gaming", roles: MENU_ROLES.all, keywords: "gaming oroactive giochi aurum blocks corsa oro elite arcade formazione" },
-      { id: "aurum-blocks", label: "Aurum Blocks", description: "Arcade formativo con lingotti e carature.", icon: "AB", order: 75, section: "aurumBlocks", roles: MENU_ROLES.all, keywords: "aurum blocks gioco arcade lingotti carature formazione punteggi" },
+      { id: "gaming-oroactive", label: "Gaming OroActive", description: "Aurum Blocks arcade formativo.", icon: "GO", order: 70, section: "gaming", roles: MENU_ROLES.all, keywords: "gaming oroactive giochi arcade formazione punteggi carature" },
       { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "NC", order: 80, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
       { id: "aurum-assistant", label: "Assistente IA / Aurum", description: "Tutor e assistente operativo.", icon: "AI", order: 90, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
       { id: "app-tutorial", label: "Tutorial app", description: "Guida rapida all'app.", icon: "TU", order: 100, action: "tutorial", roles: MENU_ROLES.all, keywords: "tutorial guida aiuto" }
@@ -3033,7 +2961,6 @@ function setScreen(id) {
     stopAurumBlocksLoop();
     updateAurumBlocksUiState(true);
   }
-  if (id !== "gaming") stopGoldRunLoop();
   setAurumSection(requestedSection);
   void handleScreenDataLoad(id).catch((error) => {
     showToast(sectionLoadErrorMessage(id, error), "error");
@@ -8573,7 +8500,7 @@ async function endAurumBlocksGame() {
         <div class="aurum-blocks-actions">
           <button class="primary-button" type="button" data-aurum-blocks-start="${escapeHtml(game.mode)}">Gioca ancora</button>
           <button type="button" data-aurum-blocks-exit>Menu Aurum Blocks</button>
-          <button type="button" data-aurum-blocks-go-training>Torna a Formazione</button>
+          <button type="button" data-aurum-blocks-go-gaming>Torna a Gaming OroActive</button>
         </div>
       </div>
     `;
@@ -8596,524 +8523,71 @@ function exitAurumBlocksGame() {
   updateAurumBlocksUiState(true);
 }
 
-function weightedGoldRunReward() {
-  const total = GOLD_RUN_REWARDS.reduce((sum, reward) => sum + Number(reward.weight || 1), 0);
-  let pick = Math.random() * total;
-  for (const reward of GOLD_RUN_REWARDS) {
-    pick -= Number(reward.weight || 1);
-    if (pick <= 0) return reward;
-  }
-  return GOLD_RUN_REWARDS[0];
-}
+function renderGamingAurumBlocks() {
+  const scores = state.aurumBlocksScores || [];
+  const leaderboard = state.aurumBlocksLeaderboard || [];
+  const badges = state.aurumBlocksBadges || [];
+  const bestScore = Number(state.aurumBlocksBestScore || 0);
+  const bestRow = state.aurumBlocksBestScoreRow || null;
 
-function goldRunCurrentLevel(game = state.goldRunGame) {
-  return GOLD_RUN_LEVELS[Math.max(0, Math.min(GOLD_RUN_LEVELS.length - 1, Number(game?.levelIndex || 0)))] || GOLD_RUN_LEVELS[0];
-}
-
-function goldRunLevelLength(level = goldRunCurrentLevel()) {
-  return 920 + Number(level.id || 1) * 180;
-}
-
-function goldRunStageActive() {
-  return document.getElementById("gaming")?.classList.contains("active-screen");
-}
-
-function showGoldRunCoach(message = "", options = {}) {
-  const game = state.goldRunGame;
-  const now = Date.now();
-  if (!options.force && game?.lastCoachAt && now - game.lastCoachAt < 16000) return;
-  if (game) game.lastCoachAt = now;
-  if (!goldRunCoach) return;
-  goldRunCoach.innerHTML = `
-    <strong>Aurum coach</strong>
-    <span>${escapeHtml(message || `Aurum: Forza ${GOLD_RUN_PLAYER_NAME}, raccogli più lingotti possibile.`)}</span>
-  `;
-}
-
-function goldRunSpawnReward(game) {
-  const reward = weightedGoldRunReward();
-  game.objects.push({
-    id: `reward-${Date.now()}-${Math.random()}`,
-    kind: "reward",
-    ...reward,
-    x: 102,
-    y: 18 + Math.random() * 34,
-    w: reward.code === "diamond" ? 6 : 5.5,
-    h: reward.code === "diamond" ? 6 : 5
-  });
-}
-
-function goldRunSpawnEnemy(game) {
-  const level = goldRunCurrentLevel(game);
-  const enemy = GOLD_RUN_ENEMIES[(Math.floor(Math.random() * (2 + level.id)) % GOLD_RUN_ENEMIES.length)] || GOLD_RUN_ENEMIES[0];
-  game.objects.push({
-    id: `enemy-${Date.now()}-${Math.random()}`,
-    kind: "enemy",
-    ...enemy,
-    x: 104,
-    y: 14,
-    w: 7.2,
-    h: 12,
-    phase: Math.random() * Math.PI * 2
-  });
-}
-
-function goldRunSpawnBoss(game) {
-  const level = goldRunCurrentLevel(game);
-  if (game.boss) return;
-  game.boss = {
-    id: `boss-${level.id}`,
-    kind: "boss",
-    label: level.boss,
-    x: 88,
-    y: 13,
-    w: 11,
-    h: 18,
-    hp: 4 + Math.floor(level.id / 2),
-    maxHp: 4 + Math.floor(level.id / 2),
-    direction: -1
-  };
-  showGoldRunCoach(`Aurum: Attento ${GOLD_RUN_PLAYER_NAME}, ${level.boss} blocca il livello.`, { force: true });
-}
-
-function goldRunRectsOverlap(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-}
-
-function goldRunPlayerRect(game) {
-  return { x: game.x, y: game.y, w: 7.8, h: 18 };
-}
-
-function triggerGoldRunSpark(x = 50, y = 50, label = "") {
-  if (!goldRunEffects) return;
-  const burst = document.createElement("span");
-  burst.className = "gold-run-spark-burst";
-  burst.style.left = `${x}%`;
-  burst.style.bottom = `${y}%`;
-  burst.textContent = label;
-  goldRunEffects.appendChild(burst);
-  window.setTimeout(() => burst.remove(), 780);
-}
-
-function goldRunHitPlayer(game, message = "") {
-  if (!game || game.over || game.invulnerableUntil > Date.now()) return;
-  if (game.shieldUntil > Date.now()) {
-    game.score += 80;
-    showGoldRunCoach(`Aurum: Scudo attivo, ${GOLD_RUN_PLAYER_NAME} resta protetto.`, { force: true });
-    return;
-  }
-  game.lives -= 1;
-  game.invulnerableUntil = Date.now() + 1300;
-  goldRunElite?.classList.add("is-hit");
-  window.setTimeout(() => goldRunElite?.classList.remove("is-hit"), 420);
-  showGoldRunCoach(message || `Aurum: Attento ${GOLD_RUN_PLAYER_NAME}, recupera ritmo.`, { force: true });
-  if (game.lives <= 0) {
-    void finishGoldRunGame("game_over");
-  }
-}
-
-function goldRunCollectReward(game, object) {
-  game.score += Number(object.points || 0);
-  game.rewardsCollected += 1;
-  game.rewardCounts[object.code] = Number(game.rewardCounts[object.code] || 0) + 1;
-  if (object.shield) game.shieldUntil = Date.now() + 6000;
-  triggerGoldRunSpark(object.x, object.y, `+${object.points || 0}`);
-  if (["oro24", "diamond", "badge"].includes(object.code)) {
-    showGoldRunCoach(`Aurum: ${GOLD_RUN_PLAYER_NAME} ha trovato ${object.label}!`, { force: true });
-  }
-}
-
-function goldRunAttackBoss(game) {
-  if (!game?.boss || game.lastActionAt && Date.now() - game.lastActionAt < 420) return;
-  game.lastActionAt = Date.now();
-  const boss = game.boss;
-  if (Math.abs((game.x + 8) - boss.x) > 18) {
-    showGoldRunCoach("Aurum: avvicinati al boss prima dell'azione.");
-    return;
-  }
-  boss.hp -= 1;
-  game.score += 250;
-  triggerGoldRunSpark(boss.x, boss.y + 10, "HIT");
-  if (boss.hp <= 0) goldRunCompleteLevel(game);
-}
-
-function goldRunCompleteLevel(game) {
-  const level = goldRunCurrentLevel(game);
-  game.score += 1200 + level.id * 250;
-  game.bossesDefeated += 1;
-  triggerGoldRunSpark(50, 54, "LEVEL");
-  showGoldRunCoach(`Aurum: Ottima corsa, ${GOLD_RUN_PLAYER_NAME}. Hai superato ${level.title}.`, { force: true });
-  if (level.id >= GOLD_RUN_LEVELS.length) {
-    void finishGoldRunGame("completed");
-    return;
-  }
-  game.levelIndex += 1;
-  game.distance = 0;
-  game.objects = [];
-  game.boss = null;
-  game.x = 10;
-  game.y = 14;
-  game.vy = 0;
-  game.nextRewardAt = 160;
-  game.nextEnemyAt = 240;
-}
-
-function updateGoldRunAchievements(game = state.goldRunGame, personalRecord = null) {
-  const earned = new Set(game?.achievements || []);
-  if (Number(game?.rewardsCollected || 0) > 0) earned.add("primo_lingotto");
-  if (Number(game?.rewardCounts?.oro24 || 0) >= 5) earned.add("re_24kt");
-  if (Number(game?.rewardCounts?.diamond || 0) >= 3) earned.add("cacciatore_diamanti");
-  if (Number(game?.levelIndex || 0) >= GOLD_RUN_LEVELS.length - 1 && game?.status === "completed") earned.add("dieci_livelli");
-  if (Number(game?.bossesDefeated || 0) > 0) earned.add("boss_hunter");
-  if (personalRecord?.is_new_personal_record) earned.add("record_personale");
-  if (Number(game?.score || 0) >= 25000) earned.add("maestro_arcade");
-  if (game) game.achievements = Array.from(earned);
-  return Array.from(earned);
-}
-
-function renderGoldRunLevels() {
-  if (!goldRunLevels) return;
-  const current = Number(state.goldRunGame?.levelIndex || 0);
-  goldRunLevels.innerHTML = GOLD_RUN_LEVELS.map((level, index) => `
-    <span class="${index === current ? "is-current" : ""}">
-      <strong>${escapeHtml(String(level.id))}</strong>
-      ${escapeHtml(level.title)}
-    </span>
-  `).join("");
-}
-
-function renderGoldRunLists() {
-  if (gamingQuickRanking) {
-    gamingQuickRanking.innerHTML = (state.goldRunLeaderboard || []).length
-      ? state.goldRunLeaderboard.slice(0, 5).map((row, index) => `
-        <article class="${String(row.user_id || "") === String(state.currentUser?.id || "") ? "is-current-user" : ""}">
-          <strong>#${escapeHtml(String(row.position || index + 1))} · ${escapeHtml(String(row.score || 0))}</strong>
-          <span>${escapeHtml(row.user_name || row.username || "Operatore OroActive")} · La corsa all'oro</span>
-          <small>${escapeHtml(row.store_name || "Negozio non indicato")} · ${GOLD_RUN_PLAYER_NAME}</small>
-        </article>
-      `).join("")
-      : '<div class="empty-state">Nessun punteggio gaming ancora disponibile.</div>';
-  }
   if (gamingPersonalStats) {
-    gamingPersonalStats.innerHTML = `
-      <article class="is-current-user">
-        <strong>Record La corsa all'oro: ${escapeHtml(String(state.goldRunBestScore || 0))}</strong>
-        <span>${escapeHtml(GOLD_RUN_PLAYER_NAME)} · storico personale ${escapeHtml(String((state.goldRunScores || []).length))} partite</span>
-        <small>Aurum Blocks resta disponibile nella card dedicata.</small>
-      </article>
-    `;
-  }
-  if (goldRunMyScores) {
-    goldRunMyScores.innerHTML = (state.goldRunScores || []).length
+    gamingPersonalStats.innerHTML = scores.length
       ? `
-        <article class="gold-run-best-score">
-          <strong>Record personale ${escapeHtml(String(state.goldRunBestScore || 0))}</strong>
-          <span>${escapeHtml(GOLD_RUN_PLAYER_NAME)} · livello ${escapeHtml(String(state.goldRunBestScoreRow?.level_reached || 1))}</span>
-          <small>${state.goldRunBestScoreRow?.created_at ? escapeHtml(formatDateTime(state.goldRunBestScoreRow.created_at)) : "Storico personale"}</small>
+        <article class="is-current-user">
+          <strong>Record Aurum Blocks: ${escapeHtml(String(bestScore))}</strong>
+          <span>${escapeHtml(AURUM_BLOCKS_MODE_LABELS[bestRow?.mode] || bestRow?.mode || "Miglior punteggio")} · ${escapeHtml(String(scores.length))} partite salvate</span>
+          <small>${bestRow?.created_at ? escapeHtml(formatDateTime(bestRow.created_at)) : "Storico personale Aurum Blocks"}</small>
         </article>
-        ${state.goldRunScores.map((row) => `
+        ${scores.slice(0, 4).map((row) => `
           <article>
-            <strong>${escapeHtml(String(row.score || 0))}</strong>
-            <span>Livello ${escapeHtml(String(row.level_reached || 1))} · premi ${escapeHtml(String(row.rewards_collected || 0))} · boss ${escapeHtml(String(row.bosses_defeated || 0))}</span>
+            <strong>${escapeHtml(String(row.score || 0))} punti</strong>
+            <span>${escapeHtml(AURUM_BLOCKS_MODE_LABELS[row.mode] || row.mode || "Arcade")} · livello ${escapeHtml(String(row.level || 1))} · righe ${escapeHtml(String(row.lines_cleared || 0))}</span>
             <small>${escapeHtml(formatDateTime(row.created_at))}</small>
           </article>
         `).join("")}
       `
-      : '<div class="empty-state">Nessuna corsa salvata.</div>';
+      : '<div class="empty-state">Nessuna partita Aurum Blocks salvata.</div>';
   }
-  if (goldRunLeaderboard) {
-    goldRunLeaderboard.innerHTML = (state.goldRunLeaderboard || []).length
-      ? state.goldRunLeaderboard.map((row, index) => `
+
+  if (gamingQuickRanking) {
+    gamingQuickRanking.innerHTML = leaderboard.length
+      ? leaderboard.slice(0, 6).map((row, index) => `
         <article class="${String(row.user_id || "") === String(state.currentUser?.id || "") ? "is-current-user" : ""}">
           <strong>#${escapeHtml(String(row.position || index + 1))} · ${escapeHtml(String(row.score || 0))}</strong>
-          <span>${escapeHtml(row.user_name || row.username || "Operatore OroActive")} · ${escapeHtml(row.character_name || GOLD_RUN_PLAYER_NAME)}</span>
-          <small>${escapeHtml(row.store_name || "Negozio non indicato")} · livello ${escapeHtml(String(row.level_reached || 1))}</small>
+          <span>${escapeHtml(row.user_name || row.username || "Operatore OroActive")} · ${escapeHtml(AURUM_BLOCKS_MODE_LABELS[row.mode] || row.mode || "Arcade")}</span>
+          <small>${escapeHtml(row.store_name || row.negozio || "Negozio non indicato")} · livello ${escapeHtml(String(row.level || 1))} · righe ${escapeHtml(String(row.lines_cleared || 0))}</small>
         </article>
       `).join("")
-      : '<div class="empty-state">Classifica La corsa all&apos;oro non ancora disponibile.</div>';
+      : '<div class="empty-state">Non ci sono ancora altri punteggi in classifica.</div>';
   }
-  if (goldRunAchievements) {
-    const earned = new Set(state.goldRunBestScoreRow?.achievements_unlocked || state.goldRunGame?.achievements || []);
-    goldRunAchievements.innerHTML = GOLD_RUN_ACHIEVEMENTS.map((achievement) => `
-      <article class="${earned.has(achievement.code) ? "is-current-user" : ""}">
-        <strong>${escapeHtml(achievement.name)}</strong>
-        <span>${escapeHtml(achievement.description)}</span>
-        <small>${earned.has(achievement.code) ? "Ottenuto" : "Da sbloccare"}</small>
-      </article>
-    `).join("");
+
+  if (gamingAurumBlocksBadges) {
+    gamingAurumBlocksBadges.innerHTML = badges.length
+      ? badges.slice(0, 6).map((badge) => `
+        <article>
+          <strong>${escapeHtml(badge.name || badge.badge_name || "Badge Aurum Blocks")}</strong>
+          <span>${escapeHtml(badge.description || "Badge formativo Aurum Blocks")}</span>
+          <small>${escapeHtml(formatDateTime(badge.awarded_at || badge.created_at))}</small>
+        </article>
+      `).join("")
+      : '<div class="empty-state">Nessun badge Aurum Blocks ancora ottenuto.</div>';
   }
 }
 
 async function loadGamingOroActive() {
-  const [overviewData, scoresData, leaderboardData] = await Promise.all([
+  const [overviewData, scoresData, leaderboardData, badgesData] = await Promise.all([
     apiRequest("/gaming/overview").catch(() => ({ overview: null })),
-    apiRequest("/gaming/gold-run/my-scores").catch(() => ({ scores: [], best_score: 0, best: null })),
-    apiRequest("/gaming/gold-run/leaderboard").catch(() => ({ leaderboard: [] }))
+    apiRequest("/aurum-blocks/my-scores").catch(() => ({ scores: [], best_score: 0, best: null })),
+    apiRequest("/aurum-blocks/leaderboard").catch(() => ({ leaderboard: [] })),
+    apiRequest("/aurum-blocks/my-badges").catch(() => ({ badges: [] }))
   ]);
   state.gamingOverview = overviewData.overview || overviewData || null;
-  state.goldRunScores = scoresData.scores || [];
-  state.goldRunBestScore = Number(scoresData.best_score || scoresData.best?.score || 0);
-  state.goldRunBestScoreRow = scoresData.best || null;
-  state.goldRunLeaderboard = leaderboardData.leaderboard || [];
-  renderGoldRunLevels();
-  renderGoldRunLists();
-  renderGoldRunHud();
-}
-
-function renderGoldRunHud() {
-  const game = state.goldRunGame;
-  if (goldRunScore) goldRunScore.textContent = String(Math.max(0, Math.round(game?.score || 0)));
-  if (goldRunLives) goldRunLives.textContent = String(Math.max(0, Math.round(game?.lives ?? 3)));
-  if (goldRunLevel) goldRunLevel.textContent = String((game?.levelIndex || 0) + 1);
-  if (goldRunRewards) goldRunRewards.textContent = String(Math.max(0, Math.round(game?.rewardsCollected || 0)));
-  if (goldRunBossCard) goldRunBossCard.hidden = !game?.boss;
-  if (goldRunBossName) goldRunBossName.textContent = game?.boss?.label || "";
-  if (goldRunBossHp) {
-    const hp = Number(game?.boss?.hp || 0);
-    const maxHp = Math.max(1, Number(game?.boss?.maxHp || 1));
-    goldRunBossHp.style.width = `${Math.max(0, Math.min(100, (hp / maxHp) * 100))}%`;
-  }
-  goldRunShell?.classList.toggle("is-playing", Boolean(game && !game.over));
-  goldRunShell?.classList.toggle("is-paused", Boolean(game?.paused));
-  document.body.classList.toggle("gold-run-playing", Boolean(game && !game.over));
-}
-
-function renderGoldRunObjects() {
-  const game = state.goldRunGame;
-  if (!goldRunLayer || !game) {
-    if (goldRunLayer) goldRunLayer.innerHTML = "";
-    return;
-  }
-  const objectMarkup = game.objects.map((object) => {
-    const title = object.label || "";
-    const content = object.kind === "reward" ? escapeHtml(object.short || "") : escapeHtml(object.label || "");
-    return `<span class="gold-run-object ${escapeHtml(object.kind)} ${escapeHtml(object.className || "")}" style="left:${object.x}%; bottom:${object.y}%;" title="${escapeHtml(title)}">${content}</span>`;
-  }).join("");
-  const boss = game.boss
-    ? `<span class="gold-run-object boss" style="left:${game.boss.x}%; bottom:${game.boss.y}%;" title="${escapeHtml(game.boss.label)}">${escapeHtml(game.boss.label)}</span>`
-    : "";
-  goldRunLayer.innerHTML = objectMarkup + boss;
-}
-
-function renderGoldRunFrame() {
-  const game = state.goldRunGame;
-  if (!game) {
-    if (goldRunOverlay) {
-      goldRunOverlay.hidden = false;
-      goldRunOverlay.innerHTML = `<strong>Guida ${GOLD_RUN_PLAYER_NAME} nella corsa all'oro.</strong><span>Premi Gioca per iniziare.</span>`;
-    }
-    return;
-  }
-  if (goldRunElite) {
-    goldRunElite.style.setProperty("--elite-x", `${game.x}%`);
-    goldRunElite.style.setProperty("--elite-y", `${game.y}%`);
-    goldRunElite.classList.toggle("is-running", state.goldRunKeys.right || state.goldRunKeys.left || state.goldRunTouchActions.has("right") || state.goldRunTouchActions.has("left"));
-    goldRunElite.classList.toggle("is-jumping", !game.onGround);
-    goldRunElite.classList.toggle("has-shield", game.shieldUntil > Date.now());
-  }
-  if (goldRunStage) {
-    const level = goldRunCurrentLevel(game);
-    goldRunStage.dataset.theme = level.theme;
-    goldRunStage.style.setProperty("--run-progress", `${Math.min(100, (game.distance / goldRunLevelLength(level)) * 100)}%`);
-  }
-  if (goldRunOverlay) {
-    goldRunOverlay.hidden = !game.paused && !game.over;
-    if (game.paused && !game.over) {
-      goldRunOverlay.innerHTML = `<strong>PAUSA</strong><span>${GOLD_RUN_PLAYER_NAME} riparte quando vuoi.</span>`;
-    }
-  }
-  renderGoldRunObjects();
-  renderGoldRunHud();
-}
-
-function startGoldRunGame() {
-  stopGoldRunLoop();
-  state.goldRunKeys = { left: false, right: false };
-  state.goldRunTouchActions = new Set();
-  state.goldRunGame = {
-    score: 0,
-    lives: 3,
-    levelIndex: 0,
-    rewardsCollected: 0,
-    bossesDefeated: 0,
-    rewardCounts: {},
-    achievements: [],
-    x: 10,
-    y: 14,
-    vy: 0,
-    onGround: true,
-    distance: 0,
-    objects: [],
-    boss: null,
-    paused: false,
-    over: false,
-    status: "started",
-    startedAt: Date.now(),
-    lastTime: 0,
-    nextRewardAt: 120,
-    nextEnemyAt: 220,
-    invulnerableUntil: 0,
-    shieldUntil: 0,
-    lastCoachAt: 0,
-    lastActionAt: 0
-  };
-  if (goldRunOverlay) goldRunOverlay.hidden = true;
-  showGoldRunCoach(`Aurum: Forza ${GOLD_RUN_PLAYER_NAME}, raccogli più lingotti possibile.`, { force: true });
-  renderGoldRunLevels();
-  renderGoldRunFrame();
-  state.goldRunLoop = window.requestAnimationFrame(goldRunTick);
-}
-
-function stopGoldRunLoop() {
-  if (state.goldRunLoop) window.cancelAnimationFrame(state.goldRunLoop);
-  state.goldRunLoop = null;
-  document.body.classList.remove("gold-run-playing");
-}
-
-function pauseGoldRunGame() {
-  const game = state.goldRunGame;
-  if (!game || game.over) return;
-  game.paused = !game.paused;
-  showGoldRunCoach(game.paused ? "Aurum: Pausa intelligente." : `Aurum: Riparti ${GOLD_RUN_PLAYER_NAME}, ritmo e precisione.`);
-  if (!game.paused && !state.goldRunLoop) state.goldRunLoop = window.requestAnimationFrame(goldRunTick);
-  renderGoldRunFrame();
-}
-
-function resetGoldRunGame() {
-  startGoldRunGame();
-}
-
-function goldRunJump() {
-  const game = state.goldRunGame;
-  if (!game || game.over || game.paused) return;
-  if (game.onGround) {
-    game.vy = 45;
-    game.onGround = false;
-  } else if (goldRunCurrentLevel(game).id >= 6 && !game.doubleJumpUsed) {
-    game.vy = 36;
-    game.doubleJumpUsed = true;
-  }
-}
-
-function goldRunTick(timestamp = 0) {
-  const game = state.goldRunGame;
-  if (!game || game.over || !goldRunStageActive()) return;
-  const dt = Math.min(0.035, Math.max(0.001, (timestamp - (game.lastTime || timestamp)) / 1000));
-  game.lastTime = timestamp;
-  if (game.paused) {
-    state.goldRunLoop = window.requestAnimationFrame(goldRunTick);
-    return;
-  }
-  const level = goldRunCurrentLevel(game);
-  const wantsLeft = state.goldRunKeys.left || state.goldRunTouchActions.has("left");
-  const wantsRight = state.goldRunKeys.right || state.goldRunTouchActions.has("right");
-  if (wantsLeft) game.x = Math.max(4, game.x - 38 * dt);
-  if (wantsRight) game.x = Math.min(43, game.x + 42 * dt);
-  const scroll = (16 + (wantsRight ? 26 : 0)) * Number(level.speed || 1);
-  game.distance += scroll * dt;
-  game.vy -= 96 * dt;
-  game.y += game.vy * dt;
-  if (game.y <= 14) {
-    game.y = 14;
-    game.vy = 0;
-    game.onGround = true;
-    game.doubleJumpUsed = false;
-  } else {
-    game.onGround = false;
-  }
-  game.nextRewardAt -= scroll * dt;
-  game.nextEnemyAt -= scroll * dt;
-  if (game.nextRewardAt <= 0) {
-    goldRunSpawnReward(game);
-    game.nextRewardAt = 90 + Math.random() * 140;
-  }
-  if (game.nextEnemyAt <= 0 && !game.boss) {
-    goldRunSpawnEnemy(game);
-    game.nextEnemyAt = (170 + Math.random() * 180) / Number(level.enemyRate || 1);
-  }
-  game.objects.forEach((object) => {
-    object.x -= scroll * dt;
-    if (object.kind === "enemy" && object.code === "bilancia_impazzita") object.y = 14 + Math.sin(timestamp / 210 + object.phase) * 7;
-  });
-  game.objects = game.objects.filter((object) => object.x > -12);
-  if (game.distance > goldRunLevelLength(level) * 0.76) goldRunSpawnBoss(game);
-  if (game.boss) {
-    game.boss.x += game.boss.direction * 12 * dt;
-    if (game.boss.x < 62 || game.boss.x > 91) game.boss.direction *= -1;
-  }
-  const player = goldRunPlayerRect(game);
-  game.objects = game.objects.filter((object) => {
-    if (!goldRunRectsOverlap(player, object)) return true;
-    if (object.kind === "reward") {
-      goldRunCollectReward(game, object);
-      return false;
-    }
-    goldRunHitPlayer(game, `Aurum: ${object.label} ha rallentato ${GOLD_RUN_PLAYER_NAME}.`);
-    return false;
-  });
-  if (game.boss && goldRunRectsOverlap(player, game.boss)) {
-    if (game.vy < -8 && game.y > game.boss.y + 7) {
-      game.boss.hp -= 1;
-      game.vy = 34;
-      game.score += 300;
-      triggerGoldRunSpark(game.boss.x, game.boss.y + 16, "BOSS");
-      if (game.boss.hp <= 0) goldRunCompleteLevel(game);
-    } else {
-      goldRunHitPlayer(game, `Aurum: ${game.boss.label} ha colpito ${GOLD_RUN_PLAYER_NAME}.`);
-    }
-  }
-  renderGoldRunFrame();
-  state.goldRunLoop = window.requestAnimationFrame(goldRunTick);
-}
-
-async function finishGoldRunGame(status = "game_over") {
-  const game = state.goldRunGame;
-  if (!game || game.over) return;
-  game.over = true;
-  game.status = status;
-  stopGoldRunLoop();
-  const duration = Math.max(0, Math.round((Date.now() - Number(game.startedAt || Date.now())) / 1000));
-  let personalRecord = null;
-  updateGoldRunAchievements(game);
-  try {
-    const data = await apiRequest("/gaming/gold-run/session/finish", {
-      method: "POST",
-      body: JSON.stringify({
-        score: Math.max(0, Math.round(game.score || 0)),
-        level_reached: Math.max(1, (game.levelIndex || 0) + 1),
-        duration_seconds: duration,
-        rewards_collected: game.rewardsCollected || 0,
-        bosses_defeated: game.bossesDefeated || 0,
-        status,
-        character_name: GOLD_RUN_PLAYER_NAME,
-        rewards_unlocked: Object.keys(game.rewardCounts || {}),
-        achievements_unlocked: game.achievements || [],
-        metadata: { reward_counts: game.rewardCounts || {}, final_level: goldRunCurrentLevel(game)?.title || "" }
-      })
-    });
-    personalRecord = data.personal_record || null;
-    if (personalRecord?.is_new_personal_record) {
-      game.achievements = updateGoldRunAchievements(game, personalRecord);
-      showToast(`Nuovo record personale di ${GOLD_RUN_PLAYER_NAME}!`, "success");
-    }
-    await loadGamingOroActive();
-  } catch (error) {
-    showToast(error.message || "Punteggio La corsa all'oro non salvato.", "warning");
-  }
-  if (goldRunOverlay) {
-    const recordMarkup = personalRecord?.is_new_personal_record
-      ? `<span>Nuovo record personale: ${escapeHtml(String(personalRecord.new_score || game.score))} punti · +${escapeHtml(String(personalRecord.difference || 0))}.</span>`
-      : `<span>Score finale: ${escapeHtml(String(Math.round(game.score || 0)))} punti.</span>`;
-    goldRunOverlay.hidden = false;
-    goldRunOverlay.innerHTML = `
-      <strong>${status === "completed" ? `${GOLD_RUN_PLAYER_NAME} ha conquistato la Fortezza dell'Oro!` : "Game over"}</strong>
-      ${recordMarkup}
-      <button class="primary-button" type="button" data-gold-run-start>Gioca ancora</button>
-      <button class="ghost-button" type="button" data-gaming-focus="top">Torna a Gaming OroActive</button>
-    `;
-  }
-  showGoldRunCoach(`Aurum: ${GOLD_RUN_PLAYER_NAME} chiude la corsa con ${Math.round(game.score || 0)} punti.`, { force: true });
-  renderGoldRunFrame();
+  state.aurumBlocksScores = scoresData.scores || [];
+  state.aurumBlocksBestScore = Number(scoresData.best_score || scoresData.best?.score || 0);
+  state.aurumBlocksBestScoreRow = scoresData.best || null;
+  state.aurumBlocksLeaderboard = leaderboardData.leaderboard || [];
+  state.aurumBlocksBadges = badgesData.badges || [];
+  renderGamingAurumBlocks();
 }
 
 async function createTrainingCourse(event) {
@@ -13192,52 +12666,9 @@ trainingList?.addEventListener("click", async (event) => {
 });
 gamingShell?.addEventListener("click", (event) => {
   const openSectionButton = event.target.closest("[data-gaming-open]");
-  const focusButton = event.target.closest("[data-gaming-focus]");
-  const startButton = event.target.closest("[data-gold-run-start]");
-  const pauseButton = event.target.closest("[data-gold-run-pause]");
-  const resetButton = event.target.closest("[data-gold-run-reset]");
   if (openSectionButton) {
     setScreen(openSectionButton.dataset.gamingOpen);
-    return;
   }
-  if (focusButton) {
-    if (focusButton.dataset.gamingFocus === "goldRun") {
-      goldRunShell?.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      gamingShell?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-    return;
-  }
-  if (startButton) {
-    withButtonBusy(startButton, "Avvio...", () => startGoldRunGame());
-    return;
-  }
-  if (pauseButton) {
-    pauseGoldRunGame();
-    return;
-  }
-  if (resetButton) {
-    resetGoldRunGame();
-  }
-});
-
-gamingShell?.addEventListener("pointerdown", (event) => {
-  const control = event.target.closest("[data-gold-run-control]");
-  if (!control) return;
-  event.preventDefault();
-  const action = control.dataset.goldRunControl;
-  if (action === "left" || action === "right") state.goldRunTouchActions.add(action);
-  if (action === "jump") goldRunJump();
-  if (action === "action") goldRunAttackBoss(state.goldRunGame);
-});
-
-["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
-  gamingShell?.addEventListener(eventName, (event) => {
-    const control = event.target.closest("[data-gold-run-control]");
-    if (!control) return;
-    const action = control.dataset.goldRunControl;
-    if (action === "left" || action === "right") state.goldRunTouchActions.delete(action);
-  });
 });
 
 aurumBlocksShell?.addEventListener("click", (event) => {
@@ -13247,7 +12678,7 @@ aurumBlocksShell?.addEventListener("click", (event) => {
   const pause = event.target.closest("[data-aurum-blocks-pause]");
   const restart = event.target.closest("[data-aurum-blocks-restart]");
   const exit = event.target.closest("[data-aurum-blocks-exit]");
-  const training = event.target.closest("[data-aurum-blocks-go-training]");
+  const gaming = event.target.closest("[data-aurum-blocks-go-gaming]");
   if (start) {
     withButtonBusy(start, "Avvio...", () => startAurumBlocks(start.dataset.aurumBlocksStart));
     return;
@@ -13277,10 +12708,9 @@ aurumBlocksShell?.addEventListener("click", (event) => {
     exitAurumBlocksGame();
     return;
   }
-  if (training) {
+  if (gaming) {
     exitAurumBlocksGame();
-    state.courseActiveTab = "catalog";
-    setScreen("training");
+    setScreen("gaming");
   }
 });
 aurumBlocksBoard?.addEventListener("pointerdown", (event) => {
@@ -13700,18 +13130,6 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (goldRunStageActive() && state.goldRunGame && !state.goldRunGame.over) {
-    const handledKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", " ", "Spacebar", "p", "P", "a", "A"];
-    if (handledKeys.includes(event.key)) {
-      event.preventDefault();
-      if (event.key === "ArrowLeft") state.goldRunKeys.left = true;
-      if (event.key === "ArrowRight") state.goldRunKeys.right = true;
-      if (event.key === "ArrowUp" || event.key === " " || event.key === "Spacebar") goldRunJump();
-      if (event.key === "a" || event.key === "A") goldRunAttackBoss(state.goldRunGame);
-      if (event.key === "p" || event.key === "P") pauseGoldRunGame();
-      return;
-    }
-  }
   if (document.getElementById("aurumBlocks")?.classList.contains("active-screen") && state.aurumBlocksGame && !state.aurumBlocksGame.over) {
     const handledKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Spacebar", "p", "P"];
     if (handledKeys.includes(event.key)) {
@@ -13726,11 +13144,6 @@ document.addEventListener("keydown", (event) => {
     }
   }
   if (event.key === "Escape" && aurumChatPanel && !aurumChatPanel.hidden) closeAurumChat();
-});
-
-document.addEventListener("keyup", (event) => {
-  if (event.key === "ArrowLeft") state.goldRunKeys.left = false;
-  if (event.key === "ArrowRight") state.goldRunKeys.right = false;
 });
 
 steps.forEach((step) => {
