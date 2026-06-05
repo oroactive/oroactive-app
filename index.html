@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260605-gold-prediction-1">
+  <link rel="stylesheet" href="styles.css?v=20260605-buyback-pricing-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -906,16 +906,23 @@
             <p id="bullionVaultChartFallback" class="quote-fallback" hidden>Grafico BullionVault non incorporabile direttamente. <a href="https://www.bullionvault.com/gold-price-chart.do" target="_blank" rel="noopener">Apri grafico BullionVault</a>.</p>
           </div>
         </section>
-        <section class="gold-prediction-panel quote-section-panel" id="goldPredictionPanel" aria-label="Analisi Predittiva Oro">
+        <section class="gold-prediction-panel quote-section-panel" id="goldPredictionPanel" aria-label="Analisi Predittiva Metalli">
           <div class="gold-prediction-header">
             <div>
-              <p class="eyebrow">Analisi Predittiva Oro</p>
-              <h3>Analisi Predittiva Oro</h3>
-              <p>Stima statistica del trend dell'oro basata su storico prezzi, volatilità e medie mobili.</p>
+              <p class="eyebrow">Analisi Predittiva Metalli</p>
+              <h3>Analisi Predittiva Metalli</h3>
+              <p>Stima statistica e prezzo massimo pagabile per oro, argento, carature e titoli.</p>
             </div>
             <div class="gold-prediction-actions">
-              <button class="ghost-button" type="button" id="syncGoldHistory">Sync storico prezzi</button>
-              <button class="primary-button" type="button" id="runGoldPrediction">Aggiorna previsione</button>
+              <label class="gold-prediction-scenario-select">Scenario
+                <select id="buybackScenarioSelect">
+                  <option value="prudente">Prudente</option>
+                  <option value="standard" selected>Standard</option>
+                  <option value="aggressivo">Aggressivo</option>
+                </select>
+              </label>
+              <button class="ghost-button" type="button" id="syncGoldHistory">Sync metalli</button>
+              <button class="primary-button" type="button" id="runGoldPrediction">Calcola prezzi</button>
               <button class="ghost-button" type="button" id="askAurumGoldPrediction">Chiedi ad Aurum</button>
             </div>
           </div>
@@ -932,13 +939,51 @@
             </article>
           </div>
           <article class="gold-prediction-card">
-            <h4>Carature teoriche</h4>
+            <h4>Prezzo massimo pagabile Oro e Argento</h4>
             <div id="goldPredictionKaratTable"></div>
-            <p class="gold-prediction-disclaimer">Valori teorici indicativi. Il prezzo di acquisto cliente è definito dalle policy OroActive.</p>
+            <p class="gold-prediction-disclaimer">Valori teorici indicativi. Il prezzo massimo pagabile è calcolato secondo le policy OroActive configurate dal Founder.</p>
+          </article>
+          <article class="gold-prediction-card">
+            <h4>Simulatore prezzo di acquisto</h4>
+            <form class="buyback-simulator-form" id="buybackSimulatorForm">
+              <label>Metallo
+                <select name="metal">
+                  <option value="gold">Oro</option>
+                  <option value="silver">Argento</option>
+                </select>
+              </label>
+              <label>Caratura / titolo
+                <select name="purity_code">
+                  <option value="18kt">Oro 18kt</option>
+                  <option value="24kt">Oro 24kt</option>
+                  <option value="22kt">Oro 22kt</option>
+                  <option value="21kt">Oro 21kt</option>
+                  <option value="14kt">Oro 14kt</option>
+                  <option value="12kt">Oro 12kt</option>
+                  <option value="9kt">Oro 9kt</option>
+                  <option value="6kt">Oro 6kt</option>
+                  <option value="999">Argento 999</option>
+                  <option value="925">Argento 925</option>
+                  <option value="800">Argento 800</option>
+                </select>
+              </label>
+              <label>Grammi
+                <input name="grams" type="number" min="0.01" step="0.01" value="20">
+              </label>
+              <label>Scenario
+                <select name="scenario">
+                  <option value="prudente">Prudente</option>
+                  <option value="standard" selected>Standard</option>
+                  <option value="aggressivo">Aggressivo</option>
+                </select>
+              </label>
+              <button class="primary-button" type="submit">Simula</button>
+            </form>
+            <div class="buyback-simulator-output" id="buybackSimulatorOutput">Inserisci metallo, titolo e peso per simulare massimo pagabile e prezzo consigliato.</div>
           </article>
           <article class="gold-prediction-card gold-prediction-explanation" id="goldPredictionExplanation"></article>
           <details class="gold-prediction-settings founder-only" id="goldPredictionSettingsPanel" hidden>
-            <summary>Impostazioni Founder</summary>
+            <summary>Policy Prezzi Compro Oro</summary>
             <form class="gold-prediction-settings-form" id="goldPredictionSettingsForm">
               <label>Provider prezzi
                 <select name="provider">
@@ -969,6 +1014,7 @@
               <label class="gold-prediction-settings-wide">Disclaimer
                 <textarea name="disclaimer" rows="3"></textarea>
               </label>
+              <div class="gold-prediction-policy-editor gold-prediction-settings-wide" id="buybackPolicyEditor"></div>
               <button class="primary-button" type="submit">Salva impostazioni</button>
             </form>
           </details>
@@ -1723,6 +1769,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260605-gold-prediction-1"></script>
+  <script src="app.js?v=20260605-buyback-pricing-1"></script>
 </body>
 </html>

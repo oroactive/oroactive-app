@@ -4586,6 +4586,26 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   gap: 10px;
 }
 
+.gold-prediction-scenario-select {
+  display: grid;
+  gap: 6px;
+  min-width: 150px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.gold-prediction-scenario-select select {
+  min-height: 42px;
+  border: 1px solid rgba(255, 106, 0, 0.35);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  padding: 8px 10px;
+}
+
 .gold-prediction-status {
   display: flex;
   flex-wrap: wrap;
@@ -4610,7 +4630,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .gold-prediction-cards {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -4747,6 +4767,11 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   stroke-dasharray: 10 8;
 }
 
+.gold-prediction-line.silver {
+  stroke: #dbeafe;
+  filter: drop-shadow(0 0 8px rgba(219, 234, 254, 0.35));
+}
+
 .gold-prediction-range-line {
   stroke: rgba(255, 255, 255, 0.38);
   stroke-width: 7;
@@ -4764,9 +4789,18 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   overflow-x: auto;
 }
 
+.gold-prediction-table-heading {
+  margin: 16px 0 8px;
+  color: #ff9a45;
+  font-size: 13px;
+  font-weight: 1000;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .gold-prediction-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 1180px;
   border-collapse: collapse;
 }
 
@@ -4850,6 +4884,94 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .gold-prediction-settings-wide {
   grid-column: 1 / -1;
+}
+
+.buyback-simulator-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.buyback-simulator-form label {
+  display: grid;
+  gap: 7px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.buyback-simulator-form input,
+.buyback-simulator-form select {
+  width: 100%;
+  border: 1px solid rgba(255, 106, 0, 0.28);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #111111;
+  font: inherit;
+  padding: 10px 12px;
+}
+
+.buyback-simulator-output {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.buyback-simulator-output div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 106, 0, 0.2);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.buyback-simulator-output span,
+.buyback-simulator-output strong {
+  display: block;
+}
+
+.buyback-simulator-output span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.buyback-simulator-output strong {
+  margin-top: 6px;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.gold-prediction-policy-editor h4 {
+  margin: 0 0 12px;
+  color: #ffffff;
+}
+
+.buyback-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.buyback-policy-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 106, 0, 0.22);
+  border-radius: 14px;
+}
+
+.buyback-policy-row legend {
+  color: #ff9a45;
+  font-weight: 1000;
+  padding: 0 6px;
 }
 
 .topbar[hidden] {
@@ -9839,6 +9961,13 @@ input.document-expired {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .buyback-simulator-form,
+  .buyback-simulator-output,
+  .buyback-policy-grid,
+  .buyback-policy-row {
+    grid-template-columns: 1fr;
+  }
+
   .gold-prediction-settings-form {
     grid-template-columns: 1fr;
   }
@@ -9851,6 +9980,11 @@ input.document-expired {
 @media (max-width: 680px) {
   .gold-prediction-cards {
     grid-template-columns: 1fr;
+  }
+
+  .gold-prediction-scenario-select,
+  .gold-prediction-scenario-select select {
+    width: 100%;
   }
 
   .gold-prediction-panel.quote-section-panel {
