@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260606-aurum-price-1">
+  <link rel="stylesheet" href="styles.css?v=20260606-competitor-market-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -957,6 +957,7 @@
                     <option value="configured_page">Pagina configurata</option>
                   </select>
                 </label>
+                <label>Note <input name="notes" placeholder="Aggiornamento manuale, selettori, policy fonte"></label>
                 <button class="ghost-button" type="submit">Salva fonte</button>
               </form>
               <form class="competitor-quote-form" id="competitorQuoteForm">
@@ -981,7 +982,7 @@
               </form>
               <form class="competitor-csv-form" id="competitorCsvForm">
                 <label>Import CSV competitor
-                  <textarea name="csv" rows="4" placeholder="competitor_name,metal,purity_code,price_per_gram,currency,quote_date,url"></textarea>
+                  <textarea name="csv" rows="4" placeholder="competitor_name,website_url,metal,purity_code,price_per_gram,currency,quote_date,confidence,url"></textarea>
                 </label>
                 <button class="ghost-button" type="submit">Importa CSV</button>
               </form>
@@ -1067,6 +1068,21 @@
               </label>
               <label class="gold-prediction-check">
                 <input name="demo_mode" type="checkbox"> Modalità demo
+              </label>
+              <label>Delta market match €/g
+                <input name="market_match_delta_per_gram" type="number" min="0" step="0.01" value="0">
+              </label>
+              <label>Età max competitor (ore)
+                <input name="competitor_data_max_age_hours" type="number" min="1" max="720" value="24">
+              </label>
+              <label class="gold-prediction-check">
+                <input name="allow_aggressive_market_match" type="checkbox"> Consenti inseguimento aggressivo
+              </label>
+              <label class="gold-prediction-check">
+                <input name="show_competitor_to_commesso" type="checkbox"> Mostra competitor ai commessi
+              </label>
+              <label class="gold-prediction-check">
+                <input name="require_founder_approval_if_competitor_above_max" type="checkbox" checked> Approvazione Founder se competitor sopra massimo
               </label>
               <label class="gold-prediction-settings-wide">Disclaimer
                 <textarea name="disclaimer" rows="3"></textarea>
@@ -1835,6 +1851,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260606-aurum-price-1"></script>
+  <script src="app.js?v=20260606-competitor-market-1"></script>
 </body>
 </html>

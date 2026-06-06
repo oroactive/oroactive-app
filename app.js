@@ -11981,6 +11981,68 @@ function competitorComparisonMessage(row = {}) {
   return `${avgText} · ${maxText}`;
 }
 
+function marketStatusLabel(status = "", row = {}) {
+  if (competitorDataIsStale(row)) return "Dati competitor da aggiornare";
+  const value = String(status || row.market_comparison_status || "").toLowerCase();
+  if (value === "competitor_too_high") return "Competitor sopra massimo pagabile";
+  if (value === "aligned_market") return "Allineato";
+  if (value === "above_market") return "Competitivo";
+  if (value === "below_market") return "Sotto media";
+  if (value === "no_competitor_data") return "Dati competitor assenti";
+  return row.competitor_count ? "Confronto disponibile" : "Dati competitor assenti";
+}
+
+function marketStatusClass(status = "") {
+  const value = String(status || "").toLowerCase();
+  if (value === "competitor_too_high") return "warning";
+  if (value === "aligned_market") return "neutral";
+  if (value === "above_market") return "success";
+  if (value === "below_market") return "warning";
+  return "muted";
+}
+
+function competitorDataIsStale(row = {}) {
+  if (!row.competitor_count || !row.competitor_last_update) return false;
+  const maxAgeHours = Number(state.goldPredictionSettings?.competitor_data_max_age_hours || state.goldPredictionStatus?.settings?.competitor_data_max_age_hours || 24);
+  const updatedAt = new Date(row.competitor_last_update).getTime();
+  if (!Number.isFinite(updatedAt)) return false;
+  return Date.now() - updatedAt > Math.max(1, maxAgeHours) * 60 * 60 * 1000;
+}
+
+function marketDelta(value, currency = "EUR") {
+  if (!aurumHasNumber(value)) return "—";
+  const number = Number(value);
+  if (number === 0) return "Allineato";
+  return number > 0
+    ? `+${formatGoldPerGram(number, currency)}`
+    : `-${formatGoldPerGram(Math.abs(number), currency)}`;
+}
+
+function buybackMarketPrice(row = {}) {
+  return Number(row.best_market_client_price_per_gram || row.recommended_payable_per_gram || 0);
+}
+
+function competitorSourceStatusLabel(source = {}) {
+  const status = String(source.last_sync_status || "").toLowerCase();
+  if (status === "updated") return "Aggiornato";
+  if (status === "failed") return "Sync fallito";
+  if (status === "no_quotes") return "Nessun prezzo inserito";
+  if (status === "manual_required") return "Da aggiornare manualmente";
+  if (source.source_type === "manual") return "Manuale";
+  return "Da aggiornare";
+}
+
+function competitorSourceForQuote(quote = {}) {
+  const sources = state.competitorSources || [];
+  return sources.find((source) => String(source.id) === String(quote.source_id))
+    || sources.find((source) => source.name?.toLowerCase() === quote.competitor_name?.toLowerCase())
+    || {};
+}
+
+function competitorMarketSummaryRows() {
+  return buybackRowsFor("gold", "today").concat(buybackRowsFor("silver", "today"));
+}
+
 function buybackRowsFor(metal, horizon = "today") {
   return (state.buybackCalculations || [])
     .filter((row) => row.metal === metal && (row.horizon || row.prediction_horizon) === horizon && row.scenario === state.buybackScenario)
@@ -12107,9 +12169,18 @@ function buildPriceExplanationContext(row = {}, options = {}) {
     competitor_avg_price: aurumHasNumber(row.competitor_avg_price) ? Number(row.competitor_avg_price) : null,
     competitor_max_price: aurumHasNumber(row.competitor_max_price) ? Number(row.competitor_max_price) : null,
     competitor_min_price: aurumHasNumber(row.competitor_min_price) ? Number(row.competitor_min_price) : null,
+    competitor_median_price: aurumHasNumber(row.competitor_median_price) ? Number(row.competitor_median_price) : null,
     competitor_count: Number(row.competitor_count || 0),
+    best_competitor_name: row.best_competitor_name || row.competitor_reference?.competitor_name || "",
+    best_competitor_price: aurumHasNumber(row.best_competitor_price) ? Number(row.best_competitor_price) : aurumHasNumber(row.competitor_reference?.price_per_gram) ? Number(row.competitor_reference.price_per_gram) : null,
+    best_market_client_price_per_gram: aurumHasNumber(row.best_market_client_price_per_gram) ? Number(row.best_market_client_price_per_gram) : null,
+    market_comparison_status: row.market_comparison_status || "",
+    market_price_reason: row.market_price_reason || "",
+    safe_to_offer: row.safe_to_offer,
+    requires_founder_approval: row.requires_founder_approval,
     difference_vs_avg: aurumHasNumber(row.difference_vs_avg) ? Number(row.difference_vs_avg) : null,
     difference_vs_max: aurumHasNumber(row.difference_vs_max) ? Number(row.difference_vs_max) : null,
+    difference_vs_market_best: aurumHasNumber(row.difference_vs_market_best) ? Number(row.difference_vs_market_best) : null,
     last_update: row.created_at || prediction.created_at || latestMetalHistoryDate(metal) || null,
     source: row.source || prediction.source || latestMetalHistorySource(metal) || "fallback",
     model_features: prediction.features || row.features || {},
@@ -12117,6 +12188,8 @@ function buildPriceExplanationContext(row = {}, options = {}) {
     theoretical_total: aurumHasNumber(options.grams) && aurumHasNumber(row.theoretical_value_per_gram) ? Number(options.grams) * Number(row.theoretical_value_per_gram) : null,
     max_payable_total: aurumHasNumber(options.grams) && aurumHasNumber(row.max_payable_per_gram) ? Number(options.grams) * Number(row.max_payable_per_gram) : null,
     recommended_total: aurumHasNumber(options.grams) && aurumHasNumber(row.recommended_payable_per_gram) ? Number(options.grams) * Number(row.recommended_payable_per_gram) : null,
+    best_market_total: aurumHasNumber(options.grams) && aurumHasNumber(row.best_market_client_price_per_gram) ? Number(options.grams) * Number(row.best_market_client_price_per_gram) : null,
+    best_competitor_total: aurumHasNumber(options.grams) && aurumHasNumber(row.best_competitor_price) ? Number(options.grams) * Number(row.best_competitor_price) : null,
     margin_total: aurumHasNumber(options.grams) && aurumHasNumber(row.margin_estimated_per_gram) ? Number(options.grams) * Number(row.margin_estimated_per_gram) : null,
     recoverable_total: aurumHasNumber(options.grams) && aurumHasNumber(row.recoverable_value_per_gram) ? Number(options.grams) * Number(row.recoverable_value_per_gram) : null
   };
@@ -12171,13 +12244,20 @@ function competitorExplanation(context = {}) {
   const recommended = Number(context.recommended_payable_per_gram || 0);
   const avg = Number(context.competitor_avg_price || 0);
   const max = Number(context.competitor_max_price || 0);
+  const bestMarket = Number(context.best_market_client_price_per_gram || 0);
+  const bestName = context.best_competitor_name || "miglior competitor rilevato";
+  const bestPrice = Number(context.best_competitor_price || max || 0);
   const deltaAvg = recommended && avg ? recommended - avg : null;
   const deltaText = deltaAvg === null
     ? ""
     : deltaAvg >= 0
       ? ` Il consigliato OroActive è sopra la media competitor di ${formatAurumGram(deltaAvg, currency)}.`
       : ` Il consigliato OroActive è sotto la media competitor di ${formatAurumGram(Math.abs(deltaAvg), currency)}.`;
-  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}.${deltaText}`;
+  const marketText = bestMarket
+    ? ` Il prezzo migliore di mercato sostenibile è ${formatAurumGram(bestMarket, currency)}: ${context.market_price_reason || marketStatusLabel(context.market_comparison_status)}.`
+    : "";
+  const approvalText = context.requires_founder_approval ? " Serve attenzione: per superare il limite sostenibile è richiesta approvazione Founder." : "";
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}`;
 }
 
 function formulaExplanation(context = {}) {
@@ -12229,7 +12309,7 @@ Il massimo pagabile è la soglia che tutela il margine configurato. Il prezzo co
   }
   if (context.type === "general" && options.followup === "competitor") {
     return Number(context.competitor_count || 0)
-      ? `Confronto competitor generale: sono presenti ${context.competitor_count} rilevazioni aggregate. Apri una riga specifica Oro o Argento e usa “Spiega” per confrontare media, minimo, massimo e prezzo consigliato di quella caratura o titolo.`
+      ? `Confronto competitor generale: sono presenti ${context.competitor_count} rilevazioni aggregate. Apri una riga specifica Oro o Argento e usa “Spiega” per confrontare media, miglior competitor, massimo pagabile e prezzo migliore di mercato sostenibile di quella caratura o titolo.`
       : "Confronto competitor generale: non ci sono ancora competitor configurati. Aurum non inventa prezzi esterni: inserisci rilevazioni manuali, CSV o fonti autorizzate per ottenere il confronto.";
   }
   if (context.type === "general" && options.followup === "risk") {
@@ -12252,7 +12332,7 @@ Se lo storico è insufficiente o la fonte non è configurata, la confidence rest
     ? `${context.purity_code || "titolo"} / 1000 = ${formatAurumNumber(context.purity_value, 3)}`
     : `${String(context.purity_code || "").replace(/kt/i, "") || "kt"} / 24 = ${formatAurumNumber(context.purity_value, 3)}`;
   const simulatorText = context.type === "simulator" && aurumHasNumber(context.grams)
-    ? `\n\nSimulatore\nPer ${formatAurumNumber(context.grams, 2)} grammi il valore teorico totale è ${formatEuro(context.theoretical_total)}, il massimo pagabile totale è ${formatEuro(context.max_payable_total)}, il consigliato totale è ${formatEuro(context.recommended_total)} e il margine stimato totale è ${formatEuro(context.margin_total)}.`
+    ? `\n\nSimulatore\nPer ${formatAurumNumber(context.grams, 2)} grammi il valore teorico totale è ${formatEuro(context.theoretical_total)}, il massimo pagabile totale è ${formatEuro(context.max_payable_total)}, il consigliato totale è ${formatEuro(context.recommended_total)}, il miglior prezzo mercato sostenibile è ${formatEuro(context.best_market_total)} e il margine stimato totale è ${formatEuro(context.margin_total)}.${context.best_competitor_total ? ` Il miglior competitor rilevato equivale a ${formatEuro(context.best_competitor_total)}.` : ""}`
     : "";
   return `Spiegazione prezzo ${metal} ${purity} — Scenario ${context.scenario || "standard"}
 
@@ -12368,6 +12448,13 @@ function renderGoldPredictionCards() {
   const gold = predictionMap.get("gold:today") || predictionMap.get("gold:24h") || {};
   const silver = predictionMap.get("silver:today") || predictionMap.get("silver:24h") || {};
   const currency = gold.currency || silver.currency || state.goldPredictionStatus?.settings?.currency || "EUR";
+  const sources = state.competitorSources || [];
+  const quotes = state.competitorQuotes || [];
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const gold18 = findBuybackRow("gold", "18kt", "today", state.buybackScenario) || {};
+  const silver925 = findBuybackRow("silver", "925", "today", state.buybackScenario) || {};
+  const competitiveRows = competitorMarketSummaryRows().filter((row) => ["above_market", "aligned_market"].includes(row.market_comparison_status)).length;
+  const competitorTooHighRows = competitorMarketSummaryRows().filter((row) => row.market_comparison_status === "competitor_too_high").length;
   const cards = [
     { label: "Oro puro", value: formatMetalPerKg(Number(gold.current_price_per_gram || gold.predicted_price_per_gram || 0) * 1000, currency) },
     { label: "Oro puro", value: formatGoldPerGram(gold.current_price_per_gram || gold.predicted_price_per_gram, currency) },
@@ -12377,7 +12464,13 @@ function renderGoldPredictionCards() {
     { label: "Trend argento", value: silver.trend || "In attesa", className: goldPredictionTrendClass(silver.trend) },
     { label: "Volatilità oro", value: gold.volatility || "In attesa", className: gold.volatility === "alta" ? "warning" : "" },
     { label: "Volatilità argento", value: silver.volatility || "In attesa", className: silver.volatility === "alta" ? "warning" : "" },
-    { label: "Scenario", value: state.buybackScenario }
+    { label: "Scenario", value: state.buybackScenario },
+    { label: "Competitor monitorati", value: String(sources.filter((source) => source.active !== false).length) },
+    { label: "Quotazioni oggi", value: String(quotes.filter((quote) => String(quote.quote_date || "").slice(0, 10) === todayKey).length) },
+    { label: "Oro 18kt media competitor", value: gold18.competitor_count ? formatGoldPerGram(gold18.competitor_avg_price, currency) : "Non disponibile" },
+    { label: "Argento 925 media competitor", value: silver925.competitor_count ? formatGoldPerGram(silver925.competitor_avg_price, currency) : "Non disponibile" },
+    { label: "Carature competitive", value: String(competitiveRows), className: competitiveRows ? "success" : "" },
+    { label: "Competitor oltre limite", value: String(competitorTooHighRows), className: competitorTooHighRows ? "warning" : "" }
   ];
   goldPredictionCards.innerHTML = cards.map((card) => `
     <article class="gold-prediction-metric ${card.className || ""}">
@@ -12424,10 +12517,14 @@ function buybackTableHtml(title, metal) {
             <th>Previsione 24h</th>
             <th>Previsione 7g</th>
             <th>Max pagabile oggi</th>
-            <th>Consigliato</th>
-            <th>Competitor medio</th>
-            <th>Competitor max</th>
-            <th>Confronto</th>
+            <th>Prezzo OroActive consigliato</th>
+            <th>Media competitor</th>
+            <th>Miglior competitor</th>
+            <th>Competitor migliore</th>
+            <th>Prezzo migliore di mercato</th>
+            <th>Scostamento vs media</th>
+            <th>Scostamento vs miglior competitor</th>
+            <th>Stato competitività</th>
             <th>Margine stimato</th>
             <th>Scenario</th>
             <th>Trend</th>
@@ -12438,6 +12535,8 @@ function buybackTableHtml(title, metal) {
           ${rows.map((row) => {
             const day = predictionMap.get(`${metal}:24h`);
             const week = predictionMap.get(`${metal}:7d`);
+            const bestCompetitorPrice = Number(row.best_competitor_price || row.competitor_max_price || 0);
+            const bestMarketPrice = buybackMarketPrice(row);
             return `
               <tr>
                 <th>${escapeHtml(row.label || row.purity_code)}</th>
@@ -12448,8 +12547,12 @@ function buybackTableHtml(title, metal) {
                 <td>${escapeHtml(formatGoldPerGram(row.max_payable_per_gram, row.currency))}</td>
                 <td>${escapeHtml(formatGoldPerGram(row.recommended_payable_per_gram, row.currency))}</td>
                 <td>${row.competitor_count ? escapeHtml(formatGoldPerGram(row.competitor_avg_price, row.currency)) : "—"}</td>
-                <td>${row.competitor_count ? escapeHtml(formatGoldPerGram(row.competitor_max_price, row.currency)) : "—"}</td>
-                <td>${escapeHtml(competitorComparisonMessage(row))}</td>
+                <td>${row.competitor_count ? escapeHtml(formatGoldPerGram(bestCompetitorPrice, row.currency)) : "—"}</td>
+                <td>${row.competitor_count ? escapeHtml(row.best_competitor_name || "Miglior competitor") : "—"}</td>
+                <td>${escapeHtml(formatGoldPerGram(bestMarketPrice, row.currency))}</td>
+                <td>${escapeHtml(marketDelta(row.difference_vs_avg, row.currency))}</td>
+                <td>${escapeHtml(marketDelta(row.difference_vs_market_best ?? row.difference_vs_max, row.currency))}</td>
+                <td><span class="market-status ${escapeHtml(marketStatusClass(row.market_comparison_status))}">${escapeHtml(marketStatusLabel(row.market_comparison_status, row))}</span></td>
                 <td>${escapeHtml(formatGoldPerGram(row.margin_estimated_per_gram, row.currency))} · ${escapeHtml(formatPredictionPercent(row.margin_estimated_pct))}</td>
                 <td>${escapeHtml(row.scenario)}</td>
                 <td>${escapeHtml(row.trend || "laterale")}</td>
@@ -12531,45 +12634,95 @@ function renderCompetitorQuotes() {
   if (!competitorQuotesList) return;
   const quotes = state.competitorQuotes || [];
   const sources = state.competitorSources || [];
-  if (!quotes.length) {
-    competitorQuotesList.innerHTML = `
-      <div class="empty-state">Nessun competitor configurato. Inserisci prezzi manuali o importa CSV per il confronto.</div>
-      ${sources.length ? `<div class="competitor-source-chips">${sources.map((source) => `<span>${escapeHtml(source.name)} · ${escapeHtml(source.source_type)}</span>`).join("")}</div>` : ""}
-    `;
-    return;
-  }
-  competitorQuotesList.innerHTML = `
-    <div class="competitor-summary">
-      <strong>${quotes.length}</strong>
-      <span>rilevazioni competitor negli ultimi 30 giorni</span>
-    </div>
-    ${sources.length ? `<div class="competitor-source-chips">${sources.map((source) => `<span>${escapeHtml(source.name)} · ${escapeHtml(source.source_type)}</span>`).join("")}</div>` : ""}
+  const sourceTable = sources.length ? `
     <div class="competitor-table-wrap">
       <table class="competitor-table">
         <thead>
           <tr>
             <th>Competitor</th>
-            <th>Metallo</th>
-            <th>Caratura/titolo</th>
-            <th>Prezzo €/g</th>
-            <th>Affidabilità</th>
-            <th>Data</th>
+            <th>Sito</th>
+            <th>Metodo</th>
+            <th>Attendibilità</th>
+            <th>Stato aggiornamento</th>
+            <th>Ultimo aggiornamento</th>
+            <th>Azioni</th>
           </tr>
         </thead>
         <tbody>
-          ${quotes.slice(0, 30).map((quote) => `
+          ${sources.map((source) => `
             <tr>
-              <td>${escapeHtml(quote.competitor_name)}</td>
-              <td>${escapeHtml(metalDisplayName(quote.metal))}</td>
-              <td>${escapeHtml(quote.purity_code)}</td>
-              <td>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</td>
-              <td>${escapeHtml(quote.confidence || "medium")}</td>
-              <td>${escapeHtml(quote.quote_date ? formatDateTime(quote.quote_date) : "—")}</td>
+              <td>${escapeHtml(source.name)}</td>
+              <td>${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
+              <td>${escapeHtml(source.source_type || "manual")}</td>
+              <td>Media</td>
+              <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
+              <td>${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "Da aggiornare"}</td>
+              <td>
+                ${source.website_url ? `<a class="small-button" href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : ""}
+                <button class="small-button" type="button" data-fill-competitor-source="${escapeHtml(source.id)}">Aggiungi quotazione</button>
+                ${isFounder() && source.active !== false ? `<button class="small-button" type="button" data-disable-competitor-source="${escapeHtml(source.id)}">Disattiva fonte</button>` : ""}
+                <span class="muted">${source.active === false ? "Disattivata" : "Attiva"}</span>
+              </td>
             </tr>
           `).join("")}
         </tbody>
       </table>
     </div>
+  ` : '<div class="empty-state">Nessuna fonte competitor configurata. Le fonti preconfigurate verranno create al prossimo bootstrap backend.</div>';
+
+  const quoteTable = quotes.length ? `
+    <div class="competitor-table-wrap">
+      <table class="competitor-table">
+        <thead>
+          <tr>
+            <th>Competitor</th>
+            <th>Sito</th>
+            <th>Metallo</th>
+            <th>Caratura/Titolo</th>
+            <th>Prezzo €/g</th>
+            <th>Prezzo €/kg</th>
+            <th>Data rilevazione</th>
+            <th>Metodo</th>
+            <th>Attendibilità</th>
+            <th>Stato aggiornamento</th>
+            <th>Azioni</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${quotes.slice(0, 50).map((quote) => {
+            const source = competitorSourceForQuote(quote);
+            return `
+              <tr>
+                <td>${escapeHtml(quote.competitor_name)}</td>
+                <td>${quote.url || source.website_url ? `<a href="${escapeHtml(quote.url || source.website_url)}" target="_blank" rel="noopener">Fonte</a>` : "—"}</td>
+                <td>${escapeHtml(metalDisplayName(quote.metal))}</td>
+                <td>${escapeHtml(quote.purity_code)}</td>
+                <td>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</td>
+                <td>${escapeHtml(formatMetalPerKg(quote.price_per_kg, quote.currency || "EUR"))}</td>
+                <td>${escapeHtml(quote.quote_date ? formatDateTime(quote.quote_date) : "—")}</td>
+                <td>${escapeHtml(quote.extraction_method || "manual")}</td>
+                <td>${escapeHtml(quote.confidence || "medium")}</td>
+                <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
+                <td>${quote.url || source.website_url ? `<a class="small-button" href="${escapeHtml(quote.url || source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  ` : '<div class="empty-state">Nessuna quotazione competitor inserita. Inserisci prezzi manuali o importa CSV; non vengono inventati dati di mercato.</div>';
+
+  competitorQuotesList.innerHTML = `
+    <div class="competitor-summary">
+      <strong>${sources.length}</strong>
+      <span>fonti competitor monitorate</span>
+      <strong>${quotes.length}</strong>
+      <span>rilevazioni competitor negli ultimi 30 giorni</span>
+    </div>
+    <h5>Fonti competitor preconfigurate</h5>
+    ${sourceTable}
+    <h5>Quotazioni competitor rilevate</h5>
+    ${quoteTable}
   `;
 }
 
@@ -12584,6 +12737,21 @@ function renderGoldPredictionSettings() {
   goldPredictionSettingsForm.history_days.value = settings.history_days || 90;
   goldPredictionSettingsForm.model.value = settings.model || "ensemble";
   goldPredictionSettingsForm.demo_mode.checked = Boolean(settings.demo_mode || state.goldPredictionStatus?.status?.demo_mode);
+  if (goldPredictionSettingsForm.market_match_delta_per_gram) {
+    goldPredictionSettingsForm.market_match_delta_per_gram.value = Number(settings.market_match_delta_per_gram || 0);
+  }
+  if (goldPredictionSettingsForm.competitor_data_max_age_hours) {
+    goldPredictionSettingsForm.competitor_data_max_age_hours.value = Number(settings.competitor_data_max_age_hours || 24);
+  }
+  if (goldPredictionSettingsForm.allow_aggressive_market_match) {
+    goldPredictionSettingsForm.allow_aggressive_market_match.checked = Boolean(settings.allow_aggressive_market_match);
+  }
+  if (goldPredictionSettingsForm.show_competitor_to_commesso) {
+    goldPredictionSettingsForm.show_competitor_to_commesso.checked = Boolean(settings.show_competitor_to_commesso);
+  }
+  if (goldPredictionSettingsForm.require_founder_approval_if_competitor_above_max) {
+    goldPredictionSettingsForm.require_founder_approval_if_competitor_above_max.checked = settings.require_founder_approval_if_competitor_above_max !== false;
+  }
   goldPredictionSettingsForm.disclaimer.value = settings.disclaimer || state.goldPredictionStatus?.settings?.disclaimer || "";
   if (buybackPolicyEditor) {
     const policies = state.buybackPolicy?.policies || [];
@@ -12719,6 +12887,11 @@ async function saveGoldPredictionSettings(event) {
     history_days: Number(formData.get("history_days") || 90),
     model: formData.get("model"),
     demo_mode: formData.get("demo_mode") === "on",
+    market_match_delta_per_gram: Number(formData.get("market_match_delta_per_gram") || 0),
+    competitor_data_max_age_hours: Number(formData.get("competitor_data_max_age_hours") || 24),
+    allow_aggressive_market_match: formData.get("allow_aggressive_market_match") === "on",
+    show_competitor_to_commesso: formData.get("show_competitor_to_commesso") === "on",
+    require_founder_approval_if_competitor_above_max: formData.get("require_founder_approval_if_competitor_above_max") === "on",
     disclaimer: formData.get("disclaimer"),
     horizons: ["today", "24h", "7d", "30d"]
   };
@@ -12747,13 +12920,23 @@ function renderBuybackSimulation(event) {
     return;
   }
   state.buybackSimulationContext = buildPriceExplanationContext(row, { type: "simulator", grams, scenario });
+  const bestMarket = buybackMarketPrice(row);
+  const bestCompetitor = Number(row.best_competitor_price || row.competitor_max_price || 0);
+  const residualMargin = Math.max(0, Number(row.recoverable_value_per_gram || 0) - bestMarket);
+  const warning = row.market_comparison_status === "competitor_too_high"
+    ? `<p class="gold-prediction-disclaimer">Il miglior competitor rilevato supera il massimo sostenibile OroActive. Superare ${escapeHtml(formatEuro(row.max_payable_per_gram * grams))} ridurrebbe il margine sotto la policy configurata.</p>`
+    : "";
   buybackSimulatorOutput.innerHTML = `
     <div><span>Valore teorico</span><strong>${escapeHtml(formatEuro(row.theoretical_value_per_gram * grams))}</strong></div>
     <div><span>Massimo pagabile</span><strong>${escapeHtml(formatEuro(row.max_payable_per_gram * grams))}</strong></div>
     <div><span>Prezzo consigliato</span><strong>${escapeHtml(formatEuro(row.recommended_payable_per_gram * grams))}</strong></div>
+    <div><span>Miglior prezzo mercato stimato</span><strong>${escapeHtml(formatEuro(bestMarket * grams))}</strong></div>
+    <div><span>Miglior competitor rilevato</span><strong>${bestCompetitor ? escapeHtml(formatEuro(bestCompetitor * grams)) : "Non disponibile"}</strong></div>
     <div><span>Margine stimato</span><strong>${escapeHtml(formatEuro(row.margin_estimated_per_gram * grams))}</strong></div>
+    <div><span>Margine residuo su mercato</span><strong>${escapeHtml(formatEuro(residualMargin * grams))}</strong></div>
     <div><span>Rientro previsto</span><strong>${escapeHtml(formatEuro(row.recoverable_value_per_gram * grams))}</strong></div>
     <div><span>Competitor medio</span><strong>${row.competitor_count ? escapeHtml(formatGoldPerGram(row.competitor_avg_price, row.currency)) : "Non disponibile"}</strong></div>
+    ${warning}
   `;
 }
 
@@ -12765,6 +12948,7 @@ async function saveCompetitorSource(event) {
     name: formData.get("name"),
     website_url: formData.get("website_url"),
     source_type: formData.get("source_type"),
+    notes: formData.get("notes"),
     active: true
   };
   await apiRequest("/quotazioni/competitors/sources", {
@@ -12783,6 +12967,7 @@ async function saveCompetitorQuote(event) {
   const payload = {
     competitor_name: formData.get("competitor_name"),
     url: formData.get("url"),
+    website_url: formData.get("url"),
     metal: formData.get("metal"),
     purity_code: formData.get("purity_code"),
     price_per_gram: Number(formData.get("price_per_gram") || 0),
@@ -12815,6 +13000,28 @@ async function importCompetitorCsv(event) {
   competitorCsvForm.reset();
   showToast(data.message || "Import competitor completato.", data.errors?.length ? "warning" : "success");
   await loadGoldPredictionPanel({ silent: true });
+}
+
+async function handleCompetitorAction(event) {
+  const fill = event.target.closest("[data-fill-competitor-source]");
+  const disable = event.target.closest("[data-disable-competitor-source]");
+  if (fill) {
+    const source = (state.competitorSources || []).find((item) => String(item.id) === String(fill.dataset.fillCompetitorSource));
+    if (source && competitorQuoteForm) {
+      competitorQuoteForm.competitor_name.value = source.name || "";
+      competitorQuoteForm.url.value = source.website_url || "";
+      competitorQuoteForm.price_per_gram?.focus();
+      showToast("Fonte competitor pronta per inserire una quotazione manuale.", "success");
+    }
+    return;
+  }
+  if (disable && isFounder()) {
+    await apiRequest(`/quotazioni/competitors/sources/${encodeURIComponent(disable.dataset.disableCompetitorSource)}`, {
+      method: "DELETE"
+    });
+    showToast("Fonte competitor disattivata.", "success");
+    await loadGoldPredictionPanel({ silent: true });
+  }
 }
 
 function askAurumGoldPrediction() {
@@ -14398,6 +14605,9 @@ competitorQuoteForm?.addEventListener("submit", (event) => {
 });
 competitorCsvForm?.addEventListener("submit", (event) => {
   withButtonBusy(event.submitter || competitorCsvForm.querySelector('button[type="submit"]'), "Importo...", () => importCompetitorCsv(event));
+});
+competitorQuotesList?.addEventListener("click", (event) => {
+  void handleCompetitorAction(event);
 });
 goldPredictionSettingsForm?.addEventListener("submit", (event) => {
   event.preventDefault();

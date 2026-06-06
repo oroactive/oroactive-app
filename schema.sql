@@ -2046,10 +2046,16 @@ CREATE TABLE IF NOT EXISTS competitor_quote_sources (
   active BOOLEAN DEFAULT true,
   notes TEXT,
   selectors JSONB DEFAULT '{}'::jsonb,
+  last_sync_at TIMESTAMPTZ NULL,
+  last_sync_status TEXT DEFAULT 'not_synced',
   created_by BIGINT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(name)
 );
+
+ALTER TABLE competitor_quote_sources ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ NULL;
+ALTER TABLE competitor_quote_sources ADD COLUMN IF NOT EXISTS last_sync_status TEXT DEFAULT 'not_synced';
 
 CREATE TABLE IF NOT EXISTS competitor_buyback_quotes (
   id BIGSERIAL PRIMARY KEY,
@@ -2071,6 +2077,9 @@ CREATE TABLE IF NOT EXISTS competitor_buyback_quotes (
 
 CREATE INDEX IF NOT EXISTS idx_competitor_quotes_metal_purity
   ON competitor_buyback_quotes(metal, purity_code);
+
+CREATE INDEX IF NOT EXISTS idx_competitor_quotes_competitor
+  ON competitor_buyback_quotes(competitor_name);
 
 CREATE INDEX IF NOT EXISTS idx_competitor_quotes_date
   ON competitor_buyback_quotes(quote_date DESC);
