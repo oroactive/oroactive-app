@@ -17,6 +17,7 @@ import { createAiCompetitorQuoteExtractor } from "./services/competitors/aiCompe
 import { createCompetitorExtractionTrainer } from "./services/competitors/competitorExtractionTrainer.js";
 import { createAmicoOroExtractor } from "./services/competitors/extractors/amicoOroExtractor.js";
 import { createBancoPreziosiExtractor } from "./services/competitors/extractors/bancoPreziosiExtractor.js";
+import { createBordinExtractor } from "./services/competitors/extractors/bordinExtractor.js";
 import { createOroDOroExtractor } from "./services/competitors/extractors/oroDOroExtractor.js";
 import { createOroExpressExtractor } from "./services/competitors/extractors/oroExpressExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
@@ -91,6 +92,13 @@ const bancoPreziosiQuoteUrl = process.env.BANCO_PREZIOSI_QUOTE_URL || "https://w
 const bancoPreziosiUsePlaywright = String(process.env.BANCO_PREZIOSI_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
 const bancoPreziosiUseAiFallback = String(process.env.BANCO_PREZIOSI_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const bancoPreziosiTimeoutMs = Math.min(Math.max(Number(process.env.BANCO_PREZIOSI_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
+const bordinAutoSyncEnabled = String(process.env.BORDIN_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const bordinAutoSyncOnStartup = String(process.env.BORDIN_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const bordinSyncIntervalMinutes = Math.max(60, Number(process.env.BORDIN_SYNC_INTERVAL_MINUTES || 60));
+const bordinUrl = process.env.BORDIN_URL || "https://www.orometallipreziosi.com";
+const bordinUsePlaywright = String(process.env.BORDIN_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const bordinUseAiFallback = String(process.env.BORDIN_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
+const bordinTimeoutMs = Math.min(Math.max(Number(process.env.BORDIN_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const competitorAiExtractionEnabled = String(process.env.AI_COMPETITOR_EXTRACTION_ENABLED || process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiAutoExtractionEnabled = String(process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiExtractionIntervalMinutes = Math.max(60, Number(process.env.AI_COMPETITOR_EXTRACTION_INTERVAL_MINUTES || process.env.COMPETITOR_AI_AUTO_EXTRACTION_INTERVAL_MINUTES || 360));
@@ -152,6 +160,15 @@ const amicoOroSyncState = {
 };
 const bancoPreziosiSyncState = {
   enabled: bancoPreziosiAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: ""
+};
+const bordinSyncState = {
+  enabled: bordinAutoSyncEnabled,
   running: false,
   timer: null,
   lastRunAt: null,
@@ -366,6 +383,16 @@ const bancoPreziosiExtractor = createBancoPreziosiExtractor({
   useAiFallback: bancoPreziosiUseAiFallback,
   maxTextChars: competitorAiMaxTextChars
 });
+const bordinExtractor = createBordinExtractor({
+  openai,
+  model: competitorAiExtractionModel,
+  url: bordinUrl,
+  timeoutMs: bordinTimeoutMs,
+  userAgent: competitorAutoSyncUserAgent,
+  usePlaywright: bordinUsePlaywright,
+  useAiFallback: bordinUseAiFallback,
+  maxTextChars: competitorAiMaxTextChars
+});
 const competitorExtractionTrainer = createCompetitorExtractionTrainer({
   openai,
   model: competitorAiExtractionModel,
@@ -373,7 +400,8 @@ const competitorExtractionTrainer = createCompetitorExtractionTrainer({
   oroExpressExtractor,
   oroDOroExtractor,
   amicoOroExtractor,
-  bancoPreziosiExtractor
+  bancoPreziosiExtractor,
+  bordinExtractor
 });
 const aiRuntime = {
   pgvector: false,
@@ -2358,7 +2386,19 @@ const DEFAULT_COMPETITOR_SOURCES = [
     },
     notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
   },
-  { name: "Bordin", website_url: "https://www.orometallipreziosi.com" },
+  {
+    name: "Bordin",
+    website_url: bordinUrl,
+    source_type: "bordin_parser",
+    sync_interval_minutes: bordinSyncIntervalMinutes,
+    extraction_config: {
+      method: "bordin_parser",
+      url: bordinUrl,
+      currency: "EUR",
+      min_quantity_grams: 35
+    },
+    notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
+  },
   { name: "Gold Standard", website_url: "https://www.goldstandard.gold" },
   { name: "Oro in Euro", website_url: "https://www.quotazioneritirooro.it" }
 ].map((source) => ({
@@ -2457,7 +2497,8 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN $6::text
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $6::text
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $6::text
-                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'oro_doro_parser', 'amico_oro_parser', 'banco_preziosi_parser')
+                WHEN LOWER(name) = LOWER('Bordin') THEN $6::text
+                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'oro_doro_parser', 'amico_oro_parser', 'banco_preziosi_parser', 'bordin_parser')
                  AND (notes IS NULL OR notes = '' OR notes ILIKE '%Competitor preconfigurato OroActive%') THEN $6::text
                 ELSE source_type
               END,
@@ -2466,6 +2507,7 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN true
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN true
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN true
+                WHEN LOWER(name) = LOWER('Bordin') THEN true
                 ELSE COALESCE(auto_sync_enabled, true)
               END,
               sync_interval_minutes = CASE
@@ -2473,6 +2515,7 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN $3::int
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $3::int
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $3::int
+                WHEN LOWER(name) = LOWER('Bordin') THEN $3::int
                 ELSE COALESCE(sync_interval_minutes, $3::int)
               END,
               extraction_config = CASE
@@ -2690,6 +2733,55 @@ function defaultBancoPreziosiExtractionRules(source = {}) {
   }));
 }
 
+function defaultBordinExtractionRules(source = {}) {
+  const pageUrl = source.website_url || bordinUrl;
+  const rows = [
+    [
+      "bordin_gold_24kt",
+      "Oro 24kt - 999,9‰",
+      "gold",
+      "24kt",
+      0.9999,
+      "Oro 24kt",
+      "Oro\\s*24\\s*(?:kt|k)[\\s\\S]{0,120}?999[,.]9\\s*(?:‰|per\\s*mille|\\/\\s*1000)[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/\\s*(?:gr|g)"
+    ],
+    [
+      "bordin_gold_18kt",
+      "Oro 18kt - 750‰",
+      "gold",
+      "18kt",
+      0.75,
+      "Oro 18kt",
+      "Oro\\s*18\\s*(?:kt|k)[\\s\\S]{0,120}?750\\s*(?:‰|per\\s*mille|\\/\\s*1000)[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/\\s*(?:gr|g)"
+    ],
+    [
+      "bordin_gold_14kt",
+      "Oro 14kt - 585‰",
+      "gold",
+      "14kt",
+      0.585,
+      "Oro 14kt",
+      "Oro\\s*14\\s*(?:kt|k)[\\s\\S]{0,120}?585\\s*(?:‰|per\\s*mille|\\/\\s*1000)[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/\\s*(?:gr|g)"
+    ]
+  ];
+  return rows.map(([field_key, label, metal, purity_code, purity_value, anchor_text, regex_pattern]) => ({
+    field_key,
+    label,
+    metal,
+    purity_code,
+    purity_value,
+    anchor_text,
+    regex_pattern,
+    competitor_name: source.name || "Bordin",
+    source_id: source.id || null,
+    page_url: pageUrl,
+    unit: "EUR/g",
+    extraction_method: "anchor_regex",
+    required: true,
+    active: true
+  }));
+}
+
 function publicCompetitorExtractionRule(row = {}) {
   const metal = normalizePredictionMetal(row.metal || "gold");
   const purityCode = normalizePurityCode(row.purity_code || row.purityCode, metal);
@@ -2761,7 +2853,8 @@ async function seedDefaultCompetitorExtractionRules() {
     { source: await getOroExpressSource().catch(() => null), rulesFor: defaultOroExpressExtractionRules },
     { source: await getOroDOroSource().catch(() => null), rulesFor: defaultOroDOroExtractionRules },
     { source: await getAmicoOroSource().catch(() => null), rulesFor: defaultAmicoOroExtractionRules },
-    { source: await getBancoPreziosiSource().catch(() => null), rulesFor: defaultBancoPreziosiExtractionRules }
+    { source: await getBancoPreziosiSource().catch(() => null), rulesFor: defaultBancoPreziosiExtractionRules },
+    { source: await getBordinSource().catch(() => null), rulesFor: defaultBordinExtractionRules }
   ];
   for (const { source, rulesFor } of ruleSets) {
     if (!source?.id) continue;
@@ -3033,7 +3126,7 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
   const payload = {
     name: String(input.name || "").trim().slice(0, 120),
     website_url: String(input.website_url || input.websiteUrl || "").trim().slice(0, 500),
-    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "oro_doro_parser", "amico_oro_parser", "banco_preziosi_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
+    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "oro_doro_parser", "amico_oro_parser", "banco_preziosi_parser", "bordin_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
       ? String(input.source_type || input.sourceType || "manual").toLowerCase()
       : "manual",
     active: input.active !== false,
@@ -3616,6 +3709,19 @@ async function extractCompetitorQuotes(source = {}) {
     });
   }
 
+  if (method === "bordin_parser" || source.source_type === "bordin_parser" || source.name?.toLowerCase() === "bordin") {
+    return bordinExtractor.extractBordinQuotes({
+      source_id: source.id,
+      sourceId: source.id,
+      url: config.url || source.website_url || bordinUrl,
+      sourceUrl: config.url || source.website_url || bordinUrl,
+      timeoutMs: bordinTimeoutMs,
+      userAgent: competitorAutoSyncUserAgent,
+      usePlaywright: bordinUsePlaywright,
+      useAiFallback: bordinUseAiFallback
+    });
+  }
+
   if (method === "api" || source.source_type === "api") {
     const { body } = await fetchCompetitorPage(source.website_url);
     const data = JSON.parse(body);
@@ -3972,6 +4078,13 @@ async function getBancoPreziosiSource() {
   return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
 }
 
+async function getBordinSource() {
+  const result = await pool.query(
+    "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Bordin') LIMIT 1"
+  );
+  return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
+}
+
 async function runOroExpressHourlySync({ force = false, user = {}, req = null } = {}) {
   if (!oroExpressAutoSyncEnabled && !force) {
     return { ok: false, skipped: true, message: "Sync Oro Express disattivato.", state: oroExpressSyncPublicStatus() };
@@ -4290,6 +4403,90 @@ function startBancoPreziosiHourlySync() {
   }, bancoPreziosiSyncIntervalMinutes * 60 * 1000);
   bancoPreziosiSyncState.timer.unref?.();
   return bancoPreziosiSyncPublicStatus();
+}
+
+function bordinSyncPublicStatus() {
+  return {
+    enabled: bordinAutoSyncEnabled,
+    running: bordinSyncState.running,
+    interval_minutes: bordinSyncIntervalMinutes,
+    on_startup: bordinAutoSyncOnStartup,
+    url: bordinUrl,
+    use_playwright: bordinUsePlaywright,
+    use_ai_fallback: bordinUseAiFallback,
+    timeout_ms: bordinTimeoutMs,
+    last_run_at: bordinSyncState.lastRunAt,
+    next_run_at: bordinSyncState.nextRunAt,
+    last_status: bordinSyncState.lastStatus,
+    last_error: bordinSyncState.lastError
+  };
+}
+
+async function runBordinHourlySync({ force = false, user = {}, req = null } = {}) {
+  if (!bordinAutoSyncEnabled && !force) {
+    return { ok: false, skipped: true, message: "Sync Bordin disattivato.", state: bordinSyncPublicStatus() };
+  }
+  if (bordinSyncState.running) {
+    return { ok: true, skipped: true, message: "Sync Bordin gia in corso.", state: bordinSyncPublicStatus() };
+  }
+  bordinSyncState.running = true;
+  bordinSyncState.lastRunAt = new Date().toISOString();
+  bordinSyncState.lastStatus = "running";
+  bordinSyncState.lastError = "";
+  try {
+    const source = await getBordinSource();
+    if (!source?.id) throw new Error("Fonte Bordin non configurata");
+    const result = await syncSingleCompetitorSource(source, user, req, { force });
+    const summary = await calculateCompetitorMarketSummary().catch(() => null);
+    bordinSyncState.lastStatus = result.status || "success";
+    bordinSyncState.lastError = result.error || result.log?.error_message || "";
+    bordinSyncState.nextRunAt = new Date(Date.now() + bordinSyncIntervalMinutes * 60 * 1000).toISOString();
+    return {
+      ok: true,
+      result,
+      summary,
+      state: bordinSyncPublicStatus()
+    };
+  } catch (error) {
+    bordinSyncState.lastStatus = "failed";
+    bordinSyncState.lastError = error.message || "Sync Bordin non riuscito";
+    const source = await getBordinSource().catch(() => null);
+    if (source?.id) {
+      await updateCompetitorSourceSyncStatus(
+        source.id,
+        "failed",
+        new Date().toISOString(),
+        bordinSyncState.lastError,
+        new Date(Date.now() + bordinSyncIntervalMinutes * 60 * 1000).toISOString()
+      ).catch(() => {});
+    }
+    throw error;
+  } finally {
+    bordinSyncState.running = false;
+  }
+}
+
+function startBordinHourlySync() {
+  if (!bordinAutoSyncEnabled || bordinSyncState.timer) return bordinSyncPublicStatus();
+  bordinSyncState.nextRunAt = new Date(Date.now() + bordinSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (bordinAutoSyncOnStartup) {
+    setTimeout(() => {
+      runBordinHourlySync({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        bordinSyncState.lastStatus = "failed";
+        bordinSyncState.lastError = error.message || "Sync startup Bordin fallito";
+        console.error("Errore sync Bordin", error);
+      });
+    }, 8500).unref?.();
+  }
+  bordinSyncState.timer = setInterval(() => {
+    runBordinHourlySync({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      bordinSyncState.lastStatus = "failed";
+      bordinSyncState.lastError = error.message || "Sync Bordin fallito";
+      console.error("Errore sync Bordin", error);
+    });
+  }, bordinSyncIntervalMinutes * 60 * 1000);
+  bordinSyncState.timer.unref?.();
+  return bordinSyncPublicStatus();
 }
 
 async function updateCompetitorSourceAutoSync(id, input = {}, user = {}, req = null) {
@@ -19370,6 +19567,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       oro_doro_status: oroDOroSyncPublicStatus(),
       amico_oro_status: amicoOroSyncPublicStatus(),
       banco_preziosi_status: bancoPreziosiSyncPublicStatus(),
+      bordin_status: bordinSyncPublicStatus(),
       sources,
       recent_logs: logs
     });
@@ -19486,6 +19684,14 @@ app.post("/api/quotazioni/competitors/amico-oro/sync", requireFounder, async (re
 app.post("/api/quotazioni/competitors/banco-preziosi/sync", requireFounder, async (request, response, next) => {
   try {
     response.json(await runBancoPreziosiHourlySync({ force: true, user: request.user, req: request }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/bordin/sync", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await runBordinHourlySync({ force: true, user: request.user, req: request }));
   } catch (error) {
     next(error);
   }
@@ -20668,6 +20874,7 @@ initDatabase()
     startOroDOroHourlySync();
     startAmicoOroHourlySync();
     startBancoPreziosiHourlySync();
+    startBordinHourlySync();
     startCompetitorAiAutoExtraction();
   })
   .catch((error) => {

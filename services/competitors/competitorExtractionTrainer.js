@@ -244,7 +244,8 @@ export function createCompetitorExtractionTrainer(options = {}) {
     oroExpressExtractor: options.oroExpressExtractor || null,
     oroDOroExtractor: options.oroDOroExtractor || null,
     amicoOroExtractor: options.amicoOroExtractor || null,
-    bancoPreziosiExtractor: options.bancoPreziosiExtractor || null
+    bancoPreziosiExtractor: options.bancoPreziosiExtractor || null,
+    bordinExtractor: options.bordinExtractor || null
   };
 
   async function fetchPublicPage(url = "") {
@@ -289,12 +290,21 @@ export function createCompetitorExtractionTrainer(options = {}) {
       }).catch(() => ({ quotes: [] }));
       return result.quotes || [];
     }
+    if (config.bordinExtractor && sourceName === "bordin") {
+      const result = await config.bordinExtractor.extractBordinQuotes({
+        source_id: source.id,
+        sourceId: source.id,
+        url: rules[0]?.page_url || source.website_url
+      }).catch(() => ({ quotes: [] }));
+      return result.quotes || [];
+    }
     return [];
   }
 
   function sourceSpecificMethod(source = {}) {
     const sourceName = String(source.name || "").toLowerCase();
     if (sourceName === "banco preziosi") return "guided_banco_preziosi_parser";
+    if (sourceName === "bordin") return "guided_bordin_parser";
     if (sourceName === "amico oro") return "guided_amico_oro_parser";
     if (sourceName === "oro d'oro") return "guided_oro_doro_parser";
     if (sourceName === "oro express") return "guided_oro_express_parser";
