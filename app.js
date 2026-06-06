@@ -12144,6 +12144,25 @@ function competitorQuoteTypeLabel(type = "") {
   return "Da verificare";
 }
 
+function competitorSourceTypeLabel(type = "") {
+  const normalized = String(type || "").toLowerCase();
+  if (normalized === "oro_express_parser") return "Parser Oro Express";
+  if (normalized === "configured_page") return "Pagina configurata";
+  if (normalized === "api") return "API";
+  if (normalized === "csv_import") return "CSV";
+  return normalized || "manuale";
+}
+
+function competitorPurityDisplay(quote = {}) {
+  if (quote.competitor_name === "Oro Express" && quote.metal === "silver" && quote.purity_code === "used_generic") {
+    return "Argento usato / generico";
+  }
+  if (quote.competitor_name === "Oro Express" && quote.metal === "gold" && quote.purity_code === "24kt") return "Oro puro / 24kt";
+  if (quote.competitor_name === "Oro Express" && quote.metal === "gold" && quote.purity_code === "18kt") return "Oro usato / 18kt";
+  if (quote.competitor_name === "Oro Express" && quote.metal === "silver" && quote.purity_code === "999") return "Argento puro / 999";
+  return quote.purity_code || "—";
+}
+
 function competitorEvidenceHtml(quote = {}) {
   const evidence = String(quote.evidence_text || "").trim();
   if (!evidence) return "—";
@@ -12154,6 +12173,45 @@ function competitorEvidenceHtml(quote = {}) {
       <p>${escapeHtml(evidence.slice(0, 320))}${evidence.length > 320 ? "..." : ""}</p>
       ${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Apri fonte</a>` : ""}
     </details>
+  `;
+}
+
+function latestOroExpressQuote(metal = "", purityCode = "") {
+  return (state.competitorQuotes || [])
+    .filter((quote) => quote.competitor_name === "Oro Express")
+    .filter((quote) => !metal || quote.metal === metal)
+    .filter((quote) => !purityCode || quote.purity_code === purityCode)
+    .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
+}
+
+function oroExpressSummaryHtml() {
+  const source = (state.competitorSources || []).find((item) => item.name === "Oro Express") || {};
+  const quotes = ["24kt", "18kt", "999", "used_generic"]
+    .map((code) => latestOroExpressQuote(code === "999" || code === "used_generic" ? "silver" : "gold", code))
+    .filter(Boolean);
+  if (!source.id && !quotes.length) return "";
+  const quoteRows = quotes.length
+    ? quotes.map((quote) => `
+        <div>
+          <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
+          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
+        </div>
+      `).join("")
+    : `<p>Nessuna quotazione Oro Express rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
+  return `
+    <article class="oro-express-card">
+      <header>
+        <div>
+          <span>Competitor dedicato</span>
+          <h5>Oro Express</h5>
+        </div>
+        <strong>${escapeHtml(competitorSourceStatusLabel(source))}</strong>
+      </header>
+      <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">www.oro-express.it</a>` : "https://www.oro-express.it"} · Metodo: parser automatico · Ogni 60 minuti</p>
+      <div class="oro-express-grid">${quoteRows}</div>
+      <p>Ultimo aggiornamento: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
+      ${isFounder() ? `<button class="ghost-button" type="button" data-force-oro-express-sync>Forza aggiornamento Oro Express</button>` : ""}
+    </article>
   `;
 }
 
@@ -12251,6 +12309,7 @@ function buildPriceExplanationContext(row = {}, options = {}) {
   const predictedPure = Number(prediction.predicted_price_per_gram || prediction.current_price_per_gram || 0);
   const predictedLowPure = Number(prediction.predicted_low_per_gram || 0);
   const predictedHighPure = Number(prediction.predicted_high_per_gram || 0);
+  const oroExpressQuote = latestOroExpressQuote(metal, row.purity_code || options.purity_code || "");
   return {
     mode: "price_explanation",
     type: options.type || "row",
@@ -12313,6 +12372,16 @@ function buildPriceExplanationContext(row = {}, options = {}) {
     best_competitor_name: row.best_competitor_name || row.competitor_reference?.competitor_name || "",
     best_competitor_price: aurumHasNumber(row.best_competitor_price) ? Number(row.best_competitor_price) : aurumHasNumber(row.competitor_reference?.price_per_gram) ? Number(row.competitor_reference.price_per_gram) : null,
     best_market_client_price_per_gram: aurumHasNumber(row.best_market_client_price_per_gram) ? Number(row.best_market_client_price_per_gram) : null,
+    oro_express_quote: oroExpressQuote ? {
+      metal: oroExpressQuote.metal,
+      purity_code: oroExpressQuote.purity_code,
+      label: competitorPurityDisplay(oroExpressQuote),
+      price_per_gram: Number(oroExpressQuote.price_per_gram || 0),
+      source_url: oroExpressQuote.source_url || oroExpressQuote.url || "",
+      quote_date: oroExpressQuote.quote_date || null,
+      evidence_text: oroExpressQuote.evidence_text || "",
+      confidence: oroExpressQuote.ai_confidence || oroExpressQuote.confidence || "high"
+    } : null,
     market_comparison_status: row.market_comparison_status || "",
     market_price_reason: row.market_price_reason || "",
     safe_to_offer: row.safe_to_offer,
@@ -12380,6 +12449,17 @@ function buildGeneralPriceExplanationContext() {
     competitor_ai_quotes_saved: Number(state.competitorAiStatus?.latest_run?.quotes_saved || 0),
     competitor_ai_quotes_24h: Number(state.competitorAiStatus?.quotes_24h || state.competitorAiQuotes?.length || 0),
     competitor_ai_last_error: state.competitorAiStatus?.status?.last_error || state.competitorAiStatus?.latest_run?.error_message || "",
+    oro_express_quotes: (state.competitorQuotes || [])
+      .filter((quote) => quote.competitor_name === "Oro Express")
+      .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
+      .slice(0, 4)
+      .map((quote) => ({
+        label: competitorPurityDisplay(quote),
+        price_per_gram: Number(quote.price_per_gram || 0),
+        source_url: quote.source_url || quote.url || "",
+        quote_date: quote.quote_date || null,
+        evidence_text: quote.evidence_text || ""
+      })),
     gold: buildPriceExplanationContext(gold, { type: "summary", metal: "gold", purity_code: gold.purity_code || "18kt" }),
     silver: buildPriceExplanationContext(silver, { type: "summary", metal: "silver", purity_code: silver.purity_code || "925" })
   };
@@ -12442,7 +12522,11 @@ function competitorExplanation(context = {}) {
     ? ` Il prezzo migliore di mercato sostenibile è ${formatAurumGram(bestMarket, currency)}: ${context.market_price_reason || marketStatusLabel(context.market_comparison_status)}.`
     : "";
   const approvalText = context.requires_founder_approval ? " Serve attenzione: per superare il limite sostenibile è richiesta approvazione Founder." : "";
-  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${syncText}${aiText}`;
+  const oroExpress = context.oro_express_quote;
+  const oroExpressText = oroExpress
+    ? ` Oro Express è stato aggiornato ${oroExpress.quote_date ? `il ${formatDateTime(oroExpress.quote_date)}` : "automaticamente"}: ${oroExpress.label || context.purity_code} a ${formatAurumGram(oroExpress.price_per_gram, currency)}. Fonte: ${oroExpress.source_url || "https://www.oro-express.it"}. ${Number(context.max_payable_per_gram || 0) && Number(oroExpress.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: non è consigliato superarlo senza autorizzazione." : "Rientra nel confronto con il massimo pagabile e il prezzo consigliato OroActive."}`
+    : "";
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${syncText}${aiText}`;
 }
 
 function formulaExplanation(context = {}) {
@@ -12481,6 +12565,7 @@ Per l'argento il riferimento operativo è ${silver.purity_code || "925"}: valore
 
 Competitor e fonti
 ${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${competitorSync} ${competitorAi} ${context.competitor_sync_last_error ? `Ultimo errore sync: ${context.competitor_sync_last_error}.` : ""} ${context.competitor_ai_last_error ? `Ultimo errore AI: ${context.competitor_ai_last_error}.` : ""} ${context.warning ? `Nota dati: ${context.warning}` : ""}
+${context.oro_express_quotes?.length ? `Oro Express rilevato: ${context.oro_express_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Oro Express non ha ancora quotazioni recenti salvate nel confronto."}
 
 Avviso finale
 Questa è una stima operativa e non una garanzia di prezzo. Il prezzo finale resta definito dalle policy OroActive e dall'operatore autorizzato.`;
@@ -12854,7 +12939,7 @@ function renderCompetitorQuotes() {
               <tr>
                 <td>${escapeHtml(source.name)}</td>
                 <td>${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
-                <td>${escapeHtml(source.source_type || "manual")}</td>
+                <td>${escapeHtml(competitorSourceTypeLabel(source.source_type))}</td>
                 <td>${source.auto_sync_enabled ? "On" : "Off"} · ${escapeHtml(String(source.sync_interval_minutes || 180))} min</td>
                 <td>Media</td>
                 <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
@@ -12908,7 +12993,7 @@ function renderCompetitorQuotes() {
                 <td>${escapeHtml(quote.competitor_name)}</td>
                 <td>${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Fonte</a>` : "—"}</td>
                 <td>${escapeHtml(metalDisplayName(quote.metal))}</td>
-                <td>${escapeHtml(quote.purity_code)}</td>
+                <td>${escapeHtml(competitorPurityDisplay(quote))}</td>
                 <td>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</td>
                 <td>${escapeHtml(formatMetalPerKg(quote.price_per_kg, quote.currency || "EUR"))}</td>
                 <td>${escapeHtml(quote.quote_date ? formatDateTime(quote.quote_date) : "—")}</td>
@@ -12929,6 +13014,7 @@ function renderCompetitorQuotes() {
   competitorQuotesList.innerHTML = `
     ${competitorAutoSyncSummaryHtml()}
     ${competitorAiExtractionSummaryHtml()}
+    ${oroExpressSummaryHtml()}
     <div class="competitor-summary">
       <strong>${sources.length}</strong>
       <span>fonti competitor monitorate</span>
@@ -13247,6 +13333,23 @@ async function forceCompetitorAutoSync(sourceId = "all") {
   await loadGoldPredictionPanel({ silent: true });
 }
 
+async function forceOroExpressSync() {
+  if (!isFounder()) return;
+  showToast("Aggiornamento Oro Express in esecuzione...", "success");
+  const data = await apiRequest("/quotazioni/competitors/oro-express/sync", {
+    method: "POST",
+    body: JSON.stringify({}),
+    timeoutMs: 90000
+  });
+  const saved = Number(data.result?.quotes_saved || 0);
+  const status = data.result?.status || data.state?.last_status || "success";
+  showToast(
+    status === "failed" ? "Oro Express non leggibile automaticamente. Ultimo dato valido mantenuto." : `Oro Express aggiornato. Quotazioni salvate: ${saved}.`,
+    status === "failed" ? "warning" : "success"
+  );
+  await loadGoldPredictionPanel({ silent: true });
+}
+
 async function runAiCompetitorExtraction(sourceId = "all") {
   if (!isFounder()) return;
   const payload = sourceId && sourceId !== "all" ? { source_id: sourceId } : {};
@@ -13289,6 +13392,7 @@ async function handleCompetitorAction(event) {
   const fill = event.target.closest("[data-fill-competitor-source]");
   const disable = event.target.closest("[data-disable-competitor-source]");
   const forceSync = event.target.closest("[data-force-competitor-sync]");
+  const forceOroExpress = event.target.closest("[data-force-oro-express-sync]");
   const runAiExtract = event.target.closest("[data-run-ai-competitor-extract]");
   const toggleAutoSync = event.target.closest("[data-toggle-competitor-auto-sync]");
   if (fill) {
@@ -13303,6 +13407,10 @@ async function handleCompetitorAction(event) {
   }
   if (forceSync && isFounder()) {
     await forceCompetitorAutoSync(forceSync.dataset.forceCompetitorSync || "all");
+    return;
+  }
+  if (forceOroExpress && isFounder()) {
+    await forceOroExpressSync();
     return;
   }
   if (runAiExtract && isFounder()) {

@@ -14,6 +14,7 @@ import OpenAI from "openai";
 import PDFDocument from "pdfkit";
 import pg from "pg";
 import { createAiCompetitorQuoteExtractor } from "./services/competitors/aiCompetitorQuoteExtractor.js";
+import { createOroExpressExtractor } from "./services/competitors/extractors/oroExpressExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
 
 dotenv.config();
@@ -57,6 +58,13 @@ const competitorAutoSyncOnStartup = String(process.env.COMPETITOR_AUTO_SYNC_ON_S
 const competitorAutoSyncMaxSourcesPerRun = Math.min(Math.max(Number(process.env.COMPETITOR_AUTO_SYNC_MAX_SOURCES_PER_RUN || 8), 1), 20);
 const competitorAutoSyncTimeoutMs = Math.min(Math.max(Number(process.env.COMPETITOR_AUTO_SYNC_TIMEOUT_MS || 15000), 3000), 60000);
 const competitorAutoSyncUserAgent = process.env.COMPETITOR_AUTO_SYNC_USER_AGENT || "OroActiveBot/1.0";
+const oroExpressAutoSyncEnabled = String(process.env.ORO_EXPRESS_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const oroExpressAutoSyncOnStartup = String(process.env.ORO_EXPRESS_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const oroExpressSyncIntervalMinutes = Math.max(60, Number(process.env.ORO_EXPRESS_SYNC_INTERVAL_MINUTES || 60));
+const oroExpressUrl = process.env.ORO_EXPRESS_URL || "https://www.oro-express.it";
+const oroExpressUsePlaywright = String(process.env.ORO_EXPRESS_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const oroExpressTimeoutMs = Math.min(Math.max(Number(process.env.ORO_EXPRESS_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
+const oroExpressSilverUsedMapping = String(process.env.ORO_EXPRESS_SILVER_USED_MAPPING || "generic").toLowerCase();
 const competitorAiExtractionEnabled = String(process.env.AI_COMPETITOR_EXTRACTION_ENABLED || process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiAutoExtractionEnabled = String(process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiExtractionIntervalMinutes = Math.max(60, Number(process.env.AI_COMPETITOR_EXTRACTION_INTERVAL_MINUTES || process.env.COMPETITOR_AI_AUTO_EXTRACTION_INTERVAL_MINUTES || 360));
@@ -88,6 +96,15 @@ const competitorAiExtractionState = {
   lastError: "",
   lastRunId: null,
   lastSummary: null
+};
+const oroExpressSyncState = {
+  enabled: oroExpressAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: ""
 };
 const bullionVaultEnabled = String(process.env.BULLIONVAULT_ENABLED || "true").toLowerCase() !== "false";
 const alphaVantageApiKey = process.env.ALPHA_VANTAGE_API_KEY || "";
@@ -254,6 +271,16 @@ const aiCompetitorQuoteExtractor = createAiCompetitorQuoteExtractor({
   usePlaywright: competitorAiUsePlaywright,
   maxTextChars: competitorAiMaxTextChars,
   logger: console
+});
+const oroExpressExtractor = createOroExpressExtractor({
+  openai,
+  model: competitorAiExtractionModel,
+  url: oroExpressUrl,
+  timeoutMs: oroExpressTimeoutMs,
+  userAgent: competitorAutoSyncUserAgent,
+  usePlaywright: oroExpressUsePlaywright,
+  silverUsedMapping: oroExpressSilverUsedMapping,
+  maxTextChars: competitorAiMaxTextChars
 });
 const aiRuntime = {
   pgvector: false,
@@ -2136,6 +2163,7 @@ function normalizePurityCode(input = "", metal = "gold") {
   }
   if (/sterling/.test(value)) return "925";
   if (/argentopuro|puro/.test(value)) return "999";
+  if (/usedgeneric|generic|generico|argentousato|usato/.test(value)) return "used_generic";
   const match = value.match(/\b(999|925|800)\b/);
   if (match) return match[1];
   return value.replace(/[^0-9]/g, "") || "925";
@@ -2150,6 +2178,7 @@ function purityValueForCode(metal = "gold", purityCode = "") {
     const kt = Number(normalizedCode.replace("kt", ""));
     return Number.isFinite(kt) && kt > 0 ? Math.min(1, kt / 24) : 18 / 24;
   }
+  if (normalizedCode === "used_generic") return 0;
   const title = Number(normalizedCode);
   return Number.isFinite(title) && title > 0 ? Math.min(1, title / 1000) : 0.925;
 }
@@ -2174,6 +2203,7 @@ function defaultCompetitorExtractionConfig(url = "") {
       "9kt": "9kt",
       "6kt": "6kt",
       "argento puro": "999",
+      "argento usato": "used_generic",
       "sterling": "925",
       "argento 925": "925",
       "argento 800": "800"
@@ -2184,7 +2214,19 @@ function defaultCompetitorExtractionConfig(url = "") {
 }
 
 const DEFAULT_COMPETITOR_SOURCES = [
-  { name: "Oro Express", website_url: "https://www.oro-express.it" },
+  {
+    name: "Oro Express",
+    website_url: oroExpressUrl,
+    source_type: "oro_express_parser",
+    sync_interval_minutes: oroExpressSyncIntervalMinutes,
+    extraction_config: {
+      method: "oro_express_parser",
+      url: oroExpressUrl,
+      silver_used_mapping: oroExpressSilverUsedMapping,
+      currency: "EUR"
+    },
+    notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
+  },
   { name: "Oro D'oro", website_url: "https://www.comproorodoro.it" },
   { name: "Amico Oro", website_url: "https://www.amico-oro.it" },
   { name: "Pronto Gold", website_url: "https://www.prontogold.com" },
@@ -2194,12 +2236,12 @@ const DEFAULT_COMPETITOR_SOURCES = [
   { name: "Oro in Euro", website_url: "https://www.quotazioneritirooro.it" }
 ].map((source) => ({
   ...source,
-  source_type: "configured_page",
+  source_type: source.source_type || "configured_page",
   active: true,
   auto_sync_enabled: true,
-  sync_interval_minutes: competitorAutoSyncIntervalMinutes,
-  extraction_config: defaultCompetitorExtractionConfig(source.website_url),
-  notes: "Competitor preconfigurato OroActive con aggiornamento automatico prudente"
+  sync_interval_minutes: source.sync_interval_minutes || competitorAutoSyncIntervalMinutes,
+  extraction_config: source.extraction_config || defaultCompetitorExtractionConfig(source.website_url),
+  notes: source.notes || "Competitor preconfigurato OroActive con aggiornamento automatico prudente"
 }));
 
 function publicCompetitorSource(row = {}) {
@@ -2284,11 +2326,19 @@ async function seedDefaultCompetitorSources() {
       `UPDATE competitor_quote_sources
           SET website_url = COALESCE(NULLIF(website_url, ''), $2::text),
               source_type = CASE
-                WHEN source_type IN ('manual', 'configured_page') THEN 'configured_page'
+                WHEN LOWER(name) = LOWER('Oro Express') THEN $6::text
+                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser')
+                 AND (notes IS NULL OR notes = '' OR notes ILIKE '%Competitor preconfigurato OroActive%') THEN $6::text
                 ELSE source_type
               END,
-              auto_sync_enabled = COALESCE(auto_sync_enabled, true),
-              sync_interval_minutes = COALESCE(sync_interval_minutes, $3::int),
+              auto_sync_enabled = CASE
+                WHEN LOWER(name) = LOWER('Oro Express') THEN true
+                ELSE COALESCE(auto_sync_enabled, true)
+              END,
+              sync_interval_minutes = CASE
+                WHEN LOWER(name) = LOWER('Oro Express') THEN $3::int
+                ELSE COALESCE(sync_interval_minutes, $3::int)
+              END,
               extraction_config = CASE
                 WHEN extraction_config IS NULL OR extraction_config = '{}'::jsonb THEN $4::jsonb
                 ELSE extraction_config
@@ -2315,7 +2365,8 @@ async function seedDefaultCompetitorSources() {
         source.website_url,
         source.sync_interval_minutes,
         sanitizeForPostgres(source.extraction_config),
-        source.notes
+        source.notes,
+        source.source_type
       ]
     );
   }
@@ -2330,7 +2381,7 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
   const payload = {
     name: String(input.name || "").trim().slice(0, 120),
     website_url: String(input.website_url || input.websiteUrl || "").trim().slice(0, 500),
-    source_type: ["manual", "csv_import", "api", "configured_page"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
+    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
       ? String(input.source_type || input.sourceType || "manual").toLowerCase()
       : "manual",
     active: input.active !== false,
@@ -2487,13 +2538,13 @@ async function insertCompetitorQuote(input = {}, user = {}) {
     `INSERT INTO competitor_buyback_quotes (
       source_id, competitor_name, metal, purity_code, purity_value,
       price_per_gram, price_per_kg, currency, quote_date,
-      extraction_method, confidence, url, raw_payload,
+      extraction_method, confidence, url, source_url, raw_payload,
       ai_extracted, ai_confidence, evidence_text, quote_type, extraction_run_id,
       created_at
     ) VALUES (
       $1::bigint,$2::text,$3::text,$4::text,$5::numeric,$6::numeric,$7::numeric,$8::text,$9::timestamptz,
-      $10::text,$11::text,$12::text,$13::jsonb,
-      $14::boolean,$15::text,$16::text,$17::text,$18::bigint,
+      $10::text,$11::text,$12::text,$13::text,$14::jsonb,
+      $15::boolean,$16::text,$17::text,$18::text,$19::bigint,
       NOW()
     )
     RETURNING *`,
@@ -2509,6 +2560,7 @@ async function insertCompetitorQuote(input = {}, user = {}) {
       quoteDate,
       String(input.extraction_method || input.extractionMethod || "manual").slice(0, 40),
       String(input.confidence || "medium").toLowerCase().slice(0, 20),
+      sourceUrl,
       sourceUrl,
       sanitizeForPostgres(input.raw_payload || input.rawPayload || { inserted_by: user?.id || null }),
       Boolean(input.ai_extracted || input.aiExtracted),
@@ -2808,6 +2860,11 @@ function normalizeCompetitorQuote(rawQuote = {}, source = {}) {
     extraction_method: rawQuote.extraction_method || rawQuote.extractionMethod || "auto",
     confidence: rawQuote.confidence || "medium",
     url: rawQuote.url || source.website_url || "",
+    source_url: rawQuote.source_url || rawQuote.sourceUrl || rawQuote.url || source.website_url || "",
+    quote_type: rawQuote.quote_type || rawQuote.quoteType || "customer_buyback",
+    ai_extracted: Boolean(rawQuote.ai_extracted || rawQuote.aiExtracted),
+    ai_confidence: rawQuote.ai_confidence || rawQuote.aiConfidence || rawQuote.confidence || "medium",
+    evidence_text: rawQuote.evidence_text || rawQuote.evidenceText || "",
     raw_payload: rawQuote.raw_payload || rawQuote.rawPayload || rawQuote
   };
 }
@@ -2838,6 +2895,18 @@ async function extractCompetitorQuotes(source = {}) {
   const method = String(config.method || source.source_type || "manual_fallback").toLowerCase();
   if (!source.auto_sync_enabled || method === "manual_fallback" || source.source_type === "manual" || source.source_type === "csv_import") {
     return { quotes: [], status: "disabled", error: "Fonte non configurata per aggiornamento automatico." };
+  }
+  if (method === "oro_express_parser" || source.source_type === "oro_express_parser" || source.name?.toLowerCase() === "oro express") {
+    return oroExpressExtractor.extractOroExpressQuotes({
+      source_id: source.id,
+      sourceId: source.id,
+      url: config.url || source.website_url || oroExpressUrl,
+      sourceUrl: config.url || source.website_url || oroExpressUrl,
+      silverUsedMapping: config.silver_used_mapping || config.silverUsedMapping || oroExpressSilverUsedMapping,
+      timeoutMs: oroExpressTimeoutMs,
+      userAgent: competitorAutoSyncUserAgent,
+      usePlaywright: oroExpressUsePlaywright
+    });
   }
 
   if (method === "api" || source.source_type === "api") {
@@ -3138,6 +3207,97 @@ function stopCompetitorAutoSync() {
   competitorAutoSyncState.timer = null;
   competitorAutoSyncState.nextRunAt = null;
   return competitorAutoSyncPublicStatus();
+}
+
+function oroExpressSyncPublicStatus() {
+  return {
+    enabled: oroExpressAutoSyncEnabled,
+    running: oroExpressSyncState.running,
+    interval_minutes: oroExpressSyncIntervalMinutes,
+    on_startup: oroExpressAutoSyncOnStartup,
+    url: oroExpressUrl,
+    use_playwright: oroExpressUsePlaywright,
+    timeout_ms: oroExpressTimeoutMs,
+    silver_used_mapping: oroExpressSilverUsedMapping,
+    last_run_at: oroExpressSyncState.lastRunAt,
+    next_run_at: oroExpressSyncState.nextRunAt,
+    last_status: oroExpressSyncState.lastStatus,
+    last_error: oroExpressSyncState.lastError
+  };
+}
+
+async function getOroExpressSource() {
+  const result = await pool.query(
+    "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Oro Express') LIMIT 1"
+  );
+  return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
+}
+
+async function runOroExpressHourlySync({ force = false, user = {}, req = null } = {}) {
+  if (!oroExpressAutoSyncEnabled && !force) {
+    return { ok: false, skipped: true, message: "Sync Oro Express disattivato.", state: oroExpressSyncPublicStatus() };
+  }
+  if (oroExpressSyncState.running) {
+    return { ok: true, skipped: true, message: "Sync Oro Express gia in corso.", state: oroExpressSyncPublicStatus() };
+  }
+  oroExpressSyncState.running = true;
+  oroExpressSyncState.lastRunAt = new Date().toISOString();
+  oroExpressSyncState.lastStatus = "running";
+  oroExpressSyncState.lastError = "";
+  try {
+    const source = await getOroExpressSource();
+    if (!source?.id) throw new Error("Fonte Oro Express non configurata");
+    const result = await syncSingleCompetitorSource(source, user, req, { force });
+    const summary = await calculateCompetitorMarketSummary().catch(() => null);
+    oroExpressSyncState.lastStatus = result.status || "success";
+    oroExpressSyncState.lastError = result.error || result.log?.error_message || "";
+    oroExpressSyncState.nextRunAt = new Date(Date.now() + oroExpressSyncIntervalMinutes * 60 * 1000).toISOString();
+    return {
+      ok: true,
+      result,
+      summary,
+      state: oroExpressSyncPublicStatus()
+    };
+  } catch (error) {
+    oroExpressSyncState.lastStatus = "failed";
+    oroExpressSyncState.lastError = error.message || "Sync Oro Express non riuscito";
+    const source = await getOroExpressSource().catch(() => null);
+    if (source?.id) {
+      await updateCompetitorSourceSyncStatus(
+        source.id,
+        "failed",
+        new Date().toISOString(),
+        oroExpressSyncState.lastError,
+        new Date(Date.now() + oroExpressSyncIntervalMinutes * 60 * 1000).toISOString()
+      ).catch(() => {});
+    }
+    throw error;
+  } finally {
+    oroExpressSyncState.running = false;
+  }
+}
+
+function startOroExpressHourlySync() {
+  if (!oroExpressAutoSyncEnabled || oroExpressSyncState.timer) return oroExpressSyncPublicStatus();
+  oroExpressSyncState.nextRunAt = new Date(Date.now() + oroExpressSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (oroExpressAutoSyncOnStartup) {
+    setTimeout(() => {
+      runOroExpressHourlySync({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        oroExpressSyncState.lastStatus = "failed";
+        oroExpressSyncState.lastError = error.message || "Sync startup Oro Express fallito";
+        console.error("Errore sync Oro Express", error);
+      });
+    }, 6000).unref?.();
+  }
+  oroExpressSyncState.timer = setInterval(() => {
+    runOroExpressHourlySync({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      oroExpressSyncState.lastStatus = "failed";
+      oroExpressSyncState.lastError = error.message || "Sync Oro Express fallito";
+      console.error("Errore sync Oro Express", error);
+    });
+  }, oroExpressSyncIntervalMinutes * 60 * 1000);
+  oroExpressSyncState.timer.unref?.();
+  return oroExpressSyncPublicStatus();
 }
 
 async function updateCompetitorSourceAutoSync(id, input = {}, user = {}, req = null) {
@@ -18133,6 +18293,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       sources_updated: updatedSources,
       sources_failed: failedSources,
       valid_quotes_24h: Number(validQuotes.rows[0]?.count || 0),
+      oro_express_status: oroExpressSyncPublicStatus(),
       sources,
       recent_logs: logs
     });
@@ -18217,6 +18378,14 @@ app.get("/api/quotazioni/competitors/quotes/ai", async (request, response, next)
         validOnly: request.query.valid_only === "true" || request.query.validOnly === "true"
       })
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/oro-express/sync", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await runOroExpressHourlySync({ force: true, user: request.user, req: request }));
   } catch (error) {
     next(error);
   }
@@ -19395,6 +19564,7 @@ initDatabase()
     runtimeStatus.databaseError = "";
     scheduleBackups();
     startCompetitorAutoSync();
+    startOroExpressHourlySync();
     startCompetitorAiAutoExtraction();
   })
   .catch((error) => {

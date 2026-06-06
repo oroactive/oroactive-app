@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS competitor_buyback_quotes (
   extraction_method TEXT DEFAULT 'manual',
   confidence TEXT DEFAULT 'medium',
   url TEXT,
+  source_url TEXT NULL,
   raw_payload JSONB DEFAULT '{}'::jsonb,
   ai_extracted BOOLEAN DEFAULT false,
   ai_confidence TEXT DEFAULT 'medium',
@@ -64,6 +65,7 @@ ALTER TABLE competitor_buyback_quotes ADD COLUMN IF NOT EXISTS ai_extracted BOOL
 ALTER TABLE competitor_buyback_quotes ADD COLUMN IF NOT EXISTS ai_confidence TEXT DEFAULT 'medium';
 ALTER TABLE competitor_buyback_quotes ADD COLUMN IF NOT EXISTS evidence_text TEXT NULL;
 ALTER TABLE competitor_buyback_quotes ADD COLUMN IF NOT EXISTS quote_type TEXT DEFAULT 'customer_buyback';
+ALTER TABLE competitor_buyback_quotes ADD COLUMN IF NOT EXISTS source_url TEXT NULL;
 ALTER TABLE competitor_buyback_quotes ADD COLUMN IF NOT EXISTS extraction_run_id BIGINT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_competitor_quotes_metal_purity
