@@ -5070,6 +5070,55 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   font-size: 24px;
 }
 
+.competitor-auto-sync-card {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 184, 76, 0.22);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 106, 0, 0.13), rgba(255, 215, 0, 0.05)),
+    rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.competitor-auto-sync-card div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.competitor-auto-sync-card span {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.competitor-auto-sync-card strong {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 1000;
+  overflow-wrap: anywhere;
+}
+
+.competitor-auto-sync-card p,
+.competitor-auto-sync-card button {
+  grid-column: 1 / -1;
+}
+
+.competitor-auto-sync-card p {
+  margin: 0;
+  color: #ffd7a3;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .competitor-quotes-list h5 {
   margin: 16px 0 8px;
   color: #ffffff;
@@ -5100,7 +5149,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .competitor-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 1380px;
   border-collapse: collapse;
 }
 
@@ -10136,8 +10185,10 @@ input.document-expired {
   .buyback-simulator-form,
   .buyback-simulator-output,
   .competitor-tools,
+  .competitor-auto-sync-card,
   .competitor-quote-form,
   .competitor-source-form,
+  .competitor-csv-form,
   .buyback-policy-grid,
   .buyback-policy-row {
     grid-template-columns: 1fr;

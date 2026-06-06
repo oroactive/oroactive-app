@@ -50,6 +50,22 @@ const goldPriceBaseCurrency = String(process.env.METAL_PRICE_CURRENCY || process
 const metalPriceCacheMinutes = Math.max(5, Number(process.env.METAL_PRICE_CACHE_MINUTES || process.env.GOLD_PRICE_UPDATE_INTERVAL_MINUTES || 15));
 const metalPriceSyncDays = Math.min(Math.max(Number(process.env.METAL_PRICE_SYNC_DAYS || 90), 10), 365);
 const goldPriceUpdateIntervalMinutes = metalPriceCacheMinutes;
+const competitorAutoSyncEnabled = String(process.env.COMPETITOR_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const competitorAutoSyncIntervalMinutes = Math.max(15, Number(process.env.COMPETITOR_AUTO_SYNC_INTERVAL_MINUTES || 180));
+const competitorAutoSyncOnStartup = String(process.env.COMPETITOR_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const competitorAutoSyncMaxSourcesPerRun = Math.min(Math.max(Number(process.env.COMPETITOR_AUTO_SYNC_MAX_SOURCES_PER_RUN || 8), 1), 20);
+const competitorAutoSyncTimeoutMs = Math.min(Math.max(Number(process.env.COMPETITOR_AUTO_SYNC_TIMEOUT_MS || 15000), 3000), 60000);
+const competitorAutoSyncUserAgent = process.env.COMPETITOR_AUTO_SYNC_USER_AGENT || "OroActiveBot/1.0";
+const competitorAutoSyncState = {
+  enabled: competitorAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: "",
+  lastSummary: null
+};
 const bullionVaultEnabled = String(process.env.BULLIONVAULT_ENABLED || "true").toLowerCase() !== "false";
 const alphaVantageApiKey = process.env.ALPHA_VANTAGE_API_KEY || "";
 const customMetalApiUrl = process.env.CUSTOM_METAL_API_URL || "";
@@ -2077,12 +2093,18 @@ function purityCatalogByKey() {
 
 function normalizePurityCode(input = "", metal = "gold") {
   const normalizedMetal = normalizePredictionMetal(metal);
-  const value = String(input || "").trim().toLowerCase().replace(/\s+/g, "");
+  const raw = String(input || "").trim().toLowerCase();
+  const value = raw.replace(/\s+/g, "");
   if (!value) return normalizedMetal === "silver" ? "925" : "18kt";
   if (normalizedMetal === "gold") {
-    const kt = value.replace("k", "kt");
-    return /^\d{1,2}kt$/.test(kt) ? kt : "18kt";
+    if (/oropuro|puro|24carati/.test(value)) return "24kt";
+    const match = raw.match(/\b(24|22|21|18|14|12|9|6)\s*(?:kt|k|carati|carato)?\b/);
+    return match ? `${match[1]}kt` : "18kt";
   }
+  if (/sterling/.test(value)) return "925";
+  if (/argentopuro|puro/.test(value)) return "999";
+  const match = value.match(/\b(999|925|800)\b/);
+  if (match) return match[1];
   return value.replace(/[^0-9]/g, "") || "925";
 }
 
@@ -2099,16 +2121,53 @@ function purityValueForCode(metal = "gold", purityCode = "") {
   return Number.isFinite(title) && title > 0 ? Math.min(1, title / 1000) : 0.925;
 }
 
+function defaultCompetitorExtractionConfig(url = "") {
+  return {
+    method: "html_regex",
+    pages: [
+      { url, metal: "gold" },
+      { url, metal: "silver" }
+    ],
+    purityMapping: {
+      "oro puro": "24kt",
+      "24kt": "24kt",
+      "24 carati": "24kt",
+      "22kt": "22kt",
+      "21kt": "21kt",
+      "18kt": "18kt",
+      "18 carati": "18kt",
+      "14kt": "14kt",
+      "12kt": "12kt",
+      "9kt": "9kt",
+      "6kt": "6kt",
+      "argento puro": "999",
+      "sterling": "925",
+      "argento 925": "925",
+      "argento 800": "800"
+    },
+    priceFormat: "it-IT",
+    currency: "EUR"
+  };
+}
+
 const DEFAULT_COMPETITOR_SOURCES = [
-  { name: "Oro Express", website_url: "https://www.oro-express.it", source_type: "manual", active: true, notes: "Competitor preconfigurato OroActive" },
-  { name: "Oro D'oro", website_url: "https://www.comproorodoro.it", source_type: "manual", active: true, notes: "Competitor preconfigurato OroActive" },
-  { name: "Amico Oro", website_url: "https://www.amico-oro.it", source_type: "manual", active: true, notes: "Competitor preconfigurato OroActive" },
-  { name: "Pronto Gold", website_url: "https://www.prontogold.com", source_type: "manual", active: true, notes: "Competitor preconfigurato OroActive" },
-  { name: "Banco Preziosi", website_url: "https://www.bancopreziosimilano.it", source_type: "manual", active: true, notes: "Competitor preconfigurato OroActive" },
-  { name: "Bordin", website_url: "https://www.orometallipreziosi.com", source_type: "manual", active: true, notes: "Competitor preconfigurato OroActive" },
-  { name: "Gold Standard", website_url: "https://www.goldstandard.gold", source_type: "manual", active: true, notes: "Competitor preconfigurato OroActive" },
-  { name: "Oro in Euro", website_url: "https://www.quotazioneritirooro.it", source_type: "manual", active: true, notes: "Competitor preconfigurato OroActive" }
-];
+  { name: "Oro Express", website_url: "https://www.oro-express.it" },
+  { name: "Oro D'oro", website_url: "https://www.comproorodoro.it" },
+  { name: "Amico Oro", website_url: "https://www.amico-oro.it" },
+  { name: "Pronto Gold", website_url: "https://www.prontogold.com" },
+  { name: "Banco Preziosi", website_url: "https://www.bancopreziosimilano.it" },
+  { name: "Bordin", website_url: "https://www.orometallipreziosi.com" },
+  { name: "Gold Standard", website_url: "https://www.goldstandard.gold" },
+  { name: "Oro in Euro", website_url: "https://www.quotazioneritirooro.it" }
+].map((source) => ({
+  ...source,
+  source_type: "configured_page",
+  active: true,
+  auto_sync_enabled: true,
+  sync_interval_minutes: competitorAutoSyncIntervalMinutes,
+  extraction_config: defaultCompetitorExtractionConfig(source.website_url),
+  notes: "Competitor preconfigurato OroActive con aggiornamento automatico prudente"
+}));
 
 function publicCompetitorSource(row = {}) {
   return {
@@ -2117,10 +2176,15 @@ function publicCompetitorSource(row = {}) {
     website_url: row.website_url || "",
     source_type: row.source_type || "manual",
     active: row.active !== false,
+    auto_sync_enabled: row.auto_sync_enabled !== false,
+    sync_interval_minutes: Number(row.sync_interval_minutes || competitorAutoSyncIntervalMinutes),
     notes: row.notes || "",
     selectors: row.selectors || {},
+    extraction_config: row.extraction_config || row.extractionConfig || row.selectors || {},
     last_sync_at: row.last_sync_at || null,
+    next_sync_at: row.next_sync_at || null,
     last_sync_status: row.last_sync_status || "not_synced",
+    last_sync_error: row.last_sync_error || "",
     created_at: row.created_at || null,
     updated_at: row.updated_at || null
   };
@@ -2156,15 +2220,64 @@ async function seedDefaultCompetitorSources() {
   for (const source of DEFAULT_COMPETITOR_SOURCES) {
     await pool.query(
       `INSERT INTO competitor_quote_sources (
-        name, website_url, source_type, active, notes, selectors, last_sync_status, created_by, created_at, updated_at
+        name, website_url, source_type, active, auto_sync_enabled, sync_interval_minutes,
+        notes, selectors, extraction_config, last_sync_status, next_sync_at, created_by, created_at, updated_at
       )
-      SELECT $1::text,$2::text,$3::text,$4::boolean,$5::text,'{}'::jsonb,'manual_required',NULL,NOW(),NOW()
+      SELECT $1::text,$2::text,$3::text,$4::boolean,$5::boolean,$6::int,
+             $7::text,'{}'::jsonb,$8::jsonb,'not_synced',NOW(),NULL,NOW(),NOW()
       WHERE NOT EXISTS (
         SELECT 1
           FROM competitor_quote_sources
          WHERE LOWER(name) = LOWER($1::text)
       )`,
-      [source.name, source.website_url, source.source_type, source.active, source.notes]
+      [
+        source.name,
+        source.website_url,
+        source.source_type,
+        source.active,
+        source.auto_sync_enabled,
+        source.sync_interval_minutes,
+        source.notes,
+        sanitizeForPostgres(source.extraction_config)
+      ]
+    );
+    await pool.query(
+      `UPDATE competitor_quote_sources
+          SET website_url = COALESCE(NULLIF(website_url, ''), $2::text),
+              source_type = CASE
+                WHEN source_type IN ('manual', 'configured_page') THEN 'configured_page'
+                ELSE source_type
+              END,
+              auto_sync_enabled = COALESCE(auto_sync_enabled, true),
+              sync_interval_minutes = COALESCE(sync_interval_minutes, $3::int),
+              extraction_config = CASE
+                WHEN extraction_config IS NULL OR extraction_config = '{}'::jsonb THEN $4::jsonb
+                ELSE extraction_config
+              END,
+              last_sync_status = CASE
+                WHEN last_sync_status IS NULL OR last_sync_status IN ('', 'manual_required', 'not_synced') THEN 'not_synced'
+                ELSE last_sync_status
+              END,
+              next_sync_at = COALESCE(next_sync_at, NOW()),
+              notes = CASE
+                WHEN notes IS NULL OR notes = '' OR notes ILIKE '%Competitor preconfigurato OroActive%' THEN $5::text
+                ELSE notes
+              END,
+              updated_at = NOW()
+        WHERE LOWER(name) = LOWER($1::text)
+          AND (
+            notes IS NULL
+            OR notes = ''
+            OR notes ILIKE '%Competitor preconfigurato OroActive%'
+            OR website_url = $2::text
+          )`,
+      [
+        source.name,
+        source.website_url,
+        source.sync_interval_minutes,
+        sanitizeForPostgres(source.extraction_config),
+        source.notes
+      ]
     );
   }
 }
@@ -2182,8 +2295,11 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
       ? String(input.source_type || input.sourceType || "manual").toLowerCase()
       : "manual",
     active: input.active !== false,
+    auto_sync_enabled: input.auto_sync_enabled ?? input.autoSyncEnabled ?? !["manual", "csv_import"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase()),
+    sync_interval_minutes: Math.min(Math.max(Number(input.sync_interval_minutes || input.syncIntervalMinutes || competitorAutoSyncIntervalMinutes), 15), 10080),
     notes: String(input.notes || "").trim().slice(0, 600),
-    selectors: sanitizeForPostgres(input.selectors || {})
+    selectors: sanitizeForPostgres(input.selectors || {}),
+    extraction_config: sanitizeForPostgres(input.extraction_config || input.extractionConfig || input.selectors || {})
   };
   if (!payload.name) throw new Error("Nome competitor obbligatorio");
   if (!id) {
@@ -2200,21 +2316,41 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
               website_url = $2::text,
               source_type = $3::text,
               active = $4::boolean,
-              notes = $5::text,
-              selectors = $6::jsonb,
+              auto_sync_enabled = $5::boolean,
+              sync_interval_minutes = $6::int,
+              notes = $7::text,
+              selectors = $8::jsonb,
+              extraction_config = $9::jsonb,
+              next_sync_at = CASE
+                WHEN $5::boolean THEN COALESCE(next_sync_at, NOW())
+                ELSE NULL
+              END,
               updated_at = NOW()
-        WHERE id = $7::bigint
+        WHERE id = $10::bigint
         RETURNING *`,
-      [payload.name, payload.website_url, payload.source_type, payload.active, payload.notes, payload.selectors, id]
+      [
+        payload.name,
+        payload.website_url,
+        payload.source_type,
+        payload.active,
+        payload.auto_sync_enabled !== false,
+        payload.sync_interval_minutes,
+        payload.notes,
+        payload.selectors,
+        payload.extraction_config,
+        id
+      ]
     );
     if (!result.rows[0]) throw new Error("Fonte competitor non trovata");
     return publicCompetitorSource(result.rows[0]);
   }
   const result = await pool.query(
     `INSERT INTO competitor_quote_sources (
-      name, website_url, source_type, active, notes, selectors, last_sync_status, created_by, created_at, updated_at
+      name, website_url, source_type, active, auto_sync_enabled, sync_interval_minutes,
+      notes, selectors, extraction_config, last_sync_status, next_sync_at, created_by, created_at, updated_at
     ) VALUES (
-      $1::text,$2::text,$3::text,$4::boolean,$5::text,$6::jsonb,$7::text,$8::bigint,NOW(),NOW()
+      $1::text,$2::text,$3::text,$4::boolean,$5::boolean,$6::int,
+      $7::text,$8::jsonb,$9::jsonb,$10::text,NOW(),$11::bigint,NOW(),NOW()
     )
     RETURNING *`,
     [
@@ -2222,9 +2358,12 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
       payload.website_url,
       payload.source_type,
       payload.active,
+      payload.auto_sync_enabled !== false,
+      payload.sync_interval_minutes,
       payload.notes,
       payload.selectors,
-      payload.source_type === "api" ? "not_synced" : "manual_required",
+      payload.extraction_config,
+      payload.source_type === "manual" || payload.source_type === "csv_import" ? "manual_required" : "not_synced",
       user?.id || null
     ]
   );
@@ -2250,25 +2389,29 @@ async function ensureCompetitorSourceForQuote(input = {}, user = {}) {
   if (!websiteUrl) return null;
   const result = await pool.query(
     `INSERT INTO competitor_quote_sources (
-      name, website_url, source_type, active, notes, selectors, last_sync_status, created_by, created_at, updated_at
+      name, website_url, source_type, active, auto_sync_enabled, sync_interval_minutes,
+      notes, selectors, extraction_config, last_sync_status, created_by, created_at, updated_at
     ) VALUES (
-      $1::text,$2::text,'manual',true,'Fonte creata da quotazione competitor','{}'::jsonb,'manual_required',$3::bigint,NOW(),NOW()
+      $1::text,$2::text,'manual',true,false,$3::int,
+      'Fonte creata da quotazione competitor','{}'::jsonb,'{}'::jsonb,'manual_required',$4::bigint,NOW(),NOW()
     )
     RETURNING *`,
-    [competitorName, websiteUrl, user?.id || null]
+    [competitorName, websiteUrl, competitorAutoSyncIntervalMinutes, user?.id || null]
   );
   return result.rows[0] || null;
 }
 
-async function updateCompetitorSourceSyncStatus(id, status = "not_synced", syncAt = new Date().toISOString()) {
+async function updateCompetitorSourceSyncStatus(id, status = "not_synced", syncAt = new Date().toISOString(), errorMessage = "", nextSyncAt = null) {
   if (!id) return;
   await pool.query(
     `UPDATE competitor_quote_sources
         SET last_sync_status = $1::text,
             last_sync_at = $2::timestamptz,
+            last_sync_error = $3::text,
+            next_sync_at = COALESCE($4::timestamptz, next_sync_at),
             updated_at = NOW()
-      WHERE id = $3::bigint`,
-    [String(status || "not_synced").slice(0, 80), syncAt, id]
+      WHERE id = $5::bigint`,
+    [String(status || "not_synced").slice(0, 80), syncAt, String(errorMessage || "").slice(0, 1200), nextSyncAt, id]
   );
 }
 
@@ -2349,15 +2492,16 @@ async function listCompetitorQuotes({ metal = "", purityCode = "", currency = "E
   return result.rows.map(publicCompetitorQuote);
 }
 
-async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "EUR", days = 30 } = {}) {
+async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "EUR", days = 30, hours = null } = {}) {
   const normalizedMetals = metals.map(normalizePredictionMetal).filter((metal, index, array) => ["gold", "silver"].includes(metal) && array.indexOf(metal) === index);
+  const lookbackHours = hours ? Math.min(Math.max(Number(hours || 24), 1), 24 * 365) : Math.min(Math.max(Number(days || 30), 1), 365) * 24;
   const result = await pool.query(
     `WITH filtered AS (
        SELECT *
          FROM competitor_buyback_quotes
         WHERE currency = $1::text
           AND metal = ANY($2::text[])
-          AND quote_date >= NOW() - ($3::int * INTERVAL '1 day')
+          AND quote_date >= NOW() - ($3::int * INTERVAL '1 hour')
           AND price_per_gram IS NOT NULL
      ),
      ranked AS (
@@ -2380,7 +2524,7 @@ async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "E
             MAX(CASE WHEN competitor_rank = 1 THEN price_per_gram END)::numeric AS best_competitor_price
        FROM ranked
       GROUP BY metal, purity_code`,
-    [normalizePredictionCurrency(currency), normalizedMetals, Math.min(Math.max(Number(days || 30), 1), 365)]
+    [normalizePredictionCurrency(currency), normalizedMetals, lookbackHours]
   );
   return Object.fromEntries(result.rows.map((row) => {
     const avg = Number(row.competitor_avg_price || 0);
@@ -2434,52 +2578,533 @@ async function importCompetitorQuotesCsv(csv = "", user = {}) {
   return { inserted, errors };
 }
 
-async function syncConfiguredCompetitorQuotes(user = {}, req = null) {
-  const sources = (await listCompetitorSources()).filter((source) => source.active);
-  const inserted = [];
-  const warnings = [];
-  for (const source of sources) {
-    if (source.source_type !== "api") {
-      await updateCompetitorSourceSyncStatus(source.id, "manual_required").catch(() => {});
-      warnings.push(`${source.name}: fonte ${source.source_type} da aggiornare manualmente.`);
-      continue;
-    }
-    if (!source.website_url) {
-      await updateCompetitorSourceSyncStatus(source.id, "failed").catch(() => {});
-      warnings.push(`${source.name}: URL API mancante.`);
-      continue;
-    }
-    try {
-      const response = await fetch(source.website_url, { headers: { Accept: "application/json" } });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      const quotes = Array.isArray(data) ? data : Array.isArray(data.quotes) ? data.quotes : [];
-      for (const quote of quotes.slice(0, 50)) {
-        inserted.push(await insertCompetitorQuote({
-          ...quote,
-          source_id: source.id,
-          competitor_name: quote.competitor_name || source.name,
-          url: quote.url || source.website_url,
-          extraction_method: "api",
-          raw_payload: quote
-        }, user));
+function parseItalianPriceToNumber(value = "") {
+  const raw = String(value || "").replace(/\u00a0/g, " ").replace(/[^\d,.\s]/g, "").trim();
+  if (!raw) return 0;
+  const compact = raw.replace(/\s+/g, "");
+  if (compact.includes(",")) {
+    return Number(compact.replace(/\./g, "").replace(",", "."));
+  }
+  const dotParts = compact.split(".");
+  if (dotParts.length > 2) return Number(compact.replace(/\./g, ""));
+  if (dotParts.length === 2 && dotParts[1].length === 3 && dotParts[0].length <= 3) {
+    return Number(compact.replace(/\./g, ""));
+  }
+  return Number(compact);
+}
+
+function normalizeUnit(value = "") {
+  const text = String(value || "").toLowerCase();
+  if (/kg|chilo|kilo|chilogram/.test(text)) return "kg";
+  if (/g|gr|gramm/.test(text)) return "g";
+  return "";
+}
+
+function getPurityValue(metal = "gold", purityCode = "") {
+  return purityValueForCode(metal, purityCode);
+}
+
+function isReasonableCompetitorPrice(metal = "gold", pricePerGram = 0) {
+  const price = Number(pricePerGram || 0);
+  if (!Number.isFinite(price) || price <= 0) return false;
+  if (normalizePredictionMetal(metal) === "silver") return price >= 0.01 && price <= 20;
+  return price >= 1 && price <= 250;
+}
+
+function stripHtmlForPriceExtraction(html = "") {
+  return String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&euro;/gi, "€")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function competitorPurityPatterns(metal = "gold") {
+  const normalizedMetal = normalizePredictionMetal(metal);
+  if (normalizedMetal === "silver") {
+    return [
+      { code: "999", labels: ["argento\\s*puro", "\\b999\\b"] },
+      { code: "925", labels: ["argento\\s*925", "\\b925\\b", "sterling"] },
+      { code: "800", labels: ["argento\\s*800", "\\b800\\b"] }
+    ].map((item) => ({ ...item, metal: "silver" }));
+  }
+  return [
+    { code: "24kt", labels: ["oro\\s*puro", "\\b24\\s*(?:kt|k|carati|carato)\\b"] },
+    { code: "22kt", labels: ["\\b22\\s*(?:kt|k|carati|carato)\\b"] },
+    { code: "21kt", labels: ["\\b21\\s*(?:kt|k|carati|carato)\\b"] },
+    { code: "18kt", labels: ["\\b18\\s*(?:kt|k|carati|carato)\\b"] },
+    { code: "14kt", labels: ["\\b14\\s*(?:kt|k|carati|carato)\\b"] },
+    { code: "12kt", labels: ["\\b12\\s*(?:kt|k|carati|carato)\\b"] },
+    { code: "9kt", labels: ["\\b9\\s*(?:kt|k|carati|carato)\\b"] },
+    { code: "6kt", labels: ["\\b6\\s*(?:kt|k|carati|carato)\\b"] }
+  ].map((item) => ({ ...item, metal: "gold" }));
+}
+
+function extractPriceNearLabel(text = "", labelIndex = 0) {
+  const start = Math.max(0, labelIndex - 160);
+  const snippet = String(text || "").slice(start, labelIndex + 320);
+  const priceRegex = /(?:€\s*)?(\d{1,3}(?:[.\s]\d{3})*(?:[,.]\d{1,2})?|\d+(?:[,.]\d{1,2})?)\s*(?:€|eur|euro)?\s*(?:\/?\s*(kg|g|gr|grammo|grammi|chilogrammo|chilo|kilo)|euro\s+al\s+(grammo|chilogrammo|chilo|kilo))/gi;
+  const matches = [...snippet.matchAll(priceRegex)];
+  for (const match of matches) {
+    const rawPrice = match[1];
+    const unit = normalizeUnit(match[2] || match[3] || "");
+    const number = parseItalianPriceToNumber(rawPrice);
+    if (!number || !unit) continue;
+    return {
+      value: unit === "kg" ? number / 1000 : number,
+      unit,
+      raw: match[0]
+    };
+  }
+  return null;
+}
+
+function extractQuotesFromText(text = "", source = {}, page = {}) {
+  const normalizedText = stripHtmlForPriceExtraction(text);
+  const metals = page.metal ? [normalizePredictionMetal(page.metal)] : ["gold", "silver"];
+  const quotes = [];
+  const seen = new Set();
+  for (const metal of metals.filter((item) => ["gold", "silver"].includes(item))) {
+    for (const pattern of competitorPurityPatterns(metal)) {
+      for (const label of pattern.labels) {
+        const labelRegex = new RegExp(label, "ig");
+        const labelMatches = [...normalizedText.matchAll(labelRegex)].slice(0, 8);
+        for (const match of labelMatches) {
+          const price = extractPriceNearLabel(normalizedText, match.index || 0);
+          if (!price || !isReasonableCompetitorPrice(metal, price.value)) continue;
+          const key = `${metal}:${pattern.code}:${price.value.toFixed(4)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          quotes.push({
+            source_id: source.id,
+            competitor_name: source.name,
+            metal,
+            purity_code: pattern.code,
+            purity_value: getPurityValue(metal, pattern.code),
+            price_per_gram: price.value,
+            price_per_kg: price.value * 1000,
+            currency: normalizePredictionCurrency(page.currency || source.extraction_config?.currency || "EUR"),
+            quote_date: new Date().toISOString(),
+            extraction_method: "auto_html_regex",
+            confidence: "medium",
+            url: page.url || source.website_url,
+            raw_payload: {
+              label: match[0],
+              price: price.raw,
+              source_method: source.extraction_config?.method || "html_regex"
+            }
+          });
+        }
       }
-      await updateCompetitorSourceSyncStatus(source.id, quotes.length ? "updated" : "no_quotes").catch(() => {});
-    } catch (error) {
-      await updateCompetitorSourceSyncStatus(source.id, "failed").catch(() => {});
-      warnings.push(`${source.name}: ${error.message || "sync non riuscito"}`);
     }
   }
+  return quotes;
+}
+
+function normalizeCompetitorQuote(rawQuote = {}, source = {}) {
+  const metal = normalizePredictionMetal(rawQuote.metal || "gold");
+  const purityCode = normalizePurityCode(rawQuote.purity_code || rawQuote.purityCode || rawQuote.label || "", metal);
+  const unit = normalizeUnit(rawQuote.unit || rawQuote.price_unit || rawQuote.priceUnit || "");
+  const rawPrice = rawQuote.price_per_gram || rawQuote.pricePerGram || rawQuote.price || rawQuote.value;
+  const parsedPrice = Number(rawQuote.price_per_gram || rawQuote.pricePerGram || 0) || parseItalianPriceToNumber(rawPrice);
+  const pricePerGram = unit === "kg"
+    ? parsedPrice / 1000
+    : Number(rawQuote.price_per_kg || rawQuote.pricePerKg || 0)
+      ? Number(rawQuote.price_per_kg || rawQuote.pricePerKg) / 1000
+      : parsedPrice;
+  if (!isReasonableCompetitorPrice(metal, pricePerGram)) return null;
+  return {
+    source_id: rawQuote.source_id || rawQuote.sourceId || source.id || null,
+    competitor_name: rawQuote.competitor_name || rawQuote.competitorName || source.name || "",
+    metal,
+    purity_code: purityCode,
+    purity_value: Number(rawQuote.purity_value ?? rawQuote.purityValue ?? getPurityValue(metal, purityCode)),
+    price_per_gram: pricePerGram,
+    price_per_kg: pricePerGram * 1000,
+    currency: normalizePredictionCurrency(rawQuote.currency || source.extraction_config?.currency || "EUR"),
+    quote_date: rawQuote.quote_date || rawQuote.quoteDate || new Date().toISOString(),
+    extraction_method: rawQuote.extraction_method || rawQuote.extractionMethod || "auto",
+    confidence: rawQuote.confidence || "medium",
+    url: rawQuote.url || source.website_url || "",
+    raw_payload: rawQuote.raw_payload || rawQuote.rawPayload || rawQuote
+  };
+}
+
+async function fetchCompetitorPage(url = "") {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), competitorAutoSyncTimeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
+        "User-Agent": competitorAutoSyncUserAgent
+      }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return {
+      contentType: response.headers.get("content-type") || "",
+      body: await response.text()
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function extractCompetitorQuotes(source = {}) {
+  const config = source.extraction_config || source.extractionConfig || {};
+  const method = String(config.method || source.source_type || "manual_fallback").toLowerCase();
+  if (!source.auto_sync_enabled || method === "manual_fallback" || source.source_type === "manual" || source.source_type === "csv_import") {
+    return { quotes: [], status: "disabled", error: "Fonte non configurata per aggiornamento automatico." };
+  }
+
+  if (method === "api" || source.source_type === "api") {
+    const { body } = await fetchCompetitorPage(source.website_url);
+    const data = JSON.parse(body);
+    const rawQuotes = Array.isArray(data) ? data : Array.isArray(data.quotes) ? data.quotes : [];
+    const quotes = rawQuotes.slice(0, 80)
+      .map((quote) => normalizeCompetitorQuote({ ...quote, extraction_method: "auto_api" }, source))
+      .filter(Boolean);
+    return { quotes, status: quotes.length ? "success" : "partial", error: quotes.length ? "" : "API leggibile ma senza quotazioni normalizzabili." };
+  }
+
+  const pages = Array.isArray(config.pages) && config.pages.length
+    ? config.pages
+    : [{ url: source.website_url, metal: "gold" }, { url: source.website_url, metal: "silver" }];
+  const quotes = [];
+  const errors = [];
+  for (const page of pages.slice(0, 4)) {
+    const url = page.url || source.website_url;
+    if (!url) continue;
+    try {
+      const { body } = await fetchCompetitorPage(url);
+      const pageQuotes = extractQuotesFromText(body, source, page)
+        .map((quote) => normalizeCompetitorQuote(quote, source))
+        .filter(Boolean);
+      quotes.push(...pageQuotes);
+      if (!pageQuotes.length) errors.push(`${url}: nessuna quotazione riconosciuta`);
+    } catch (error) {
+      errors.push(`${url}: ${error.message || "lettura non riuscita"}`);
+    }
+  }
+  return {
+    quotes,
+    status: quotes.length ? (errors.length ? "partial" : "success") : "failed",
+    error: errors.join(" | ").slice(0, 1200)
+  };
+}
+
+async function saveCompetitorQuotes(quotes = [], user = {}) {
+  const saved = [];
+  const errors = [];
+  for (const quote of quotes) {
+    try {
+      saved.push(await insertCompetitorQuote(quote, user));
+    } catch (error) {
+      errors.push(error.message || "quotazione non salvata");
+    }
+  }
+  return { saved, errors };
+}
+
+function publicCompetitorSyncLog(row = {}) {
+  return {
+    id: row.id || null,
+    source_id: row.source_id || null,
+    competitor_name: row.competitor_name || "",
+    status: row.status || "not_synced",
+    quotes_found: Number(row.quotes_found || 0),
+    quotes_saved: Number(row.quotes_saved || 0),
+    error_message: row.error_message || "",
+    started_at: row.started_at || null,
+    completed_at: row.completed_at || null,
+    metadata: row.metadata || {}
+  };
+}
+
+async function createCompetitorSyncLog(source = {}) {
+  const result = await pool.query(
+    `INSERT INTO competitor_quote_sync_logs (
+      source_id, competitor_name, status, quotes_found, quotes_saved, started_at, metadata
+    ) VALUES (
+      $1::bigint,$2::text,'running',0,0,NOW(),$3::jsonb
+    )
+    RETURNING *`,
+    [source.id || null, source.name || "", sanitizeForPostgres({ url: source.website_url || "", source_type: source.source_type || "" })]
+  );
+  return result.rows[0];
+}
+
+async function finishCompetitorSyncLog(logId, updates = {}) {
+  if (!logId) return null;
+  const result = await pool.query(
+    `UPDATE competitor_quote_sync_logs
+        SET status = $1::text,
+            quotes_found = $2::int,
+            quotes_saved = $3::int,
+            error_message = $4::text,
+            completed_at = NOW(),
+            metadata = COALESCE(metadata, '{}'::jsonb) || $5::jsonb
+      WHERE id = $6::bigint
+      RETURNING *`,
+    [
+      updates.status || "failed",
+      Number(updates.quotes_found || 0),
+      Number(updates.quotes_saved || 0),
+      String(updates.error_message || "").slice(0, 1200),
+      sanitizeForPostgres(updates.metadata || {}),
+      logId
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+function nextCompetitorSyncDate(source = {}, from = new Date()) {
+  const minutes = Math.min(Math.max(Number(source.sync_interval_minutes || competitorAutoSyncIntervalMinutes), 15), 10080);
+  return new Date(from.getTime() + minutes * 60 * 1000).toISOString();
+}
+
+async function syncSingleCompetitorSource(sourceIdOrSource, user = {}, req = null, options = {}) {
+  const source = typeof sourceIdOrSource === "object" && sourceIdOrSource?.id
+    ? publicCompetitorSource(sourceIdOrSource)
+    : publicCompetitorSource((await pool.query("SELECT * FROM competitor_quote_sources WHERE id = $1::bigint LIMIT 1", [sourceIdOrSource])).rows[0] || {});
+  if (!source.id) throw new Error("Fonte competitor non trovata");
+  const log = await createCompetitorSyncLog(source);
+  const completedAt = new Date();
+  const nextSyncAt = nextCompetitorSyncDate(source, completedAt);
+  if (!source.active || !source.auto_sync_enabled) {
+    await updateCompetitorSourceSyncStatus(source.id, "disabled", completedAt.toISOString(), "", nextSyncAt);
+    const finished = await finishCompetitorSyncLog(log.id, { status: "disabled", metadata: { forced: Boolean(options.force) } });
+    return { source, status: "disabled", quotes_found: 0, quotes_saved: 0, log: publicCompetitorSyncLog(finished) };
+  }
+
+  try {
+    const extracted = await extractCompetitorQuotes(source);
+    const saveResult = await saveCompetitorQuotes(extracted.quotes || [], user);
+    const status = saveResult.saved.length
+      ? extracted.status === "failed" ? "partial" : extracted.status
+      : extracted.status === "success" ? "partial" : extracted.status;
+    const errorMessage = [extracted.error, ...saveResult.errors].filter(Boolean).join(" | ");
+    await updateCompetitorSourceSyncStatus(source.id, status, completedAt.toISOString(), errorMessage, nextSyncAt);
+    const finished = await finishCompetitorSyncLog(log.id, {
+      status,
+      quotes_found: extracted.quotes?.length || 0,
+      quotes_saved: saveResult.saved.length,
+      error_message: errorMessage,
+      metadata: { forced: Boolean(options.force), next_sync_at: nextSyncAt }
+    });
+    void writeAuditLog({
+      req,
+      user,
+      action: "competitor_auto_sync_source",
+      entityType: "competitor_quote_source",
+      entityId: source.id,
+      entityLabel: source.name,
+      afterData: { status, quotes_saved: saveResult.saved.length, error: errorMessage },
+      metadata: { forced: Boolean(options.force) }
+    });
+    return {
+      source: { ...source, last_sync_status: status, last_sync_at: completedAt.toISOString(), next_sync_at: nextSyncAt, last_sync_error: errorMessage },
+      status,
+      quotes_found: extracted.quotes?.length || 0,
+      quotes_saved: saveResult.saved.length,
+      error: errorMessage,
+      log: publicCompetitorSyncLog(finished)
+    };
+  } catch (error) {
+    const errorMessage = error.message || "Sync competitor non riuscita";
+    await updateCompetitorSourceSyncStatus(source.id, "failed", completedAt.toISOString(), errorMessage, nextSyncAt);
+    const finished = await finishCompetitorSyncLog(log.id, {
+      status: "failed",
+      error_message: errorMessage,
+      metadata: { forced: Boolean(options.force), next_sync_at: nextSyncAt }
+    });
+    return { source, status: "failed", quotes_found: 0, quotes_saved: 0, error: errorMessage, log: publicCompetitorSyncLog(finished) };
+  }
+}
+
+async function calculateCompetitorMarketSummary({ currency = goldPriceBaseCurrency } = {}) {
+  const settings = await loadGoldPredictionSettings();
+  const hours = Number(settings.competitor_data_max_age_hours || 24);
+  const stats = await competitorQuoteStats({ metals: ["gold", "silver"], currency, hours });
+  return {
+    currency: normalizePredictionCurrency(currency),
+    hours,
+    generated_at: new Date().toISOString(),
+    stats
+  };
+}
+
+async function listCompetitorSyncLogs({ limit = 80 } = {}) {
+  const result = await pool.query(
+    `SELECT *
+       FROM competitor_quote_sync_logs
+      ORDER BY started_at DESC
+      LIMIT $1::int`,
+    [Math.min(Math.max(Number(limit || 80), 1), 300)]
+  );
+  return result.rows.map(publicCompetitorSyncLog);
+}
+
+async function runCompetitorAutoSyncNow({ force = false, user = {}, req = null, maxSources = competitorAutoSyncMaxSourcesPerRun } = {}) {
+  if (competitorAutoSyncState.running) {
+    return { ok: true, skipped: true, message: "Sync competitor gia in corso.", state: competitorAutoSyncPublicStatus() };
+  }
+  competitorAutoSyncState.running = true;
+  competitorAutoSyncState.lastRunAt = new Date().toISOString();
+  competitorAutoSyncState.lastStatus = "running";
+  competitorAutoSyncState.lastError = "";
+  try {
+    const params = [Math.min(Math.max(Number(maxSources || competitorAutoSyncMaxSourcesPerRun), 1), 20)];
+    const dueClause = force ? "" : "AND (next_sync_at IS NULL OR next_sync_at <= NOW())";
+    const result = await pool.query(
+      `SELECT *
+         FROM competitor_quote_sources
+        WHERE active = true
+          AND auto_sync_enabled = true
+          ${dueClause}
+        ORDER BY COALESCE(next_sync_at, '1970-01-01'::timestamptz) ASC, id ASC
+        LIMIT $1::int`,
+      params
+    );
+    const results = [];
+    for (const source of result.rows) {
+      results.push(await syncSingleCompetitorSource(source, user, req, { force }).catch((error) => ({
+        source: publicCompetitorSource(source),
+        status: "failed",
+        quotes_found: 0,
+        quotes_saved: 0,
+        error: error.message || "Sync fonte fallita"
+      })));
+    }
+    const summary = await calculateCompetitorMarketSummary().catch(() => null);
+    competitorAutoSyncState.lastSummary = summary;
+    competitorAutoSyncState.lastStatus = results.some((item) => item.status === "failed") ? "partial" : "success";
+    competitorAutoSyncState.nextRunAt = new Date(Date.now() + competitorAutoSyncIntervalMinutes * 60 * 1000).toISOString();
+    void writeAuditLog({
+      req,
+      user,
+      action: "competitor_auto_sync_run",
+      entityType: "competitor_quotes",
+      entityLabel: "Auto sync competitor",
+      afterData: {
+        sources: results.length,
+        quotes_saved: results.reduce((sum, item) => sum + Number(item.quotes_saved || 0), 0),
+        failed: results.filter((item) => item.status === "failed").length
+      },
+      metadata: { force }
+    });
+    return {
+      ok: true,
+      force,
+      sources_checked: results.length,
+      quotes_saved: results.reduce((sum, item) => sum + Number(item.quotes_saved || 0), 0),
+      results,
+      summary,
+      state: competitorAutoSyncPublicStatus()
+    };
+  } catch (error) {
+    competitorAutoSyncState.lastStatus = "failed";
+    competitorAutoSyncState.lastError = error.message || "Auto sync competitor non riuscita";
+    throw error;
+  } finally {
+    competitorAutoSyncState.running = false;
+  }
+}
+
+function competitorAutoSyncPublicStatus() {
+  return {
+    enabled: competitorAutoSyncEnabled,
+    running: competitorAutoSyncState.running,
+    interval_minutes: competitorAutoSyncIntervalMinutes,
+    on_startup: competitorAutoSyncOnStartup,
+    max_sources_per_run: competitorAutoSyncMaxSourcesPerRun,
+    timeout_ms: competitorAutoSyncTimeoutMs,
+    last_run_at: competitorAutoSyncState.lastRunAt,
+    next_run_at: competitorAutoSyncState.nextRunAt,
+    last_status: competitorAutoSyncState.lastStatus,
+    last_error: competitorAutoSyncState.lastError,
+    last_summary: competitorAutoSyncState.lastSummary
+  };
+}
+
+function startCompetitorAutoSync() {
+  if (!competitorAutoSyncEnabled || competitorAutoSyncState.timer) return competitorAutoSyncPublicStatus();
+  competitorAutoSyncState.nextRunAt = new Date(Date.now() + competitorAutoSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (competitorAutoSyncOnStartup) {
+    setTimeout(() => {
+      runCompetitorAutoSyncNow({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        competitorAutoSyncState.lastStatus = "failed";
+        competitorAutoSyncState.lastError = error.message || "Auto sync startup fallita";
+        console.error("Errore auto sync competitor", error);
+      });
+    }, 3000).unref?.();
+  }
+  competitorAutoSyncState.timer = setInterval(() => {
+    runCompetitorAutoSyncNow({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      competitorAutoSyncState.lastStatus = "failed";
+      competitorAutoSyncState.lastError = error.message || "Auto sync competitor fallita";
+      console.error("Errore auto sync competitor", error);
+    });
+  }, competitorAutoSyncIntervalMinutes * 60 * 1000);
+  competitorAutoSyncState.timer.unref?.();
+  return competitorAutoSyncPublicStatus();
+}
+
+function stopCompetitorAutoSync() {
+  if (competitorAutoSyncState.timer) clearInterval(competitorAutoSyncState.timer);
+  competitorAutoSyncState.timer = null;
+  competitorAutoSyncState.nextRunAt = null;
+  return competitorAutoSyncPublicStatus();
+}
+
+async function updateCompetitorSourceAutoSync(id, input = {}, user = {}, req = null) {
+  const current = await pool.query("SELECT * FROM competitor_quote_sources WHERE id = $1::bigint LIMIT 1", [id]);
+  if (!current.rows[0]) throw new Error("Fonte competitor non trovata");
+  const active = input.active ?? current.rows[0].active;
+  const autoSyncEnabled = input.auto_sync_enabled ?? input.autoSyncEnabled ?? current.rows[0].auto_sync_enabled;
+  const interval = Math.min(Math.max(Number(input.sync_interval_minutes || input.syncIntervalMinutes || current.rows[0].sync_interval_minutes || competitorAutoSyncIntervalMinutes), 15), 10080);
+  const extractionConfig = sanitizeForPostgres(input.extraction_config || input.extractionConfig || current.rows[0].extraction_config || {});
+  const result = await pool.query(
+    `UPDATE competitor_quote_sources
+        SET active = $1::boolean,
+            auto_sync_enabled = $2::boolean,
+            sync_interval_minutes = $3::int,
+            extraction_config = $4::jsonb,
+            source_type = COALESCE($5::text, source_type),
+            last_sync_status = CASE WHEN $2::boolean THEN last_sync_status ELSE 'disabled' END,
+            next_sync_at = CASE WHEN $2::boolean THEN COALESCE(next_sync_at, NOW()) ELSE NULL END,
+            updated_at = NOW()
+      WHERE id = $6::bigint
+      RETURNING *`,
+    [
+      active !== false,
+      autoSyncEnabled !== false,
+      interval,
+      extractionConfig,
+      input.source_type || input.sourceType || null,
+      id
+    ]
+  );
   void writeAuditLog({
     req,
     user,
-    action: "competitor_quotes_sync",
-    entityType: "competitor_quotes",
-    entityLabel: "Sync competitor configurati",
-    afterData: { inserted: inserted.length, warnings },
-    metadata: { sources: sources.length }
+    action: "competitor_auto_sync_source_updated",
+    entityType: "competitor_quote_source",
+    entityId: id,
+    entityLabel: result.rows[0]?.name || "Fonte competitor",
+    beforeData: current.rows[0],
+    afterData: result.rows[0]
   });
-  return { ok: true, inserted, warnings };
+  return publicCompetitorSource(result.rows[0]);
+}
+
+async function syncConfiguredCompetitorQuotes(user = {}, req = null) {
+  return runCompetitorAutoSyncNow({ force: true, user, req });
 }
 
 function scenarioPredictionPrice(prediction = {}, scenario = "standard") {
@@ -2743,7 +3368,11 @@ async function calculateMetalBuyback(input = {}, user = {}, req = null) {
   const scenario = normalizeBuybackScenario(input.scenario || settings.default_scenario);
   const predictionBundle = await runMetalPredictions({ metals, currency, horizons }, user, req);
   const predictionsByKey = new Map((predictionBundle.predictions || []).map((prediction) => [`${prediction.metal}:${prediction.horizon}`, prediction]));
-  const competitorStats = await competitorQuoteStats({ metals, currency, days: 30 }).catch(() => ({}));
+  const competitorStats = await competitorQuoteStats({
+    metals,
+    currency,
+    hours: predictionSettings.competitor_data_max_age_hours || 24
+  }).catch(() => ({}));
   const enrichedSettings = { ...settings, ...predictionSettings, competitorStats };
   const calculations = [];
   for (const policy of settings.policies.filter((row) => metals.includes(row.metal) && row.active !== false)) {
@@ -16810,7 +17439,11 @@ app.get("/api/quotazioni/metals/status", async (_request, response, next) => {
       latest_predictions[metal] = await latestMetalPredictions({ metal, currency });
       history_points[metal] = (await queryMetalPriceHistory({ metal, currency, days: settings.history_days || metalPriceSyncDays, limit: 365 })).length;
     }
-    const competitorStats = await competitorQuoteStats({ metals, currency, days: 30 }).catch(() => ({}));
+    const competitorStats = await competitorQuoteStats({
+      metals,
+      currency,
+      hours: settings.competitor_data_max_age_hours || 24
+    }).catch(() => ({}));
     response.json({
       ok: true,
       metals,
@@ -17002,8 +17635,81 @@ app.get("/api/quotazioni/competitors/quotes", async (request, response, next) =>
       days: request.query.days || 30,
       limit: request.query.limit || 200
     });
-    const stats = await competitorQuoteStats({ metals: ["gold", "silver"], currency, days: request.query.days || 30 });
+    const settings = await loadGoldPredictionSettings();
+    const stats = await competitorQuoteStats({
+      metals: ["gold", "silver"],
+      currency,
+      hours: request.query.hours || settings.competitor_data_max_age_hours || 24
+    });
     response.json({ ok: true, currency, quotes, stats });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/competitors/sync-status", async (request, response, next) => {
+  try {
+    if (!["founder", "responsabile"].includes(normalizeRole(request.user?.ruolo))) {
+      return response.status(403).json({ ok: false, error: "Non autorizzato" });
+    }
+    const sources = await listCompetitorSources();
+    const logs = await listCompetitorSyncLogs({ limit: 12 }).catch(() => []);
+    const updatedSources = sources.filter((source) => ["success", "updated", "partial"].includes(String(source.last_sync_status || "").toLowerCase())).length;
+    const failedSources = sources.filter((source) => String(source.last_sync_status || "").toLowerCase() === "failed").length;
+    const validQuotes = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM competitor_buyback_quotes WHERE quote_date >= NOW() - INTERVAL '24 hours'"
+    ).catch(() => ({ rows: [{ count: 0 }] }));
+    response.json({
+      ok: true,
+      status: competitorAutoSyncPublicStatus(),
+      sources_total: sources.length,
+      sources_updated: updatedSources,
+      sources_failed: failedSources,
+      valid_quotes_24h: Number(validQuotes.rows[0]?.count || 0),
+      sources,
+      recent_logs: logs
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/auto-sync/run", requireFounder, async (request, response, next) => {
+  try {
+    if (request.body?.source_id || request.body?.sourceId) {
+      const result = await syncSingleCompetitorSource(request.body.source_id || request.body.sourceId, request.user, request, { force: true });
+      return response.json({ ok: true, result, state: competitorAutoSyncPublicStatus() });
+    }
+    response.json(await runCompetitorAutoSyncNow({ force: true, user: request.user, req: request }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/competitors/auto-sync/logs", requireFounder, async (request, response, next) => {
+  try {
+    response.json({ ok: true, logs: await listCompetitorSyncLogs({ limit: request.query.limit || 80 }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/quotazioni/competitors/sources/:id/auto-sync", requireFounder, async (request, response, next) => {
+  try {
+    response.json({
+      ok: true,
+      source: await updateCompetitorSourceAutoSync(request.params.id, request.body || {}, request.user, request),
+      message: "Auto sync fonte competitor aggiornato."
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/competitors/market-summary", async (request, response, next) => {
+  try {
+    const currency = normalizePredictionCurrency(request.query.currency || goldPriceBaseCurrency);
+    response.json({ ok: true, summary: await calculateCompetitorMarketSummary({ currency }) });
   } catch (error) {
     next(error);
   }
@@ -18140,6 +18846,7 @@ initDatabase()
     runtimeStatus.databaseReady = true;
     runtimeStatus.databaseError = "";
     scheduleBackups();
+    startCompetitorAutoSync();
   })
   .catch((error) => {
     runtimeStatus.databaseReady = false;

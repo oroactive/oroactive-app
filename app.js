@@ -12024,12 +12024,55 @@ function buybackMarketPrice(row = {}) {
 
 function competitorSourceStatusLabel(source = {}) {
   const status = String(source.last_sync_status || "").toLowerCase();
-  if (status === "updated") return "Aggiornato";
+  if (status === "success" || status === "updated") return "Aggiornato";
+  if (status === "partial") return "Parziale";
   if (status === "failed") return "Sync fallito";
   if (status === "no_quotes") return "Nessun prezzo inserito";
   if (status === "manual_required") return "Da aggiornare manualmente";
+  if (status === "disabled") return "Disattivato";
   if (source.source_type === "manual") return "Manuale";
   return "Da aggiornare";
+}
+
+function competitorAutoSyncSummaryHtml() {
+  const sync = state.competitorSyncStatus || {};
+  const status = sync.status || {};
+  const hasStatus = Boolean(sync.status);
+  const sourcesTotal = Number(sync.sources_total || state.competitorSources?.length || 0);
+  const updated = Number(sync.sources_updated || 0);
+  const failed = Number(sync.sources_failed || 0);
+  const validQuotes = Number(sync.valid_quotes_24h || 0);
+  const lastError = status.last_error || (sync.recent_logs || []).find((log) => log.error_message)?.error_message || "";
+  return `
+    <article class="competitor-auto-sync-card">
+      <div>
+        <span>Auto aggiornamento competitor</span>
+        <strong>${hasStatus ? status.enabled ? "Attivo" : "Disattivo" : "Stato riservato"}</strong>
+      </div>
+      <div>
+        <span>Ultima sync</span>
+        <strong>${status.last_run_at ? escapeHtml(formatDateTime(status.last_run_at)) : "Non ancora eseguita"}</strong>
+      </div>
+      <div>
+        <span>Prossima sync</span>
+        <strong>${status.next_run_at ? escapeHtml(formatDateTime(status.next_run_at)) : "Non pianificata"}</strong>
+      </div>
+      <div>
+        <span>Fonti aggiornate</span>
+        <strong>${updated}/${sourcesTotal}</strong>
+      </div>
+      <div>
+        <span>Fonti fallite</span>
+        <strong>${failed}</strong>
+      </div>
+      <div>
+        <span>Prezzi validi 24h</span>
+        <strong>${validQuotes}</strong>
+      </div>
+      ${lastError ? `<p>${escapeHtml(lastError)}</p>` : ""}
+      ${isFounder() ? `<button class="ghost-button" type="button" data-force-competitor-sync="all">Forza sync competitor</button>` : ""}
+    </article>
+  `;
 }
 
 function competitorSourceForQuote(quote = {}) {
@@ -12171,6 +12214,16 @@ function buildPriceExplanationContext(row = {}, options = {}) {
     competitor_min_price: aurumHasNumber(row.competitor_min_price) ? Number(row.competitor_min_price) : null,
     competitor_median_price: aurumHasNumber(row.competitor_median_price) ? Number(row.competitor_median_price) : null,
     competitor_count: Number(row.competitor_count || 0),
+    competitor_sync_status: state.competitorSyncStatus?.status?.last_status || null,
+    competitor_sources_updated: Number(state.competitorSyncStatus?.sources_updated || 0),
+    competitor_sources_failed: Number(state.competitorSyncStatus?.sources_failed || 0),
+    competitor_valid_quotes_24h: Number(state.competitorSyncStatus?.valid_quotes_24h || 0),
+    competitor_sync_last_run_at: state.competitorSyncStatus?.status?.last_run_at || null,
+    competitor_sync_next_run_at: state.competitorSyncStatus?.status?.next_run_at || null,
+    competitor_failed_sources: (state.competitorSyncStatus?.sources || [])
+      .filter((source) => String(source.last_sync_status || "").toLowerCase() === "failed")
+      .map((source) => source.name)
+      .slice(0, 5),
     best_competitor_name: row.best_competitor_name || row.competitor_reference?.competitor_name || "",
     best_competitor_price: aurumHasNumber(row.best_competitor_price) ? Number(row.best_competitor_price) : aurumHasNumber(row.competitor_reference?.price_per_gram) ? Number(row.competitor_reference.price_per_gram) : null,
     best_market_client_price_per_gram: aurumHasNumber(row.best_market_client_price_per_gram) ? Number(row.best_market_client_price_per_gram) : null,
@@ -12199,6 +12252,11 @@ function buildGeneralPriceExplanationContext() {
   const gold = findBuybackRow("gold", "18kt", "today", state.buybackScenario) || buybackRowsFor("gold", "today")[0] || {};
   const silver = findBuybackRow("silver", "925", "today", state.buybackScenario) || buybackRowsFor("silver", "today")[0] || {};
   const status = state.goldPredictionStatus?.status || {};
+  const syncStatus = state.competitorSyncStatus?.status || {};
+  const failedSources = (state.competitorSyncStatus?.sources || [])
+    .filter((source) => String(source.last_sync_status || "").toLowerCase() === "failed")
+    .map((source) => source.name)
+    .slice(0, 5);
   return {
     mode: "price_explanation",
     type: "general",
@@ -12210,6 +12268,17 @@ function buildGeneralPriceExplanationContext() {
     last_update: [latestMetalHistoryDate("gold"), latestMetalHistoryDate("silver")].filter(Boolean).sort().at(-1) || null,
     warning: state.goldPredictionStatus?.warning || state.goldPredictionStatus?.historyWarning || "",
     competitor_count: Number(state.competitorQuotes?.length || 0),
+    competitor_sync_status: syncStatus.last_status || null,
+    competitor_sync_enabled: Boolean(syncStatus.enabled),
+    competitor_sync_running: Boolean(syncStatus.running),
+    competitor_sources_total: Number(state.competitorSyncStatus?.sources_total || state.competitorSources?.length || 0),
+    competitor_sources_updated: Number(state.competitorSyncStatus?.sources_updated || 0),
+    competitor_sources_failed: Number(state.competitorSyncStatus?.sources_failed || 0),
+    competitor_valid_quotes_24h: Number(state.competitorSyncStatus?.valid_quotes_24h || 0),
+    competitor_sync_last_run_at: syncStatus.last_run_at || null,
+    competitor_sync_next_run_at: syncStatus.next_run_at || null,
+    competitor_sync_last_error: syncStatus.last_error || "",
+    competitor_failed_sources: failedSources,
     gold: buildPriceExplanationContext(gold, { type: "summary", metal: "gold", purity_code: gold.purity_code || "18kt" }),
     silver: buildPriceExplanationContext(silver, { type: "summary", metal: "silver", purity_code: silver.purity_code || "925" })
   };
@@ -12237,8 +12306,14 @@ function trendExplanation(context = {}) {
 }
 
 function competitorExplanation(context = {}) {
+  const syncParts = [];
+  if (context.competitor_sync_last_run_at) syncParts.push(`ultimo auto aggiornamento ${formatDateTime(context.competitor_sync_last_run_at)}`);
+  if (Number(context.competitor_sources_updated || 0)) syncParts.push(`${context.competitor_sources_updated} fonti aggiornate`);
+  if (Number(context.competitor_sources_failed || 0)) syncParts.push(`${context.competitor_sources_failed} fonti fallite`);
+  if (context.competitor_failed_sources?.length) syncParts.push(`fonti da verificare: ${context.competitor_failed_sources.join(", ")}`);
+  const syncText = syncParts.length ? ` Stato auto sync: ${syncParts.join("; ")}.` : "";
   if (!Number(context.competitor_count || 0)) {
-    return "Confronto competitor: non ci sono rilevazioni competitor disponibili per questa voce. Aurum non inventa prezzi esterni: serve inserimento manuale, CSV o fonte configurata.";
+    return `Confronto competitor: non ci sono rilevazioni competitor disponibili per questa voce. Aurum non inventa prezzi esterni: serve inserimento manuale, CSV o fonte configurata.${syncText}`;
   }
   const currency = context.currency || "EUR";
   const recommended = Number(context.recommended_payable_per_gram || 0);
@@ -12257,7 +12332,7 @@ function competitorExplanation(context = {}) {
     ? ` Il prezzo migliore di mercato sostenibile è ${formatAurumGram(bestMarket, currency)}: ${context.market_price_reason || marketStatusLabel(context.market_comparison_status)}.`
     : "";
   const approvalText = context.requires_founder_approval ? " Serve attenzione: per superare il limite sostenibile è richiesta approvazione Founder." : "";
-  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}`;
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${syncText}`;
 }
 
 function formulaExplanation(context = {}) {
@@ -12277,6 +12352,9 @@ function formulaExplanation(context = {}) {
 function generateGeneralPriceExplanation(context = {}) {
   const gold = context.gold || {};
   const silver = context.silver || {};
+  const competitorSync = context.competitor_sync_last_run_at
+    ? `Auto aggiornamento competitor: ${context.competitor_sync_status || "stato non disponibile"}, ultimo run ${formatDateTime(context.competitor_sync_last_run_at)}${context.competitor_sync_next_run_at ? `, prossimo run ${formatDateTime(context.competitor_sync_next_run_at)}` : ""}. Fonti aggiornate: ${context.competitor_sources_updated || 0}/${context.competitor_sources_total || 0}; fonti fallite: ${context.competitor_sources_failed || 0}; prezzi validi 24h: ${context.competitor_valid_quotes_24h || 0}.`
+    : `Auto aggiornamento competitor: ${context.competitor_sync_enabled ? "attivo" : "non disponibile o disattivo"}.`;
   return `Spiegazione generale Analisi Predittiva Metalli
 
 Scenario attivo
@@ -12289,7 +12367,7 @@ Argento
 Per l'argento il riferimento operativo è ${silver.purity_code || "925"}: valore teorico ${formatAurumGram(silver.theoretical_value_per_gram, silver.currency)}, massimo pagabile ${formatAurumGram(silver.max_payable_per_gram, silver.currency)}, consigliato ${formatAurumGram(silver.recommended_payable_per_gram, silver.currency)}. ${trendExplanation(silver)}
 
 Competitor e fonti
-${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${context.warning ? `Nota dati: ${context.warning}` : ""}
+${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${competitorSync} ${context.competitor_sync_last_error ? `Ultimo errore: ${context.competitor_sync_last_error}.` : ""} ${context.warning ? `Nota dati: ${context.warning}` : ""}
 
 Avviso finale
 Questa è una stima operativa e non una garanzia di prezzo. Il prezzo finale resta definito dalle policy OroActive e dall'operatore autorizzato.`;
@@ -12642,9 +12720,12 @@ function renderCompetitorQuotes() {
             <th>Competitor</th>
             <th>Sito</th>
             <th>Metodo</th>
+            <th>Auto sync</th>
             <th>Attendibilità</th>
             <th>Stato aggiornamento</th>
             <th>Ultimo aggiornamento</th>
+            <th>Prossimo aggiornamento</th>
+            <th>Errore</th>
             <th>Azioni</th>
           </tr>
         </thead>
@@ -12654,12 +12735,17 @@ function renderCompetitorQuotes() {
               <td>${escapeHtml(source.name)}</td>
               <td>${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
               <td>${escapeHtml(source.source_type || "manual")}</td>
+              <td>${source.auto_sync_enabled ? "On" : "Off"} · ${escapeHtml(String(source.sync_interval_minutes || 180))} min</td>
               <td>Media</td>
               <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
               <td>${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "Da aggiornare"}</td>
+              <td>${source.next_sync_at ? escapeHtml(formatDateTime(source.next_sync_at)) : "Non pianificato"}</td>
+              <td>${source.last_sync_error ? escapeHtml(source.last_sync_error) : "—"}</td>
               <td>
                 ${source.website_url ? `<a class="small-button" href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : ""}
+                ${isFounder() ? `<button class="small-button" type="button" data-force-competitor-sync="${escapeHtml(source.id)}">Forza sync</button>` : ""}
                 <button class="small-button" type="button" data-fill-competitor-source="${escapeHtml(source.id)}">Aggiungi quotazione</button>
+                ${isFounder() ? `<button class="small-button" type="button" data-toggle-competitor-auto-sync="${escapeHtml(source.id)}" data-next-auto-sync="${source.auto_sync_enabled ? "false" : "true"}">${source.auto_sync_enabled ? "Disattiva auto sync" : "Attiva auto sync"}</button>` : ""}
                 ${isFounder() && source.active !== false ? `<button class="small-button" type="button" data-disable-competitor-source="${escapeHtml(source.id)}">Disattiva fonte</button>` : ""}
                 <span class="muted">${source.active === false ? "Disattivata" : "Attiva"}</span>
               </td>
@@ -12713,6 +12799,7 @@ function renderCompetitorQuotes() {
   ` : '<div class="empty-state">Nessuna quotazione competitor inserita. Inserisci prezzi manuali o importa CSV; non vengono inventati dati di mercato.</div>';
 
   competitorQuotesList.innerHTML = `
+    ${competitorAutoSyncSummaryHtml()}
     <div class="competitor-summary">
       <strong>${sources.length}</strong>
       <span>fonti competitor monitorate</span>
@@ -12723,6 +12810,7 @@ function renderCompetitorQuotes() {
     ${sourceTable}
     <h5>Quotazioni competitor rilevate</h5>
     ${quoteTable}
+    <p class="gold-prediction-disclaimer">Le quotazioni competitor sono rilevate automaticamente da fonti configurate o da ultimo dato disponibile. Possono variare senza preavviso. Verificare sempre la fonte prima di decisioni operative rilevanti.</p>
   `;
 }
 
@@ -12793,7 +12881,7 @@ async function loadGoldPredictionPanel(options = {}) {
     const statusData = await apiRequest("/quotazioni/metals/status");
     const currency = encodeURIComponent(statusData.settings?.currency || "EUR");
     const scenario = state.buybackScenario || "standard";
-    const [historyData, latestData, policyData, buybackData, competitorData, competitorSourcesData] = await Promise.all([
+    const [historyData, latestData, policyData, buybackData, competitorData, competitorSourcesData, competitorSyncData, competitorMarketData] = await Promise.all([
       apiRequest(`/quotazioni/metals/history?metals=gold,silver&days=30&currency=${currency}`),
       apiRequest(`/quotazioni/metals/predictions/latest?metals=gold,silver&currency=${currency}`),
       apiRequest("/quotazioni/buyback-policy"),
@@ -12802,7 +12890,9 @@ async function loadGoldPredictionPanel(options = {}) {
         body: JSON.stringify({ metals: ["gold", "silver"], currency: decodeURIComponent(currency), horizons: ["today", "24h", "7d", "30d"], scenario })
       }),
       apiRequest(`/quotazioni/competitors/quotes?days=30&currency=${currency}`).catch(() => ({ quotes: [], stats: {} })),
-      apiRequest("/quotazioni/competitors/sources").catch(() => ({ sources: [] }))
+      apiRequest("/quotazioni/competitors/sources").catch(() => ({ sources: [] })),
+      apiRequest("/quotazioni/competitors/sync-status").catch(() => null),
+      apiRequest(`/quotazioni/competitors/market-summary?currency=${currency}`).catch(() => null)
     ]);
     state.goldPredictionStatus = {
       ...statusData,
@@ -12818,6 +12908,8 @@ async function loadGoldPredictionPanel(options = {}) {
     state.competitorQuotes = competitorData.quotes || [];
     state.competitorStats = buybackData.competitor_stats || competitorData.stats || statusData.competitor_stats || {};
     state.competitorSources = competitorSourcesData.sources || [];
+    state.competitorSyncStatus = competitorSyncData || null;
+    state.competitorMarketSummary = competitorMarketData?.summary || null;
     state.goldPredictionSettings = statusData.settings || null;
     if (isFounder()) {
       const settingsData = await apiRequest("/quotazioni/gold-prediction/settings").catch(() => null);
@@ -13002,9 +13094,48 @@ async function importCompetitorCsv(event) {
   await loadGoldPredictionPanel({ silent: true });
 }
 
+async function forceCompetitorAutoSync(sourceId = "all") {
+  if (!isFounder()) return;
+  const payload = sourceId && sourceId !== "all" ? { source_id: sourceId } : {};
+  showToast(sourceId === "all" ? "Auto sync competitor in esecuzione..." : "Sync fonte competitor in esecuzione...", "success");
+  const data = await apiRequest("/quotazioni/competitors/auto-sync/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    timeoutMs: 90000
+  });
+  const saved = Number(data.quotes_saved || data.result?.quotes_saved || 0);
+  const failed = (data.results || []).filter((item) => item.status === "failed").length + (data.result?.status === "failed" ? 1 : 0);
+  showToast(
+    failed ? `Sync completata con ${failed} fonte/i da verificare. Quotazioni salvate: ${saved}.` : `Sync competitor completata. Quotazioni salvate: ${saved}.`,
+    failed ? "warning" : "success"
+  );
+  await loadGoldPredictionPanel({ silent: true });
+}
+
+async function toggleCompetitorAutoSync(sourceId, nextAutoSync) {
+  if (!isFounder() || !sourceId) return;
+  const source = (state.competitorSources || []).find((item) => String(item.id) === String(sourceId)) || {};
+  const enabled = nextAutoSync === true || nextAutoSync === "true";
+  const payload = {
+    active: source.active !== false,
+    auto_sync_enabled: enabled,
+    sync_interval_minutes: source.sync_interval_minutes || 180,
+    source_type: enabled ? "configured_page" : source.source_type || "configured_page",
+    extraction_config: source.extraction_config || {}
+  };
+  await apiRequest(`/quotazioni/competitors/sources/${encodeURIComponent(sourceId)}/auto-sync`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+  showToast(enabled ? "Auto sync fonte competitor attivato." : "Auto sync fonte competitor disattivato.", "success");
+  await loadGoldPredictionPanel({ silent: true });
+}
+
 async function handleCompetitorAction(event) {
   const fill = event.target.closest("[data-fill-competitor-source]");
   const disable = event.target.closest("[data-disable-competitor-source]");
+  const forceSync = event.target.closest("[data-force-competitor-sync]");
+  const toggleAutoSync = event.target.closest("[data-toggle-competitor-auto-sync]");
   if (fill) {
     const source = (state.competitorSources || []).find((item) => String(item.id) === String(fill.dataset.fillCompetitorSource));
     if (source && competitorQuoteForm) {
@@ -13013,6 +13144,14 @@ async function handleCompetitorAction(event) {
       competitorQuoteForm.price_per_gram?.focus();
       showToast("Fonte competitor pronta per inserire una quotazione manuale.", "success");
     }
+    return;
+  }
+  if (forceSync && isFounder()) {
+    await forceCompetitorAutoSync(forceSync.dataset.forceCompetitorSync || "all");
+    return;
+  }
+  if (toggleAutoSync && isFounder()) {
+    await toggleCompetitorAutoSync(toggleAutoSync.dataset.toggleCompetitorAutoSync, toggleAutoSync.dataset.nextAutoSync);
     return;
   }
   if (disable && isFounder()) {
