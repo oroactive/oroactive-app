@@ -4946,6 +4946,115 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   font-size: 18px;
 }
 
+.competitor-tools {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.competitor-quote-form,
+.competitor-source-form,
+.competitor-csv-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.competitor-csv-form {
+  grid-template-columns: 1fr;
+}
+
+.competitor-quote-form label,
+.competitor-source-form label,
+.competitor-csv-form label {
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.competitor-quote-form input,
+.competitor-quote-form select,
+.competitor-source-form input,
+.competitor-source-form select,
+.competitor-csv-form textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 106, 0, 0.24);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.34);
+  color: #ffffff;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.competitor-quote-form button,
+.competitor-source-form button,
+.competitor-csv-form button {
+  align-self: end;
+}
+
+.competitor-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 800;
+}
+
+.competitor-summary strong {
+  color: #ffd700;
+  font-size: 24px;
+}
+
+.competitor-source-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.competitor-source-chips span {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 106, 0, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 106, 0, 0.1);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.competitor-table-wrap {
+  overflow-x: auto;
+}
+
+.competitor-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.competitor-table th,
+.competitor-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.82);
+  text-align: left;
+  font-size: 13px;
+}
+
+.competitor-table th {
+  color: #ffd7a3;
+  background: rgba(255, 106, 0, 0.1);
+}
+
 .gold-prediction-policy-editor h4 {
   margin: 0 0 12px;
   color: #ffffff;
@@ -9963,6 +10072,9 @@ input.document-expired {
 
   .buyback-simulator-form,
   .buyback-simulator-output,
+  .competitor-tools,
+  .competitor-quote-form,
+  .competitor-source-form,
   .buyback-policy-grid,
   .buyback-policy-row {
     grid-template-columns: 1fr;

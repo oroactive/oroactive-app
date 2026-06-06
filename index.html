@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260605-buyback-pricing-1">
+  <link rel="stylesheet" href="styles.css?v=20260606-metal-competitor-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -906,12 +906,12 @@
             <p id="bullionVaultChartFallback" class="quote-fallback" hidden>Grafico BullionVault non incorporabile direttamente. <a href="https://www.bullionvault.com/gold-price-chart.do" target="_blank" rel="noopener">Apri grafico BullionVault</a>.</p>
           </div>
         </section>
-        <section class="gold-prediction-panel quote-section-panel" id="goldPredictionPanel" aria-label="Analisi Predittiva Metalli">
+        <section class="gold-prediction-panel quote-section-panel" id="goldPredictionPanel" aria-label="Analisi Predittiva Metalli e Prezzi di Acquisto">
           <div class="gold-prediction-header">
             <div>
-              <p class="eyebrow">Analisi Predittiva Metalli</p>
-              <h3>Analisi Predittiva Metalli</h3>
-              <p>Stima statistica e prezzo massimo pagabile per oro, argento, carature e titoli.</p>
+              <p class="eyebrow">Analisi Predittiva Metalli e Prezzi di Acquisto</p>
+              <h3>Analisi Predittiva Metalli e Prezzi di Acquisto</h3>
+              <p>Storico oro/argento, previsione, confronto competitor e prezzo massimo pagabile per caratura e titolo.</p>
             </div>
             <div class="gold-prediction-actions">
               <label class="gold-prediction-scenario-select">Scenario
@@ -921,9 +921,9 @@
                   <option value="aggressivo">Aggressivo</option>
                 </select>
               </label>
-              <button class="ghost-button" type="button" id="syncGoldHistory">Sync metalli</button>
+              <button class="ghost-button" type="button" id="syncGoldHistory">Sync BullionVault</button>
               <button class="primary-button" type="button" id="runGoldPrediction">Calcola prezzi</button>
-              <button class="ghost-button" type="button" id="askAurumGoldPrediction">Chiedi ad Aurum</button>
+              <button class="ghost-button" type="button" id="askAurumGoldPrediction">Chiedi ad Aurum di spiegare il prezzo</button>
             </div>
           </div>
           <div class="gold-prediction-status" id="goldPredictionStatus" aria-live="polite">Caricamento analisi...</div>
@@ -939,9 +939,54 @@
             </article>
           </div>
           <article class="gold-prediction-card">
-            <h4>Prezzo massimo pagabile Oro e Argento</h4>
+            <h4>Oro e Argento: valore teorico, competitor e massimo pagabile</h4>
             <div id="goldPredictionKaratTable"></div>
             <p class="gold-prediction-disclaimer">Valori teorici indicativi. Il prezzo massimo pagabile è calcolato secondo le policy OroActive configurate dal Founder.</p>
+          </article>
+          <article class="gold-prediction-card">
+            <h4>Confronto competitor</h4>
+            <div class="competitor-tools founder-only">
+              <form class="competitor-source-form" id="competitorSourceForm">
+                <label>Fonte competitor <input name="name" placeholder="Nome fonte"></label>
+                <label>URL <input name="website_url" type="url" placeholder="https://..."></label>
+                <label>Tipo fonte
+                  <select name="source_type">
+                    <option value="manual">Manuale</option>
+                    <option value="csv_import">CSV</option>
+                    <option value="api">API configurata</option>
+                    <option value="configured_page">Pagina configurata</option>
+                  </select>
+                </label>
+                <button class="ghost-button" type="submit">Salva fonte</button>
+              </form>
+              <form class="competitor-quote-form" id="competitorQuoteForm">
+                <label>Competitor <input name="competitor_name" placeholder="Nome competitor"></label>
+                <label>URL fonte <input name="url" type="url" placeholder="https://..."></label>
+                <label>Metallo
+                  <select name="metal">
+                    <option value="gold">Oro</option>
+                    <option value="silver">Argento</option>
+                  </select>
+                </label>
+                <label>Caratura / titolo <input name="purity_code" placeholder="18kt / 925"></label>
+                <label>Prezzo €/g <input name="price_per_gram" type="number" step="0.01" min="0"></label>
+                <label>Affidabilità
+                  <select name="confidence">
+                    <option value="medium">Media</option>
+                    <option value="high">Alta</option>
+                    <option value="low">Bassa</option>
+                  </select>
+                </label>
+                <button class="primary-button" type="submit">Aggiungi prezzo</button>
+              </form>
+              <form class="competitor-csv-form" id="competitorCsvForm">
+                <label>Import CSV competitor
+                  <textarea name="csv" rows="4" placeholder="competitor_name,metal,purity_code,price_per_gram,currency,quote_date,url"></textarea>
+                </label>
+                <button class="ghost-button" type="submit">Importa CSV</button>
+              </form>
+            </div>
+            <div class="competitor-quotes-list" id="competitorQuotesList">Nessun competitor configurato. Inserisci prezzi manuali o importa CSV per il confronto.</div>
           </article>
           <article class="gold-prediction-card">
             <h4>Simulatore prezzo di acquisto</h4>
@@ -989,7 +1034,18 @@
                 <select name="provider">
                   <option value="manual">Manuale / demo</option>
                   <option value="bullionvault">BullionVault</option>
+                  <option value="lbma">LBMA fallback</option>
                   <option value="alphavantage">Alpha Vantage</option>
+                  <option value="custom_api">Custom API</option>
+                </select>
+              </label>
+              <label>Provider fallback
+                <select name="fallback_provider">
+                  <option value="manual">Manuale / ultimo dato</option>
+                  <option value="bullionvault">BullionVault</option>
+                  <option value="lbma">LBMA</option>
+                  <option value="alphavantage">Alpha Vantage</option>
+                  <option value="custom_api">Custom API</option>
                 </select>
               </label>
               <label>Valuta
@@ -1769,6 +1825,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260605-buyback-pricing-1"></script>
+  <script src="app.js?v=20260606-metal-competitor-1"></script>
 </body>
 </html>
