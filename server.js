@@ -17,6 +17,7 @@ import { createAiCompetitorQuoteExtractor } from "./services/competitors/aiCompe
 import { createCompetitorExtractionTrainer } from "./services/competitors/competitorExtractionTrainer.js";
 import { createAmicoOroExtractor } from "./services/competitors/extractors/amicoOroExtractor.js";
 import { createBancoPreziosiExtractor } from "./services/competitors/extractors/bancoPreziosiExtractor.js";
+import { createOroDOroExtractor } from "./services/competitors/extractors/oroDOroExtractor.js";
 import { createOroExpressExtractor } from "./services/competitors/extractors/oroExpressExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
 
@@ -68,6 +69,13 @@ const oroExpressUrl = process.env.ORO_EXPRESS_URL || "https://www.oro-express.it
 const oroExpressUsePlaywright = String(process.env.ORO_EXPRESS_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
 const oroExpressTimeoutMs = Math.min(Math.max(Number(process.env.ORO_EXPRESS_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const oroExpressSilverUsedMapping = String(process.env.ORO_EXPRESS_SILVER_USED_MAPPING || "generic").toLowerCase();
+const oroDOroAutoSyncEnabled = String(process.env.ORO_DORO_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const oroDOroAutoSyncOnStartup = String(process.env.ORO_DORO_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const oroDOroSyncIntervalMinutes = Math.max(60, Number(process.env.ORO_DORO_SYNC_INTERVAL_MINUTES || 60));
+const oroDOroUrl = process.env.ORO_DORO_URL || "https://www.comproorodoro.it";
+const oroDOroUsePlaywright = String(process.env.ORO_DORO_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const oroDOroUseAiFallback = String(process.env.ORO_DORO_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
+const oroDOroTimeoutMs = Math.min(Math.max(Number(process.env.ORO_DORO_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const amicoOroAutoSyncEnabled = String(process.env.AMICO_ORO_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const amicoOroAutoSyncOnStartup = String(process.env.AMICO_ORO_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const amicoOroSyncIntervalMinutes = Math.max(60, Number(process.env.AMICO_ORO_SYNC_INTERVAL_MINUTES || 60));
@@ -117,6 +125,15 @@ const competitorAiExtractionState = {
 };
 const oroExpressSyncState = {
   enabled: oroExpressAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: ""
+};
+const oroDOroSyncState = {
+  enabled: oroDOroAutoSyncEnabled,
   running: false,
   timer: null,
   lastRunAt: null,
@@ -318,6 +335,16 @@ const oroExpressExtractor = createOroExpressExtractor({
   silverUsedMapping: oroExpressSilverUsedMapping,
   maxTextChars: competitorAiMaxTextChars
 });
+const oroDOroExtractor = createOroDOroExtractor({
+  openai,
+  model: competitorAiExtractionModel,
+  url: oroDOroUrl,
+  timeoutMs: oroDOroTimeoutMs,
+  userAgent: competitorAutoSyncUserAgent,
+  usePlaywright: oroDOroUsePlaywright,
+  useAiFallback: oroDOroUseAiFallback,
+  maxTextChars: competitorAiMaxTextChars
+});
 const amicoOroExtractor = createAmicoOroExtractor({
   openai,
   model: competitorAiExtractionModel,
@@ -344,6 +371,7 @@ const competitorExtractionTrainer = createCompetitorExtractionTrainer({
   model: competitorAiExtractionModel,
   fetchPage: fetchCompetitorPage,
   oroExpressExtractor,
+  oroDOroExtractor,
   amicoOroExtractor,
   bancoPreziosiExtractor
 });
@@ -2223,7 +2251,7 @@ function normalizePurityCode(input = "", metal = "gold") {
   if (!value) return normalizedMetal === "silver" ? "925" : "18kt";
   if (normalizedMetal === "gold") {
     if (/oropuro|puro|24carati/.test(value)) return "24kt";
-    const match = raw.match(/\b(24|22|21|18|14|12|9|6)\s*(?:kt|k|carati|carato)?\b/);
+    const match = raw.match(/\b(24|22|21|20|18|14|12|9|6)\s*(?:kt|k|carati|carato)?\b/);
     return match ? `${match[1]}kt` : "18kt";
   }
   if (/sterling/.test(value)) return "925";
@@ -2292,7 +2320,18 @@ const DEFAULT_COMPETITOR_SOURCES = [
     },
     notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
   },
-  { name: "Oro D'oro", website_url: "https://www.comproorodoro.it" },
+  {
+    name: "Oro D'Oro",
+    website_url: oroDOroUrl,
+    source_type: "oro_doro_parser",
+    sync_interval_minutes: oroDOroSyncIntervalMinutes,
+    extraction_config: {
+      method: "oro_doro_parser",
+      url: oroDOroUrl,
+      currency: "EUR"
+    },
+    notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
+  },
   {
     name: "Amico Oro",
     website_url: amicoOroUrl,
@@ -2415,20 +2454,23 @@ async function seedDefaultCompetitorSources() {
           SET website_url = COALESCE(NULLIF(website_url, ''), $2::text),
               source_type = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN $6::text
+                WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN $6::text
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $6::text
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $6::text
-                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'amico_oro_parser', 'banco_preziosi_parser')
+                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'oro_doro_parser', 'amico_oro_parser', 'banco_preziosi_parser')
                  AND (notes IS NULL OR notes = '' OR notes ILIKE '%Competitor preconfigurato OroActive%') THEN $6::text
                 ELSE source_type
               END,
               auto_sync_enabled = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN true
+                WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN true
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN true
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN true
                 ELSE COALESCE(auto_sync_enabled, true)
               END,
               sync_interval_minutes = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN $3::int
+                WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN $3::int
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $3::int
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $3::int
                 ELSE COALESCE(sync_interval_minutes, $3::int)
@@ -2447,7 +2489,10 @@ async function seedDefaultCompetitorSources() {
                 ELSE notes
               END,
               updated_at = NOW()
-        WHERE LOWER(name) = LOWER($1::text)
+        WHERE (
+            LOWER(name) = LOWER($1::text)
+            OR (LOWER($1::text) = LOWER('Oro D''Oro') AND LOWER(name) = LOWER('Oro D''oro'))
+          )
           AND (
             notes IS NULL
             OR notes = ''
@@ -2508,6 +2553,38 @@ function defaultOroExpressExtractionRules(source = {}) {
   ].map((rule) => ({
     ...rule,
     competitor_name: source.name || "Oro Express",
+    source_id: source.id || null,
+    page_url: pageUrl,
+    unit: "EUR/g",
+    extraction_method: "anchor_regex",
+    required: true,
+    active: true
+  }));
+}
+
+function defaultOroDOroExtractionRules(source = {}) {
+  const pageUrl = source.website_url || oroDOroUrl;
+  const rows = [
+    ["oro_doro_gold_24kt", "ORO 24kt", "gold", "24kt", 1, "ORO 24kt", "ORO\\s*(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)[\\s\\S]{0,40}?24\\s*(?:kt|k)"],
+    ["oro_doro_gold_22kt", "ORO 22kt", "gold", "22kt", 22 / 24, "ORO 22KT", "ORO\\s*22\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+    ["oro_doro_gold_21kt", "ORO 21kt", "gold", "21kt", 21 / 24, "ORO 21KT", "ORO\\s*21\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+    ["oro_doro_gold_20kt", "ORO 20kt", "gold", "20kt", 20 / 24, "ORO 20KT", "ORO\\s*20\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+    ["oro_doro_gold_18kt", "ORO 18kt", "gold", "18kt", 0.75, "ORO 18KT", "ORO\\s*18\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+    ["oro_doro_gold_14kt", "ORO 14kt", "gold", "14kt", 14 / 24, "ORO 14KT", "ORO\\s*14\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+    ["oro_doro_gold_9kt", "ORO 9kt", "gold", "9kt", 9 / 24, "ORO 9KT", "ORO\\s*9\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+    ["oro_doro_silver_999", "ARGENTO 999", "silver", "999", 0.999, "ARGENTO 999", "ARGENTO\\s*(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)[\\s\\S]{0,40}?999"],
+    ["oro_doro_silver_925", "ARGENTO 925", "silver", "925", 0.925, "ARGENTO 925", "ARGENTO\\s*925[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+    ["oro_doro_silver_800", "ARGENTO 800", "silver", "800", 0.8, "ARGENTO 800", "ARGENTO\\s*800[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"]
+  ];
+  return rows.map(([field_key, label, metal, purity_code, purity_value, anchor_text, regex_pattern]) => ({
+    field_key,
+    label,
+    metal,
+    purity_code,
+    purity_value,
+    anchor_text,
+    regex_pattern,
+    competitor_name: source.name || "Oro D'Oro",
     source_id: source.id || null,
     page_url: pageUrl,
     unit: "EUR/g",
@@ -2682,6 +2759,7 @@ async function seedDefaultCompetitorExtractionRules() {
   const inserted = [];
   const ruleSets = [
     { source: await getOroExpressSource().catch(() => null), rulesFor: defaultOroExpressExtractionRules },
+    { source: await getOroDOroSource().catch(() => null), rulesFor: defaultOroDOroExtractionRules },
     { source: await getAmicoOroSource().catch(() => null), rulesFor: defaultAmicoOroExtractionRules },
     { source: await getBancoPreziosiSource().catch(() => null), rulesFor: defaultBancoPreziosiExtractionRules }
   ];
@@ -2955,7 +3033,7 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
   const payload = {
     name: String(input.name || "").trim().slice(0, 120),
     website_url: String(input.website_url || input.websiteUrl || "").trim().slice(0, 500),
-    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "amico_oro_parser", "banco_preziosi_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
+    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "oro_doro_parser", "amico_oro_parser", "banco_preziosi_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
       ? String(input.source_type || input.sourceType || "manual").toLowerCase()
       : "manual",
     active: input.active !== false,
@@ -3340,6 +3418,7 @@ function competitorPurityPatterns(metal = "gold") {
     { code: "24kt", labels: ["oro\\s*puro", "\\b24\\s*(?:kt|k|carati|carato)\\b"] },
     { code: "22kt", labels: ["\\b22\\s*(?:kt|k|carati|carato)\\b"] },
     { code: "21kt", labels: ["\\b21\\s*(?:kt|k|carati|carato)\\b"] },
+    { code: "20kt", labels: ["\\b20\\s*(?:kt|k|carati|carato)\\b"] },
     { code: "18kt", labels: ["\\b18\\s*(?:kt|k|carati|carato)\\b"] },
     { code: "14kt", labels: ["\\b14\\s*(?:kt|k|carati|carato)\\b"] },
     { code: "12kt", labels: ["\\b12\\s*(?:kt|k|carati|carato)\\b"] },
@@ -3494,6 +3573,19 @@ async function extractCompetitorQuotes(source = {}) {
       timeoutMs: oroExpressTimeoutMs,
       userAgent: competitorAutoSyncUserAgent,
       usePlaywright: oroExpressUsePlaywright
+    });
+  }
+
+  if (method === "oro_doro_parser" || source.source_type === "oro_doro_parser" || source.name?.toLowerCase() === "oro d'oro") {
+    return oroDOroExtractor.extractOroDOroQuotes({
+      source_id: source.id,
+      sourceId: source.id,
+      url: config.url || source.website_url || oroDOroUrl,
+      sourceUrl: config.url || source.website_url || oroDOroUrl,
+      timeoutMs: oroDOroTimeoutMs,
+      userAgent: competitorAutoSyncUserAgent,
+      usePlaywright: oroDOroUsePlaywright,
+      useAiFallback: oroDOroUseAiFallback
     });
   }
 
@@ -3859,6 +3951,13 @@ async function getOroExpressSource() {
   return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
 }
 
+async function getOroDOroSource() {
+  const result = await pool.query(
+    "SELECT * FROM competitor_quote_sources WHERE LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) LIMIT 1"
+  );
+  return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
+}
+
 async function getAmicoOroSource() {
   const result = await pool.query(
     "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Amico Oro') LIMIT 1"
@@ -3938,6 +4037,90 @@ function startOroExpressHourlySync() {
   }, oroExpressSyncIntervalMinutes * 60 * 1000);
   oroExpressSyncState.timer.unref?.();
   return oroExpressSyncPublicStatus();
+}
+
+function oroDOroSyncPublicStatus() {
+  return {
+    enabled: oroDOroAutoSyncEnabled,
+    running: oroDOroSyncState.running,
+    interval_minutes: oroDOroSyncIntervalMinutes,
+    on_startup: oroDOroAutoSyncOnStartup,
+    url: oroDOroUrl,
+    use_playwright: oroDOroUsePlaywright,
+    use_ai_fallback: oroDOroUseAiFallback,
+    timeout_ms: oroDOroTimeoutMs,
+    last_run_at: oroDOroSyncState.lastRunAt,
+    next_run_at: oroDOroSyncState.nextRunAt,
+    last_status: oroDOroSyncState.lastStatus,
+    last_error: oroDOroSyncState.lastError
+  };
+}
+
+async function runOroDOroHourlySync({ force = false, user = {}, req = null } = {}) {
+  if (!oroDOroAutoSyncEnabled && !force) {
+    return { ok: false, skipped: true, message: "Sync Oro D'Oro disattivato.", state: oroDOroSyncPublicStatus() };
+  }
+  if (oroDOroSyncState.running) {
+    return { ok: true, skipped: true, message: "Sync Oro D'Oro gia in corso.", state: oroDOroSyncPublicStatus() };
+  }
+  oroDOroSyncState.running = true;
+  oroDOroSyncState.lastRunAt = new Date().toISOString();
+  oroDOroSyncState.lastStatus = "running";
+  oroDOroSyncState.lastError = "";
+  try {
+    const source = await getOroDOroSource();
+    if (!source?.id) throw new Error("Fonte Oro D'Oro non configurata");
+    const result = await syncSingleCompetitorSource(source, user, req, { force });
+    const summary = await calculateCompetitorMarketSummary().catch(() => null);
+    oroDOroSyncState.lastStatus = result.status || "success";
+    oroDOroSyncState.lastError = result.error || result.log?.error_message || "";
+    oroDOroSyncState.nextRunAt = new Date(Date.now() + oroDOroSyncIntervalMinutes * 60 * 1000).toISOString();
+    return {
+      ok: true,
+      result,
+      summary,
+      state: oroDOroSyncPublicStatus()
+    };
+  } catch (error) {
+    oroDOroSyncState.lastStatus = "failed";
+    oroDOroSyncState.lastError = error.message || "Sync Oro D'Oro non riuscito";
+    const source = await getOroDOroSource().catch(() => null);
+    if (source?.id) {
+      await updateCompetitorSourceSyncStatus(
+        source.id,
+        "failed",
+        new Date().toISOString(),
+        oroDOroSyncState.lastError,
+        new Date(Date.now() + oroDOroSyncIntervalMinutes * 60 * 1000).toISOString()
+      ).catch(() => {});
+    }
+    throw error;
+  } finally {
+    oroDOroSyncState.running = false;
+  }
+}
+
+function startOroDOroHourlySync() {
+  if (!oroDOroAutoSyncEnabled || oroDOroSyncState.timer) return oroDOroSyncPublicStatus();
+  oroDOroSyncState.nextRunAt = new Date(Date.now() + oroDOroSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (oroDOroAutoSyncOnStartup) {
+    setTimeout(() => {
+      runOroDOroHourlySync({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        oroDOroSyncState.lastStatus = "failed";
+        oroDOroSyncState.lastError = error.message || "Sync startup Oro D'Oro fallito";
+        console.error("Errore sync Oro D'Oro", error);
+      });
+    }, 6500).unref?.();
+  }
+  oroDOroSyncState.timer = setInterval(() => {
+    runOroDOroHourlySync({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      oroDOroSyncState.lastStatus = "failed";
+      oroDOroSyncState.lastError = error.message || "Sync Oro D'Oro fallito";
+      console.error("Errore sync Oro D'Oro", error);
+    });
+  }, oroDOroSyncIntervalMinutes * 60 * 1000);
+  oroDOroSyncState.timer.unref?.();
+  return oroDOroSyncPublicStatus();
 }
 
 function amicoOroSyncPublicStatus() {
@@ -19184,6 +19367,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       sources_failed: failedSources,
       valid_quotes_24h: Number(validQuotes.rows[0]?.count || 0),
       oro_express_status: oroExpressSyncPublicStatus(),
+      oro_doro_status: oroDOroSyncPublicStatus(),
       amico_oro_status: amicoOroSyncPublicStatus(),
       banco_preziosi_status: bancoPreziosiSyncPublicStatus(),
       sources,
@@ -19278,6 +19462,14 @@ app.get("/api/quotazioni/competitors/quotes/ai", async (request, response, next)
 app.post("/api/quotazioni/competitors/oro-express/sync", requireFounder, async (request, response, next) => {
   try {
     response.json(await runOroExpressHourlySync({ force: true, user: request.user, req: request }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/oro-doro/sync", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await runOroDOroHourlySync({ force: true, user: request.user, req: request }));
   } catch (error) {
     next(error);
   }
@@ -20473,6 +20665,7 @@ initDatabase()
     scheduleBackups();
     startCompetitorAutoSync();
     startOroExpressHourlySync();
+    startOroDOroHourlySync();
     startAmicoOroHourlySync();
     startBancoPreziosiHourlySync();
     startCompetitorAiAutoExtraction();

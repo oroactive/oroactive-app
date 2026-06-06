@@ -12151,6 +12151,7 @@ function competitorQuoteTypeLabel(type = "") {
 function competitorSourceTypeLabel(type = "") {
   const normalized = String(type || "").toLowerCase();
   if (normalized === "oro_express_parser") return "Parser Oro Express";
+  if (normalized === "oro_doro_parser") return "Parser Oro D'Oro";
   if (normalized === "amico_oro_parser") return "Parser Amico Oro";
   if (normalized === "banco_preziosi_parser") return "Parser Banco Preziosi";
   if (normalized === "configured_page") return "Pagina configurata";
@@ -12166,6 +12167,8 @@ function competitorPurityDisplay(quote = {}) {
   if (quote.competitor_name === "Oro Express" && quote.metal === "gold" && quote.purity_code === "24kt") return "Oro puro / 24kt";
   if (quote.competitor_name === "Oro Express" && quote.metal === "gold" && quote.purity_code === "18kt") return "Oro usato / 18kt";
   if (quote.competitor_name === "Oro Express" && quote.metal === "silver" && quote.purity_code === "999") return "Argento puro / 999";
+  if (quote.competitor_name === "Oro D'Oro" && quote.metal === "gold") return `Oro ${quote.purity_code}`;
+  if (quote.competitor_name === "Oro D'Oro" && quote.metal === "silver") return `Argento ${quote.purity_code}`;
   if (quote.competitor_name === "Amico Oro" && quote.metal === "gold" && quote.purity_code === "24kt") return "24K / 24kt";
   if (quote.competitor_name === "Amico Oro" && quote.metal === "gold" && quote.purity_code === "18kt") return "18K / 18kt";
   if (quote.competitor_name === "Amico Oro" && quote.metal === "gold" && quote.purity_code === "14kt") return "14K / 14kt";
@@ -12195,6 +12198,14 @@ function competitorEvidenceHtml(quote = {}) {
 function latestOroExpressQuote(metal = "", purityCode = "") {
   return (state.competitorQuotes || [])
     .filter((quote) => quote.competitor_name === "Oro Express")
+    .filter((quote) => !metal || quote.metal === metal)
+    .filter((quote) => !purityCode || quote.purity_code === purityCode)
+    .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
+}
+
+function latestOroDOroQuote(metal = "", purityCode = "") {
+  return (state.competitorQuotes || [])
+    .filter((quote) => quote.competitor_name === "Oro D'Oro" || String(quote.competitor_name || "").toLowerCase() === "oro d'oro")
     .filter((quote) => !metal || quote.metal === metal)
     .filter((quote) => !purityCode || quote.purity_code === purityCode)
     .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
@@ -12244,6 +12255,49 @@ function oroExpressSummaryHtml() {
       <div class="oro-express-grid">${quoteRows}</div>
       <p>Ultimo aggiornamento: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
       ${isFounder() ? `<button class="ghost-button" type="button" data-force-oro-express-sync>Forza aggiornamento Oro Express</button>` : ""}
+    </article>
+  `;
+}
+
+function oroDOroSummaryHtml() {
+  const source = (state.competitorSources || []).find((item) => String(item.name || "").toLowerCase() === "oro d'oro") || {};
+  const quoteConfigs = [
+    { metal: "gold", code: "24kt" },
+    { metal: "gold", code: "22kt" },
+    { metal: "gold", code: "21kt" },
+    { metal: "gold", code: "20kt" },
+    { metal: "gold", code: "18kt" },
+    { metal: "gold", code: "14kt" },
+    { metal: "gold", code: "9kt" },
+    { metal: "silver", code: "999" },
+    { metal: "silver", code: "925" },
+    { metal: "silver", code: "800" }
+  ];
+  const quotes = quoteConfigs
+    .map((item) => latestOroDOroQuote(item.metal, item.code))
+    .filter(Boolean);
+  if (!source.id && !quotes.length) return "";
+  const quoteRows = quotes.length
+    ? quotes.map((quote) => `
+        <div>
+          <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
+          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
+        </div>
+      `).join("")
+    : `<p>Nessuna quotazione Oro D'Oro rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
+  return `
+    <article class="oro-doro-card">
+      <header>
+        <div>
+          <span>Competitor dedicato</span>
+          <h5>Oro D'Oro</h5>
+        </div>
+        <strong>${escapeHtml(competitorSourceStatusLabel(source))}</strong>
+      </header>
+      <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">www.comproorodoro.it</a>` : "https://www.comproorodoro.it"} · Metodo: parser automatico · Ogni 60 minuti</p>
+      <div class="oro-doro-grid">${quoteRows}</div>
+      <p>Ultimo aggiornamento: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
+      ${isFounder() ? `<button class="ghost-button" type="button" data-force-oro-doro-sync>Forza aggiornamento Oro D'Oro</button>` : ""}
     </article>
   `;
 }
@@ -12417,6 +12471,7 @@ function buildPriceExplanationContext(row = {}, options = {}) {
   const predictedHighPure = Number(prediction.predicted_high_per_gram || 0);
   const purityCode = row.purity_code || options.purity_code || "";
   const oroExpressQuote = latestOroExpressQuote(metal, purityCode);
+  const oroDOroQuote = latestOroDOroQuote(metal, purityCode);
   const amicoOroQuote = latestAmicoOroQuote(metal, purityCode);
   const bancoPreziosiQuote = latestBancoPreziosiQuote(
     metal,
@@ -12494,6 +12549,18 @@ function buildPriceExplanationContext(row = {}, options = {}) {
       quote_date: oroExpressQuote.quote_date || null,
       evidence_text: oroExpressQuote.evidence_text || "",
       confidence: oroExpressQuote.ai_confidence || oroExpressQuote.confidence || "high"
+    } : null,
+    oro_doro_quote: oroDOroQuote ? {
+      metal: oroDOroQuote.metal,
+      purity_code: oroDOroQuote.purity_code,
+      quote_type: oroDOroQuote.quote_type || "customer_buyback",
+      label: competitorPurityDisplay(oroDOroQuote),
+      price_per_gram: Number(oroDOroQuote.price_per_gram || 0),
+      price_per_kg: Number(oroDOroQuote.price_per_kg || 0),
+      source_url: oroDOroQuote.source_url || oroDOroQuote.url || "",
+      quote_date: oroDOroQuote.quote_date || null,
+      evidence_text: oroDOroQuote.evidence_text || "",
+      confidence: oroDOroQuote.ai_confidence || oroDOroQuote.confidence || "high"
     } : null,
     amico_oro_quote: amicoOroQuote ? {
       metal: amicoOroQuote.metal,
@@ -12600,6 +12667,17 @@ function buildGeneralPriceExplanationContext() {
         quote_date: quote.quote_date || null,
         evidence_text: quote.evidence_text || ""
       })),
+    oro_doro_quotes: (state.competitorQuotes || [])
+      .filter((quote) => quote.competitor_name === "Oro D'Oro" || String(quote.competitor_name || "").toLowerCase() === "oro d'oro")
+      .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
+      .slice(0, 10)
+      .map((quote) => ({
+        label: competitorPurityDisplay(quote),
+        price_per_gram: Number(quote.price_per_gram || 0),
+        source_url: quote.source_url || quote.url || "",
+        quote_date: quote.quote_date || null,
+        evidence_text: quote.evidence_text || ""
+      })),
     amico_oro_quotes: (state.competitorQuotes || [])
       .filter((quote) => quote.competitor_name === "Amico Oro")
       .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
@@ -12690,6 +12768,10 @@ function competitorExplanation(context = {}) {
   const oroExpressText = oroExpress
     ? ` Oro Express è stato aggiornato ${oroExpress.quote_date ? `il ${formatDateTime(oroExpress.quote_date)}` : "automaticamente"}: ${oroExpress.label || context.purity_code} a ${formatAurumGram(oroExpress.price_per_gram, currency)}. Fonte: ${oroExpress.source_url || "https://www.oro-express.it"}. ${Number(context.max_payable_per_gram || 0) && Number(oroExpress.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: non è consigliato superarlo senza autorizzazione." : "Rientra nel confronto con il massimo pagabile e il prezzo consigliato OroActive."}`
     : "";
+  const oroDOro = context.oro_doro_quote;
+  const oroDOroText = oroDOro
+    ? ` Oro D'Oro è stato aggiornato ${oroDOro.quote_date ? `il ${formatDateTime(oroDOro.quote_date)}` : "automaticamente"}: ${oroDOro.label || context.purity_code} a ${formatAurumGram(oroDOro.price_per_gram, currency)}. Fonte: ${oroDOro.source_url || "https://www.comproorodoro.it"}. ${Number(context.max_payable_per_gram || 0) && Number(oroDOro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: inseguirlo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    : "";
   const amicoOro = context.amico_oro_quote;
   const amicoOroText = amicoOro
     ? ` Amico Oro è stato aggiornato ${amicoOro.quote_date ? `il ${formatDateTime(amicoOro.quote_date)}` : "automaticamente"}: ${amicoOro.label || context.purity_code} a ${formatAurumGram(amicoOro.price_per_gram, currency)}. Fonte: ${amicoOro.source_url || "https://www.amico-oro.it"}. ${Number(context.max_payable_per_gram || 0) && Number(amicoOro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: non è consigliato superarlo senza autorizzazione." : "Rientra nel confronto con il massimo pagabile e il prezzo consigliato OroActive."}`
@@ -12700,7 +12782,7 @@ function competitorExplanation(context = {}) {
       ? ` Banco Preziosi è stato aggiornato ${bancoPreziosi.quote_date ? `il ${formatDateTime(bancoPreziosi.quote_date)}` : "automaticamente"}: ${bancoPreziosi.label || "quotazione ufficiale oro"} a ${formatAurumGram(bancoPreziosi.price_per_gram, currency)}. Fonte: ${bancoPreziosi.source_url || "https://www.bancopreziosimilano.it"}. Questa è una reference ufficiale oro/24kt: non viene trattata come prezzo cliente se il testo non dice “acquistiamo”.`
       : ` Banco Preziosi è stato aggiornato ${bancoPreziosi.quote_date ? `il ${formatDateTime(bancoPreziosi.quote_date)}` : "automaticamente"}: ${bancoPreziosi.label || context.purity_code} a ${formatAurumGram(bancoPreziosi.price_per_gram, currency)}. Fonte: ${bancoPreziosi.source_url || "https://www.bancopreziosimilano.it"}. ${Number(context.max_payable_per_gram || 0) && Number(bancoPreziosi.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: inseguirlo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
-  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${amicoOroText}${bancoPreziosiText}${syncText}${aiText}`;
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${oroDOroText}${amicoOroText}${bancoPreziosiText}${syncText}${aiText}`;
 }
 
 function formulaExplanation(context = {}) {
@@ -12743,6 +12825,7 @@ Per l'argento il riferimento operativo è ${silver.purity_code || "925"}: valore
 Competitor e fonti
 ${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${competitorSync} ${competitorAi} ${extractionRules} ${context.competitor_sync_last_error ? `Ultimo errore sync: ${context.competitor_sync_last_error}.` : ""} ${context.competitor_ai_last_error ? `Ultimo errore AI: ${context.competitor_ai_last_error}.` : ""} ${context.warning ? `Nota dati: ${context.warning}` : ""}
 ${context.oro_express_quotes?.length ? `Oro Express rilevato: ${context.oro_express_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Oro Express non ha ancora quotazioni recenti salvate nel confronto."}
+${context.oro_doro_quotes?.length ? `Oro D'Oro rilevato: ${context.oro_doro_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Oro D'Oro non ha ancora quotazioni recenti salvate nel confronto."}
 ${context.amico_oro_quotes?.length ? `Amico Oro rilevato: ${context.amico_oro_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Amico Oro non ha ancora quotazioni recenti salvate nel confronto."}
 ${context.banco_preziosi_quotes?.length ? `Banco Preziosi rilevato: ${context.banco_preziosi_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_type === "reference_official_gold_price" ? " (reference ufficiale)" : ""}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Banco Preziosi non ha ancora quotazioni recenti salvate nel confronto."}
 
@@ -13111,6 +13194,37 @@ function defaultExtractionRulesForSource(source = {}) {
       last_test_status: "not_tested"
     }));
   }
+  if (String(source.name || "").toLowerCase() === "oro d'oro") {
+    const pageUrl = source.website_url || "https://www.comproorodoro.it";
+    return [
+      ["oro_doro_gold_24kt", "ORO 24kt", "gold", "24kt", "1", "ORO 24kt", "ORO\\s*(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)[\\s\\S]{0,40}?24\\s*(?:kt|k)"],
+      ["oro_doro_gold_22kt", "ORO 22kt", "gold", "22kt", String(22 / 24), "ORO 22KT", "ORO\\s*22\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+      ["oro_doro_gold_21kt", "ORO 21kt", "gold", "21kt", String(21 / 24), "ORO 21KT", "ORO\\s*21\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+      ["oro_doro_gold_20kt", "ORO 20kt", "gold", "20kt", String(20 / 24), "ORO 20KT", "ORO\\s*20\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+      ["oro_doro_gold_18kt", "ORO 18kt", "gold", "18kt", "0.75", "ORO 18KT", "ORO\\s*18\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+      ["oro_doro_gold_14kt", "ORO 14kt", "gold", "14kt", String(14 / 24), "ORO 14KT", "ORO\\s*14\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+      ["oro_doro_gold_9kt", "ORO 9kt", "gold", "9kt", String(9 / 24), "ORO 9KT", "ORO\\s*9\\s*(?:kt|k)[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+      ["oro_doro_silver_999", "ARGENTO 999", "silver", "999", "0.999", "ARGENTO 999", "ARGENTO\\s*(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)[\\s\\S]{0,40}?999"],
+      ["oro_doro_silver_925", "ARGENTO 925", "silver", "925", "0.925", "ARGENTO 925", "ARGENTO\\s*925[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"],
+      ["oro_doro_silver_800", "ARGENTO 800", "silver", "800", "0.8", "ARGENTO 800", "ARGENTO\\s*800[\\s\\S]{0,90}?(?:€\\s*)?([0-9]+[,.]?[0-9]*)\\s*(?:€\\s*)?\\/\\s*(?:g|gr)"]
+    ].map(([field_key, label, metal, purity_code, purity_value, anchor_text, regex_pattern]) => ({
+      source_id: source.id,
+      competitor_name: source.name || "Oro D'Oro",
+      page_url: pageUrl,
+      field_key,
+      label,
+      metal,
+      purity_code,
+      purity_value,
+      unit: "EUR/g",
+      anchor_text,
+      regex_pattern,
+      extraction_method: "anchor_regex",
+      required: true,
+      active: true,
+      last_test_status: "not_tested"
+    }));
+  }
   if (String(source.name || "").toLowerCase() === "amico oro") {
     const pageUrl = source.website_url || "https://www.amico-oro.it";
     return [
@@ -13417,6 +13531,7 @@ function renderCompetitorQuotes() {
     ${competitorAutoSyncSummaryHtml()}
     ${competitorAiExtractionSummaryHtml()}
     ${oroExpressSummaryHtml()}
+    ${oroDOroSummaryHtml()}
     ${amicoOroSummaryHtml()}
     ${bancoPreziosiSummaryHtml()}
     <div class="competitor-summary">
@@ -13757,6 +13872,27 @@ async function forceOroExpressSync() {
   await loadGoldPredictionPanel({ silent: true });
 }
 
+async function forceOroDOroSync() {
+  if (!isFounder()) return;
+  showToast("Aggiornamento Oro D'Oro in esecuzione...", "success");
+  const data = await apiRequest("/quotazioni/competitors/oro-doro/sync", {
+    method: "POST",
+    body: JSON.stringify({}),
+    timeoutMs: 90000
+  });
+  const saved = Number(data.result?.quotes_saved || 0);
+  const status = data.result?.status || data.state?.last_status || "success";
+  showToast(
+    status === "failed"
+      ? "Oro D'Oro non leggibile automaticamente. Ultimo dato valido mantenuto."
+      : status === "partial"
+        ? `Oro D'Oro aggiornato parzialmente. Quotazioni salvate: ${saved}.`
+        : `Oro D'Oro aggiornato. Quotazioni salvate: ${saved}.`,
+    status === "failed" || status === "partial" ? "warning" : "success"
+  );
+  await loadGoldPredictionPanel({ silent: true });
+}
+
 async function forceAmicoOroSync() {
   if (!isFounder()) return;
   showToast("Aggiornamento Amico Oro in esecuzione...", "success");
@@ -13910,6 +14046,7 @@ async function handleCompetitorAction(event) {
   const disable = event.target.closest("[data-disable-competitor-source]");
   const forceSync = event.target.closest("[data-force-competitor-sync]");
   const forceOroExpress = event.target.closest("[data-force-oro-express-sync]");
+  const forceOroDOro = event.target.closest("[data-force-oro-doro-sync]");
   const forceAmicoOro = event.target.closest("[data-force-amico-oro-sync]");
   const forceBancoPreziosi = event.target.closest("[data-force-banco-preziosi-sync]");
   const runAiExtract = event.target.closest("[data-run-ai-competitor-extract]");
@@ -13933,6 +14070,10 @@ async function handleCompetitorAction(event) {
   }
   if (forceOroExpress && isFounder()) {
     await forceOroExpressSync();
+    return;
+  }
+  if (forceOroDOro && isFounder()) {
+    await forceOroDOroSync();
     return;
   }
   if (forceAmicoOro && isFounder()) {
