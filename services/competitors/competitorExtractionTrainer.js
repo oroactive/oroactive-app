@@ -241,7 +241,8 @@ export function createCompetitorExtractionTrainer(options = {}) {
     fetchPage: options.fetchPage,
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    oroExpressExtractor: options.oroExpressExtractor || null
+    oroExpressExtractor: options.oroExpressExtractor || null,
+    amicoOroExtractor: options.amicoOroExtractor || null
   };
 
   async function fetchPublicPage(url = "") {
@@ -252,27 +253,46 @@ export function createCompetitorExtractionTrainer(options = {}) {
   }
 
   async function sourceSpecificQuotes(source = {}, rules = []) {
-    if (!config.oroExpressExtractor || String(source.name || "").toLowerCase() !== "oro express") return [];
-    const result = await config.oroExpressExtractor.extractOroExpressQuotes({
-      source_id: source.id,
-      sourceId: source.id,
-      url: rules[0]?.page_url || source.website_url
-    }).catch(() => ({ quotes: [] }));
-    return result.quotes || [];
+    const sourceName = String(source.name || "").toLowerCase();
+    if (config.oroExpressExtractor && sourceName === "oro express") {
+      const result = await config.oroExpressExtractor.extractOroExpressQuotes({
+        source_id: source.id,
+        sourceId: source.id,
+        url: rules[0]?.page_url || source.website_url
+      }).catch(() => ({ quotes: [] }));
+      return result.quotes || [];
+    }
+    if (config.amicoOroExtractor && sourceName === "amico oro") {
+      const result = await config.amicoOroExtractor.extractAmicoOroQuotes({
+        source_id: source.id,
+        sourceId: source.id,
+        url: rules[0]?.page_url || source.website_url
+      }).catch(() => ({ quotes: [] }));
+      return result.quotes || [];
+    }
+    return [];
+  }
+
+  function sourceSpecificMethod(source = {}) {
+    const sourceName = String(source.name || "").toLowerCase();
+    if (sourceName === "amico oro") return "guided_amico_oro_parser";
+    if (sourceName === "oro express") return "guided_oro_express_parser";
+    return "guided_specific_parser";
   }
 
   async function extractRule(rule = {}, source = {}, pageCache = new Map(), sourceQuotes = [], options = {}) {
     const specific = options.forceAi ? null : sourceSpecificQuoteForRule(rule, sourceQuotes);
     if (specific) {
+      const method = sourceSpecificMethod(source);
       return {
         rule,
         status: "found",
         value: Number(specific.price_per_gram || 0),
         unit: "EUR/g",
         evidence_text: specific.evidence_text || "",
-        method: "guided_oro_express_parser",
+        method,
         confidence: specific.ai_confidence || specific.confidence || "high",
-        quote: { ...specific, extraction_method: "guided_oro_express_parser" }
+        quote: { ...specific, extraction_method: method }
       };
     }
     const pageUrl = rule.page_url || source.website_url || "";

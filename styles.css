@@ -5285,7 +5285,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   font-weight: 900;
 }
 
-.oro-express-card {
+.oro-express-card,
+.amico-oro-card {
   display: grid;
   gap: 12px;
   margin: 0 0 14px;
@@ -5299,34 +5300,42 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 }
 
 .oro-express-card header,
-.oro-express-grid {
+.amico-oro-card header,
+.oro-express-grid,
+.amico-oro-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   align-items: center;
 }
 
-.oro-express-card header {
+.oro-express-card header,
+.amico-oro-card header {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .oro-express-card h5,
-.oro-express-card p {
+.oro-express-card p,
+.amico-oro-card h5,
+.amico-oro-card p {
   margin: 0;
 }
 
-.oro-express-card span {
+.oro-express-card span,
+.amico-oro-card span {
   color: rgba(255, 255, 255, 0.64);
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.oro-express-card strong {
+.oro-express-card strong,
+.amico-oro-card strong {
   color: #ffd700;
 }
 
-.oro-express-grid div {
+.oro-express-grid div,
+.amico-oro-grid div {
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -10404,7 +10413,9 @@ input.document-expired {
   .competitor-extraction-head,
   .competitor-auto-sync-card,
   .oro-express-card header,
+  .amico-oro-card header,
   .oro-express-grid,
+  .amico-oro-grid,
   .competitor-quote-form,
   .competitor-source-form,
   .competitor-csv-form,

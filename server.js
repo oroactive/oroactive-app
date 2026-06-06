@@ -15,6 +15,7 @@ import PDFDocument from "pdfkit";
 import pg from "pg";
 import { createAiCompetitorQuoteExtractor } from "./services/competitors/aiCompetitorQuoteExtractor.js";
 import { createCompetitorExtractionTrainer } from "./services/competitors/competitorExtractionTrainer.js";
+import { createAmicoOroExtractor } from "./services/competitors/extractors/amicoOroExtractor.js";
 import { createOroExpressExtractor } from "./services/competitors/extractors/oroExpressExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
 
@@ -66,6 +67,13 @@ const oroExpressUrl = process.env.ORO_EXPRESS_URL || "https://www.oro-express.it
 const oroExpressUsePlaywright = String(process.env.ORO_EXPRESS_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
 const oroExpressTimeoutMs = Math.min(Math.max(Number(process.env.ORO_EXPRESS_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const oroExpressSilverUsedMapping = String(process.env.ORO_EXPRESS_SILVER_USED_MAPPING || "generic").toLowerCase();
+const amicoOroAutoSyncEnabled = String(process.env.AMICO_ORO_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const amicoOroAutoSyncOnStartup = String(process.env.AMICO_ORO_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const amicoOroSyncIntervalMinutes = Math.max(60, Number(process.env.AMICO_ORO_SYNC_INTERVAL_MINUTES || 60));
+const amicoOroUrl = process.env.AMICO_ORO_URL || "https://www.amico-oro.it";
+const amicoOroUsePlaywright = String(process.env.AMICO_ORO_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const amicoOroUseAiVisionFallback = String(process.env.AMICO_ORO_USE_AI_VISION_FALLBACK || "true").toLowerCase() !== "false";
+const amicoOroTimeoutMs = Math.min(Math.max(Number(process.env.AMICO_ORO_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const competitorAiExtractionEnabled = String(process.env.AI_COMPETITOR_EXTRACTION_ENABLED || process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiAutoExtractionEnabled = String(process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiExtractionIntervalMinutes = Math.max(60, Number(process.env.AI_COMPETITOR_EXTRACTION_INTERVAL_MINUTES || process.env.COMPETITOR_AI_AUTO_EXTRACTION_INTERVAL_MINUTES || 360));
@@ -100,6 +108,15 @@ const competitorAiExtractionState = {
 };
 const oroExpressSyncState = {
   enabled: oroExpressAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: ""
+};
+const amicoOroSyncState = {
+  enabled: amicoOroAutoSyncEnabled,
   running: false,
   timer: null,
   lastRunAt: null,
@@ -283,11 +300,22 @@ const oroExpressExtractor = createOroExpressExtractor({
   silverUsedMapping: oroExpressSilverUsedMapping,
   maxTextChars: competitorAiMaxTextChars
 });
+const amicoOroExtractor = createAmicoOroExtractor({
+  openai,
+  model: competitorAiExtractionModel,
+  url: amicoOroUrl,
+  timeoutMs: amicoOroTimeoutMs,
+  userAgent: competitorAutoSyncUserAgent,
+  usePlaywright: amicoOroUsePlaywright,
+  useAiVisionFallback: amicoOroUseAiVisionFallback,
+  maxTextChars: competitorAiMaxTextChars
+});
 const competitorExtractionTrainer = createCompetitorExtractionTrainer({
   openai,
   model: competitorAiExtractionModel,
   fetchPage: fetchCompetitorPage,
-  oroExpressExtractor
+  oroExpressExtractor,
+  amicoOroExtractor
 });
 const aiRuntime = {
   pgvector: false,
@@ -2235,7 +2263,18 @@ const DEFAULT_COMPETITOR_SOURCES = [
     notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
   },
   { name: "Oro D'oro", website_url: "https://www.comproorodoro.it" },
-  { name: "Amico Oro", website_url: "https://www.amico-oro.it" },
+  {
+    name: "Amico Oro",
+    website_url: amicoOroUrl,
+    source_type: "amico_oro_parser",
+    sync_interval_minutes: amicoOroSyncIntervalMinutes,
+    extraction_config: {
+      method: "amico_oro_parser",
+      url: amicoOroUrl,
+      currency: "EUR"
+    },
+    notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
+  },
   { name: "Pronto Gold", website_url: "https://www.prontogold.com" },
   { name: "Banco Preziosi", website_url: "https://www.bancopreziosimilano.it" },
   { name: "Bordin", website_url: "https://www.orometallipreziosi.com" },
@@ -2334,16 +2373,19 @@ async function seedDefaultCompetitorSources() {
           SET website_url = COALESCE(NULLIF(website_url, ''), $2::text),
               source_type = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN $6::text
-                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser')
+                WHEN LOWER(name) = LOWER('Amico Oro') THEN $6::text
+                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'amico_oro_parser')
                  AND (notes IS NULL OR notes = '' OR notes ILIKE '%Competitor preconfigurato OroActive%') THEN $6::text
                 ELSE source_type
               END,
               auto_sync_enabled = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN true
+                WHEN LOWER(name) = LOWER('Amico Oro') THEN true
                 ELSE COALESCE(auto_sync_enabled, true)
               END,
               sync_interval_minutes = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN $3::int
+                WHEN LOWER(name) = LOWER('Amico Oro') THEN $3::int
                 ELSE COALESCE(sync_interval_minutes, $3::int)
               END,
               extraction_config = CASE
@@ -2430,6 +2472,48 @@ function defaultOroExpressExtractionRules(source = {}) {
   }));
 }
 
+function defaultAmicoOroExtractionRules(source = {}) {
+  const pageUrl = source.website_url || amicoOroUrl;
+  return [
+    {
+      field_key: "amico_oro_gold_24kt",
+      label: "24K al gr",
+      metal: "gold",
+      purity_code: "24kt",
+      purity_value: 1,
+      anchor_text: "24K al gr",
+      regex_pattern: "24K\\s*al\\s*gr\\s*=\\s*([0-9]+[,.]?[0-9]*)\\s*€"
+    },
+    {
+      field_key: "amico_oro_gold_18kt",
+      label: "18K al gr",
+      metal: "gold",
+      purity_code: "18kt",
+      purity_value: 0.75,
+      anchor_text: "18K al gr",
+      regex_pattern: "18K\\s*al\\s*gr\\s*=\\s*([0-9]+[,.]?[0-9]*)\\s*€"
+    },
+    {
+      field_key: "amico_oro_gold_14kt",
+      label: "14K al gr",
+      metal: "gold",
+      purity_code: "14kt",
+      purity_value: 14 / 24,
+      anchor_text: "14K al gr",
+      regex_pattern: "14K\\s*al\\s*gr\\s*=\\s*([0-9]+[,.]?[0-9]*)\\s*€"
+    }
+  ].map((rule) => ({
+    ...rule,
+    competitor_name: source.name || "Amico Oro",
+    source_id: source.id || null,
+    page_url: pageUrl,
+    unit: "EUR/g",
+    extraction_method: "anchor_regex",
+    required: true,
+    active: true
+  }));
+}
+
 function publicCompetitorExtractionRule(row = {}) {
   const metal = normalizePredictionMetal(row.metal || "gold");
   const purityCode = normalizePurityCode(row.purity_code || row.purityCode, metal);
@@ -2496,42 +2580,47 @@ function normalizeCompetitorExtractionRule(input = {}, source = {}) {
 }
 
 async function seedDefaultCompetitorExtractionRules() {
-  const source = await getOroExpressSource().catch(() => null);
-  if (!source?.id) return [];
   const inserted = [];
-  for (const rule of defaultOroExpressExtractionRules(source)) {
-    const result = await pool.query(
-      `INSERT INTO competitor_extraction_rules (
-        source_id, competitor_name, page_url, field_key, label, metal, purity_code, purity_value,
-        unit, anchor_text, css_selector, xpath_selector, regex_pattern, extraction_method,
-        required, active, created_at, updated_at
-      ) VALUES (
-        $1::bigint,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,$8::numeric,
-        $9::text,$10::text,$11::text,$12::text,$13::text,$14::text,
-        $15::boolean,$16::boolean,NOW(),NOW()
-      )
-      ON CONFLICT (source_id, field_key) DO NOTHING
-      RETURNING *`,
-      [
-        rule.source_id,
-        rule.competitor_name,
-        rule.page_url,
-        rule.field_key,
-        rule.label,
-        rule.metal,
-        rule.purity_code,
-        rule.purity_value,
-        rule.unit,
-        rule.anchor_text,
-        rule.css_selector || "",
-        rule.xpath_selector || "",
-        rule.regex_pattern,
-        rule.extraction_method,
-        rule.required,
-        rule.active
-      ]
-    );
-    if (result.rows[0]) inserted.push(publicCompetitorExtractionRule(result.rows[0]));
+  const ruleSets = [
+    { source: await getOroExpressSource().catch(() => null), rulesFor: defaultOroExpressExtractionRules },
+    { source: await getAmicoOroSource().catch(() => null), rulesFor: defaultAmicoOroExtractionRules }
+  ];
+  for (const { source, rulesFor } of ruleSets) {
+    if (!source?.id) continue;
+    for (const rule of rulesFor(source)) {
+      const result = await pool.query(
+        `INSERT INTO competitor_extraction_rules (
+          source_id, competitor_name, page_url, field_key, label, metal, purity_code, purity_value,
+          unit, anchor_text, css_selector, xpath_selector, regex_pattern, extraction_method,
+          required, active, created_at, updated_at
+        ) VALUES (
+          $1::bigint,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,$8::numeric,
+          $9::text,$10::text,$11::text,$12::text,$13::text,$14::text,
+          $15::boolean,$16::boolean,NOW(),NOW()
+        )
+        ON CONFLICT (source_id, field_key) DO NOTHING
+        RETURNING *`,
+        [
+          rule.source_id,
+          rule.competitor_name,
+          rule.page_url,
+          rule.field_key,
+          rule.label,
+          rule.metal,
+          rule.purity_code,
+          rule.purity_value,
+          rule.unit,
+          rule.anchor_text,
+          rule.css_selector || "",
+          rule.xpath_selector || "",
+          rule.regex_pattern,
+          rule.extraction_method,
+          rule.required,
+          rule.active
+        ]
+      );
+      if (result.rows[0]) inserted.push(publicCompetitorExtractionRule(result.rows[0]));
+    }
   }
   return inserted;
 }
@@ -2766,7 +2855,7 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
   const payload = {
     name: String(input.name || "").trim().slice(0, 120),
     website_url: String(input.website_url || input.websiteUrl || "").trim().slice(0, 500),
-    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
+    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "amico_oro_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
       ? String(input.source_type || input.sourceType || "manual").toLowerCase()
       : "manual",
     active: input.active !== false,
@@ -3308,6 +3397,19 @@ async function extractCompetitorQuotes(source = {}) {
     });
   }
 
+  if (method === "amico_oro_parser" || source.source_type === "amico_oro_parser" || source.name?.toLowerCase() === "amico oro") {
+    return amicoOroExtractor.extractAmicoOroQuotes({
+      source_id: source.id,
+      sourceId: source.id,
+      url: config.url || source.website_url || amicoOroUrl,
+      sourceUrl: config.url || source.website_url || amicoOroUrl,
+      timeoutMs: amicoOroTimeoutMs,
+      userAgent: competitorAutoSyncUserAgent,
+      usePlaywright: amicoOroUsePlaywright,
+      useAiVisionFallback: amicoOroUseAiVisionFallback
+    });
+  }
+
   if (method === "api" || source.source_type === "api") {
     const { body } = await fetchCompetitorPage(source.website_url);
     const data = JSON.parse(body);
@@ -3642,6 +3744,13 @@ async function getOroExpressSource() {
   return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
 }
 
+async function getAmicoOroSource() {
+  const result = await pool.query(
+    "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Amico Oro') LIMIT 1"
+  );
+  return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
+}
+
 async function runOroExpressHourlySync({ force = false, user = {}, req = null } = {}) {
   if (!oroExpressAutoSyncEnabled && !force) {
     return { ok: false, skipped: true, message: "Sync Oro Express disattivato.", state: oroExpressSyncPublicStatus() };
@@ -3707,6 +3816,90 @@ function startOroExpressHourlySync() {
   }, oroExpressSyncIntervalMinutes * 60 * 1000);
   oroExpressSyncState.timer.unref?.();
   return oroExpressSyncPublicStatus();
+}
+
+function amicoOroSyncPublicStatus() {
+  return {
+    enabled: amicoOroAutoSyncEnabled,
+    running: amicoOroSyncState.running,
+    interval_minutes: amicoOroSyncIntervalMinutes,
+    on_startup: amicoOroAutoSyncOnStartup,
+    url: amicoOroUrl,
+    use_playwright: amicoOroUsePlaywright,
+    use_ai_vision_fallback: amicoOroUseAiVisionFallback,
+    timeout_ms: amicoOroTimeoutMs,
+    last_run_at: amicoOroSyncState.lastRunAt,
+    next_run_at: amicoOroSyncState.nextRunAt,
+    last_status: amicoOroSyncState.lastStatus,
+    last_error: amicoOroSyncState.lastError
+  };
+}
+
+async function runAmicoOroHourlySync({ force = false, user = {}, req = null } = {}) {
+  if (!amicoOroAutoSyncEnabled && !force) {
+    return { ok: false, skipped: true, message: "Sync Amico Oro disattivato.", state: amicoOroSyncPublicStatus() };
+  }
+  if (amicoOroSyncState.running) {
+    return { ok: true, skipped: true, message: "Sync Amico Oro gia in corso.", state: amicoOroSyncPublicStatus() };
+  }
+  amicoOroSyncState.running = true;
+  amicoOroSyncState.lastRunAt = new Date().toISOString();
+  amicoOroSyncState.lastStatus = "running";
+  amicoOroSyncState.lastError = "";
+  try {
+    const source = await getAmicoOroSource();
+    if (!source?.id) throw new Error("Fonte Amico Oro non configurata");
+    const result = await syncSingleCompetitorSource(source, user, req, { force });
+    const summary = await calculateCompetitorMarketSummary().catch(() => null);
+    amicoOroSyncState.lastStatus = result.status || "success";
+    amicoOroSyncState.lastError = result.error || result.log?.error_message || "";
+    amicoOroSyncState.nextRunAt = new Date(Date.now() + amicoOroSyncIntervalMinutes * 60 * 1000).toISOString();
+    return {
+      ok: true,
+      result,
+      summary,
+      state: amicoOroSyncPublicStatus()
+    };
+  } catch (error) {
+    amicoOroSyncState.lastStatus = "failed";
+    amicoOroSyncState.lastError = error.message || "Sync Amico Oro non riuscito";
+    const source = await getAmicoOroSource().catch(() => null);
+    if (source?.id) {
+      await updateCompetitorSourceSyncStatus(
+        source.id,
+        "failed",
+        new Date().toISOString(),
+        amicoOroSyncState.lastError,
+        new Date(Date.now() + amicoOroSyncIntervalMinutes * 60 * 1000).toISOString()
+      ).catch(() => {});
+    }
+    throw error;
+  } finally {
+    amicoOroSyncState.running = false;
+  }
+}
+
+function startAmicoOroHourlySync() {
+  if (!amicoOroAutoSyncEnabled || amicoOroSyncState.timer) return amicoOroSyncPublicStatus();
+  amicoOroSyncState.nextRunAt = new Date(Date.now() + amicoOroSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (amicoOroAutoSyncOnStartup) {
+    setTimeout(() => {
+      runAmicoOroHourlySync({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        amicoOroSyncState.lastStatus = "failed";
+        amicoOroSyncState.lastError = error.message || "Sync startup Amico Oro fallito";
+        console.error("Errore sync Amico Oro", error);
+      });
+    }, 7000).unref?.();
+  }
+  amicoOroSyncState.timer = setInterval(() => {
+    runAmicoOroHourlySync({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      amicoOroSyncState.lastStatus = "failed";
+      amicoOroSyncState.lastError = error.message || "Sync Amico Oro fallito";
+      console.error("Errore sync Amico Oro", error);
+    });
+  }, amicoOroSyncIntervalMinutes * 60 * 1000);
+  amicoOroSyncState.timer.unref?.();
+  return amicoOroSyncPublicStatus();
 }
 
 async function updateCompetitorSourceAutoSync(id, input = {}, user = {}, req = null) {
@@ -18784,6 +18977,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       sources_failed: failedSources,
       valid_quotes_24h: Number(validQuotes.rows[0]?.count || 0),
       oro_express_status: oroExpressSyncPublicStatus(),
+      amico_oro_status: amicoOroSyncPublicStatus(),
       sources,
       recent_logs: logs
     });
@@ -18876,6 +19070,14 @@ app.get("/api/quotazioni/competitors/quotes/ai", async (request, response, next)
 app.post("/api/quotazioni/competitors/oro-express/sync", requireFounder, async (request, response, next) => {
   try {
     response.json(await runOroExpressHourlySync({ force: true, user: request.user, req: request }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/amico-oro/sync", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await runAmicoOroHourlySync({ force: true, user: request.user, req: request }));
   } catch (error) {
     next(error);
   }
@@ -20055,6 +20257,7 @@ initDatabase()
     scheduleBackups();
     startCompetitorAutoSync();
     startOroExpressHourlySync();
+    startAmicoOroHourlySync();
     startCompetitorAiAutoExtraction();
   })
   .catch((error) => {
