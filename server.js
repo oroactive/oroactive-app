@@ -22,6 +22,7 @@ import { createGoldStandardExtractor } from "./services/competitors/extractors/g
 import { createOroDOroExtractor } from "./services/competitors/extractors/oroDOroExtractor.js";
 import { createOroExpressExtractor } from "./services/competitors/extractors/oroExpressExtractor.js";
 import { createOroInEuroExtractor } from "./services/competitors/extractors/oroInEuroExtractor.js";
+import { createProntoGoldExtractor } from "./services/competitors/extractors/prontoGoldExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
 
 dotenv.config();
@@ -86,6 +87,14 @@ const amicoOroUrl = process.env.AMICO_ORO_URL || "https://www.amico-oro.it";
 const amicoOroUsePlaywright = String(process.env.AMICO_ORO_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
 const amicoOroUseAiVisionFallback = String(process.env.AMICO_ORO_USE_AI_VISION_FALLBACK || "true").toLowerCase() !== "false";
 const amicoOroTimeoutMs = Math.min(Math.max(Number(process.env.AMICO_ORO_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
+const prontoGoldAutoSyncEnabled = String(process.env.PRONTO_GOLD_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const prontoGoldAutoSyncOnStartup = String(process.env.PRONTO_GOLD_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const prontoGoldSyncIntervalMinutes = Math.max(60, Number(process.env.PRONTO_GOLD_SYNC_INTERVAL_MINUTES || 60));
+const prontoGoldUrl = process.env.PRONTO_GOLD_URL || "https://www.prontogold.com";
+const prontoGoldQuoteUrl = process.env.PRONTO_GOLD_QUOTE_URL || "https://www.prontogold.com/quotazioni";
+const prontoGoldUsePlaywright = String(process.env.PRONTO_GOLD_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const prontoGoldUseAiFallback = String(process.env.PRONTO_GOLD_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
+const prontoGoldTimeoutMs = Math.min(Math.max(Number(process.env.PRONTO_GOLD_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const bancoPreziosiAutoSyncEnabled = String(process.env.BANCO_PREZIOSI_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const bancoPreziosiAutoSyncOnStartup = String(process.env.BANCO_PREZIOSI_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const bancoPreziosiSyncIntervalMinutes = Math.max(60, Number(process.env.BANCO_PREZIOSI_SYNC_INTERVAL_MINUTES || 60));
@@ -167,6 +176,15 @@ const oroDOroSyncState = {
 };
 const amicoOroSyncState = {
   enabled: amicoOroAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: ""
+};
+const prontoGoldSyncState = {
+  enabled: prontoGoldAutoSyncEnabled,
   running: false,
   timer: null,
   lastRunAt: null,
@@ -406,6 +424,17 @@ const amicoOroExtractor = createAmicoOroExtractor({
   useAiVisionFallback: amicoOroUseAiVisionFallback,
   maxTextChars: competitorAiMaxTextChars
 });
+const prontoGoldExtractor = createProntoGoldExtractor({
+  openai,
+  model: competitorAiExtractionModel,
+  url: prontoGoldUrl,
+  quoteUrl: prontoGoldQuoteUrl,
+  timeoutMs: prontoGoldTimeoutMs,
+  userAgent: competitorAutoSyncUserAgent,
+  usePlaywright: prontoGoldUsePlaywright,
+  useAiFallback: prontoGoldUseAiFallback,
+  maxTextChars: competitorAiMaxTextChars
+});
 const bancoPreziosiExtractor = createBancoPreziosiExtractor({
   openai,
   model: competitorAiExtractionModel,
@@ -454,6 +483,7 @@ const competitorExtractionTrainer = createCompetitorExtractionTrainer({
   oroExpressExtractor,
   oroDOroExtractor,
   amicoOroExtractor,
+  prontoGoldExtractor,
   bancoPreziosiExtractor,
   bordinExtractor,
   goldStandardExtractor,
@@ -2428,7 +2458,19 @@ const DEFAULT_COMPETITOR_SOURCES = [
     },
     notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
   },
-  { name: "Pronto Gold", website_url: "https://www.prontogold.com" },
+  {
+    name: "Pronto Gold",
+    website_url: prontoGoldUrl,
+    source_type: "pronto_gold_parser",
+    sync_interval_minutes: prontoGoldSyncIntervalMinutes,
+    extraction_config: {
+      method: "pronto_gold_parser",
+      url: prontoGoldUrl,
+      quote_url: prontoGoldQuoteUrl,
+      currency: "EUR"
+    },
+    notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
+  },
   {
     name: "Banco Preziosi",
     website_url: bancoPreziosiUrl,
@@ -2574,11 +2616,12 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) = LOWER('Oro Express') THEN $6::text
                 WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN $6::text
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $6::text
+                WHEN LOWER(name) = LOWER('Pronto Gold') THEN $6::text
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $6::text
                 WHEN LOWER(name) = LOWER('Bordin') THEN $6::text
                 WHEN LOWER(name) = LOWER('Gold Standard') THEN $6::text
                 WHEN LOWER(name) = LOWER('Oro in Euro') THEN $6::text
-                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'oro_doro_parser', 'amico_oro_parser', 'banco_preziosi_parser', 'bordin_parser', 'gold_standard_parser', 'oro_in_euro_parser')
+                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'oro_doro_parser', 'amico_oro_parser', 'pronto_gold_parser', 'banco_preziosi_parser', 'bordin_parser', 'gold_standard_parser', 'oro_in_euro_parser')
                  AND (notes IS NULL OR notes = '' OR notes ILIKE '%Competitor preconfigurato OroActive%') THEN $6::text
                 ELSE source_type
               END,
@@ -2586,6 +2629,7 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) = LOWER('Oro Express') THEN true
                 WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN true
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN true
+                WHEN LOWER(name) = LOWER('Pronto Gold') THEN true
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN true
                 WHEN LOWER(name) = LOWER('Bordin') THEN true
                 WHEN LOWER(name) = LOWER('Gold Standard') THEN true
@@ -2596,6 +2640,7 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) = LOWER('Oro Express') THEN $3::int
                 WHEN LOWER(name) IN (LOWER('Oro D''Oro'), LOWER('Oro D''oro')) THEN $3::int
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $3::int
+                WHEN LOWER(name) = LOWER('Pronto Gold') THEN $3::int
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $3::int
                 WHEN LOWER(name) = LOWER('Bordin') THEN $3::int
                 WHEN LOWER(name) = LOWER('Gold Standard') THEN $3::int
@@ -2603,7 +2648,7 @@ async function seedDefaultCompetitorSources() {
                 ELSE COALESCE(sync_interval_minutes, $3::int)
               END,
               extraction_config = CASE
-                WHEN LOWER(name) IN (LOWER('Bordin'), LOWER('Gold Standard'), LOWER('Oro in Euro')) THEN COALESCE(extraction_config, '{}'::jsonb) || $4::jsonb
+                WHEN LOWER(name) IN (LOWER('Bordin'), LOWER('Gold Standard'), LOWER('Oro in Euro'), LOWER('Pronto Gold')) THEN COALESCE(extraction_config, '{}'::jsonb) || $4::jsonb
                 WHEN extraction_config IS NULL OR extraction_config = '{}'::jsonb THEN $4::jsonb
                 ELSE extraction_config
               END,
@@ -2631,6 +2676,7 @@ async function seedDefaultCompetitorSources() {
               LOWER('Oro D''Oro'),
               LOWER('Oro D''oro'),
               LOWER('Amico Oro'),
+              LOWER('Pronto Gold'),
               LOWER('Banco Preziosi'),
               LOWER('Bordin'),
               LOWER('Gold Standard'),
@@ -2769,6 +2815,40 @@ function defaultAmicoOroExtractionRules(source = {}) {
     page_url: pageUrl,
     unit: "EUR/g",
     extraction_method: "anchor_regex",
+    required: true,
+    active: true
+  }));
+}
+
+function defaultProntoGoldExtractionRules(source = {}) {
+  const pageUrl = source.extraction_config?.quote_url || source.extraction_config?.quoteUrl || prontoGoldQuoteUrl || source.website_url || prontoGoldUrl;
+  const rows = [
+    ["pronto_gold_reference_gold", "Valore dell'ORO sulle Borse internazionali", "gold", "24kt", 1, "Valore dell'ORO", "EUR/g", "Valore\\s+dell[’']ORO[\\s\\S]{0,160}?([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "reference_market_gold_price"],
+    ["pronto_gold_gold_24kt_buy", "ORO PURO 24k Acquisto", "gold", "24kt", 1, "ORO PURO 24k", "EUR/g", "ORO\\s+PURO\\s*24k[\\s\\S]{0,160}?Acquisto\\s*([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "customer_buyback"],
+    ["pronto_gold_gold_24kt_sell", "ORO PURO 24k Vendita", "gold", "24kt", 1, "ORO PURO 24k", "EUR/g", "ORO\\s+PURO\\s*24k[\\s\\S]{0,220}?Vendita\\s*([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "sell_price"],
+    ["pronto_gold_gold_18kt_range", "Compro ORO usato 18k da/a", "gold", "18kt", 0.75, "Compro ORO usato 18k", "EUR/g", "Compro\\s+ORO\\s+usato\\s*18k[\\s\\S]{0,160}?da\\s*([0-9]+[,.]?[0-9]*)[\\s\\S]{0,120}?a\\s*([0-9]+[,.]?[0-9]*)", "customer_buyback"],
+    ["pronto_gold_gold_14kt", "Compro ORO usato 14k", "gold", "14kt", 14 / 24, "Compro ORO usato 14k", "EUR/g", "Compro\\s+ORO\\s+usato\\s*14k[\\s\\S]{0,160}?Acquisto\\s*([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "customer_buyback"],
+    ["pronto_gold_gold_9kt", "Compro ORO usato 9k", "gold", "9kt", 9 / 24, "Compro ORO usato 9k", "EUR/g", "Compro\\s+ORO\\s+usato\\s*9k[\\s\\S]{0,160}?Acquisto\\s*([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "customer_buyback"],
+    ["pronto_gold_reference_silver", "Valore dell'ARGENTO sulle Borse internazionali", "silver", "999", 0.999, "Valore dell'ARGENTO", "EUR/g", "Valore\\s+dell[’']ARGENTO[\\s\\S]{0,160}?([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "reference_market_silver_price"],
+    ["pronto_gold_silver_999_buy", "ARGENTO PURO Acquisto", "silver", "999", 0.999, "ARGENTO PURO", "EUR/g", "ARGENTO\\s+PURO[\\s\\S]{0,160}?Acquisto\\s*([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "customer_buyback"],
+    ["pronto_gold_silver_999_sell", "ARGENTO PURO Vendita", "silver", "999", 0.999, "ARGENTO PURO", "EUR/g", "ARGENTO\\s+PURO[\\s\\S]{0,220}?Vendita\\s*([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "sell_price"],
+    ["pronto_gold_silver_925", "Compro ARGENTO usato 925", "silver", "925", 0.925, "Compro ARGENTO usato 925", "EUR/g", "Compro\\s+ARGENTO\\s+usato\\s*925[\\s\\S]{0,160}?Acquisto\\s*([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "customer_buyback"],
+    ["pronto_gold_silver_800", "Compro ARGENTO usato 800", "silver", "800", 0.8, "Compro ARGENTO usato 800", "EUR/g", "Compro\\s+ARGENTO\\s+usato\\s*800[\\s\\S]{0,160}?Acquisto\\s*([0-9]+[,.]?[0-9]*)\\s*(?:Euro|Eur|€)", "customer_buyback"]
+  ];
+  return rows.map(([field_key, label, metal, purity_code, purity_value, anchor_text, unit, regex_pattern, quote_type]) => ({
+    field_key,
+    label,
+    metal,
+    purity_code,
+    purity_value,
+    anchor_text,
+    regex_pattern,
+    competitor_name: source.name || "Pronto Gold",
+    source_id: source.id || null,
+    page_url: pageUrl,
+    unit,
+    extraction_method: "anchor_regex",
+    quote_type,
     required: true,
     active: true
   }));
@@ -3084,6 +3164,7 @@ async function seedDefaultCompetitorExtractionRules() {
     { source: await getOroExpressSource().catch(() => null), rulesFor: defaultOroExpressExtractionRules },
     { source: await getOroDOroSource().catch(() => null), rulesFor: defaultOroDOroExtractionRules },
     { source: await getAmicoOroSource().catch(() => null), rulesFor: defaultAmicoOroExtractionRules },
+    { source: await getProntoGoldSource().catch(() => null), rulesFor: defaultProntoGoldExtractionRules },
     { source: await getBancoPreziosiSource().catch(() => null), rulesFor: defaultBancoPreziosiExtractionRules },
     { source: await getBordinSource().catch(() => null), rulesFor: defaultBordinExtractionRules },
     { source: await getGoldStandardSource().catch(() => null), rulesFor: defaultGoldStandardExtractionRules },
@@ -3507,7 +3588,7 @@ async function insertCompetitorQuote(input = {}, user = {}) {
     ? { id: input.source_id || input.sourceId }
     : await ensureCompetitorSourceForQuote(input, user);
   const quoteDate = input.quote_date || input.quoteDate || new Date().toISOString();
-  const quoteType = ["customer_buyback", "reference_official_gold_price", "reference_market_gold_price", "reference_market_silver_price", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
+  const quoteType = ["customer_buyback", "reference_official_gold_price", "reference_market_gold_price", "reference_market_silver_price", "sell_price", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
     ? String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase()
     : "unknown";
   const aiConfidence = String(input.ai_confidence || input.aiConfidence || input.confidence || "medium").toLowerCase().slice(0, 20);
@@ -3928,6 +4009,20 @@ async function extractCompetitorQuotes(source = {}) {
     });
   }
 
+  if (method === "pronto_gold_parser" || source.source_type === "pronto_gold_parser" || source.name?.toLowerCase() === "pronto gold") {
+    return prontoGoldExtractor.extractProntoGoldQuotes({
+      source_id: source.id,
+      sourceId: source.id,
+      url: config.url || source.website_url || prontoGoldUrl,
+      quoteUrl: config.quote_url || config.quoteUrl || prontoGoldQuoteUrl,
+      sourceUrl: config.quote_url || config.quoteUrl || prontoGoldQuoteUrl,
+      timeoutMs: prontoGoldTimeoutMs,
+      userAgent: competitorAutoSyncUserAgent,
+      usePlaywright: prontoGoldUsePlaywright,
+      useAiFallback: prontoGoldUseAiFallback
+    });
+  }
+
   if (method === "banco_preziosi_parser" || source.source_type === "banco_preziosi_parser" || source.name?.toLowerCase() === "banco preziosi") {
     return bancoPreziosiExtractor.extractBancoPreziosiQuotes({
       source_id: source.id,
@@ -4330,6 +4425,13 @@ async function getAmicoOroSource() {
   return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
 }
 
+async function getProntoGoldSource() {
+  const result = await pool.query(
+    "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Pronto Gold') LIMIT 1"
+  );
+  return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
+}
+
 async function getBancoPreziosiSource() {
   const result = await pool.query(
     "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Banco Preziosi') LIMIT 1"
@@ -4591,6 +4693,91 @@ function startAmicoOroHourlySync() {
   }, amicoOroSyncIntervalMinutes * 60 * 1000);
   amicoOroSyncState.timer.unref?.();
   return amicoOroSyncPublicStatus();
+}
+
+function prontoGoldSyncPublicStatus() {
+  return {
+    enabled: prontoGoldAutoSyncEnabled,
+    running: prontoGoldSyncState.running,
+    interval_minutes: prontoGoldSyncIntervalMinutes,
+    on_startup: prontoGoldAutoSyncOnStartup,
+    url: prontoGoldUrl,
+    quote_url: prontoGoldQuoteUrl,
+    use_playwright: prontoGoldUsePlaywright,
+    use_ai_fallback: prontoGoldUseAiFallback,
+    timeout_ms: prontoGoldTimeoutMs,
+    last_run_at: prontoGoldSyncState.lastRunAt,
+    next_run_at: prontoGoldSyncState.nextRunAt,
+    last_status: prontoGoldSyncState.lastStatus,
+    last_error: prontoGoldSyncState.lastError
+  };
+}
+
+async function runProntoGoldHourlySync({ force = false, user = {}, req = null } = {}) {
+  if (!prontoGoldAutoSyncEnabled && !force) {
+    return { ok: false, skipped: true, message: "Sync Pronto Gold disattivato.", state: prontoGoldSyncPublicStatus() };
+  }
+  if (prontoGoldSyncState.running) {
+    return { ok: true, skipped: true, message: "Sync Pronto Gold gia in corso.", state: prontoGoldSyncPublicStatus() };
+  }
+  prontoGoldSyncState.running = true;
+  prontoGoldSyncState.lastRunAt = new Date().toISOString();
+  prontoGoldSyncState.lastStatus = "running";
+  prontoGoldSyncState.lastError = "";
+  try {
+    const source = await getProntoGoldSource();
+    if (!source?.id) throw new Error("Fonte Pronto Gold non configurata");
+    const result = await syncSingleCompetitorSource(source, user, req, { force });
+    const summary = await calculateCompetitorMarketSummary().catch(() => null);
+    prontoGoldSyncState.lastStatus = result.status || "success";
+    prontoGoldSyncState.lastError = result.error || result.log?.error_message || "";
+    prontoGoldSyncState.nextRunAt = new Date(Date.now() + prontoGoldSyncIntervalMinutes * 60 * 1000).toISOString();
+    return {
+      ok: true,
+      result,
+      summary,
+      state: prontoGoldSyncPublicStatus()
+    };
+  } catch (error) {
+    prontoGoldSyncState.lastStatus = "failed";
+    prontoGoldSyncState.lastError = error.message || "Sync Pronto Gold non riuscito";
+    const source = await getProntoGoldSource().catch(() => null);
+    if (source?.id) {
+      await updateCompetitorSourceSyncStatus(
+        source.id,
+        "failed",
+        new Date().toISOString(),
+        prontoGoldSyncState.lastError,
+        new Date(Date.now() + prontoGoldSyncIntervalMinutes * 60 * 1000).toISOString()
+      ).catch(() => {});
+    }
+    throw error;
+  } finally {
+    prontoGoldSyncState.running = false;
+  }
+}
+
+function startProntoGoldHourlySync() {
+  if (!prontoGoldAutoSyncEnabled || prontoGoldSyncState.timer) return prontoGoldSyncPublicStatus();
+  prontoGoldSyncState.nextRunAt = new Date(Date.now() + prontoGoldSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (prontoGoldAutoSyncOnStartup) {
+    setTimeout(() => {
+      runProntoGoldHourlySync({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        prontoGoldSyncState.lastStatus = "failed";
+        prontoGoldSyncState.lastError = error.message || "Sync startup Pronto Gold fallito";
+        console.error("Errore sync Pronto Gold", error);
+      });
+    }, 7500).unref?.();
+  }
+  prontoGoldSyncState.timer = setInterval(() => {
+    runProntoGoldHourlySync({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      prontoGoldSyncState.lastStatus = "failed";
+      prontoGoldSyncState.lastError = error.message || "Sync Pronto Gold fallito";
+      console.error("Errore sync Pronto Gold", error);
+    });
+  }, prontoGoldSyncIntervalMinutes * 60 * 1000);
+  prontoGoldSyncState.timer.unref?.();
+  return prontoGoldSyncPublicStatus();
 }
 
 function bancoPreziosiSyncPublicStatus() {
@@ -20007,6 +20194,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       oro_express_status: oroExpressSyncPublicStatus(),
       oro_doro_status: oroDOroSyncPublicStatus(),
       amico_oro_status: amicoOroSyncPublicStatus(),
+      pronto_gold_status: prontoGoldSyncPublicStatus(),
       banco_preziosi_status: bancoPreziosiSyncPublicStatus(),
       bordin_status: bordinSyncPublicStatus(),
       gold_standard_status: goldStandardSyncPublicStatus(),
@@ -20119,6 +20307,14 @@ app.post("/api/quotazioni/competitors/oro-doro/sync", requireFounder, async (req
 app.post("/api/quotazioni/competitors/amico-oro/sync", requireFounder, async (request, response, next) => {
   try {
     response.json(await runAmicoOroHourlySync({ force: true, user: request.user, req: request }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/pronto-gold/sync", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await runProntoGoldHourlySync({ force: true, user: request.user, req: request }));
   } catch (error) {
     next(error);
   }
@@ -21332,6 +21528,7 @@ initDatabase()
     startOroExpressHourlySync();
     startOroDOroHourlySync();
     startAmicoOroHourlySync();
+    startProntoGoldHourlySync();
     startBancoPreziosiHourlySync();
     startBordinHourlySync();
     startGoldStandardHourlySync();

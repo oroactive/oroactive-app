@@ -217,7 +217,7 @@ function quoteFromResult(rule = {}, result = {}, source = {}) {
     confidence: result.confidence || "medium",
     ai_confidence: result.ai_extracted ? result.confidence || "medium" : result.confidence || "high",
     ai_extracted: Boolean(result.ai_extracted),
-    quote_type: "customer_buyback",
+    quote_type: rule.quote_type || rule.quoteType || "customer_buyback",
     evidence_text: result.evidence_text || "",
     url: rule.page_url || source.website_url || "",
     source_url: rule.page_url || source.website_url || "",
@@ -239,7 +239,8 @@ function sourceSpecificQuoteForRule(rule = {}, sourceQuotes = []) {
       quote.raw_payload?.banco_preziosi_key,
       quote.raw_payload?.bordin_key,
       quote.raw_payload?.gold_standard_key,
-      quote.raw_payload?.oro_in_euro_key
+      quote.raw_payload?.oro_in_euro_key,
+      quote.raw_payload?.pronto_gold_key
     ].filter(Boolean).some((key) => String(key) === String(rule.field_key))
   ));
   if (byFieldKey) return byFieldKey;
@@ -260,7 +261,8 @@ export function createCompetitorExtractionTrainer(options = {}) {
     bancoPreziosiExtractor: options.bancoPreziosiExtractor || null,
     bordinExtractor: options.bordinExtractor || null,
     goldStandardExtractor: options.goldStandardExtractor || null,
-    oroInEuroExtractor: options.oroInEuroExtractor || null
+    oroInEuroExtractor: options.oroInEuroExtractor || null,
+    prontoGoldExtractor: options.prontoGoldExtractor || null
   };
 
   async function fetchPublicPage(url = "") {
@@ -329,6 +331,15 @@ export function createCompetitorExtractionTrainer(options = {}) {
       }).catch(() => ({ quotes: [] }));
       return result.quotes || [];
     }
+    if (config.prontoGoldExtractor && sourceName === "pronto gold") {
+      const result = await config.prontoGoldExtractor.extractProntoGoldQuotes({
+        source_id: source.id,
+        sourceId: source.id,
+        url: source.website_url,
+        quoteUrl: rules.find((rule) => /quotazioni/i.test(rule.page_url || ""))?.page_url || rules[0]?.page_url || source.website_url
+      }).catch(() => ({ quotes: [] }));
+      return result.quotes || [];
+    }
     return [];
   }
 
@@ -338,6 +349,7 @@ export function createCompetitorExtractionTrainer(options = {}) {
     if (sourceName === "bordin") return "guided_bordin_parser";
     if (sourceName === "gold standard") return "guided_gold_standard_parser";
     if (sourceName === "oro in euro") return "guided_oro_in_euro_parser";
+    if (sourceName === "pronto gold") return "guided_pronto_gold_parser";
     if (sourceName === "amico oro") return "guided_amico_oro_parser";
     if (sourceName === "oro d'oro") return "guided_oro_doro_parser";
     if (sourceName === "oro express") return "guided_oro_express_parser";
