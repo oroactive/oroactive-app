@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260606-oro-express-hourly-1">
+  <link rel="stylesheet" href="styles.css?v=20260606-extraction-trainer-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -987,6 +987,11 @@
                 <button class="ghost-button" type="submit">Importa CSV</button>
               </form>
             </div>
+            <details class="competitor-extraction-trainer founder-only" id="competitorExtractionTrainerPanel">
+              <summary>Configura estrazione</summary>
+              <p>Definisci pagina, anchor, selettore o regex per guidare il backend e l'AI. Se un dato non viene trovato, OroActive lo marca come non rilevato e non inventa prezzi.</p>
+              <div id="competitorExtractionTrainerList"></div>
+            </details>
             <div class="competitor-quotes-list" id="competitorQuotesList">Nessun competitor configurato. Inserisci prezzi manuali o importa CSV per il confronto.</div>
           </article>
           <article class="gold-prediction-card">
@@ -1851,6 +1856,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260606-oro-express-hourly-1"></script>
+  <script src="app.js?v=20260606-extraction-trainer-1"></script>
 </body>
 </html>

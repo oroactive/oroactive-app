@@ -14,6 +14,7 @@ import OpenAI from "openai";
 import PDFDocument from "pdfkit";
 import pg from "pg";
 import { createAiCompetitorQuoteExtractor } from "./services/competitors/aiCompetitorQuoteExtractor.js";
+import { createCompetitorExtractionTrainer } from "./services/competitors/competitorExtractionTrainer.js";
 import { createOroExpressExtractor } from "./services/competitors/extractors/oroExpressExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
 
@@ -281,6 +282,12 @@ const oroExpressExtractor = createOroExpressExtractor({
   usePlaywright: oroExpressUsePlaywright,
   silverUsedMapping: oroExpressSilverUsedMapping,
   maxTextChars: competitorAiMaxTextChars
+});
+const competitorExtractionTrainer = createCompetitorExtractionTrainer({
+  openai,
+  model: competitorAiExtractionModel,
+  fetchPage: fetchCompetitorPage,
+  oroExpressExtractor
 });
 const aiRuntime = {
   pgvector: false,
@@ -2372,6 +2379,384 @@ async function seedDefaultCompetitorSources() {
   }
 }
 
+function defaultOroExpressExtractionRules(source = {}) {
+  const pageUrl = source.website_url || oroExpressUrl;
+  return [
+    {
+      field_key: "gold_24kt",
+      label: "Oro puro",
+      metal: "gold",
+      purity_code: "24kt",
+      purity_value: 1,
+      anchor_text: "oro puro",
+      regex_pattern: "oro\\s+puro[\\s\\S]{0,180}?([0-9]+[,.]?[0-9]*)\\s*€\\s*/\\s*gr"
+    },
+    {
+      field_key: "gold_18kt",
+      label: "Oro usato",
+      metal: "gold",
+      purity_code: "18kt",
+      purity_value: 0.75,
+      anchor_text: "oro usato",
+      regex_pattern: "oro\\s+usato[\\s\\S]{0,180}?([0-9]+[,.]?[0-9]*)\\s*€\\s*/\\s*gr"
+    },
+    {
+      field_key: "silver_999",
+      label: "Argento puro",
+      metal: "silver",
+      purity_code: "999",
+      purity_value: 0.999,
+      anchor_text: "argento puro",
+      regex_pattern: "argento\\s+puro[\\s\\S]{0,180}?([0-9]+[,.]?[0-9]*)\\s*€\\s*/\\s*gr"
+    },
+    {
+      field_key: "silver_used_generic",
+      label: "Argento usato",
+      metal: "silver",
+      purity_code: "used_generic",
+      purity_value: null,
+      anchor_text: "argento usato",
+      regex_pattern: "argento\\s+usato[\\s\\S]{0,180}?([0-9]+[,.]?[0-9]*)\\s*€\\s*/\\s*gr"
+    }
+  ].map((rule) => ({
+    ...rule,
+    competitor_name: source.name || "Oro Express",
+    source_id: source.id || null,
+    page_url: pageUrl,
+    unit: "EUR/g",
+    extraction_method: "anchor_regex",
+    required: true,
+    active: true
+  }));
+}
+
+function publicCompetitorExtractionRule(row = {}) {
+  const metal = normalizePredictionMetal(row.metal || "gold");
+  const purityCode = normalizePurityCode(row.purity_code || row.purityCode, metal);
+  return {
+    id: row.id || null,
+    source_id: row.source_id || row.sourceId || null,
+    competitor_name: row.competitor_name || row.competitorName || "",
+    page_url: row.page_url || row.pageUrl || "",
+    field_key: row.field_key || row.fieldKey || "",
+    label: row.label || "",
+    metal,
+    purity_code: purityCode,
+    purity_value: row.purity_value === null || row.purity_value === undefined || row.purityValue === null
+      ? null
+      : Number(row.purity_value ?? row.purityValue),
+    unit: row.unit || "EUR/g",
+    anchor_text: row.anchor_text || row.anchorText || "",
+    css_selector: row.css_selector || row.cssSelector || "",
+    xpath_selector: row.xpath_selector || row.xpathSelector || "",
+    regex_pattern: row.regex_pattern || row.regexPattern || "",
+    extraction_method: row.extraction_method || row.extractionMethod || "anchor_regex",
+    required: row.required !== false,
+    active: row.active !== false,
+    last_test_status: row.last_test_status || row.lastTestStatus || "not_tested",
+    last_test_value: row.last_test_value === null || row.last_test_value === undefined ? null : Number(row.last_test_value),
+    last_test_evidence: row.last_test_evidence || "",
+    last_test_at: row.last_test_at || null,
+    last_verified_by: row.last_verified_by || null,
+    last_verified_at: row.last_verified_at || null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null
+  };
+}
+
+function normalizeCompetitorExtractionRule(input = {}, source = {}) {
+  const metal = normalizePredictionMetal(input.metal || "gold");
+  const purityCode = normalizePurityCode(input.purity_code || input.purityCode || "", metal);
+  const rawPurity = input.purity_value ?? input.purityValue;
+  const purityValue = rawPurity === "" || rawPurity === null || rawPurity === undefined
+    ? (purityCode === "used_generic" ? null : purityValueForCode(metal, purityCode))
+    : Number(rawPurity);
+  const fieldKey = String(input.field_key || input.fieldKey || `${metal}_${purityCode}`).trim().toLowerCase().replace(/[^a-z0-9_:-]+/g, "_").slice(0, 80);
+  return {
+    id: input.id || null,
+    source_id: source.id || input.source_id || input.sourceId || null,
+    competitor_name: String(input.competitor_name || input.competitorName || source.name || "").trim().slice(0, 160),
+    page_url: String(input.page_url || input.pageUrl || source.website_url || "").trim().slice(0, 800),
+    field_key: fieldKey,
+    label: String(input.label || fieldKey).trim().slice(0, 120),
+    metal,
+    purity_code: purityCode,
+    purity_value: Number.isFinite(purityValue) ? purityValue : null,
+    unit: String(input.unit || "EUR/g").trim().slice(0, 20) || "EUR/g",
+    anchor_text: String(input.anchor_text || input.anchorText || "").trim().slice(0, 250),
+    css_selector: String(input.css_selector || input.cssSelector || "").trim().slice(0, 300),
+    xpath_selector: String(input.xpath_selector || input.xpathSelector || "").trim().slice(0, 500),
+    regex_pattern: String(input.regex_pattern || input.regexPattern || "").trim().slice(0, 900),
+    extraction_method: ["css_selector", "xpath_selector", "anchor_regex", "ai_guided_fallback"].includes(String(input.extraction_method || input.extractionMethod || "anchor_regex").toLowerCase())
+      ? String(input.extraction_method || input.extractionMethod || "anchor_regex").toLowerCase()
+      : "anchor_regex",
+    required: input.required !== false,
+    active: input.active !== false
+  };
+}
+
+async function seedDefaultCompetitorExtractionRules() {
+  const source = await getOroExpressSource().catch(() => null);
+  if (!source?.id) return [];
+  const inserted = [];
+  for (const rule of defaultOroExpressExtractionRules(source)) {
+    const result = await pool.query(
+      `INSERT INTO competitor_extraction_rules (
+        source_id, competitor_name, page_url, field_key, label, metal, purity_code, purity_value,
+        unit, anchor_text, css_selector, xpath_selector, regex_pattern, extraction_method,
+        required, active, created_at, updated_at
+      ) VALUES (
+        $1::bigint,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,$8::numeric,
+        $9::text,$10::text,$11::text,$12::text,$13::text,$14::text,
+        $15::boolean,$16::boolean,NOW(),NOW()
+      )
+      ON CONFLICT (source_id, field_key) DO NOTHING
+      RETURNING *`,
+      [
+        rule.source_id,
+        rule.competitor_name,
+        rule.page_url,
+        rule.field_key,
+        rule.label,
+        rule.metal,
+        rule.purity_code,
+        rule.purity_value,
+        rule.unit,
+        rule.anchor_text,
+        rule.css_selector || "",
+        rule.xpath_selector || "",
+        rule.regex_pattern,
+        rule.extraction_method,
+        rule.required,
+        rule.active
+      ]
+    );
+    if (result.rows[0]) inserted.push(publicCompetitorExtractionRule(result.rows[0]));
+  }
+  return inserted;
+}
+
+async function listCompetitorExtractionRules({ sourceId = null, competitorName = "", activeOnly = false } = {}) {
+  const conditions = [];
+  const params = [];
+  if (sourceId) {
+    params.push(sourceId);
+    conditions.push(`source_id = $${params.length}::bigint`);
+  }
+  if (competitorName) {
+    params.push(String(competitorName));
+    conditions.push(`LOWER(competitor_name) = LOWER($${params.length}::text)`);
+  }
+  if (activeOnly) conditions.push("active = true");
+  const result = await pool.query(
+    `SELECT *
+       FROM competitor_extraction_rules
+      ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY competitor_name ASC, source_id ASC, field_key ASC`,
+    params
+  );
+  return result.rows.map(publicCompetitorExtractionRule);
+}
+
+async function saveCompetitorExtractionRules(sourceId, rules = [], user = {}, req = null) {
+  const source = publicCompetitorSource((await pool.query("SELECT * FROM competitor_quote_sources WHERE id = $1::bigint LIMIT 1", [sourceId])).rows[0] || {});
+  if (!source.id) throw new Error("Fonte competitor non trovata");
+  const saved = [];
+  for (const input of Array.isArray(rules) ? rules : []) {
+    const rule = normalizeCompetitorExtractionRule(input, source);
+    if (!rule.field_key || !rule.page_url) continue;
+    const params = [
+      rule.source_id,
+      rule.competitor_name,
+      rule.page_url,
+      rule.field_key,
+      rule.label,
+      rule.metal,
+      rule.purity_code,
+      rule.purity_value,
+      rule.unit,
+      rule.anchor_text,
+      rule.css_selector,
+      rule.xpath_selector,
+      rule.regex_pattern,
+      rule.extraction_method,
+      rule.required,
+      rule.active,
+      user?.id || null
+    ];
+    let result = null;
+    if (rule.id) {
+      result = await pool.query(
+        `UPDATE competitor_extraction_rules
+            SET competitor_name = $2::text,
+                page_url = $3::text,
+                field_key = $4::text,
+                label = $5::text,
+                metal = $6::text,
+                purity_code = $7::text,
+                purity_value = $8::numeric,
+                unit = $9::text,
+                anchor_text = $10::text,
+                css_selector = $11::text,
+                xpath_selector = $12::text,
+                regex_pattern = $13::text,
+                extraction_method = $14::text,
+                required = $15::boolean,
+                active = $16::boolean,
+                last_verified_by = $17::bigint,
+                last_verified_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $18::bigint
+            AND source_id = $1::bigint
+          RETURNING *`,
+        [...params, rule.id]
+      );
+    }
+    if (!result?.rows[0]) {
+      result = await pool.query(
+        `INSERT INTO competitor_extraction_rules (
+          source_id, competitor_name, page_url, field_key, label, metal, purity_code, purity_value,
+          unit, anchor_text, css_selector, xpath_selector, regex_pattern, extraction_method,
+          required, active, last_verified_by, last_verified_at, created_at, updated_at
+        ) VALUES (
+          $1::bigint,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,$8::numeric,
+          $9::text,$10::text,$11::text,$12::text,$13::text,$14::text,
+          $15::boolean,$16::boolean,$17::bigint,NOW(),NOW(),NOW()
+        )
+        ON CONFLICT (source_id, field_key) DO UPDATE
+          SET competitor_name = EXCLUDED.competitor_name,
+              page_url = EXCLUDED.page_url,
+              label = EXCLUDED.label,
+              metal = EXCLUDED.metal,
+              purity_code = EXCLUDED.purity_code,
+              purity_value = EXCLUDED.purity_value,
+              unit = EXCLUDED.unit,
+              anchor_text = EXCLUDED.anchor_text,
+              css_selector = EXCLUDED.css_selector,
+              xpath_selector = EXCLUDED.xpath_selector,
+              regex_pattern = EXCLUDED.regex_pattern,
+              extraction_method = EXCLUDED.extraction_method,
+              required = EXCLUDED.required,
+              active = EXCLUDED.active,
+              last_verified_by = EXCLUDED.last_verified_by,
+              last_verified_at = NOW(),
+              updated_at = NOW()
+        RETURNING *`,
+        params
+      );
+    }
+    saved.push(publicCompetitorExtractionRule(result.rows[0]));
+  }
+  if (saved.length) {
+    await pool.query(
+      `UPDATE competitor_quote_sources
+          SET source_type = CASE
+                WHEN source_type IN ('manual', 'csv_import') THEN 'configured_page'
+                ELSE source_type
+              END,
+              auto_sync_enabled = true,
+              next_sync_at = COALESCE(next_sync_at, NOW()),
+              updated_at = NOW()
+        WHERE id = $1::bigint`,
+      [source.id]
+    );
+  }
+  void writeAuditLog({
+    req,
+    user,
+    action: "competitor_extraction_rules_updated",
+    entityType: "competitor_quote_source",
+    entityId: source.id,
+    entityLabel: source.name,
+    afterData: { rules: saved.length }
+  });
+  return saved;
+}
+
+async function saveExtractionTestResult(rule = {}, result = {}) {
+  if (!rule?.id) return null;
+  const status = result.status || "not_found";
+  const value = result.value === null || result.value === undefined ? null : Number(result.value);
+  const update = await pool.query(
+    `UPDATE competitor_extraction_rules
+        SET last_test_status = $1::text,
+            last_test_value = $2::numeric,
+            last_test_evidence = $3::text,
+            last_test_at = NOW(),
+            updated_at = NOW()
+      WHERE id = $4::bigint
+      RETURNING *`,
+    [
+      String(status).slice(0, 80),
+      Number.isFinite(value) ? value : null,
+      String(result.evidence_text || result.error || "").slice(0, 1200),
+      rule.id
+    ]
+  );
+  return update.rows[0] ? publicCompetitorExtractionRule(update.rows[0]) : null;
+}
+
+function publicExtractionTestResult(result = {}) {
+  return {
+    rule: publicCompetitorExtractionRule(result.rule || {}),
+    status: result.status || "not_found",
+    value: result.value === null || result.value === undefined ? null : Number(result.value || 0),
+    unit: result.unit || "EUR/g",
+    evidence_text: result.evidence_text || "",
+    method: result.method || "",
+    confidence: result.confidence || "low",
+    error: result.error || ""
+  };
+}
+
+async function testCompetitorExtractionForSource(sourceId, user = {}, req = null, options = {}) {
+  const source = publicCompetitorSource((await pool.query("SELECT * FROM competitor_quote_sources WHERE id = $1::bigint LIMIT 1", [sourceId])).rows[0] || {});
+  if (!source.id) throw new Error("Fonte competitor non trovata");
+  const rules = await listCompetitorExtractionRules({ sourceId: source.id, activeOnly: true });
+  const result = await competitorExtractionTrainer.testCompetitorExtraction(source, rules, {
+    forceAi: Boolean(options.forceAi)
+  });
+  for (const item of result.results || []) {
+    await saveExtractionTestResult(item.rule, item).catch(() => null);
+  }
+  const saveResult = options.saveQuotes === false
+    ? { saved: [], errors: [] }
+    : await saveCompetitorQuotes(result.quotes || [], user);
+  const status = saveResult.saved.length
+    ? (result.status === "failed" ? "partial" : result.status)
+    : result.status;
+  const errorMessage = [result.error, ...saveResult.errors].filter(Boolean).join(" | ").slice(0, 1200);
+  await updateCompetitorSourceSyncStatus(
+    source.id,
+    status === "not_configured" ? "manual_required" : status,
+    new Date().toISOString(),
+    errorMessage,
+    nextCompetitorSyncDate(source)
+  ).catch(() => {});
+  void writeAuditLog({
+    req,
+    user,
+    action: options.forceAi ? "competitor_extraction_ai_assisted_test" : "competitor_extraction_test",
+    entityType: "competitor_quote_source",
+    entityId: source.id,
+    entityLabel: source.name,
+    afterData: { status, quotes_saved: saveResult.saved.length, rules_tested: result.results?.length || 0 }
+  });
+  return {
+    ok: true,
+    source: { ...source, last_sync_status: status, last_sync_error: errorMessage },
+    status,
+    results: (result.results || []).map(publicExtractionTestResult),
+    quotes_found: result.quotes?.length || 0,
+    quotes_saved: saveResult.saved.length,
+    saved_quotes: saveResult.saved,
+    errors: saveResult.errors,
+    message: saveResult.saved.length
+      ? `Estrazione completata. Quotazioni salvate: ${saveResult.saved.length}.`
+      : "Dato non rilevato: controlla anchor, selettore o regex."
+  };
+}
+
 async function listCompetitorSources() {
   const result = await pool.query("SELECT * FROM competitor_quote_sources ORDER BY active DESC, name ASC");
   return result.rows.map(publicCompetitorSource);
@@ -2896,6 +3281,20 @@ async function extractCompetitorQuotes(source = {}) {
   if (!source.auto_sync_enabled || method === "manual_fallback" || source.source_type === "manual" || source.source_type === "csv_import") {
     return { quotes: [], status: "disabled", error: "Fonte non configurata per aggiornamento automatico." };
   }
+  const guidedRules = await listCompetitorExtractionRules({ sourceId: source.id, activeOnly: true }).catch(() => []);
+  if (guidedRules.length) {
+    const trained = await competitorExtractionTrainer.testCompetitorExtraction(source, guidedRules);
+    for (const result of trained.results || []) {
+      await saveExtractionTestResult(result.rule, result).catch(() => null);
+    }
+    return {
+      quotes: trained.quotes || [],
+      status: trained.status === "success" ? "success" : (trained.quotes?.length ? "partial" : "failed"),
+      error: trained.error || (trained.quotes?.length ? "" : "Dato non rilevato. Configura anchor, selettore o regex."),
+      extraction_method: "guided_extraction_rules",
+      rule_results: (trained.results || []).map(publicExtractionTestResult)
+    };
+  }
   if (method === "oro_express_parser" || source.source_type === "oro_express_parser" || source.name?.toLowerCase() === "oro express") {
     return oroExpressExtractor.extractOroExpressQuotes({
       source_id: source.id,
@@ -3042,7 +3441,17 @@ async function syncSingleCompetitorSource(sourceIdOrSource, user = {}, req = nul
       quotes_found: extracted.quotes?.length || 0,
       quotes_saved: saveResult.saved.length,
       error_message: errorMessage,
-      metadata: { forced: Boolean(options.force), next_sync_at: nextSyncAt }
+      metadata: {
+        forced: Boolean(options.force),
+        next_sync_at: nextSyncAt,
+        extraction_method: extracted.extraction_method || source.source_type || "",
+        rules_tested: extracted.rule_results?.length || 0,
+        rule_statuses: (extracted.rule_results || []).map((item) => ({
+          field_key: item.rule?.field_key || "",
+          status: item.status,
+          value: item.value || null
+        }))
+      }
     });
     void writeAuditLog({
       req,
@@ -5655,7 +6064,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const client = openai;
     const result = await client.responses.create({
       model: openaiModel,
-      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor e motivo per cui non superare il massimo pagabile. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.`}
+      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.`}
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Usa prima il libro "La bilancia d'oro" di Christian Dinato, poi le procedure/conoscenze OroActive approvate.
 Le conoscenze OroActive approvate possono essere piu recenti e operative del libro: se sono piu dettagliate, integrale alla risposta senza ignorarle.
@@ -6190,6 +6599,7 @@ async function initDatabase() {
   await bootstrapAdminUser();
   await bootstrapPrivacyPolicy();
   await seedDefaultCompetitorSources();
+  await seedDefaultCompetitorExtractionRules();
 }
 
 function backupTimestamp(date = new Date()) {
@@ -18224,9 +18634,89 @@ app.get("/api/quotazioni/competitors/sources", async (_request, response, next) 
   }
 });
 
+app.get("/api/quotazioni/competitors/extraction-rules", requireFounder, async (request, response, next) => {
+  try {
+    response.json({
+      ok: true,
+      rules: await listCompetitorExtractionRules({
+        sourceId: request.query.source_id || request.query.sourceId || null,
+        competitorName: request.query.competitor_name || request.query.competitorName || "",
+        activeOnly: request.query.active_only === "true" || request.query.activeOnly === "true"
+      })
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/extraction-rules/:id/test", requireFounder, async (request, response, next) => {
+  try {
+    const rule = publicCompetitorExtractionRule((await pool.query(
+      "SELECT * FROM competitor_extraction_rules WHERE id = $1::bigint LIMIT 1",
+      [request.params.id]
+    )).rows[0] || {});
+    if (!rule.id) return response.status(404).json({ ok: false, error: "Regola estrazione non trovata" });
+    const source = publicCompetitorSource((await pool.query(
+      "SELECT * FROM competitor_quote_sources WHERE id = $1::bigint LIMIT 1",
+      [rule.source_id]
+    )).rows[0] || {});
+    if (!source.id) return response.status(404).json({ ok: false, error: "Fonte competitor non trovata" });
+    const result = await competitorExtractionTrainer.testCompetitorExtraction(source, [rule], {
+      forceAi: request.body?.force_ai === true || request.body?.forceAi === true
+    });
+    for (const item of result.results || []) await saveExtractionTestResult(item.rule, item).catch(() => null);
+    const saveResult = request.body?.save_quotes === false || request.body?.saveQuotes === false
+      ? { saved: [], errors: [] }
+      : await saveCompetitorQuotes(result.quotes || [], request.user);
+    response.json({
+      ok: true,
+      status: result.status,
+      result: publicExtractionTestResult(result.results?.[0] || {}),
+      quotes_saved: saveResult.saved.length,
+      errors: saveResult.errors || []
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/quotazioni/competitors/sources", requireFounder, async (request, response, next) => {
   try {
     response.json({ ok: true, source: await saveCompetitorSource(request.body || {}, request.user), message: "Fonte competitor salvata." });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/quotazioni/competitors/sources/:id/extraction-rules", requireFounder, async (request, response, next) => {
+  try {
+    response.json({
+      ok: true,
+      rules: await saveCompetitorExtractionRules(request.params.id, request.body?.rules || [], request.user, request),
+      message: "Regole di estrazione salvate."
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/sources/:id/extraction-test", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await testCompetitorExtractionForSource(request.params.id, request.user, request, {
+      saveQuotes: request.body?.save_quotes !== false && request.body?.saveQuotes !== false,
+      forceAi: false
+    }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/sources/:id/extraction-ai-assisted", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await testCompetitorExtractionForSource(request.params.id, request.user, request, {
+      saveQuotes: request.body?.save_quotes !== false && request.body?.saveQuotes !== false,
+      forceAi: true
+    }));
   } catch (error) {
     next(error);
   }

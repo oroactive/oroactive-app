@@ -2110,6 +2110,41 @@ CREATE INDEX IF NOT EXISTS idx_competitor_quotes_date
 CREATE INDEX IF NOT EXISTS idx_competitor_quotes_ai_valid
   ON competitor_buyback_quotes(ai_extracted, quote_type, ai_confidence);
 
+CREATE TABLE IF NOT EXISTS competitor_extraction_rules (
+  id BIGSERIAL PRIMARY KEY,
+  source_id BIGINT NULL REFERENCES competitor_quote_sources(id) ON DELETE SET NULL,
+  competitor_name TEXT NOT NULL,
+  page_url TEXT NOT NULL,
+  field_key TEXT NOT NULL,
+  label TEXT NOT NULL,
+  metal TEXT NOT NULL,
+  purity_code TEXT NOT NULL,
+  purity_value NUMERIC(10,6),
+  unit TEXT DEFAULT 'EUR/g',
+  anchor_text TEXT,
+  css_selector TEXT,
+  xpath_selector TEXT,
+  regex_pattern TEXT,
+  extraction_method TEXT DEFAULT 'anchor_regex',
+  required BOOLEAN DEFAULT true,
+  active BOOLEAN DEFAULT true,
+  last_test_status TEXT DEFAULT 'not_tested',
+  last_test_value NUMERIC(18,6) NULL,
+  last_test_evidence TEXT NULL,
+  last_test_at TIMESTAMPTZ NULL,
+  last_verified_by BIGINT NULL,
+  last_verified_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(source_id, field_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_competitor_extraction_rules_source_id
+  ON competitor_extraction_rules(source_id);
+
+CREATE INDEX IF NOT EXISTS idx_competitor_extraction_rules_competitor
+  ON competitor_extraction_rules(competitor_name);
+
 CREATE TABLE IF NOT EXISTS competitor_quote_sync_logs (
   id BIGSERIAL PRIMARY KEY,
   source_id BIGINT NULL REFERENCES competitor_quote_sources(id) ON DELETE SET NULL,

@@ -5070,6 +5070,139 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   font-size: 24px;
 }
 
+.competitor-extraction-trainer {
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid rgba(255, 184, 76, 0.24);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.competitor-extraction-trainer summary {
+  cursor: pointer;
+  color: #ffd700;
+  font-weight: 1000;
+}
+
+.competitor-extraction-trainer > p {
+  margin: 10px 0 14px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.competitor-extraction-source {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 106, 0, 0.1), rgba(255, 215, 0, 0.04)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.competitor-extraction-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.competitor-extraction-head h5,
+.competitor-extraction-head p {
+  margin: 0;
+}
+
+.competitor-extraction-head p,
+.competitor-extraction-head a {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.competitor-extraction-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.competitor-extraction-table {
+  min-width: 1780px;
+}
+
+.competitor-extraction-table input,
+.competitor-extraction-table select,
+.competitor-extraction-table textarea {
+  width: 100%;
+  min-width: 110px;
+  border: 1px solid rgba(255, 106, 0, 0.24);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.34);
+  color: #ffffff;
+  padding: 8px 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.competitor-extraction-table textarea {
+  min-width: 260px;
+  resize: vertical;
+}
+
+.competitor-extraction-table input[type="checkbox"] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  accent-color: #ff8a00;
+}
+
+.extraction-result-list {
+  display: grid;
+  gap: 8px;
+}
+
+.extraction-result {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.extraction-result strong {
+  color: #ffffff;
+}
+
+.extraction-result span {
+  color: #ffd7a3;
+  font-weight: 900;
+}
+
+.extraction-result small {
+  grid-column: 1 / -1;
+  color: rgba(255, 255, 255, 0.68);
+  overflow-wrap: anywhere;
+}
+
+.extraction-result.found,
+.extraction-result.success {
+  border-color: rgba(34, 197, 94, 0.32);
+}
+
+.extraction-result.not_found,
+.extraction-result.failed,
+.extraction-result.error {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
 .competitor-auto-sync-card {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -10268,6 +10401,7 @@ input.document-expired {
   .buyback-simulator-form,
   .buyback-simulator-output,
   .competitor-tools,
+  .competitor-extraction-head,
   .competitor-auto-sync-card,
   .oro-express-card header,
   .oro-express-grid,
@@ -10276,6 +10410,19 @@ input.document-expired {
   .competitor-csv-form,
   .buyback-policy-grid,
   .buyback-policy-row {
+    grid-template-columns: 1fr;
+  }
+
+  .competitor-extraction-actions {
+    justify-content: stretch;
+  }
+
+  .competitor-extraction-actions button,
+  .extraction-result {
+    width: 100%;
+  }
+
+  .extraction-result {
     grid-template-columns: 1fr;
   }
 

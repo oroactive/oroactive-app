@@ -47,6 +47,8 @@ const state = {
   competitorQuotes: [],
   competitorAiStatus: null,
   competitorAiQuotes: [],
+  competitorExtractionRules: [],
+  competitorExtractionResults: {},
   competitorStats: {},
   buybackSimulationContext: null,
   lastActCaptureAttachments: [],
@@ -773,6 +775,7 @@ const competitorSourceForm = document.getElementById("competitorSourceForm");
 const competitorQuoteForm = document.getElementById("competitorQuoteForm");
 const competitorCsvForm = document.getElementById("competitorCsvForm");
 const competitorQuotesList = document.getElementById("competitorQuotesList");
+const competitorExtractionTrainerList = document.getElementById("competitorExtractionTrainerList");
 const profileCard = document.getElementById("profileCard");
 const practiceTopbar = document.getElementById("practiceTopbar");
 const loginScreen = document.getElementById("loginScreen");
@@ -12449,6 +12452,10 @@ function buildGeneralPriceExplanationContext() {
     competitor_ai_quotes_saved: Number(state.competitorAiStatus?.latest_run?.quotes_saved || 0),
     competitor_ai_quotes_24h: Number(state.competitorAiStatus?.quotes_24h || state.competitorAiQuotes?.length || 0),
     competitor_ai_last_error: state.competitorAiStatus?.status?.last_error || state.competitorAiStatus?.latest_run?.error_message || "",
+    competitor_extraction_rules_total: Number(state.competitorExtractionRules?.length || 0),
+    competitor_extraction_rules_found: Number((state.competitorExtractionRules || []).filter((rule) => String(rule.last_test_status || "").toLowerCase() === "found").length),
+    competitor_extraction_rules_not_found: Number((state.competitorExtractionRules || []).filter((rule) => ["not_found", "failed", "error"].includes(String(rule.last_test_status || "").toLowerCase())).length),
+    competitor_extraction_sources_configured: Number(new Set((state.competitorExtractionRules || []).map((rule) => rule.source_id).filter(Boolean)).size),
     oro_express_quotes: (state.competitorQuotes || [])
       .filter((quote) => quote.competitor_name === "Oro Express")
       .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
@@ -12552,6 +12559,9 @@ function generateGeneralPriceExplanation(context = {}) {
   const competitorAi = context.competitor_ai_last_run_at
     ? `Analisi AI competitor: ultimo run ${formatDateTime(context.competitor_ai_last_run_at)}${context.competitor_ai_next_run_at ? `, prossimo run ${formatDateTime(context.competitor_ai_next_run_at)}` : ""}. Pagine analizzate: ${context.competitor_ai_pages_analyzed || 0}; quotazioni AI recenti: ${context.competitor_ai_quotes_24h || 0}; fonti fallite o senza dati: ${context.competitor_ai_sources_failed || 0}.`
     : `Analisi AI competitor: ${context.competitor_ai_enabled ? "attiva, ma senza un run completato disponibile" : "non disponibile o disattiva"}${context.competitor_ai_openai_configured ? "" : " e modello AI backend non configurato"}.`;
+  const extractionRules = Number(context.competitor_extraction_rules_total || 0)
+    ? `Trainer estrazione: ${context.competitor_extraction_rules_total} regole configurate su ${context.competitor_extraction_sources_configured || 0} fonti; ${context.competitor_extraction_rules_found || 0} rilevate negli ultimi test e ${context.competitor_extraction_rules_not_found || 0} non rilevate o da correggere.`
+    : "Trainer estrazione: nessuna regola guidata configurata; il Founder puo aggiungerla nella tab Configura estrazione.";
   return `Spiegazione generale Analisi Predittiva Metalli
 
 Scenario attivo
@@ -12564,7 +12574,7 @@ Argento
 Per l'argento il riferimento operativo è ${silver.purity_code || "925"}: valore teorico ${formatAurumGram(silver.theoretical_value_per_gram, silver.currency)}, massimo pagabile ${formatAurumGram(silver.max_payable_per_gram, silver.currency)}, consigliato ${formatAurumGram(silver.recommended_payable_per_gram, silver.currency)}. ${trendExplanation(silver)}
 
 Competitor e fonti
-${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${competitorSync} ${competitorAi} ${context.competitor_sync_last_error ? `Ultimo errore sync: ${context.competitor_sync_last_error}.` : ""} ${context.competitor_ai_last_error ? `Ultimo errore AI: ${context.competitor_ai_last_error}.` : ""} ${context.warning ? `Nota dati: ${context.warning}` : ""}
+${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${competitorSync} ${competitorAi} ${extractionRules} ${context.competitor_sync_last_error ? `Ultimo errore sync: ${context.competitor_sync_last_error}.` : ""} ${context.competitor_ai_last_error ? `Ultimo errore AI: ${context.competitor_ai_last_error}.` : ""} ${context.warning ? `Nota dati: ${context.warning}` : ""}
 ${context.oro_express_quotes?.length ? `Oro Express rilevato: ${context.oro_express_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Oro Express non ha ancora quotazioni recenti salvate nel confronto."}
 
 Avviso finale
@@ -12906,6 +12916,173 @@ function renderGoldPredictionExplanation() {
   `;
 }
 
+function defaultExtractionRulesForSource(source = {}) {
+  if (String(source.name || "").toLowerCase() === "oro express") {
+    const pageUrl = source.website_url || "https://www.oro-express.it";
+    return [
+      ["gold_24kt", "Oro puro", "gold", "24kt", "1", "oro puro", "oro\\s+puro[\\s\\S]{0,180}?([0-9]+[,.]?[0-9]*)\\s*€\\s*/\\s*gr"],
+      ["gold_18kt", "Oro usato", "gold", "18kt", "0.75", "oro usato", "oro\\s+usato[\\s\\S]{0,180}?([0-9]+[,.]?[0-9]*)\\s*€\\s*/\\s*gr"],
+      ["silver_999", "Argento puro", "silver", "999", "0.999", "argento puro", "argento\\s+puro[\\s\\S]{0,180}?([0-9]+[,.]?[0-9]*)\\s*€\\s*/\\s*gr"],
+      ["silver_used_generic", "Argento usato", "silver", "used_generic", "", "argento usato", "argento\\s+usato[\\s\\S]{0,180}?([0-9]+[,.]?[0-9]*)\\s*€\\s*/\\s*gr"]
+    ].map(([field_key, label, metal, purity_code, purity_value, anchor_text, regex_pattern]) => ({
+      source_id: source.id,
+      competitor_name: source.name || "Oro Express",
+      page_url: pageUrl,
+      field_key,
+      label,
+      metal,
+      purity_code,
+      purity_value,
+      unit: "EUR/g",
+      anchor_text,
+      regex_pattern,
+      extraction_method: "anchor_regex",
+      required: true,
+      active: true,
+      last_test_status: "not_tested"
+    }));
+  }
+  return [{
+    source_id: source.id,
+    competitor_name: source.name || "",
+    page_url: source.website_url || "",
+    field_key: "gold_18kt",
+    label: "Oro 18kt",
+    metal: "gold",
+    purity_code: "18kt",
+    purity_value: "0.75",
+    unit: "EUR/g",
+    anchor_text: "",
+    css_selector: "",
+    xpath_selector: "",
+    regex_pattern: "",
+    extraction_method: "anchor_regex",
+    required: true,
+    active: true,
+    last_test_status: "not_configured"
+  }];
+}
+
+function extractionRulesForSource(source = {}) {
+  const rules = (state.competitorExtractionRules || []).filter((rule) => String(rule.source_id) === String(source.id));
+  return rules.length ? rules : defaultExtractionRulesForSource(source);
+}
+
+function extractionTestResultsForSource(sourceId) {
+  const direct = state.competitorExtractionResults?.[sourceId]?.results || [];
+  if (direct.length) return direct;
+  return (state.competitorExtractionRules || [])
+    .filter((rule) => String(rule.source_id) === String(sourceId) && rule.last_test_status && rule.last_test_status !== "not_tested")
+    .map((rule) => ({
+      rule,
+      status: rule.last_test_status,
+      value: rule.last_test_value,
+      evidence_text: rule.last_test_evidence,
+      method: rule.extraction_method,
+      confidence: "medium"
+    }));
+}
+
+function extractionStatusLabel(status = "") {
+  const normalized = String(status || "").toLowerCase();
+  if (["found", "success"].includes(normalized)) return "Rilevato";
+  if (["partial", "da_verificare"].includes(normalized)) return "Da verificare";
+  if (["not_found", "failed"].includes(normalized)) return "Non rilevato";
+  if (normalized === "not_configured") return "Da configurare";
+  if (normalized === "error") return "Errore";
+  return "Non testato";
+}
+
+function extractionResultListHtml(sourceId) {
+  const results = extractionTestResultsForSource(sourceId);
+  if (!results.length) return '<div class="empty-state">Nessun test eseguito. Usa “Testa estrazione” per verificare le regole.</div>';
+  return `
+    <div class="extraction-result-list">
+      ${results.map((result) => `
+        <div class="extraction-result ${escapeHtml(String(result.status || "not_tested").toLowerCase())}">
+          <strong>${escapeHtml(result.rule?.label || result.rule?.field_key || "Regola")}</strong>
+          <span>${escapeHtml(extractionStatusLabel(result.status))}</span>
+          <span>${result.value ? escapeHtml(formatGoldPerGram(result.value, "EUR")) : "Dato non rilevato"}</span>
+          <small>${escapeHtml(result.evidence_text || result.error || "Nessuna prova testuale disponibile")}</small>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderCompetitorExtractionTrainer() {
+  if (!competitorExtractionTrainerList) return;
+  if (!isFounder()) {
+    competitorExtractionTrainerList.innerHTML = "";
+    return;
+  }
+  const sources = state.competitorSources || [];
+  if (!sources.length) {
+    competitorExtractionTrainerList.innerHTML = '<div class="empty-state">Nessuna fonte competitor configurata.</div>';
+    return;
+  }
+  competitorExtractionTrainerList.innerHTML = sources.map((source) => {
+    const rules = extractionRulesForSource(source);
+    return `
+      <section class="competitor-extraction-source" data-extraction-source-id="${escapeHtml(source.id)}">
+        <div class="competitor-extraction-head">
+          <div>
+            <h5>${escapeHtml(source.name)}</h5>
+            <p>${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">${escapeHtml(source.website_url)}</a>` : "URL non configurato"}</p>
+          </div>
+          <div class="competitor-extraction-actions">
+            <button class="small-button" type="button" data-test-extraction-source="${escapeHtml(source.id)}">Testa estrazione</button>
+            <button class="small-button" type="button" data-ai-assisted-extraction="${escapeHtml(source.id)}">Esegui analisi AI assistita</button>
+            <button class="primary-button small-button" type="button" data-save-extraction-rules="${escapeHtml(source.id)}">Salva regole</button>
+          </div>
+        </div>
+        <div class="competitor-table-wrap">
+          <table class="competitor-table competitor-extraction-table">
+            <thead>
+              <tr>
+                <th>Attiva</th>
+                <th>Campo</th>
+                <th>Label</th>
+                <th>Pagina quotazioni</th>
+                <th>Metallo</th>
+                <th>Caratura/Titolo</th>
+                <th>Purezza</th>
+                <th>Anchor</th>
+                <th>CSS</th>
+                <th>XPath</th>
+                <th>Regex</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rules.map((rule) => `
+                <tr class="extraction-rule-row" data-rule-id="${escapeHtml(rule.id || "")}">
+                  <td><input data-rule-field="active" type="checkbox" ${rule.active !== false ? "checked" : ""} aria-label="Regola attiva"></td>
+                  <td><input data-rule-field="field_key" value="${escapeHtml(rule.field_key || "")}" placeholder="gold_18kt"></td>
+                  <td><input data-rule-field="label" value="${escapeHtml(rule.label || "")}" placeholder="Oro 18kt"></td>
+                  <td><input data-rule-field="page_url" type="url" value="${escapeHtml(rule.page_url || source.website_url || "")}" placeholder="https://..."></td>
+                  <td>
+                    <select data-rule-field="metal">
+                      <option value="gold" ${rule.metal === "gold" ? "selected" : ""}>Oro</option>
+                      <option value="silver" ${rule.metal === "silver" ? "selected" : ""}>Argento</option>
+                    </select>
+                  </td>
+                  <td><input data-rule-field="purity_code" value="${escapeHtml(rule.purity_code || "")}" placeholder="18kt / 925"></td>
+                  <td><input data-rule-field="purity_value" type="number" step="0.001" min="0" max="1" value="${rule.purity_value ?? ""}" placeholder="0.75"></td>
+                  <td><input data-rule-field="anchor_text" value="${escapeHtml(rule.anchor_text || "")}" placeholder="oro usato"></td>
+                  <td><input data-rule-field="css_selector" value="${escapeHtml(rule.css_selector || "")}" placeholder=".price-18kt"></td>
+                  <td><input data-rule-field="xpath_selector" value="${escapeHtml(rule.xpath_selector || "")}" placeholder="//div[contains(@class,'price')]"></td>
+                  <td><textarea data-rule-field="regex_pattern" rows="2" placeholder="oro\\s+usato...">${escapeHtml(rule.regex_pattern || "")}</textarea></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+        ${extractionResultListHtml(source.id)}
+      </section>
+    `;
+  }).join("");
+}
+
 function renderCompetitorQuotes() {
   if (!competitorQuotesList) return;
   const quotes = state.competitorQuotes || [];
@@ -13029,6 +13206,7 @@ function renderCompetitorQuotes() {
     ${quoteTable}
     <p class="gold-prediction-disclaimer">Le quotazioni competitor sono rilevate automaticamente da fonti configurate, analisi AI backend o ultimo dato disponibile. L'AI usa solo pagine pubbliche e quote con prova testuale: se non trova dati, non inventa prezzi. Verificare sempre la fonte prima di decisioni operative rilevanti.</p>
   `;
+  renderCompetitorExtractionTrainer();
 }
 
 function renderGoldPredictionSettings() {
@@ -13098,7 +13276,7 @@ async function loadGoldPredictionPanel(options = {}) {
     const statusData = await apiRequest("/quotazioni/metals/status");
     const currency = encodeURIComponent(statusData.settings?.currency || "EUR");
     const scenario = state.buybackScenario || "standard";
-    const [historyData, latestData, policyData, buybackData, competitorData, competitorSourcesData, competitorSyncData, competitorMarketData, competitorAiStatusData, competitorAiQuotesData] = await Promise.all([
+    const [historyData, latestData, policyData, buybackData, competitorData, competitorSourcesData, competitorSyncData, competitorMarketData, competitorAiStatusData, competitorAiQuotesData, competitorExtractionRulesData] = await Promise.all([
       apiRequest(`/quotazioni/metals/history?metals=gold,silver&days=30&currency=${currency}`),
       apiRequest(`/quotazioni/metals/predictions/latest?metals=gold,silver&currency=${currency}`),
       apiRequest("/quotazioni/buyback-policy"),
@@ -13111,7 +13289,8 @@ async function loadGoldPredictionPanel(options = {}) {
       apiRequest("/quotazioni/competitors/sync-status").catch(() => null),
       apiRequest(`/quotazioni/competitors/market-summary?currency=${currency}`).catch(() => null),
       apiRequest("/quotazioni/competitors/ai-extract/status").catch(() => null),
-      apiRequest(`/quotazioni/competitors/quotes/ai?days=30&currency=${currency}`).catch(() => ({ quotes: [] }))
+      apiRequest(`/quotazioni/competitors/quotes/ai?days=30&currency=${currency}`).catch(() => ({ quotes: [] })),
+      isFounder() ? apiRequest("/quotazioni/competitors/extraction-rules").catch(() => ({ rules: [] })) : Promise.resolve({ rules: [] })
     ]);
     state.goldPredictionStatus = {
       ...statusData,
@@ -13131,6 +13310,7 @@ async function loadGoldPredictionPanel(options = {}) {
     state.competitorMarketSummary = competitorMarketData?.summary || null;
     state.competitorAiStatus = competitorAiStatusData || null;
     state.competitorAiQuotes = competitorAiQuotesData.quotes || [];
+    state.competitorExtractionRules = competitorExtractionRulesData.rules || [];
     state.goldPredictionSettings = statusData.settings || null;
     if (isFounder()) {
       const settingsData = await apiRequest("/quotazioni/gold-prediction/settings").catch(() => null);
@@ -13388,6 +13568,78 @@ async function toggleCompetitorAutoSync(sourceId, nextAutoSync) {
   await loadGoldPredictionPanel({ silent: true });
 }
 
+function collectExtractionRulesForSource(sourceId) {
+  const container = competitorExtractionTrainerList?.querySelector(`[data-extraction-source-id="${cssEscape(String(sourceId))}"]`);
+  if (!container) return [];
+  const source = (state.competitorSources || []).find((item) => String(item.id) === String(sourceId)) || {};
+  return [...container.querySelectorAll(".extraction-rule-row")].map((row) => {
+    const field = (name) => row.querySelector(`[data-rule-field="${name}"]`);
+    const value = (name) => field(name)?.value?.trim() || "";
+    const purityValue = value("purity_value");
+    return {
+      id: row.dataset.ruleId || null,
+      source_id: sourceId,
+      competitor_name: source.name || "",
+      active: field("active")?.checked !== false,
+      field_key: value("field_key"),
+      label: value("label"),
+      page_url: value("page_url") || source.website_url || "",
+      metal: value("metal") || "gold",
+      purity_code: value("purity_code"),
+      purity_value: purityValue === "" ? null : Number(purityValue),
+      unit: "EUR/g",
+      anchor_text: value("anchor_text"),
+      css_selector: value("css_selector"),
+      xpath_selector: value("xpath_selector"),
+      regex_pattern: value("regex_pattern"),
+      extraction_method: value("css_selector")
+        ? "css_selector"
+        : value("xpath_selector")
+          ? "xpath_selector"
+          : "anchor_regex",
+      required: true
+    };
+  }).filter((rule) => rule.field_key && rule.page_url);
+}
+
+async function saveExtractionRules(sourceId) {
+  if (!isFounder() || !sourceId) return;
+  const rules = collectExtractionRulesForSource(sourceId);
+  if (!rules.length) {
+    showToast("Configura almeno una regola con campo e URL pagina.", "warning");
+    return;
+  }
+  const data = await apiRequest(`/quotazioni/competitors/sources/${encodeURIComponent(sourceId)}/extraction-rules`, {
+    method: "PUT",
+    body: JSON.stringify({ rules })
+  });
+  const otherRules = (state.competitorExtractionRules || []).filter((rule) => String(rule.source_id) !== String(sourceId));
+  state.competitorExtractionRules = [...otherRules, ...(data.rules || [])];
+  renderCompetitorExtractionTrainer();
+  showToast(data.message || "Regole di estrazione salvate.", "success");
+}
+
+async function testExtractionSource(sourceId, options = {}) {
+  if (!isFounder() || !sourceId) return;
+  const endpoint = options.forceAi ? "extraction-ai-assisted" : "extraction-test";
+  const data = await apiRequest(`/quotazioni/competitors/sources/${encodeURIComponent(sourceId)}/${endpoint}`, {
+    method: "POST",
+    body: JSON.stringify({ save_quotes: true }),
+    timeoutMs: options.forceAi ? 180000 : 90000
+  });
+  state.competitorExtractionResults = {
+    ...(state.competitorExtractionResults || {}),
+    [sourceId]: data
+  };
+  showToast(
+    data.quotes_saved
+      ? `Estrazione completata. Quotazioni salvate: ${data.quotes_saved}.`
+      : data.message || "Dato non rilevato: controlla anchor, selettore o regex.",
+    data.quotes_saved ? "success" : "warning"
+  );
+  await loadGoldPredictionPanel({ silent: true });
+}
+
 async function handleCompetitorAction(event) {
   const fill = event.target.closest("[data-fill-competitor-source]");
   const disable = event.target.closest("[data-disable-competitor-source]");
@@ -13395,6 +13647,9 @@ async function handleCompetitorAction(event) {
   const forceOroExpress = event.target.closest("[data-force-oro-express-sync]");
   const runAiExtract = event.target.closest("[data-run-ai-competitor-extract]");
   const toggleAutoSync = event.target.closest("[data-toggle-competitor-auto-sync]");
+  const saveRules = event.target.closest("[data-save-extraction-rules]");
+  const testRules = event.target.closest("[data-test-extraction-source]");
+  const aiAssistedRules = event.target.closest("[data-ai-assisted-extraction]");
   if (fill) {
     const source = (state.competitorSources || []).find((item) => String(item.id) === String(fill.dataset.fillCompetitorSource));
     if (source && competitorQuoteForm) {
@@ -13419,6 +13674,18 @@ async function handleCompetitorAction(event) {
   }
   if (toggleAutoSync && isFounder()) {
     await toggleCompetitorAutoSync(toggleAutoSync.dataset.toggleCompetitorAutoSync, toggleAutoSync.dataset.nextAutoSync);
+    return;
+  }
+  if (saveRules && isFounder()) {
+    await withButtonBusy(saveRules, "Salvo...", () => saveExtractionRules(saveRules.dataset.saveExtractionRules));
+    return;
+  }
+  if (testRules && isFounder()) {
+    await withButtonBusy(testRules, "Testo...", () => testExtractionSource(testRules.dataset.testExtractionSource));
+    return;
+  }
+  if (aiAssistedRules && isFounder()) {
+    await withButtonBusy(aiAssistedRules, "Analizzo...", () => testExtractionSource(aiAssistedRules.dataset.aiAssistedExtraction, { forceAi: true }));
     return;
   }
   if (disable && isFounder()) {
@@ -15013,6 +15280,9 @@ competitorCsvForm?.addEventListener("submit", (event) => {
   withButtonBusy(event.submitter || competitorCsvForm.querySelector('button[type="submit"]'), "Importo...", () => importCompetitorCsv(event));
 });
 competitorQuotesList?.addEventListener("click", (event) => {
+  void handleCompetitorAction(event);
+});
+competitorExtractionTrainerList?.addEventListener("click", (event) => {
   void handleCompetitorAction(event);
 });
 goldPredictionSettingsForm?.addEventListener("submit", (event) => {
