@@ -12158,6 +12158,7 @@ function competitorSourceTypeLabel(type = "") {
   if (normalized === "banco_preziosi_parser") return "Parser Banco Preziosi";
   if (normalized === "bordin_parser") return "Parser Bordin";
   if (normalized === "gold_standard_parser") return "Parser Gold Standard";
+  if (normalized === "oro_in_euro_parser") return "Parser Oro in Euro";
   if (normalized === "configured_page") return "Pagina configurata";
   if (normalized === "api") return "API";
   if (normalized === "csv_import") return "CSV";
@@ -12192,6 +12193,9 @@ function competitorPurityDisplay(quote = {}) {
   if (quote.competitor_name === "Gold Standard" && quote.metal === "gold" && quote.purity_code === "18kt") return "Oro 18K prezzo MIN";
   if (quote.competitor_name === "Gold Standard" && quote.metal === "silver" && quote.quote_type === "reference_market_silver_price") return `Quotazione argento borsa / ${quote.purity_code}`;
   if (quote.competitor_name === "Gold Standard" && quote.metal === "silver") return `Argento ${quote.purity_code} prezzo MIN`;
+  if (quote.competitor_name === "Oro in Euro" && quote.metal === "gold" && quote.purity_code === "18kt") return "Oro 750/1000 / 18kt";
+  if (quote.competitor_name === "Oro in Euro" && quote.metal === "gold" && quote.purity_code === "24kt") return "Oro 999/1000 / 24kt";
+  if (quote.competitor_name === "Oro in Euro" && quote.metal === "silver" && quote.purity_code === "999") return "Argento 999/1000";
   return quote.purity_code || "—";
 }
 
@@ -12255,6 +12259,15 @@ function latestGoldStandardQuote(metal = "", purityCode = "", quoteType = "") {
     .filter((quote) => !metal || quote.metal === metal)
     .filter((quote) => !purityCode || quote.purity_code === purityCode)
     .filter((quote) => !quoteType || quote.quote_type === quoteType)
+    .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
+}
+
+function latestOroInEuroQuote(metal = "", purityCode = "") {
+  return (state.competitorQuotes || [])
+    .filter((quote) => quote.competitor_name === "Oro in Euro")
+    .filter((quote) => !metal || quote.metal === metal)
+    .filter((quote) => !purityCode || quote.purity_code === purityCode)
+    .filter((quote) => !quote.quote_type || quote.quote_type === "customer_buyback")
     .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
 }
 
@@ -12502,6 +12515,43 @@ function goldStandardSummaryHtml() {
   `;
 }
 
+function oroInEuroSummaryHtml() {
+  const source = (state.competitorSources || []).find((item) => item.name === "Oro in Euro") || {};
+  const quoteConfigs = [
+    { metal: "gold", code: "18kt" },
+    { metal: "gold", code: "24kt" },
+    { metal: "silver", code: "999" }
+  ];
+  const quotes = quoteConfigs
+    .map((item) => latestOroInEuroQuote(item.metal, item.code))
+    .filter(Boolean);
+  if (!source.id && !quotes.length) return "";
+  const quoteRows = quotes.length
+    ? quotes.map((quote) => `
+        <div>
+          <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
+          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
+        </div>
+      `).join("")
+    : `<p>Nessuna quotazione Oro in Euro rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
+  return `
+    <article class="oro-in-euro-card">
+      <header>
+        <div>
+          <span>Competitor dedicato</span>
+          <h5>Oro in Euro</h5>
+        </div>
+        <strong>${escapeHtml(competitorSourceStatusLabel(source))}</strong>
+      </header>
+      <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">www.quotazioneritirooro.it</a>` : "https://www.quotazioneritirooro.it"} · Metodo: parser automatico · Ogni 60 minuti</p>
+      <div class="oro-in-euro-grid">${quoteRows}</div>
+      <p>Ultimo sync app: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
+      <p class="gold-prediction-disclaimer">Oro in Euro pubblica valori al grammo per 750/1000, 999/1000 oro e 999/1000 argento: vengono usati come benchmark cliente, non come prezzo spot internazionale.</p>
+      ${isFounder() ? `<button class="ghost-button" type="button" data-force-oro-in-euro-sync>Forza aggiornamento Oro in Euro</button>` : ""}
+    </article>
+  `;
+}
+
 function competitorMarketSummaryRows() {
   return buybackRowsFor("gold", "today").concat(buybackRowsFor("silver", "today"));
 }
@@ -12608,6 +12658,7 @@ function buildPriceExplanationContext(row = {}, options = {}) {
   const bordinQuote = latestBordinQuote(metal, purityCode);
   const goldStandardQuote = latestGoldStandardQuote(metal, purityCode, "customer_buyback");
   const goldStandardReferenceQuote = latestGoldStandardQuote(metal, metal === "silver" ? "999" : "24kt", metal === "silver" ? "reference_market_silver_price" : "reference_market_gold_price");
+  const oroInEuroQuote = latestOroInEuroQuote(metal, purityCode);
   return {
     mode: "price_explanation",
     type: options.type || "row",
@@ -12755,6 +12806,19 @@ function buildPriceExplanationContext(row = {}, options = {}) {
       evidence_text: goldStandardReferenceQuote.evidence_text || "",
       confidence: goldStandardReferenceQuote.ai_confidence || goldStandardReferenceQuote.confidence || "high"
     } : null,
+    oro_in_euro_quote: oroInEuroQuote ? {
+      metal: oroInEuroQuote.metal,
+      purity_code: oroInEuroQuote.purity_code,
+      quote_type: oroInEuroQuote.quote_type || "customer_buyback",
+      label: competitorPurityDisplay(oroInEuroQuote),
+      price_per_gram: Number(oroInEuroQuote.price_per_gram || 0),
+      price_per_kg: Number(oroInEuroQuote.price_per_kg || 0),
+      source_url: oroInEuroQuote.source_url || oroInEuroQuote.url || "",
+      quote_date: oroInEuroQuote.quote_date || null,
+      fineness_per_mille: oroInEuroQuote.raw_payload?.fineness_per_mille || null,
+      evidence_text: oroInEuroQuote.evidence_text || "",
+      confidence: oroInEuroQuote.ai_confidence || oroInEuroQuote.confidence || "high"
+    } : null,
     market_comparison_status: row.market_comparison_status || "",
     market_price_reason: row.market_price_reason || "",
     safe_to_offer: row.safe_to_offer,
@@ -12899,6 +12963,20 @@ function buildGeneralPriceExplanationContext() {
         price_kind: quote.raw_payload?.price_kind || "",
         evidence_text: quote.evidence_text || ""
       })),
+    oro_in_euro_quotes: (state.competitorQuotes || [])
+      .filter((quote) => quote.competitor_name === "Oro in Euro")
+      .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
+      .slice(0, 3)
+      .map((quote) => ({
+        label: competitorPurityDisplay(quote),
+        quote_type: quote.quote_type || "customer_buyback",
+        price_per_gram: Number(quote.price_per_gram || 0),
+        price_per_kg: Number(quote.price_per_kg || 0),
+        source_url: quote.source_url || quote.url || "",
+        quote_date: quote.quote_date || null,
+        fineness_per_mille: quote.raw_payload?.fineness_per_mille || null,
+        evidence_text: quote.evidence_text || ""
+      })),
     gold: buildPriceExplanationContext(gold, { type: "summary", metal: "gold", purity_code: gold.purity_code || "18kt" }),
     silver: buildPriceExplanationContext(silver, { type: "summary", metal: "silver", purity_code: silver.purity_code || "925" })
   };
@@ -12988,7 +13066,11 @@ function competitorExplanation(context = {}) {
   const goldStandardText = goldStandard
     ? ` Gold Standard è stato aggiornato ${goldStandard.quote_date ? `il ${formatDateTime(goldStandard.quote_date)}` : "automaticamente"}: ${goldStandard.label || context.purity_code} a ${formatAurumGram(goldStandard.price_per_gram, currency)}. Fonte: ${goldStandard.source_url || "https://www.goldstandard.gold"}. ${goldStandard.price_kind === "min_price" ? "Questo è un prezzo MIN pubblicato, utile come benchmark cliente ma da verificare con le condizioni in negozio." : ""} ${goldStandardReference ? `La reference borsa collegata è ${goldStandardReference.label} a ${formatAurumGram(goldStandardReference.price_per_gram, currency)} e non entra nella media dei prezzi cliente.` : ""} ${Number(context.max_payable_per_gram || 0) && Number(goldStandard.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
-  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${oroDOroText}${amicoOroText}${bancoPreziosiText}${bordinText}${goldStandardText}${syncText}${aiText}`;
+  const oroInEuro = context.oro_in_euro_quote;
+  const oroInEuroText = oroInEuro
+    ? ` Oro in Euro è stato aggiornato ${oroInEuro.quote_date ? `il ${formatDateTime(oroInEuro.quote_date)}` : "automaticamente"}: ${oroInEuro.label || context.purity_code} a ${formatAurumGram(oroInEuro.price_per_gram, currency)}. Fonte: ${oroInEuro.source_url || "https://www.quotazioneritirooro.it"}. ${oroInEuro.fineness_per_mille ? `Finezza pubblicata: ${oroInEuro.fineness_per_mille}/1000.` : ""} ${Number(context.max_payable_per_gram || 0) && Number(oroInEuro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo richiede verifica del margine o autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    : "";
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${oroDOroText}${amicoOroText}${bancoPreziosiText}${bordinText}${goldStandardText}${oroInEuroText}${syncText}${aiText}`;
 }
 
 function formulaExplanation(context = {}) {
@@ -13036,6 +13118,7 @@ ${context.amico_oro_quotes?.length ? `Amico Oro rilevato: ${context.amico_oro_qu
 ${context.banco_preziosi_quotes?.length ? `Banco Preziosi rilevato: ${context.banco_preziosi_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_type === "reference_official_gold_price" ? " (reference ufficiale)" : ""}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Banco Preziosi non ha ancora quotazioni recenti salvate nel confronto."}
 ${context.bordin_quotes?.length ? `Bordin rilevato: ${context.bordin_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}${quote.condition_text ? ` - ${quote.condition_text}` : ""}`).join("; ")}.` : "Bordin non ha ancora quotazioni recenti salvate nel confronto."}
 ${context.gold_standard_quotes?.length ? `Gold Standard rilevato: ${context.gold_standard_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_type === "reference_market_gold_price" || quote.quote_type === "reference_market_silver_price" ? " (reference borsa)" : quote.price_kind === "min_price" ? " (prezzo MIN cliente)" : ""}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Gold Standard non ha ancora quotazioni recenti salvate nel confronto."}
+${context.oro_in_euro_quotes?.length ? `Oro in Euro rilevato: ${context.oro_in_euro_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.fineness_per_mille ? ` (${quote.fineness_per_mille}/1000)` : ""}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Oro in Euro non ha ancora quotazioni recenti salvate nel confronto."}
 
 Avviso finale
 Questa è una stima operativa e non una garanzia di prezzo. Il prezzo finale resta definito dalle policy OroActive e dall'operatore autorizzato.`;
@@ -13533,6 +13616,30 @@ function defaultExtractionRulesForSource(source = {}) {
       last_test_status: "not_tested"
     }));
   }
+  if (String(source.name || "").toLowerCase() === "oro in euro") {
+    const pageUrl = source.website_url || "https://www.quotazioneritirooro.it";
+    return [
+      ["oro_in_euro_gold_18kt", "Oro 750/1000", "gold", "18kt", "0.75", "Oro 750/1000", "Oro\\s*750\\s*\\/\\s*1000[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/?\\s*(?:Grammo|grammo|g|gr)"],
+      ["oro_in_euro_gold_24kt", "Oro 999/1000", "gold", "24kt", "0.999", "Oro 999/1000", "Oro\\s*999\\s*\\/\\s*1000[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/?\\s*(?:Grammo|grammo|g|gr)"],
+      ["oro_in_euro_silver_999", "Argento 999/1000", "silver", "999", "0.999", "Argento 999/1000", "Argento\\s*999\\s*\\/\\s*1000[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/?\\s*(?:Grammo|grammo|g|gr)"]
+    ].map(([field_key, label, metal, purity_code, purity_value, anchor_text, regex_pattern]) => ({
+      source_id: source.id,
+      competitor_name: source.name || "Oro in Euro",
+      page_url: pageUrl,
+      field_key,
+      label,
+      metal,
+      purity_code,
+      purity_value,
+      unit: "EUR/g",
+      anchor_text,
+      regex_pattern,
+      extraction_method: "anchor_regex",
+      required: true,
+      active: true,
+      last_test_status: "not_tested"
+    }));
+  }
   return [{
     source_id: source.id,
     competitor_name: source.name || "",
@@ -13795,6 +13902,7 @@ function renderCompetitorQuotes() {
     ${bancoPreziosiSummaryHtml()}
     ${bordinSummaryHtml()}
     ${goldStandardSummaryHtml()}
+    ${oroInEuroSummaryHtml()}
     <div class="competitor-summary">
       <strong>${sources.length}</strong>
       <span>fonti competitor monitorate</span>
@@ -14240,6 +14348,27 @@ async function forceGoldStandardSync() {
   await loadGoldPredictionPanel({ silent: true });
 }
 
+async function forceOroInEuroSync() {
+  if (!isFounder()) return;
+  showToast("Aggiornamento Oro in Euro in esecuzione...", "success");
+  const data = await apiRequest("/quotazioni/competitors/oro-in-euro/sync", {
+    method: "POST",
+    body: JSON.stringify({}),
+    timeoutMs: 90000
+  });
+  const saved = Number(data.result?.quotes_saved || 0);
+  const status = data.result?.status || data.state?.last_status || "success";
+  showToast(
+    status === "failed"
+      ? "Oro in Euro non leggibile automaticamente. Ultimo dato valido mantenuto."
+      : status === "partial"
+        ? `Oro in Euro aggiornato parzialmente. Quotazioni salvate: ${saved}.`
+        : `Oro in Euro aggiornato. Quotazioni salvate: ${saved}.`,
+    status === "failed" || status === "partial" ? "warning" : "success"
+  );
+  await loadGoldPredictionPanel({ silent: true });
+}
+
 async function runAiCompetitorExtraction(sourceId = "all") {
   if (!isFounder()) return;
   const payload = sourceId && sourceId !== "all" ? { source_id: sourceId } : {};
@@ -14360,6 +14489,7 @@ async function handleCompetitorAction(event) {
   const forceBancoPreziosi = event.target.closest("[data-force-banco-preziosi-sync]");
   const forceBordin = event.target.closest("[data-force-bordin-sync]");
   const forceGoldStandard = event.target.closest("[data-force-gold-standard-sync]");
+  const forceOroInEuro = event.target.closest("[data-force-oro-in-euro-sync]");
   const runAiExtract = event.target.closest("[data-run-ai-competitor-extract]");
   const toggleAutoSync = event.target.closest("[data-toggle-competitor-auto-sync]");
   const saveRules = event.target.closest("[data-save-extraction-rules]");
@@ -14401,6 +14531,10 @@ async function handleCompetitorAction(event) {
   }
   if (forceGoldStandard && isFounder()) {
     await forceGoldStandardSync();
+    return;
+  }
+  if (forceOroInEuro && isFounder()) {
+    await forceOroInEuroSync();
     return;
   }
   if (runAiExtract && isFounder()) {

@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260606-bordin-gold-standard-1";
+const STATIC_CACHE = "oroactive-static-v20260606-oro-in-euro-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260606-bordin-gold-standard-1",
-  "/app.js?v=20260606-bordin-gold-standard-1",
+  "/styles.css?v=20260606-oro-in-euro-1",
+  "/app.js?v=20260606-oro-in-euro-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

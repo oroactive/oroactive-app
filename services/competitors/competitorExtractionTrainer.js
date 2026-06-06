@@ -238,7 +238,8 @@ function sourceSpecificQuoteForRule(rule = {}, sourceQuotes = []) {
       quote.raw_payload?.amico_oro_key,
       quote.raw_payload?.banco_preziosi_key,
       quote.raw_payload?.bordin_key,
-      quote.raw_payload?.gold_standard_key
+      quote.raw_payload?.gold_standard_key,
+      quote.raw_payload?.oro_in_euro_key
     ].filter(Boolean).some((key) => String(key) === String(rule.field_key))
   ));
   if (byFieldKey) return byFieldKey;
@@ -258,7 +259,8 @@ export function createCompetitorExtractionTrainer(options = {}) {
     amicoOroExtractor: options.amicoOroExtractor || null,
     bancoPreziosiExtractor: options.bancoPreziosiExtractor || null,
     bordinExtractor: options.bordinExtractor || null,
-    goldStandardExtractor: options.goldStandardExtractor || null
+    goldStandardExtractor: options.goldStandardExtractor || null,
+    oroInEuroExtractor: options.oroInEuroExtractor || null
   };
 
   async function fetchPublicPage(url = "") {
@@ -319,6 +321,14 @@ export function createCompetitorExtractionTrainer(options = {}) {
       }).catch(() => ({ quotes: [] }));
       return result.quotes || [];
     }
+    if (config.oroInEuroExtractor && sourceName === "oro in euro") {
+      const result = await config.oroInEuroExtractor.extractOroInEuroQuotes({
+        source_id: source.id,
+        sourceId: source.id,
+        url: rules[0]?.page_url || source.website_url
+      }).catch(() => ({ quotes: [] }));
+      return result.quotes || [];
+    }
     return [];
   }
 
@@ -327,6 +337,7 @@ export function createCompetitorExtractionTrainer(options = {}) {
     if (sourceName === "banco preziosi") return "guided_banco_preziosi_parser";
     if (sourceName === "bordin") return "guided_bordin_parser";
     if (sourceName === "gold standard") return "guided_gold_standard_parser";
+    if (sourceName === "oro in euro") return "guided_oro_in_euro_parser";
     if (sourceName === "amico oro") return "guided_amico_oro_parser";
     if (sourceName === "oro d'oro") return "guided_oro_doro_parser";
     if (sourceName === "oro express") return "guided_oro_express_parser";
