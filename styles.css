@@ -5286,7 +5286,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 }
 
 .oro-express-card,
-.amico-oro-card {
+.amico-oro-card,
+.banco-preziosi-card {
   display: grid;
   gap: 12px;
   margin: 0 0 14px;
@@ -5301,8 +5302,10 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .oro-express-card header,
 .amico-oro-card header,
+.banco-preziosi-card header,
 .oro-express-grid,
-.amico-oro-grid {
+.amico-oro-grid,
+.banco-preziosi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -5310,19 +5313,23 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 }
 
 .oro-express-card header,
-.amico-oro-card header {
+.amico-oro-card header,
+.banco-preziosi-card header {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .oro-express-card h5,
 .oro-express-card p,
 .amico-oro-card h5,
-.amico-oro-card p {
+.amico-oro-card p,
+.banco-preziosi-card h5,
+.banco-preziosi-card p {
   margin: 0;
 }
 
 .oro-express-card span,
-.amico-oro-card span {
+.amico-oro-card span,
+.banco-preziosi-card span {
   color: rgba(255, 255, 255, 0.64);
   font-size: 11px;
   font-weight: 900;
@@ -5330,12 +5337,14 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 }
 
 .oro-express-card strong,
-.amico-oro-card strong {
+.amico-oro-card strong,
+.banco-preziosi-card strong {
   color: #ffd700;
 }
 
 .oro-express-grid div,
-.amico-oro-grid div {
+.amico-oro-grid div,
+.banco-preziosi-grid div {
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -10414,8 +10423,10 @@ input.document-expired {
   .competitor-auto-sync-card,
   .oro-express-card header,
   .amico-oro-card header,
+  .banco-preziosi-card header,
   .oro-express-grid,
   .amico-oro-grid,
+  .banco-preziosi-grid,
   .competitor-quote-form,
   .competitor-source-form,
   .competitor-csv-form,

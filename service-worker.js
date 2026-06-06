@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260606-amico-oro-hourly-1";
+const STATIC_CACHE = "oroactive-static-v20260606-banco-preziosi-hourly-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260606-amico-oro-hourly-1",
-  "/app.js?v=20260606-amico-oro-hourly-1",
+  "/styles.css?v=20260606-banco-preziosi-hourly-1",
+  "/app.js?v=20260606-banco-preziosi-hourly-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

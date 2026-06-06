@@ -242,7 +242,8 @@ export function createCompetitorExtractionTrainer(options = {}) {
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
     oroExpressExtractor: options.oroExpressExtractor || null,
-    amicoOroExtractor: options.amicoOroExtractor || null
+    amicoOroExtractor: options.amicoOroExtractor || null,
+    bancoPreziosiExtractor: options.bancoPreziosiExtractor || null
   };
 
   async function fetchPublicPage(url = "") {
@@ -270,11 +271,21 @@ export function createCompetitorExtractionTrainer(options = {}) {
       }).catch(() => ({ quotes: [] }));
       return result.quotes || [];
     }
+    if (config.bancoPreziosiExtractor && sourceName === "banco preziosi") {
+      const result = await config.bancoPreziosiExtractor.extractBancoPreziosiQuotes({
+        source_id: source.id,
+        sourceId: source.id,
+        url: source.website_url,
+        quoteUrl: rules.find((rule) => /quotazioni/i.test(rule.page_url || ""))?.page_url || rules[0]?.page_url || source.website_url
+      }).catch(() => ({ quotes: [] }));
+      return result.quotes || [];
+    }
     return [];
   }
 
   function sourceSpecificMethod(source = {}) {
     const sourceName = String(source.name || "").toLowerCase();
+    if (sourceName === "banco preziosi") return "guided_banco_preziosi_parser";
     if (sourceName === "amico oro") return "guided_amico_oro_parser";
     if (sourceName === "oro express") return "guided_oro_express_parser";
     return "guided_specific_parser";

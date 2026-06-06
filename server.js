@@ -16,6 +16,7 @@ import pg from "pg";
 import { createAiCompetitorQuoteExtractor } from "./services/competitors/aiCompetitorQuoteExtractor.js";
 import { createCompetitorExtractionTrainer } from "./services/competitors/competitorExtractionTrainer.js";
 import { createAmicoOroExtractor } from "./services/competitors/extractors/amicoOroExtractor.js";
+import { createBancoPreziosiExtractor } from "./services/competitors/extractors/bancoPreziosiExtractor.js";
 import { createOroExpressExtractor } from "./services/competitors/extractors/oroExpressExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
 
@@ -74,6 +75,14 @@ const amicoOroUrl = process.env.AMICO_ORO_URL || "https://www.amico-oro.it";
 const amicoOroUsePlaywright = String(process.env.AMICO_ORO_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
 const amicoOroUseAiVisionFallback = String(process.env.AMICO_ORO_USE_AI_VISION_FALLBACK || "true").toLowerCase() !== "false";
 const amicoOroTimeoutMs = Math.min(Math.max(Number(process.env.AMICO_ORO_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
+const bancoPreziosiAutoSyncEnabled = String(process.env.BANCO_PREZIOSI_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const bancoPreziosiAutoSyncOnStartup = String(process.env.BANCO_PREZIOSI_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const bancoPreziosiSyncIntervalMinutes = Math.max(60, Number(process.env.BANCO_PREZIOSI_SYNC_INTERVAL_MINUTES || 60));
+const bancoPreziosiUrl = process.env.BANCO_PREZIOSI_URL || "https://www.bancopreziosimilano.it";
+const bancoPreziosiQuoteUrl = process.env.BANCO_PREZIOSI_QUOTE_URL || "https://www.bancopreziosimilano.it/quotazioni";
+const bancoPreziosiUsePlaywright = String(process.env.BANCO_PREZIOSI_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const bancoPreziosiUseAiFallback = String(process.env.BANCO_PREZIOSI_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
+const bancoPreziosiTimeoutMs = Math.min(Math.max(Number(process.env.BANCO_PREZIOSI_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const competitorAiExtractionEnabled = String(process.env.AI_COMPETITOR_EXTRACTION_ENABLED || process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiAutoExtractionEnabled = String(process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiExtractionIntervalMinutes = Math.max(60, Number(process.env.AI_COMPETITOR_EXTRACTION_INTERVAL_MINUTES || process.env.COMPETITOR_AI_AUTO_EXTRACTION_INTERVAL_MINUTES || 360));
@@ -117,6 +126,15 @@ const oroExpressSyncState = {
 };
 const amicoOroSyncState = {
   enabled: amicoOroAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: ""
+};
+const bancoPreziosiSyncState = {
+  enabled: bancoPreziosiAutoSyncEnabled,
   running: false,
   timer: null,
   lastRunAt: null,
@@ -310,12 +328,24 @@ const amicoOroExtractor = createAmicoOroExtractor({
   useAiVisionFallback: amicoOroUseAiVisionFallback,
   maxTextChars: competitorAiMaxTextChars
 });
+const bancoPreziosiExtractor = createBancoPreziosiExtractor({
+  openai,
+  model: competitorAiExtractionModel,
+  url: bancoPreziosiUrl,
+  quoteUrl: bancoPreziosiQuoteUrl,
+  timeoutMs: bancoPreziosiTimeoutMs,
+  userAgent: competitorAutoSyncUserAgent,
+  usePlaywright: bancoPreziosiUsePlaywright,
+  useAiFallback: bancoPreziosiUseAiFallback,
+  maxTextChars: competitorAiMaxTextChars
+});
 const competitorExtractionTrainer = createCompetitorExtractionTrainer({
   openai,
   model: competitorAiExtractionModel,
   fetchPage: fetchCompetitorPage,
   oroExpressExtractor,
-  amicoOroExtractor
+  amicoOroExtractor,
+  bancoPreziosiExtractor
 });
 const aiRuntime = {
   pgvector: false,
@@ -2276,7 +2306,19 @@ const DEFAULT_COMPETITOR_SOURCES = [
     notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
   },
   { name: "Pronto Gold", website_url: "https://www.prontogold.com" },
-  { name: "Banco Preziosi", website_url: "https://www.bancopreziosimilano.it" },
+  {
+    name: "Banco Preziosi",
+    website_url: bancoPreziosiUrl,
+    source_type: "banco_preziosi_parser",
+    sync_interval_minutes: bancoPreziosiSyncIntervalMinutes,
+    extraction_config: {
+      method: "banco_preziosi_parser",
+      url: bancoPreziosiUrl,
+      quote_url: bancoPreziosiQuoteUrl,
+      currency: "EUR"
+    },
+    notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
+  },
   { name: "Bordin", website_url: "https://www.orometallipreziosi.com" },
   { name: "Gold Standard", website_url: "https://www.goldstandard.gold" },
   { name: "Oro in Euro", website_url: "https://www.quotazioneritirooro.it" }
@@ -2374,18 +2416,21 @@ async function seedDefaultCompetitorSources() {
               source_type = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN $6::text
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $6::text
-                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'amico_oro_parser')
+                WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $6::text
+                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'amico_oro_parser', 'banco_preziosi_parser')
                  AND (notes IS NULL OR notes = '' OR notes ILIKE '%Competitor preconfigurato OroActive%') THEN $6::text
                 ELSE source_type
               END,
               auto_sync_enabled = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN true
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN true
+                WHEN LOWER(name) = LOWER('Banco Preziosi') THEN true
                 ELSE COALESCE(auto_sync_enabled, true)
               END,
               sync_interval_minutes = CASE
                 WHEN LOWER(name) = LOWER('Oro Express') THEN $3::int
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $3::int
+                WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $3::int
                 ELSE COALESCE(sync_interval_minutes, $3::int)
               END,
               extraction_config = CASE
@@ -2514,6 +2559,60 @@ function defaultAmicoOroExtractionRules(source = {}) {
   }));
 }
 
+function defaultBancoPreziosiExtractionRules(source = {}) {
+  const pageUrl = source.extraction_config?.quote_url || source.extraction_config?.quoteUrl || bancoPreziosiQuoteUrl || source.website_url || bancoPreziosiUrl;
+  return [
+    {
+      field_key: "banco_preziosi_gold_24kt_reference",
+      label: "Quotazione ufficiale oro",
+      metal: "gold",
+      purity_code: "24kt",
+      purity_value: 1,
+      anchor_text: "QUOTAZIONE UFFICIALE ORO",
+      unit: "EUR/g",
+      regex_pattern: "QUOTAZIONE\\s+UFFICIALE\\s+ORO[\\s\\S]{0,120}?euro\\s*([0-9]+[,.]?[0-9]*)\\s*al\\s*grammo"
+    },
+    {
+      field_key: "banco_preziosi_gold_18kt",
+      label: "Acquistiamo oro 18K",
+      metal: "gold",
+      purity_code: "18kt",
+      purity_value: 0.75,
+      anchor_text: "ACQUISTIAMO ORO 18K",
+      unit: "EUR/g",
+      regex_pattern: "ACQUISTIAMO\\s+ORO\\s+18K[\\s\\S]{0,120}?euro\\s*([0-9]+[,.]?[0-9]*)\\s*al\\s*grammo"
+    },
+    {
+      field_key: "banco_preziosi_silver_925",
+      label: "Argento 925",
+      metal: "silver",
+      purity_code: "925",
+      purity_value: 0.925,
+      anchor_text: "ARGENTO 925",
+      unit: "EUR/kg",
+      regex_pattern: "ARGENTO\\s*925[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)\\s*al\\s*KG"
+    },
+    {
+      field_key: "banco_preziosi_silver_800",
+      label: "Argento 800",
+      metal: "silver",
+      purity_code: "800",
+      purity_value: 0.8,
+      anchor_text: "ARGENTO 800",
+      unit: "EUR/kg",
+      regex_pattern: "ARGENTO\\s*800[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)\\s*al\\s*Kg"
+    }
+  ].map((rule) => ({
+    ...rule,
+    competitor_name: source.name || "Banco Preziosi",
+    source_id: source.id || null,
+    page_url: pageUrl,
+    extraction_method: "anchor_regex",
+    required: true,
+    active: true
+  }));
+}
+
 function publicCompetitorExtractionRule(row = {}) {
   const metal = normalizePredictionMetal(row.metal || "gold");
   const purityCode = normalizePurityCode(row.purity_code || row.purityCode, metal);
@@ -2583,7 +2682,8 @@ async function seedDefaultCompetitorExtractionRules() {
   const inserted = [];
   const ruleSets = [
     { source: await getOroExpressSource().catch(() => null), rulesFor: defaultOroExpressExtractionRules },
-    { source: await getAmicoOroSource().catch(() => null), rulesFor: defaultAmicoOroExtractionRules }
+    { source: await getAmicoOroSource().catch(() => null), rulesFor: defaultAmicoOroExtractionRules },
+    { source: await getBancoPreziosiSource().catch(() => null), rulesFor: defaultBancoPreziosiExtractionRules }
   ];
   for (const { source, rulesFor } of ruleSets) {
     if (!source?.id) continue;
@@ -2855,7 +2955,7 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
   const payload = {
     name: String(input.name || "").trim().slice(0, 120),
     website_url: String(input.website_url || input.websiteUrl || "").trim().slice(0, 500),
-    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "amico_oro_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
+    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "amico_oro_parser", "banco_preziosi_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
       ? String(input.source_type || input.sourceType || "manual").toLowerCase()
       : "manual",
     active: input.active !== false,
@@ -3003,7 +3103,7 @@ async function insertCompetitorQuote(input = {}, user = {}) {
     ? { id: input.source_id || input.sourceId }
     : await ensureCompetitorSourceForQuote(input, user);
   const quoteDate = input.quote_date || input.quoteDate || new Date().toISOString();
-  const quoteType = ["customer_buyback", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
+  const quoteType = ["customer_buyback", "reference_official_gold_price", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
     ? String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase()
     : "unknown";
   const aiConfidence = String(input.ai_confidence || input.aiConfidence || input.confidence || "medium").toLowerCase().slice(0, 20);
@@ -3410,6 +3510,20 @@ async function extractCompetitorQuotes(source = {}) {
     });
   }
 
+  if (method === "banco_preziosi_parser" || source.source_type === "banco_preziosi_parser" || source.name?.toLowerCase() === "banco preziosi") {
+    return bancoPreziosiExtractor.extractBancoPreziosiQuotes({
+      source_id: source.id,
+      sourceId: source.id,
+      url: config.url || source.website_url || bancoPreziosiUrl,
+      quoteUrl: config.quote_url || config.quoteUrl || bancoPreziosiQuoteUrl,
+      sourceUrl: config.url || source.website_url || bancoPreziosiUrl,
+      timeoutMs: bancoPreziosiTimeoutMs,
+      userAgent: competitorAutoSyncUserAgent,
+      usePlaywright: bancoPreziosiUsePlaywright,
+      useAiFallback: bancoPreziosiUseAiFallback
+    });
+  }
+
   if (method === "api" || source.source_type === "api") {
     const { body } = await fetchCompetitorPage(source.website_url);
     const data = JSON.parse(body);
@@ -3547,6 +3661,7 @@ async function syncSingleCompetitorSource(sourceIdOrSource, user = {}, req = nul
         forced: Boolean(options.force),
         next_sync_at: nextSyncAt,
         extraction_method: extracted.extraction_method || source.source_type || "",
+        extraction_warnings: extracted.warnings || [],
         rules_tested: extracted.rule_results?.length || 0,
         rule_statuses: (extracted.rule_results || []).map((item) => ({
           field_key: item.rule?.field_key || "",
@@ -3751,6 +3866,13 @@ async function getAmicoOroSource() {
   return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
 }
 
+async function getBancoPreziosiSource() {
+  const result = await pool.query(
+    "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Banco Preziosi') LIMIT 1"
+  );
+  return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
+}
+
 async function runOroExpressHourlySync({ force = false, user = {}, req = null } = {}) {
   if (!oroExpressAutoSyncEnabled && !force) {
     return { ok: false, skipped: true, message: "Sync Oro Express disattivato.", state: oroExpressSyncPublicStatus() };
@@ -3900,6 +4022,91 @@ function startAmicoOroHourlySync() {
   }, amicoOroSyncIntervalMinutes * 60 * 1000);
   amicoOroSyncState.timer.unref?.();
   return amicoOroSyncPublicStatus();
+}
+
+function bancoPreziosiSyncPublicStatus() {
+  return {
+    enabled: bancoPreziosiAutoSyncEnabled,
+    running: bancoPreziosiSyncState.running,
+    interval_minutes: bancoPreziosiSyncIntervalMinutes,
+    on_startup: bancoPreziosiAutoSyncOnStartup,
+    url: bancoPreziosiUrl,
+    quote_url: bancoPreziosiQuoteUrl,
+    use_playwright: bancoPreziosiUsePlaywright,
+    use_ai_fallback: bancoPreziosiUseAiFallback,
+    timeout_ms: bancoPreziosiTimeoutMs,
+    last_run_at: bancoPreziosiSyncState.lastRunAt,
+    next_run_at: bancoPreziosiSyncState.nextRunAt,
+    last_status: bancoPreziosiSyncState.lastStatus,
+    last_error: bancoPreziosiSyncState.lastError
+  };
+}
+
+async function runBancoPreziosiHourlySync({ force = false, user = {}, req = null } = {}) {
+  if (!bancoPreziosiAutoSyncEnabled && !force) {
+    return { ok: false, skipped: true, message: "Sync Banco Preziosi disattivato.", state: bancoPreziosiSyncPublicStatus() };
+  }
+  if (bancoPreziosiSyncState.running) {
+    return { ok: true, skipped: true, message: "Sync Banco Preziosi gia in corso.", state: bancoPreziosiSyncPublicStatus() };
+  }
+  bancoPreziosiSyncState.running = true;
+  bancoPreziosiSyncState.lastRunAt = new Date().toISOString();
+  bancoPreziosiSyncState.lastStatus = "running";
+  bancoPreziosiSyncState.lastError = "";
+  try {
+    const source = await getBancoPreziosiSource();
+    if (!source?.id) throw new Error("Fonte Banco Preziosi non configurata");
+    const result = await syncSingleCompetitorSource(source, user, req, { force });
+    const summary = await calculateCompetitorMarketSummary().catch(() => null);
+    bancoPreziosiSyncState.lastStatus = result.status || "success";
+    bancoPreziosiSyncState.lastError = result.error || result.log?.error_message || "";
+    bancoPreziosiSyncState.nextRunAt = new Date(Date.now() + bancoPreziosiSyncIntervalMinutes * 60 * 1000).toISOString();
+    return {
+      ok: true,
+      result,
+      summary,
+      state: bancoPreziosiSyncPublicStatus()
+    };
+  } catch (error) {
+    bancoPreziosiSyncState.lastStatus = "failed";
+    bancoPreziosiSyncState.lastError = error.message || "Sync Banco Preziosi non riuscito";
+    const source = await getBancoPreziosiSource().catch(() => null);
+    if (source?.id) {
+      await updateCompetitorSourceSyncStatus(
+        source.id,
+        "failed",
+        new Date().toISOString(),
+        bancoPreziosiSyncState.lastError,
+        new Date(Date.now() + bancoPreziosiSyncIntervalMinutes * 60 * 1000).toISOString()
+      ).catch(() => {});
+    }
+    throw error;
+  } finally {
+    bancoPreziosiSyncState.running = false;
+  }
+}
+
+function startBancoPreziosiHourlySync() {
+  if (!bancoPreziosiAutoSyncEnabled || bancoPreziosiSyncState.timer) return bancoPreziosiSyncPublicStatus();
+  bancoPreziosiSyncState.nextRunAt = new Date(Date.now() + bancoPreziosiSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (bancoPreziosiAutoSyncOnStartup) {
+    setTimeout(() => {
+      runBancoPreziosiHourlySync({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        bancoPreziosiSyncState.lastStatus = "failed";
+        bancoPreziosiSyncState.lastError = error.message || "Sync startup Banco Preziosi fallito";
+        console.error("Errore sync Banco Preziosi", error);
+      });
+    }, 8000).unref?.();
+  }
+  bancoPreziosiSyncState.timer = setInterval(() => {
+    runBancoPreziosiHourlySync({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      bancoPreziosiSyncState.lastStatus = "failed";
+      bancoPreziosiSyncState.lastError = error.message || "Sync Banco Preziosi fallito";
+      console.error("Errore sync Banco Preziosi", error);
+    });
+  }, bancoPreziosiSyncIntervalMinutes * 60 * 1000);
+  bancoPreziosiSyncState.timer.unref?.();
+  return bancoPreziosiSyncPublicStatus();
 }
 
 async function updateCompetitorSourceAutoSync(id, input = {}, user = {}, req = null) {
@@ -18978,6 +19185,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       valid_quotes_24h: Number(validQuotes.rows[0]?.count || 0),
       oro_express_status: oroExpressSyncPublicStatus(),
       amico_oro_status: amicoOroSyncPublicStatus(),
+      banco_preziosi_status: bancoPreziosiSyncPublicStatus(),
       sources,
       recent_logs: logs
     });
@@ -19078,6 +19286,14 @@ app.post("/api/quotazioni/competitors/oro-express/sync", requireFounder, async (
 app.post("/api/quotazioni/competitors/amico-oro/sync", requireFounder, async (request, response, next) => {
   try {
     response.json(await runAmicoOroHourlySync({ force: true, user: request.user, req: request }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/banco-preziosi/sync", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await runBancoPreziosiHourlySync({ force: true, user: request.user, req: request }));
   } catch (error) {
     next(error);
   }
@@ -20258,6 +20474,7 @@ initDatabase()
     startCompetitorAutoSync();
     startOroExpressHourlySync();
     startAmicoOroHourlySync();
+    startBancoPreziosiHourlySync();
     startCompetitorAiAutoExtraction();
   })
   .catch((error) => {
