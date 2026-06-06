@@ -13,6 +13,7 @@ import jwt from "jsonwebtoken";
 import OpenAI from "openai";
 import PDFDocument from "pdfkit";
 import pg from "pg";
+import { createAiCompetitorQuoteExtractor } from "./services/competitors/aiCompetitorQuoteExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
 
 dotenv.config();
@@ -56,6 +57,16 @@ const competitorAutoSyncOnStartup = String(process.env.COMPETITOR_AUTO_SYNC_ON_S
 const competitorAutoSyncMaxSourcesPerRun = Math.min(Math.max(Number(process.env.COMPETITOR_AUTO_SYNC_MAX_SOURCES_PER_RUN || 8), 1), 20);
 const competitorAutoSyncTimeoutMs = Math.min(Math.max(Number(process.env.COMPETITOR_AUTO_SYNC_TIMEOUT_MS || 15000), 3000), 60000);
 const competitorAutoSyncUserAgent = process.env.COMPETITOR_AUTO_SYNC_USER_AGENT || "OroActiveBot/1.0";
+const competitorAiExtractionEnabled = String(process.env.AI_COMPETITOR_EXTRACTION_ENABLED || process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
+const competitorAiAutoExtractionEnabled = String(process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
+const competitorAiExtractionIntervalMinutes = Math.max(60, Number(process.env.AI_COMPETITOR_EXTRACTION_INTERVAL_MINUTES || process.env.COMPETITOR_AI_AUTO_EXTRACTION_INTERVAL_MINUTES || 360));
+const competitorAiExtractionOnStartup = String(process.env.COMPETITOR_AI_EXTRACTION_ON_STARTUP || "false").toLowerCase() === "true";
+const competitorAiMaxPagesPerSource = Math.min(Math.max(Number(process.env.AI_COMPETITOR_EXTRACTION_MAX_PAGES_PER_SOURCE || process.env.COMPETITOR_AI_MAX_PAGES_PER_SOURCE || 8), 1), 8);
+const competitorAiExtractionTimeoutMs = Math.min(Math.max(Number(process.env.AI_COMPETITOR_EXTRACTION_TIMEOUT_MS || 15000), 3000), 60000);
+const competitorAiUsePlaywright = String(process.env.AI_COMPETITOR_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const competitorAiUserAgent = process.env.AI_COMPETITOR_USER_AGENT || competitorAutoSyncUserAgent;
+const competitorAiExtractionModel = process.env.AI_COMPETITOR_EXTRACTION_MODEL || process.env.COMPETITOR_AI_EXTRACTION_MODEL || openaiModel;
+const competitorAiMaxTextChars = Math.min(Math.max(Number(process.env.COMPETITOR_AI_MAX_TEXT_CHARS || 12000), 3000), 24000);
 const competitorAutoSyncState = {
   enabled: competitorAutoSyncEnabled,
   running: false,
@@ -64,6 +75,18 @@ const competitorAutoSyncState = {
   nextRunAt: null,
   lastStatus: "idle",
   lastError: "",
+  lastSummary: null
+};
+const competitorAiExtractionState = {
+  enabled: competitorAiExtractionEnabled,
+  autoEnabled: competitorAiAutoExtractionEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: "",
+  lastRunId: null,
   lastSummary: null
 };
 const bullionVaultEnabled = String(process.env.BULLIONVAULT_ENABLED || "true").toLowerCase() !== "false";
@@ -222,6 +245,16 @@ const pool = new Pool({
 });
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const aiCompetitorQuoteExtractor = createAiCompetitorQuoteExtractor({
+  openai,
+  model: competitorAiExtractionModel,
+  maxPagesPerSource: competitorAiMaxPagesPerSource,
+  timeoutMs: competitorAiExtractionTimeoutMs,
+  userAgent: competitorAiUserAgent,
+  usePlaywright: competitorAiUsePlaywright,
+  maxTextChars: competitorAiMaxTextChars,
+  logger: console
+});
 const aiRuntime = {
   pgvector: false,
   vectorColumn: null,
@@ -2209,7 +2242,13 @@ function publicCompetitorQuote(row = {}) {
     confidence: ["low", "medium", "high", "bassa", "media", "alta"].includes(String(row.confidence || "").toLowerCase())
       ? String(row.confidence).toLowerCase()
       : "medium",
+    ai_extracted: Boolean(row.ai_extracted || row.aiExtracted),
+    ai_confidence: row.ai_confidence || row.aiConfidence || row.confidence || "medium",
+    evidence_text: row.evidence_text || row.evidenceText || "",
+    quote_type: row.quote_type || row.quoteType || "customer_buyback",
+    extraction_run_id: row.extraction_run_id || row.extractionRunId || null,
     url: row.url || "",
+    source_url: row.source_url || row.sourceUrl || row.url || "",
     website_url: row.website_url || row.websiteUrl || "",
     raw_payload: row.raw_payload || row.rawPayload || {},
     created_at: row.created_at || null
@@ -2439,14 +2478,23 @@ async function insertCompetitorQuote(input = {}, user = {}) {
     ? { id: input.source_id || input.sourceId }
     : await ensureCompetitorSourceForQuote(input, user);
   const quoteDate = input.quote_date || input.quoteDate || new Date().toISOString();
+  const quoteType = ["customer_buyback", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
+    ? String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase()
+    : "unknown";
+  const aiConfidence = String(input.ai_confidence || input.aiConfidence || input.confidence || "medium").toLowerCase().slice(0, 20);
+  const sourceUrl = String(input.source_url || input.sourceUrl || input.url || "").trim().slice(0, 500);
   const result = await pool.query(
     `INSERT INTO competitor_buyback_quotes (
       source_id, competitor_name, metal, purity_code, purity_value,
       price_per_gram, price_per_kg, currency, quote_date,
-      extraction_method, confidence, url, raw_payload, created_at
+      extraction_method, confidence, url, raw_payload,
+      ai_extracted, ai_confidence, evidence_text, quote_type, extraction_run_id,
+      created_at
     ) VALUES (
       $1::bigint,$2::text,$3::text,$4::text,$5::numeric,$6::numeric,$7::numeric,$8::text,$9::timestamptz,
-      $10::text,$11::text,$12::text,$13::jsonb,NOW()
+      $10::text,$11::text,$12::text,$13::jsonb,
+      $14::boolean,$15::text,$16::text,$17::text,$18::bigint,
+      NOW()
     )
     RETURNING *`,
     [
@@ -2461,8 +2509,13 @@ async function insertCompetitorQuote(input = {}, user = {}) {
       quoteDate,
       String(input.extraction_method || input.extractionMethod || "manual").slice(0, 40),
       String(input.confidence || "medium").toLowerCase().slice(0, 20),
-      String(input.url || "").trim().slice(0, 500),
-      sanitizeForPostgres(input.raw_payload || input.rawPayload || { inserted_by: user?.id || null })
+      sourceUrl,
+      sanitizeForPostgres(input.raw_payload || input.rawPayload || { inserted_by: user?.id || null }),
+      Boolean(input.ai_extracted || input.aiExtracted),
+      aiConfidence,
+      String(input.evidence_text || input.evidenceText || "").trim().slice(0, 1200),
+      quoteType,
+      input.extraction_run_id || input.extractionRunId || null
     ]
   );
   await updateCompetitorSourceSyncStatus(source?.id, "updated", quoteDate).catch(() => {});
@@ -2492,6 +2545,29 @@ async function listCompetitorQuotes({ metal = "", purityCode = "", currency = "E
   return result.rows.map(publicCompetitorQuote);
 }
 
+async function listAiCompetitorQuotes({ currency = "EUR", days = 30, limit = 200, validOnly = false } = {}) {
+  const conditions = [
+    "ai_extracted = true",
+    "currency = $1::text",
+    "quote_date >= NOW() - ($2::int * INTERVAL '1 day')"
+  ];
+  const params = [normalizePredictionCurrency(currency), Math.min(Math.max(Number(days || 30), 1), 365)];
+  if (validOnly) {
+    conditions.push("COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'");
+    conditions.push("LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')");
+  }
+  params.push(Math.min(Math.max(Number(limit || 200), 1), 500));
+  const result = await pool.query(
+    `SELECT *
+       FROM competitor_buyback_quotes
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY quote_date DESC, created_at DESC
+      LIMIT $${params.length}::int`,
+    params
+  );
+  return result.rows.map(publicCompetitorQuote);
+}
+
 async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "EUR", days = 30, hours = null } = {}) {
   const normalizedMetals = metals.map(normalizePredictionMetal).filter((metal, index, array) => ["gold", "silver"].includes(metal) && array.indexOf(metal) === index);
   const lookbackHours = hours ? Math.min(Math.max(Number(hours || 24), 1), 24 * 365) : Math.min(Math.max(Number(days || 30), 1), 365) * 24;
@@ -2503,6 +2579,8 @@ async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "E
           AND metal = ANY($2::text[])
           AND quote_date >= NOW() - ($3::int * INTERVAL '1 hour')
           AND price_per_gram IS NOT NULL
+          AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
+          AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')
      ),
      ranked AS (
        SELECT *,
@@ -3105,6 +3183,391 @@ async function updateCompetitorSourceAutoSync(id, input = {}, user = {}, req = n
 
 async function syncConfiguredCompetitorQuotes(user = {}, req = null) {
   return runCompetitorAutoSyncNow({ force: true, user, req });
+}
+
+function publicAiExtractionRun(row = {}) {
+  return {
+    id: row.id || null,
+    status: row.status || "running",
+    started_at: row.started_at || null,
+    completed_at: row.completed_at || null,
+    sources_total: Number(row.sources_total || 0),
+    sources_success: Number(row.sources_success || 0),
+    sources_failed: Number(row.sources_failed || 0),
+    pages_analyzed: Number(row.pages_analyzed || 0),
+    quotes_extracted: Number(row.quotes_extracted || 0),
+    quotes_saved: Number(row.quotes_saved || 0),
+    error_message: row.error_message || "",
+    metadata: row.metadata || {}
+  };
+}
+
+function publicAiExtractionPageLog(row = {}) {
+  return {
+    id: row.id || null,
+    run_id: row.run_id || null,
+    source_id: row.source_id || null,
+    competitor_name: row.competitor_name || "",
+    page_url: row.page_url || "",
+    status: row.status || "",
+    quotes_found: Number(row.quotes_found || 0),
+    error_message: row.error_message || "",
+    ai_response: row.ai_response || {},
+    created_at: row.created_at || null
+  };
+}
+
+async function createAiExtractionRun({ sourcesTotal = 0, metadata = {} } = {}) {
+  const result = await pool.query(
+    `INSERT INTO competitor_ai_extraction_runs (
+      status, started_at, sources_total, metadata
+    ) VALUES (
+      'running', NOW(), $1::int, $2::jsonb
+    )
+    RETURNING *`,
+    [Number(sourcesTotal || 0), sanitizeForPostgres(metadata)]
+  );
+  return result.rows[0];
+}
+
+async function finishAiExtractionRun(runId, updates = {}) {
+  const result = await pool.query(
+    `UPDATE competitor_ai_extraction_runs
+        SET status = $1::text,
+            completed_at = NOW(),
+            sources_success = $2::int,
+            sources_failed = $3::int,
+            pages_analyzed = $4::int,
+            quotes_extracted = $5::int,
+            quotes_saved = $6::int,
+            error_message = $7::text,
+            metadata = COALESCE(metadata, '{}'::jsonb) || $8::jsonb
+      WHERE id = $9::bigint
+      RETURNING *`,
+    [
+      updates.status || "failed",
+      Number(updates.sources_success || 0),
+      Number(updates.sources_failed || 0),
+      Number(updates.pages_analyzed || 0),
+      Number(updates.quotes_extracted || 0),
+      Number(updates.quotes_saved || 0),
+      String(updates.error_message || "").slice(0, 1200),
+      sanitizeForPostgres(updates.metadata || {}),
+      runId
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+async function insertAiExtractionPageLog(runId, source = {}, page = {}) {
+  const result = await pool.query(
+    `INSERT INTO competitor_ai_extraction_page_logs (
+      run_id, source_id, competitor_name, page_url, status, quotes_found, error_message, ai_response, created_at
+    ) VALUES (
+      $1::bigint,$2::bigint,$3::text,$4::text,$5::text,$6::int,$7::text,$8::jsonb,NOW()
+    )
+    RETURNING *`,
+    [
+      runId || null,
+      source.id || null,
+      source.name || "",
+      String(page.page_url || page.url || source.website_url || "").slice(0, 600),
+      String(page.status || "failed").slice(0, 80),
+      Number(page.quotes_found || 0),
+      String(page.error_message || "").slice(0, 1200),
+      sanitizeForPostgres(page.ai_response || {})
+    ]
+  );
+  return publicAiExtractionPageLog(result.rows[0]);
+}
+
+async function listAiExtractionRuns({ limit = 40 } = {}) {
+  const result = await pool.query(
+    `SELECT *
+       FROM competitor_ai_extraction_runs
+      ORDER BY started_at DESC
+      LIMIT $1::int`,
+    [Math.min(Math.max(Number(limit || 40), 1), 200)]
+  );
+  return result.rows.map(publicAiExtractionRun);
+}
+
+async function getAiExtractionRun(id) {
+  const [runResult, pagesResult] = await Promise.all([
+    pool.query("SELECT * FROM competitor_ai_extraction_runs WHERE id = $1::bigint LIMIT 1", [id]),
+    pool.query(
+      `SELECT *
+         FROM competitor_ai_extraction_page_logs
+        WHERE run_id = $1::bigint
+        ORDER BY created_at ASC, id ASC`,
+      [id]
+    )
+  ]);
+  if (!runResult.rows[0]) return null;
+  return {
+    run: publicAiExtractionRun(runResult.rows[0]),
+    pages: pagesResult.rows.map(publicAiExtractionPageLog)
+  };
+}
+
+async function latestAiExtractionPageSummary() {
+  const result = await pool.query(
+    `WITH latest AS (
+       SELECT DISTINCT ON (source_id) *
+         FROM competitor_ai_extraction_page_logs
+        WHERE source_id IS NOT NULL
+        ORDER BY source_id, created_at DESC
+     )
+     SELECT * FROM latest`
+  ).catch(() => ({ rows: [] }));
+  return result.rows.map(publicAiExtractionPageLog);
+}
+
+async function validateAiQuoteAgainstSpot(quote = {}, spotMap = {}) {
+  const normalized = { ...quote };
+  const spot = spotMap[normalized.metal];
+  if (!spot || normalized.quote_type !== "customer_buyback") return { ok: true, quote: normalized, reason: "" };
+  const theoretical = Number(spot.price_per_gram || 0) * Number(normalized.purity_value || 0);
+  if (theoretical > 0 && Number(normalized.price_per_gram || 0) > theoretical * 1.05) {
+    return {
+      ok: false,
+      quote: normalized,
+      reason: "Prezzo AI superiore al valore teorico spot della purezza: non salvo come prezzo cliente."
+    };
+  }
+  return { ok: true, quote: normalized, reason: "" };
+}
+
+function rejectInconsistentAiPurityOrder(quotes = []) {
+  const rejected = [];
+  const valid = [...quotes];
+  const bySourceMetal = new Map();
+  valid.forEach((quote) => {
+    const key = `${quote.source_id || quote.competitor_name}:${quote.metal}:${quote.quote_type}`;
+    bySourceMetal.set(key, (bySourceMetal.get(key) || []).concat(quote));
+  });
+  for (const group of bySourceMetal.values()) {
+    if (group[0]?.metal !== "gold" || group[0]?.quote_type !== "customer_buyback") continue;
+    const priceByCode = Object.fromEntries(group.map((quote) => [quote.purity_code, Number(quote.price_per_gram || 0)]));
+    if (priceByCode["9kt"] && priceByCode["18kt"] && priceByCode["9kt"] > priceByCode["18kt"]) {
+      const index = valid.findIndex((quote) => quote.metal === "gold" && quote.purity_code === "9kt" && Number(quote.price_per_gram || 0) === priceByCode["9kt"]);
+      if (index >= 0) rejected.push({ quote: valid.splice(index, 1)[0], reason: "Oro 9kt maggiore di oro 18kt nella stessa fonte." });
+    }
+  }
+  return { valid, rejected };
+}
+
+async function saveAiExtractedCompetitorQuotes(quotes = [], { runId = null, user = {}, spotMap = {} } = {}) {
+  const saved = [];
+  const rejected = [];
+  const ordered = rejectInconsistentAiPurityOrder(quotes);
+  rejected.push(...ordered.rejected);
+  for (const quote of ordered.valid) {
+    const checked = await validateAiQuoteAgainstSpot(quote, spotMap);
+    if (!checked.ok) {
+      rejected.push({ quote, reason: checked.reason });
+      continue;
+    }
+    try {
+      saved.push(await insertCompetitorQuote({
+        ...checked.quote,
+        extraction_run_id: runId,
+        ai_extracted: true,
+        extraction_method: "ai_extraction",
+        confidence: checked.quote.ai_confidence || checked.quote.confidence || "medium",
+        source_url: checked.quote.source_url || checked.quote.url || "",
+        raw_payload: {
+          ...(checked.quote.raw_payload || {}),
+          extraction_run_id: runId,
+          saved_by: "ai_competitor_quote_extractor"
+        }
+      }, user));
+    } catch (error) {
+      rejected.push({ quote, reason: error.message || "quotazione AI non salvata" });
+    }
+  }
+  return { saved, rejected };
+}
+
+async function runAiCompetitorQuoteExtraction(options = {}) {
+  const force = Boolean(options.force);
+  if (!competitorAiExtractionEnabled && !force) {
+    return { ok: false, skipped: true, message: "Analisi AI competitor disattivata.", status: competitorAiExtractionPublicStatus() };
+  }
+  if (competitorAiExtractionState.running) {
+    return { ok: true, skipped: true, message: "Analisi AI competitor gia in corso.", status: competitorAiExtractionPublicStatus() };
+  }
+  competitorAiExtractionState.running = true;
+  competitorAiExtractionState.lastRunAt = new Date().toISOString();
+  competitorAiExtractionState.lastStatus = "running";
+  competitorAiExtractionState.lastError = "";
+  let run = null;
+  try {
+    const sourceParams = [];
+    const where = ["active = true"];
+    if (options.sourceId || options.source_id) {
+      sourceParams.push(options.sourceId || options.source_id);
+      where.push(`id = $${sourceParams.length}::bigint`);
+    }
+    const sourcesResult = await pool.query(
+      `SELECT *
+         FROM competitor_quote_sources
+        WHERE ${where.join(" AND ")}
+        ORDER BY name ASC`,
+      sourceParams
+    );
+    const sources = sourcesResult.rows.map(publicCompetitorSource);
+    run = await createAiExtractionRun({
+      sourcesTotal: sources.length,
+      metadata: {
+        force,
+        model: competitorAiExtractionModel,
+        max_pages_per_source: competitorAiMaxPagesPerSource,
+        max_text_chars: competitorAiMaxTextChars,
+        playwright_requested: competitorAiUsePlaywright,
+        openai_configured: Boolean(openai)
+      }
+    });
+    competitorAiExtractionState.lastRunId = run.id;
+    const spotMap = {
+      gold: await latestMetalPriceHistory("gold", goldPriceBaseCurrency).catch(() => null),
+      silver: await latestMetalPriceHistory("silver", goldPriceBaseCurrency).catch(() => null)
+    };
+    const results = [];
+    let pagesAnalyzed = 0;
+    let quotesExtracted = 0;
+    let quotesSaved = 0;
+    let sourcesSuccess = 0;
+    let sourcesFailed = 0;
+    for (const source of sources) {
+      const extracted = await aiCompetitorQuoteExtractor.extractQuotesFromCompetitor(source);
+      pagesAnalyzed += Number(extracted.pages_analyzed || extracted.pages?.length || 0);
+      quotesExtracted += Number(extracted.quotes_found || extracted.quotes?.length || 0);
+      for (const page of extracted.pages || []) {
+        await insertAiExtractionPageLog(run.id, source, page);
+      }
+      const saved = await saveAiExtractedCompetitorQuotes(extracted.quotes || [], { runId: run.id, user: options.user || {}, spotMap });
+      quotesSaved += saved.saved.length;
+      const status = saved.saved.length
+        ? extracted.status === "failed" ? "partial" : extracted.status
+        : extracted.status;
+      if (saved.saved.length) sourcesSuccess += 1;
+      if (!saved.saved.length || status === "failed") sourcesFailed += 1;
+      const errorMessage = [
+        ...(extracted.warnings || []),
+        ...(extracted.pages || []).map((page) => page.error_message).filter(Boolean),
+        ...saved.rejected.map((item) => item.reason || item.reasons?.join(", ") || "").filter(Boolean)
+      ].join(" | ").slice(0, 1200);
+      await updateCompetitorSourceSyncStatus(source.id, status || "no_quotes", new Date().toISOString(), errorMessage, nextCompetitorSyncDate(source));
+      results.push({
+        source,
+        status: status || "no_quotes",
+        pages_analyzed: extracted.pages?.length || 0,
+        quotes_found: extracted.quotes?.length || 0,
+        quotes_saved: saved.saved.length,
+        rejected: saved.rejected.length,
+        error: errorMessage
+      });
+    }
+    const finalStatus = sourcesFailed && sourcesSuccess ? "partial" : sourcesFailed && !sourcesSuccess ? "failed" : "success";
+    const finished = await finishAiExtractionRun(run.id, {
+      status: finalStatus,
+      sources_success: sourcesSuccess,
+      sources_failed: sourcesFailed,
+      pages_analyzed: pagesAnalyzed,
+      quotes_extracted: quotesExtracted,
+      quotes_saved: quotesSaved,
+      error_message: results.map((item) => item.error).filter(Boolean).join(" | ").slice(0, 1200),
+      metadata: { results: results.slice(0, 20) }
+    });
+    const summary = await calculateCompetitorMarketSummary({ currency: goldPriceBaseCurrency }).catch(() => null);
+    competitorAiExtractionState.lastStatus = finalStatus;
+    competitorAiExtractionState.lastSummary = summary;
+    competitorAiExtractionState.nextRunAt = new Date(Date.now() + competitorAiExtractionIntervalMinutes * 60 * 1000).toISOString();
+    void writeAuditLog({
+      req: options.req,
+      user: options.user,
+      action: "competitor_ai_extraction_run",
+      entityType: "competitor_quotes",
+      entityId: run.id,
+      entityLabel: "Analisi AI competitor",
+      afterData: publicAiExtractionRun(finished),
+      metadata: { force }
+    });
+    return {
+      ok: true,
+      run: publicAiExtractionRun(finished),
+      results,
+      summary,
+      status: competitorAiExtractionPublicStatus()
+    };
+  } catch (error) {
+    competitorAiExtractionState.lastStatus = "failed";
+    competitorAiExtractionState.lastError = error.message || "Analisi AI competitor non riuscita";
+    if (run?.id) {
+      await finishAiExtractionRun(run.id, {
+        status: "failed",
+        error_message: competitorAiExtractionState.lastError
+      }).catch(() => {});
+    }
+    throw error;
+  } finally {
+    competitorAiExtractionState.running = false;
+  }
+}
+
+function competitorAiExtractionPublicStatus() {
+  return {
+    enabled: competitorAiExtractionEnabled,
+    auto_enabled: competitorAiAutoExtractionEnabled,
+    running: competitorAiExtractionState.running,
+    interval_minutes: competitorAiExtractionIntervalMinutes,
+    on_startup: competitorAiExtractionOnStartup,
+    max_pages_per_source: competitorAiMaxPagesPerSource,
+    timeout_ms: competitorAiExtractionTimeoutMs,
+    use_playwright: competitorAiUsePlaywright,
+    max_text_chars: competitorAiMaxTextChars,
+    model: competitorAiExtractionModel,
+    openai_configured: Boolean(openai),
+    last_run_at: competitorAiExtractionState.lastRunAt,
+    next_run_at: competitorAiExtractionState.nextRunAt,
+    last_status: competitorAiExtractionState.lastStatus,
+    last_error: competitorAiExtractionState.lastError,
+    last_run_id: competitorAiExtractionState.lastRunId,
+    last_summary: competitorAiExtractionState.lastSummary
+  };
+}
+
+function startCompetitorAiAutoExtraction() {
+  if (!competitorAiExtractionEnabled || !competitorAiAutoExtractionEnabled || competitorAiExtractionState.timer) {
+    return competitorAiExtractionPublicStatus();
+  }
+  competitorAiExtractionState.nextRunAt = new Date(Date.now() + competitorAiExtractionIntervalMinutes * 60 * 1000).toISOString();
+  if (competitorAiExtractionOnStartup) {
+    setTimeout(() => {
+      runAiCompetitorQuoteExtraction({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        competitorAiExtractionState.lastStatus = "failed";
+        competitorAiExtractionState.lastError = error.message || "Analisi AI startup fallita";
+        console.error("Errore analisi AI competitor", error);
+      });
+    }, 5000).unref?.();
+  }
+  competitorAiExtractionState.timer = setInterval(() => {
+    runAiCompetitorQuoteExtraction({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      competitorAiExtractionState.lastStatus = "failed";
+      competitorAiExtractionState.lastError = error.message || "Analisi AI competitor fallita";
+      console.error("Errore analisi AI competitor", error);
+    });
+  }, competitorAiExtractionIntervalMinutes * 60 * 1000);
+  competitorAiExtractionState.timer.unref?.();
+  return competitorAiExtractionPublicStatus();
+}
+
+function stopCompetitorAiAutoExtraction() {
+  if (competitorAiExtractionState.timer) clearInterval(competitorAiExtractionState.timer);
+  competitorAiExtractionState.timer = null;
+  competitorAiExtractionState.nextRunAt = null;
+  return competitorAiExtractionPublicStatus();
 }
 
 function scenarioPredictionPrice(prediction = {}, scenario = "standard") {
@@ -17657,7 +18120,11 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
     const updatedSources = sources.filter((source) => ["success", "updated", "partial"].includes(String(source.last_sync_status || "").toLowerCase())).length;
     const failedSources = sources.filter((source) => String(source.last_sync_status || "").toLowerCase() === "failed").length;
     const validQuotes = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM competitor_buyback_quotes WHERE quote_date >= NOW() - INTERVAL '24 hours'"
+      `SELECT COUNT(*)::int AS count
+         FROM competitor_buyback_quotes
+        WHERE quote_date >= NOW() - INTERVAL '24 hours'
+          AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
+          AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')`
     ).catch(() => ({ rows: [{ count: 0 }] }));
     response.json({
       ok: true,
@@ -17668,6 +18135,87 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       valid_quotes_24h: Number(validQuotes.rows[0]?.count || 0),
       sources,
       recent_logs: logs
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/ai-extract/run", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await runAiCompetitorQuoteExtraction({
+      force: true,
+      sourceId: request.body?.source_id || request.body?.sourceId || null,
+      user: request.user,
+      req: request
+    }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/competitors/ai-extract/status", async (request, response, next) => {
+  try {
+    if (!["founder", "responsabile"].includes(normalizeRole(request.user?.ruolo))) {
+      return response.status(403).json({ ok: false, error: "Non autorizzato" });
+    }
+    const [runs, pageSummary, aiQuotes] = await Promise.all([
+      listAiExtractionRuns({ limit: 5 }).catch(() => []),
+      latestAiExtractionPageSummary().catch(() => []),
+      listAiCompetitorQuotes({ days: 1, limit: 500 }).catch(() => [])
+    ]);
+    const sources = await listCompetitorSources();
+    response.json({
+      ok: true,
+      status: competitorAiExtractionPublicStatus(),
+      sources_total: sources.length,
+      sources_success: pageSummary.filter((page) => ["success", "partial"].includes(String(page.status || "").toLowerCase())).length,
+      sources_failed: pageSummary.filter((page) => String(page.status || "").toLowerCase() === "failed").length,
+      pages_analyzed: pageSummary.length,
+      quotes_24h: aiQuotes.length,
+      latest_run: runs[0] || null,
+      recent_runs: runs,
+      page_summary: pageSummary,
+      sources
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/competitors/ai-extract/runs", async (request, response, next) => {
+  try {
+    if (!["founder", "responsabile"].includes(normalizeRole(request.user?.ruolo))) {
+      return response.status(403).json({ ok: false, error: "Non autorizzato" });
+    }
+    response.json({ ok: true, runs: await listAiExtractionRuns({ limit: request.query.limit || 40 }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/competitors/ai-extract/runs/:id", requireFounder, async (request, response, next) => {
+  try {
+    const detail = await getAiExtractionRun(request.params.id);
+    if (!detail) return response.status(404).json({ ok: false, error: "Run AI competitor non trovata" });
+    response.json({ ok: true, ...detail });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/competitors/quotes/ai", async (request, response, next) => {
+  try {
+    const currency = normalizePredictionCurrency(request.query.currency || goldPriceBaseCurrency);
+    response.json({
+      ok: true,
+      currency,
+      quotes: await listAiCompetitorQuotes({
+        currency,
+        days: request.query.days || 30,
+        limit: request.query.limit || 200,
+        validOnly: request.query.valid_only === "true" || request.query.validOnly === "true"
+      })
     });
   } catch (error) {
     next(error);
@@ -18847,6 +19395,7 @@ initDatabase()
     runtimeStatus.databaseError = "";
     scheduleBackups();
     startCompetitorAutoSync();
+    startCompetitorAiAutoExtraction();
   })
   .catch((error) => {
     runtimeStatus.databaseReady = false;

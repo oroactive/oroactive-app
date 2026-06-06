@@ -5119,6 +5119,39 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   font-weight: 800;
 }
 
+.competitor-ai-sync-card {
+  border-color: rgba(255, 215, 0, 0.3);
+  background:
+    linear-gradient(135deg, rgba(255, 215, 0, 0.13), rgba(255, 106, 0, 0.06)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.competitor-ai-evidence {
+  max-width: 280px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.competitor-ai-evidence summary {
+  cursor: pointer;
+  color: #ffd700;
+  font-weight: 900;
+}
+
+.competitor-ai-evidence p {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid rgba(255, 184, 76, 0.18);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.competitor-ai-evidence a {
+  color: #ffcf77;
+  font-weight: 900;
+}
+
 .competitor-quotes-list h5 {
   margin: 16px 0 8px;
   color: #ffffff;

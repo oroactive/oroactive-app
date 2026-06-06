@@ -151,7 +151,7 @@ test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () =>
 });
 
 test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
-  const [index, app, server, schema, goldPredictionMigration, metalBuybackMigration, competitorMigration, bullionVaultProvider] = await Promise.all([
+  const [index, app, server, schema, goldPredictionMigration, metalBuybackMigration, competitorMigration, competitorAiMigration, bullionVaultProvider, aiCompetitorExtractor] = await Promise.all([
     file("index.html"),
     file("app.js"),
     file("server.js"),
@@ -159,7 +159,9 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
     file("migrations/20260605_gold_price_prediction.sql"),
     file("migrations/20260605_metal_buyback_pricing.sql"),
     file("migrations/20260606_metal_competitor_quotes.sql"),
-    file("services/marketData/bullionVaultProvider.js")
+    file("migrations/20260606_competitor_ai_extraction.sql"),
+    file("services/marketData/bullionVaultProvider.js"),
+    file("services/competitors/aiCompetitorQuoteExtractor.js")
   ]);
 
   assert.doesNotMatch(index, /Quotazioni e andamento di oro, argento, platino e diamanti/);
@@ -227,8 +229,15 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(app, /function competitorAutoSyncSummaryHtml/);
   assert.match(app, /async function forceCompetitorAutoSync/);
   assert.match(app, /async function toggleCompetitorAutoSync/);
+  assert.match(app, /function competitorAiExtractionSummaryHtml/);
+  assert.match(app, /async function runAiCompetitorExtraction/);
   assert.match(app, /data-force-competitor-sync/);
   assert.match(app, /data-toggle-competitor-auto-sync/);
+  assert.match(app, /data-run-ai-competitor-extract/);
+  assert.match(app, /competitorAiStatus/);
+  assert.match(app, /competitorAiQuotes/);
+  assert.match(app, /evidence_text/);
+  assert.match(app, /quote_type/);
   assert.match(app, /function collectBuybackPolicyRows/);
   assert.match(app, /function askAurumGoldPrediction/);
   assert.match(app, /apiRequest\("\/quotazioni\/metals\/status"/);
@@ -241,6 +250,9 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(app, /apiRequest\("\/quotazioni\/competitors\/sources"/);
   assert.match(app, /apiRequest\("\/quotazioni\/competitors\/quotes\/manual"/);
   assert.match(app, /apiRequest\("\/quotazioni\/competitors\/quotes\/import-csv"/);
+  assert.match(app, /apiRequest\("\/quotazioni\/competitors\/ai-extract\/status"/);
+  assert.match(app, /apiRequest\("\/quotazioni\/competitors\/ai-extract\/run"/);
+  assert.match(app, /quotazioni\/competitors\/quotes\/ai\?days=30&currency=/);
   assert.match(app, /apiRequest\("\/quotazioni\/gold-prediction\/settings"/);
   assert.match(server, /import \{ fetchBullionVaultSpotPrice \}/);
   assert.match(server, /function calculateGoldPrediction/);
@@ -251,6 +263,17 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(server, /price_explanation/);
   assert.match(server, /CONTESTO PREZZO AURUM/);
   assert.match(server, /async function competitorQuoteStats/);
+  assert.match(server, /createAiCompetitorQuoteExtractor/);
+  assert.match(server, /AI_COMPETITOR_EXTRACTION_ENABLED/);
+  assert.match(server, /COMPETITOR_AI_AUTO_EXTRACTION_ENABLED/);
+  assert.match(server, /async function runAiCompetitorQuoteExtraction/);
+  assert.match(server, /async function saveAiExtractedCompetitorQuotes/);
+  assert.match(server, /competitor_ai_extraction_runs/);
+  assert.match(server, /app\.post\("\/api\/quotazioni\/competitors\/ai-extract\/run"/);
+  assert.match(server, /app\.get\("\/api\/quotazioni\/competitors\/ai-extract\/status"/);
+  assert.match(server, /app\.get\("\/api\/quotazioni\/competitors\/ai-extract\/runs"/);
+  assert.match(server, /app\.get\("\/api\/quotazioni\/competitors\/ai-extract\/runs\/:id"/);
+  assert.match(server, /app\.get\("\/api\/quotazioni\/competitors\/quotes\/ai"/);
   assert.match(server, /DEFAULT_COMPETITOR_SOURCES/);
   assert.match(server, /Oro Express/);
   assert.match(server, /Oro D'oro/);
@@ -311,6 +334,12 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(schema, /CREATE TABLE IF NOT EXISTS metal_buyback_calculations/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS competitor_quote_sources/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS competitor_buyback_quotes/);
+  assert.match(schema, /ai_extracted BOOLEAN DEFAULT false/);
+  assert.match(schema, /ai_confidence TEXT DEFAULT 'medium'/);
+  assert.match(schema, /evidence_text TEXT NULL/);
+  assert.match(schema, /quote_type TEXT DEFAULT 'customer_buyback'/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS competitor_ai_extraction_runs/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS competitor_ai_extraction_page_logs/);
   assert.match(schema, /auto_sync_enabled BOOLEAN DEFAULT true/);
   assert.match(schema, /extraction_config JSONB DEFAULT '\{\}'::jsonb/);
   assert.match(schema, /last_sync_error TEXT NULL/);
@@ -325,17 +354,36 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(competitorMigration, /ALTER TABLE metal_price_history ADD COLUMN IF NOT EXISTS raw_payload/);
   assert.match(competitorMigration, /CREATE TABLE IF NOT EXISTS competitor_quote_sources/);
   assert.match(competitorMigration, /CREATE TABLE IF NOT EXISTS competitor_buyback_quotes/);
+  assert.match(competitorMigration, /ai_extracted BOOLEAN DEFAULT false/);
+  assert.match(competitorMigration, /evidence_text TEXT NULL/);
+  assert.match(competitorMigration, /CREATE TABLE IF NOT EXISTS competitor_ai_extraction_runs/);
   assert.match(competitorMigration, /auto_sync_enabled BOOLEAN DEFAULT true/);
   assert.match(competitorMigration, /next_sync_at TIMESTAMPTZ NULL/);
   assert.match(competitorMigration, /CREATE TABLE IF NOT EXISTS competitor_quote_sync_logs/);
   assert.match(competitorMigration, /last_sync_status TEXT DEFAULT 'not_synced'/);
   assert.match(competitorMigration, /idx_competitor_quotes_competitor/);
+  assert.match(competitorAiMigration, /ALTER TABLE competitor_buyback_quotes/);
+  assert.match(competitorAiMigration, /ADD COLUMN IF NOT EXISTS ai_extracted BOOLEAN DEFAULT false/);
+  assert.match(competitorAiMigration, /ADD COLUMN IF NOT EXISTS evidence_text TEXT NULL/);
+  assert.match(competitorAiMigration, /CREATE TABLE IF NOT EXISTS competitor_ai_extraction_runs/);
+  assert.match(competitorAiMigration, /CREATE TABLE IF NOT EXISTS competitor_ai_extraction_page_logs/);
   assert.match(bullionVaultProvider, /export async function fetchBullionVaultSpotPrice/);
+  assert.match(aiCompetitorExtractor, /export function createAiCompetitorQuoteExtractor/);
+  assert.match(aiCompetitorExtractor, /async function discoverRelevantQuotePages/);
+  assert.match(aiCompetitorExtractor, /async function extractQuotesWithAi/);
+  assert.match(aiCompetitorExtractor, /function normalizeAiQuote/);
+  assert.match(aiCompetitorExtractor, /function validateExtractedQuotes/);
+  assert.match(aiCompetitorExtractor, /Non devi inventare dati/);
+  assert.match(aiCompetitorExtractor, /json_schema/);
+  assert.match(aiCompetitorExtractor, /customer_buyback/);
   assert.doesNotMatch(index + app, /ALPHA_VANTAGE_API_KEY/);
+  assert.doesNotMatch(index + app, /OPENAI_API_KEY/);
   assert.match(styles, /gold-prediction-panel/);
   assert.match(styles, /buyback-simulator-form/);
   assert.match(styles, /buyback-policy-grid/);
   assert.match(styles, /competitor-auto-sync-card/);
+  assert.match(styles, /competitor-ai-sync-card/);
+  assert.match(styles, /competitor-ai-evidence/);
   assert.match(styles, /competitor-quote-form/);
 });
 
@@ -881,7 +929,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -934,7 +982,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -986,7 +1034,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -1056,9 +1104,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260606-competitor-auto-sync-1/);
-  assert.match(index, /styles\.css\?v=20260606-competitor-auto-sync-1/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(index, /app\.js\?v=20260606-competitor-ai-extract-1/);
+  assert.match(index, /styles\.css\?v=20260606-competitor-ai-extract-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -1104,8 +1152,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260606-competitor-auto-sync-1/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(index, /styles\.css\?v=20260606-competitor-ai-extract-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -1178,7 +1226,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -1282,7 +1330,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -1333,9 +1381,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260606-competitor-auto-sync-1/);
-  assert.match(index, /styles\.css\?v=20260606-competitor-auto-sync-1/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(index, /app\.js\?v=20260606-competitor-ai-extract-1/);
+  assert.match(index, /styles\.css\?v=20260606-competitor-ai-extract-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -1392,9 +1440,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260606-competitor-auto-sync-1/);
-  assert.match(index, /styles\.css\?v=20260606-competitor-auto-sync-1/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(index, /app\.js\?v=20260606-competitor-ai-extract-1/);
+  assert.match(index, /styles\.css\?v=20260606-competitor-ai-extract-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -1472,7 +1520,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -1589,7 +1637,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -1633,7 +1681,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /competitor-auto-sync-1/);
+  assert.match(worker, /competitor-ai-extract-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i

@@ -45,6 +45,8 @@ const state = {
   buybackScenario: "standard",
   competitorSources: [],
   competitorQuotes: [],
+  competitorAiStatus: null,
+  competitorAiQuotes: [],
   competitorStats: {},
   buybackSimulationContext: null,
   lastActCaptureAttachments: [],
@@ -12075,11 +12077,84 @@ function competitorAutoSyncSummaryHtml() {
   `;
 }
 
+function competitorAiExtractionSummaryHtml() {
+  const ai = state.competitorAiStatus || {};
+  const status = ai.status || {};
+  const hasStatus = Boolean(ai.status);
+  const latest = ai.latest_run || {};
+  const sourcesTotal = Number(latest.sources_total || status.sources_total || state.competitorSources?.length || 0);
+  const sourcesSuccess = Number(latest.sources_success || 0);
+  const sourcesFailed = Number(latest.sources_failed || 0);
+  const pagesAnalyzed = Number(latest.pages_analyzed || 0);
+  const quotesSaved = Number(latest.quotes_saved || 0);
+  const validQuotes = Number(ai.quotes_24h || state.competitorAiQuotes?.length || 0);
+  const lastError = status.last_error || latest.error_message || "";
+  return `
+    <article class="competitor-auto-sync-card competitor-ai-sync-card">
+      <div>
+        <span>Analisi AI competitor</span>
+        <strong>${hasStatus ? status.enabled ? "Attiva" : "Disattiva" : "Stato riservato"}</strong>
+      </div>
+      <div>
+        <span>AI backend</span>
+        <strong>${hasStatus ? status.openai_configured ? "Configurata" : "Non configurata" : "Riservata"}</strong>
+      </div>
+      <div>
+        <span>Ultima analisi</span>
+        <strong>${status.last_run_at ? escapeHtml(formatDateTime(status.last_run_at)) : latest.started_at ? escapeHtml(formatDateTime(latest.started_at)) : "Non ancora eseguita"}</strong>
+      </div>
+      <div>
+        <span>Prossima analisi</span>
+        <strong>${status.next_run_at ? escapeHtml(formatDateTime(status.next_run_at)) : "Non pianificata"}</strong>
+      </div>
+      <div>
+        <span>Fonti ok/fallite</span>
+        <strong>${sourcesSuccess}/${sourcesTotal} · ${sourcesFailed} KO</strong>
+      </div>
+      <div>
+        <span>Pagine / quote</span>
+        <strong>${pagesAnalyzed} pagine · ${quotesSaved || validQuotes} quote</strong>
+      </div>
+      ${status.running ? `<p>Analisi AI competitor in corso. I nuovi dati compariranno appena il backend completa il run.</p>` : ""}
+      ${lastError ? `<p>${escapeHtml(lastError)}</p>` : ""}
+      ${isFounder() ? `<button class="ghost-button" type="button" data-run-ai-competitor-extract="all">Riesegui analisi AI</button>` : ""}
+    </article>
+  `;
+}
+
 function competitorSourceForQuote(quote = {}) {
   const sources = state.competitorSources || [];
   return sources.find((source) => String(source.id) === String(quote.source_id))
     || sources.find((source) => source.name?.toLowerCase() === quote.competitor_name?.toLowerCase())
     || {};
+}
+
+function competitorAiPageForSource(source = {}) {
+  const summary = state.competitorAiStatus?.page_summary || [];
+  return summary.find((page) => String(page.source_id || "") === String(source.id || ""))
+    || summary.find((page) => page.competitor_name?.toLowerCase() === source.name?.toLowerCase())
+    || {};
+}
+
+function competitorQuoteTypeLabel(type = "") {
+  const normalized = String(type || "customer_buyback").toLowerCase();
+  if (normalized === "customer_buyback") return "Prezzo cliente";
+  if (normalized === "spot_price") return "Spot";
+  if (normalized === "theoretical_price") return "Teorico";
+  return "Da verificare";
+}
+
+function competitorEvidenceHtml(quote = {}) {
+  const evidence = String(quote.evidence_text || "").trim();
+  if (!evidence) return "—";
+  const sourceUrl = quote.source_url || quote.url || "";
+  return `
+    <details class="competitor-ai-evidence">
+      <summary>Vedi prova</summary>
+      <p>${escapeHtml(evidence.slice(0, 320))}${evidence.length > 320 ? "..." : ""}</p>
+      ${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Apri fonte</a>` : ""}
+    </details>
+  `;
 }
 
 function competitorMarketSummaryRows() {
@@ -12220,6 +12295,17 @@ function buildPriceExplanationContext(row = {}, options = {}) {
     competitor_valid_quotes_24h: Number(state.competitorSyncStatus?.valid_quotes_24h || 0),
     competitor_sync_last_run_at: state.competitorSyncStatus?.status?.last_run_at || null,
     competitor_sync_next_run_at: state.competitorSyncStatus?.status?.next_run_at || null,
+    competitor_ai_enabled: Boolean(state.competitorAiStatus?.status?.enabled),
+    competitor_ai_openai_configured: Boolean(state.competitorAiStatus?.status?.openai_configured),
+    competitor_ai_running: Boolean(state.competitorAiStatus?.status?.running),
+    competitor_ai_last_run_at: state.competitorAiStatus?.status?.last_run_at || state.competitorAiStatus?.latest_run?.started_at || null,
+    competitor_ai_next_run_at: state.competitorAiStatus?.status?.next_run_at || null,
+    competitor_ai_sources_success: Number(state.competitorAiStatus?.latest_run?.sources_success || 0),
+    competitor_ai_sources_failed: Number(state.competitorAiStatus?.latest_run?.sources_failed || 0),
+    competitor_ai_pages_analyzed: Number(state.competitorAiStatus?.latest_run?.pages_analyzed || 0),
+    competitor_ai_quotes_saved: Number(state.competitorAiStatus?.latest_run?.quotes_saved || 0),
+    competitor_ai_quotes_24h: Number(state.competitorAiStatus?.quotes_24h || state.competitorAiQuotes?.length || 0),
+    competitor_ai_last_error: state.competitorAiStatus?.status?.last_error || state.competitorAiStatus?.latest_run?.error_message || "",
     competitor_failed_sources: (state.competitorSyncStatus?.sources || [])
       .filter((source) => String(source.last_sync_status || "").toLowerCase() === "failed")
       .map((source) => source.name)
@@ -12237,6 +12323,10 @@ function buildPriceExplanationContext(row = {}, options = {}) {
     last_update: row.created_at || prediction.created_at || latestMetalHistoryDate(metal) || null,
     source: row.source || prediction.source || latestMetalHistorySource(metal) || "fallback",
     model_features: prediction.features || row.features || {},
+    ai_quote_type: row.quote_type || null,
+    ai_confidence: row.ai_confidence || null,
+    evidence_text: row.evidence_text || null,
+    source_url: row.source_url || row.url || null,
     grams: aurumHasNumber(options.grams) ? Number(options.grams) : null,
     theoretical_total: aurumHasNumber(options.grams) && aurumHasNumber(row.theoretical_value_per_gram) ? Number(options.grams) * Number(row.theoretical_value_per_gram) : null,
     max_payable_total: aurumHasNumber(options.grams) && aurumHasNumber(row.max_payable_per_gram) ? Number(options.grams) * Number(row.max_payable_per_gram) : null,
@@ -12279,6 +12369,17 @@ function buildGeneralPriceExplanationContext() {
     competitor_sync_next_run_at: syncStatus.next_run_at || null,
     competitor_sync_last_error: syncStatus.last_error || "",
     competitor_failed_sources: failedSources,
+    competitor_ai_enabled: Boolean(state.competitorAiStatus?.status?.enabled),
+    competitor_ai_openai_configured: Boolean(state.competitorAiStatus?.status?.openai_configured),
+    competitor_ai_running: Boolean(state.competitorAiStatus?.status?.running),
+    competitor_ai_last_run_at: state.competitorAiStatus?.status?.last_run_at || state.competitorAiStatus?.latest_run?.started_at || null,
+    competitor_ai_next_run_at: state.competitorAiStatus?.status?.next_run_at || null,
+    competitor_ai_sources_success: Number(state.competitorAiStatus?.latest_run?.sources_success || 0),
+    competitor_ai_sources_failed: Number(state.competitorAiStatus?.latest_run?.sources_failed || 0),
+    competitor_ai_pages_analyzed: Number(state.competitorAiStatus?.latest_run?.pages_analyzed || 0),
+    competitor_ai_quotes_saved: Number(state.competitorAiStatus?.latest_run?.quotes_saved || 0),
+    competitor_ai_quotes_24h: Number(state.competitorAiStatus?.quotes_24h || state.competitorAiQuotes?.length || 0),
+    competitor_ai_last_error: state.competitorAiStatus?.status?.last_error || state.competitorAiStatus?.latest_run?.error_message || "",
     gold: buildPriceExplanationContext(gold, { type: "summary", metal: "gold", purity_code: gold.purity_code || "18kt" }),
     silver: buildPriceExplanationContext(silver, { type: "summary", metal: "silver", purity_code: silver.purity_code || "925" })
   };
@@ -12312,8 +12413,17 @@ function competitorExplanation(context = {}) {
   if (Number(context.competitor_sources_failed || 0)) syncParts.push(`${context.competitor_sources_failed} fonti fallite`);
   if (context.competitor_failed_sources?.length) syncParts.push(`fonti da verificare: ${context.competitor_failed_sources.join(", ")}`);
   const syncText = syncParts.length ? ` Stato auto sync: ${syncParts.join("; ")}.` : "";
+  const aiParts = [];
+  if (context.competitor_ai_last_run_at) aiParts.push(`ultima analisi AI ${formatDateTime(context.competitor_ai_last_run_at)}`);
+  if (Number(context.competitor_ai_pages_analyzed || 0)) aiParts.push(`${context.competitor_ai_pages_analyzed} pagine analizzate`);
+  if (Number(context.competitor_ai_quotes_24h || context.competitor_ai_quotes_saved || 0)) aiParts.push(`${context.competitor_ai_quotes_24h || context.competitor_ai_quotes_saved} quotazioni AI valide/recenti`);
+  if (Number(context.competitor_ai_sources_failed || 0)) aiParts.push(`${context.competitor_ai_sources_failed} fonti senza dati o fallite`);
+  if (context.competitor_ai_last_error) aiParts.push(`ultimo errore AI: ${context.competitor_ai_last_error}`);
+  const aiText = aiParts.length
+    ? ` Analisi AI: ${aiParts.join("; ")}.`
+    : ` Analisi AI: ${context.competitor_ai_enabled ? "attiva ma senza quotazioni cliente valide ancora disponibili" : "non disponibile o disattiva"}.`;
   if (!Number(context.competitor_count || 0)) {
-    return `Confronto competitor: non ci sono rilevazioni competitor disponibili per questa voce. Aurum non inventa prezzi esterni: serve inserimento manuale, CSV o fonte configurata.${syncText}`;
+    return `Confronto competitor: non ci sono rilevazioni competitor disponibili per questa voce. Aurum non inventa prezzi esterni: serve inserimento manuale, CSV, fonte configurata o analisi AI con prova testuale.${syncText}${aiText}`;
   }
   const currency = context.currency || "EUR";
   const recommended = Number(context.recommended_payable_per_gram || 0);
@@ -12332,7 +12442,7 @@ function competitorExplanation(context = {}) {
     ? ` Il prezzo migliore di mercato sostenibile è ${formatAurumGram(bestMarket, currency)}: ${context.market_price_reason || marketStatusLabel(context.market_comparison_status)}.`
     : "";
   const approvalText = context.requires_founder_approval ? " Serve attenzione: per superare il limite sostenibile è richiesta approvazione Founder." : "";
-  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${syncText}`;
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${syncText}${aiText}`;
 }
 
 function formulaExplanation(context = {}) {
@@ -12355,6 +12465,9 @@ function generateGeneralPriceExplanation(context = {}) {
   const competitorSync = context.competitor_sync_last_run_at
     ? `Auto aggiornamento competitor: ${context.competitor_sync_status || "stato non disponibile"}, ultimo run ${formatDateTime(context.competitor_sync_last_run_at)}${context.competitor_sync_next_run_at ? `, prossimo run ${formatDateTime(context.competitor_sync_next_run_at)}` : ""}. Fonti aggiornate: ${context.competitor_sources_updated || 0}/${context.competitor_sources_total || 0}; fonti fallite: ${context.competitor_sources_failed || 0}; prezzi validi 24h: ${context.competitor_valid_quotes_24h || 0}.`
     : `Auto aggiornamento competitor: ${context.competitor_sync_enabled ? "attivo" : "non disponibile o disattivo"}.`;
+  const competitorAi = context.competitor_ai_last_run_at
+    ? `Analisi AI competitor: ultimo run ${formatDateTime(context.competitor_ai_last_run_at)}${context.competitor_ai_next_run_at ? `, prossimo run ${formatDateTime(context.competitor_ai_next_run_at)}` : ""}. Pagine analizzate: ${context.competitor_ai_pages_analyzed || 0}; quotazioni AI recenti: ${context.competitor_ai_quotes_24h || 0}; fonti fallite o senza dati: ${context.competitor_ai_sources_failed || 0}.`
+    : `Analisi AI competitor: ${context.competitor_ai_enabled ? "attiva, ma senza un run completato disponibile" : "non disponibile o disattiva"}${context.competitor_ai_openai_configured ? "" : " e modello AI backend non configurato"}.`;
   return `Spiegazione generale Analisi Predittiva Metalli
 
 Scenario attivo
@@ -12367,7 +12480,7 @@ Argento
 Per l'argento il riferimento operativo è ${silver.purity_code || "925"}: valore teorico ${formatAurumGram(silver.theoretical_value_per_gram, silver.currency)}, massimo pagabile ${formatAurumGram(silver.max_payable_per_gram, silver.currency)}, consigliato ${formatAurumGram(silver.recommended_payable_per_gram, silver.currency)}. ${trendExplanation(silver)}
 
 Competitor e fonti
-${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${competitorSync} ${context.competitor_sync_last_error ? `Ultimo errore: ${context.competitor_sync_last_error}.` : ""} ${context.warning ? `Nota dati: ${context.warning}` : ""}
+${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${competitorSync} ${competitorAi} ${context.competitor_sync_last_error ? `Ultimo errore sync: ${context.competitor_sync_last_error}.` : ""} ${context.competitor_ai_last_error ? `Ultimo errore AI: ${context.competitor_ai_last_error}.` : ""} ${context.warning ? `Nota dati: ${context.warning}` : ""}
 
 Avviso finale
 Questa è una stima operativa e non una garanzia di prezzo. Il prezzo finale resta definito dalle policy OroActive e dall'operatore autorizzato.`;
@@ -12711,6 +12824,7 @@ function renderGoldPredictionExplanation() {
 function renderCompetitorQuotes() {
   if (!competitorQuotesList) return;
   const quotes = state.competitorQuotes || [];
+  const aiQuotes = state.competitorAiQuotes || [];
   const sources = state.competitorSources || [];
   const sourceTable = sources.length ? `
     <div class="competitor-table-wrap">
@@ -12723,6 +12837,7 @@ function renderCompetitorQuotes() {
             <th>Auto sync</th>
             <th>Attendibilità</th>
             <th>Stato aggiornamento</th>
+            <th>Analisi AI</th>
             <th>Ultimo aggiornamento</th>
             <th>Prossimo aggiornamento</th>
             <th>Errore</th>
@@ -12730,27 +12845,35 @@ function renderCompetitorQuotes() {
           </tr>
         </thead>
         <tbody>
-          ${sources.map((source) => `
-            <tr>
-              <td>${escapeHtml(source.name)}</td>
-              <td>${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
-              <td>${escapeHtml(source.source_type || "manual")}</td>
-              <td>${source.auto_sync_enabled ? "On" : "Off"} · ${escapeHtml(String(source.sync_interval_minutes || 180))} min</td>
-              <td>Media</td>
-              <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
-              <td>${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "Da aggiornare"}</td>
-              <td>${source.next_sync_at ? escapeHtml(formatDateTime(source.next_sync_at)) : "Non pianificato"}</td>
-              <td>${source.last_sync_error ? escapeHtml(source.last_sync_error) : "—"}</td>
-              <td>
-                ${source.website_url ? `<a class="small-button" href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : ""}
-                ${isFounder() ? `<button class="small-button" type="button" data-force-competitor-sync="${escapeHtml(source.id)}">Forza sync</button>` : ""}
-                <button class="small-button" type="button" data-fill-competitor-source="${escapeHtml(source.id)}">Aggiungi quotazione</button>
-                ${isFounder() ? `<button class="small-button" type="button" data-toggle-competitor-auto-sync="${escapeHtml(source.id)}" data-next-auto-sync="${source.auto_sync_enabled ? "false" : "true"}">${source.auto_sync_enabled ? "Disattiva auto sync" : "Attiva auto sync"}</button>` : ""}
-                ${isFounder() && source.active !== false ? `<button class="small-button" type="button" data-disable-competitor-source="${escapeHtml(source.id)}">Disattiva fonte</button>` : ""}
-                <span class="muted">${source.active === false ? "Disattivata" : "Attiva"}</span>
-              </td>
-            </tr>
-          `).join("")}
+          ${sources.map((source) => {
+            const aiPage = competitorAiPageForSource(source);
+            const aiStatus = aiPage.status
+              ? `${aiPage.status}${Number(aiPage.quotes_found || 0) ? ` · ${aiPage.quotes_found} quote` : ""}`
+              : "Non ancora analizzata";
+            return `
+              <tr>
+                <td>${escapeHtml(source.name)}</td>
+                <td>${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
+                <td>${escapeHtml(source.source_type || "manual")}</td>
+                <td>${source.auto_sync_enabled ? "On" : "Off"} · ${escapeHtml(String(source.sync_interval_minutes || 180))} min</td>
+                <td>Media</td>
+                <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
+                <td>${escapeHtml(aiStatus)}</td>
+                <td>${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "Da aggiornare"}</td>
+                <td>${source.next_sync_at ? escapeHtml(formatDateTime(source.next_sync_at)) : "Non pianificato"}</td>
+                <td>${source.last_sync_error || aiPage.error_message ? escapeHtml(source.last_sync_error || aiPage.error_message) : "—"}</td>
+                <td>
+                  ${source.website_url ? `<a class="small-button" href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : ""}
+                  ${isFounder() ? `<button class="small-button" type="button" data-force-competitor-sync="${escapeHtml(source.id)}">Forza sync</button>` : ""}
+                  ${isFounder() ? `<button class="small-button" type="button" data-run-ai-competitor-extract="${escapeHtml(source.id)}">Analizza AI</button>` : ""}
+                  <button class="small-button" type="button" data-fill-competitor-source="${escapeHtml(source.id)}">Aggiungi quotazione</button>
+                  ${isFounder() ? `<button class="small-button" type="button" data-toggle-competitor-auto-sync="${escapeHtml(source.id)}" data-next-auto-sync="${source.auto_sync_enabled ? "false" : "true"}">${source.auto_sync_enabled ? "Disattiva auto sync" : "Attiva auto sync"}</button>` : ""}
+                  ${isFounder() && source.active !== false ? `<button class="small-button" type="button" data-disable-competitor-source="${escapeHtml(source.id)}">Disattiva fonte</button>` : ""}
+                  <span class="muted">${source.active === false ? "Disattivata" : "Attiva"}</span>
+                </td>
+              </tr>
+            `;
+          }).join("")}
         </tbody>
       </table>
     </div>
@@ -12770,6 +12893,8 @@ function renderCompetitorQuotes() {
             <th>Data rilevazione</th>
             <th>Metodo</th>
             <th>Attendibilità</th>
+            <th>Tipo quota</th>
+            <th>Prova testuale</th>
             <th>Stato aggiornamento</th>
             <th>Azioni</th>
           </tr>
@@ -12777,19 +12902,22 @@ function renderCompetitorQuotes() {
         <tbody>
           ${quotes.slice(0, 50).map((quote) => {
             const source = competitorSourceForQuote(quote);
+            const sourceUrl = quote.source_url || quote.url || source.website_url || "";
             return `
               <tr>
                 <td>${escapeHtml(quote.competitor_name)}</td>
-                <td>${quote.url || source.website_url ? `<a href="${escapeHtml(quote.url || source.website_url)}" target="_blank" rel="noopener">Fonte</a>` : "—"}</td>
+                <td>${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Fonte</a>` : "—"}</td>
                 <td>${escapeHtml(metalDisplayName(quote.metal))}</td>
                 <td>${escapeHtml(quote.purity_code)}</td>
                 <td>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</td>
                 <td>${escapeHtml(formatMetalPerKg(quote.price_per_kg, quote.currency || "EUR"))}</td>
                 <td>${escapeHtml(quote.quote_date ? formatDateTime(quote.quote_date) : "—")}</td>
-                <td>${escapeHtml(quote.extraction_method || "manual")}</td>
-                <td>${escapeHtml(quote.confidence || "medium")}</td>
+                <td>${quote.ai_extracted ? "AI" : escapeHtml(quote.extraction_method || "manual")}</td>
+                <td>${escapeHtml(quote.ai_confidence || quote.confidence || "medium")}</td>
+                <td>${escapeHtml(competitorQuoteTypeLabel(quote.quote_type))}</td>
+                <td>${competitorEvidenceHtml(quote)}</td>
                 <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
-                <td>${quote.url || source.website_url ? `<a class="small-button" href="${escapeHtml(quote.url || source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
+                <td>${sourceUrl ? `<a class="small-button" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
               </tr>
             `;
           }).join("")}
@@ -12800,17 +12928,20 @@ function renderCompetitorQuotes() {
 
   competitorQuotesList.innerHTML = `
     ${competitorAutoSyncSummaryHtml()}
+    ${competitorAiExtractionSummaryHtml()}
     <div class="competitor-summary">
       <strong>${sources.length}</strong>
       <span>fonti competitor monitorate</span>
       <strong>${quotes.length}</strong>
       <span>rilevazioni competitor negli ultimi 30 giorni</span>
+      <strong>${aiQuotes.length}</strong>
+      <span>quotazioni estratte con AI</span>
     </div>
     <h5>Fonti competitor preconfigurate</h5>
     ${sourceTable}
     <h5>Quotazioni competitor rilevate</h5>
     ${quoteTable}
-    <p class="gold-prediction-disclaimer">Le quotazioni competitor sono rilevate automaticamente da fonti configurate o da ultimo dato disponibile. Possono variare senza preavviso. Verificare sempre la fonte prima di decisioni operative rilevanti.</p>
+    <p class="gold-prediction-disclaimer">Le quotazioni competitor sono rilevate automaticamente da fonti configurate, analisi AI backend o ultimo dato disponibile. L'AI usa solo pagine pubbliche e quote con prova testuale: se non trova dati, non inventa prezzi. Verificare sempre la fonte prima di decisioni operative rilevanti.</p>
   `;
 }
 
@@ -12881,7 +13012,7 @@ async function loadGoldPredictionPanel(options = {}) {
     const statusData = await apiRequest("/quotazioni/metals/status");
     const currency = encodeURIComponent(statusData.settings?.currency || "EUR");
     const scenario = state.buybackScenario || "standard";
-    const [historyData, latestData, policyData, buybackData, competitorData, competitorSourcesData, competitorSyncData, competitorMarketData] = await Promise.all([
+    const [historyData, latestData, policyData, buybackData, competitorData, competitorSourcesData, competitorSyncData, competitorMarketData, competitorAiStatusData, competitorAiQuotesData] = await Promise.all([
       apiRequest(`/quotazioni/metals/history?metals=gold,silver&days=30&currency=${currency}`),
       apiRequest(`/quotazioni/metals/predictions/latest?metals=gold,silver&currency=${currency}`),
       apiRequest("/quotazioni/buyback-policy"),
@@ -12892,7 +13023,9 @@ async function loadGoldPredictionPanel(options = {}) {
       apiRequest(`/quotazioni/competitors/quotes?days=30&currency=${currency}`).catch(() => ({ quotes: [], stats: {} })),
       apiRequest("/quotazioni/competitors/sources").catch(() => ({ sources: [] })),
       apiRequest("/quotazioni/competitors/sync-status").catch(() => null),
-      apiRequest(`/quotazioni/competitors/market-summary?currency=${currency}`).catch(() => null)
+      apiRequest(`/quotazioni/competitors/market-summary?currency=${currency}`).catch(() => null),
+      apiRequest("/quotazioni/competitors/ai-extract/status").catch(() => null),
+      apiRequest(`/quotazioni/competitors/quotes/ai?days=30&currency=${currency}`).catch(() => ({ quotes: [] }))
     ]);
     state.goldPredictionStatus = {
       ...statusData,
@@ -12910,6 +13043,8 @@ async function loadGoldPredictionPanel(options = {}) {
     state.competitorSources = competitorSourcesData.sources || [];
     state.competitorSyncStatus = competitorSyncData || null;
     state.competitorMarketSummary = competitorMarketData?.summary || null;
+    state.competitorAiStatus = competitorAiStatusData || null;
+    state.competitorAiQuotes = competitorAiQuotesData.quotes || [];
     state.goldPredictionSettings = statusData.settings || null;
     if (isFounder()) {
       const settingsData = await apiRequest("/quotazioni/gold-prediction/settings").catch(() => null);
@@ -13112,6 +13247,25 @@ async function forceCompetitorAutoSync(sourceId = "all") {
   await loadGoldPredictionPanel({ silent: true });
 }
 
+async function runAiCompetitorExtraction(sourceId = "all") {
+  if (!isFounder()) return;
+  const payload = sourceId && sourceId !== "all" ? { source_id: sourceId } : {};
+  showToast(sourceId === "all" ? "Analisi AI competitor in esecuzione..." : "Analisi AI della fonte competitor in esecuzione...", "success");
+  const data = await apiRequest("/quotazioni/competitors/ai-extract/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    timeoutMs: 180000
+  });
+  const saved = Number(data.quotes_saved || data.run?.quotes_saved || data.result?.quotes_saved || 0);
+  const pages = Number(data.pages_analyzed || data.run?.pages_analyzed || data.result?.pages_analyzed || 0);
+  const failed = Number(data.sources_failed || data.run?.sources_failed || data.result?.sources_failed || 0);
+  showToast(
+    failed ? `Analisi AI completata con ${failed} fonte/i da verificare. Quote salvate: ${saved}.` : `Analisi AI completata. Pagine: ${pages}. Quote salvate: ${saved}.`,
+    failed ? "warning" : "success"
+  );
+  await loadGoldPredictionPanel({ silent: true });
+}
+
 async function toggleCompetitorAutoSync(sourceId, nextAutoSync) {
   if (!isFounder() || !sourceId) return;
   const source = (state.competitorSources || []).find((item) => String(item.id) === String(sourceId)) || {};
@@ -13135,6 +13289,7 @@ async function handleCompetitorAction(event) {
   const fill = event.target.closest("[data-fill-competitor-source]");
   const disable = event.target.closest("[data-disable-competitor-source]");
   const forceSync = event.target.closest("[data-force-competitor-sync]");
+  const runAiExtract = event.target.closest("[data-run-ai-competitor-extract]");
   const toggleAutoSync = event.target.closest("[data-toggle-competitor-auto-sync]");
   if (fill) {
     const source = (state.competitorSources || []).find((item) => String(item.id) === String(fill.dataset.fillCompetitorSource));
@@ -13148,6 +13303,10 @@ async function handleCompetitorAction(event) {
   }
   if (forceSync && isFounder()) {
     await forceCompetitorAutoSync(forceSync.dataset.forceCompetitorSync || "all");
+    return;
+  }
+  if (runAiExtract && isFounder()) {
+    await runAiCompetitorExtraction(runAiExtract.dataset.runAiCompetitorExtract || "all");
     return;
   }
   if (toggleAutoSync && isFounder()) {
