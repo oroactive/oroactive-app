@@ -5289,7 +5289,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card,
 .amico-oro-card,
 .banco-preziosi-card,
-.bordin-card {
+.bordin-card,
+.gold-standard-card {
   display: grid;
   gap: 12px;
   margin: 0 0 14px;
@@ -5307,11 +5308,13 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .amico-oro-card header,
 .banco-preziosi-card header,
 .bordin-card header,
+.gold-standard-card header,
 .oro-express-grid,
 .oro-doro-grid,
 .amico-oro-grid,
 .banco-preziosi-grid,
-.bordin-grid {
+.bordin-grid,
+.gold-standard-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -5322,7 +5325,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card header,
 .amico-oro-card header,
 .banco-preziosi-card header,
-.bordin-card header {
+.bordin-card header,
+.gold-standard-card header {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
@@ -5335,7 +5339,9 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .banco-preziosi-card h5,
 .banco-preziosi-card p,
 .bordin-card h5,
-.bordin-card p {
+.bordin-card p,
+.gold-standard-card h5,
+.gold-standard-card p {
   margin: 0;
 }
 
@@ -5343,7 +5349,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card span,
 .amico-oro-card span,
 .banco-preziosi-card span,
-.bordin-card span {
+.bordin-card span,
+.gold-standard-card span {
   color: rgba(255, 255, 255, 0.64);
   font-size: 11px;
   font-weight: 900;
@@ -5354,7 +5361,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card strong,
 .amico-oro-card strong,
 .banco-preziosi-card strong,
-.bordin-card strong {
+.bordin-card strong,
+.gold-standard-card strong {
   color: #ffd700;
 }
 
@@ -5362,7 +5370,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-grid div,
 .amico-oro-grid div,
 .banco-preziosi-grid div,
-.bordin-grid div {
+.bordin-grid div,
+.gold-standard-grid div {
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -10444,11 +10453,13 @@ input.document-expired {
   .amico-oro-card header,
   .banco-preziosi-card header,
   .bordin-card header,
+  .gold-standard-card header,
   .oro-express-grid,
   .oro-doro-grid,
   .amico-oro-grid,
   .banco-preziosi-grid,
   .bordin-grid,
+  .gold-standard-grid,
   .competitor-quote-form,
   .competitor-source-form,
   .competitor-csv-form,

@@ -18,6 +18,7 @@ import { createCompetitorExtractionTrainer } from "./services/competitors/compet
 import { createAmicoOroExtractor } from "./services/competitors/extractors/amicoOroExtractor.js";
 import { createBancoPreziosiExtractor } from "./services/competitors/extractors/bancoPreziosiExtractor.js";
 import { createBordinExtractor } from "./services/competitors/extractors/bordinExtractor.js";
+import { createGoldStandardExtractor } from "./services/competitors/extractors/goldStandardExtractor.js";
 import { createOroDOroExtractor } from "./services/competitors/extractors/oroDOroExtractor.js";
 import { createOroExpressExtractor } from "./services/competitors/extractors/oroExpressExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
@@ -95,10 +96,17 @@ const bancoPreziosiTimeoutMs = Math.min(Math.max(Number(process.env.BANCO_PREZIO
 const bordinAutoSyncEnabled = String(process.env.BORDIN_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const bordinAutoSyncOnStartup = String(process.env.BORDIN_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const bordinSyncIntervalMinutes = Math.max(60, Number(process.env.BORDIN_SYNC_INTERVAL_MINUTES || 60));
-const bordinUrl = process.env.BORDIN_URL || "https://www.orometallipreziosi.com";
+const bordinUrl = process.env.BORDIN_URL || "https://oroemetallipreziosi.com";
 const bordinUsePlaywright = String(process.env.BORDIN_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
 const bordinUseAiFallback = String(process.env.BORDIN_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const bordinTimeoutMs = Math.min(Math.max(Number(process.env.BORDIN_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
+const goldStandardAutoSyncEnabled = String(process.env.GOLD_STANDARD_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const goldStandardAutoSyncOnStartup = String(process.env.GOLD_STANDARD_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const goldStandardSyncIntervalMinutes = Math.max(60, Number(process.env.GOLD_STANDARD_SYNC_INTERVAL_MINUTES || 60));
+const goldStandardUrl = process.env.GOLD_STANDARD_URL || "https://www.goldstandard.gold";
+const goldStandardUsePlaywright = String(process.env.GOLD_STANDARD_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const goldStandardUseAiFallback = String(process.env.GOLD_STANDARD_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
+const goldStandardTimeoutMs = Math.min(Math.max(Number(process.env.GOLD_STANDARD_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const competitorAiExtractionEnabled = String(process.env.AI_COMPETITOR_EXTRACTION_ENABLED || process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiAutoExtractionEnabled = String(process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
 const competitorAiExtractionIntervalMinutes = Math.max(60, Number(process.env.AI_COMPETITOR_EXTRACTION_INTERVAL_MINUTES || process.env.COMPETITOR_AI_AUTO_EXTRACTION_INTERVAL_MINUTES || 360));
@@ -169,6 +177,15 @@ const bancoPreziosiSyncState = {
 };
 const bordinSyncState = {
   enabled: bordinAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: ""
+};
+const goldStandardSyncState = {
+  enabled: goldStandardAutoSyncEnabled,
   running: false,
   timer: null,
   lastRunAt: null,
@@ -393,6 +410,16 @@ const bordinExtractor = createBordinExtractor({
   useAiFallback: bordinUseAiFallback,
   maxTextChars: competitorAiMaxTextChars
 });
+const goldStandardExtractor = createGoldStandardExtractor({
+  openai,
+  model: competitorAiExtractionModel,
+  url: goldStandardUrl,
+  timeoutMs: goldStandardTimeoutMs,
+  userAgent: competitorAutoSyncUserAgent,
+  usePlaywright: goldStandardUsePlaywright,
+  useAiFallback: goldStandardUseAiFallback,
+  maxTextChars: competitorAiMaxTextChars
+});
 const competitorExtractionTrainer = createCompetitorExtractionTrainer({
   openai,
   model: competitorAiExtractionModel,
@@ -401,7 +428,8 @@ const competitorExtractionTrainer = createCompetitorExtractionTrainer({
   oroDOroExtractor,
   amicoOroExtractor,
   bancoPreziosiExtractor,
-  bordinExtractor
+  bordinExtractor,
+  goldStandardExtractor
 });
 const aiRuntime = {
   pgvector: false,
@@ -2399,7 +2427,18 @@ const DEFAULT_COMPETITOR_SOURCES = [
     },
     notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
   },
-  { name: "Gold Standard", website_url: "https://www.goldstandard.gold" },
+  {
+    name: "Gold Standard",
+    website_url: goldStandardUrl,
+    source_type: "gold_standard_parser",
+    sync_interval_minutes: goldStandardSyncIntervalMinutes,
+    extraction_config: {
+      method: "gold_standard_parser",
+      url: goldStandardUrl,
+      currency: "EUR"
+    },
+    notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
+  },
   { name: "Oro in Euro", website_url: "https://www.quotazioneritirooro.it" }
 ].map((source) => ({
   ...source,
@@ -2498,7 +2537,8 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $6::text
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $6::text
                 WHEN LOWER(name) = LOWER('Bordin') THEN $6::text
-                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'oro_doro_parser', 'amico_oro_parser', 'banco_preziosi_parser', 'bordin_parser')
+                WHEN LOWER(name) = LOWER('Gold Standard') THEN $6::text
+                WHEN source_type IN ('manual', 'configured_page', 'oro_express_parser', 'oro_doro_parser', 'amico_oro_parser', 'banco_preziosi_parser', 'bordin_parser', 'gold_standard_parser')
                  AND (notes IS NULL OR notes = '' OR notes ILIKE '%Competitor preconfigurato OroActive%') THEN $6::text
                 ELSE source_type
               END,
@@ -2508,6 +2548,7 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN true
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN true
                 WHEN LOWER(name) = LOWER('Bordin') THEN true
+                WHEN LOWER(name) = LOWER('Gold Standard') THEN true
                 ELSE COALESCE(auto_sync_enabled, true)
               END,
               sync_interval_minutes = CASE
@@ -2516,9 +2557,11 @@ async function seedDefaultCompetitorSources() {
                 WHEN LOWER(name) = LOWER('Amico Oro') THEN $3::int
                 WHEN LOWER(name) = LOWER('Banco Preziosi') THEN $3::int
                 WHEN LOWER(name) = LOWER('Bordin') THEN $3::int
+                WHEN LOWER(name) = LOWER('Gold Standard') THEN $3::int
                 ELSE COALESCE(sync_interval_minutes, $3::int)
               END,
               extraction_config = CASE
+                WHEN LOWER(name) IN (LOWER('Bordin'), LOWER('Gold Standard')) THEN COALESCE(extraction_config, '{}'::jsonb) || $4::jsonb
                 WHEN extraction_config IS NULL OR extraction_config = '{}'::jsonb THEN $4::jsonb
                 ELSE extraction_config
               END,
@@ -2541,6 +2584,15 @@ async function seedDefaultCompetitorSources() {
             OR notes = ''
             OR notes ILIKE '%Competitor preconfigurato OroActive%'
             OR website_url = $2::text
+            OR LOWER(name) IN (
+              LOWER('Oro Express'),
+              LOWER('Oro D''Oro'),
+              LOWER('Oro D''oro'),
+              LOWER('Amico Oro'),
+              LOWER('Banco Preziosi'),
+              LOWER('Bordin'),
+              LOWER('Gold Standard')
+            )
           )`,
       [
         source.name,
@@ -2762,6 +2814,33 @@ function defaultBordinExtractionRules(source = {}) {
       0.585,
       "Oro 14kt",
       "Oro\\s*14\\s*(?:kt|k)[\\s\\S]{0,120}?585\\s*(?:‰|per\\s*mille|\\/\\s*1000)[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/\\s*(?:gr|g)"
+    ],
+    [
+      "bordin_silver_999",
+      "Argento 999‰",
+      "silver",
+      "999",
+      0.999,
+      "Argento 999",
+      "Argento\\s*999\\s*(?:‰|per\\s*mille|\\/\\s*1000)?[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/\\s*(?:gr|g)"
+    ],
+    [
+      "bordin_silver_925",
+      "Argento 925‰",
+      "silver",
+      "925",
+      0.925,
+      "Argento 925",
+      "Argento\\s*925\\s*(?:‰|per\\s*mille|\\/\\s*1000)?[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/\\s*(?:gr|g)"
+    ],
+    [
+      "bordin_silver_800",
+      "Argento 800‰",
+      "silver",
+      "800",
+      0.8,
+      "Argento 800",
+      "Argento\\s*800\\s*(?:‰|per\\s*mille|\\/\\s*1000)?[\\s\\S]{0,120}?([0-9]+[,.]?[0-9]*)\\s*€\\s*\\/\\s*(?:gr|g)"
     ]
   ];
   return rows.map(([field_key, label, metal, purity_code, purity_value, anchor_text, regex_pattern]) => ({
@@ -2777,6 +2856,62 @@ function defaultBordinExtractionRules(source = {}) {
     page_url: pageUrl,
     unit: "EUR/g",
     extraction_method: "anchor_regex",
+    required: true,
+    active: true
+  }));
+}
+
+function defaultGoldStandardExtractionRules(source = {}) {
+  const pageUrl = source.website_url || goldStandardUrl;
+  const rows = [
+    [
+      "gold_standard_gold_24kt_reference",
+      "Quotazione dell'oro in borsa",
+      "gold",
+      "24kt",
+      1,
+      "Quotazione dell'oro in borsa",
+      "EUR/g",
+      "Quotazione\\s+dell[’']oro\\s+in\\s+borsa[\\s\\S]{0,120}?€\\s*([0-9]+[,.]?[0-9]*)",
+      "reference_market_gold_price"
+    ],
+    [
+      "gold_standard_gold_18kt_buyback",
+      "Acquistiamo ORO 18K prezzo MIN",
+      "gold",
+      "18kt",
+      0.75,
+      "Acquistiamo ORO 18K",
+      "EUR/g",
+      "Acquistiamo\\s+ORO\\s*18\\s*K[\\s\\S]{0,120}?prezzo\\s*MIN[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)",
+      "customer_buyback"
+    ],
+    [
+      "gold_standard_gold_24kt_buyback",
+      "Acquistiamo ORO 24K al prezzo MIN",
+      "gold",
+      "24kt",
+      1,
+      "Acquistiamo ORO 24K",
+      "EUR/g",
+      "Acquistiamo\\s+ORO\\s*24\\s*K[\\s\\S]{0,120}?prezzo\\s*MIN[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)",
+      "customer_buyback"
+    ]
+  ];
+  return rows.map(([field_key, label, metal, purity_code, purity_value, anchor_text, unit, regex_pattern, quote_type]) => ({
+    field_key,
+    label,
+    metal,
+    purity_code,
+    purity_value,
+    anchor_text,
+    regex_pattern,
+    competitor_name: source.name || "Gold Standard",
+    source_id: source.id || null,
+    page_url: pageUrl,
+    unit,
+    extraction_method: "anchor_regex",
+    quote_type,
     required: true,
     active: true
   }));
@@ -2854,7 +2989,8 @@ async function seedDefaultCompetitorExtractionRules() {
     { source: await getOroDOroSource().catch(() => null), rulesFor: defaultOroDOroExtractionRules },
     { source: await getAmicoOroSource().catch(() => null), rulesFor: defaultAmicoOroExtractionRules },
     { source: await getBancoPreziosiSource().catch(() => null), rulesFor: defaultBancoPreziosiExtractionRules },
-    { source: await getBordinSource().catch(() => null), rulesFor: defaultBordinExtractionRules }
+    { source: await getBordinSource().catch(() => null), rulesFor: defaultBordinExtractionRules },
+    { source: await getGoldStandardSource().catch(() => null), rulesFor: defaultGoldStandardExtractionRules }
   ];
   for (const { source, rulesFor } of ruleSets) {
     if (!source?.id) continue;
@@ -3126,7 +3262,7 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
   const payload = {
     name: String(input.name || "").trim().slice(0, 120),
     website_url: String(input.website_url || input.websiteUrl || "").trim().slice(0, 500),
-    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "oro_doro_parser", "amico_oro_parser", "banco_preziosi_parser", "bordin_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
+    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "oro_doro_parser", "amico_oro_parser", "banco_preziosi_parser", "bordin_parser", "gold_standard_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
       ? String(input.source_type || input.sourceType || "manual").toLowerCase()
       : "manual",
     active: input.active !== false,
@@ -3274,7 +3410,7 @@ async function insertCompetitorQuote(input = {}, user = {}) {
     ? { id: input.source_id || input.sourceId }
     : await ensureCompetitorSourceForQuote(input, user);
   const quoteDate = input.quote_date || input.quoteDate || new Date().toISOString();
-  const quoteType = ["customer_buyback", "reference_official_gold_price", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
+  const quoteType = ["customer_buyback", "reference_official_gold_price", "reference_market_gold_price", "reference_market_silver_price", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
     ? String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase()
     : "unknown";
   const aiConfidence = String(input.ai_confidence || input.aiConfidence || input.confidence || "medium").toLowerCase().slice(0, 20);
@@ -3722,6 +3858,19 @@ async function extractCompetitorQuotes(source = {}) {
     });
   }
 
+  if (method === "gold_standard_parser" || source.source_type === "gold_standard_parser" || source.name?.toLowerCase() === "gold standard") {
+    return goldStandardExtractor.extractGoldStandardQuotes({
+      source_id: source.id,
+      sourceId: source.id,
+      url: config.url || source.website_url || goldStandardUrl,
+      sourceUrl: config.url || source.website_url || goldStandardUrl,
+      timeoutMs: goldStandardTimeoutMs,
+      userAgent: competitorAutoSyncUserAgent,
+      usePlaywright: goldStandardUsePlaywright,
+      useAiFallback: goldStandardUseAiFallback
+    });
+  }
+
   if (method === "api" || source.source_type === "api") {
     const { body } = await fetchCompetitorPage(source.website_url);
     const data = JSON.parse(body);
@@ -4081,6 +4230,13 @@ async function getBancoPreziosiSource() {
 async function getBordinSource() {
   const result = await pool.query(
     "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Bordin') LIMIT 1"
+  );
+  return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
+}
+
+async function getGoldStandardSource() {
+  const result = await pool.query(
+    "SELECT * FROM competitor_quote_sources WHERE LOWER(name) = LOWER('Gold Standard') LIMIT 1"
   );
   return result.rows[0] ? publicCompetitorSource(result.rows[0]) : null;
 }
@@ -4487,6 +4643,90 @@ function startBordinHourlySync() {
   }, bordinSyncIntervalMinutes * 60 * 1000);
   bordinSyncState.timer.unref?.();
   return bordinSyncPublicStatus();
+}
+
+function goldStandardSyncPublicStatus() {
+  return {
+    enabled: goldStandardAutoSyncEnabled,
+    running: goldStandardSyncState.running,
+    interval_minutes: goldStandardSyncIntervalMinutes,
+    on_startup: goldStandardAutoSyncOnStartup,
+    url: goldStandardUrl,
+    use_playwright: goldStandardUsePlaywright,
+    use_ai_fallback: goldStandardUseAiFallback,
+    timeout_ms: goldStandardTimeoutMs,
+    last_run_at: goldStandardSyncState.lastRunAt,
+    next_run_at: goldStandardSyncState.nextRunAt,
+    last_status: goldStandardSyncState.lastStatus,
+    last_error: goldStandardSyncState.lastError
+  };
+}
+
+async function runGoldStandardHourlySync({ force = false, user = {}, req = null } = {}) {
+  if (!goldStandardAutoSyncEnabled && !force) {
+    return { ok: false, skipped: true, message: "Sync Gold Standard disattivato.", state: goldStandardSyncPublicStatus() };
+  }
+  if (goldStandardSyncState.running) {
+    return { ok: true, skipped: true, message: "Sync Gold Standard gia in corso.", state: goldStandardSyncPublicStatus() };
+  }
+  goldStandardSyncState.running = true;
+  goldStandardSyncState.lastRunAt = new Date().toISOString();
+  goldStandardSyncState.lastStatus = "running";
+  goldStandardSyncState.lastError = "";
+  try {
+    const source = await getGoldStandardSource();
+    if (!source?.id) throw new Error("Fonte Gold Standard non configurata");
+    const result = await syncSingleCompetitorSource(source, user, req, { force });
+    const summary = await calculateCompetitorMarketSummary().catch(() => null);
+    goldStandardSyncState.lastStatus = result.status || "success";
+    goldStandardSyncState.lastError = result.error || result.log?.error_message || "";
+    goldStandardSyncState.nextRunAt = new Date(Date.now() + goldStandardSyncIntervalMinutes * 60 * 1000).toISOString();
+    return {
+      ok: true,
+      result,
+      summary,
+      state: goldStandardSyncPublicStatus()
+    };
+  } catch (error) {
+    goldStandardSyncState.lastStatus = "failed";
+    goldStandardSyncState.lastError = error.message || "Sync Gold Standard non riuscito";
+    const source = await getGoldStandardSource().catch(() => null);
+    if (source?.id) {
+      await updateCompetitorSourceSyncStatus(
+        source.id,
+        "failed",
+        new Date().toISOString(),
+        goldStandardSyncState.lastError,
+        new Date(Date.now() + goldStandardSyncIntervalMinutes * 60 * 1000).toISOString()
+      ).catch(() => {});
+    }
+    throw error;
+  } finally {
+    goldStandardSyncState.running = false;
+  }
+}
+
+function startGoldStandardHourlySync() {
+  if (!goldStandardAutoSyncEnabled || goldStandardSyncState.timer) return goldStandardSyncPublicStatus();
+  goldStandardSyncState.nextRunAt = new Date(Date.now() + goldStandardSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (goldStandardAutoSyncOnStartup) {
+    setTimeout(() => {
+      runGoldStandardHourlySync({ force: true, user: { id: null, ruolo: "system" } }).catch((error) => {
+        goldStandardSyncState.lastStatus = "failed";
+        goldStandardSyncState.lastError = error.message || "Sync startup Gold Standard fallito";
+        console.error("Errore sync Gold Standard", error);
+      });
+    }, 9000).unref?.();
+  }
+  goldStandardSyncState.timer = setInterval(() => {
+    runGoldStandardHourlySync({ user: { id: null, ruolo: "system" } }).catch((error) => {
+      goldStandardSyncState.lastStatus = "failed";
+      goldStandardSyncState.lastError = error.message || "Sync Gold Standard fallito";
+      console.error("Errore sync Gold Standard", error);
+    });
+  }, goldStandardSyncIntervalMinutes * 60 * 1000);
+  goldStandardSyncState.timer.unref?.();
+  return goldStandardSyncPublicStatus();
 }
 
 async function updateCompetitorSourceAutoSync(id, input = {}, user = {}, req = null) {
@@ -19568,6 +19808,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       amico_oro_status: amicoOroSyncPublicStatus(),
       banco_preziosi_status: bancoPreziosiSyncPublicStatus(),
       bordin_status: bordinSyncPublicStatus(),
+      gold_standard_status: goldStandardSyncPublicStatus(),
       sources,
       recent_logs: logs
     });
@@ -19692,6 +19933,14 @@ app.post("/api/quotazioni/competitors/banco-preziosi/sync", requireFounder, asyn
 app.post("/api/quotazioni/competitors/bordin/sync", requireFounder, async (request, response, next) => {
   try {
     response.json(await runBordinHourlySync({ force: true, user: request.user, req: request }));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quotazioni/competitors/gold-standard/sync", requireFounder, async (request, response, next) => {
+  try {
+    response.json(await runGoldStandardHourlySync({ force: true, user: request.user, req: request }));
   } catch (error) {
     next(error);
   }
@@ -20875,6 +21124,7 @@ initDatabase()
     startAmicoOroHourlySync();
     startBancoPreziosiHourlySync();
     startBordinHourlySync();
+    startGoldStandardHourlySync();
     startCompetitorAiAutoExtraction();
   })
   .catch((error) => {

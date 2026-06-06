@@ -230,6 +230,18 @@ function quoteFromResult(rule = {}, result = {}, source = {}) {
 }
 
 function sourceSpecificQuoteForRule(rule = {}, sourceQuotes = []) {
+  const byFieldKey = sourceQuotes.find((quote) => (
+    rule.field_key
+    && [
+      quote.raw_payload?.oro_express_key,
+      quote.raw_payload?.oro_doro_key,
+      quote.raw_payload?.amico_oro_key,
+      quote.raw_payload?.banco_preziosi_key,
+      quote.raw_payload?.bordin_key,
+      quote.raw_payload?.gold_standard_key
+    ].filter(Boolean).some((key) => String(key) === String(rule.field_key))
+  ));
+  if (byFieldKey) return byFieldKey;
   return sourceQuotes.find((quote) => (
     String(quote.metal) === String(rule.metal)
     && String(quote.purity_code) === String(rule.purity_code)
@@ -245,7 +257,8 @@ export function createCompetitorExtractionTrainer(options = {}) {
     oroDOroExtractor: options.oroDOroExtractor || null,
     amicoOroExtractor: options.amicoOroExtractor || null,
     bancoPreziosiExtractor: options.bancoPreziosiExtractor || null,
-    bordinExtractor: options.bordinExtractor || null
+    bordinExtractor: options.bordinExtractor || null,
+    goldStandardExtractor: options.goldStandardExtractor || null
   };
 
   async function fetchPublicPage(url = "") {
@@ -298,6 +311,14 @@ export function createCompetitorExtractionTrainer(options = {}) {
       }).catch(() => ({ quotes: [] }));
       return result.quotes || [];
     }
+    if (config.goldStandardExtractor && sourceName === "gold standard") {
+      const result = await config.goldStandardExtractor.extractGoldStandardQuotes({
+        source_id: source.id,
+        sourceId: source.id,
+        url: rules[0]?.page_url || source.website_url
+      }).catch(() => ({ quotes: [] }));
+      return result.quotes || [];
+    }
     return [];
   }
 
@@ -305,6 +326,7 @@ export function createCompetitorExtractionTrainer(options = {}) {
     const sourceName = String(source.name || "").toLowerCase();
     if (sourceName === "banco preziosi") return "guided_banco_preziosi_parser";
     if (sourceName === "bordin") return "guided_bordin_parser";
+    if (sourceName === "gold standard") return "guided_gold_standard_parser";
     if (sourceName === "amico oro") return "guided_amico_oro_parser";
     if (sourceName === "oro d'oro") return "guided_oro_doro_parser";
     if (sourceName === "oro express") return "guided_oro_express_parser";

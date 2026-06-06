@@ -1,6 +1,12 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
 
-const BORDIN_DEFAULT_URL = "https://www.orometallipreziosi.com";
+const BORDIN_DEFAULT_URL = "https://oroemetallipreziosi.com";
+const BORDIN_ALLOWED_HOSTS = new Set([
+  "oroemetallipreziosi.com",
+  "www.oroemetallipreziosi.com",
+  "orometallipreziosi.com",
+  "www.orometallipreziosi.com"
+]);
 
 const BORDIN_DEFINITIONS = [
   {
@@ -174,6 +180,46 @@ function extractCondition(text = "") {
   };
 }
 
+function canonicalBordinUrl(url = BORDIN_DEFAULT_URL) {
+  try {
+    const parsed = new URL(String(url || BORDIN_DEFAULT_URL));
+    if (/^www\.?orometallipreziosi\.com$/i.test(parsed.hostname) || /^orometallipreziosi\.com$/i.test(parsed.hostname)) {
+      parsed.hostname = "oroemetallipreziosi.com";
+    }
+    if (parsed.hostname === "www.oroemetallipreziosi.com") parsed.hostname = "oroemetallipreziosi.com";
+    return parsed.toString();
+  } catch {
+    return BORDIN_DEFAULT_URL;
+  }
+}
+
+function textSection(text = "", startPattern, endPattern = null) {
+  const source = String(text || "");
+  const startMatch = source.match(startPattern);
+  if (!startMatch || startMatch.index === undefined) return source;
+  const start = startMatch.index;
+  const rest = source.slice(start);
+  if (!endPattern) return rest;
+  const endMatch = rest.slice(Math.max(startMatch[0].length, 1)).match(endPattern);
+  if (!endMatch || endMatch.index === undefined) return rest;
+  return rest.slice(0, Math.max(startMatch[0].length, 1) + endMatch.index);
+}
+
+function sectionOptionsForDefinition(definition = {}, normalizedText = "", baseOptions = {}) {
+  const section = definition.metal === "silver"
+    ? textSection(normalizedText, /Quotazione\s+Argento/i)
+    : textSection(normalizedText, /Quotazione\s+Oro/i, /Quotazione\s+Argento/i);
+  const timestamp = parseProviderTimestamp(section);
+  const condition = extractCondition(section);
+  return {
+    ...baseOptions,
+    providerTimestamp: timestamp.providerTimestamp || baseOptions.providerTimestamp,
+    providerTimestampText: timestamp.providerTimestampText || baseOptions.providerTimestampText,
+    conditionText: condition.conditionText || baseOptions.conditionText,
+    minQuantityGrams: condition.minQuantityGrams ?? baseOptions.minQuantityGrams
+  };
+}
+
 export function extractPriceNearAnchor(text = "", anchor = "", maxDistance = 240) {
   const source = String(text || "");
   const anchorRegex = new RegExp(anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*"), "i");
@@ -257,7 +303,7 @@ function addAnchorFallbackQuote(quotes = [], text = "", definition = {}, sourceU
 }
 
 export function extractBordinQuotesFromText(text = "", options = {}) {
-  const sourceUrl = options.sourceUrl || BORDIN_DEFAULT_URL;
+  const sourceUrl = canonicalBordinUrl(options.sourceUrl || BORDIN_DEFAULT_URL);
   const normalized = compactText(decodeHtml(text));
   const timestamp = parseProviderTimestamp(normalized);
   const condition = extractCondition(normalized);
@@ -270,8 +316,9 @@ export function extractBordinQuotesFromText(text = "", options = {}) {
   };
   const quotes = [];
   for (const definition of BORDIN_DEFINITIONS) {
-    const found = addRegexQuote(quotes, normalized, definition, sourceUrl, quoteOptions);
-    if (!found) addAnchorFallbackQuote(quotes, normalized, definition, sourceUrl, quoteOptions);
+    const definitionOptions = sectionOptionsForDefinition(definition, normalized, quoteOptions);
+    const found = addRegexQuote(quotes, normalized, definition, sourceUrl, definitionOptions);
+    if (!found) addAnchorFallbackQuote(quotes, normalized, definition, sourceUrl, definitionOptions);
   }
   return dedupeBordinQuotes(quotes);
 }
@@ -292,10 +339,11 @@ function dedupeBordinQuotes(quotes = []) {
 }
 
 export async function fetchBordinPage(url = BORDIN_DEFAULT_URL, options = {}) {
+  const targetUrl = canonicalBordinUrl(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
   try {
-    const response = await fetch(url, {
+    const response = await fetch(targetUrl, {
       signal: controller.signal,
       headers: {
         Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
@@ -305,7 +353,7 @@ export async function fetchBordinPage(url = BORDIN_DEFAULT_URL, options = {}) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
     return {
-      url: response.url || url,
+      url: canonicalBordinUrl(response.url || targetUrl),
       html,
       text: extractReadableTextFromHtml(html),
       method: "fetch"
@@ -317,9 +365,9 @@ export async function fetchBordinPage(url = BORDIN_DEFAULT_URL, options = {}) {
 
 function resolveBordinUrl(href = "", baseUrl = BORDIN_DEFAULT_URL) {
   try {
-    const url = new URL(decodeHtml(href), baseUrl);
-    if (!/(\.|^)orometallipreziosi\.com$/i.test(url.hostname)) return "";
-    return url.toString();
+    const url = new URL(decodeHtml(href), canonicalBordinUrl(baseUrl));
+    if (!BORDIN_ALLOWED_HOSTS.has(url.hostname.toLowerCase())) return "";
+    return canonicalBordinUrl(url.toString());
   } catch {
     return "";
   }
@@ -341,6 +389,7 @@ export function discoverBordinQuoteUrls(html = "", baseUrl = BORDIN_DEFAULT_URL)
 
 async function renderBordinPageWithPlaywright(url = BORDIN_DEFAULT_URL, options = {}) {
   if (!options.usePlaywright) return { page: null, warning: "Playwright disattivato." };
+  const targetUrl = canonicalBordinUrl(url);
   let chromium;
   try {
     ({ chromium } = await import("playwright"));
@@ -350,7 +399,7 @@ async function renderBordinPageWithPlaywright(url = BORDIN_DEFAULT_URL, options 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
   try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
     const acceptButton = page.getByText(/accetto|accetta|ok/i);
     if (await acceptButton.count().catch(() => 0)) {
       await acceptButton.first().click({ timeout: 1500 }).catch(() => {});
@@ -358,7 +407,7 @@ async function renderBordinPageWithPlaywright(url = BORDIN_DEFAULT_URL, options 
     await page.waitForTimeout(1500);
     return {
       page: {
-        url: page.url() || url,
+        url: canonicalBordinUrl(page.url() || targetUrl),
         html: "",
         text: await page.evaluate(() => document.body?.innerText || ""),
         method: "playwright"
@@ -464,7 +513,7 @@ ${pageTexts.map((page) => `URL: ${page.url}\n${String(page.text || "").replace(/
 
 export function createBordinExtractor(options = {}) {
   const config = {
-    url: options.url || BORDIN_DEFAULT_URL,
+    url: canonicalBordinUrl(options.url || BORDIN_DEFAULT_URL),
     timeoutMs: Number(options.timeoutMs || 15000),
     userAgent: options.userAgent || "OroActiveBot/1.0",
     usePlaywright: options.usePlaywright !== false,
