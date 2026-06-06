@@ -1498,7 +1498,8 @@ textarea:disabled {
   color: #fff;
 }
 
-.aurum-tutor-toolbar {
+.aurum-tutor-toolbar,
+.aurum-price-toolbar {
   flex: 0 1 auto;
   display: grid;
   gap: 8px;
@@ -1513,11 +1514,21 @@ textarea:disabled {
   padding: 10px;
 }
 
-.aurum-tutor-toolbar span {
+.aurum-price-toolbar {
+  border-color: rgba(255, 215, 0, 0.32);
+  background: rgba(255, 122, 0, 0.1);
+}
+
+.aurum-tutor-toolbar span,
+.aurum-price-toolbar span {
   color: #ffd696;
   font-size: 12px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.aurum-price-explanation-mode .aurum-chat-log {
+  min-height: 220px;
 }
 
 .aurum-quick-actions {
@@ -4818,6 +4829,12 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   font-weight: 900;
 }
 
+.gold-prediction-explain-button {
+  min-height: 34px;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
 .gold-prediction-disclaimer {
   margin: 12px 0 0;
   color: rgba(255, 255, 255, 0.76);
@@ -4888,7 +4905,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .buyback-simulator-form {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 

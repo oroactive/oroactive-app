@@ -4061,8 +4061,17 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const hasAcademyContext = chunks.some((chunk) => chunk.metadata?.sourceType === "academy");
   const shouldUseWeb = chunks.length < 3 || options.allowWeb === true;
   const web = shouldUseWeb ? await webSearchFallback(domanda) : { available: false, results: [] };
-  const mode = options.mode === "quiz" ? "quiz" : options.mode === "tutorial_operativo" ? "tutorial_operativo" : "chat";
+  const mode = options.mode === "quiz"
+    ? "quiz"
+    : options.mode === "tutorial_operativo"
+      ? "tutorial_operativo"
+      : options.mode === "price_explanation"
+        ? "price_explanation"
+        : "chat";
   const aurumContext = sanitizeForPostgres(options.context || {});
+  const priceExplanationContext = aurumContext.priceExplanationContext && typeof aurumContext.priceExplanationContext === "object"
+    ? aurumContext.priceExplanationContext
+    : {};
   const aurumMemories = Array.isArray(aurumContext.availableMemories)
     ? aurumContext.availableMemories.map((item) => String(item || "").slice(0, 240)).filter(Boolean).slice(0, 8)
     : [];
@@ -4087,6 +4096,9 @@ async function askOroActiveAssistant(question = "", options = {}) {
     aurumGuideText,
     aurumMemories.length ? `Memorie consensuali utente: ${aurumMemories.join(" | ")}` : ""
   ].filter(Boolean).join("\n");
+  const priceExplanationText = mode === "price_explanation"
+    ? `Modalita prezzo: spiega il prezzo in modo operativo da compro oro. Contesto prezzo JSON senza dati cliente:\n${JSON.stringify(priceExplanationContext).slice(0, 8000)}`
+    : "";
   const context = chunks.map((chunk, index) => (
     `[Fonte ${index + 1}: ${chunk.metadata?.sourceType === "note" ? "Procedura OroActive approvata" : chunk.metadata?.sourceType === "academy" ? "Materiale OroActive Academy" : "La bilancia d'oro"} - ${chunk.titolo || "Knowledge base"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
   )).join("\n\n---\n\n");
@@ -4114,7 +4126,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const client = openai;
     const result = await client.responses.create({
       model: openaiModel,
-      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.`}
+      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile e prezzo consigliato. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.`}
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Usa prima il libro "La bilancia d'oro" di Christian Dinato, poi le procedure/conoscenze OroActive approvate.
 Le conoscenze OroActive approvate possono essere piu recenti e operative del libro: se sono piu dettagliate, integrale alla risposta senza ignorarle.
@@ -4124,10 +4136,13 @@ Se il contesto non contiene abbastanza informazioni e non sono presenti risultat
 Non inventare fonti web aggiornate: usa soltanto i risultati web forniti nel contesto.
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
-Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : "Assistente operativo."}
+Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : mode === "price_explanation" ? "Spiegazione prezzo Quotazione. Rispondi con questa struttura: titolo, punto di partenza, calcolo purezza, valore teorico, costi e rientro compro oro, massimo pagabile, prezzo consigliato, fluttuazione prevista, confronto competitor se disponibile, avviso finale. Usa solo i dati nel contesto prezzo; se un dato manca, dichiaralo." : "Assistente operativo."}
 
 CONTESTO APP AURUM:
 ${aurumSectionContext || "Nessun contesto app fornito."}
+
+CONTESTO PREZZO AURUM:
+${priceExplanationText || "Nessun contesto prezzo specifico."}
 
 CONTESTO KNOWLEDGE BASE:
 ${hasContext ? context : "Nessun passaggio trovato per questa domanda."}

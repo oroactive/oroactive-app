@@ -46,6 +46,7 @@ const state = {
   competitorSources: [],
   competitorQuotes: [],
   competitorStats: {},
+  buybackSimulationContext: null,
   lastActCaptureAttachments: [],
   loadedSignatureImages: [],
   saving: false,
@@ -122,6 +123,9 @@ const state = {
   aurumTipIndex: 0,
   aurumPositionIndex: 0,
   aurumMessages: [],
+  aurumMode: "",
+  aurumPriceContext: null,
+  aurumLastPriceContext: null,
   aurumSending: false,
   aurumAskedMoodToday: false,
   aurumLastUserMessage: "",
@@ -761,6 +765,7 @@ const askAurumGoldPredictionButton = document.getElementById("askAurumGoldPredic
 const buybackScenarioSelect = document.getElementById("buybackScenarioSelect");
 const buybackSimulatorForm = document.getElementById("buybackSimulatorForm");
 const buybackSimulatorOutput = document.getElementById("buybackSimulatorOutput");
+const explainBuybackSimulationButton = document.getElementById("explainBuybackSimulation");
 const buybackPolicyEditor = document.getElementById("buybackPolicyEditor");
 const competitorSourceForm = document.getElementById("competitorSourceForm");
 const competitorQuoteForm = document.getElementById("competitorQuoteForm");
@@ -803,12 +808,14 @@ const aurumTipBubble = document.getElementById("aurumTipBubble");
 const aurumTipText = document.getElementById("aurumTipText");
 const aurumTipClose = document.getElementById("aurumTipClose");
 const aurumChatPanel = document.getElementById("aurumChatPanel");
+const aurumChatTitle = document.getElementById("aurumChatTitle");
 const aurumChatClose = document.getElementById("aurumChatClose");
 const aurumChatMessages = document.getElementById("aurumChatMessages");
 const aurumChatForm = document.getElementById("aurumChatForm");
 const aurumQuestion = document.getElementById("aurumQuestion");
 const aurumAskButton = document.getElementById("aurumAskButton");
 const aurumTutorToolbar = document.getElementById("aurumTutorToolbar");
+const aurumPriceToolbar = document.getElementById("aurumPriceToolbar");
 const aurumConsentPanel = document.getElementById("aurumConsentPanel");
 const aurumRememberYes = document.getElementById("aurumRememberYes");
 const aurumRememberNo = document.getElementById("aurumRememberNo");
@@ -4517,8 +4524,15 @@ function aurumLookAtLogo(message = "Il logo OroActive mi piace particolarmente."
 
 function renderAurumMessages() {
   if (!aurumChatMessages) return;
+  const isPriceExplanation = state.aurumMode === "price_explanation";
+  if (aurumChatTitle) aurumChatTitle.textContent = isPriceExplanation ? "Aurum — Spiegazione prezzo" : "Aurum — Assistente OroActive";
+  if (aurumTutorToolbar) aurumTutorToolbar.hidden = isPriceExplanation;
+  if (aurumPriceToolbar) aurumPriceToolbar.hidden = !isPriceExplanation;
+  aurumChatPanel?.classList.toggle("aurum-price-explanation-mode", isPriceExplanation);
   if (!state.aurumMessages.length) {
-    aurumChatMessages.innerHTML = '<div class="empty-state">Aurum è pronto per rispondere usando l’Assistente IA OroActive.</div>';
+    aurumChatMessages.innerHTML = isPriceExplanation
+      ? '<div class="empty-state">Aurum è pronto per spiegare prezzi, carature, titoli, costi, margini e scenari.</div>'
+      : '<div class="empty-state">Aurum è pronto per rispondere usando l’Assistente IA OroActive.</div>';
   } else {
     aurumChatMessages.innerHTML = state.aurumMessages.map((message) => `
       <article class="aurum-message ${message.role === "user" ? "user" : "assistant"}">
@@ -4545,9 +4559,27 @@ function openAurumChat() {
   updateAurumMascotVisibility();
 }
 
+function openAurumPanel(options = {}) {
+  if (options.mode) state.aurumMode = options.mode;
+  if (options.context) {
+    state.aurumPriceContext = options.context;
+    if (options.mode === "price_explanation") state.aurumLastPriceContext = options.context;
+  }
+  if (options.initialMessage) {
+    const message = String(options.initialMessage || "").trim();
+    if (message && state.aurumMessages[state.aurumMessages.length - 1]?.content !== message) {
+      state.aurumMessages.push({ role: "user", content: message });
+      state.aurumLastUserMessage = message;
+    }
+  }
+  openAurumChat();
+}
+
 function resetAurumVisibleChat() {
   state.aurumMessages = [];
   state.aurumLastUserMessage = "";
+  state.aurumMode = "";
+  state.aurumPriceContext = null;
   state.aurumActiveQuiz = null;
   state.aurumSending = false;
   showAurumMemoryConsent(null);
@@ -5002,16 +5034,17 @@ function evaluateAurumQuizAnswer(answer = "") {
 function aurumContextPayload(question) {
   const guide = currentAurumGuide();
   const tutorialId = inferAurumTutorialId(question);
+  const isPriceExplanation = state.aurumMode === "price_explanation";
   return {
     domanda: question,
     message: question,
-    mode: tutorialId ? "tutorial_operativo" : "chat",
+    mode: isPriceExplanation ? "price_explanation" : tutorialId ? "tutorial_operativo" : "chat",
     interface: "aurum_operational_tutor",
-    section: aurumSectionKey(),
+    section: isPriceExplanation ? "quotazione" : aurumSectionKey(),
     userId: state.currentUser?.id || null,
     context: {
-      currentSection: aurumSectionKey(),
-      currentSubSection: currentAurumSubSection(),
+      currentSection: isPriceExplanation ? "quotazione" : aurumSectionKey(),
+      currentSubSection: isPriceExplanation ? "analisi_predittiva_metalli" : currentAurumSubSection(),
       userRole: state.currentUser?.ruolo || "",
       role: state.currentUser?.ruolo || "",
       storeName: state.currentUser?.negozio || "",
@@ -5031,6 +5064,7 @@ function aurumContextPayload(question) {
       },
       tutorialRequested: Boolean(tutorialId),
       tutorialId,
+      priceExplanationContext: isPriceExplanation ? state.aurumPriceContext : null,
       availableMemories: (state.aurumMemories || []).map((memory) => memory.memory_text).filter(Boolean).slice(0, 8)
     }
   };
@@ -11962,6 +11996,353 @@ function findBuybackRow(metal, purityCode, horizon = "today", scenario = state.b
   ));
 }
 
+function aurumHasNumber(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+}
+
+function formatAurumGram(value, currency = "EUR") {
+  return aurumHasNumber(value) && Number(value) > 0 ? formatGoldPerGram(value, currency) : "non disponibile";
+}
+
+function formatAurumKg(value, currency = "EUR") {
+  return aurumHasNumber(value) && Number(value) > 0 ? formatMetalPerKg(value, currency) : "non disponibile";
+}
+
+function formatAurumPercent(value) {
+  return aurumHasNumber(value) ? formatPredictionPercent(value) : "non disponibile";
+}
+
+function formatAurumNumber(value, digits = 2) {
+  if (!aurumHasNumber(value)) return "non disponibile";
+  return new Intl.NumberFormat("it-IT", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  }).format(Number(value));
+}
+
+function latestMetalHistoryDate(metal = "") {
+  const rows = state.metalPredictionHistory?.[metal] || [];
+  return rows.at(-1)?.provider_timestamp || rows.at(-1)?.created_at || "";
+}
+
+function latestMetalHistorySource(metal = "") {
+  const rows = state.metalPredictionHistory?.[metal] || [];
+  return rows.at(-1)?.source || state.goldPredictionStatus?.status?.provider || state.goldPredictionStatus?.settings?.provider || "";
+}
+
+function buildPriceExplanationQuestion(context = {}, followup = "") {
+  const metal = metalDisplayName(context.metal);
+  const purity = context.purity_code ? ` ${context.purity_code}` : "";
+  if (context.type === "general") {
+    return "Spiega l'Analisi Predittiva Metalli: situazione generale di oro e argento, scenario attivo, trend, volatilità, fonti dati, competitor e prezzo massimo pagabile.";
+  }
+  if (context.type === "simulator") {
+    return `Spiega questo calcolo simulato per ${metal}${purity}: ${formatAurumNumber(context.grams, 2)} grammi, scenario ${context.scenario || "standard"}, massimo pagabile e prezzo consigliato.`;
+  }
+  if (followup === "simple") return `Spiegami in modo più semplice il prezzo ${metal}${purity} nello scenario ${context.scenario || "standard"}.`;
+  if (followup === "formula") return `Mostrami la formula del prezzo ${metal}${purity}: valore teorico, costi, margine, massimo pagabile e consigliato.`;
+  if (followup === "competitor") return `Confronta il prezzo ${metal}${purity} con i competitor disponibili senza inventare dati mancanti.`;
+  if (followup === "risk") return `Spiegami il rischio di rialzo o ribasso per ${metal}${purity}, usando trend, volatilità, range e confidence.`;
+  return `Spiega il prezzo ${metal}${purity} nello scenario ${context.scenario || "standard"} partendo dalla quotazione pura e arrivando a massimo pagabile e consigliato.`;
+}
+
+function pricePolicyFor(row = {}) {
+  return (state.buybackPolicy?.policies || []).find((policy) => (
+    policy.metal === row.metal && policy.purity_code === row.purity_code
+  )) || {};
+}
+
+function predictionForMetal(metal = "", horizon = "today") {
+  const predictionMap = metalPredictionsByKey();
+  return predictionMap.get(`${metal}:${horizon}`)
+    || predictionMap.get(`${metal}:today`)
+    || predictionMap.get(`${metal}:24h`)
+    || {};
+}
+
+function buildPriceExplanationContext(row = {}, options = {}) {
+  const metal = row.metal || options.metal || "gold";
+  const horizon = row.horizon || row.prediction_horizon || options.horizon || "today";
+  const currency = row.currency || options.currency || state.goldPredictionStatus?.settings?.currency || "EUR";
+  const purity = Number(row.purity_value || options.purity_value || 0);
+  const prediction = predictionForMetal(metal, horizon);
+  const policy = pricePolicyFor(row);
+  const pureSpotPerGram = Number(row.spot_price_per_gram || prediction.current_price_per_gram || prediction.predicted_price_per_gram || 0);
+  const predictedPure = Number(prediction.predicted_price_per_gram || prediction.current_price_per_gram || 0);
+  const predictedLowPure = Number(prediction.predicted_low_per_gram || 0);
+  const predictedHighPure = Number(prediction.predicted_high_per_gram || 0);
+  return {
+    mode: "price_explanation",
+    type: options.type || "row",
+    section: "quotazione",
+    subsection: "analisi_predittiva_metalli",
+    metal,
+    metal_label: metalDisplayName(metal),
+    purity_code: row.purity_code || options.purity_code || "",
+    purity_label: row.label || row.purity_code || options.purity_code || "",
+    purity_value: purity || null,
+    scenario: row.scenario || options.scenario || state.buybackScenario || "standard",
+    horizon,
+    currency,
+    spot_price_per_kg: pureSpotPerGram ? pureSpotPerGram * 1000 : null,
+    spot_price_per_gram: pureSpotPerGram || null,
+    theoretical_value_per_gram: aurumHasNumber(row.theoretical_value_per_gram) ? Number(row.theoretical_value_per_gram) : null,
+    predicted_price_per_gram: predictedPure && purity ? predictedPure * purity : null,
+    predicted_low_per_gram: predictedLowPure && purity ? predictedLowPure * purity : null,
+    predicted_high_per_gram: predictedHighPure && purity ? predictedHighPure * purity : null,
+    max_payable_per_gram: aurumHasNumber(row.max_payable_per_gram) ? Number(row.max_payable_per_gram) : null,
+    recommended_payable_per_gram: aurumHasNumber(row.recommended_payable_per_gram) ? Number(row.recommended_payable_per_gram) : null,
+    recoverable_value_per_gram: aurumHasNumber(row.recoverable_value_per_gram) ? Number(row.recoverable_value_per_gram) : null,
+    margin_estimated_per_gram: aurumHasNumber(row.margin_estimated_per_gram) ? Number(row.margin_estimated_per_gram) : null,
+    margin_estimated_pct: aurumHasNumber(row.margin_estimated_pct) ? Number(row.margin_estimated_pct) : aurumHasNumber(policy.margin_target_pct) ? Number(policy.margin_target_pct) : null,
+    melting_loss_pct: aurumHasNumber(row.melting_loss_pct) ? Number(row.melting_loss_pct) : aurumHasNumber(policy.melting_loss_pct) ? Number(policy.melting_loss_pct) : null,
+    refinery_spread_pct: aurumHasNumber(row.refinery_spread_pct) ? Number(row.refinery_spread_pct) : aurumHasNumber(policy.refinery_spread_pct) ? Number(policy.refinery_spread_pct) : null,
+    operating_cost_per_gram: aurumHasNumber(row.operating_cost_per_gram) ? Number(row.operating_cost_per_gram) : aurumHasNumber(policy.operating_cost_per_gram) ? Number(policy.operating_cost_per_gram) : null,
+    melting_cost_per_gram: aurumHasNumber(row.melting_cost_per_gram) ? Number(row.melting_cost_per_gram) : aurumHasNumber(policy.melting_cost_per_gram) ? Number(policy.melting_cost_per_gram) : null,
+    risk_buffer_pct: aurumHasNumber(row.risk_buffer_pct) ? Number(row.risk_buffer_pct) : aurumHasNumber(policy.risk_buffer_pct) ? Number(policy.risk_buffer_pct) : null,
+    negotiation_buffer_pct: aurumHasNumber(row.negotiation_buffer_pct) ? Number(row.negotiation_buffer_pct) : aurumHasNumber(policy.negotiation_buffer_pct) ? Number(policy.negotiation_buffer_pct) : null,
+    trend: row.trend || prediction.trend || "laterale",
+    volatility: row.volatility || prediction.volatility || "media",
+    confidence: row.confidence || prediction.confidence || "bassa",
+    competitor_avg_price: aurumHasNumber(row.competitor_avg_price) ? Number(row.competitor_avg_price) : null,
+    competitor_max_price: aurumHasNumber(row.competitor_max_price) ? Number(row.competitor_max_price) : null,
+    competitor_min_price: aurumHasNumber(row.competitor_min_price) ? Number(row.competitor_min_price) : null,
+    competitor_count: Number(row.competitor_count || 0),
+    difference_vs_avg: aurumHasNumber(row.difference_vs_avg) ? Number(row.difference_vs_avg) : null,
+    difference_vs_max: aurumHasNumber(row.difference_vs_max) ? Number(row.difference_vs_max) : null,
+    last_update: row.created_at || prediction.created_at || latestMetalHistoryDate(metal) || null,
+    source: row.source || prediction.source || latestMetalHistorySource(metal) || "fallback",
+    model_features: prediction.features || row.features || {},
+    grams: aurumHasNumber(options.grams) ? Number(options.grams) : null,
+    theoretical_total: aurumHasNumber(options.grams) && aurumHasNumber(row.theoretical_value_per_gram) ? Number(options.grams) * Number(row.theoretical_value_per_gram) : null,
+    max_payable_total: aurumHasNumber(options.grams) && aurumHasNumber(row.max_payable_per_gram) ? Number(options.grams) * Number(row.max_payable_per_gram) : null,
+    recommended_total: aurumHasNumber(options.grams) && aurumHasNumber(row.recommended_payable_per_gram) ? Number(options.grams) * Number(row.recommended_payable_per_gram) : null,
+    margin_total: aurumHasNumber(options.grams) && aurumHasNumber(row.margin_estimated_per_gram) ? Number(options.grams) * Number(row.margin_estimated_per_gram) : null,
+    recoverable_total: aurumHasNumber(options.grams) && aurumHasNumber(row.recoverable_value_per_gram) ? Number(options.grams) * Number(row.recoverable_value_per_gram) : null
+  };
+}
+
+function buildGeneralPriceExplanationContext() {
+  const gold = findBuybackRow("gold", "18kt", "today", state.buybackScenario) || buybackRowsFor("gold", "today")[0] || {};
+  const silver = findBuybackRow("silver", "925", "today", state.buybackScenario) || buybackRowsFor("silver", "today")[0] || {};
+  const status = state.goldPredictionStatus?.status || {};
+  return {
+    mode: "price_explanation",
+    type: "general",
+    section: "quotazione",
+    subsection: "analisi_predittiva_metalli",
+    scenario: state.buybackScenario || "standard",
+    source: status.provider_label || status.provider || latestMetalHistorySource("gold") || latestMetalHistorySource("silver") || "fallback",
+    provider_configured: Boolean(status.configured),
+    last_update: [latestMetalHistoryDate("gold"), latestMetalHistoryDate("silver")].filter(Boolean).sort().at(-1) || null,
+    warning: state.goldPredictionStatus?.warning || state.goldPredictionStatus?.historyWarning || "",
+    competitor_count: Number(state.competitorQuotes?.length || 0),
+    gold: buildPriceExplanationContext(gold, { type: "summary", metal: "gold", purity_code: gold.purity_code || "18kt" }),
+    silver: buildPriceExplanationContext(silver, { type: "summary", metal: "silver", purity_code: silver.purity_code || "925" })
+  };
+}
+
+function trendExplanation(context = {}) {
+  const trend = String(context.trend || "laterale").toLowerCase();
+  const volatility = String(context.volatility || "media").toLowerCase();
+  const confidence = String(context.confidence || "bassa").toLowerCase();
+  const featureText = context.model_features && Object.keys(context.model_features).length
+    ? ` I dati modello disponibili includono: ${Object.entries(context.model_features).slice(0, 4).map(([key, value]) => `${key}=${value}`).join(", ")}.`
+    : "";
+  const volatilityText = volatility === "alta"
+    ? "La volatilità è alta, quindi il range previsto si allarga e conviene usare più prudenza."
+    : volatility === "bassa"
+      ? "La volatilità è bassa, quindi il range previsto è più contenuto."
+      : "La volatilità è media, quindi il prezzo può muoversi ma senza un segnale estremo.";
+  if (trend.includes("rial")) {
+    return `Il sistema legge un trend rialzista: le medie o la regressione recente indicano una possibile spinta verso l'alto.${featureText} ${volatilityText} La confidence indicata è ${confidence}.`;
+  }
+  if (trend.includes("rib")) {
+    return `Il sistema legge un trend ribassista: le medie brevi o il prezzo recente risultano più deboli rispetto al riferimento lungo.${featureText} ${volatilityText} La confidence indicata è ${confidence}.`;
+  }
+  return `Il sistema legge una fase laterale: le medie sono vicine o la variazione recente è contenuta.${featureText} ${volatilityText} La confidence indicata è ${confidence}.`;
+}
+
+function competitorExplanation(context = {}) {
+  if (!Number(context.competitor_count || 0)) {
+    return "Confronto competitor: non ci sono rilevazioni competitor disponibili per questa voce. Aurum non inventa prezzi esterni: serve inserimento manuale, CSV o fonte configurata.";
+  }
+  const currency = context.currency || "EUR";
+  const recommended = Number(context.recommended_payable_per_gram || 0);
+  const avg = Number(context.competitor_avg_price || 0);
+  const max = Number(context.competitor_max_price || 0);
+  const deltaAvg = recommended && avg ? recommended - avg : null;
+  const deltaText = deltaAvg === null
+    ? ""
+    : deltaAvg >= 0
+      ? ` Il consigliato OroActive è sopra la media competitor di ${formatAurumGram(deltaAvg, currency)}.`
+      : ` Il consigliato OroActive è sotto la media competitor di ${formatAurumGram(Math.abs(deltaAvg), currency)}.`;
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}.${deltaText}`;
+}
+
+function formulaExplanation(context = {}) {
+  const currency = context.currency || "EUR";
+  const costs = [
+    `perdita fusione ${formatAurumPercent(context.melting_loss_pct)}`,
+    `spread raffineria ${formatAurumPercent(context.refinery_spread_pct)}`,
+    `costo operativo ${formatAurumGram(context.operating_cost_per_gram, currency)}`,
+    `costo fonderia ${formatAurumGram(context.melting_cost_per_gram, currency)}`,
+    `buffer rischio ${formatAurumPercent(context.risk_buffer_pct)}`,
+    `buffer trattativa ${formatAurumPercent(context.negotiation_buffer_pct)}`,
+    `margine target ${formatAurumPercent(context.margin_estimated_pct)}`
+  ].join("; ");
+  return `Formula sintetica: prezzo puro €/g × purezza = valore teorico. Poi si considera il rientro netto togliendo fonderia, perdita, spread e costi. Da quel netto si applica il margine target per ottenere il massimo pagabile, poi il buffer rischio/trattativa per arrivare al prezzo consigliato. Parametri disponibili: ${costs}.`;
+}
+
+function generateGeneralPriceExplanation(context = {}) {
+  const gold = context.gold || {};
+  const silver = context.silver || {};
+  return `Spiegazione generale Analisi Predittiva Metalli
+
+Scenario attivo
+Lo scenario operativo selezionato è ${context.scenario || "standard"}. La fonte dati indicata è ${context.source || "non disponibile"}${context.last_update ? `, ultimo aggiornamento ${formatDateTime(context.last_update)}` : ""}.
+
+Oro
+Per l'oro il riferimento operativo è ${gold.purity_code || "18kt"}: valore teorico ${formatAurumGram(gold.theoretical_value_per_gram, gold.currency)}, massimo pagabile ${formatAurumGram(gold.max_payable_per_gram, gold.currency)}, consigliato ${formatAurumGram(gold.recommended_payable_per_gram, gold.currency)}. ${trendExplanation(gold)}
+
+Argento
+Per l'argento il riferimento operativo è ${silver.purity_code || "925"}: valore teorico ${formatAurumGram(silver.theoretical_value_per_gram, silver.currency)}, massimo pagabile ${formatAurumGram(silver.max_payable_per_gram, silver.currency)}, consigliato ${formatAurumGram(silver.recommended_payable_per_gram, silver.currency)}. ${trendExplanation(silver)}
+
+Competitor e fonti
+${Number(context.competitor_count || 0) ? `Sono presenti ${context.competitor_count} rilevazioni competitor aggregate.` : "Nessun competitor configurato: il confronto esterno non viene inventato."} ${context.warning ? `Nota dati: ${context.warning}` : ""}
+
+Avviso finale
+Questa è una stima operativa e non una garanzia di prezzo. Il prezzo finale resta definito dalle policy OroActive e dall'operatore autorizzato.`;
+}
+
+function generateLocalPriceExplanation(context = {}, options = {}) {
+  if (context.type === "general" && options.followup === "formula") {
+    return `Formula generale Analisi Predittiva Metalli
+
+Per ogni riga OroActive parte dal prezzo puro al grammo, applica la purezza della caratura o del titolo, calcola il valore teorico e poi considera perdita fusione, spread raffineria, costi operativi, costi fonderia, buffer rischio, buffer trattativa e margine target.
+
+Oro: il riferimento puro viene convertito da €/kg a €/g e poi moltiplicato per kt/24. Esempio: 18kt = 18/24 = 0,75.
+
+Argento: il riferimento puro viene convertito da €/kg a €/g e poi moltiplicato per titolo/1000. Esempio: 925 = 0,925.
+
+Il massimo pagabile è la soglia che tutela il margine configurato. Il prezzo consigliato resta più prudente perché include spazio per trattativa, volatilità e rischio operativo.`;
+  }
+  if (context.type === "general" && options.followup === "competitor") {
+    return Number(context.competitor_count || 0)
+      ? `Confronto competitor generale: sono presenti ${context.competitor_count} rilevazioni aggregate. Apri una riga specifica Oro o Argento e usa “Spiega” per confrontare media, minimo, massimo e prezzo consigliato di quella caratura o titolo.`
+      : "Confronto competitor generale: non ci sono ancora competitor configurati. Aurum non inventa prezzi esterni: inserisci rilevazioni manuali, CSV o fonti autorizzate per ottenere il confronto.";
+  }
+  if (context.type === "general" && options.followup === "risk") {
+    return `Rischio di fluttuazione generale
+
+Oro: ${trendExplanation(context.gold || {})}
+
+Argento: ${trendExplanation(context.silver || {})}
+
+Se lo storico è insufficiente o la fonte non è configurata, la confidence resta bassa e lo scenario prudente è più adatto.`;
+  }
+  if (context.type === "general") return generateGeneralPriceExplanation(context);
+  if (options.followup === "competitor") return competitorExplanation(context);
+  if (options.followup === "formula") return formulaExplanation(context);
+  if (options.followup === "risk") return trendExplanation(context);
+  const currency = context.currency || "EUR";
+  const metal = context.metal_label || metalDisplayName(context.metal);
+  const purity = context.purity_label || context.purity_code || "";
+  const purityFormula = context.metal === "silver"
+    ? `${context.purity_code || "titolo"} / 1000 = ${formatAurumNumber(context.purity_value, 3)}`
+    : `${String(context.purity_code || "").replace(/kt/i, "") || "kt"} / 24 = ${formatAurumNumber(context.purity_value, 3)}`;
+  const simulatorText = context.type === "simulator" && aurumHasNumber(context.grams)
+    ? `\n\nSimulatore\nPer ${formatAurumNumber(context.grams, 2)} grammi il valore teorico totale è ${formatEuro(context.theoretical_total)}, il massimo pagabile totale è ${formatEuro(context.max_payable_total)}, il consigliato totale è ${formatEuro(context.recommended_total)} e il margine stimato totale è ${formatEuro(context.margin_total)}.`
+    : "";
+  return `Spiegazione prezzo ${metal} ${purity} — Scenario ${context.scenario || "standard"}
+
+Punto di partenza
+Il calcolo parte dal prezzo puro di borsa: ${formatAurumKg(context.spot_price_per_kg, currency)}, cioè ${formatAurumGram(context.spot_price_per_gram, currency)}.
+
+Calcolo purezza
+La purezza usata è ${purityFormula}. Se questo dato manca o lo storico è insufficiente, la stima diventa meno affidabile.
+
+Valore teorico
+${formatAurumGram(context.spot_price_per_gram, currency)} × ${formatAurumNumber(context.purity_value, 3)} = ${formatAurumGram(context.theoretical_value_per_gram, currency)}. Questo è il valore teorico del metallo prima di costi e margini.
+
+Costi e rientro compro oro
+${formulaExplanation(context)}
+
+Massimo pagabile
+Il massimo pagabile è ${formatAurumGram(context.max_payable_per_gram, currency)}. È il limite oltre cui il rientro OroActive rischia di non rispettare margine, costi e policy Founder.
+
+Prezzo consigliato
+Il prezzo consigliato è ${formatAurumGram(context.recommended_payable_per_gram, currency)}. Può essere diverso dal massimo pagabile perché lascia spazio a volatilità, trattativa, rischio operativo e sicurezza di margine.
+
+Fluttuazione prevista
+Range stimato per questa voce: basso ${formatAurumGram(context.predicted_low_per_gram, currency)}, centrale ${formatAurumGram(context.predicted_price_per_gram, currency)}, alto ${formatAurumGram(context.predicted_high_per_gram, currency)}. ${trendExplanation(context)}
+
+Confronto competitor
+${competitorExplanation(context)}${simulatorText}
+
+Avviso finale
+Questa è una stima operativa e non una garanzia di prezzo. Il prezzo finale resta definito dalle policy OroActive e dall'operatore autorizzato.`;
+}
+
+async function explainPriceWithAurum(context = {}, options = {}) {
+  const question = options.question || buildPriceExplanationQuestion(context, options.followup);
+  openAurumPanel({ mode: "price_explanation", initialMessage: question, context });
+  const loadingIndex = state.aurumMessages.push({ role: "assistant", content: "Sto preparando la spiegazione del prezzo..." }) - 1;
+  renderAurumMessages();
+  try {
+    const data = await apiRequest("/ai/assistente", {
+      method: "POST",
+      body: JSON.stringify({
+        message: question,
+        mode: "price_explanation",
+        interface: "aurum_price_explanation",
+        section: "quotazione",
+        context: {
+          currentSection: "quotazione",
+          currentSubSection: "analisi_predittiva_metalli",
+          userRole: state.currentUser?.ruolo || "",
+          storeName: state.currentUser?.negozio || "",
+          priceExplanationContext: context
+        }
+      }),
+      timeoutMs: 60000
+    });
+    const answer = String(data.risposta || "").trim();
+    const fallbackNeeded = Boolean(data.error) || !answer || /Non ho trovato una risposta sufficiente|Questa informazione non è presente/i.test(answer);
+    state.aurumMessages[loadingIndex] = {
+      role: "assistant",
+      content: fallbackNeeded
+        ? `Aurum AI non disponibile. Ti mostro una spiegazione tecnica locale.\n\n${generateLocalPriceExplanation(context, options)}`
+        : answer,
+      source: fallbackNeeded ? "Spiegazione locale OroActive" : data.fonte || "Aurum"
+    };
+  } catch (error) {
+    state.aurumMessages[loadingIndex] = {
+      role: "assistant",
+      content: `Aurum AI non disponibile. Ti mostro una spiegazione tecnica locale.\n\n${generateLocalPriceExplanation(context, options)}`,
+      source: "Spiegazione locale OroActive"
+    };
+  } finally {
+    renderAurumMessages();
+  }
+}
+
+function handlePriceExplanationClick(event) {
+  const button = event.target.closest("[data-explain-price-row]");
+  if (!button) return;
+  const row = findBuybackRow(
+    button.dataset.metal || "gold",
+    button.dataset.purityCode || "",
+    button.dataset.horizon || "today",
+    button.dataset.scenario || state.buybackScenario
+  );
+  if (!row) {
+    showToast("Calcolo prezzo non disponibile. Aggiorna l'analisi metalli.", "warning");
+    return;
+  }
+  void explainPriceWithAurum(buildPriceExplanationContext(row));
+}
+
 function renderGoldPredictionStatus() {
   if (!goldPredictionStatus) return;
   const status = state.goldPredictionStatus?.status || {};
@@ -12050,6 +12431,7 @@ function buybackTableHtml(title, metal) {
             <th>Margine stimato</th>
             <th>Scenario</th>
             <th>Trend</th>
+            <th>Aurum</th>
           </tr>
         </thead>
         <tbody>
@@ -12071,6 +12453,17 @@ function buybackTableHtml(title, metal) {
                 <td>${escapeHtml(formatGoldPerGram(row.margin_estimated_per_gram, row.currency))} · ${escapeHtml(formatPredictionPercent(row.margin_estimated_pct))}</td>
                 <td>${escapeHtml(row.scenario)}</td>
                 <td>${escapeHtml(row.trend || "laterale")}</td>
+                <td>
+                  <button
+                    class="small-button gold-prediction-explain-button"
+                    type="button"
+                    data-explain-price-row
+                    data-metal="${escapeHtml(row.metal)}"
+                    data-purity-code="${escapeHtml(row.purity_code)}"
+                    data-horizon="${escapeHtml(row.horizon || row.prediction_horizon || "today")}"
+                    data-scenario="${escapeHtml(row.scenario)}"
+                  >Spiega</button>
+                </td>
               </tr>
             `;
           }).join("")}
@@ -12349,9 +12742,11 @@ function renderBuybackSimulation(event) {
   const scenario = String(formData.get("scenario") || state.buybackScenario || "standard");
   const row = findBuybackRow(metal, purityCode, "today", scenario) || findBuybackRow(metal, purityCode, "today", state.buybackScenario);
   if (!row || !grams) {
+    state.buybackSimulationContext = null;
     buybackSimulatorOutput.textContent = "Calcolo non disponibile. Aggiorna i prezzi e inserisci un peso valido.";
     return;
   }
+  state.buybackSimulationContext = buildPriceExplanationContext(row, { type: "simulator", grams, scenario });
   buybackSimulatorOutput.innerHTML = `
     <div><span>Valore teorico</span><strong>${escapeHtml(formatEuro(row.theoretical_value_per_gram * grams))}</strong></div>
     <div><span>Massimo pagabile</span><strong>${escapeHtml(formatEuro(row.max_payable_per_gram * grams))}</strong></div>
@@ -12423,13 +12818,18 @@ async function importCompetitorCsv(event) {
 }
 
 function askAurumGoldPrediction() {
-  const row = findBuybackRow("gold", "18kt", "today", state.buybackScenario) || state.buybackCalculations?.[0];
-  const message = row
-    ? `Per ${row.label || row.purity_code} parto dal prezzo puro al grammo e lo moltiplico per la purezza (${formatPredictionPercent(row.purity_value)}). Poi sottraggo costi fonderia, spread raffineria, perdita fusione e buffer rischio, quindi applico il margine target OroActive. Con scenario ${row.scenario}, il valore teorico è ${formatGoldPerGram(row.theoretical_value_per_gram, row.currency)}, il massimo pagabile è ${formatGoldPerGram(row.max_payable_per_gram, row.currency)} e il prezzo consigliato è ${formatGoldPerGram(row.recommended_payable_per_gram, row.currency)}. ${row.competitor_count ? `Il competitor medio rilevato è ${formatGoldPerGram(row.competitor_avg_price, row.currency)}.` : "Non ci sono ancora competitor configurati per questa voce."} È una stima indicativa, non una garanzia di prezzo.`
-    : "Analisi Predittiva Metalli e Prezzi di Acquisto: aggiorna il calcolo per vedere valore teorico, massimo pagabile, prezzo consigliato, margine e confronto competitor. Le stime non sono una garanzia di prezzo.";
-  state.aurumMessages.push({ role: "assistant", content: message });
-  renderAurumMessages();
-  openAurumChat();
+  void explainPriceWithAurum(buildGeneralPriceExplanationContext());
+}
+
+function explainBuybackSimulation() {
+  if (!state.buybackSimulationContext && buybackSimulatorForm) renderBuybackSimulation();
+  if (!state.buybackSimulationContext) {
+    showToast("Prima esegui una simulazione prezzo valida.", "warning");
+    return;
+  }
+  void explainPriceWithAurum(state.buybackSimulationContext, {
+    question: buildPriceExplanationQuestion(state.buybackSimulationContext)
+  });
 }
 
 async function setPracticeMeta(options = {}) {
@@ -13572,6 +13972,24 @@ aurumTutorToolbar?.addEventListener("click", (event) => {
     startAurumCuriosityQuiz();
   }
 });
+aurumPriceToolbar?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-aurum-price-followup]");
+  if (!button) return;
+  const context = state.aurumLastPriceContext || state.aurumPriceContext;
+  if (!context) {
+    showToast("Apri prima una spiegazione prezzo.", "warning");
+    return;
+  }
+  const followup = button.dataset.aurumPriceFollowup || "simple";
+  const question = buildPriceExplanationQuestion(context, followup);
+  state.aurumMessages.push({ role: "user", content: question });
+  state.aurumMessages.push({
+    role: "assistant",
+    content: generateLocalPriceExplanation(context, { followup }),
+    source: "Spiegazione locale OroActive"
+  });
+  renderAurumMessages();
+});
 aurumRememberYes?.addEventListener("click", saveAurumMemory);
 aurumRememberNo?.addEventListener("click", () => {
   showAurumMemoryConsent(null);
@@ -13965,11 +14383,13 @@ document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () =
 syncGoldHistoryButton?.addEventListener("click", () => withButtonBusy(syncGoldHistoryButton, "Sincronizzo...", syncGoldHistory));
 runGoldPredictionButton?.addEventListener("click", () => withButtonBusy(runGoldPredictionButton, "Calcolo...", runGoldPrediction));
 askAurumGoldPredictionButton?.addEventListener("click", askAurumGoldPrediction);
+goldPredictionKaratTable?.addEventListener("click", handlePriceExplanationClick);
 buybackScenarioSelect?.addEventListener("change", () => {
   state.buybackScenario = buybackScenarioSelect.value || "standard";
   withButtonBusy(runGoldPredictionButton, "Calcolo...", runGoldPrediction);
 });
 buybackSimulatorForm?.addEventListener("submit", renderBuybackSimulation);
+explainBuybackSimulationButton?.addEventListener("click", explainBuybackSimulation);
 competitorSourceForm?.addEventListener("submit", (event) => {
   withButtonBusy(event.submitter || competitorSourceForm.querySelector('button[type="submit"]'), "Salvo...", () => saveCompetitorSource(event));
 });
