@@ -12027,6 +12027,37 @@ function buybackMarketPrice(row = {}) {
   return Number(row.best_market_client_price_per_gram || row.recommended_payable_per_gram || 0);
 }
 
+function competitorNamesForMetal(metal = "") {
+  const quotes = (state.competitorQuotes || [])
+    .filter(isCompetitorBuybackQuote)
+    .filter((quote) => !metal || quote.metal === metal)
+    .map((quote) => String(quote.competitor_name || "").trim())
+    .filter(Boolean);
+  return [...new Set(quotes)].sort((first, second) => first.localeCompare(second, "it"));
+}
+
+function latestCompetitorQuoteForPurity(competitorName = "", metal = "", purityCode = "") {
+  const normalizedName = String(competitorName || "").toLowerCase();
+  return (state.competitorQuotes || [])
+    .filter(isCompetitorBuybackQuote)
+    .filter((quote) => String(quote.competitor_name || "").toLowerCase() === normalizedName)
+    .filter((quote) => quote.metal === metal)
+    .filter((quote) => quote.purity_code === purityCode)
+    .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
+}
+
+function competitorQuoteMatrixValue(quote = null) {
+  if (!quote) return "—";
+  const currency = quote.currency || "EUR";
+  const isRange = quote.raw_payload?.price_kind === "range";
+  const min = Number(quote.raw_payload?.range_min_per_gram || 0);
+  const max = Number(quote.raw_payload?.range_max_per_gram || 0);
+  if (isRange && min && max) {
+    return `da ${formatGoldPerGram(min, currency)} a ${formatGoldPerGram(max, currency)}`;
+  }
+  return formatGoldPerGram(quote.price_per_gram, currency);
+}
+
 function competitorSourceStatusLabel(source = {}) {
   const status = String(source.last_sync_status || "").toLowerCase();
   if (status === "success" || status === "updated") return "Aggiornato";
@@ -13428,70 +13459,35 @@ function renderGoldPredictionList() {
 
 function buybackTableHtml(title, metal) {
   const rows = buybackRowsFor(metal, "today");
-  const predictionMap = metalPredictionsByKey();
   if (!rows.length) return `<div class="empty-state">Calcolo ${escapeHtml(title)} non ancora disponibile.</div>`;
+  const competitorNames = competitorNamesForMetal(metal);
+  const competitorHeaders = competitorNames.length
+    ? competitorNames.map((name) => `<th>${escapeHtml(name)}</th>`).join("")
+    : `<th>Competitor</th>`;
   return `
     <div class="gold-prediction-table-heading">${escapeHtml(title)}</div>
     <div class="gold-prediction-table-wrap">
       <table class="gold-prediction-table">
         <thead>
           <tr>
-            <th>${metal === "gold" ? "Caratura" : "Titolo"}</th>
+            <th>Caratura</th>
             <th>Purezza</th>
-            <th>Teorico oggi</th>
-            <th>Previsione 24h</th>
-            <th>Previsione 7g</th>
-            <th>Max pagabile oggi</th>
-            <th>Prezzo OroActive consigliato</th>
-            <th>Media competitor</th>
-            <th>Miglior competitor</th>
-            <th>Competitor migliore</th>
-            <th>Prezzo migliore di mercato</th>
-            <th>Scostamento vs media</th>
-            <th>Scostamento vs miglior competitor</th>
-            <th>Stato competitività</th>
-            <th>Margine stimato</th>
-            <th>Scenario</th>
-            <th>Trend</th>
-            <th>Aurum</th>
+            ${competitorHeaders}
           </tr>
         </thead>
         <tbody>
           ${rows.map((row) => {
-            const day = predictionMap.get(`${metal}:24h`);
-            const week = predictionMap.get(`${metal}:7d`);
-            const bestCompetitorPrice = Number(row.best_competitor_price || row.competitor_max_price || 0);
-            const bestMarketPrice = buybackMarketPrice(row);
+            const competitorCells = competitorNames.length
+              ? competitorNames.map((name) => {
+                  const quote = latestCompetitorQuoteForPurity(name, metal, row.purity_code);
+                  return `<td>${escapeHtml(competitorQuoteMatrixValue(quote))}</td>`;
+                }).join("")
+              : `<td>—</td>`;
             return `
               <tr>
                 <th>${escapeHtml(row.label || row.purity_code)}</th>
                 <td>${escapeHtml(formatPredictionPercent(row.purity_value))}</td>
-                <td>${escapeHtml(formatGoldPerGram(row.theoretical_value_per_gram, row.currency))}</td>
-                <td>${escapeHtml(formatGoldPerGram(Number(day?.predicted_price_per_gram || 0) * Number(row.purity_value || 0), row.currency))}</td>
-                <td>${escapeHtml(formatGoldPerGram(Number(week?.predicted_price_per_gram || 0) * Number(row.purity_value || 0), row.currency))}</td>
-                <td>${escapeHtml(formatGoldPerGram(row.max_payable_per_gram, row.currency))}</td>
-                <td>${escapeHtml(formatGoldPerGram(row.recommended_payable_per_gram, row.currency))}</td>
-                <td>${row.competitor_count ? escapeHtml(formatGoldPerGram(row.competitor_avg_price, row.currency)) : "—"}</td>
-                <td>${row.competitor_count ? escapeHtml(formatGoldPerGram(bestCompetitorPrice, row.currency)) : "—"}</td>
-                <td>${row.competitor_count ? escapeHtml(row.best_competitor_name || "Miglior competitor") : "—"}</td>
-                <td>${escapeHtml(formatGoldPerGram(bestMarketPrice, row.currency))}</td>
-                <td>${escapeHtml(marketDelta(row.difference_vs_avg, row.currency))}</td>
-                <td>${escapeHtml(marketDelta(row.difference_vs_market_best ?? row.difference_vs_max, row.currency))}</td>
-                <td><span class="market-status ${escapeHtml(marketStatusClass(row.market_comparison_status))}">${escapeHtml(marketStatusLabel(row.market_comparison_status, row))}</span></td>
-                <td>${escapeHtml(formatGoldPerGram(row.margin_estimated_per_gram, row.currency))} · ${escapeHtml(formatPredictionPercent(row.margin_estimated_pct))}</td>
-                <td>${escapeHtml(row.scenario)}</td>
-                <td>${escapeHtml(row.trend || "laterale")}</td>
-                <td>
-                  <button
-                    class="small-button gold-prediction-explain-button"
-                    type="button"
-                    data-explain-price-row
-                    data-metal="${escapeHtml(row.metal)}"
-                    data-purity-code="${escapeHtml(row.purity_code)}"
-                    data-horizon="${escapeHtml(row.horizon || row.prediction_horizon || "today")}"
-                    data-scenario="${escapeHtml(row.scenario)}"
-                  >Spiega</button>
-                </td>
+                ${competitorCells}
               </tr>
             `;
           }).join("")}
