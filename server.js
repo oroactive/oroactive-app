@@ -3956,6 +3956,19 @@ async function extractCompetitorQuotes(source = {}) {
   if (!source.auto_sync_enabled || method === "manual_fallback" || source.source_type === "manual" || source.source_type === "csv_import") {
     return { quotes: [], status: "disabled", error: "Fonte non configurata per aggiornamento automatico." };
   }
+  if (method === "pronto_gold_parser" || source.source_type === "pronto_gold_parser" || source.name?.toLowerCase() === "pronto gold") {
+    return prontoGoldExtractor.extractProntoGoldQuotes({
+      source_id: source.id,
+      sourceId: source.id,
+      url: config.url || source.website_url || prontoGoldUrl,
+      quoteUrl: config.quote_url || config.quoteUrl || prontoGoldQuoteUrl,
+      sourceUrl: config.quote_url || config.quoteUrl || prontoGoldQuoteUrl,
+      timeoutMs: prontoGoldTimeoutMs,
+      userAgent: competitorAutoSyncUserAgent,
+      usePlaywright: prontoGoldUsePlaywright,
+      useAiFallback: prontoGoldUseAiFallback
+    });
+  }
   const guidedRules = await listCompetitorExtractionRules({ sourceId: source.id, activeOnly: true }).catch(() => []);
   if (guidedRules.length) {
     const trained = await competitorExtractionTrainer.testCompetitorExtraction(source, guidedRules);
@@ -4006,20 +4019,6 @@ async function extractCompetitorQuotes(source = {}) {
       userAgent: competitorAutoSyncUserAgent,
       usePlaywright: amicoOroUsePlaywright,
       useAiVisionFallback: amicoOroUseAiVisionFallback
-    });
-  }
-
-  if (method === "pronto_gold_parser" || source.source_type === "pronto_gold_parser" || source.name?.toLowerCase() === "pronto gold") {
-    return prontoGoldExtractor.extractProntoGoldQuotes({
-      source_id: source.id,
-      sourceId: source.id,
-      url: config.url || source.website_url || prontoGoldUrl,
-      quoteUrl: config.quote_url || config.quoteUrl || prontoGoldQuoteUrl,
-      sourceUrl: config.quote_url || config.quoteUrl || prontoGoldQuoteUrl,
-      timeoutMs: prontoGoldTimeoutMs,
-      userAgent: competitorAutoSyncUserAgent,
-      usePlaywright: prontoGoldUsePlaywright,
-      useAiFallback: prontoGoldUseAiFallback
     });
   }
 

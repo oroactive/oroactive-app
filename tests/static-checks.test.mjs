@@ -623,6 +623,10 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(prontoGoldExtractor, /range_min_per_gram/);
   assert.match(prontoGoldExtractor, /auto_pronto_gold_parser/);
   assert.match(prontoGoldExtractor, /AI fallback Pronto Gold/);
+  assert.ok(
+    server.indexOf("method === \"pronto_gold_parser\"") < server.indexOf("const guidedRules = await listCompetitorExtractionRules"),
+    "il parser dedicato Pronto Gold deve avere precedenza sulle regole guidate salvate"
+  );
   assert.match(bancoPreziosiExtractor, /export function createBancoPreziosiExtractor/);
   assert.match(bancoPreziosiExtractor, /export function parseItalianEuroPrice/);
   assert.match(bancoPreziosiExtractor, /extractBancoPreziosiQuotesFromText/);
