@@ -5009,6 +5009,36 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   margin-bottom: 16px;
 }
 
+.market-analysis-panel .gold-prediction-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.market-analysis-panel .gold-prediction-card {
+  border-radius: 12px;
+}
+
+.market-admin-tools {
+  display: block;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 184, 76, 0.22);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.market-admin-tools summary {
+  cursor: pointer;
+  color: #ffd7a3;
+  font-weight: 1000;
+}
+
+.market-admin-tools-body {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 14px;
+  margin-top: 12px;
+}
+
 .competitor-quote-form,
 .competitor-source-form,
 .competitor-csv-form {
@@ -10464,6 +10494,7 @@ input.document-expired {
   .buyback-simulator-form,
   .buyback-simulator-output,
   .competitor-tools,
+  .market-admin-tools-body,
   .competitor-extraction-head,
   .competitor-auto-sync-card,
   .oro-express-card header,

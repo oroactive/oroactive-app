@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260606-pronto-gold-1">
+  <link rel="stylesheet" href="styles.css?v=20260607-market-analysis-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -906,12 +906,12 @@
             <p id="bullionVaultChartFallback" class="quote-fallback" hidden>Grafico BullionVault non incorporabile direttamente. <a href="https://www.bullionvault.com/gold-price-chart.do" target="_blank" rel="noopener">Apri grafico BullionVault</a>.</p>
           </div>
         </section>
-        <section class="gold-prediction-panel quote-section-panel" id="goldPredictionPanel" aria-label="Analisi Predittiva Metalli e Prezzi di Acquisto">
+        <section class="gold-prediction-panel quote-section-panel market-analysis-panel" id="goldPredictionPanel" aria-label="Analisi di mercato">
           <div class="gold-prediction-header">
             <div>
-              <p class="eyebrow">Analisi Predittiva Metalli e Prezzi di Acquisto</p>
-              <h3>Analisi Predittiva Metalli e Prezzi di Acquisto</h3>
-              <p>Storico oro/argento, previsione, confronto competitor e prezzo massimo pagabile per caratura e titolo.</p>
+              <p class="eyebrow">Analisi di mercato</p>
+              <h3>Analisi di mercato</h3>
+              <p>Quotazioni oro e argento, competitor e prezzo massimo pagabile per caratura e titolo.</p>
             </div>
             <div class="gold-prediction-actions">
               <label class="gold-prediction-scenario-select">Scenario
@@ -923,29 +923,31 @@
               </label>
               <button class="ghost-button" type="button" id="syncGoldHistory">Sync BullionVault</button>
               <button class="primary-button" type="button" id="runGoldPrediction">Calcola prezzi</button>
-              <button class="ghost-button" type="button" id="askAurumGoldPrediction">Chiedi ad Aurum di spiegare il prezzo</button>
+            <button class="ghost-button" type="button" id="askAurumGoldPrediction">Chiedi ad Aurum</button>
             </div>
           </div>
           <div class="gold-prediction-status" id="goldPredictionStatus" aria-live="polite">Caricamento analisi...</div>
           <div class="gold-prediction-cards" id="goldPredictionCards"></div>
           <div class="gold-prediction-grid">
             <article class="gold-prediction-card">
-              <h4>Scenari previsionali</h4>
+              <h4>Scenari mercato</h4>
               <div class="gold-prediction-list" id="goldPredictionList"></div>
             </article>
             <article class="gold-prediction-card">
-              <h4>Grafico storico + previsione</h4>
+              <h4>Storico prezzi</h4>
               <div class="gold-prediction-chart" id="goldPredictionChart"></div>
             </article>
           </div>
           <article class="gold-prediction-card">
-            <h4>Oro e Argento: valore teorico, competitor e massimo pagabile</h4>
+            <h4>Prezzi per caratura e titolo</h4>
             <div id="goldPredictionKaratTable"></div>
             <p class="gold-prediction-disclaimer">Valori teorici indicativi. Il prezzo massimo pagabile è calcolato secondo le policy OroActive configurate dal Founder.</p>
           </article>
           <article class="gold-prediction-card">
             <h4>Confronto competitor</h4>
-            <div class="competitor-tools founder-only">
+            <details class="competitor-tools market-admin-tools founder-only">
+              <summary>Gestione fonti e import</summary>
+              <div class="market-admin-tools-body">
               <form class="competitor-source-form" id="competitorSourceForm">
                 <label>Fonte competitor <input name="name" placeholder="Nome fonte"></label>
                 <label>URL <input name="website_url" type="url" placeholder="https://..."></label>
@@ -994,7 +996,8 @@
                 </label>
                 <button class="ghost-button" type="submit">Importa CSV</button>
               </form>
-            </div>
+              </div>
+            </details>
             <details class="competitor-extraction-trainer founder-only" id="competitorExtractionTrainerPanel">
               <summary>Configura estrazione</summary>
               <p>Definisci pagina, anchor, selettore o regex per guidare il backend e l'AI. Se un dato non viene trovato, OroActive lo marca come non rilevato e non inventa prezzi.</p>
@@ -1864,6 +1867,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260606-pronto-gold-1"></script>
+  <script src="app.js?v=20260607-market-analysis-1"></script>
 </body>
 </html>

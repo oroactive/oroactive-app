@@ -905,7 +905,7 @@ function auditActionLabel(action = "") {
     founder_daily_report_sent: "Invio Founder Daily Report",
     founder_daily_report_failed: "Errore Founder Daily Report",
     gold_price_sync: "Sync storico prezzo oro",
-    gold_prediction_run: "Analisi predittiva oro",
+    gold_prediction_run: "Analisi di mercato oro",
     gold_prediction_settings_updated: "Impostazioni predizione oro aggiornate",
     customer_trust_pack_generated: "Customer Trust Pack generato",
     customer_trust_pack_downloaded: "Download Customer Trust Pack",
@@ -1574,7 +1574,7 @@ async function updateGoldPredictionSettings(input = {}, user = {}, req = null) {
     user,
     action: "gold_prediction_settings_updated",
     entityType: "gold_prediction",
-    entityLabel: "Impostazioni Analisi Predittiva Oro",
+    entityLabel: "Impostazioni Analisi di mercato oro",
     beforeData: current,
     afterData: next,
     metadata: { provider: next.provider, model: next.model }
@@ -2161,7 +2161,7 @@ async function runGoldPredictions(input = {}, user = {}, req = null) {
     user,
     action: "gold_prediction_run",
     entityType: "gold_prediction",
-    entityLabel: "Analisi Predittiva Oro",
+    entityLabel: "Analisi di mercato oro",
     afterData: { horizons, predictions },
     metadata: { metal, currency, demo: historyBundle.demo, model: settings.model || "ensemble" }
   });
@@ -2207,7 +2207,7 @@ async function runMetalPredictions(input = {}, user = {}, req = null) {
     user,
     action: "gold_prediction_run",
     entityType: "metal_prediction",
-    entityLabel: "Analisi Predittiva Metalli",
+    entityLabel: "Analisi di mercato",
     afterData: { metals, horizons, predictions },
     metadata: { metals, currency, model: settings.model || "ensemble" }
   });
@@ -3633,9 +3633,13 @@ async function insertCompetitorQuote(input = {}, user = {}) {
   return publicCompetitorQuote(result.rows[0]);
 }
 
-async function listCompetitorQuotes({ metal = "", purityCode = "", currency = "EUR", days = 30, limit = 200 } = {}) {
+async function listCompetitorQuotes({ metal = "", purityCode = "", competitorName = "", currency = "EUR", days = 30, limit = 200 } = {}) {
   const conditions = ["currency = $1::text", "quote_date >= NOW() - ($2::int * INTERVAL '1 day')"];
   const params = [normalizePredictionCurrency(currency), Math.min(Math.max(Number(days || 30), 1), 365)];
+  if (competitorName) {
+    params.push(String(competitorName).trim());
+    conditions.push(`LOWER(competitor_name) = LOWER($${params.length}::text)`);
+  }
   if (metal) {
     params.push(normalizePredictionMetal(metal));
     conditions.push(`metal = $${params.length}::text`);
@@ -19859,7 +19863,7 @@ app.put("/api/quotazioni/gold-prediction/settings", requireFounder, async (reque
       ok: true,
       settings,
       status: providerStatus(settings.provider, settings),
-      message: "Impostazioni Analisi Predittiva Metalli aggiornate."
+      message: "Impostazioni Analisi di mercato aggiornate."
     });
   } catch (error) {
     next(error);
@@ -20151,6 +20155,7 @@ app.get("/api/quotazioni/competitors/quotes", async (request, response, next) =>
     const quotes = await listCompetitorQuotes({
       metal: request.query.metal || "",
       purityCode: request.query.purity_code || request.query.purityCode || "",
+      competitorName: request.query.competitor_name || request.query.competitorName || "",
       currency,
       days: request.query.days || 30,
       limit: request.query.limit || 200

@@ -6164,7 +6164,7 @@ function auditActionLabel(action = "") {
     founder_daily_report_sent: "Invio Founder Daily Report",
     founder_daily_report_failed: "Errore Founder Daily Report",
     gold_price_sync: "Sync storico prezzo oro",
-    gold_prediction_run: "Analisi predittiva oro",
+    gold_prediction_run: "Analisi di mercato oro",
     gold_prediction_settings_updated: "Impostazioni predizione oro aggiornate",
     store_health_score_calculated: "Store Health Score ricalcolato",
     customer_trust_pack_generated: "Customer Trust Pack generato",
@@ -12416,13 +12416,12 @@ function prontoGoldSummaryHtml() {
   const quotes = quoteConfigs
     .map((item) => latestProntoGoldQuote(item.metal, item.code, item.type))
     .filter(Boolean);
-  if (!source.id && !quotes.length) return "";
+  if (!quotes.length) return "";
   const providerTimestamp = quotes.map((quote) => quote.raw_payload?.provider_timestamp || quote.raw_payload?.provider_timestamp_text).filter(Boolean)[0] || "";
   const providerTimestampLabel = providerTimestamp
     ? Number.isNaN(new Date(providerTimestamp).getTime()) ? providerTimestamp : formatDateTime(providerTimestamp)
     : "non rilevato";
-  const quoteRows = quotes.length
-    ? quotes.map((quote) => {
+  const quoteRows = quotes.map((quote) => {
         const isRange = quote.raw_payload?.price_kind === "range";
         const min = Number(quote.raw_payload?.range_min_per_gram || 0);
         const max = Number(quote.raw_payload?.range_max_per_gram || 0);
@@ -12436,8 +12435,7 @@ function prontoGoldSummaryHtml() {
             <strong>${escapeHtml(priceLabel)}</strong>
           </div>
         `;
-      }).join("")
-    : `<p>Nessuna quotazione Pronto Gold rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
+      }).join("");
   return `
     <article class="pronto-gold-card">
       <header>
@@ -12689,7 +12687,7 @@ function buildPriceExplanationQuestion(context = {}, followup = "") {
   const metal = metalDisplayName(context.metal);
   const purity = context.purity_code ? ` ${context.purity_code}` : "";
   if (context.type === "general") {
-    return "Spiega l'Analisi Predittiva Metalli: situazione generale di oro e argento, scenario attivo, trend, volatilità, fonti dati, competitor e prezzo massimo pagabile.";
+    return "Spiega l'Analisi di mercato: situazione generale di oro e argento, scenario attivo, trend, volatilità, fonti dati, competitor e prezzo massimo pagabile.";
   }
   if (context.type === "simulator") {
     return `Spiega questo calcolo simulato per ${metal}${purity}: ${formatAurumNumber(context.grams, 2)} grammi, scenario ${context.scenario || "standard"}, massimo pagabile e prezzo consigliato.`;
@@ -13254,7 +13252,7 @@ function generateGeneralPriceExplanation(context = {}) {
   const extractionRules = Number(context.competitor_extraction_rules_total || 0)
     ? `Trainer estrazione: ${context.competitor_extraction_rules_total} regole configurate su ${context.competitor_extraction_sources_configured || 0} fonti; ${context.competitor_extraction_rules_found || 0} rilevate negli ultimi test e ${context.competitor_extraction_rules_not_found || 0} non rilevate o da correggere.`
     : "Trainer estrazione: nessuna regola guidata configurata; il Founder puo aggiungerla nella tab Configura estrazione.";
-  return `Spiegazione generale Analisi Predittiva Metalli
+  return `Spiegazione generale Analisi di mercato
 
 Scenario attivo
 Lo scenario operativo selezionato è ${context.scenario || "standard"}. La fonte dati indicata è ${context.source || "non disponibile"}${context.last_update ? `, ultimo aggiornamento ${formatDateTime(context.last_update)}` : ""}.
@@ -13282,7 +13280,7 @@ Questa è una stima operativa e non una garanzia di prezzo. Il prezzo finale res
 
 function generateLocalPriceExplanation(context = {}, options = {}) {
   if (context.type === "general" && options.followup === "formula") {
-    return `Formula generale Analisi Predittiva Metalli
+    return `Formula generale Analisi di mercato
 
 Per ogni riga OroActive parte dal prezzo puro al grammo, applica la purezza della caratura o del titolo, calcola il valore teorico e poi considera perdita fusione, spread raffineria, costi operativi, costi fonderia, buffer rischio, buffer trattativa e margine target.
 
@@ -13981,7 +13979,8 @@ function renderCompetitorQuotes() {
   const quotes = state.competitorQuotes || [];
   const aiQuotes = state.competitorAiQuotes || [];
   const sources = state.competitorSources || [];
-  const sourceTable = sources.length ? `
+  const visibleSources = sources.filter((source) => source.name !== "Pronto Gold" || quotes.some((quote) => quote.competitor_name === "Pronto Gold"));
+  const sourceTable = visibleSources.length ? `
     <div class="competitor-table-wrap">
       <table class="competitor-table">
         <thead>
@@ -14000,7 +13999,7 @@ function renderCompetitorQuotes() {
           </tr>
         </thead>
         <tbody>
-          ${sources.map((source) => {
+          ${visibleSources.map((source) => {
             const aiPage = competitorAiPageForSource(source);
             const aiStatus = aiPage.status
               ? `${aiPage.status}${Number(aiPage.quotes_found || 0) ? ` · ${aiPage.quotes_found} quote` : ""}`
@@ -14092,8 +14091,8 @@ function renderCompetitorQuotes() {
     ${bordinSummaryHtml()}
     ${goldStandardSummaryHtml()}
     ${oroInEuroSummaryHtml()}
-    <div class="competitor-summary">
-      <strong>${sources.length}</strong>
+      <div class="competitor-summary">
+      <strong>${visibleSources.length}</strong>
       <span>fonti competitor monitorate</span>
       <strong>${quotes.length}</strong>
       <span>rilevazioni competitor negli ultimi 30 giorni</span>
@@ -14171,12 +14170,12 @@ function renderGoldPredictionPanel() {
 
 async function loadGoldPredictionPanel(options = {}) {
   if (!goldPredictionStatus) return;
-  if (!options.silent) goldPredictionStatus.textContent = "Caricamento Analisi Predittiva Metalli e Prezzi di Acquisto...";
+  if (!options.silent) goldPredictionStatus.textContent = "Caricamento Analisi di mercato...";
   try {
     const statusData = await apiRequest("/quotazioni/metals/status");
     const currency = encodeURIComponent(statusData.settings?.currency || "EUR");
     const scenario = state.buybackScenario || "standard";
-    const [historyData, latestData, policyData, buybackData, competitorData, competitorSourcesData, competitorSyncData, competitorMarketData, competitorAiStatusData, competitorAiQuotesData, competitorExtractionRulesData] = await Promise.all([
+    const [historyData, latestData, policyData, buybackData, competitorData, prontoGoldQuotesData, competitorSourcesData, competitorSyncData, competitorMarketData, competitorAiStatusData, competitorAiQuotesData, competitorExtractionRulesData] = await Promise.all([
       apiRequest(`/quotazioni/metals/history?metals=gold,silver&days=30&currency=${currency}`),
       apiRequest(`/quotazioni/metals/predictions/latest?metals=gold,silver&currency=${currency}`),
       apiRequest("/quotazioni/buyback-policy"),
@@ -14184,7 +14183,8 @@ async function loadGoldPredictionPanel(options = {}) {
         method: "POST",
         body: JSON.stringify({ metals: ["gold", "silver"], currency: decodeURIComponent(currency), horizons: ["today", "24h", "7d", "30d"], scenario })
       }),
-      apiRequest(`/quotazioni/competitors/quotes?days=30&currency=${currency}`).catch(() => ({ quotes: [], stats: {} })),
+      apiRequest(`/quotazioni/competitors/quotes?days=30&limit=500&currency=${currency}`).catch(() => ({ quotes: [], stats: {} })),
+      apiRequest(`/quotazioni/competitors/quotes?competitor_name=${encodeURIComponent("Pronto Gold")}&days=30&limit=80&currency=${currency}`).catch(() => ({ quotes: [] })),
       apiRequest("/quotazioni/competitors/sources").catch(() => ({ sources: [] })),
       apiRequest("/quotazioni/competitors/sync-status").catch(() => null),
       apiRequest(`/quotazioni/competitors/market-summary?currency=${currency}`).catch(() => null),
@@ -14203,7 +14203,21 @@ async function loadGoldPredictionPanel(options = {}) {
     state.goldPredictionLatest = buybackData.predictions || Object.values(state.metalPredictionLatest).flat();
     state.buybackPolicy = policyData.policy || null;
     state.buybackCalculations = buybackData.calculations || [];
-    state.competitorQuotes = competitorData.quotes || [];
+    const quoteMap = new Map();
+    [...(competitorData.quotes || []), ...(prontoGoldQuotesData.quotes || [])].forEach((quote) => {
+      const key = [
+        quote.id || "",
+        quote.competitor_name || "",
+        quote.metal || "",
+        quote.purity_code || "",
+        quote.quote_type || "",
+        quote.quote_date || quote.created_at || "",
+        quote.price_per_gram || ""
+      ].join("|");
+      quoteMap.set(key, quote);
+    });
+    state.competitorQuotes = [...quoteMap.values()]
+      .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0));
     state.competitorStats = buybackData.competitor_stats || competitorData.stats || statusData.competitor_stats || {};
     state.competitorSources = competitorSourcesData.sources || [];
     state.competitorSyncStatus = competitorSyncData || null;
