@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260607-competitor-matrix-2";
+const STATIC_CACHE = "oroactive-static-v20260607-competitor-matrix-dedupe-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260607-competitor-matrix-2",
-  "/app.js?v=20260607-competitor-matrix-2",
+  "/styles.css?v=20260607-competitor-matrix-dedupe-1",
+  "/app.js?v=20260607-competitor-matrix-dedupe-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

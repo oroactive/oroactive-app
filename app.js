@@ -12027,20 +12027,41 @@ function buybackMarketPrice(row = {}) {
   return Number(row.best_market_client_price_per_gram || row.recommended_payable_per_gram || 0);
 }
 
+function competitorNameKey(name = "") {
+  const normalized = String(name || "")
+    .normalize("NFKC")
+    .replace(/[’`´]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("it-IT");
+  if (normalized === "oro d oro" || normalized === "oro d'oro") return "oro d'oro";
+  return normalized;
+}
+
+function competitorDisplayName(name = "") {
+  const key = competitorNameKey(name);
+  if (key === "oro d'oro") return "Oro D'oro";
+  return String(name || "").trim();
+}
+
 function competitorNamesForMetal(metal = "") {
-  const quotes = (state.competitorQuotes || [])
+  const namesByKey = new Map();
+  (state.competitorQuotes || [])
     .filter(isCompetitorBuybackQuote)
     .filter((quote) => !metal || quote.metal === metal)
-    .map((quote) => String(quote.competitor_name || "").trim())
-    .filter(Boolean);
-  return [...new Set(quotes)].sort((first, second) => first.localeCompare(second, "it"));
+    .forEach((quote) => {
+      const name = String(quote.competitor_name || "").trim();
+      const key = competitorNameKey(name);
+      if (key && !namesByKey.has(key)) namesByKey.set(key, competitorDisplayName(name));
+    });
+  return [...namesByKey.values()].sort((first, second) => first.localeCompare(second, "it"));
 }
 
 function latestCompetitorQuoteForPurity(competitorName = "", metal = "", purityCode = "") {
-  const normalizedName = String(competitorName || "").toLowerCase();
+  const normalizedName = competitorNameKey(competitorName);
   return (state.competitorQuotes || [])
     .filter(isCompetitorBuybackQuote)
-    .filter((quote) => String(quote.competitor_name || "").toLowerCase() === normalizedName)
+    .filter((quote) => competitorNameKey(quote.competitor_name) === normalizedName)
     .filter((quote) => quote.metal === metal)
     .filter((quote) => quote.purity_code === purityCode)
     .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
@@ -14026,17 +14047,19 @@ async function loadGoldPredictionPanel(options = {}) {
     [...(competitorData.quotes || []), ...(prontoGoldQuotesData.quotes || [])]
       .filter(isCompetitorBuybackQuote)
       .forEach((quote) => {
-      const key = [
-        quote.id || "",
-        quote.competitor_name || "",
-        quote.metal || "",
-        quote.purity_code || "",
-        quote.quote_type || "",
-        quote.quote_date || quote.created_at || "",
-        quote.price_per_gram || ""
-      ].join("|");
-      quoteMap.set(key, quote);
-    });
+        const key = [
+          competitorNameKey(quote.competitor_name),
+          quote.metal || "",
+          quote.purity_code || "",
+          quote.quote_type || ""
+        ].join("|");
+        const existing = quoteMap.get(key);
+        const existingDate = new Date(existing?.quote_date || existing?.created_at || 0).getTime();
+        const quoteDate = new Date(quote.quote_date || quote.created_at || 0).getTime();
+        if (!existing || quoteDate >= existingDate) {
+          quoteMap.set(key, { ...quote, competitor_name: competitorDisplayName(quote.competitor_name) });
+        }
+      });
     state.competitorQuotes = [...quoteMap.values()]
       .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0));
     state.competitorStats = buybackData.competitor_stats || competitorData.stats || statusData.competitor_stats || {};
