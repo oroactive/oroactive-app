@@ -5347,7 +5347,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .banco-preziosi-card,
 .bordin-card,
 .gold-standard-card,
-.oro-in-euro-card {
+.oro-in-euro-card,
+.gruppo-oro-24k-card {
   display: grid;
   gap: 12px;
   margin: 0 0 14px;
@@ -5368,6 +5369,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .bordin-card header,
 .gold-standard-card header,
 .oro-in-euro-card header,
+.gruppo-oro-24k-card header,
 .oro-express-grid,
 .oro-doro-grid,
 .amico-oro-grid,
@@ -5375,7 +5377,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .banco-preziosi-grid,
 .bordin-grid,
 .gold-standard-grid,
-.oro-in-euro-grid {
+.oro-in-euro-grid,
+.gruppo-oro-24k-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -5389,7 +5392,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .banco-preziosi-card header,
 .bordin-card header,
 .gold-standard-card header,
-.oro-in-euro-card header {
+.oro-in-euro-card header,
+.gruppo-oro-24k-card header {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
@@ -5408,7 +5412,9 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .gold-standard-card h5,
 .gold-standard-card p,
 .oro-in-euro-card h5,
-.oro-in-euro-card p {
+.oro-in-euro-card p,
+.gruppo-oro-24k-card h5,
+.gruppo-oro-24k-card p {
   margin: 0;
 }
 
@@ -5419,7 +5425,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .banco-preziosi-card span,
 .bordin-card span,
 .gold-standard-card span,
-.oro-in-euro-card span {
+.oro-in-euro-card span,
+.gruppo-oro-24k-card span {
   color: rgba(255, 255, 255, 0.64);
   font-size: 11px;
   font-weight: 900;
@@ -5433,7 +5440,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .banco-preziosi-card strong,
 .bordin-card strong,
 .gold-standard-card strong,
-.oro-in-euro-card strong {
+.oro-in-euro-card strong,
+.gruppo-oro-24k-card strong {
   color: #ffd700;
 }
 
@@ -5444,7 +5452,8 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .banco-preziosi-grid div,
 .bordin-grid div,
 .gold-standard-grid div,
-.oro-in-euro-grid div {
+.oro-in-euro-grid div,
+.gruppo-oro-24k-grid div {
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -10530,6 +10539,7 @@ input.document-expired {
   .bordin-card header,
   .gold-standard-card header,
   .oro-in-euro-card header,
+  .gruppo-oro-24k-card header,
   .oro-express-grid,
   .oro-doro-grid,
   .amico-oro-grid,
@@ -10538,6 +10548,7 @@ input.document-expired {
   .bordin-grid,
   .gold-standard-grid,
   .oro-in-euro-grid,
+  .gruppo-oro-24k-grid,
   .competitor-quote-form,
   .competitor-source-form,
   .competitor-csv-form,

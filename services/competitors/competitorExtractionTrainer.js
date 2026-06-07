@@ -240,6 +240,7 @@ function sourceSpecificQuoteForRule(rule = {}, sourceQuotes = []) {
       quote.raw_payload?.bordin_key,
       quote.raw_payload?.gold_standard_key,
       quote.raw_payload?.oro_in_euro_key,
+      quote.raw_payload?.gruppo_oro_24k_key,
       quote.raw_payload?.pronto_gold_key
     ].filter(Boolean).some((key) => String(key) === String(rule.field_key))
   ));
@@ -262,6 +263,7 @@ export function createCompetitorExtractionTrainer(options = {}) {
     bordinExtractor: options.bordinExtractor || null,
     goldStandardExtractor: options.goldStandardExtractor || null,
     oroInEuroExtractor: options.oroInEuroExtractor || null,
+    gruppoOro24kExtractor: options.gruppoOro24kExtractor || null,
     prontoGoldExtractor: options.prontoGoldExtractor || null
   };
 
@@ -331,6 +333,14 @@ export function createCompetitorExtractionTrainer(options = {}) {
       }).catch(() => ({ quotes: [] }));
       return result.quotes || [];
     }
+    if (config.gruppoOro24kExtractor && sourceName === "gruppo oro 24k") {
+      const result = await config.gruppoOro24kExtractor.extractGruppoOro24kQuotes({
+        source_id: source.id,
+        sourceId: source.id,
+        url: rules[0]?.page_url || source.website_url
+      }).catch(() => ({ quotes: [] }));
+      return result.quotes || [];
+    }
     if (config.prontoGoldExtractor && sourceName === "pronto gold") {
       const result = await config.prontoGoldExtractor.extractProntoGoldQuotes({
         source_id: source.id,
@@ -349,6 +359,7 @@ export function createCompetitorExtractionTrainer(options = {}) {
     if (sourceName === "bordin") return "guided_bordin_parser";
     if (sourceName === "gold standard") return "guided_gold_standard_parser";
     if (sourceName === "oro in euro") return "guided_oro_in_euro_parser";
+    if (sourceName === "gruppo oro 24k") return "guided_gruppo_oro_24k_parser";
     if (sourceName === "pronto gold") return "guided_pronto_gold_parser";
     if (sourceName === "amico oro") return "guided_amico_oro_parser";
     if (sourceName === "oro d'oro") return "guided_oro_doro_parser";

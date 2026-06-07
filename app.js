@@ -12211,6 +12211,7 @@ function competitorSourceTypeLabel(type = "") {
   if (normalized === "bordin_parser") return "Parser Bordin";
   if (normalized === "gold_standard_parser") return "Parser Gold Standard";
   if (normalized === "oro_in_euro_parser") return "Parser Oro in Euro";
+  if (normalized === "gruppo_oro_24k_parser") return "Parser Gruppo Oro 24K";
   if (normalized === "configured_page") return "Pagina configurata";
   if (normalized === "api") return "API";
   if (normalized === "csv_import") return "CSV";
@@ -12252,6 +12253,10 @@ function competitorPurityDisplay(quote = {}) {
   if (quote.competitor_name === "Oro in Euro" && quote.metal === "gold" && quote.purity_code === "18kt") return "Oro 750/1000 / 18kt";
   if (quote.competitor_name === "Oro in Euro" && quote.metal === "gold" && quote.purity_code === "24kt") return "Oro 999/1000 / 24kt";
   if (quote.competitor_name === "Oro in Euro" && quote.metal === "silver" && quote.purity_code === "999") return "Argento 999/1000";
+  if (quote.competitor_name === "Gruppo Oro 24K" && quote.metal === "gold" && quote.purity_code === "24kt") return "Oro 24 carati / 24kt";
+  if (quote.competitor_name === "Gruppo Oro 24K" && quote.metal === "gold" && quote.purity_code === "18kt") return "Oro 18 carati / 18kt";
+  if (quote.competitor_name === "Gruppo Oro 24K" && quote.metal === "silver" && quote.purity_code === "999") return "Argento 999";
+  if (quote.competitor_name === "Gruppo Oro 24K" && quote.metal === "silver" && quote.purity_code === "800") return "Argento 800";
   return quote.purity_code || "—";
 }
 
@@ -12337,6 +12342,15 @@ function latestGoldStandardQuote(metal = "", purityCode = "", quoteType = "custo
 function latestOroInEuroQuote(metal = "", purityCode = "") {
   return (state.competitorQuotes || [])
     .filter((quote) => quote.competitor_name === "Oro in Euro")
+    .filter((quote) => !metal || quote.metal === metal)
+    .filter((quote) => !purityCode || quote.purity_code === purityCode)
+    .filter(isCompetitorBuybackQuote)
+    .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
+}
+
+function latestGruppoOro24kQuote(metal = "", purityCode = "") {
+  return (state.competitorQuotes || [])
+    .filter((quote) => quote.competitor_name === "Gruppo Oro 24K")
     .filter((quote) => !metal || quote.metal === metal)
     .filter((quote) => !purityCode || quote.purity_code === purityCode)
     .filter(isCompetitorBuybackQuote)
@@ -12672,6 +12686,52 @@ function oroInEuroSummaryHtml() {
   `;
 }
 
+function gruppoOro24kSummaryHtml() {
+  const source = (state.competitorSources || []).find((item) => item.name === "Gruppo Oro 24K") || {};
+  const quoteConfigs = [
+    { metal: "gold", code: "24kt" },
+    { metal: "gold", code: "18kt" },
+    { metal: "silver", code: "999" },
+    { metal: "silver", code: "800" }
+  ];
+  const quotes = quoteConfigs
+    .map((item) => latestGruppoOro24kQuote(item.metal, item.code))
+    .filter(Boolean);
+  if (!source.id && !quotes.length) return "";
+  const providerTimestamp = quotes
+    .map((quote) => quote.raw_payload?.provider_timestamp || quote.quote_date)
+    .filter(Boolean)
+    .sort((first, second) => new Date(second) - new Date(first))[0] || "";
+  const quoteRows = quotes.length
+    ? quotes.map((quote) => `
+        <div>
+          <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
+          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
+        </div>
+      `).join("")
+    : `<p>Nessuna quotazione Gruppo Oro 24K rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
+  return `
+    <article class="gruppo-oro-24k-card">
+      <header>
+        <div>
+          <span>Competitor dedicato</span>
+          <h5>Gruppo Oro 24K</h5>
+        </div>
+        <strong>${escapeHtml(competitorSourceStatusLabel(source))}</strong>
+      </header>
+      <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">www.comprooromilano.org</a>` : "https://www.comprooromilano.org"} · Metodo: parser automatico · Ogni 60 minuti</p>
+      <div class="gruppo-oro-24k-grid">${quoteRows}</div>
+      <p>
+        Ultimo sync app: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}
+        ${providerTimestamp ? ` · Ultimo aggiornamento sito: ${escapeHtml(formatDateTime(providerTimestamp))}` : ""}
+        ${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}
+      </p>
+      <p class="gold-prediction-disclaimer">Vengono usati solo ORO 24 carati, ORO 18 carati, Argento 999 e Argento 800 dal riquadro pubblico. Monete, sterline, krugerrand e valori borsa restano esclusi.</p>
+      ${isFounder() ? `<button class="ghost-button" type="button" data-force-gruppo-oro-24k-sync>Forza aggiornamento Gruppo Oro 24K</button>` : ""}
+    </article>
+  `;
+}
+
 function competitorMarketSummaryRows() {
   return buybackRowsFor("gold", "today").concat(buybackRowsFor("silver", "today"));
 }
@@ -12779,6 +12839,7 @@ function buildPriceExplanationContext(row = {}, options = {}) {
   const bordinQuote = latestBordinQuote(metal, purityCode);
   const goldStandardQuote = latestGoldStandardQuote(metal, purityCode, "customer_buyback");
   const oroInEuroQuote = latestOroInEuroQuote(metal, purityCode);
+  const gruppoOro24kQuote = latestGruppoOro24kQuote(metal, purityCode);
   return {
     mode: "price_explanation",
     type: options.type || "row",
@@ -12943,6 +13004,20 @@ function buildPriceExplanationContext(row = {}, options = {}) {
       fineness_per_mille: oroInEuroQuote.raw_payload?.fineness_per_mille || null,
       evidence_text: oroInEuroQuote.evidence_text || "",
       confidence: oroInEuroQuote.ai_confidence || oroInEuroQuote.confidence || "high"
+    } : null,
+    gruppo_oro_24k_quote: gruppoOro24kQuote ? {
+      metal: gruppoOro24kQuote.metal,
+      purity_code: gruppoOro24kQuote.purity_code,
+      quote_type: gruppoOro24kQuote.quote_type || "customer_buyback",
+      label: competitorPurityDisplay(gruppoOro24kQuote),
+      price_per_gram: Number(gruppoOro24kQuote.price_per_gram || 0),
+      price_per_kg: Number(gruppoOro24kQuote.price_per_kg || 0),
+      source_url: gruppoOro24kQuote.source_url || gruppoOro24kQuote.url || "",
+      quote_date: gruppoOro24kQuote.quote_date || null,
+      provider_timestamp: gruppoOro24kQuote.raw_payload?.provider_timestamp || null,
+      fineness_per_mille: gruppoOro24kQuote.raw_payload?.fineness_per_mille || null,
+      evidence_text: gruppoOro24kQuote.evidence_text || "",
+      confidence: gruppoOro24kQuote.ai_confidence || gruppoOro24kQuote.confidence || "high"
     } : null,
     market_comparison_status: row.market_comparison_status || "",
     market_price_reason: row.market_price_reason || "",
@@ -13120,6 +13195,21 @@ function buildGeneralPriceExplanationContext() {
         fineness_per_mille: quote.raw_payload?.fineness_per_mille || null,
         evidence_text: quote.evidence_text || ""
       })),
+    gruppo_oro_24k_quotes: buybackCompetitorQuotes
+      .filter((quote) => quote.competitor_name === "Gruppo Oro 24K")
+      .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
+      .slice(0, 4)
+      .map((quote) => ({
+        label: competitorPurityDisplay(quote),
+        quote_type: quote.quote_type || "customer_buyback",
+        price_per_gram: Number(quote.price_per_gram || 0),
+        price_per_kg: Number(quote.price_per_kg || 0),
+        source_url: quote.source_url || quote.url || "",
+        quote_date: quote.quote_date || null,
+        provider_timestamp: quote.raw_payload?.provider_timestamp || null,
+        fineness_per_mille: quote.raw_payload?.fineness_per_mille || null,
+        evidence_text: quote.evidence_text || ""
+      })),
     gold: buildPriceExplanationContext(gold, { type: "summary", metal: "gold", purity_code: gold.purity_code || "18kt" }),
     silver: buildPriceExplanationContext(silver, { type: "summary", metal: "silver", purity_code: silver.purity_code || "925" })
   };
@@ -13217,7 +13307,11 @@ function competitorExplanation(context = {}) {
   const oroInEuroText = oroInEuro
     ? ` Oro in Euro è stato aggiornato ${oroInEuro.quote_date ? `il ${formatDateTime(oroInEuro.quote_date)}` : "automaticamente"}: ${oroInEuro.label || context.purity_code} a ${formatAurumGram(oroInEuro.price_per_gram, currency)}. Fonte: ${oroInEuro.source_url || "https://www.quotazioneritirooro.it"}. ${oroInEuro.fineness_per_mille ? `Finezza pubblicata: ${oroInEuro.fineness_per_mille}/1000.` : ""} ${Number(context.max_payable_per_gram || 0) && Number(oroInEuro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo richiede verifica del margine o autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
-  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${oroDOroText}${amicoOroText}${prontoGoldText}${bancoPreziosiText}${bordinText}${goldStandardText}${oroInEuroText}${syncText}${aiText}`;
+  const gruppoOro24k = context.gruppo_oro_24k_quote;
+  const gruppoOro24kText = gruppoOro24k
+    ? ` Gruppo Oro 24K è stato aggiornato ${gruppoOro24k.provider_timestamp ? `dal sito il ${formatDateTime(gruppoOro24k.provider_timestamp)}` : gruppoOro24k.quote_date ? `il ${formatDateTime(gruppoOro24k.quote_date)}` : "automaticamente"}: ${gruppoOro24k.label || context.purity_code} a ${formatAurumGram(gruppoOro24k.price_per_gram, currency)}. Fonte: ${gruppoOro24k.source_url || "https://www.comprooromilano.org"}. Sono escluse monete e quotazioni borsa. ${Number(context.max_payable_per_gram || 0) && Number(gruppoOro24k.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo richiede verifica del margine o autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    : "";
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${oroDOroText}${amicoOroText}${prontoGoldText}${bancoPreziosiText}${bordinText}${goldStandardText}${oroInEuroText}${gruppoOro24kText}${syncText}${aiText}`;
 }
 
 function formulaExplanation(context = {}) {
@@ -13943,6 +14037,7 @@ function renderCompetitorQuotes() {
     ${bordinSummaryHtml()}
     ${goldStandardSummaryHtml()}
     ${oroInEuroSummaryHtml()}
+    ${gruppoOro24kSummaryHtml()}
     <p class="gold-prediction-disclaimer">La vista resta sintetica: fonti preconfigurate e tabella tecnica delle quotazioni rilevate sono nascoste. Il confronto usa solo prezzi di acquisto cliente validi per caratura o titolo disponibile.</p>
   `;
   renderCompetitorExtractionTrainer();
@@ -14437,6 +14532,27 @@ async function forceOroInEuroSync() {
   await loadGoldPredictionPanel({ silent: true });
 }
 
+async function forceGruppoOro24kSync() {
+  if (!isFounder()) return;
+  showToast("Aggiornamento Gruppo Oro 24K in esecuzione...", "success");
+  const data = await apiRequest("/quotazioni/competitors/gruppo-oro-24k/sync", {
+    method: "POST",
+    body: JSON.stringify({}),
+    timeoutMs: 90000
+  });
+  const saved = Number(data.result?.quotes_saved || 0);
+  const status = data.result?.status || data.state?.last_status || "success";
+  showToast(
+    status === "failed"
+      ? "Gruppo Oro 24K non leggibile automaticamente. Ultimo dato valido mantenuto."
+      : status === "partial"
+        ? `Gruppo Oro 24K aggiornato parzialmente. Quotazioni salvate: ${saved}.`
+        : `Gruppo Oro 24K aggiornato. Quotazioni salvate: ${saved}.`,
+    status === "failed" || status === "partial" ? "warning" : "success"
+  );
+  await loadGoldPredictionPanel({ silent: true });
+}
+
 async function runAiCompetitorExtraction(sourceId = "all") {
   if (!isFounder()) return;
   const payload = sourceId && sourceId !== "all" ? { source_id: sourceId } : {};
@@ -14559,6 +14675,7 @@ async function handleCompetitorAction(event) {
   const forceBordin = event.target.closest("[data-force-bordin-sync]");
   const forceGoldStandard = event.target.closest("[data-force-gold-standard-sync]");
   const forceOroInEuro = event.target.closest("[data-force-oro-in-euro-sync]");
+  const forceGruppoOro24k = event.target.closest("[data-force-gruppo-oro-24k-sync]");
   const runAiExtract = event.target.closest("[data-run-ai-competitor-extract]");
   const toggleAutoSync = event.target.closest("[data-toggle-competitor-auto-sync]");
   const saveRules = event.target.closest("[data-save-extraction-rules]");
@@ -14608,6 +14725,10 @@ async function handleCompetitorAction(event) {
   }
   if (forceOroInEuro && isFounder()) {
     await forceOroInEuroSync();
+    return;
+  }
+  if (forceGruppoOro24k && isFounder()) {
+    await forceGruppoOro24kSync();
     return;
   }
   if (runAiExtract && isFounder()) {
