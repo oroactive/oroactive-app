@@ -13360,9 +13360,9 @@ function renderGoldPredictionStatus() {
     : (status.note || "Fonte prezzo non configurata. Usa Sync BullionVault o import manuale.");
   goldPredictionStatus.innerHTML = `
     <span>${escapeHtml(configured)}</span>
-    <strong>${escapeHtml(latestDate ? `Ultimo aggiornamento: ${formatDateTime(latestDate)}` : "Storico prezzi non ancora salvato")}</strong>
+    <strong>${escapeHtml(latestDate ? `Ultimo aggiornamento: ${formatDateTime(latestDate)}` : "Dati prezzo non ancora salvati")}</strong>
     <strong>Scenario attivo: ${escapeHtml(state.buybackScenario)}</strong>
-    <strong>Competitor: ${escapeHtml(String(state.competitorQuotes?.length || 0))} rilevazioni</strong>
+    <strong>Competitor: confronto integrato</strong>
     ${warning ? `<em>${escapeHtml(warning)}</em>` : ""}
   `;
 }
@@ -13913,110 +13913,6 @@ function renderCompetitorExtractionTrainer() {
 
 function renderCompetitorQuotes() {
   if (!competitorQuotesList) return;
-  const quotes = (state.competitorQuotes || []).filter(isCompetitorBuybackQuote);
-  const aiQuotes = (state.competitorAiQuotes || []).filter(isCompetitorBuybackQuote);
-  const sources = state.competitorSources || [];
-  const visibleSources = sources.filter((source) => source.name !== "Pronto Gold" || quotes.some((quote) => quote.competitor_name === "Pronto Gold"));
-  const sourceTable = visibleSources.length ? `
-    <div class="competitor-table-wrap">
-      <table class="competitor-table">
-        <thead>
-          <tr>
-            <th>Competitor</th>
-            <th>Sito</th>
-            <th>Metodo</th>
-            <th>Auto sync</th>
-            <th>Attendibilità</th>
-            <th>Stato aggiornamento</th>
-            <th>Analisi AI</th>
-            <th>Ultimo aggiornamento</th>
-            <th>Prossimo aggiornamento</th>
-            <th>Errore</th>
-            <th>Azioni</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${visibleSources.map((source) => {
-            const aiPage = competitorAiPageForSource(source);
-            const aiStatus = aiPage.status
-              ? `${aiPage.status}${Number(aiPage.quotes_found || 0) ? ` · ${aiPage.quotes_found} quote` : ""}`
-              : "Non ancora analizzata";
-            return `
-              <tr>
-                <td>${escapeHtml(source.name)}</td>
-                <td>${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
-                <td>${escapeHtml(competitorSourceTypeLabel(source.source_type))}</td>
-                <td>${source.auto_sync_enabled ? "On" : "Off"} · ${escapeHtml(String(source.sync_interval_minutes || 180))} min</td>
-                <td>Media</td>
-                <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
-                <td>${escapeHtml(aiStatus)}</td>
-                <td>${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "Da aggiornare"}</td>
-                <td>${source.next_sync_at ? escapeHtml(formatDateTime(source.next_sync_at)) : "Non pianificato"}</td>
-                <td>${source.last_sync_error || aiPage.error_message ? escapeHtml(source.last_sync_error || aiPage.error_message) : "—"}</td>
-                <td>
-                  ${source.website_url ? `<a class="small-button" href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">Apri sito</a>` : ""}
-                  ${isFounder() ? `<button class="small-button" type="button" data-force-competitor-sync="${escapeHtml(source.id)}">Forza sync</button>` : ""}
-                  ${isFounder() ? `<button class="small-button" type="button" data-run-ai-competitor-extract="${escapeHtml(source.id)}">Analizza AI</button>` : ""}
-                  <button class="small-button" type="button" data-fill-competitor-source="${escapeHtml(source.id)}">Aggiungi quotazione</button>
-                  ${isFounder() ? `<button class="small-button" type="button" data-toggle-competitor-auto-sync="${escapeHtml(source.id)}" data-next-auto-sync="${source.auto_sync_enabled ? "false" : "true"}">${source.auto_sync_enabled ? "Disattiva auto sync" : "Attiva auto sync"}</button>` : ""}
-                  ${isFounder() && source.active !== false ? `<button class="small-button" type="button" data-disable-competitor-source="${escapeHtml(source.id)}">Disattiva fonte</button>` : ""}
-                  <span class="muted">${source.active === false ? "Disattivata" : "Attiva"}</span>
-                </td>
-              </tr>
-            `;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>
-  ` : '<div class="empty-state">Nessuna fonte competitor configurata. Le fonti preconfigurate verranno create al prossimo bootstrap backend.</div>';
-
-  const quoteTable = quotes.length ? `
-    <div class="competitor-table-wrap">
-      <table class="competitor-table">
-        <thead>
-          <tr>
-            <th>Competitor</th>
-            <th>Sito</th>
-            <th>Metallo</th>
-            <th>Caratura/Titolo</th>
-            <th>Prezzo €/g</th>
-            <th>Prezzo €/kg</th>
-            <th>Data rilevazione</th>
-            <th>Metodo</th>
-            <th>Attendibilità</th>
-            <th>Dato mostrato</th>
-            <th>Prova testuale</th>
-            <th>Stato aggiornamento</th>
-            <th>Azioni</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${quotes.slice(0, 50).map((quote) => {
-            const source = competitorSourceForQuote(quote);
-            const sourceUrl = quote.source_url || quote.url || source.website_url || "";
-            return `
-              <tr>
-                <td>${escapeHtml(quote.competitor_name)}</td>
-                <td>${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Fonte</a>` : "—"}</td>
-                <td>${escapeHtml(metalDisplayName(quote.metal))}</td>
-                <td>${escapeHtml(competitorPurityDisplay(quote))}</td>
-                <td>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</td>
-                <td>${escapeHtml(formatMetalPerKg(quote.price_per_kg, quote.currency || "EUR"))}</td>
-                <td>${escapeHtml(quote.quote_date ? formatDateTime(quote.quote_date) : "—")}</td>
-                <td>${quote.ai_extracted ? "AI" : escapeHtml(quote.extraction_method || "manual")}</td>
-                <td>${escapeHtml(quote.ai_confidence || quote.confidence || "medium")}</td>
-                <td>${escapeHtml(competitorQuoteTypeLabel(quote.quote_type))}</td>
-                <td>${competitorEvidenceHtml(quote)}</td>
-                <td>${escapeHtml(competitorSourceStatusLabel(source))}</td>
-                <td>${sourceUrl ? `<a class="small-button" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Apri sito</a>` : "—"}</td>
-              </tr>
-            `;
-          }).join("")}
-        </tbody>
-      </table>
-    </div>
-  ` : '<div class="empty-state">Nessuna quotazione di acquisto competitor inserita. Inserisci prezzi manuali o importa CSV; non vengono inventati dati di mercato.</div>';
-
   competitorQuotesList.innerHTML = `
     ${competitorAutoSyncSummaryHtml()}
     ${competitorAiExtractionSummaryHtml()}
@@ -14028,19 +13924,7 @@ function renderCompetitorQuotes() {
     ${bordinSummaryHtml()}
     ${goldStandardSummaryHtml()}
     ${oroInEuroSummaryHtml()}
-      <div class="competitor-summary">
-      <strong>${visibleSources.length}</strong>
-      <span>fonti competitor monitorate</span>
-      <strong>${quotes.length}</strong>
-      <span>rilevazioni competitor negli ultimi 30 giorni</span>
-      <strong>${aiQuotes.length}</strong>
-      <span>quotazioni estratte con AI</span>
-    </div>
-    <h5>Fonti competitor preconfigurate</h5>
-    ${sourceTable}
-    <h5>Quotazioni competitor rilevate</h5>
-    ${quoteTable}
-    <p class="gold-prediction-disclaimer">Sono mostrate solo quotazioni di acquisto oro/argento pagate al cliente dai competitor, per caratura o titolo disponibile. Valori di borsa, reference spot e prezzi vendita sono esclusi dalla vista operativa. Verificare sempre la fonte prima di decisioni rilevanti.</p>
+    <p class="gold-prediction-disclaimer">La vista resta sintetica: fonti preconfigurate e tabella tecnica delle quotazioni rilevate sono nascoste. Il confronto usa solo prezzi di acquisto cliente validi per caratura o titolo disponibile.</p>
   `;
   renderCompetitorExtractionTrainer();
 }

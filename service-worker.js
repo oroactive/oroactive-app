@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260607-buyback-only-1";
+const STATIC_CACHE = "oroactive-static-v20260607-market-cleanup-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260607-buyback-only-1",
-  "/app.js?v=20260607-buyback-only-1",
+  "/styles.css?v=20260607-market-cleanup-1",
+  "/app.js?v=20260607-market-cleanup-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

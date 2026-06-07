@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260607-buyback-only-1">
+  <link rel="stylesheet" href="styles.css?v=20260607-market-cleanup-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -928,16 +928,6 @@
           </div>
           <div class="gold-prediction-status" id="goldPredictionStatus" aria-live="polite">Caricamento analisi...</div>
           <div class="gold-prediction-cards" id="goldPredictionCards"></div>
-          <div class="gold-prediction-grid">
-            <article class="gold-prediction-card">
-              <h4>Scenari mercato</h4>
-              <div class="gold-prediction-list" id="goldPredictionList"></div>
-            </article>
-            <article class="gold-prediction-card">
-              <h4>Storico prezzi</h4>
-              <div class="gold-prediction-chart" id="goldPredictionChart"></div>
-            </article>
-          </div>
           <article class="gold-prediction-card">
             <h4>Prezzi per caratura e titolo</h4>
             <div id="goldPredictionKaratTable"></div>
@@ -1072,7 +1062,7 @@
                   <option value="USD">USD</option>
                 </select>
               </label>
-              <label>Giorni storico
+              <label>Giorni analisi
                 <input name="history_days" type="number" min="10" max="365" value="90">
               </label>
               <label>Modello
@@ -1867,6 +1857,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260607-buyback-only-1"></script>
+  <script src="app.js?v=20260607-market-cleanup-1"></script>
 </body>
 </html>
