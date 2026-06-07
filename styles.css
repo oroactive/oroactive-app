@@ -4815,7 +4815,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .gold-prediction-table {
   width: 100%;
-  min-width: 1680px;
+  min-width: 920px;
   border-collapse: collapse;
 }
 
@@ -4831,6 +4831,31 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .gold-prediction-table th {
   color: #ffffff;
   font-weight: 900;
+}
+
+.gold-prediction-table th:first-child,
+.gold-prediction-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 160px;
+  background: #111111;
+}
+
+.gold-prediction-table thead th:first-child {
+  z-index: 2;
+}
+
+.gold-prediction-purity-code {
+  display: block;
+}
+
+.gold-prediction-table th small {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .gold-prediction-explain-button {

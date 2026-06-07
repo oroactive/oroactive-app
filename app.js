@@ -13461,36 +13461,38 @@ function buybackTableHtml(title, metal) {
   const rows = buybackRowsFor(metal, "today");
   if (!rows.length) return `<div class="empty-state">Calcolo ${escapeHtml(title)} non ancora disponibile.</div>`;
   const competitorNames = competitorNamesForMetal(metal);
-  const competitorHeaders = competitorNames.length
-    ? competitorNames.map((name) => `<th>${escapeHtml(name)}</th>`).join("")
-    : `<th>Competitor</th>`;
+  const purityHeaders = rows.map((row) => `
+    <th>
+      <span class="gold-prediction-purity-code">${escapeHtml(row.label || row.purity_code)}</span>
+      <small>Purezza ${escapeHtml(formatPredictionPercent(row.purity_value))}</small>
+    </th>
+  `).join("");
+  const competitorRows = competitorNames.length
+    ? competitorNames.map((name) => {
+        const quoteCells = rows.map((row) => {
+          const quote = latestCompetitorQuoteForPurity(name, metal, row.purity_code);
+          return `<td>${escapeHtml(competitorQuoteMatrixValue(quote))}</td>`;
+        }).join("");
+        return `
+          <tr>
+            <th>${escapeHtml(name)}</th>
+            ${quoteCells}
+          </tr>
+        `;
+      }).join("")
+    : `<tr><td colspan="${rows.length + 1}">Nessuna quotazione competitor disponibile.</td></tr>`;
   return `
     <div class="gold-prediction-table-heading">${escapeHtml(title)}</div>
     <div class="gold-prediction-table-wrap">
       <table class="gold-prediction-table">
         <thead>
           <tr>
-            <th>Caratura</th>
-            <th>Purezza</th>
-            ${competitorHeaders}
+            <th>Competitor</th>
+            ${purityHeaders}
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => {
-            const competitorCells = competitorNames.length
-              ? competitorNames.map((name) => {
-                  const quote = latestCompetitorQuoteForPurity(name, metal, row.purity_code);
-                  return `<td>${escapeHtml(competitorQuoteMatrixValue(quote))}</td>`;
-                }).join("")
-              : `<td>—</td>`;
-            return `
-              <tr>
-                <th>${escapeHtml(row.label || row.purity_code)}</th>
-                <td>${escapeHtml(formatPredictionPercent(row.purity_value))}</td>
-                ${competitorCells}
-              </tr>
-            `;
-          }).join("")}
+          ${competitorRows}
         </tbody>
       </table>
     </div>
