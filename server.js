@@ -3633,9 +3633,14 @@ async function insertCompetitorQuote(input = {}, user = {}) {
   return publicCompetitorQuote(result.rows[0]);
 }
 
-async function listCompetitorQuotes({ metal = "", purityCode = "", competitorName = "", currency = "EUR", days = 30, limit = 200 } = {}) {
+async function listCompetitorQuotes({ metal = "", purityCode = "", competitorName = "", quoteType = "customer_buyback", currency = "EUR", days = 30, limit = 200 } = {}) {
   const conditions = ["currency = $1::text", "quote_date >= NOW() - ($2::int * INTERVAL '1 day')"];
   const params = [normalizePredictionCurrency(currency), Math.min(Math.max(Number(days || 30), 1), 365)];
+  const normalizedQuoteType = String(quoteType || "customer_buyback").toLowerCase();
+  if (normalizedQuoteType && normalizedQuoteType !== "all") {
+    params.push(normalizedQuoteType);
+    conditions.push(`COALESCE(quote_type, 'customer_buyback') = $${params.length}::text`);
+  }
   if (competitorName) {
     params.push(String(competitorName).trim());
     conditions.push(`LOWER(competitor_name) = LOWER($${params.length}::text)`);
@@ -20156,6 +20161,7 @@ app.get("/api/quotazioni/competitors/quotes", async (request, response, next) =>
       metal: request.query.metal || "",
       purityCode: request.query.purity_code || request.query.purityCode || "",
       competitorName: request.query.competitor_name || request.query.competitorName || "",
+      quoteType: request.query.quote_type || request.query.quoteType || "customer_buyback",
       currency,
       days: request.query.days || 30,
       limit: request.query.limit || 200
@@ -20232,7 +20238,7 @@ app.get("/api/quotazioni/competitors/ai-extract/status", async (request, respons
     const [runs, pageSummary, aiQuotes] = await Promise.all([
       listAiExtractionRuns({ limit: 5 }).catch(() => []),
       latestAiExtractionPageSummary().catch(() => []),
-      listAiCompetitorQuotes({ days: 1, limit: 500 }).catch(() => [])
+      listAiCompetitorQuotes({ days: 1, limit: 500, validOnly: true }).catch(() => [])
     ]);
     const sources = await listCompetitorSources();
     response.json({
@@ -20284,7 +20290,7 @@ app.get("/api/quotazioni/competitors/quotes/ai", async (request, response, next)
         currency,
         days: request.query.days || 30,
         limit: request.query.limit || 200,
-        validOnly: request.query.valid_only === "true" || request.query.validOnly === "true"
+        validOnly: request.query.valid_only !== "false" && request.query.validOnly !== "false"
       })
     });
   } catch (error) {
