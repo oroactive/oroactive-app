@@ -12206,9 +12206,18 @@ function isUnsupportedCompetitorBuybackQuote(quote = {}) {
     && quote.purity_code === "24kt";
 }
 
+function isCompetitorQuoteOverOperationalLimit(quote = {}) {
+  const row = findBuybackRow(quote.metal, quote.purity_code, "today", state.buybackScenario)
+    || findBuybackRow(quote.metal, quote.purity_code, "today", "standard");
+  const limit = Number(row?.max_payable_per_gram || 0);
+  const price = Number(quote.price_per_gram || 0);
+  return Boolean(limit && price && price > limit + 0.000001);
+}
+
 function isCompetitorBuybackQuote(quote = {}) {
   return String(quote.quote_type || "customer_buyback").toLowerCase() === "customer_buyback"
-    && !isUnsupportedCompetitorBuybackQuote(quote);
+    && !isUnsupportedCompetitorBuybackQuote(quote)
+    && !isCompetitorQuoteOverOperationalLimit(quote);
 }
 
 function competitorSourceTypeLabel(type = "") {

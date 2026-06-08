@@ -3812,14 +3812,53 @@ async function listAiCompetitorQuotes({ currency = "EUR", days = 30, limit = 200
   return result.rows.map(publicCompetitorQuote);
 }
 
-async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "EUR", days = 30, hours = null } = {}) {
+function isCompetitorQuoteAboveOperationalLimit(row = {}, maxPayableByKey = {}) {
+  const key = `${row.metal}:${row.purity_code}`;
+  const limit = Number(maxPayableByKey[key] || 0);
+  const price = Number(row.price_per_gram || 0);
+  return Boolean(limit && price && price > limit + 0.000001);
+}
+
+function buildCompetitorStatsFromRows(rows = []) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = `${row.metal}:${row.purity_code}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return Object.fromEntries([...groups.entries()].map(([key, groupRows]) => {
+    const sortedByPrice = [...groupRows].sort((first, second) => Number(first.price_per_gram || 0) - Number(second.price_per_gram || 0));
+    const prices = sortedByPrice.map((row) => Number(row.price_per_gram || 0)).filter((price) => price > 0);
+    const best = [...groupRows].sort((first, second) => (
+      Number(second.price_per_gram || 0) - Number(first.price_per_gram || 0)
+      || new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0)
+    ))[0] || {};
+    const median = prices.length % 2
+      ? prices[Math.floor(prices.length / 2)]
+      : (prices[(prices.length / 2) - 1] + prices[prices.length / 2]) / 2;
+    return [key, {
+      competitor_avg_price: prices.length ? prices.reduce((sum, price) => sum + price, 0) / prices.length : 0,
+      competitor_min_price: prices[0] || 0,
+      competitor_max_price: prices.at(-1) || 0,
+      competitor_median_price: median || 0,
+      competitor_count: prices.length,
+      competitor_last_update: groupRows
+        .map((row) => row.quote_date || row.created_at)
+        .filter(Boolean)
+        .sort((first, second) => new Date(second) - new Date(first))[0] || null,
+      best_competitor_name: best.competitor_name || "",
+      best_competitor_price: Number(best.price_per_gram || 0)
+    }];
+  }));
+}
+
+async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "EUR", days = 30, hours = null, maxPayableByKey = {} } = {}) {
   const normalizedMetals = metals.map(normalizePredictionMetal).filter((metal, index, array) => ["gold", "silver"].includes(metal) && array.indexOf(metal) === index);
   const lookbackHours = hours ? Math.min(Math.max(Number(hours || 24), 1), 24 * 365) : Math.min(Math.max(Number(days || 30), 1), 365) * 24;
   const result = await pool.query(
-    `WITH filtered AS (
-       SELECT *
-         FROM competitor_buyback_quotes
-        WHERE currency = $1::text
+    `SELECT *
+       FROM competitor_buyback_quotes
+      WHERE currency = $1::text
           AND metal = ANY($2::text[])
           AND quote_date >= NOW() - ($3::int * INTERVAL '1 hour')
           AND price_per_gram IS NOT NULL
@@ -3831,43 +3870,11 @@ async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "E
             AND purity_code = '24kt'
             AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
           )
-     ),
-     ranked AS (
-       SELECT *,
-              ROW_NUMBER() OVER (
-                PARTITION BY metal, purity_code
-                ORDER BY price_per_gram DESC, quote_date DESC, created_at DESC
-              ) AS competitor_rank
-         FROM filtered
-     )
-     SELECT metal,
-            purity_code,
-            AVG(price_per_gram)::numeric AS competitor_avg_price,
-            MIN(price_per_gram)::numeric AS competitor_min_price,
-            MAX(price_per_gram)::numeric AS competitor_max_price,
-            percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_gram)::numeric AS competitor_median_price,
-            COUNT(*)::int AS competitor_count,
-            MAX(quote_date) AS competitor_last_update,
-            MAX(CASE WHEN competitor_rank = 1 THEN competitor_name END) AS best_competitor_name,
-            MAX(CASE WHEN competitor_rank = 1 THEN price_per_gram END)::numeric AS best_competitor_price
-       FROM ranked
-      GROUP BY metal, purity_code`,
+      ORDER BY quote_date DESC, created_at DESC`,
     [normalizePredictionCurrency(currency), normalizedMetals, lookbackHours]
   );
-  return Object.fromEntries(result.rows.map((row) => {
-    const avg = Number(row.competitor_avg_price || 0);
-    const max = Number(row.competitor_max_price || 0);
-    return [`${row.metal}:${row.purity_code}`, {
-      competitor_avg_price: avg,
-      competitor_min_price: Number(row.competitor_min_price || 0),
-      competitor_max_price: max,
-      competitor_median_price: Number(row.competitor_median_price || 0),
-      competitor_count: Number(row.competitor_count || 0),
-      competitor_last_update: row.competitor_last_update || null,
-      best_competitor_name: row.best_competitor_name || "",
-      best_competitor_price: Number(row.best_competitor_price || max || 0)
-    }];
-  }));
+  const coherentRows = result.rows.filter((row) => !isCompetitorQuoteAboveOperationalLimit(row, maxPayableByKey));
+  return buildCompetitorStatsFromRows(coherentRows);
 }
 
 function parseCompetitorCsv(csv = "") {
@@ -6007,6 +6014,22 @@ function calculateBuybackRow(policy = {}, prediction = {}, scenario = "standard"
   };
 }
 
+function buildMaxPayableByPurityKey(policies = [], predictionsByKey = new Map(), scenario = "standard", settings = {}, metals = []) {
+  const allowedMetals = metals.length ? metals : ["gold", "silver"];
+  const limitMap = {};
+  for (const policy of policies.filter((row) => allowedMetals.includes(row.metal) && row.active !== false)) {
+    const prediction = predictionsByKey.get(`${policy.metal}:today`)
+      || predictionsByKey.get(`${policy.metal}:24h`)
+      || [...predictionsByKey.values()].find((item) => item.metal === policy.metal);
+    if (!prediction) continue;
+    const row = calculateBuybackRow(policy, prediction, scenario, { ...settings, competitorStats: {} });
+    if (row.max_payable_per_gram > 0) {
+      limitMap[`${row.metal}:${row.purity_code}`] = Number(row.max_payable_per_gram || 0);
+    }
+  }
+  return limitMap;
+}
+
 async function insertBuybackCalculation(row = {}) {
   const result = await pool.query(
     `INSERT INTO metal_buyback_calculations (
@@ -6049,10 +6072,12 @@ async function calculateMetalBuyback(input = {}, user = {}, req = null) {
   const scenario = normalizeBuybackScenario(input.scenario || settings.default_scenario);
   const predictionBundle = await runMetalPredictions({ metals, currency, horizons }, user, req);
   const predictionsByKey = new Map((predictionBundle.predictions || []).map((prediction) => [`${prediction.metal}:${prediction.horizon}`, prediction]));
+  const maxPayableByKey = buildMaxPayableByPurityKey(settings.policies, predictionsByKey, scenario, { ...settings, ...predictionSettings }, metals);
   const competitorStats = await competitorQuoteStats({
     metals,
     currency,
-    hours: predictionSettings.competitor_data_max_age_hours || 24
+    hours: predictionSettings.competitor_data_max_age_hours || 24,
+    maxPayableByKey
   }).catch(() => ({}));
   const enrichedSettings = { ...settings, ...predictionSettings, competitorStats };
   const calculations = [];
