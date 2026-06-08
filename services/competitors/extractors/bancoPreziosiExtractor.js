@@ -101,6 +101,29 @@ function isQuotePage(url = "") {
   return /quotazioni/i.test(String(url || ""));
 }
 
+function isLegacyQuotePost(url = "") {
+  return /quotazioni-oro-in-tempo-reale-milano/i.test(String(url || ""));
+}
+
+function isPublicHomeQuoteSource(url = "") {
+  try {
+    const parsed = new URL(String(url || ""), BANCO_PREZIOSI_DEFAULT_URL);
+    return /bancopreziosimilano\.it$/i.test(parsed.hostname) && (!parsed.pathname || parsed.pathname === "/");
+  } catch {
+    return false;
+  }
+}
+
+function quoteSourcePriority(quote = {}) {
+  const sourceUrl = quote.source_url || quote.url || "";
+  const sourceMethod = quote.raw_payload?.source_method || "";
+  if (sourceMethod === "public_home_quote_section") return 100;
+  if (isPublicHomeQuoteSource(sourceUrl)) return 90;
+  if (isLegacyQuotePost(sourceUrl)) return 20;
+  if (isQuotePage(sourceUrl)) return 40;
+  return 50;
+}
+
 function bancoDefinition(key = "") {
   return BANCO_PREZIOSI_DEFINITIONS.find((item) => item.key === key) || {};
 }
@@ -150,11 +173,17 @@ function addRegexQuote(quotes = [], text = "", definitionKey = "", regexes = [],
     const price = match ? parseItalianEuroPrice(match[1]) : 0;
     if (!price) continue;
     const unit = unitFromText(match[2] || definition.defaultUnit, definition.defaultUnit);
+    const sourceMethod = isPublicHomeQuoteSource(sourceUrl) ? "public_home_quote_section" : "text_regex";
     quotes.push(bancoPreziosiQuote(definition, price, sourceUrl, {
-      source_method: "text_regex",
+      source_method: sourceMethod,
       matched_text: match[0],
       unit
-    }, { ...options, unit }));
+    }, {
+      ...options,
+      unit,
+      extractionMethod: options.extractionMethod || "auto_banco_preziosi_parser",
+      confidence: options.confidence || (sourceMethod === "public_home_quote_section" ? "high" : undefined)
+    }));
     return true;
   }
   return false;
@@ -214,7 +243,7 @@ export function extractBancoPreziosiQuotesFromText(text = "", options = {}) {
   return dedupeBancoPreziosiQuotes(quotes);
 }
 
-function dedupeBancoPreziosiQuotes(quotes = [], warnings = []) {
+export function dedupeBancoPreziosiQuotes(quotes = [], warnings = []) {
   const map = new Map();
   for (const quote of quotes) {
     const key = quoteKey(quote);
@@ -228,7 +257,7 @@ function dedupeBancoPreziosiQuotes(quotes = [], warnings = []) {
     if (existingPrice && nextPrice && Math.abs(existingPrice - nextPrice) > 0.0001 && quote.purity_code === "18kt") {
       warnings.push("Prezzo oro 18kt diverso tra homepage e pagina quotazioni.");
     }
-    const preferNext = isQuotePage(quote.source_url) && !isQuotePage(existing.source_url);
+    const preferNext = quoteSourcePriority(quote) > quoteSourcePriority(existing);
     const chosen = preferNext ? quote : existing;
     const other = preferNext ? existing : quote;
     map.set(key, {
@@ -481,12 +510,13 @@ export function createBancoPreziosiExtractor(options = {}) {
     const requiredCount = BANCO_PREZIOSI_DEFINITIONS.length;
     const foundCount = requiredCount - missingBancoDefinitions(quotes).length;
     const status = foundCount === requiredCount ? "success" : foundCount ? "partial" : "failed";
+    const uniqueWarnings = [...new Set(warnings.filter(Boolean))];
     return {
       source: "banco_preziosi",
       status,
       quotes,
-      error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),
-      warnings,
+      error: status === "success" ? "" : uniqueWarnings.join(" | ").slice(0, 1200),
+      warnings: uniqueWarnings,
       pages_analyzed: pages.map((page) => page.url)
     };
   }
