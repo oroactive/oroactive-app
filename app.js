@@ -956,6 +956,26 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "shield", back: "elephant", frontText: "SOM", backText: "1OZ" }
   },
   {
+    id: "arca-noe-armenia-2025-1-oz",
+    name: "Arca di Noe Armenia 2025 1 oz",
+    country: "Armenia",
+    mintYears: "2025",
+    nominal: "50.000 Dram",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.1,
+    fineGold: 31.1,
+    diameter: 38.6,
+    thickness: 1.65,
+    edge: "Zigrinato",
+    obverse: "Stemma della Repubblica d'Armenia con aquila e leone, valore 50.000 Dram, peso 1 oz, titolo Au 999,9 e anno 2025",
+    reverse: "Arca di Noe sulle acque con Monte Ararat, sole nascente e colomba con ramoscello d'ulivo; iscrizioni Noah's Ark e testo armeno",
+    history: "La serie Arca di Noe rende omaggio al patrimonio culturale armeno e alla simbologia biblica legata al Monte Ararat. Il rovescio racconta l'Arca di Noe che galleggia sull'acqua, con la colomba e il ramoscello d'ulivo come simboli di pace e speranza. Prodotta da Geiger Edelmetalle, rinomata zecca tedesca, questa emissione in oro puro 999,9 combina artigianalita, precisione e valore d'investimento.",
+    recognitionHints: ["arca di noe", "noah's ark", "armenia 2025", "50000 dram", "republic of armenia", "ararat", "colomba", "geiger edelmetalle", "au 999.9"],
+    visual: { front: "shield", back: "ark", frontText: "ARM", backText: "NOE" }
+  },
+  {
     id: "britannia-1-oz",
     name: "Britannia 1 oz",
     country: "Regno Unito",
@@ -1136,6 +1156,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "wiener-philharmoniker-1-oz": "wiener-philharmoniker-1-oz",
   "filarmonica-vienna-2026-1-oz": "filarmonica-vienna-2026-1-oz",
   "somalia-elephant-2023-1-oz": "somalia-elephant-2023-1-oz",
+  "arca-noe-armenia-2025-1-oz": "arca-noe-armenia-2025-1-oz",
   "britannia-1-oz": "britannia-1-oz",
   "kangaroo-nugget-1-oz": "kangaroo-nugget-1-oz",
   "libertad-1-oz": "libertad-1-oz",
@@ -1154,6 +1175,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "napoleone-20-franchi-gallo-marianne": "Archivio OroActive",
   "filarmonica-vienna-2026-1-oz": "Archivio OroActive",
   "somalia-elephant-2023-1-oz": "Archivio OroActive",
+  "arca-noe-armenia-2025-1-oz": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
 };
 
