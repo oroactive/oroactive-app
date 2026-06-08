@@ -918,6 +918,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "organ", back: "music", frontText: "WIEN", backText: "9999" }
   },
   {
+    id: "filarmonica-vienna-2026-1-oz",
+    name: "Filarmonica di Vienna 2026 1 oz",
+    country: "Austria",
+    mintYears: "2026",
+    nominal: "100 Euro",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.1,
+    fineGold: 31.1,
+    diameter: 37,
+    edge: "Zigrinato",
+    obverse: "Grande organo della Musikverein di Vienna con iscrizioni REPUBLIK ÖSTERREICH, 1 UNZE GOLD 999.9, 2026 e 100 EURO",
+    reverse: "Composizione di strumenti orchestrali con violini, violoncello, arpa, fagotto e corno sotto il titolo Wiener Philharmoniker",
+    history: "Emissione 2026 della celebre bullion austriaca da un'oncia, prodotta ufficialmente dalla Zecca Austriaca. La moneta unisce il grande organo della Musikverein e gli strumenti dell'orchestra filarmonica, simboli immediati della tradizione musicale viennese. E riconosciuta a livello globale, garantita per autenticita, peso e purezza, e apprezzata per elevata liquidita e raffinata estetica.",
+    recognitionHints: ["filarmonica vienna 2026", "wiener philharmoniker", "republik osterreich", "1 unze gold 999.9", "100 euro", "organo musikverein", "strumenti orchestra"],
+    visual: { front: "organ", back: "music", frontText: "2026", backText: "WIEN" }
+  },
+  {
     id: "britannia-1-oz",
     name: "Britannia 1 oz",
     country: "Regno Unito",
@@ -1096,6 +1115,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "american-buffalo-1-oz": "american-buffalo-1-oz",
   "maple-leaf-1-oz": "maple-leaf-1-oz",
   "wiener-philharmoniker-1-oz": "wiener-philharmoniker-1-oz",
+  "filarmonica-vienna-2026-1-oz": "filarmonica-vienna-2026-1-oz",
   "britannia-1-oz": "britannia-1-oz",
   "kangaroo-nugget-1-oz": "kangaroo-nugget-1-oz",
   "libertad-1-oz": "libertad-1-oz",
@@ -1112,6 +1132,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "libertad-1-oz": "Archivio OroActive",
   "panda-cinese-30g": "Archivio OroActive",
   "napoleone-20-franchi-gallo-marianne": "Archivio OroActive",
+  "filarmonica-vienna-2026-1-oz": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
 };
 
