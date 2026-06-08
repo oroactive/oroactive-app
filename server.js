@@ -6417,6 +6417,50 @@ const assistantAiSchema = {
   required: ["risposta", "fonte", "dal_libro", "citazioni"]
 };
 
+const GOLD_COIN_AI_CATALOG = [
+  { id: "sterlina-oro-sovrana", name: "Sterlina d'oro", country: "Regno Unito", purity: "22 kt / 916,7 per mille", obverse: "ritratto sovrano britannico", reverse: "San Giorgio e drago o stemma", hints: ["sovereign", "sovrana", "san giorgio", "drago"] },
+  { id: "marengo-20-lire-italia", name: "Marengo italiano 20 Lire", country: "Italia", purity: "900 per mille", obverse: "Re d'Italia", reverse: "stemma sabaudo e 20 Lire", hints: ["20 lire", "vittorio emanuele", "umberto", "regno d'italia"] },
+  { id: "marengo-francese-20-franchi", name: "Marengo francese 20 Franchi", country: "Francia", purity: "900 per mille", obverse: "Napoleone, Marianne o Gallo", reverse: "20 Francs", hints: ["20 francs", "napoleon", "marianne", "gallo"] },
+  { id: "marengo-svizzero-vreneli", name: "Vreneli 20 Franchi", country: "Svizzera", purity: "900 per mille", obverse: "Helvetia / Vreneli", reverse: "stemma svizzero 20 FR", hints: ["helvetia", "vreneli", "20 fr", "croce"] },
+  { id: "krugerrand-1-oz", name: "Krugerrand 1 oz", country: "Sud Africa", purity: "22 kt / 916,7 per mille", obverse: "Paul Kruger", reverse: "springbok", hints: ["krugerrand", "kruger", "springbok"] },
+  { id: "american-eagle-1-oz", name: "American Gold Eagle 1 oz", country: "Stati Uniti", purity: "22 kt / 916,7 per mille", obverse: "Liberty", reverse: "aquila", hints: ["american eagle", "liberty", "50 dollars"] },
+  { id: "american-buffalo-1-oz", name: "American Buffalo 1 oz", country: "Stati Uniti", purity: "999,9 per mille", obverse: "profilo nativo americano", reverse: "bisonte", hints: ["buffalo", "bison", "indian head"] },
+  { id: "maple-leaf-1-oz", name: "Maple Leaf 1 oz", country: "Canada", purity: "999,9 per mille", obverse: "ritratto reale", reverse: "foglia d'acero", hints: ["maple leaf", "canada", "or pur", "fine gold"] },
+  { id: "wiener-philharmoniker-1-oz", name: "Wiener Philharmoniker 1 oz", country: "Austria", purity: "999,9 per mille", obverse: "organo Musikverein", reverse: "strumenti orchestra", hints: ["philharmoniker", "wiener", "organo", "strumenti"] },
+  { id: "britannia-1-oz", name: "Britannia 1 oz", country: "Regno Unito", purity: "999,9 per mille dal 2013", obverse: "sovrano britannico", reverse: "Britannia con tridente", hints: ["britannia", "tridente", "100 pounds"] },
+  { id: "kangaroo-nugget-1-oz", name: "Australian Kangaroo 1 oz", country: "Australia", purity: "999,9 per mille", obverse: "ritratto reale", reverse: "canguro", hints: ["kangaroo", "nugget", "australia"] },
+  { id: "libertad-1-oz", name: "Libertad 1 oz", country: "Messico", purity: "999 per mille", obverse: "stemma messicano", reverse: "Vittoria alata", hints: ["libertad", "onza", "mexico"] },
+  { id: "panda-cinese-30g", name: "Panda cinese 30 g", country: "Cina", purity: "999 per mille", obverse: "Tempio del Cielo", reverse: "panda", hints: ["panda", "china", "500 yuan"] },
+  { id: "centenario-50-pesos", name: "50 Pesos Centenario", country: "Messico", purity: "900 per mille", obverse: "Vittoria alata", reverse: "aquila messicana", hints: ["50 pesos", "centenario", "37.5"] },
+  { id: "ducato-austriaco", name: "Ducato austriaco", country: "Austria", purity: "986 per mille", obverse: "Francesco Giuseppe", reverse: "aquila bicipite", hints: ["ducat", "ducato", "1915", "franz joseph"] },
+  { id: "20-dollari-double-eagle", name: "20 Dollars Double Eagle", country: "Stati Uniti", purity: "900 per mille", obverse: "Liberty o Saint-Gaudens", reverse: "aquila americana", hints: ["double eagle", "twenty dollars", "20 dollars"] },
+  { id: "20-mark-germania", name: "20 Mark oro", country: "Germania", purity: "900 per mille", obverse: "sovrano o stemma", reverse: "aquila imperiale", hints: ["20 mark", "deutsches reich", "kaiser"] }
+];
+
+const goldCoinIdentificationSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    found: { type: "boolean" },
+    matches: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          confidence: { type: "number" },
+          reason: { type: "string" },
+          visual_evidence: { type: "string" }
+        },
+        required: ["id", "confidence", "reason", "visual_evidence"]
+      }
+    },
+    warnings: { type: "array", items: { type: "string" } }
+  },
+  required: ["found", "matches", "warnings"]
+};
+
 function documentAiToClientFields(result = {}) {
   const confidence = result.confidence || {};
   return {
@@ -6483,6 +6527,93 @@ La confidence deve essere: alto, medio, basso oppure stringa vuota.`
     }
   });
   return parseOpenAiJson(result);
+}
+
+function normalizeCoinCatalogForAi(inputCatalog = []) {
+  const allowedIds = new Set(GOLD_COIN_AI_CATALOG.map((coin) => coin.id));
+  const fromClient = Array.isArray(inputCatalog)
+    ? inputCatalog
+      .filter((coin) => allowedIds.has(String(coin.id || "")))
+      .map((coin) => ({
+        id: String(coin.id || ""),
+        name: String(coin.name || "").slice(0, 120),
+        country: String(coin.country || "").slice(0, 80),
+        purity: String(coin.purityLabel || coin.purity || "").slice(0, 80),
+        grossWeight: Number(coin.grossWeight || 0) || null,
+        diameter: Number(coin.diameter || 0) || null,
+        obverse: String(coin.obverse || "").slice(0, 220),
+        reverse: String(coin.reverse || "").slice(0, 220),
+        hints: Array.isArray(coin.recognitionHints) ? coin.recognitionHints.slice(0, 8) : []
+      }))
+    : [];
+  return fromClient.length ? fromClient : GOLD_COIN_AI_CATALOG;
+}
+
+async function identifyGoldCoinWithOpenAi({ image = "", catalog = [] } = {}) {
+  const imageDataUrl = validImageDataUrl(image);
+  if (!imageDataUrl) {
+    const error = new Error("Foto moneta non valida.");
+    error.status = 400;
+    throw error;
+  }
+  if (!openai) {
+    return {
+      ok: false,
+      ai_configured: false,
+      matches: [],
+      message: "AI non configurata sul backend. Usa ricerca manuale per nome, paese, peso o titolo.",
+      warnings: ["OPENAI_API_KEY non configurata"]
+    };
+  }
+  const referenceCatalog = normalizeCoinCatalogForAi(catalog);
+  const allowedIds = new Set(referenceCatalog.map((coin) => coin.id));
+  const result = await openai.responses.create({
+    model: openaiModel,
+    input: [{
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: `Sei un assistente di riconoscimento numismatico OroActive.
+Analizza solo la foto pubblica di una moneta d'oro e confrontala con il catalogo fornito.
+Non inventare monete fuori catalogo. Se non hai elementi sufficienti, found=false e matches vuoto.
+Usa indizi visivi: legenda, sovrano, stemma, animale, valore, anno, bordo e composizione generale.
+Non usare questa analisi come autenticazione definitiva: e solo supporto formativo.
+Restituisci solo JSON valido secondo schema.
+
+CATALOGO AMMESSO:
+${JSON.stringify(referenceCatalog).slice(0, 14000)}`
+        },
+        { type: "input_image", image_url: imageDataUrl, detail: "high" }
+      ]
+    }],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "oroactive_gold_coin_identification",
+        strict: true,
+        schema: goldCoinIdentificationSchema
+      }
+    }
+  });
+  const parsed = parseOpenAiJson(result);
+  const matches = (Array.isArray(parsed.matches) ? parsed.matches : [])
+    .filter((match) => allowedIds.has(String(match.id || "")))
+    .map((match) => ({
+      id: String(match.id || ""),
+      confidence: Math.max(0, Math.min(1, Number(match.confidence || 0))),
+      reason: String(match.reason || "").slice(0, 260),
+      visual_evidence: String(match.visual_evidence || "").slice(0, 260)
+    }))
+    .sort((a, b) => Number(b.confidence || 0) - Number(a.confidence || 0))
+    .slice(0, 3);
+  return {
+    ok: true,
+    ai_configured: true,
+    found: Boolean(parsed.found && matches.length),
+    matches,
+    warnings: Array.isArray(parsed.warnings) ? parsed.warnings.slice(0, 5).map((item) => String(item).slice(0, 180)) : []
+  };
 }
 
 async function checkActWithOpenAi(act) {
@@ -19664,6 +19795,32 @@ app.get("/api/ai/status", async (_request, response, next) => {
   try {
     response.json(await aiAssistantStatus());
   } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/training/gold-coins/identify", async (request, response, next) => {
+  try {
+    const result = await identifyGoldCoinWithOpenAi({
+      image: request.body.image || request.body.photo || request.body.dataUrl || "",
+      catalog: request.body.catalog || []
+    });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "gold_coin_identify",
+      entityType: "training",
+      entityLabel: "Elenco Monete",
+      metadata: {
+        ai_configured: Boolean(result.ai_configured),
+        matches_count: Array.isArray(result.matches) ? result.matches.length : 0,
+        best_match: result.matches?.[0]?.id || ""
+      }
+    });
+    response.json(result);
+  } catch (error) {
+    if (!error.status) error.status = 502;
+    if (!error.message) error.message = "Riconoscimento moneta non disponibile.";
     next(error);
   }
 });

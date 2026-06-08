@@ -1383,6 +1383,56 @@
         <div class="course-content" id="trainingList"></div>
       </section>
 
+      <section id="coinEncyclopedia" class="screen">
+        <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
+        <div class="coin-encyclopedia-shell">
+          <header class="coin-hero">
+            <div>
+              <p class="eyebrow">Formazione numismatica</p>
+              <h2>Elenco Monete</h2>
+              <p class="muted">Enciclopedia OroActive delle principali monete d'oro: fronte, retro, scheda tecnica, contenuto fino e storia operativa.</p>
+            </div>
+            <div class="coin-hero-actions">
+              <label class="primary-button coin-camera-button">
+                Ricerca con fotocamera
+                <input id="coinCameraInput" type="file" accept="image/*" capture="environment">
+              </label>
+              <button class="ghost-button" type="button" id="coinResetSearch">Reset ricerca</button>
+            </div>
+          </header>
+
+          <section class="coin-scan-panel" aria-labelledby="coinScanTitle">
+            <div>
+              <p class="eyebrow" id="coinScanTitle">Identificazione AI</p>
+              <h3>Scatta o carica una foto della moneta</h3>
+              <p class="muted">La foto viene inviata solo al backend per il confronto AI. Non vengono inviati dati cliente, documenti o atti di vendita.</p>
+            </div>
+            <div class="coin-scan-status" id="coinScanStatus" aria-live="polite">
+              Pronto per analizzare fronte o retro della moneta.
+            </div>
+            <div class="coin-scan-preview" id="coinScanPreview" hidden></div>
+            <div class="coin-identification-results" id="coinIdentificationResults" aria-live="polite"></div>
+          </section>
+
+          <section class="coin-toolbar" aria-label="Ricerca Elenco Monete">
+            <input class="search" id="coinSearchInput" placeholder="Cerca moneta, paese, caratura, peso o anno">
+            <select id="coinCountryFilter" aria-label="Filtra per paese">
+              <option value="">Tutti i paesi</option>
+            </select>
+            <select id="coinPurityFilter" aria-label="Filtra per purezza">
+              <option value="">Tutte le purezze</option>
+              <option value="999">Oro 999+</option>
+              <option value="917">Oro 916/917</option>
+              <option value="900">Oro 900</option>
+            </select>
+          </section>
+
+          <section class="coin-overview-grid" id="coinOverviewGrid" aria-label="Statistiche catalogo monete"></section>
+          <section class="coin-catalog-grid" id="coinCatalogGrid" aria-live="polite"></section>
+          <section class="coin-detail-panel" id="coinDetailPanel" aria-live="polite"></section>
+        </div>
+      </section>
+
       <section id="gaming" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
         <div class="gaming-shell" id="gamingShell">

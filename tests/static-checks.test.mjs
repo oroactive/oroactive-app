@@ -98,6 +98,38 @@ test("sezione OroActive Academy e certificazioni interne presenti", async () => 
   assert.match(schema, /CREATE TABLE IF NOT EXISTS course_badges/);
 });
 
+test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backend", async () => {
+  const [index, app, server, styles] = await Promise.all([
+    file("index.html"),
+    file("app.js"),
+    file("server.js"),
+    file("styles.css")
+  ]);
+
+  assert.match(app, /id: "gold-coin-encyclopedia"[\s\S]*label: "Elenco Monete"[\s\S]*section: "coinEncyclopedia"/);
+  assert.match(app, /keywords: "elenco monete monete oro enciclopedia numismatica/);
+  assert.match(index, /<section id="coinEncyclopedia" class="screen">/);
+  assert.match(index, /id="coinCameraInput" type="file" accept="image\/\*" capture="environment"/);
+  assert.match(index, /id="coinCatalogGrid"/);
+  assert.match(index, /id="coinDetailPanel"/);
+  assert.match(app, /const GOLD_COIN_CATALOG = \[/);
+  assert.match(app, /sterlina-oro-sovrana/);
+  assert.match(app, /marengo-20-lire-italia/);
+  assert.match(app, /krugerrand-1-oz/);
+  assert.match(app, /maple-leaf-1-oz/);
+  assert.match(app, /function renderCoinEncyclopedia/);
+  assert.match(app, /async function identifyCoinFromCamera/);
+  assert.match(app, /apiRequest\("\/training\/gold-coins\/identify"/);
+  assert.match(server, /const GOLD_COIN_AI_CATALOG = \[/);
+  assert.match(server, /const goldCoinIdentificationSchema/);
+  assert.match(server, /async function identifyGoldCoinWithOpenAi/);
+  assert.match(server, /app\.post\("\/api\/training\/gold-coins\/identify"/);
+  assert.match(server, /gold_coin_identify/);
+  assert.match(styles, /\.coin-encyclopedia-shell/);
+  assert.match(styles, /\.coin-face/);
+  assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.coin-encyclopedia-shell/);
+});
+
 test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () => {
   const [app, server, schema, migration, nixpacks, dockerfile] = await Promise.all([
     file("app.js"),

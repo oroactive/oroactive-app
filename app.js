@@ -81,6 +81,11 @@ const state = {
   courseCertificates: [],
   courseBadges: [],
   courseActiveTab: "catalog",
+  coinCatalogSearch: "",
+  coinCatalogCountry: "",
+  coinCatalogPurity: "",
+  coinSelectedId: "sterlina-oro-sovrana",
+  coinIdentification: null,
   aurumBlocksConfig: null,
   aurumBlocksQuestions: [],
   aurumBlocksSession: null,
@@ -259,6 +264,10 @@ const AURUM_SECTION_TIPS = {
   training: [
     "Puoi completare i corsi e ottenere badge interni OroActive.",
     "La formazione funziona meglio a piccoli blocchi, ma costanti."
+  ],
+  coinEncyclopedia: [
+    "Per identificare una moneta confronta sempre foto, peso, diametro, bordo e titolo.",
+    "La ricerca con fotocamera aiuta, ma la verifica fisica resta fondamentale."
   ],
   aurumBlocks: [
     "Aurum Blocks allena precisione, carature e riflessi senza toccare dati reali.",
@@ -716,6 +725,337 @@ const AURUM_COMPRO_ORO_QUIZ = [
   }
 ];
 
+const GOLD_COIN_CATALOG = [
+  {
+    id: "sterlina-oro-sovrana",
+    name: "Sterlina d'oro",
+    country: "Regno Unito",
+    mintYears: "1817-oggi",
+    nominal: "1 Sovereign",
+    metal: "Oro",
+    purity: 0.9167,
+    purityLabel: "22 kt / 916,7‰",
+    grossWeight: 7.988,
+    fineGold: 7.322,
+    diameter: 22.05,
+    edge: "Zigrinato",
+    obverse: "Ritratto del sovrano britannico",
+    reverse: "San Giorgio e il drago o stemma reale, secondo emissione",
+    history: "La sovrana moderna nasce nel 1817 con la riforma monetaria britannica. E una delle monete d'oro piu diffuse nel mercato europeo e viene usata spesso come riferimento operativo per riconoscere peso, diametro e titolo 22 kt.",
+    recognitionHints: ["sovrana", "sovereign", "san giorgio", "drago", "elizabeth", "victoria", "georgius"],
+    visual: { front: "profile", back: "dragon", frontText: "SOV", backText: "G&D" }
+  },
+  {
+    id: "marengo-20-lire-italia",
+    name: "Marengo italiano 20 Lire",
+    country: "Italia",
+    mintYears: "1861-1927",
+    nominal: "20 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.4516,
+    fineGold: 5.806,
+    diameter: 21,
+    edge: "Zigrinato o inciso, secondo emissione",
+    obverse: "Ritratto del Re d'Italia",
+    reverse: "Stemma sabaudo, valore 20 Lire e anno",
+    history: "Il 20 Lire italiano segue lo standard dell'Unione Monetaria Latina. I tipi di Vittorio Emanuele II, Umberto I e Vittorio Emanuele III sono tra le monete piu ricorrenti nei controlli da banco.",
+    recognitionHints: ["20 lire", "regno d'italia", "vittorio emanuele", "umberto", "stemma sabaudo"],
+    visual: { front: "profile", back: "shield", frontText: "20L", backText: "SAV" }
+  },
+  {
+    id: "marengo-francese-20-franchi",
+    name: "Marengo francese 20 Franchi",
+    country: "Francia",
+    mintYears: "1803-1914",
+    nominal: "20 Francs",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.4516,
+    fineGold: 5.806,
+    diameter: 21,
+    edge: "Inciso o zigrinato, secondo emissione",
+    obverse: "Napoleone, Marianne o Gallo, secondo tipologia",
+    reverse: "Valore 20 Francs e simboli della Repubblica o Impero",
+    history: "Il 20 Franchi francese e il modello da cui deriva il nome comune Marengo. Lo standard 900‰ e il peso di circa 6,45 g lo rendono immediatamente confrontabile con le emissioni latine.",
+    recognitionHints: ["20 francs", "napoleon", "marianne", "coq", "gallo", "republique francaise"],
+    visual: { front: "profile", back: "rooster", frontText: "20F", backText: "RF" }
+  },
+  {
+    id: "marengo-svizzero-vreneli",
+    name: "Vreneli 20 Franchi",
+    country: "Svizzera",
+    mintYears: "1897-1949",
+    nominal: "20 Francs",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.4516,
+    fineGold: 5.806,
+    diameter: 21,
+    edge: "Inciso o zigrinato, secondo anno",
+    obverse: "Helvetia / Vreneli con montagne alpine",
+    reverse: "Stemma svizzero, quercia e valore 20 FR",
+    history: "Il Vreneli e una delle monete svizzere piu riconoscibili. Il ritratto femminile e lo stemma con croce aiutano il riconoscimento visivo rapido in negozio.",
+    recognitionHints: ["helvetia", "vreneli", "20 fr", "svizzera", "croce svizzera"],
+    visual: { front: "profile", back: "cross", frontText: "HEL", backText: "20F" }
+  },
+  {
+    id: "krugerrand-1-oz",
+    name: "Krugerrand 1 oz",
+    country: "Sud Africa",
+    mintYears: "1967-oggi",
+    nominal: "Senza valore nominale",
+    metal: "Oro",
+    purity: 0.9167,
+    purityLabel: "22 kt / 916,7‰",
+    grossWeight: 33.93,
+    fineGold: 31.1035,
+    diameter: 32.77,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Paul Kruger",
+    reverse: "Antilope springbok e indicazione fine gold",
+    history: "Creato nel 1967, il Krugerrand e stato pensato come moneta bullion da un'oncia. Contiene esattamente un'oncia troy di oro fino, pur essendo in lega 22 kt.",
+    recognitionHints: ["krugerrand", "kruger", "springbok", "south africa", "fyngoud"],
+    visual: { front: "profile", back: "springbok", frontText: "KR", backText: "1 OZ" }
+  },
+  {
+    id: "american-eagle-1-oz",
+    name: "American Gold Eagle 1 oz",
+    country: "Stati Uniti",
+    mintYears: "1986-oggi",
+    nominal: "50 Dollars",
+    metal: "Oro",
+    purity: 0.9167,
+    purityLabel: "22 kt / 916,7‰",
+    grossWeight: 33.931,
+    fineGold: 31.1035,
+    diameter: 32.7,
+    edge: "Zigrinato",
+    obverse: "Lady Liberty con torcia e ramo d'ulivo",
+    reverse: "Aquila americana, secondo tipologia",
+    history: "La Gold Eagle e la bullion ufficiale statunitense. Come il Krugerrand e 22 kt ma contiene un'oncia troy di oro fino.",
+    recognitionHints: ["american eagle", "50 dollars", "liberty", "eagle", "united states"],
+    visual: { front: "liberty", back: "eagle", frontText: "LIB", backText: "EAG" }
+  },
+  {
+    id: "american-buffalo-1-oz",
+    name: "American Buffalo 1 oz",
+    country: "Stati Uniti",
+    mintYears: "2006-oggi",
+    nominal: "50 Dollars",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.108,
+    fineGold: 31.1035,
+    diameter: 32.7,
+    edge: "Zigrinato",
+    obverse: "Profilo nativo americano",
+    reverse: "Bisonte americano",
+    history: "La Buffalo e stata introdotta come bullion statunitense in oro 24 kt. Il bisonte sul retro e un segno visivo molto utile per distinguerla dalla Gold Eagle.",
+    recognitionHints: ["buffalo", "bison", "indian head", "50 dollars", "9999"],
+    visual: { front: "profile", back: "buffalo", frontText: "BUF", backText: "9999" }
+  },
+  {
+    id: "maple-leaf-1-oz",
+    name: "Maple Leaf 1 oz",
+    country: "Canada",
+    mintYears: "1979-oggi",
+    nominal: "50 Dollars",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.11,
+    fineGold: 31.1035,
+    diameter: 30,
+    edge: "Zigrinato",
+    obverse: "Ritratto reale canadese",
+    reverse: "Foglia d'acero",
+    history: "La Maple Leaf canadese e tra le bullion piu note in oro puro. La foglia d'acero centrale e la dicitura fine gold/or pur la rendono molto riconoscibile.",
+    recognitionHints: ["maple leaf", "foglia acero", "canada", "fine gold", "or pur"],
+    visual: { front: "profile", back: "leaf", frontText: "CAN", backText: "9999" }
+  },
+  {
+    id: "wiener-philharmoniker-1-oz",
+    name: "Wiener Philharmoniker 1 oz",
+    country: "Austria",
+    mintYears: "1989-oggi",
+    nominal: "100 Euro",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.1035,
+    fineGold: 31.1035,
+    diameter: 37,
+    edge: "Zigrinato",
+    obverse: "Organo della Musikverein",
+    reverse: "Strumenti dell'orchestra filarmonica",
+    history: "La Filarmonica di Vienna e la bullion austriaca piu conosciuta. Gli strumenti musicali sul retro sono il suo elemento di riconoscimento principale.",
+    recognitionHints: ["philharmoniker", "wiener", "vienna", "organo", "strumenti", "100 euro"],
+    visual: { front: "organ", back: "music", frontText: "WIEN", backText: "9999" }
+  },
+  {
+    id: "britannia-1-oz",
+    name: "Britannia 1 oz",
+    country: "Regno Unito",
+    mintYears: "1987-oggi",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰ dal 2013",
+    grossWeight: 31.104,
+    fineGold: 31.1035,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto del sovrano britannico",
+    reverse: "Britannia con elmo, scudo e tridente",
+    history: "La Britannia e la bullion britannica moderna. Le emissioni dal 2013 sono in oro 999,9‰, mentre le prime serie erano in lega 22 kt.",
+    recognitionHints: ["britannia", "100 pounds", "tridente", "shield", "british"],
+    visual: { front: "profile", back: "britannia", frontText: "GB", backText: "BRI" }
+  },
+  {
+    id: "kangaroo-nugget-1-oz",
+    name: "Australian Kangaroo 1 oz",
+    country: "Australia",
+    mintYears: "1986-oggi",
+    nominal: "100 Dollars",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.1035,
+    fineGold: 31.1035,
+    diameter: 32.1,
+    edge: "Zigrinato",
+    obverse: "Ritratto reale australiano",
+    reverse: "Canguro, disegno variabile per anno",
+    history: "Nata come Gold Nugget e poi diventata Kangaroo, e una bullion australiana in oro puro con disegno del canguro spesso aggiornato ogni anno.",
+    recognitionHints: ["kangaroo", "nugget", "australia", "100 dollars", "canguro"],
+    visual: { front: "profile", back: "kangaroo", frontText: "AUS", backText: "KNG" }
+  },
+  {
+    id: "libertad-1-oz",
+    name: "Libertad 1 oz",
+    country: "Messico",
+    mintYears: "1981-oggi",
+    nominal: "Onza",
+    metal: "Oro",
+    purity: 0.999,
+    purityLabel: "24 kt / 999‰",
+    grossWeight: 31.1035,
+    fineGold: 31.1035,
+    diameter: 34.5,
+    edge: "Zigrinato",
+    obverse: "Stemma messicano con aquila e serpente",
+    reverse: "Vittoria alata e vulcani Popocatepetl/Iztaccihuatl",
+    history: "La Libertad messicana deriva dalla tradizione dell'Onza. Il soggetto con Vittoria alata e vulcani e molto distintivo nel riconoscimento fotografico.",
+    recognitionHints: ["libertad", "onza", "mexico", "vittoria alata", "aquila serpente"],
+    visual: { front: "eagle", back: "winged", frontText: "MX", backText: "ONZA" }
+  },
+  {
+    id: "panda-cinese-30g",
+    name: "Panda cinese 30 g",
+    country: "Cina",
+    mintYears: "1982-oggi",
+    nominal: "500 Yuan",
+    metal: "Oro",
+    purity: 0.999,
+    purityLabel: "24 kt / 999‰",
+    grossWeight: 30,
+    fineGold: 30,
+    diameter: 32,
+    edge: "Zigrinato",
+    obverse: "Tempio del Cielo",
+    reverse: "Panda, disegno variabile per anno",
+    history: "Il Panda cinese e noto per il disegno del panda che cambia spesso. Dal 2016 la serie principale usa tagli metrici, tra cui 30 grammi.",
+    recognitionHints: ["panda", "china", "500 yuan", "tempio del cielo", "30 g"],
+    visual: { front: "temple", back: "panda", frontText: "CN", backText: "30G" }
+  },
+  {
+    id: "centenario-50-pesos",
+    name: "50 Pesos Centenario",
+    country: "Messico",
+    mintYears: "1921-1947 e riconiazioni",
+    nominal: "50 Pesos",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 41.667,
+    fineGold: 37.5,
+    diameter: 37,
+    edge: "Inciso",
+    obverse: "Vittoria alata con vulcani",
+    reverse: "Stemma messicano con aquila",
+    history: "Il Centenario celebra l'indipendenza messicana ed e molto riconoscibile per il grande formato e il contenuto di 37,5 g di oro fino.",
+    recognitionHints: ["50 pesos", "centenario", "37.5", "mexico", "vittoria alata"],
+    visual: { front: "winged", back: "eagle", frontText: "50P", backText: "37.5" }
+  },
+  {
+    id: "ducato-austriaco",
+    name: "Ducato austriaco",
+    country: "Austria",
+    mintYears: "Storico e riconiazioni 1915",
+    nominal: "1 Ducat",
+    metal: "Oro",
+    purity: 0.986,
+    purityLabel: "986‰",
+    grossWeight: 3.491,
+    fineGold: 3.443,
+    diameter: 20,
+    edge: "Liscio",
+    obverse: "Francesco Giuseppe",
+    reverse: "Aquila bicipite imperiale",
+    history: "Il ducato austriaco e una moneta sottile ad alto titolo, spesso incontrata come riconiazione 1915. Il titolo 986‰ e il peso ridotto richiedono attenzione in verifica.",
+    recognitionHints: ["ducat", "ducato", "1915", "franz joseph", "aquila bicipite"],
+    visual: { front: "profile", back: "doubleeagle", frontText: "DUC", backText: "986" }
+  },
+  {
+    id: "20-dollari-double-eagle",
+    name: "20 Dollars Double Eagle",
+    country: "Stati Uniti",
+    mintYears: "1849-1933",
+    nominal: "20 Dollars",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 33.436,
+    fineGold: 30.093,
+    diameter: 34,
+    edge: "Zigrinato o con motto, secondo tipologia",
+    obverse: "Liberty Head o Saint-Gaudens",
+    reverse: "Aquila americana",
+    history: "La Double Eagle e una grande moneta statunitense da 20 dollari. I tipi Liberty Head e Saint-Gaudens sono tra i piu noti per collezionismo e bullion storico.",
+    recognitionHints: ["double eagle", "twenty dollars", "20 dollars", "liberty", "saint gaudens"],
+    visual: { front: "liberty", back: "eagle", frontText: "20$", backText: "US" }
+  },
+  {
+    id: "20-mark-germania",
+    name: "20 Mark oro",
+    country: "Germania",
+    mintYears: "1871-1915",
+    nominal: "20 Mark",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 7.965,
+    fineGold: 7.168,
+    diameter: 22.5,
+    edge: "Inciso",
+    obverse: "Sovrano o stemma dello stato emittente",
+    reverse: "Aquila imperiale tedesca e valore",
+    history: "Il 20 Mark oro dell'Impero tedesco presenta vari stati emittenti ma mantiene standard monetari comuni. L'aquila imperiale e il valore 20 Mark aiutano l'identificazione.",
+    recognitionHints: ["20 mark", "deutsches reich", "kaiser", "aigle", "aquila imperiale"],
+    visual: { front: "profile", back: "eagle", frontText: "20M", backText: "DR" }
+  }
+];
+
+const COIN_RECOGNITION_HINTS = {
+  ai: "Confronto AI su immagine caricato dal backend.",
+  local: "Risultato locale basato sul catalogo e sui filtri visibili."
+};
+
 function normalizeSignatureArray(value, fallback = false) {
   const source = Array.isArray(value) ? value : [];
   return SIGNATURE_LABELS.map((_, index) => Boolean(source[index] ?? fallback));
@@ -918,6 +1258,17 @@ const gamingShell = document.getElementById("gamingShell");
 const gamingQuickRanking = document.getElementById("gamingQuickRanking");
 const gamingPersonalStats = document.getElementById("gamingPersonalStats");
 const gamingAurumBlocksBadges = document.getElementById("gamingAurumBlocksBadges");
+const coinSearchInput = document.getElementById("coinSearchInput");
+const coinCountryFilter = document.getElementById("coinCountryFilter");
+const coinPurityFilter = document.getElementById("coinPurityFilter");
+const coinResetSearch = document.getElementById("coinResetSearch");
+const coinCameraInput = document.getElementById("coinCameraInput");
+const coinScanStatus = document.getElementById("coinScanStatus");
+const coinScanPreview = document.getElementById("coinScanPreview");
+const coinIdentificationResults = document.getElementById("coinIdentificationResults");
+const coinOverviewGrid = document.getElementById("coinOverviewGrid");
+const coinCatalogGrid = document.getElementById("coinCatalogGrid");
+const coinDetailPanel = document.getElementById("coinDetailPanel");
 const crmSearch = document.getElementById("crmSearch");
 const crmList = document.getElementById("crmList");
 const backupsList = document.getElementById("backupsList");
@@ -2396,6 +2747,7 @@ const MENU_GROUPS = [
     roles: MENU_ROLES.all,
     items: [
       { id: "academy", label: "OroActive Academy", description: "Ingresso unico a catalogo, corsi, certificazioni, badge, storico e training.", icon: "OA", order: 10, section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo academy corsi miei corsi certificazioni attestati badge storico formazione training operatore gestione academy" },
+      { id: "gold-coin-encyclopedia", label: "Elenco Monete", description: "Enciclopedia monete d'oro con schede, storia e ricerca fotografica AI.", icon: "EM", order: 60, section: "coinEncyclopedia", roles: MENU_ROLES.all, keywords: "elenco monete monete oro enciclopedia numismatica sterlina marengo krugerrand sovereign riconoscimento fotocamera" },
       { id: "gaming-oroactive", label: "Gaming OroActive", description: "Aurum Blocks arcade formativo.", icon: "GO", order: 70, section: "gaming", roles: MENU_ROLES.all, keywords: "gaming oroactive giochi arcade formazione punteggi carature" },
       { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "NC", order: 80, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
       { id: "aurum-assistant", label: "Assistente IA / Aurum", description: "Tutor e assistente operativo.", icon: "AI", order: 90, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
@@ -3056,6 +3408,7 @@ function sectionLoadErrorMessage(id, error) {
     auditTrail: "Audit Trail non caricato.",
     founderDailyReport: "Founder Daily Report non caricato.",
     training: "Academy non caricata.",
+    coinEncyclopedia: "Elenco Monete non caricato.",
     gaming: "Gaming OroActive non caricato.",
     aurumBlocks: "Aurum Blocks non caricato.",
     crm: "CRM non caricato.",
@@ -3095,6 +3448,7 @@ async function handleScreenDataLoad(id) {
   if (id === "auditTrail") await loadAuditTrail();
   if (id === "founderDailyReport") await loadFounderDailyReport();
   if (id === "training") await loadTraining();
+  if (id === "coinEncyclopedia") renderCoinEncyclopedia();
   if (id === "gaming") await loadGamingOroActive();
   if (id === "aurumBlocks") await loadAurumBlocks();
   if (id === "crm") await loadCrmClients();
@@ -8372,6 +8726,294 @@ async function loadTraining() {
   state.operatorTrainingResults = myResultsData.results || [];
   state.operatorTeamTrainingResults = teamResultsData.results || [];
   renderTraining();
+}
+
+function formatCoinNumber(value, decimals = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return number.toLocaleString("it-IT", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+}
+
+function coinPurityPercent(coin = {}) {
+  return `${formatCoinNumber(Number(coin.purity || 0) * 100, 2)}%`;
+}
+
+function coinPurityBucket(coin = {}) {
+  const purity = Number(coin.purity || 0);
+  if (purity >= 0.999) return "999";
+  if (purity >= 0.916 && purity < 0.999) return "917";
+  if (purity >= 0.899 && purity < 0.916) return "900";
+  return "";
+}
+
+function coinCatalogFiltered() {
+  const search = String(state.coinCatalogSearch || coinSearchInput?.value || "").trim().toLowerCase();
+  const country = String(state.coinCatalogCountry || coinCountryFilter?.value || "").trim();
+  const purity = String(state.coinCatalogPurity || coinPurityFilter?.value || "").trim();
+  return GOLD_COIN_CATALOG.filter((coin) => {
+    const haystack = [
+      coin.name,
+      coin.country,
+      coin.mintYears,
+      coin.nominal,
+      coin.purityLabel,
+      coin.obverse,
+      coin.reverse,
+      coin.history,
+      ...(coin.recognitionHints || [])
+    ].join(" ").toLowerCase();
+    const matchesSearch = !search || haystack.includes(search);
+    const matchesCountry = !country || coin.country === country;
+    const matchesPurity = !purity || coinPurityBucket(coin) === purity;
+    return matchesSearch && matchesCountry && matchesPurity;
+  });
+}
+
+function coinFaceMarkup(coin = {}, side = "front") {
+  const visual = coin.visual || {};
+  const type = side === "back" ? visual.back : visual.front;
+  const text = side === "back" ? visual.backText : visual.frontText;
+  const label = side === "back" ? "Retro" : "Fronte";
+  return `
+    <div class="coin-face coin-face-${escapeHtml(type || "seal")}" aria-label="${escapeHtml(label)} ${escapeHtml(coin.name || "moneta")}">
+      <span class="coin-face-ring"></span>
+      <span class="coin-face-symbol">${escapeHtml(text || (side === "back" ? "R" : "F"))}</span>
+      <span class="coin-face-caption">${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
+function coinMiniFacesMarkup(coin = {}) {
+  return `
+    <div class="coin-mini-media">
+      ${coinFaceMarkup(coin, "front")}
+      ${coinFaceMarkup(coin, "back")}
+    </div>
+  `;
+}
+
+function coinSpecListMarkup(coin = {}) {
+  const specs = [
+    ["Paese", coin.country],
+    ["Periodo", coin.mintYears],
+    ["Valore nominale", coin.nominal],
+    ["Titolo", coin.purityLabel],
+    ["Purezza", coinPurityPercent(coin)],
+    ["Peso lordo", `${formatCoinNumber(coin.grossWeight, 3)} g`],
+    ["Oro fino", `${formatCoinNumber(coin.fineGold, 3)} g`],
+    ["Diametro", `${formatCoinNumber(coin.diameter, 2)} mm`],
+    ["Bordo", coin.edge]
+  ];
+  return specs.map(([label, value]) => `
+    <div class="coin-spec">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value || "-")}</strong>
+    </div>
+  `).join("");
+}
+
+function coinCardMarkup(coin = {}) {
+  const active = String(state.coinSelectedId || "") === String(coin.id);
+  return `
+    <article class="coin-card ${active ? "active" : ""}">
+      ${coinMiniFacesMarkup(coin)}
+      <div class="coin-card-copy">
+        <span class="coin-pill">${escapeHtml(coin.country)}</span>
+        <h3>${escapeHtml(coin.name)}</h3>
+        <p>${escapeHtml(coin.purityLabel)} · ${formatCoinNumber(coin.grossWeight, 3)} g · fino ${formatCoinNumber(coin.fineGold, 3)} g</p>
+      </div>
+      <button type="button" class="ghost-button" data-open-coin="${escapeHtml(String(coin.id))}">Apri scheda</button>
+    </article>
+  `;
+}
+
+function selectedCoin() {
+  return GOLD_COIN_CATALOG.find((coin) => coin.id === state.coinSelectedId) || GOLD_COIN_CATALOG[0];
+}
+
+function renderCoinCountryOptions() {
+  if (!coinCountryFilter) return;
+  const current = coinCountryFilter.value || state.coinCatalogCountry || "";
+  const countries = [...new Set(GOLD_COIN_CATALOG.map((coin) => coin.country))].sort((a, b) => a.localeCompare(b, "it"));
+  coinCountryFilter.innerHTML = `<option value="">Tutti i paesi</option>${countries.map((country) => `<option value="${escapeHtml(country)}">${escapeHtml(country)}</option>`).join("")}`;
+  coinCountryFilter.value = countries.includes(current) ? current : "";
+}
+
+function renderCoinOverview(visibleCoins = []) {
+  if (!coinOverviewGrid) return;
+  const countries = new Set(GOLD_COIN_CATALOG.map((coin) => coin.country)).size;
+  const pure = GOLD_COIN_CATALOG.filter((coin) => Number(coin.purity || 0) >= 0.999).length;
+  const latin = GOLD_COIN_CATALOG.filter((coin) => Number(coin.purity || 0) === 0.9).length;
+  coinOverviewGrid.innerHTML = [
+    ["Monete catalogate", GOLD_COIN_CATALOG.length],
+    ["Paesi", countries],
+    ["Oro 999+", pure],
+    ["Standard 900‰", latin],
+    ["Risultati visibili", visibleCoins.length]
+  ].map(([label, value]) => `
+    <article>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(String(value))}</strong>
+    </article>
+  `).join("");
+}
+
+function renderCoinDetail(coin = selectedCoin()) {
+  if (!coinDetailPanel || !coin) return;
+  const aliases = (coin.recognitionHints || []).slice(0, 7).map((hint) => `<span>${escapeHtml(hint)}</span>`).join("");
+  coinDetailPanel.innerHTML = `
+    <article class="coin-detail-card">
+      <div class="coin-detail-media">
+        ${coinFaceMarkup(coin, "front")}
+        ${coinFaceMarkup(coin, "back")}
+      </div>
+      <div class="coin-detail-copy">
+        <p class="eyebrow">Scheda tecnica moneta d'oro</p>
+        <h3>${escapeHtml(coin.name)}</h3>
+        <p class="muted">${escapeHtml(coin.country)} · ${escapeHtml(coin.mintYears)} · ${escapeHtml(coin.nominal)}</p>
+        <div class="coin-spec-grid">${coinSpecListMarkup(coin)}</div>
+        <section class="coin-history-box">
+          <h4>Storia e riconoscimento</h4>
+          <p>${escapeHtml(coin.history)}</p>
+          <div class="coin-history-points">
+            <span><strong>Fronte:</strong> ${escapeHtml(coin.obverse)}</span>
+            <span><strong>Retro:</strong> ${escapeHtml(coin.reverse)}</span>
+          </div>
+          <div class="coin-aliases">${aliases}</div>
+        </section>
+        <p class="coin-disclaimer">Scheda formativa indicativa. Per decisioni operative verificare sempre peso, diametro, titolo, magnetismo, bordo e autenticita fisica della moneta.</p>
+      </div>
+    </article>
+  `;
+}
+
+function renderCoinIdentificationResults() {
+  if (!coinIdentificationResults) return;
+  const result = state.coinIdentification;
+  if (!result) {
+    coinIdentificationResults.innerHTML = "";
+    return;
+  }
+  const matches = Array.isArray(result.matches) ? result.matches : [];
+  if (!matches.length) {
+    coinIdentificationResults.innerHTML = `
+      <div class="coin-identification-empty">
+        <strong>Nessuna moneta identificata con sicurezza.</strong>
+        <p>${escapeHtml(result.message || "Prova con una foto piu nitida, includendo bordo, fronte o retro completo.")}</p>
+      </div>
+    `;
+    return;
+  }
+  coinIdentificationResults.innerHTML = `
+    <div class="coin-identification-heading">
+      <strong>Possibili corrispondenze</strong>
+      <span>${escapeHtml(result.ai_configured === false ? COIN_RECOGNITION_HINTS.local : COIN_RECOGNITION_HINTS.ai)}</span>
+    </div>
+    ${matches.map((match) => {
+      const coin = GOLD_COIN_CATALOG.find((item) => item.id === match.id) || {};
+      const confidence = Math.max(0, Math.min(100, Math.round(Number(match.confidence || 0) * 100)));
+      return `
+        <button class="coin-match-row" type="button" data-open-coin="${escapeHtml(String(match.id || ""))}">
+          <span>${escapeHtml(coin.name || match.name || "Moneta candidata")}</span>
+          <strong>${confidence || "?"}%</strong>
+          <small>${escapeHtml(match.reason || match.visual_evidence || "Confronto visivo disponibile.")}</small>
+        </button>
+      `;
+    }).join("")}
+  `;
+}
+
+function renderCoinEncyclopedia() {
+  renderCoinCountryOptions();
+  const visibleCoins = coinCatalogFiltered();
+  renderCoinOverview(visibleCoins);
+  if (coinCatalogGrid) {
+    coinCatalogGrid.innerHTML = visibleCoins.length
+      ? visibleCoins.map(coinCardMarkup).join("")
+      : '<div class="empty-state">Nessuna moneta trovata. Modifica ricerca o filtri.</div>';
+  }
+  if (!visibleCoins.some((coin) => coin.id === state.coinSelectedId) && visibleCoins[0]) {
+    state.coinSelectedId = visibleCoins[0].id;
+  }
+  renderCoinDetail(selectedCoin());
+  renderCoinIdentificationResults();
+}
+
+function resetCoinSearch() {
+  state.coinCatalogSearch = "";
+  state.coinCatalogCountry = "";
+  state.coinCatalogPurity = "";
+  state.coinIdentification = null;
+  if (coinSearchInput) coinSearchInput.value = "";
+  if (coinCountryFilter) coinCountryFilter.value = "";
+  if (coinPurityFilter) coinPurityFilter.value = "";
+  if (coinCameraInput) coinCameraInput.value = "";
+  if (coinScanPreview) {
+    coinScanPreview.hidden = true;
+    coinScanPreview.innerHTML = "";
+  }
+  if (coinScanStatus) coinScanStatus.textContent = "Pronto per analizzare fronte o retro della moneta.";
+  renderCoinEncyclopedia();
+}
+
+async function identifyCoinFromCamera(file) {
+  if (!file) return;
+  if (!/^image\//i.test(file.type || "")) {
+    showToast("Carica una foto della moneta in formato immagine.", "error");
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    showToast("Foto troppo pesante. Usa un'immagine sotto 8 MB.", "error");
+    return;
+  }
+  try {
+    if (coinScanStatus) coinScanStatus.textContent = "Analisi immagine in corso...";
+    const dataUrl = await fileToDataUrl(file);
+    if (coinScanPreview) {
+      coinScanPreview.hidden = false;
+      coinScanPreview.innerHTML = `<img src="${escapeHtml(dataUrl)}" alt="Foto moneta caricata">`;
+    }
+    const catalog = GOLD_COIN_CATALOG.map((coin) => ({
+      id: coin.id,
+      name: coin.name,
+      country: coin.country,
+      purityLabel: coin.purityLabel,
+      grossWeight: coin.grossWeight,
+      diameter: coin.diameter,
+      obverse: coin.obverse,
+      reverse: coin.reverse,
+      recognitionHints: coin.recognitionHints
+    }));
+    const result = await apiRequest("/training/gold-coins/identify", {
+      method: "POST",
+      body: JSON.stringify({ image: dataUrl, catalog }),
+      timeoutMs: 45000
+    });
+    state.coinIdentification = result;
+    const firstMatch = result.matches?.[0]?.id;
+    if (firstMatch && GOLD_COIN_CATALOG.some((coin) => coin.id === firstMatch)) {
+      state.coinSelectedId = firstMatch;
+    }
+    if (coinScanStatus) {
+      coinScanStatus.textContent = result.ai_configured === false
+        ? "AI non configurata: mostrato fallback locale, usa anche ricerca manuale."
+        : "Analisi completata. Controlla sempre peso e diametro prima di decidere.";
+    }
+    renderCoinEncyclopedia();
+  } catch (error) {
+    state.coinIdentification = {
+      ok: false,
+      ai_configured: false,
+      matches: [],
+      message: cleanUserMessage(error.message, "Riconoscimento moneta non disponibile.")
+    };
+    if (coinScanStatus) coinScanStatus.textContent = "Riconoscimento non disponibile. Puoi cercare la moneta manualmente nel catalogo.";
+    renderCoinIdentificationResults();
+    showToast(error.message || "Riconoscimento moneta non disponibile.", "error");
+  }
 }
 
 function aurumBlocksSeededRandom(seed = "") {
@@ -15983,6 +16625,34 @@ trainingList?.addEventListener("click", async (event) => {
   } catch (error) {
     showToast(error.message || "Operazione corso non riuscita.");
   }
+});
+coinSearchInput?.addEventListener("input", () => {
+  state.coinCatalogSearch = coinSearchInput.value || "";
+  renderCoinEncyclopedia();
+});
+coinCountryFilter?.addEventListener("change", () => {
+  state.coinCatalogCountry = coinCountryFilter.value || "";
+  renderCoinEncyclopedia();
+});
+coinPurityFilter?.addEventListener("change", () => {
+  state.coinCatalogPurity = coinPurityFilter.value || "";
+  renderCoinEncyclopedia();
+});
+coinResetSearch?.addEventListener("click", resetCoinSearch);
+coinCameraInput?.addEventListener("change", (event) => {
+  const [file] = event.target.files || [];
+  void identifyCoinFromCamera(file);
+});
+[coinCatalogGrid, coinIdentificationResults].forEach((container) => {
+  container?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-open-coin]");
+    if (!button) return;
+    const id = button.dataset.openCoin;
+    if (!GOLD_COIN_CATALOG.some((coin) => coin.id === id)) return;
+    state.coinSelectedId = id;
+    renderCoinEncyclopedia();
+    coinDetailPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 });
 gamingShell?.addEventListener("click", (event) => {
   const openSectionButton = event.target.closest("[data-gaming-open]");
