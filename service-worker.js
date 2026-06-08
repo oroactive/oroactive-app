@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260608-coin-card-layout-1";
+const STATIC_CACHE = "oroactive-static-v20260608-ducato-images-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260608-coin-card-layout-1",
-  "/app.js?v=20260608-coin-card-layout-1",
+  "/styles.css?v=20260608-ducato-images-1",
+  "/app.js?v=20260608-ducato-images-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",
