@@ -12197,8 +12197,18 @@ function competitorQuoteTypeLabel(type = "") {
   return "Non mostrata";
 }
 
+function isUnsupportedCompetitorBuybackQuote(quote = {}) {
+  const competitorKey = competitorNameKey(quote.competitor_name);
+  const quoteType = String(quote.quote_type || "customer_buyback").toLowerCase();
+  return competitorKey === "banco preziosi"
+    && quoteType === "customer_buyback"
+    && quote.metal === "gold"
+    && quote.purity_code === "24kt";
+}
+
 function isCompetitorBuybackQuote(quote = {}) {
-  return String(quote.quote_type || "customer_buyback").toLowerCase() === "customer_buyback";
+  return String(quote.quote_type || "customer_buyback").toLowerCase() === "customer_buyback"
+    && !isUnsupportedCompetitorBuybackQuote(quote);
 }
 
 function competitorSourceTypeLabel(type = "") {

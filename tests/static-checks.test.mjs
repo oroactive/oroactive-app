@@ -257,6 +257,8 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(app, /function renderCompetitorQuotes/);
   assert.match(app, /function competitorNameKey/);
   assert.match(app, /function competitorDisplayName/);
+  assert.match(app, /function isUnsupportedCompetitorBuybackQuote/);
+  assert.match(app, /competitorKey === "banco preziosi"[\s\S]*quote\.purity_code === "24kt"/);
   assert.match(app, /if \(normalized === "oro d oro" \|\| normalized === "oro d'oro"\) return "oro d'oro"/);
   assert.match(app, /if \(key === "oro d'oro"\) return "Oro D'oro"/);
   assert.match(app, /function competitorNamesForMetal/);
@@ -413,6 +415,8 @@ test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
   assert.match(server, /source_type: "amico_oro_parser"/);
   assert.match(server, /source_type: "pronto_gold_parser"/);
   assert.match(server, /source_type: "banco_preziosi_parser"/);
+  assert.match(server, /Banco Preziosi non pubblica una quotazione cliente 24kt/);
+  assert.match(server, /LOWER\(competitor_name\) = LOWER\('Banco Preziosi'\)[\s\S]*purity_code = '24kt'/);
   assert.match(index, /value="pronto_gold_parser"/);
   assert.match(server, /source_type: "bordin_parser"/);
   assert.match(server, /source_type: "gold_standard_parser"/);

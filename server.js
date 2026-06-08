@@ -3688,13 +3688,21 @@ async function insertCompetitorQuote(input = {}, user = {}) {
   const competitorName = String(input.competitor_name || input.competitorName || "").trim().slice(0, 160);
   if (!competitorName) throw new Error("Nome competitor obbligatorio");
   if (!Number.isFinite(pricePerGram) || pricePerGram <= 0) throw new Error("Prezzo competitor non valido");
+  const quoteType = ["customer_buyback", "reference_official_gold_price", "reference_market_gold_price", "reference_market_silver_price", "sell_price", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
+    ? String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase()
+    : "unknown";
+  if (
+    competitorName.toLowerCase() === "banco preziosi"
+    && metal === "gold"
+    && purityCode === "24kt"
+    && quoteType === "customer_buyback"
+  ) {
+    throw new Error("Banco Preziosi non pubblica una quotazione cliente 24kt: dato escluso dal confronto competitor");
+  }
   const source = input.source_id || input.sourceId
     ? { id: input.source_id || input.sourceId }
     : await ensureCompetitorSourceForQuote(input, user);
   const quoteDate = input.quote_date || input.quoteDate || new Date().toISOString();
-  const quoteType = ["customer_buyback", "reference_official_gold_price", "reference_market_gold_price", "reference_market_silver_price", "sell_price", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
-    ? String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase()
-    : "unknown";
   const aiConfidence = String(input.ai_confidence || input.aiConfidence || input.confidence || "medium").toLowerCase().slice(0, 20);
   const sourceUrl = String(input.source_url || input.sourceUrl || input.url || "").trim().slice(0, 500);
   const result = await pool.query(
@@ -3740,6 +3748,12 @@ async function insertCompetitorQuote(input = {}, user = {}) {
 async function listCompetitorQuotes({ metal = "", purityCode = "", competitorName = "", quoteType = "customer_buyback", currency = "EUR", days = 30, limit = 200 } = {}) {
   const conditions = ["currency = $1::text", "quote_date >= NOW() - ($2::int * INTERVAL '1 day')"];
   const params = [normalizePredictionCurrency(currency), Math.min(Math.max(Number(days || 30), 1), 365)];
+  conditions.push(`NOT (
+    LOWER(competitor_name) = LOWER('Banco Preziosi')
+    AND metal = 'gold'
+    AND purity_code = '24kt'
+    AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
+  )`);
   const normalizedQuoteType = String(quoteType || "customer_buyback").toLowerCase();
   if (normalizedQuoteType && normalizedQuoteType !== "all") {
     params.push(normalizedQuoteType);
@@ -3779,6 +3793,12 @@ async function listAiCompetitorQuotes({ currency = "EUR", days = 30, limit = 200
   if (validOnly) {
     conditions.push("COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'");
     conditions.push("LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')");
+    conditions.push(`NOT (
+      LOWER(competitor_name) = LOWER('Banco Preziosi')
+      AND metal = 'gold'
+      AND purity_code = '24kt'
+      AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
+    )`);
   }
   params.push(Math.min(Math.max(Number(limit || 200), 1), 500));
   const result = await pool.query(
@@ -3805,6 +3825,12 @@ async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "E
           AND price_per_gram IS NOT NULL
           AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
           AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')
+          AND NOT (
+            LOWER(competitor_name) = LOWER('Banco Preziosi')
+            AND metal = 'gold'
+            AND purity_code = '24kt'
+            AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
+          )
      ),
      ranked AS (
        SELECT *,
@@ -20397,9 +20423,15 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
     const validQuotes = await pool.query(
       `SELECT COUNT(*)::int AS count
          FROM competitor_buyback_quotes
-        WHERE quote_date >= NOW() - INTERVAL '24 hours'
+       WHERE quote_date >= NOW() - INTERVAL '24 hours'
           AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
-          AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')`
+          AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')
+          AND NOT (
+            LOWER(competitor_name) = LOWER('Banco Preziosi')
+            AND metal = 'gold'
+            AND purity_code = '24kt'
+            AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
+          )`
     ).catch(() => ({ rows: [{ count: 0 }] }));
     response.json({
       ok: true,
