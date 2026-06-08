@@ -1053,16 +1053,16 @@ const GOLD_COIN_CATALOG = [
 
 const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
 
-function bilanciaDoroCoinImages(slug) {
+function bilanciaDoroCoinImages(slug, source = "La Bilancia d'Oro") {
   return {
     front: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-front.png`,
     back: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-back.png`,
-    source: "La Bilancia d'Oro"
+    source
   };
 }
 
-function withBilanciaDoroImages(coin, slug) {
-  return { ...coin, bookImages: bilanciaDoroCoinImages(slug) };
+function withBilanciaDoroImages(coin, slug, source) {
+  return { ...coin, bookImages: bilanciaDoroCoinImages(slug, source) };
 }
 
 const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
@@ -1072,11 +1072,25 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "marengo-svizzero-vreneli": "marengo-svizzero-vreneli",
   "krugerrand-1-oz": "krugerrand-1-oz",
   "american-eagle-1-oz": "american-eagle-1-oz",
+  "american-buffalo-1-oz": "american-buffalo-1-oz",
+  "maple-leaf-1-oz": "maple-leaf-1-oz",
   "wiener-philharmoniker-1-oz": "wiener-philharmoniker-1-oz",
   "britannia-1-oz": "britannia-1-oz",
+  "kangaroo-nugget-1-oz": "kangaroo-nugget-1-oz",
+  "libertad-1-oz": "libertad-1-oz",
+  "panda-cinese-30g": "panda-cinese-30g",
   "centenario-50-pesos": "centenario-50-pesos",
   "20-dollari-double-eagle": "20-dollari-saint-gaudens",
   "20-mark-germania": "20-mark-germania"
+};
+
+const COIN_IMAGE_SOURCE_BY_COIN = {
+  "american-buffalo-1-oz": "Archivio OroActive",
+  "maple-leaf-1-oz": "Archivio OroActive",
+  "kangaroo-nugget-1-oz": "Archivio OroActive",
+  "libertad-1-oz": "Archivio OroActive",
+  "panda-cinese-30g": "Archivio OroActive",
+  "4-ducati-austriaci": "Archivio OroActive"
 };
 
 const BILANCIA_DORO_COIN_ADDITIONS = [
@@ -1231,7 +1245,7 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
     history: "I 4 Ducati austriaci sono riconiazioni molto diffuse datate 1915, sottili e ad alto titolo. La dimensione ampia li distingue dal ducato singolo.",
     recognitionHints: ["4 ducati", "4 ducat", "ducato austriaco", "franz joseph", "1915"],
     visual: { front: "profile", back: "doubleeagle", frontText: "4D", backText: "986" }
-  }, "4-ducati-austriaci"),
+  }, "4-ducati-austriaci", COIN_IMAGE_SOURCE_BY_COIN["4-ducati-austriaci"]),
   withBilanciaDoroImages({
     id: "10-dollari-indiano",
     name: "10 Dollars Indian Head",
@@ -1331,7 +1345,7 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
 
 GOLD_COIN_CATALOG.forEach((coin) => {
   const slug = BILANCIA_DORO_IMAGE_SLUGS_BY_COIN[coin.id];
-  if (slug) coin.bookImages = bilanciaDoroCoinImages(slug);
+  if (slug) coin.bookImages = bilanciaDoroCoinImages(slug, COIN_IMAGE_SOURCE_BY_COIN[coin.id]);
 });
 GOLD_COIN_CATALOG.push(...BILANCIA_DORO_COIN_ADDITIONS);
 
