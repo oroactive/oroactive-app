@@ -2194,9 +2194,12 @@ textarea:disabled {
 
 .coin-card {
   display: grid;
+  grid-template-rows: auto minmax(108px, 1fr) auto;
   gap: 12px;
-  align-content: start;
+  align-content: stretch;
   padding: 14px;
+  min-height: 344px;
+  height: 100%;
 }
 
 .coin-card.active {
@@ -2207,13 +2210,38 @@ textarea:disabled {
 }
 
 .coin-card h3 {
-  margin: 6px 0;
+  display: -webkit-box;
+  min-height: 48px;
+  margin: 8px 0 6px;
   color: #fff;
   font-size: 20px;
+  line-height: 1.2;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .coin-card-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   min-width: 0;
+}
+
+.coin-card-copy p {
+  display: -webkit-box;
+  min-height: 42px;
+  margin: 0;
+  line-height: 1.45;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.coin-card > .ghost-button {
+  align-self: end;
+  justify-self: stretch;
+  width: 100%;
 }
 
 .coin-pill,
@@ -2238,6 +2266,10 @@ textarea:disabled {
   align-items: center;
   justify-content: center;
   gap: 12px;
+}
+
+.coin-card .coin-mini-media {
+  min-height: 132px;
 }
 
 .coin-face {
