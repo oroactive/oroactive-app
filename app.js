@@ -784,6 +784,26 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "profile", back: "rooster", frontText: "20F", backText: "RF" }
   },
   {
+    id: "napoleone-20-franchi-gallo-marianne",
+    name: "Napoleone d'oro 20 Franchi Francesi",
+    country: "Francia",
+    mintYears: "1899-1914",
+    nominal: "20 Francs",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.4516,
+    fineGold: 5.81,
+    diameter: 21,
+    thickness: 1.4,
+    edge: "Zigrinato",
+    obverse: "Marianne della Repubblica francese disegnata da J.C. Chaplain",
+    reverse: "Gallo gallico con valore 20 Francs e motto Liberte Egalite Fraternite",
+    history: "Coniata dalla zecca francese di Parigi tra il 1899 e il 1914, questa tipologia del 20 Franchi francese unisce Marianne, simbolo della Repubblica, e il gallo gallico, emblema della cultura e della storia francese. Come il Vreneli svizzero, e una moneta 900‰: circa 90% oro e 10% rame, con contenuto d'oro fino di circa 5,81 g.",
+    recognitionHints: ["napoleone d'oro", "20 francs", "marianne", "gallo", "coq", "chaplain", "liberte egalite fraternite", "french mint"],
+    visual: { front: "profile", back: "rooster", frontText: "RF", backText: "20F" }
+  },
+  {
     id: "marengo-svizzero-vreneli",
     name: "Vreneli 20 Franchi",
     country: "Svizzera",
@@ -1069,6 +1089,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "sterlina-oro-sovrana": "sterlina-oro-sovrana",
   "marengo-20-lire-italia": "marengo-20-lire-italia",
   "marengo-francese-20-franchi": "marengo-francese-20-franchi",
+  "napoleone-20-franchi-gallo-marianne": "napoleone-20-franchi-gallo-marianne",
   "marengo-svizzero-vreneli": "marengo-svizzero-vreneli",
   "krugerrand-1-oz": "krugerrand-1-oz",
   "american-eagle-1-oz": "american-eagle-1-oz",
@@ -1090,6 +1111,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "kangaroo-nugget-1-oz": "Archivio OroActive",
   "libertad-1-oz": "Archivio OroActive",
   "panda-cinese-30g": "Archivio OroActive",
+  "napoleone-20-franchi-gallo-marianne": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
 };
 
@@ -9112,6 +9134,7 @@ function coinSpecListMarkup(coin = {}) {
     ["Peso lordo", `${formatCoinNumber(coin.grossWeight, 3)} g`],
     ["Oro fino", `${formatCoinNumber(coin.fineGold, 3)} g`],
     ["Diametro", `${formatCoinNumber(coin.diameter, 2)} mm`],
+    ...(coin.thickness ? [["Spessore", `${formatCoinNumber(coin.thickness, 2)} mm`]] : []),
     ["Bordo", coin.edge]
   ];
   return specs.map(([label, value]) => `
