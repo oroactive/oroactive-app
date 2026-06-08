@@ -6437,6 +6437,22 @@ const GOLD_COIN_AI_CATALOG = [
   { id: "20-mark-germania", name: "20 Mark oro", country: "Germania", purity: "900 per mille", obverse: "sovrano o stemma", reverse: "aquila imperiale", hints: ["20 mark", "deutsches reich", "kaiser"] }
 ];
 
+GOLD_COIN_AI_CATALOG.push(
+  { id: "marengo-belga-20-franchi", name: "Marengo belga 20 Franchi", country: "Belgio", purity: "900 per mille", obverse: "regnante belga", reverse: "stemma o figura allegorica 20 Francs", hints: ["belgio", "belgique", "20 francs", "leopold"] },
+  { id: "marengo-austriaco-20-franchi", name: "Marengo austriaco", country: "Austria", purity: "900 per mille", obverse: "Francesco Giuseppe", reverse: "aquila imperiale o valore", hints: ["austria", "franz joseph", "8 florins", "20 francs"] },
+  { id: "sterlina-vecchio-conio", name: "Sterlina vecchio conio", country: "Regno Unito", purity: "22 kt / 916,7 per mille", obverse: "sovrano britannico storico", reverse: "San Giorgio e drago", hints: ["sterlina", "sovereign", "georgius", "victoria", "san giorgio"] },
+  { id: "sudafrica-2-rand", name: "Sudafrica 2 Rand", country: "Sud Africa", purity: "22 kt / 916,7 per mille", obverse: "Jan van Riebeeck", reverse: "springbok e 2 Rand", hints: ["2 rand", "south africa", "jan van riebeeck", "springbok"] },
+  { id: "cile-100-pesos", name: "Cile 100 Pesos", country: "Cile", purity: "900 per mille", obverse: "testa laureata della Repubblica", reverse: "stemma con stella, condor e cervo", hints: ["100 pesos", "cile", "chile", "condor"] },
+  { id: "20-dollari-liberty", name: "20 Dollars Liberty Head", country: "Stati Uniti", purity: "900 per mille", obverse: "Liberty Head", reverse: "aquila con scudo", hints: ["20 dollars liberty", "liberty head", "double eagle"] },
+  { id: "austria-100-corone", name: "Austria 100 Corone", country: "Austria", purity: "900 per mille", obverse: "Francesco Giuseppe", reverse: "aquila bicipite e 100 Corone", hints: ["100 corone", "100 corona", "austria", "1915"] },
+  { id: "4-ducati-austriaci", name: "4 Ducati austriaci 1915", country: "Austria", purity: "986 per mille", obverse: "Francesco Giuseppe", reverse: "aquila bicipite", hints: ["4 ducati", "4 ducat", "1915", "franz joseph"] },
+  { id: "10-dollari-indiano", name: "10 Dollars Indian Head", country: "Stati Uniti", purity: "900 per mille", obverse: "Liberty con copricapo indiano", reverse: "aquila americana", hints: ["10 dollars indian", "indian head", "ten dollars"] },
+  { id: "10-dollari-liberty", name: "10 Dollars Liberty Head", country: "Stati Uniti", purity: "900 per mille", obverse: "Liberty Head", reverse: "aquila con scudo", hints: ["10 dollars liberty", "liberty head", "ten dollars"] },
+  { id: "messico-20-pesos", name: "Messico 20 Pesos", country: "Messico", purity: "900 per mille", obverse: "calendario azteco", reverse: "aquila e serpente", hints: ["20 pesos", "mexico", "messico", "calendario azteco"] },
+  { id: "austria-1000-scellini", name: "Austria 1000 Scellini", country: "Austria", purity: "900 per mille", obverse: "motivo commemorativo", reverse: "valore 1000 Schilling", hints: ["1000 scellini", "1000 schilling", "austria", "1976"] },
+  { id: "ungheria-20-corone", name: "Ungheria 20 Corone", country: "Ungheria", purity: "900 per mille", obverse: "Francesco Giuseppe", reverse: "stemma ungherese con angeli", hints: ["20 corone", "20 korona", "ungheria", "hungary"] }
+);
+
 const goldCoinIdentificationSchema = {
   type: "object",
   additionalProperties: false,

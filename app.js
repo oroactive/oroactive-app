@@ -1051,6 +1051,290 @@ const GOLD_COIN_CATALOG = [
   }
 ];
 
+const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
+
+function bilanciaDoroCoinImages(slug) {
+  return {
+    front: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-front.png`,
+    back: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-back.png`,
+    source: "La Bilancia d'Oro"
+  };
+}
+
+function withBilanciaDoroImages(coin, slug) {
+  return { ...coin, bookImages: bilanciaDoroCoinImages(slug) };
+}
+
+const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
+  "sterlina-oro-sovrana": "sterlina-oro-sovrana",
+  "marengo-20-lire-italia": "marengo-20-lire-italia",
+  "marengo-francese-20-franchi": "marengo-francese-20-franchi",
+  "marengo-svizzero-vreneli": "marengo-svizzero-vreneli",
+  "krugerrand-1-oz": "krugerrand-1-oz",
+  "american-eagle-1-oz": "american-eagle-1-oz",
+  "wiener-philharmoniker-1-oz": "wiener-philharmoniker-1-oz",
+  "britannia-1-oz": "britannia-1-oz",
+  "centenario-50-pesos": "centenario-50-pesos",
+  "20-dollari-double-eagle": "20-dollari-saint-gaudens",
+  "20-mark-germania": "20-mark-germania"
+};
+
+const BILANCIA_DORO_COIN_ADDITIONS = [
+  withBilanciaDoroImages({
+    id: "marengo-belga-20-franchi",
+    name: "Marengo belga 20 Franchi",
+    country: "Belgio",
+    mintYears: "1865-1914",
+    nominal: "20 Francs",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.4516,
+    fineGold: 5.806,
+    diameter: 21,
+    edge: "Zigrinato o inciso, secondo emissione",
+    obverse: "Ritratto del regnante belga",
+    reverse: "Stemma o figura allegorica belga con valore 20 Francs",
+    history: "Il Marengo belga segue lo standard dell'Unione Monetaria Latina: peso circa 6,45 g, titolo 900‰ e contenuto di circa 5,80 g di oro fino.",
+    recognitionHints: ["belgio", "belgique", "20 francs", "leopold", "marengo belga"],
+    visual: { front: "profile", back: "shield", frontText: "BE", backText: "20F" }
+  }, "marengo-belga-20-franchi"),
+  withBilanciaDoroImages({
+    id: "marengo-austriaco-20-franchi",
+    name: "Marengo austriaco",
+    country: "Austria",
+    mintYears: "Varie emissioni",
+    nominal: "20 Franchi / 8 Fiorini",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.4516,
+    fineGold: 5.806,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Francesco Giuseppe I",
+    reverse: "Aquila imperiale o valore, secondo emissione",
+    history: "Le emissioni austriache equivalenti al Marengo rientrano nello standard latino e sono riconoscibili per l'effigie imperiale e il modulo da 21 mm.",
+    recognitionHints: ["austria", "francesco giuseppe", "franz joseph", "8 florins", "20 francs"],
+    visual: { front: "profile", back: "doubleeagle", frontText: "AT", backText: "20F" }
+  }, "marengo-austriaco-20-franchi"),
+  withBilanciaDoroImages({
+    id: "sterlina-vecchio-conio",
+    name: "Sterlina vecchio conio",
+    country: "Regno Unito",
+    mintYears: "1871-1925",
+    nominal: "1 Sovereign",
+    metal: "Oro",
+    purity: 0.9167,
+    purityLabel: "22 kt / 916,7‰",
+    grossWeight: 7.988,
+    fineGold: 7.322,
+    diameter: 22.12,
+    edge: "Zigrinato",
+    obverse: "Effigie di Vittoria, Edoardo VII o Giorgio V",
+    reverse: "San Giorgio a cavallo che trafigge il drago",
+    history: "La sterlina vecchio conio mantiene lo stesso standard tecnico della sovrana moderna, ma presenta effigi storiche dei sovrani britannici precedenti.",
+    recognitionHints: ["sterlina vecchio conio", "georgius", "victoria", "edward", "san giorgio"],
+    visual: { front: "profile", back: "dragon", frontText: "SOV", backText: "OLD" }
+  }, "sterlina-vecchio-conio"),
+  withBilanciaDoroImages({
+    id: "sudafrica-2-rand",
+    name: "Sudafrica 2 Rand",
+    country: "Sud Africa",
+    mintYears: "1961-1983",
+    nominal: "2 Rand",
+    metal: "Oro",
+    purity: 0.9167,
+    purityLabel: "22 kt / 916,7‰",
+    grossWeight: 7.988,
+    fineGold: 7.322,
+    diameter: 22.12,
+    edge: "Zigrinato",
+    obverse: "Busto di Jan van Riebeeck",
+    reverse: "Antilope springbok e valore 2 Rand",
+    history: "Il 2 Rand sudafricano condivide peso e titolo della sterlina, ma si riconosce per il busto di Jan van Riebeeck e lo springbok.",
+    recognitionHints: ["2 rand", "south africa", "sudafrica", "jan van riebeeck", "springbok"],
+    visual: { front: "profile", back: "springbok", frontText: "2R", backText: "SA" }
+  }, "sudafrica-2-rand"),
+  withBilanciaDoroImages({
+    id: "cile-100-pesos",
+    name: "Cile 100 Pesos",
+    country: "Cile",
+    mintYears: "1926-1946/1980",
+    nominal: "100 Pesos",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 20.34,
+    fineGold: 18.3,
+    diameter: 32,
+    edge: "Zigrinato",
+    obverse: "Testa laureata della Repubblica del Cile",
+    reverse: "Stemma con stella, condor e cervo andino",
+    history: "Il 100 Pesos cileno e una grande moneta d'oro 900‰. La figura femminile laureata e lo stemma nazionale con condor aiutano il riconoscimento.",
+    recognitionHints: ["100 pesos", "cile", "chile", "condor", "republica de chile"],
+    visual: { front: "profile", back: "shield", frontText: "CL", backText: "100P" }
+  }, "cile-100-pesos"),
+  withBilanciaDoroImages({
+    id: "20-dollari-liberty",
+    name: "20 Dollars Liberty Head",
+    country: "Stati Uniti",
+    mintYears: "1849-1907",
+    nominal: "20 Dollars",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 33.436,
+    fineGold: 30.093,
+    diameter: 34,
+    edge: "Zigrinato",
+    obverse: "Liberty Head con corona LIBERTY",
+    reverse: "Aquila americana con scudo",
+    history: "La Liberty Head Double Eagle e la tipologia storica da 20 dollari precedente al disegno Saint-Gaudens, con lo stesso modulo e contenuto d'oro.",
+    recognitionHints: ["20 dollars liberty", "liberty head", "double eagle", "united states", "twenty dollars"],
+    visual: { front: "liberty", back: "eagle", frontText: "20$", backText: "LIB" }
+  }, "20-dollari-liberty"),
+  withBilanciaDoroImages({
+    id: "austria-100-corone",
+    name: "Austria 100 Corone",
+    country: "Austria",
+    mintYears: "1915 e riconiazioni",
+    nominal: "100 Corone",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 33.88,
+    fineGold: 30.49,
+    diameter: 37,
+    edge: "Zigrinato",
+    obverse: "Francesco Giuseppe I",
+    reverse: "Aquila bicipite imperiale e valore 100 Corone",
+    history: "La 100 Corone austriaca e spesso incontrata come riconiazione datata 1915. Il grande formato e l'aquila imperiale sono elementi di riconoscimento immediati.",
+    recognitionHints: ["100 corone", "100 corona", "austria", "franz joseph", "1915"],
+    visual: { front: "profile", back: "doubleeagle", frontText: "100K", backText: "AT" }
+  }, "austria-100-corone"),
+  withBilanciaDoroImages({
+    id: "4-ducati-austriaci",
+    name: "4 Ducati austriaci 1915",
+    country: "Austria",
+    mintYears: "1915 e riconiazioni",
+    nominal: "4 Ducat",
+    metal: "Oro",
+    purity: 0.986,
+    purityLabel: "986‰",
+    grossWeight: 13.96,
+    fineGold: 13.76,
+    diameter: 39.7,
+    edge: "Liscio",
+    obverse: "Testa laureata di Francesco Giuseppe I",
+    reverse: "Scudo austriaco su aquila bicipite coronata",
+    history: "I 4 Ducati austriaci sono riconiazioni molto diffuse datate 1915, sottili e ad alto titolo. La dimensione ampia li distingue dal ducato singolo.",
+    recognitionHints: ["4 ducati", "4 ducat", "ducato austriaco", "franz joseph", "1915"],
+    visual: { front: "profile", back: "doubleeagle", frontText: "4D", backText: "986" }
+  }, "4-ducati-austriaci"),
+  withBilanciaDoroImages({
+    id: "10-dollari-indiano",
+    name: "10 Dollars Indian Head",
+    country: "Stati Uniti",
+    mintYears: "1907-1933",
+    nominal: "10 Dollars",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 16.72,
+    fineGold: 15.04,
+    diameter: 27,
+    edge: "Zigrinato",
+    obverse: "Liberty con copricapo indiano",
+    reverse: "Aquila americana",
+    history: "Il 10 Dollars Indian Head e una moneta statunitense storica dal disegno molto distintivo, con Liberty reinterpretata con copricapo indiano.",
+    recognitionHints: ["10 dollars indian", "indian head", "eagle", "united states", "ten dollars"],
+    visual: { front: "profile", back: "eagle", frontText: "10$", backText: "IND" }
+  }, "10-dollari-indiano"),
+  withBilanciaDoroImages({
+    id: "10-dollari-liberty",
+    name: "10 Dollars Liberty Head",
+    country: "Stati Uniti",
+    mintYears: "1838-1907",
+    nominal: "10 Dollars",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 16.72,
+    fineGold: 15.04,
+    diameter: 27,
+    edge: "Zigrinato",
+    obverse: "Liberty Head con corona LIBERTY",
+    reverse: "Aquila americana con scudo",
+    history: "Il 10 Dollars Liberty Head e la mezza Double Eagle storica statunitense, con ritratto Liberty e aquila con scudo.",
+    recognitionHints: ["10 dollars liberty", "liberty head", "ten dollars", "eagle", "united states"],
+    visual: { front: "liberty", back: "eagle", frontText: "10$", backText: "LIB" }
+  }, "10-dollari-liberty"),
+  withBilanciaDoroImages({
+    id: "messico-20-pesos",
+    name: "Messico 20 Pesos",
+    country: "Messico",
+    mintYears: "1917-1921 e riconiazioni 1959",
+    nominal: "20 Pesos",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 16.66,
+    fineGold: 15,
+    diameter: 27.4,
+    edge: "Inciso",
+    obverse: "Calendario azteco",
+    reverse: "Stemma messicano con aquila e serpente",
+    history: "Il 20 Pesos messicano si riconosce per il calendario azteco e lo stemma con aquila e serpente. Contiene 15 g di oro fino.",
+    recognitionHints: ["20 pesos", "messico", "mexico", "calendario azteco", "aztec calendar"],
+    visual: { front: "calendar", back: "eagle", frontText: "20P", backText: "MX" }
+  }, "messico-20-pesos"),
+  withBilanciaDoroImages({
+    id: "austria-1000-scellini",
+    name: "Austria 1000 Scellini",
+    country: "Austria",
+    mintYears: "1976",
+    nominal: "1000 Scellini",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 13.5,
+    fineGold: 12.15,
+    diameter: 27,
+    edge: "Zigrinato",
+    obverse: "Motivo commemorativo austriaco",
+    reverse: "Valore 1000 Schilling e simboli nazionali",
+    history: "Moneta commemorativa emessa per il millennio della nazione austriaca, con standard 900‰ e contenuto di circa 12,15 g di oro fino.",
+    recognitionHints: ["1000 scellini", "1000 schilling", "austria", "1976", "millennio"],
+    visual: { front: "seal", back: "shield", frontText: "1000", backText: "ATS" }
+  }, "austria-1000-scellini"),
+  withBilanciaDoroImages({
+    id: "ungheria-20-corone",
+    name: "Ungheria 20 Corone",
+    country: "Ungheria",
+    mintYears: "Varie emissioni",
+    nominal: "20 Corone",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.775,
+    fineGold: 6.097,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Francesco Giuseppe I",
+    reverse: "Stemma reale ungherese sorretto da angeli",
+    history: "La 20 Corone ungherese appartiene all'area austro-ungarica e si riconosce per l'effigie imperiale e lo stemma reale d'Ungheria.",
+    recognitionHints: ["20 corone", "20 korona", "ungheria", "hungary", "francesco giuseppe"],
+    visual: { front: "profile", back: "shield", frontText: "20K", backText: "HU" }
+  }, "ungheria-20-corone")
+];
+
+GOLD_COIN_CATALOG.forEach((coin) => {
+  const slug = BILANCIA_DORO_IMAGE_SLUGS_BY_COIN[coin.id];
+  if (slug) coin.bookImages = bilanciaDoroCoinImages(slug);
+});
+GOLD_COIN_CATALOG.push(...BILANCIA_DORO_COIN_ADDITIONS);
+
 const COIN_RECOGNITION_HINTS = {
   ai: "Confronto AI su immagine caricato dal backend.",
   local: "Risultato locale basato sul catalogo e sui filtri visibili."
@@ -8773,10 +9057,19 @@ function coinCatalogFiltered() {
 }
 
 function coinFaceMarkup(coin = {}, side = "front") {
+  const imageUrl = coin.bookImages?.[side];
   const visual = coin.visual || {};
   const type = side === "back" ? visual.back : visual.front;
   const text = side === "back" ? visual.backText : visual.frontText;
   const label = side === "back" ? "Retro" : "Fronte";
+  if (imageUrl) {
+    return `
+      <figure class="coin-photo-frame" aria-label="${escapeHtml(label)} ${escapeHtml(coin.name || "moneta")}">
+        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(`${label} ${coin.name || "moneta d'oro"}`)}" loading="lazy" decoding="async">
+        <figcaption>${escapeHtml(label)}</figcaption>
+      </figure>
+    `;
+  }
   return `
     <div class="coin-face coin-face-${escapeHtml(type || "seal")}" aria-label="${escapeHtml(label)} ${escapeHtml(coin.name || "moneta")}">
       <span class="coin-face-ring"></span>
@@ -8864,11 +9157,15 @@ function renderCoinOverview(visibleCoins = []) {
 function renderCoinDetail(coin = selectedCoin()) {
   if (!coinDetailPanel || !coin) return;
   const aliases = (coin.recognitionHints || []).slice(0, 7).map((hint) => `<span>${escapeHtml(hint)}</span>`).join("");
+  const imageSource = coin.bookImages?.source
+    ? `<p class="coin-image-source">Foto fronte/retro estratte da ${escapeHtml(coin.bookImages.source)}.</p>`
+    : "";
   coinDetailPanel.innerHTML = `
     <article class="coin-detail-card">
       <div class="coin-detail-media">
         ${coinFaceMarkup(coin, "front")}
         ${coinFaceMarkup(coin, "back")}
+        ${imageSource}
       </div>
       <div class="coin-detail-copy">
         <p class="eyebrow">Scheda tecnica moneta d'oro</p>
