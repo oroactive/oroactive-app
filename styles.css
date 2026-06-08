@@ -1332,6 +1332,9 @@ textarea:disabled {
 
 .aurum-tip {
   width: min(280px, calc(100vw - 34px));
+  max-height: min(220px, calc(100dvh - 32px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   gap: 10px;
   align-items: flex-start;
@@ -1344,6 +1347,7 @@ textarea:disabled {
   font-size: 13px;
   line-height: 1.35;
   pointer-events: auto;
+  transform: translate(var(--aurum-tip-shift-x, 0px), var(--aurum-tip-shift-y, 0px));
 }
 
 .aurum-tip button,
@@ -5344,7 +5348,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card,
 .amico-oro-card,
 .pronto-gold-card,
-.banco-preziosi-card,
 .bordin-card,
 .gold-standard-card,
 .oro-in-euro-card,
@@ -5365,7 +5368,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card header,
 .amico-oro-card header,
 .pronto-gold-card header,
-.banco-preziosi-card header,
 .bordin-card header,
 .gold-standard-card header,
 .oro-in-euro-card header,
@@ -5374,7 +5376,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-grid,
 .amico-oro-grid,
 .pronto-gold-grid,
-.banco-preziosi-grid,
 .bordin-grid,
 .gold-standard-grid,
 .oro-in-euro-grid,
@@ -5389,7 +5390,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card header,
 .amico-oro-card header,
 .pronto-gold-card header,
-.banco-preziosi-card header,
 .bordin-card header,
 .gold-standard-card header,
 .oro-in-euro-card header,
@@ -5405,8 +5405,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .amico-oro-card p,
 .pronto-gold-card h5,
 .pronto-gold-card p,
-.banco-preziosi-card h5,
-.banco-preziosi-card p,
 .bordin-card h5,
 .bordin-card p,
 .gold-standard-card h5,
@@ -5422,7 +5420,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card span,
 .amico-oro-card span,
 .pronto-gold-card span,
-.banco-preziosi-card span,
 .bordin-card span,
 .gold-standard-card span,
 .oro-in-euro-card span,
@@ -5437,7 +5434,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-card strong,
 .amico-oro-card strong,
 .pronto-gold-card strong,
-.banco-preziosi-card strong,
 .bordin-card strong,
 .gold-standard-card strong,
 .oro-in-euro-card strong,
@@ -5449,7 +5445,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 .oro-doro-grid div,
 .amico-oro-grid div,
 .pronto-gold-grid div,
-.banco-preziosi-grid div,
 .bordin-grid div,
 .gold-standard-grid div,
 .oro-in-euro-grid div,
@@ -10535,7 +10530,6 @@ input.document-expired {
   .oro-doro-card header,
   .amico-oro-card header,
   .pronto-gold-card header,
-  .banco-preziosi-card header,
   .bordin-card header,
   .gold-standard-card header,
   .oro-in-euro-card header,
@@ -10544,7 +10538,6 @@ input.document-expired {
   .oro-doro-grid,
   .amico-oro-grid,
   .pronto-gold-grid,
-  .banco-preziosi-grid,
   .bordin-grid,
   .gold-standard-grid,
   .oro-in-euro-grid,

@@ -2418,6 +2418,25 @@ function purityValueForCode(metal = "gold", purityCode = "") {
   return Number.isFinite(title) && title > 0 ? Math.min(1, title / 1000) : 0.925;
 }
 
+const HIDDEN_COMPETITOR_NAMES = new Set(["banco preziosi"]);
+
+function competitorPolicyNameKey(name = "") {
+  return String(name || "")
+    .normalize("NFKC")
+    .replace(/[’`´]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("it-IT");
+}
+
+function isHiddenCompetitorName(name = "") {
+  return HIDDEN_COMPETITOR_NAMES.has(competitorPolicyNameKey(name));
+}
+
+function hiddenCompetitorSql(column = "competitor_name") {
+  return `LOWER(COALESCE(${column}, '')) <> LOWER('Banco Preziosi')`;
+}
+
 function defaultCompetitorExtractionConfig(url = "") {
   return {
     method: "html_regex",
@@ -2495,19 +2514,6 @@ const DEFAULT_COMPETITOR_SOURCES = [
       method: "pronto_gold_parser",
       url: prontoGoldUrl,
       quote_url: prontoGoldQuoteUrl,
-      currency: "EUR"
-    },
-    notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
-  },
-  {
-    name: "Banco Preziosi",
-    website_url: bancoPreziosiUrl,
-    source_type: "banco_preziosi_parser",
-    sync_interval_minutes: bancoPreziosiSyncIntervalMinutes,
-    extraction_config: {
-      method: "banco_preziosi_parser",
-      url: bancoPreziosiUrl,
-      quote_url: bancoPreziosiQuoteUrl,
       currency: "EUR"
     },
     notes: "Competitor preconfigurato OroActive con parser automatico dedicato ogni ora"
@@ -2737,6 +2743,16 @@ async function seedDefaultCompetitorSources() {
       ]
     );
   }
+  await pool.query(
+    `UPDATE competitor_quote_sources
+        SET active = false,
+            auto_sync_enabled = false,
+            last_sync_status = 'disabled',
+            next_sync_at = NULL,
+            last_sync_error = 'Competitor rimosso dal confronto OroActive',
+            updated_at = NOW()
+      WHERE LOWER(name) = LOWER('Banco Preziosi')`
+  ).catch(() => {});
 }
 
 function defaultOroExpressExtractionRules(source = {}) {
@@ -3268,7 +3284,6 @@ async function seedDefaultCompetitorExtractionRules() {
     { source: await getOroDOroSource().catch(() => null), rulesFor: defaultOroDOroExtractionRules },
     { source: await getAmicoOroSource().catch(() => null), rulesFor: defaultAmicoOroExtractionRules },
     { source: await getProntoGoldSource().catch(() => null), rulesFor: defaultProntoGoldExtractionRules },
-    { source: await getBancoPreziosiSource().catch(() => null), rulesFor: defaultBancoPreziosiExtractionRules },
     { source: await getBordinSource().catch(() => null), rulesFor: defaultBordinExtractionRules },
     { source: await getGoldStandardSource().catch(() => null), rulesFor: defaultGoldStandardExtractionRules },
     { source: await getOroInEuroSource().catch(() => null), rulesFor: defaultOroInEuroExtractionRules },
@@ -3325,6 +3340,7 @@ async function listCompetitorExtractionRules({ sourceId = null, competitorName =
     params.push(String(competitorName));
     conditions.push(`LOWER(competitor_name) = LOWER($${params.length}::text)`);
   }
+  conditions.push(hiddenCompetitorSql("competitor_name"));
   if (activeOnly) conditions.push("active = true");
   const result = await pool.query(
     `SELECT *
@@ -3339,6 +3355,7 @@ async function listCompetitorExtractionRules({ sourceId = null, competitorName =
 async function saveCompetitorExtractionRules(sourceId, rules = [], user = {}, req = null) {
   const source = publicCompetitorSource((await pool.query("SELECT * FROM competitor_quote_sources WHERE id = $1::bigint LIMIT 1", [sourceId])).rows[0] || {});
   if (!source.id) throw new Error("Fonte competitor non trovata");
+  if (isHiddenCompetitorName(source.name)) throw new Error("Banco Preziosi è stato rimosso dai competitor OroActive");
   const saved = [];
   for (const input of Array.isArray(rules) ? rules : []) {
     const rule = normalizeCompetitorExtractionRule(input, source);
@@ -3490,6 +3507,7 @@ function publicExtractionTestResult(result = {}) {
 async function testCompetitorExtractionForSource(sourceId, user = {}, req = null, options = {}) {
   const source = publicCompetitorSource((await pool.query("SELECT * FROM competitor_quote_sources WHERE id = $1::bigint LIMIT 1", [sourceId])).rows[0] || {});
   if (!source.id) throw new Error("Fonte competitor non trovata");
+  if (isHiddenCompetitorName(source.name)) throw new Error("Banco Preziosi è stato rimosso dai competitor OroActive");
   const rules = await listCompetitorExtractionRules({ sourceId: source.id, activeOnly: true });
   const result = await competitorExtractionTrainer.testCompetitorExtraction(source, rules, {
     forceAi: Boolean(options.forceAi)
@@ -3536,7 +3554,7 @@ async function testCompetitorExtractionForSource(sourceId, user = {}, req = null
 }
 
 async function listCompetitorSources() {
-  const result = await pool.query("SELECT * FROM competitor_quote_sources ORDER BY active DESC, name ASC");
+  const result = await pool.query(`SELECT * FROM competitor_quote_sources WHERE ${hiddenCompetitorSql("name")} ORDER BY active DESC, name ASC`);
   return result.rows.map(publicCompetitorSource);
 }
 
@@ -3544,7 +3562,7 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
   const payload = {
     name: String(input.name || "").trim().slice(0, 120),
     website_url: String(input.website_url || input.websiteUrl || "").trim().slice(0, 500),
-    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "oro_doro_parser", "amico_oro_parser", "pronto_gold_parser", "banco_preziosi_parser", "bordin_parser", "gold_standard_parser", "oro_in_euro_parser", "gruppo_oro_24k_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
+    source_type: ["manual", "csv_import", "api", "configured_page", "oro_express_parser", "oro_doro_parser", "amico_oro_parser", "pronto_gold_parser", "bordin_parser", "gold_standard_parser", "oro_in_euro_parser", "gruppo_oro_24k_parser"].includes(String(input.source_type || input.sourceType || "manual").toLowerCase())
       ? String(input.source_type || input.sourceType || "manual").toLowerCase()
       : "manual",
     active: input.active !== false,
@@ -3555,6 +3573,7 @@ async function saveCompetitorSource(input = {}, user = {}, id = null) {
     extraction_config: sanitizeForPostgres(input.extraction_config || input.extractionConfig || input.selectors || {})
   };
   if (!payload.name) throw new Error("Nome competitor obbligatorio");
+  if (isHiddenCompetitorName(payload.name)) throw new Error("Banco Preziosi è stato rimosso dai competitor OroActive");
   if (!id) {
     const existing = await pool.query(
       "SELECT id FROM competitor_quote_sources WHERE LOWER(name) = LOWER($1::text) LIMIT 1",
@@ -3636,6 +3655,7 @@ async function findCompetitorSourceByName(name = "") {
 async function ensureCompetitorSourceForQuote(input = {}, user = {}) {
   const competitorName = String(input.competitor_name || input.competitorName || "").trim().slice(0, 160);
   if (!competitorName) return null;
+  if (isHiddenCompetitorName(competitorName)) throw new Error("Banco Preziosi è stato rimosso dai competitor OroActive");
   const existing = await findCompetitorSourceByName(competitorName);
   if (existing) return existing;
   const websiteUrl = String(input.website_url || input.websiteUrl || input.url || "").trim().slice(0, 500);
@@ -3687,18 +3707,11 @@ async function insertCompetitorQuote(input = {}, user = {}) {
   const pricePerGram = Number(input.price_per_gram || input.pricePerGram || 0);
   const competitorName = String(input.competitor_name || input.competitorName || "").trim().slice(0, 160);
   if (!competitorName) throw new Error("Nome competitor obbligatorio");
+  if (isHiddenCompetitorName(competitorName)) throw new Error("Banco Preziosi è stato rimosso dai competitor OroActive");
   if (!Number.isFinite(pricePerGram) || pricePerGram <= 0) throw new Error("Prezzo competitor non valido");
   const quoteType = ["customer_buyback", "reference_official_gold_price", "reference_market_gold_price", "reference_market_silver_price", "sell_price", "spot_price", "theoretical_price", "unknown"].includes(String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase())
     ? String(input.quote_type || input.quoteType || "customer_buyback").toLowerCase()
     : "unknown";
-  if (
-    competitorName.toLowerCase() === "banco preziosi"
-    && metal === "gold"
-    && purityCode === "24kt"
-    && quoteType === "customer_buyback"
-  ) {
-    throw new Error("Banco Preziosi non pubblica una quotazione cliente 24kt: dato escluso dal confronto competitor");
-  }
   const source = input.source_id || input.sourceId
     ? { id: input.source_id || input.sourceId }
     : await ensureCompetitorSourceForQuote(input, user);
@@ -3748,12 +3761,7 @@ async function insertCompetitorQuote(input = {}, user = {}) {
 async function listCompetitorQuotes({ metal = "", purityCode = "", competitorName = "", quoteType = "customer_buyback", currency = "EUR", days = 30, limit = 200 } = {}) {
   const conditions = ["currency = $1::text", "quote_date >= NOW() - ($2::int * INTERVAL '1 day')"];
   const params = [normalizePredictionCurrency(currency), Math.min(Math.max(Number(days || 30), 1), 365)];
-  conditions.push(`NOT (
-    LOWER(competitor_name) = LOWER('Banco Preziosi')
-    AND metal = 'gold'
-    AND purity_code = '24kt'
-    AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
-  )`);
+  conditions.push(hiddenCompetitorSql("competitor_name"));
   const normalizedQuoteType = String(quoteType || "customer_buyback").toLowerCase();
   if (normalizedQuoteType && normalizedQuoteType !== "all") {
     params.push(normalizedQuoteType);
@@ -3787,18 +3795,13 @@ async function listAiCompetitorQuotes({ currency = "EUR", days = 30, limit = 200
   const conditions = [
     "ai_extracted = true",
     "currency = $1::text",
-    "quote_date >= NOW() - ($2::int * INTERVAL '1 day')"
+    "quote_date >= NOW() - ($2::int * INTERVAL '1 day')",
+    hiddenCompetitorSql("competitor_name")
   ];
   const params = [normalizePredictionCurrency(currency), Math.min(Math.max(Number(days || 30), 1), 365)];
   if (validOnly) {
     conditions.push("COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'");
     conditions.push("LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')");
-    conditions.push(`NOT (
-      LOWER(competitor_name) = LOWER('Banco Preziosi')
-      AND metal = 'gold'
-      AND purity_code = '24kt'
-      AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
-    )`);
   }
   params.push(Math.min(Math.max(Number(limit || 200), 1), 500));
   const result = await pool.query(
@@ -3825,12 +3828,7 @@ async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "E
           AND price_per_gram IS NOT NULL
           AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
           AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')
-          AND NOT (
-            LOWER(competitor_name) = LOWER('Banco Preziosi')
-            AND metal = 'gold'
-            AND purity_code = '24kt'
-            AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
-          )
+          AND ${hiddenCompetitorSql("competitor_name")}
      ),
      ranked AS (
        SELECT *,
@@ -4090,6 +4088,9 @@ async function fetchCompetitorPage(url = "") {
 }
 
 async function extractCompetitorQuotes(source = {}) {
+  if (isHiddenCompetitorName(source.name)) {
+    return { quotes: [], status: "disabled", error: "Competitor rimosso dal confronto OroActive" };
+  }
   const config = source.extraction_config || source.extractionConfig || {};
   const method = String(config.method || source.source_type || "manual_fallback").toLowerCase();
   if (!source.auto_sync_enabled || method === "manual_fallback" || source.source_type === "manual" || source.source_type === "csv_import") {
@@ -4337,6 +4338,16 @@ async function syncSingleCompetitorSource(sourceIdOrSource, user = {}, req = nul
     ? publicCompetitorSource(sourceIdOrSource)
     : publicCompetitorSource((await pool.query("SELECT * FROM competitor_quote_sources WHERE id = $1::bigint LIMIT 1", [sourceIdOrSource])).rows[0] || {});
   if (!source.id) throw new Error("Fonte competitor non trovata");
+  if (isHiddenCompetitorName(source.name)) {
+    await updateCompetitorSourceSyncStatus(source.id, "disabled", new Date().toISOString(), "Competitor rimosso dal confronto OroActive", null).catch(() => {});
+    return {
+      source: { ...source, active: false, auto_sync_enabled: false, last_sync_status: "disabled" },
+      status: "disabled",
+      quotes_found: 0,
+      quotes_saved: 0,
+      error: "Competitor rimosso dal confronto OroActive"
+    };
+  }
   const log = await createCompetitorSyncLog(source);
   const completedAt = new Date();
   const nextSyncAt = nextCompetitorSyncDate(source, completedAt);
@@ -4418,6 +4429,7 @@ async function listCompetitorSyncLogs({ limit = 80 } = {}) {
   const result = await pool.query(
     `SELECT *
        FROM competitor_quote_sync_logs
+      WHERE ${hiddenCompetitorSql("competitor_name")}
       ORDER BY started_at DESC
       LIMIT $1::int`,
     [Math.min(Math.max(Number(limit || 80), 1), 300)]
@@ -4439,8 +4451,9 @@ async function runCompetitorAutoSyncNow({ force = false, user = {}, req = null, 
     const result = await pool.query(
       `SELECT *
          FROM competitor_quote_sources
-        WHERE active = true
+       WHERE active = true
           AND auto_sync_enabled = true
+          AND ${hiddenCompetitorSql("name")}
           ${dueClause}
         ORDER BY COALESCE(next_sync_at, '1970-01-01'::timestamptz) ASC, id ASC
         LIMIT $1::int`,
@@ -5517,6 +5530,7 @@ async function getAiExtractionRun(id) {
       `SELECT *
          FROM competitor_ai_extraction_page_logs
         WHERE run_id = $1::bigint
+          AND ${hiddenCompetitorSql("competitor_name")}
         ORDER BY created_at ASC, id ASC`,
       [id]
     )
@@ -5534,6 +5548,7 @@ async function latestAiExtractionPageSummary() {
        SELECT DISTINCT ON (source_id) *
          FROM competitor_ai_extraction_page_logs
         WHERE source_id IS NOT NULL
+          AND ${hiddenCompetitorSql("competitor_name")}
         ORDER BY source_id, created_at DESC
      )
      SELECT * FROM latest`
@@ -5631,6 +5646,7 @@ async function runAiCompetitorQuoteExtraction(options = {}) {
       `SELECT *
          FROM competitor_quote_sources
         WHERE ${where.join(" AND ")}
+          AND ${hiddenCompetitorSql("name")}
         ORDER BY name ASC`,
       sourceParams
     );
@@ -20426,12 +20442,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
        WHERE quote_date >= NOW() - INTERVAL '24 hours'
           AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
           AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')
-          AND NOT (
-            LOWER(competitor_name) = LOWER('Banco Preziosi')
-            AND metal = 'gold'
-            AND purity_code = '24kt'
-            AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
-          )`
+          AND ${hiddenCompetitorSql("competitor_name")}`
     ).catch(() => ({ rows: [{ count: 0 }] }));
     response.json({
       ok: true,
@@ -20444,7 +20455,6 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
       oro_doro_status: oroDOroSyncPublicStatus(),
       amico_oro_status: amicoOroSyncPublicStatus(),
       pronto_gold_status: prontoGoldSyncPublicStatus(),
-      banco_preziosi_status: bancoPreziosiSyncPublicStatus(),
       bordin_status: bordinSyncPublicStatus(),
       gold_standard_status: goldStandardSyncPublicStatus(),
       oro_in_euro_status: oroInEuroSyncPublicStatus(),
@@ -20572,7 +20582,10 @@ app.post("/api/quotazioni/competitors/pronto-gold/sync", requireFounder, async (
 
 app.post("/api/quotazioni/competitors/banco-preziosi/sync", requireFounder, async (request, response, next) => {
   try {
-    response.json(await runBancoPreziosiHourlySync({ force: true, user: request.user, req: request }));
+    response.status(410).json({
+      ok: false,
+      error: "Banco Preziosi è stato rimosso dai competitor OroActive."
+    });
   } catch (error) {
     next(error);
   }
@@ -21787,7 +21800,6 @@ initDatabase()
     startOroDOroHourlySync();
     startAmicoOroHourlySync();
     startProntoGoldHourlySync();
-    startBancoPreziosiHourlySync();
     startBordinHourlySync();
     startGoldStandardHourlySync();
     startOroInEuroHourlySync();

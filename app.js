@@ -4368,6 +4368,29 @@ function constrainAurumPanelToViewport() {
   }
 }
 
+function constrainAurumTipToViewport() {
+  if (!aurumTipBubble || aurumTipBubble.hidden) return;
+  aurumTipBubble.style.setProperty("--aurum-tip-shift-x", "0px");
+  aurumTipBubble.style.setProperty("--aurum-tip-shift-y", "0px");
+  const rect = aurumTipBubble.getBoundingClientRect();
+  const margin = AURUM_SAFE_MARGIN;
+  let shiftX = 0;
+  let shiftY = 0;
+  if (rect.left < margin) shiftX = margin - rect.left;
+  if (rect.right > window.innerWidth - margin) shiftX = window.innerWidth - margin - rect.right;
+  if (rect.top < margin) shiftY = margin - rect.top;
+  if (rect.bottom > window.innerHeight - margin) shiftY = window.innerHeight - margin - rect.bottom;
+  aurumTipBubble.style.setProperty("--aurum-tip-shift-x", `${Math.round(shiftX)}px`);
+  aurumTipBubble.style.setProperty("--aurum-tip-shift-y", `${Math.round(shiftY)}px`);
+}
+
+function scheduleAurumViewportClamp() {
+  window.requestAnimationFrame(() => {
+    constrainAurumPanelToViewport();
+    constrainAurumTipToViewport();
+  });
+}
+
 function applyAurumPanelPosition(position) {
   if (!aurumChatPanel) return;
   const rect = aurumChatPanel.getBoundingClientRect();
@@ -4548,6 +4571,7 @@ function renderAurumMessages() {
     aurumChatMessages.scrollTop = aurumChatMessages.scrollHeight;
   }
   renderAurumMemoryLists();
+  scheduleAurumViewportClamp();
 }
 
 function openAurumChat() {
@@ -4559,7 +4583,7 @@ function openAurumChat() {
   if (aurumChatPanel) aurumChatPanel.hidden = false;
   if (aurumTipBubble) aurumTipBubble.hidden = true;
   renderAurumMessages();
-  window.setTimeout(constrainAurumPanelToViewport, 0);
+  window.setTimeout(scheduleAurumViewportClamp, 0);
   window.setTimeout(() => aurumQuestion?.focus(), 60);
   updateAurumMascotVisibility();
 }
@@ -4613,6 +4637,7 @@ function showAurumTip(text = "") {
   state.aurumTipIndex += 1;
   aurumTipText.textContent = message;
   aurumTipBubble.hidden = false;
+  scheduleAurumViewportClamp();
   window.clearTimeout(state.aurumTipHideTimer);
   state.aurumTipHideTimer = window.setTimeout(() => {
     if (aurumTipBubble) aurumTipBubble.hidden = true;
@@ -12038,6 +12063,12 @@ function competitorNameKey(name = "") {
   return normalized;
 }
 
+const HIDDEN_COMPETITOR_KEYS = new Set(["banco preziosi"]);
+
+function isHiddenCompetitorName(name = "") {
+  return HIDDEN_COMPETITOR_KEYS.has(competitorNameKey(name));
+}
+
 function competitorDisplayName(name = "") {
   const key = competitorNameKey(name);
   if (key === "oro d'oro") return "Oro D'oro";
@@ -12200,10 +12231,7 @@ function competitorQuoteTypeLabel(type = "") {
 function isUnsupportedCompetitorBuybackQuote(quote = {}) {
   const competitorKey = competitorNameKey(quote.competitor_name);
   const quoteType = String(quote.quote_type || "customer_buyback").toLowerCase();
-  return competitorKey === "banco preziosi"
-    && quoteType === "customer_buyback"
-    && quote.metal === "gold"
-    && quote.purity_code === "24kt";
+  return HIDDEN_COMPETITOR_KEYS.has(competitorKey) && quoteType === "customer_buyback";
 }
 
 function isCompetitorBuybackQuote(quote = {}) {
@@ -12217,7 +12245,6 @@ function competitorSourceTypeLabel(type = "") {
   if (normalized === "oro_doro_parser") return "Parser Oro D'Oro";
   if (normalized === "amico_oro_parser") return "Parser Amico Oro";
   if (normalized === "pronto_gold_parser") return "Parser Pronto Gold";
-  if (normalized === "banco_preziosi_parser") return "Parser Banco Preziosi";
   if (normalized === "bordin_parser") return "Parser Bordin";
   if (normalized === "gold_standard_parser") return "Parser Gold Standard";
   if (normalized === "oro_in_euro_parser") return "Parser Oro in Euro";
@@ -12250,9 +12277,6 @@ function competitorPurityDisplay(quote = {}) {
   if (quote.competitor_name === "Pronto Gold" && quote.metal === "silver" && quote.purity_code === "999") return "Argento puro acquisto";
   if (quote.competitor_name === "Pronto Gold" && quote.metal === "silver" && quote.purity_code === "925") return "Argento usato 925";
   if (quote.competitor_name === "Pronto Gold" && quote.metal === "silver" && quote.purity_code === "800") return "Argento usato 800";
-  if (quote.competitor_name === "Banco Preziosi" && quote.metal === "gold" && quote.purity_code === "18kt") return "Oro 18kt";
-  if (quote.competitor_name === "Banco Preziosi" && quote.metal === "silver" && quote.purity_code === "925") return "Argento 925";
-  if (quote.competitor_name === "Banco Preziosi" && quote.metal === "silver" && quote.purity_code === "800") return "Argento 800";
   if (quote.competitor_name === "Bordin" && quote.metal === "gold" && quote.purity_code === "24kt") return "Oro 24kt / 999,9‰";
   if (quote.competitor_name === "Bordin" && quote.metal === "gold" && quote.purity_code === "18kt") return "Oro 18kt / 750‰";
   if (quote.competitor_name === "Bordin" && quote.metal === "gold" && quote.purity_code === "14kt") return "Oro 14kt / 585‰";
@@ -12313,16 +12337,6 @@ function latestAmicoOroQuote(metal = "", purityCode = "") {
 function latestProntoGoldQuote(metal = "", purityCode = "", quoteType = "customer_buyback") {
   return (state.competitorQuotes || [])
     .filter((quote) => quote.competitor_name === "Pronto Gold")
-    .filter(isCompetitorBuybackQuote)
-    .filter((quote) => !metal || quote.metal === metal)
-    .filter((quote) => !purityCode || quote.purity_code === purityCode)
-    .filter((quote) => !quoteType || String(quote.quote_type || "customer_buyback").toLowerCase() === quoteType)
-    .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))[0] || null;
-}
-
-function latestBancoPreziosiQuote(metal = "", purityCode = "", quoteType = "customer_buyback") {
-  return (state.competitorQuotes || [])
-    .filter((quote) => quote.competitor_name === "Banco Preziosi")
     .filter(isCompetitorBuybackQuote)
     .filter((quote) => !metal || quote.metal === metal)
     .filter((quote) => !purityCode || quote.purity_code === purityCode)
@@ -12519,47 +12533,6 @@ function prontoGoldSummaryHtml() {
       <p>Ultimo aggiornamento sito: ${escapeHtml(providerTimestampLabel)} · Ultimo sync app: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
       <p class="gold-prediction-disclaimer">Sono mostrate solo le quotazioni di acquisto cliente per carature e titoli disponibili. Il range 18k usa il valore massimo pubblicato; prezzi di borsa, vendita e monete restano esclusi dal confronto.</p>
       ${isFounder() ? `<button class="ghost-button" type="button" data-force-pronto-gold-sync>Forza aggiornamento Pronto Gold</button>` : ""}
-    </article>
-  `;
-}
-
-function bancoPreziosiSummaryHtml() {
-  const source = (state.competitorSources || []).find((item) => item.name === "Banco Preziosi") || {};
-  const quoteConfigs = [
-    { metal: "gold", code: "18kt", type: "customer_buyback" },
-    { metal: "silver", code: "925", type: "customer_buyback" },
-    { metal: "silver", code: "800", type: "customer_buyback" }
-  ];
-  const quotes = quoteConfigs
-    .map((item) => latestBancoPreziosiQuote(item.metal, item.code, item.type))
-    .filter(Boolean);
-  if (!source.id && !quotes.length) return "";
-  const quoteRows = quotes.length
-    ? quotes.map((quote) => {
-        const priceLabel = quote.metal === "silver"
-          ? `${formatMetalPerKg(quote.price_per_kg, quote.currency || "EUR")} · ${formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR")}`
-          : formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR");
-        return `
-          <div>
-            <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
-            <strong>${escapeHtml(priceLabel)}</strong>
-          </div>
-        `;
-      }).join("")
-    : `<p>Nessuna quotazione Banco Preziosi rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
-  return `
-    <article class="banco-preziosi-card">
-      <header>
-        <div>
-          <span>Competitor dedicato</span>
-          <h5>Banco Preziosi</h5>
-        </div>
-        <strong>${escapeHtml(competitorSourceStatusLabel(source))}</strong>
-      </header>
-      <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">www.bancopreziosimilano.it</a>` : "https://www.bancopreziosimilano.it"} · Metodo: parser automatico · Ogni 60 minuti</p>
-      <div class="banco-preziosi-grid">${quoteRows}</div>
-      <p>Ultimo aggiornamento: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
-      ${isFounder() ? `<button class="ghost-button" type="button" data-force-banco-preziosi-sync>Forza aggiornamento Banco Preziosi</button>` : ""}
     </article>
   `;
 }
@@ -12841,11 +12814,6 @@ function buildPriceExplanationContext(row = {}, options = {}) {
   const oroDOroQuote = latestOroDOroQuote(metal, purityCode);
   const amicoOroQuote = latestAmicoOroQuote(metal, purityCode);
   const prontoGoldQuote = latestProntoGoldQuote(metal, purityCode, "customer_buyback");
-  const bancoPreziosiQuote = latestBancoPreziosiQuote(
-    metal,
-    purityCode,
-    "customer_buyback"
-  );
   const bordinQuote = latestBordinQuote(metal, purityCode);
   const goldStandardQuote = latestGoldStandardQuote(metal, purityCode, "customer_buyback");
   const oroInEuroQuote = latestOroInEuroQuote(metal, purityCode);
@@ -12961,18 +12929,6 @@ function buildPriceExplanationContext(row = {}, options = {}) {
       range_max_per_gram: prontoGoldQuote.raw_payload?.range_max_per_gram || null,
       evidence_text: prontoGoldQuote.evidence_text || "",
       confidence: prontoGoldQuote.ai_confidence || prontoGoldQuote.confidence || "high"
-    } : null,
-    banco_preziosi_quote: bancoPreziosiQuote ? {
-      metal: bancoPreziosiQuote.metal,
-      purity_code: bancoPreziosiQuote.purity_code,
-      quote_type: bancoPreziosiQuote.quote_type || "customer_buyback",
-      label: competitorPurityDisplay(bancoPreziosiQuote),
-      price_per_gram: Number(bancoPreziosiQuote.price_per_gram || 0),
-      price_per_kg: Number(bancoPreziosiQuote.price_per_kg || 0),
-      source_url: bancoPreziosiQuote.source_url || bancoPreziosiQuote.url || "",
-      quote_date: bancoPreziosiQuote.quote_date || null,
-      evidence_text: bancoPreziosiQuote.evidence_text || "",
-      confidence: bancoPreziosiQuote.ai_confidence || bancoPreziosiQuote.confidence || "high"
     } : null,
     bordin_quote: bordinQuote ? {
       metal: bordinQuote.metal,
@@ -13151,19 +13107,6 @@ function buildGeneralPriceExplanationContext() {
         range_max_per_gram: quote.raw_payload?.range_max_per_gram || null,
         evidence_text: quote.evidence_text || ""
       })),
-    banco_preziosi_quotes: buybackCompetitorQuotes
-      .filter((quote) => quote.competitor_name === "Banco Preziosi")
-      .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
-      .slice(0, 6)
-      .map((quote) => ({
-        label: competitorPurityDisplay(quote),
-        quote_type: quote.quote_type || "customer_buyback",
-        price_per_gram: Number(quote.price_per_gram || 0),
-        price_per_kg: Number(quote.price_per_kg || 0),
-        source_url: quote.source_url || quote.url || "",
-        quote_date: quote.quote_date || null,
-        evidence_text: quote.evidence_text || ""
-      })),
     bordin_quotes: buybackCompetitorQuotes
       .filter((quote) => quote.competitor_name === "Bordin")
       .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
@@ -13301,10 +13244,6 @@ function competitorExplanation(context = {}) {
   const prontoGoldText = prontoGold
     ? ` Pronto Gold è stato aggiornato ${prontoGold.provider_timestamp ? `dal sito il ${formatDateTime(prontoGold.provider_timestamp)}` : prontoGold.quote_date ? `il ${formatDateTime(prontoGold.quote_date)}` : "automaticamente"}: ${prontoGold.label || context.purity_code} a ${formatAurumGram(prontoGold.price_per_gram, currency)}. Fonte: ${prontoGold.source_url || "https://www.prontogold.com/quotazioni"}.${prontoGoldRange} ${Number(context.max_payable_per_gram || 0) && Number(prontoGold.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: inseguirlo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
-  const bancoPreziosi = context.banco_preziosi_quote;
-  const bancoPreziosiText = bancoPreziosi
-    ? ` Banco Preziosi è stato aggiornato ${bancoPreziosi.quote_date ? `il ${formatDateTime(bancoPreziosi.quote_date)}` : "automaticamente"}: ${bancoPreziosi.label || context.purity_code} a ${formatAurumGram(bancoPreziosi.price_per_gram, currency)}. Fonte: ${bancoPreziosi.source_url || "https://www.bancopreziosimilano.it"}. ${Number(context.max_payable_per_gram || 0) && Number(bancoPreziosi.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: inseguirlo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
-    : "";
   const bordin = context.bordin_quote;
   const bordinText = bordin
     ? ` Bordin è stato aggiornato ${bordin.provider_timestamp ? `dal sito il ${formatDateTime(bordin.provider_timestamp)}` : bordin.quote_date ? `il ${formatDateTime(bordin.quote_date)}` : "automaticamente"}: ${bordin.label || context.purity_code} a ${formatAurumGram(bordin.price_per_gram, currency)}. Fonte: ${bordin.source_url || "https://oroemetallipreziosi.com"}.${bordin.condition_text ? ` Nota Bordin: ${bordin.condition_text}` : ""} ${Number(context.max_payable_per_gram || 0) && Number(bordin.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
@@ -13321,7 +13260,7 @@ function competitorExplanation(context = {}) {
   const gruppoOro24kText = gruppoOro24k
     ? ` Gruppo Oro 24K è stato aggiornato ${gruppoOro24k.provider_timestamp ? `dal sito il ${formatDateTime(gruppoOro24k.provider_timestamp)}` : gruppoOro24k.quote_date ? `il ${formatDateTime(gruppoOro24k.quote_date)}` : "automaticamente"}: ${gruppoOro24k.label || context.purity_code} a ${formatAurumGram(gruppoOro24k.price_per_gram, currency)}. Fonte: ${gruppoOro24k.source_url || "https://www.comprooromilano.org"}. Sono escluse monete e quotazioni borsa. ${Number(context.max_payable_per_gram || 0) && Number(gruppoOro24k.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo richiede verifica del margine o autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
-  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${oroDOroText}${amicoOroText}${prontoGoldText}${bancoPreziosiText}${bordinText}${goldStandardText}${oroInEuroText}${gruppoOro24kText}${syncText}${aiText}`;
+  return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${oroDOroText}${amicoOroText}${prontoGoldText}${bordinText}${goldStandardText}${oroInEuroText}${gruppoOro24kText}${syncText}${aiText}`;
 }
 
 function formulaExplanation(context = {}) {
@@ -13367,7 +13306,6 @@ ${context.oro_express_quotes?.length ? `Oro Express rilevato: ${context.oro_expr
 ${context.oro_doro_quotes?.length ? `Oro D'Oro rilevato: ${context.oro_doro_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Oro D'Oro non ha ancora quotazioni recenti salvate nel confronto."}
 ${context.amico_oro_quotes?.length ? `Amico Oro rilevato: ${context.amico_oro_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Amico Oro non ha ancora quotazioni recenti salvate nel confronto."}
 ${context.pronto_gold_quotes?.length ? `Pronto Gold rilevato: ${context.pronto_gold_quotes.map((quote) => `${quote.label} ${quote.price_kind === "range" && quote.range_min_per_gram && quote.range_max_per_gram ? `da ${formatAurumGram(quote.range_min_per_gram, "EUR")} a ${formatAurumGram(quote.range_max_per_gram, "EUR")}` : formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Pronto Gold non ha ancora quotazioni di acquisto cliente recenti salvate nel confronto."}
-${context.banco_preziosi_quotes?.length ? `Banco Preziosi rilevato: ${context.banco_preziosi_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Banco Preziosi non ha ancora quotazioni di acquisto cliente recenti salvate nel confronto."}
 ${context.bordin_quotes?.length ? `Bordin rilevato: ${context.bordin_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}${quote.condition_text ? ` - ${quote.condition_text}` : ""}`).join("; ")}.` : "Bordin non ha ancora quotazioni recenti salvate nel confronto."}
 ${context.gold_standard_quotes?.length ? `Gold Standard rilevato: ${context.gold_standard_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.price_kind === "min_price" ? " (prezzo MIN cliente)" : ""}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Gold Standard non ha ancora quotazioni di acquisto cliente recenti salvate nel confronto."}
 ${context.oro_in_euro_quotes?.length ? `Oro in Euro rilevato: ${context.oro_in_euro_quotes.map((quote) => `${quote.label} ${formatAurumGram(quote.price_per_gram, "EUR")}${quote.fineness_per_mille ? ` (${quote.fineness_per_mille}/1000)` : ""}${quote.quote_date ? ` (${formatDateTime(quote.quote_date)})` : ""}`).join("; ")}.` : "Oro in Euro non ha ancora quotazioni recenti salvate nel confronto."}
@@ -13529,8 +13467,8 @@ function renderGoldPredictionCards() {
   const gold = predictionMap.get("gold:today") || predictionMap.get("gold:24h") || {};
   const silver = predictionMap.get("silver:today") || predictionMap.get("silver:24h") || {};
   const currency = gold.currency || silver.currency || state.goldPredictionStatus?.settings?.currency || "EUR";
-  const sources = state.competitorSources || [];
-  const quotes = state.competitorQuotes || [];
+  const sources = (state.competitorSources || []).filter((source) => !isHiddenCompetitorName(source.name));
+  const quotes = (state.competitorQuotes || []).filter(isCompetitorBuybackQuote);
   const todayKey = new Date().toISOString().slice(0, 10);
   const gold18 = findBuybackRow("gold", "18kt", "today", state.buybackScenario) || {};
   const silver925 = findBuybackRow("silver", "925", "today", state.buybackScenario) || {};
@@ -13787,30 +13725,6 @@ function defaultExtractionRulesForSource(source = {}) {
       last_test_status: "not_tested"
     }));
   }
-  if (String(source.name || "").toLowerCase() === "banco preziosi") {
-    const pageUrl = source.extraction_config?.quote_url || source.extraction_config?.quoteUrl || source.website_url || "https://www.bancopreziosimilano.it/quotazioni";
-    return [
-      ["banco_preziosi_gold_18kt", "Acquistiamo oro 18K", "gold", "18kt", "0.75", "ACQUISTIAMO ORO 18K", "EUR/g", "(?:ACQUISTIAMO\\s+)?ORO\\s*18\\s*(?:K|kt)[\\s\\S]{0,120}?(?:euro|€)\\s*([0-9]+[,.]?[0-9]*)\\s*al\\s*grammo"],
-      ["banco_preziosi_silver_925", "Argento 925", "silver", "925", "0.925", "ARGENTO 925", "EUR/kg", "ARGENTO\\s*925[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)\\s*al\\s*KG"],
-      ["banco_preziosi_silver_800", "Argento 800", "silver", "800", "0.8", "ARGENTO 800", "EUR/kg", "ARGENTO\\s*800[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)\\s*al\\s*Kg"]
-    ].map(([field_key, label, metal, purity_code, purity_value, anchor_text, unit, regex_pattern]) => ({
-      source_id: source.id,
-      competitor_name: source.name || "Banco Preziosi",
-      page_url: pageUrl,
-      field_key,
-      label,
-      metal,
-      purity_code,
-      purity_value,
-      unit,
-      anchor_text,
-      regex_pattern,
-      extraction_method: "anchor_regex",
-      required: true,
-      active: true,
-      last_test_status: "not_tested"
-    }));
-  }
   if (String(source.name || "").toLowerCase() === "bordin") {
     const pageUrl = source.website_url || "https://oroemetallipreziosi.com";
     return [
@@ -14043,7 +13957,6 @@ function renderCompetitorQuotes() {
     ${oroDOroSummaryHtml()}
     ${amicoOroSummaryHtml()}
     ${prontoGoldSummaryHtml()}
-    ${bancoPreziosiSummaryHtml()}
     ${bordinSummaryHtml()}
     ${goldStandardSummaryHtml()}
     ${oroInEuroSummaryHtml()}
@@ -14168,12 +14081,26 @@ async function loadGoldPredictionPanel(options = {}) {
     state.competitorQuotes = [...quoteMap.values()]
       .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0));
     state.competitorStats = buybackData.competitor_stats || competitorData.stats || statusData.competitor_stats || {};
-    state.competitorSources = competitorSourcesData.sources || [];
-    state.competitorSyncStatus = competitorSyncData || null;
+    state.competitorSources = (competitorSourcesData.sources || [])
+      .filter((source) => !isHiddenCompetitorName(source.name));
+    state.competitorSyncStatus = competitorSyncData
+      ? {
+          ...competitorSyncData,
+          sources: (competitorSyncData.sources || []).filter((source) => !isHiddenCompetitorName(source.name)),
+          sources_total: (competitorSyncData.sources || state.competitorSources || []).filter((source) => !isHiddenCompetitorName(source.name)).length
+        }
+      : null;
     state.competitorMarketSummary = competitorMarketData?.summary || null;
-    state.competitorAiStatus = competitorAiStatusData || null;
-    state.competitorAiQuotes = competitorAiQuotesData.quotes || [];
-    state.competitorExtractionRules = competitorExtractionRulesData.rules || [];
+    state.competitorAiStatus = competitorAiStatusData
+      ? {
+          ...competitorAiStatusData,
+          sources: (competitorAiStatusData.sources || []).filter((source) => !isHiddenCompetitorName(source.name)),
+          page_summary: (competitorAiStatusData.page_summary || []).filter((page) => !isHiddenCompetitorName(page.competitor_name)),
+          sources_total: (competitorAiStatusData.sources || state.competitorSources || []).filter((source) => !isHiddenCompetitorName(source.name)).length
+        }
+      : null;
+    state.competitorAiQuotes = (competitorAiQuotesData.quotes || []).filter(isCompetitorBuybackQuote);
+    state.competitorExtractionRules = (competitorExtractionRulesData.rules || []).filter((rule) => !isHiddenCompetitorName(rule.competitor_name));
     state.goldPredictionSettings = statusData.settings || null;
     if (isFounder()) {
       const settingsData = await apiRequest("/quotazioni/gold-prediction/settings").catch(() => null);
@@ -14458,27 +14385,6 @@ async function forceProntoGoldSync() {
   await loadGoldPredictionPanel({ silent: true });
 }
 
-async function forceBancoPreziosiSync() {
-  if (!isFounder()) return;
-  showToast("Aggiornamento Banco Preziosi in esecuzione...", "success");
-  const data = await apiRequest("/quotazioni/competitors/banco-preziosi/sync", {
-    method: "POST",
-    body: JSON.stringify({}),
-    timeoutMs: 90000
-  });
-  const saved = Number(data.result?.quotes_saved || 0);
-  const status = data.result?.status || data.state?.last_status || "success";
-  showToast(
-    status === "failed"
-      ? "Banco Preziosi non leggibile automaticamente. Ultimo dato valido mantenuto."
-      : status === "partial"
-        ? `Banco Preziosi aggiornato parzialmente. Quotazioni salvate: ${saved}.`
-        : `Banco Preziosi aggiornato. Quotazioni salvate: ${saved}.`,
-    status === "failed" || status === "partial" ? "warning" : "success"
-  );
-  await loadGoldPredictionPanel({ silent: true });
-}
-
 async function forceBordinSync() {
   if (!isFounder()) return;
   showToast("Aggiornamento Bordin in esecuzione...", "success");
@@ -14681,7 +14587,6 @@ async function handleCompetitorAction(event) {
   const forceOroDOro = event.target.closest("[data-force-oro-doro-sync]");
   const forceAmicoOro = event.target.closest("[data-force-amico-oro-sync]");
   const forceProntoGold = event.target.closest("[data-force-pronto-gold-sync]");
-  const forceBancoPreziosi = event.target.closest("[data-force-banco-preziosi-sync]");
   const forceBordin = event.target.closest("[data-force-bordin-sync]");
   const forceGoldStandard = event.target.closest("[data-force-gold-standard-sync]");
   const forceOroInEuro = event.target.closest("[data-force-oro-in-euro-sync]");
@@ -14719,10 +14624,6 @@ async function handleCompetitorAction(event) {
   }
   if (forceProntoGold && isFounder()) {
     await forceProntoGoldSync();
-    return;
-  }
-  if (forceBancoPreziosi && isFounder()) {
-    await forceBancoPreziosiSync();
     return;
   }
   if (forceBordin && isFounder()) {
@@ -16572,7 +16473,7 @@ brandDropdown?.addEventListener("click", (event) => {
 
 window.addEventListener("resize", () => {
   restoreAurumFloatingPosition();
-  constrainAurumPanelToViewport();
+  scheduleAurumViewportClamp();
   scheduleAurumAvoidance();
 });
 window.addEventListener("scroll", scheduleAurumAvoidance, { passive: true });
