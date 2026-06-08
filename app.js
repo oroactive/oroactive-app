@@ -937,6 +937,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "organ", back: "music", frontText: "2026", backText: "WIEN" }
   },
   {
+    id: "somalia-elephant-2023-1-oz",
+    name: "Somalia Elephant 2023 1 oz",
+    country: "Somalia",
+    mintYears: "2023",
+    nominal: "1.000 Shillings",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.1,
+    fineGold: 31.1,
+    diameter: 39,
+    edge: "Zigrinato",
+    obverse: "Stemma della Repubblica Somala con due leopardi, anno 2023 e valore 1.000 Shillings",
+    reverse: "Elefante della serie African Wildlife con iscrizioni Elephant, 1 oz Au e 999,9",
+    history: "Emissione 2023 della serie African Wildlife Somalia Elephant, prodotta dalla Bavarian State Mint. La serie e apprezzata per il disegno annuale dell'elefante africano e per il formato bullion in oro puro 999,9. Il lato nazionale riporta lo stemma della Somalia e il valore nominale, mentre il rovescio valorizza il soggetto naturalistico con un forte impatto visivo.",
+    recognitionHints: ["somalia elephant 2023", "african wildlife", "elephant", "1 oz au 999.9", "somali republic", "1000 shillings", "bavarian state mint"],
+    visual: { front: "shield", back: "elephant", frontText: "SOM", backText: "1OZ" }
+  },
+  {
     id: "britannia-1-oz",
     name: "Britannia 1 oz",
     country: "Regno Unito",
@@ -1116,6 +1135,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "maple-leaf-1-oz": "maple-leaf-1-oz",
   "wiener-philharmoniker-1-oz": "wiener-philharmoniker-1-oz",
   "filarmonica-vienna-2026-1-oz": "filarmonica-vienna-2026-1-oz",
+  "somalia-elephant-2023-1-oz": "somalia-elephant-2023-1-oz",
   "britannia-1-oz": "britannia-1-oz",
   "kangaroo-nugget-1-oz": "kangaroo-nugget-1-oz",
   "libertad-1-oz": "libertad-1-oz",
@@ -1133,6 +1153,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "panda-cinese-30g": "Archivio OroActive",
   "napoleone-20-franchi-gallo-marianne": "Archivio OroActive",
   "filarmonica-vienna-2026-1-oz": "Archivio OroActive",
+  "somalia-elephant-2023-1-oz": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
 };
 
