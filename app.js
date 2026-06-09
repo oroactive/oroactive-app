@@ -9204,7 +9204,9 @@ function coinFaceMarkup(coin = {}, side = "front") {
   if (imageUrl) {
     return `
       <figure class="coin-photo-frame" aria-label="${escapeHtml(label)} ${escapeHtml(coin.name || "moneta")}">
-        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(`${label} ${coin.name || "moneta d'oro"}`)}" loading="lazy" decoding="async">
+        <span class="coin-photo-image">
+          <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(`${label} ${coin.name || "moneta d'oro"}`)}" loading="lazy" decoding="async">
+        </span>
         <figcaption>${escapeHtml(label)}</figcaption>
       </figure>
     `;

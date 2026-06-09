@@ -2330,11 +2330,19 @@ textarea:disabled {
 
 .coin-photo-frame {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 122px;
+  margin: 0;
+}
+
+.coin-photo-image {
   display: grid;
   place-items: center;
-  width: 122px;
+  width: 100%;
   aspect-ratio: 1;
-  margin: 0;
   border: 1px solid rgba(255, 215, 0, 0.34);
   border-radius: 999px;
   background:
@@ -2348,7 +2356,7 @@ textarea:disabled {
   overflow: hidden;
 }
 
-.coin-photo-frame img {
+.coin-photo-image img {
   width: 104%;
   height: 104%;
   object-fit: contain;
@@ -2356,16 +2364,14 @@ textarea:disabled {
 }
 
 .coin-photo-frame figcaption {
-  position: absolute;
-  left: 50%;
-  bottom: 6px;
-  transform: translateX(-50%);
-  padding: 2px 7px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 215, 0, 0.24);
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(255, 215, 0, 0.1);
   color: #ffe39a;
   font-size: 9px;
   font-weight: 1000;
+  line-height: 1.15;
   text-transform: uppercase;
 }
 
