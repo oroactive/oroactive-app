@@ -1162,6 +1162,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "libertad-1-oz": "libertad-1-oz",
   "panda-cinese-30g": "panda-cinese-30g",
   "centenario-50-pesos": "centenario-50-pesos",
+  "ducato-austriaco": "ducato-austriaco",
   "20-dollari-double-eagle": "20-dollari-saint-gaudens",
   "20-mark-germania": "20-mark-germania"
 };
@@ -1176,6 +1177,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "filarmonica-vienna-2026-1-oz": "Archivio OroActive",
   "somalia-elephant-2023-1-oz": "Archivio OroActive",
   "arca-noe-armenia-2025-1-oz": "Archivio OroActive",
+  "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
 };
 
