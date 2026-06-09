@@ -1486,15 +1486,11 @@ const mainMenuClock = document.getElementById("mainMenuClock");
 const mainMenuLogoRefresh = document.getElementById("mainMenuLogoRefresh");
 const mainMenuQuickActions = document.getElementById("mainMenuQuickActions");
 const mainMenuActions = document.getElementById("mainMenuActions");
-const mainMenuSidebarActions = document.getElementById("mainMenuSidebarActions");
 const mainMenuSearch = document.getElementById("mainMenuSearch");
-const mainMenuQuickJump = document.getElementById("mainMenuQuickJump");
-const mainMenuAurumButton = document.getElementById("mainMenuAurumButton");
+const mainMenuSearchResults = document.getElementById("mainMenuSearchResults");
 const mainMenuWelcome = document.getElementById("mainMenuWelcome");
 const mainMenuHeroRole = document.getElementById("mainMenuHeroRole");
 const mainMenuHeroStore = document.getElementById("mainMenuHeroStore");
-const mainMenuSidebarUserName = document.getElementById("mainMenuSidebarUserName");
-const mainMenuSidebarUserRole = document.getElementById("mainMenuSidebarUserRole");
 const mainMenuFounderKpis = document.getElementById("mainMenuFounderKpis");
 const installHint = document.getElementById("installHint");
 const quoteDashboard = document.getElementById("quoteDashboard");
@@ -3115,24 +3111,24 @@ const MENU_GROUPS = [
   {
     id: "operativita",
     label: "Operatività",
-    description: "Gestisci atti, pratiche, giacenza, fusioni e quotazioni.",
-    icon: "OP",
+    description: "Atti, giacenza, fusioni e quotazioni.",
+    icon: "Atti",
     order: 10,
     roles: MENU_ROLES.all,
     items: [
-      { id: "new-sale-deed", label: "Nuovo atto di vendita", description: "Avvia una pratica operativa.", icon: "NV", order: 10, section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita pratica nuovo compilazione" },
-      { id: "sale-deeds-list", label: "Elenco atti", description: "Apri, modifica o gestisci atti validi.", icon: "EA", order: 20, section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti archivio customer trust pack copia cliente" },
-      { id: "suspended-practices", label: "Pratiche sospese", description: "Correggi pratiche non completabili.", icon: "PS", order: 30, section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "sospese incomplete autorizzazione qualità" },
-      { id: "stock", label: "Giacenza", description: "Controlla materiali e titoli.", icon: "GI", order: 40, section: "giacenza", roles: MENU_ROLES.controls, keywords: "giacenza metalli oro argento platino" },
-      { id: "melting", label: "Fusioni", description: "Prepara e verifica i lotti.", icon: "FU", order: 50, section: "fusioni", roles: MENU_ROLES.controls, keywords: "fusioni lotti raffineria metalli" },
-      { id: "quotes", label: "Quotazioni", description: "Consulta prezzi e quotazioni.", icon: "QT", order: 60, section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro argento platino prezzi" }
+      { id: "new-sale-deed", label: "Nuovo atto di vendita", description: "Crea una nuova pratica.", icon: "+", order: 10, section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita pratica nuovo compilazione" },
+      { id: "sale-deeds-list", label: "Elenco atti", description: "Archivio pratiche.", icon: "Lista", order: 20, section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti archivio customer trust pack copia cliente" },
+      { id: "suspended-practices", label: "Pratiche sospese", description: "Pratiche da correggere.", icon: "Alert", order: 30, section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "sospese incomplete autorizzazione qualità" },
+      { id: "stock", label: "Giacenza", description: "Materiali e titoli.", icon: "Metalli", order: 40, section: "giacenza", roles: MENU_ROLES.controls, keywords: "giacenza metalli oro argento platino" },
+      { id: "melting", label: "Fusioni", description: "Lotti e raffineria.", icon: "Lotti", order: 50, section: "fusioni", roles: MENU_ROLES.controls, keywords: "fusioni lotti raffineria metalli" },
+      { id: "quotes", label: "Quotazioni", description: "Oro, argento e mercato.", icon: "EUR", order: 60, section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro argento platino prezzi analisi mercato competitor metalli" }
     ]
   },
   {
     id: "clienti",
     label: "Clienti",
-    description: "CRM, clienti e strumenti per la fiducia.",
-    icon: "CL",
+    description: "CRM, storico clienti e Trust Pack.",
+    icon: "Clienti",
     order: 20,
     roles: MENU_ROLES.operators,
     items: [
@@ -3144,32 +3140,30 @@ const MENU_GROUPS = [
   {
     id: "formazione",
     label: "Formazione",
-    description: "Academy, corsi, certificazioni e crescita continua.",
-    icon: "AC",
+    description: "Academy, corsi e Gaming OroActive.",
+    icon: "Academy",
     order: 30,
     roles: MENU_ROLES.all,
     items: [
       { id: "academy", label: "OroActive Academy", description: "Ingresso unico a catalogo, corsi, certificazioni, badge, storico e training.", icon: "OA", order: 10, section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo academy corsi miei corsi certificazioni attestati badge storico formazione training operatore gestione academy" },
       { id: "gold-coin-encyclopedia", label: "Elenco Monete", description: "Enciclopedia monete d'oro con schede, storia e ricerca fotografica AI.", icon: "EM", order: 60, section: "coinEncyclopedia", roles: MENU_ROLES.all, keywords: "elenco monete monete oro enciclopedia numismatica sterlina marengo krugerrand sovereign riconoscimento fotocamera" },
       { id: "gaming-oroactive", label: "Gaming OroActive", description: "Aurum Blocks arcade formativo.", icon: "GO", order: 70, section: "gaming", roles: MENU_ROLES.all, keywords: "gaming oroactive giochi arcade formazione punteggi carature" },
-      { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "NC", order: 80, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
-      { id: "aurum-assistant", label: "Assistente IA / Aurum", description: "Tutor e assistente operativo.", icon: "AI", order: 90, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente ia chat ai tutorial" },
+      { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "AI", order: 80, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
       { id: "app-tutorial", label: "Tutorial app", description: "Guida rapida all'app.", icon: "TU", order: 100, action: "tutorial", roles: MENU_ROLES.all, keywords: "tutorial guida aiuto" }
     ]
   },
   {
     id: "controllo",
-    label: "Controllo e sicurezza",
-    description: "Sicurezza, qualità, autorizzazioni e audit.",
-    icon: "CS",
+    label: "Controllo",
+    description: "Qualità, sicurezza e autorizzazioni.",
+    icon: "Scudo",
     order: 40,
     roles: MENU_ROLES.all,
     items: [
       { id: "antifraud", label: "Antifrode AI", description: "Alert e controlli rischio.", icon: "AF", order: 10, section: "antifraud", roles: MENU_ROLES.controls, condition: "control", keywords: "antifrode rischio alert" },
       { id: "aurum-shield", label: "Aurum Shield", description: "Risk score e compliance.", icon: "SH", order: 20, section: "aurumShield", roles: MENU_ROLES.founder, condition: "founder", keywords: "shield rischio score compliance" },
       { id: "quality-check", label: "Controllo Qualità", description: "Checklist pratica.", icon: "CQ", order: 30, section: "practice", roles: MENU_ROLES.operators, keywords: "controllo qualità checklist pratica" },
-      { id: "approvals", label: "Autorizzazioni", description: "Richieste e approvazioni.", icon: "AU", order: 40, section: "approvals", roles: MENU_ROLES.all, condition: "approval", keywords: "richieste autorizzazione approva rifiuta" },
-      { id: "notifications", label: "Notifiche", description: "Avvisi interni.", icon: "NO", order: 50, section: "notifications", roles: MENU_ROLES.all, keywords: "notifiche campanella avvisi" },
+      { id: "approvals", label: "Autorizzazioni", description: "Richieste e approvazioni.", icon: "Ok", order: 40, section: "approvals", roles: MENU_ROLES.all, condition: "approval", keywords: "richieste autorizzazione approva rifiuta" },
       { id: "audit", label: "Audit Trail", description: "Tracciamento azioni.", icon: "AT", order: 60, section: "auditTrail", roles: MENU_ROLES.founder, condition: "founder", keywords: "audit log attività sicurezza" },
       { id: "backup", label: "Backup", description: "Backup e verifica.", icon: "BK", order: 70, section: "backups", roles: MENU_ROLES.backup, condition: "backup", keywords: "backup verifica download restore" }
     ]
@@ -3177,8 +3171,8 @@ const MENU_GROUPS = [
   {
     id: "direzione",
     label: "Direzione",
-    description: "Dashboard, KPI, report e statistiche strategiche.",
-    icon: "DI",
+    description: "Dashboard, KPI e report.",
+    icon: "KPI",
     order: 50,
     roles: MENU_ROLES.founder,
     condition: "founder",
@@ -3191,10 +3185,10 @@ const MENU_GROUPS = [
   {
     id: "amministrazione",
     label: "Amministrazione",
-    description: "Utenti, negozi, impostazioni e permessi.",
-    icon: "AM",
+    description: "Utenti, privacy e impostazioni.",
+    icon: "Admin",
     order: 60,
-    roles: MENU_ROLES.all,
+    roles: MENU_ROLES.administration,
     items: [
       { id: "users", label: "Utenti e permessi", description: "Ruoli e profili.", icon: "UT", order: 10, section: "users", roles: MENU_ROLES.administration, condition: "userDirectory", keywords: "utenti permessi ruoli profili" },
       { id: "stores", label: "Negozi", description: "Sedi e configurazioni.", icon: "NG", order: 20, section: "stores", roles: MENU_ROLES.founder, condition: "founder", keywords: "negozi sedi amministrazione" },
@@ -3207,12 +3201,22 @@ const MENU_GROUPS = [
 ];
 
 const MENU_QUICK_ACTIONS = [
-  { id: "quick-new-sale-deed", label: "Nuovo atto", description: "Crea subito", icon: "NV", order: 10, section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita nuovo" },
-  { id: "quick-archive", label: "Elenco atti", description: "Archivio", icon: "EA", order: 20, section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti" },
-  { id: "quick-suspended", label: "Sospese", description: "Da correggere", icon: "PS", order: 30, section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "pratiche sospese" },
-  { id: "quick-quotes", label: "Quotazioni", description: "Prezzi", icon: "QT", order: 40, section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro prezzi" },
-  { id: "quick-aurum", label: "Aurum", description: "Assistente", icon: "AI", order: 50, section: "assistant", roles: MENU_ROLES.all, keywords: "aurum assistente" },
-  { id: "quick-notifications", label: "Notifiche", description: "Avvisi", icon: "NO", order: 60, section: "notifications", roles: MENU_ROLES.all, keywords: "notifiche" }
+  { id: "quick-new-sale-deed", label: "Nuovo atto", description: "Crea subito", icon: "+", order: 10, section: "practice", roles: MENU_ROLES.all, keywords: "atto vendita nuovo" },
+  { id: "quick-archive", label: "Elenco atti", description: "Archivio pratiche", icon: "Lista", order: 20, section: "archive", roles: MENU_ROLES.operators, keywords: "elenco atti archivio" },
+  { id: "quick-suspended", label: "Pratiche sospese", description: "Da correggere", icon: "Alert", order: 30, section: "suspendedPractices", roles: MENU_ROLES.all, keywords: "pratiche sospese" },
+  { id: "quick-quotes", label: "Quotazioni", description: "Prezzi metalli", icon: "EUR", order: 40, section: "quotazione", roles: MENU_ROLES.operators, keywords: "quotazioni oro argento prezzi analisi mercato" }
+];
+
+const MAIN_MENU_SEARCH_SHORTCUTS = [
+  {
+    id: "search-open-aurum",
+    label: "Apri Aurum",
+    description: "Assistente operativo OroActive",
+    icon: "Aurum",
+    action: "aurum",
+    roles: MENU_ROLES.all,
+    keywords: "aurum assistente ia ai chat aiuto"
+  }
 ];
 
 function menuRoleAllowed(item = {}) {
@@ -3240,6 +3244,43 @@ function menuItemMatchesSearch(item = {}, search = "") {
   if (!search) return true;
   const haystack = `${item.label || ""} ${item.keywords || ""} ${item.section || ""}`.toLowerCase();
   return haystack.includes(search);
+}
+
+function mainMenuSearchLabel(item = {}, group = {}) {
+  if (item.id === "academy") return "OroActive Academy";
+  if (item.id === "gaming-oroactive") return "Gaming OroActive";
+  if (item.id === "quotes") return "Quotazioni";
+  return item.label || group.label || "Funzione OroActive";
+}
+
+function visibleMainMenuSearchItems(search = "") {
+  if (!search) return [];
+  const results = [];
+  visibleMenuGroups().forEach((group) => {
+    group.items.forEach((item) => {
+      if (!menuItemMatchesSearch(item, search)) return;
+      results.push({
+        ...item,
+        label: mainMenuSearchLabel(item, group),
+        areaLabel: group.label,
+        areaDescription: group.description
+      });
+    });
+  });
+  MAIN_MENU_SEARCH_SHORTCUTS.forEach((item) => {
+    if (isMenuItemVisible(item) && menuItemMatchesSearch(item, search)) {
+      results.push({ ...item, areaLabel: "Assistente" });
+    }
+  });
+  const seen = new Set();
+  return results
+    .filter((item) => {
+      const key = `${item.action || item.section || ""}:${item.label}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 8);
 }
 
 function sortedMenuItems(items = []) {
@@ -3276,6 +3317,43 @@ function menuButtonMarkup(item = {}, extraClass = "") {
   `;
 }
 
+function mainMenuSearchResultMarkup(item = {}) {
+  const attributes = [
+    `type="button"`,
+    `data-menu-item="${escapeHtml(item.id)}"`
+  ];
+  if (item.section) attributes.push(`data-section="${escapeHtml(item.section)}"`);
+  if (item.courseTabShortcut) attributes.push(`data-course-tab-shortcut="${escapeHtml(item.courseTabShortcut)}"`);
+  if (item.action) attributes.push(`data-menu-action="${escapeHtml(item.action)}"`);
+  return `
+    <button class="main-menu-search-result" ${attributes.join(" ")}>
+      <span class="main-menu-search-result-icon" aria-hidden="true">${escapeHtml(item.icon || "Vai")}</span>
+      <span>
+        <strong>${escapeHtml(item.label || "")}</strong>
+        <small>${escapeHtml(`${item.areaLabel || "OroActive"} · ${item.description || item.areaDescription || "Apri funzione"}`)}</small>
+      </span>
+    </button>
+  `;
+}
+
+function closeMainMenuSearchResults() {
+  if (!mainMenuSearchResults) return;
+  mainMenuSearchResults.hidden = true;
+  mainMenuSearchResults.innerHTML = "";
+}
+
+function renderMainMenuSearchResults(search = "") {
+  if (!mainMenuSearchResults) return;
+  const cleanSearch = String(search || "").trim().toLowerCase();
+  const results = visibleMainMenuSearchItems(cleanSearch);
+  mainMenuSearchResults.hidden = !cleanSearch;
+  mainMenuSearchResults.innerHTML = cleanSearch
+    ? (results.length
+      ? results.map((item) => mainMenuSearchResultMarkup(item)).join("")
+      : '<div class="main-menu-search-empty">Nessuna funzione autorizzata trovata.</div>')
+    : "";
+}
+
 function visibleMenuItems(items = [], search = "") {
   return sortedMenuItems(items).filter((item) => isMenuItemVisible(item) && menuItemMatchesSearch(item, search));
 }
@@ -3285,6 +3363,23 @@ function visibleMenuGroups(search = "") {
     .filter((group) => isMenuItemVisible(group))
     .map((group) => ({ ...group, items: visibleMenuItems(group.items, search) }))
     .filter((group) => group.items.length);
+}
+
+function getMainMenuConfigForRole(userRole = state.currentUser?.ruolo) {
+  const role = normalizeRole(userRole);
+  const quickActions = visibleMenuItems(MENU_QUICK_ACTIONS);
+  const macroAreas = visibleMenuGroups();
+  return {
+    quickActions,
+    macroAreas,
+    showFounderMetrics: role === "founder",
+    showDirection: role === "founder",
+    showAdmin: ["founder", "supervisore", "responsabile"].includes(role),
+    searchScope: [
+      ...macroAreas.flatMap((group) => group.items.map((item) => item.id)),
+      ...MAIN_MENU_SEARCH_SHORTCUTS.filter((item) => isMenuItemVisible(item)).map((item) => item.id)
+    ]
+  };
 }
 
 function menuGroupMarkup(group = {}, area = "main") {
@@ -3320,16 +3415,27 @@ function renderFounderMenuKpis() {
   const healthScore = mainMenuKpiValue(["store_health", "average_score"]);
   const dailyActs = mainMenuKpiValue(["kpi", "numero_atti_giornalieri"]);
   const suspended = mainMenuKpiValue(["suspended_practices", "total"]);
-  const unread = Number(state.notificationUnreadCount || 0);
+  const unread = Number.isFinite(Number(state.notificationUnreadCount)) ? Number(state.notificationUnreadCount) : null;
   const kpis = [
-    { label: "Store Health medio", value: healthScore === null ? "—" : `${Number(healthScore || 0)}/100` },
-    { label: "Atti oggi", value: dailyActs === null ? "—" : dailyActs },
-    { label: "Pratiche sospese", value: suspended === null ? "—" : suspended },
-    { label: "Notifiche non lette", value: unread || "—" }
+    { label: "Store Health medio", value: healthScore === null ? null : `${Number(healthScore || 0)}/100` },
+    { label: "Atti oggi", value: dailyActs === null ? null : dailyActs },
+    { label: "Pratiche sospese", value: suspended === null ? null : suspended },
+    { label: "Notifiche non lette", value: unread }
   ];
+  const visibleKpis = kpis.filter((kpi) => kpi.value !== null && kpi.value !== undefined && kpi.value !== "");
+  if (!visibleKpis.length) {
+    mainMenuFounderKpis.innerHTML = `
+      <div class="main-menu-founder-empty">
+        <strong>Nessun dato operativo disponibile oggi</strong>
+        <small>Apri la Dashboard per controllare KPI e report quando i dati saranno caricati.</small>
+      </div>
+      <button class="main-menu-dashboard-link" type="button" data-section="dashboard">Vai alla Dashboard</button>
+    `;
+    return;
+  }
   mainMenuFounderKpis.innerHTML = `
     <div class="main-menu-founder-kpi-list">
-      ${kpis.map((kpi) => `<article><span>${escapeHtml(kpi.label)}</span><strong>${escapeHtml(String(kpi.value))}</strong></article>`).join("")}
+      ${visibleKpis.map((kpi) => `<article><span>${escapeHtml(kpi.label)}</span><strong>${escapeHtml(String(kpi.value))}</strong></article>`).join("")}
     </div>
     <button class="main-menu-dashboard-link" type="button" data-section="dashboard">Vai alla Dashboard</button>
   `;
@@ -3337,23 +3443,19 @@ function renderFounderMenuKpis() {
 
 function renderRoleBasedMenus() {
   const search = String(mainMenuSearch?.value || "").trim().toLowerCase();
+  const menuConfig = getMainMenuConfigForRole();
   if (mainMenuQuickActions) {
-    mainMenuQuickActions.innerHTML = visibleMenuItems(MENU_QUICK_ACTIONS)
+    mainMenuQuickActions.innerHTML = menuConfig.quickActions
       .map((item) => menuButtonMarkup(item, "main-menu-quick-button"))
       .join("");
   }
-  const groups = visibleMenuGroups(search);
+  const groups = menuConfig.macroAreas;
   if (mainMenuActions) {
     mainMenuActions.innerHTML = groups.length
       ? groups.map((group) => menuGroupMarkup(group)).join("")
       : '<div class="main-menu-empty">Nessuna funzione disponibile per questa ricerca.</div>';
   }
-  if (mainMenuSidebarActions) {
-    const sidebarGroups = visibleMenuGroups();
-    mainMenuSidebarActions.innerHTML = sidebarGroups.length
-      ? sidebarGroups.map((group) => menuGroupMarkup(group, "sidebar")).join("")
-      : '<div class="main-menu-empty">Nessuna funzione disponibile.</div>';
-  }
+  renderMainMenuSearchResults(search);
   if (brandDropdown) {
     const brandGroups = visibleMenuGroups();
     brandDropdown.innerHTML = brandGroups.map((group) => `
@@ -3477,12 +3579,6 @@ function applyRolePermissions() {
   }
   if (mainMenuHeroStore && state.currentUser) {
     mainMenuHeroStore.textContent = userSeesAllStores() ? "Tutti i negozi" : (state.currentUser.negozio || "Negozio assegnato");
-  }
-  if (mainMenuSidebarUserName && state.currentUser) {
-    mainMenuSidebarUserName.textContent = displayMenuUserName(state.currentUser);
-  }
-  if (mainMenuSidebarUserRole && state.currentUser) {
-    mainMenuSidebarUserRole.textContent = `${roleLabel(state.currentUser.ruolo)} · ${userSeesAllStores() ? "Tutti i negozi" : (state.currentUser.negozio || "Negozio")}`;
   }
   const operatorStoreName = document.getElementById("operatorStoreName");
   if (operatorStoreName && state.currentUser && userSeesAllStores()) {
@@ -4184,6 +4280,7 @@ function openOroActiveWebsite() {
 function showMainMenuFromSplash() {
   splashScreen.classList.add("hidden");
   renderRoleBasedMenus();
+  closeMainMenuSearchResults();
   mainMenuScreen.hidden = false;
   setAurumSection("menu");
   updateAurumMascotVisibility();
@@ -4193,6 +4290,7 @@ function showMainMenuFromSplash() {
 async function enterSectionFromMainMenu(section) {
   const route = resolveSectionRoute(section);
   if (route.fusionView) state.fusionView = route.fusionView;
+  closeMainMenuSearchResults();
   mainMenuScreen.hidden = true;
   setAurumSection(section);
   updateAurumMascotVisibility();
@@ -4244,6 +4342,7 @@ async function returnToMainMenu() {
   closeBrandMenu();
   clearActSearch();
   renderRoleBasedMenus();
+  closeMainMenuSearchResults();
   mainMenuScreen.hidden = false;
   setAurumSection("menu");
   updateAurumMascotVisibility();
@@ -17394,6 +17493,14 @@ async function openMainMenuItem(button) {
     startTutorial({ firstRun: false });
     return;
   }
+  if (button.dataset.menuAction === "aurum") {
+    closeMainMenuDropdowns();
+    closeMainMenuSearchResults();
+    setAurumSection("menu");
+    updateAurumMascotVisibility();
+    openAurumChat();
+    return;
+  }
   if (button.dataset.section) await enterSectionFromMainMenu(button.dataset.section);
 }
 
@@ -17443,13 +17550,6 @@ mainMenuActions?.addEventListener("click", (event) => {
   void openMainMenuItem(button);
 });
 
-mainMenuSidebarActions?.addEventListener("click", (event) => {
-  const button = event.target.closest("button");
-  if (!button) return;
-  event.stopPropagation();
-  void openMainMenuItem(button);
-});
-
 mainMenuFounderKpis?.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
@@ -17457,19 +17557,24 @@ mainMenuFounderKpis?.addEventListener("click", (event) => {
   void openMainMenuItem(button);
 });
 
-mainMenuQuickJump?.addEventListener("click", () => {
-  mainMenuQuickActions?.scrollIntoView({ behavior: "smooth", block: "center" });
-});
-
-mainMenuAurumButton?.addEventListener("click", (event) => {
-  event.stopPropagation();
-  setAurumSection("menu");
-  updateAurumMascotVisibility();
-  openAurumChat();
-});
-
 mainMenuSearch?.addEventListener("input", () => {
   renderRoleBasedMenus();
+});
+
+mainMenuSearch?.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  mainMenuSearch.value = "";
+  closeMainMenuSearchResults();
+  renderRoleBasedMenus();
+});
+
+mainMenuSearchResults?.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  event.stopPropagation();
+  if (mainMenuSearch) mainMenuSearch.value = "";
+  closeMainMenuSearchResults();
+  void openMainMenuItem(button);
 });
 
 mainUserMenuButton?.addEventListener("click", (event) => {
@@ -17585,6 +17690,7 @@ document.addEventListener("click", (event) => {
   if (mainUserDropdown && !mainUserDropdown.hidden && !event.target.closest(".main-user-menu")) closeMainUserMenu();
   if (notificationDropdown && !notificationDropdown.hidden && !event.target.closest(".notification-center")) closeNotificationDropdown();
   if (mainMenuScreen && !mainMenuScreen.hidden && !event.target.closest(".main-menu-group")) closeMainMenuDropdowns();
+  if (mainMenuScreen && !mainMenuScreen.hidden && !event.target.closest(".main-menu-search-wrap")) closeMainMenuSearchResults();
   if (aurumChatPanel && !aurumChatPanel.hidden && !event.target.closest("#aurumChatPanel") && !event.target.closest("#aurumMascotButton")) closeAurumChat();
 });
 
