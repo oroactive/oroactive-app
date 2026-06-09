@@ -824,7 +824,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "krugerrand-1-oz",
-    name: "Krugerrand 1 oz",
+    name: "Krugerrand",
     country: "Sud Africa",
     mintYears: "1967-oggi",
     nominal: "Senza valore nominale",
@@ -843,7 +843,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "american-eagle-1-oz",
-    name: "American Gold Eagle 1 oz",
+    name: "American Gold Eagle",
     country: "Stati Uniti",
     mintYears: "1986-oggi",
     nominal: "50 Dollars",
@@ -862,7 +862,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "american-buffalo-1-oz",
-    name: "American Buffalo 1 oz",
+    name: "American Buffalo",
     country: "Stati Uniti",
     mintYears: "2006-oggi",
     nominal: "50 Dollars",
@@ -881,7 +881,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "maple-leaf-1-oz",
-    name: "Maple Leaf 1 oz",
+    name: "Maple Leaf",
     country: "Canada",
     mintYears: "1979-oggi",
     nominal: "50 Dollars",
@@ -900,7 +900,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "filarmonica-vienna-2026-1-oz",
-    name: "Filarmonica di Vienna 2026 1 oz",
+    name: "Filarmonica di Vienna 2026",
     country: "Austria",
     mintYears: "2026",
     nominal: "100 Euro",
@@ -919,7 +919,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "somalia-elephant-2023-1-oz",
-    name: "Somalia Elephant 2023 1 oz",
+    name: "Somalia Elephant 2023",
     country: "Somalia",
     mintYears: "2023",
     nominal: "1.000 Shillings",
@@ -938,7 +938,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "arca-noe-armenia-2025-1-oz",
-    name: "Arca di Noe Armenia 2025 1 oz",
+    name: "Arca di Noe Armenia 2025",
     country: "Armenia",
     mintYears: "2025",
     nominal: "50.000 Dram",
@@ -958,7 +958,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "britannia-1-oz",
-    name: "Britannia 1 oz",
+    name: "Britannia",
     country: "Regno Unito",
     mintYears: "1987-oggi",
     nominal: "100 Pounds",
@@ -977,7 +977,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "kangaroo-nugget-1-oz",
-    name: "Australian Kangaroo 1 oz",
+    name: "Australian Kangaroo",
     country: "Australia",
     mintYears: "1986-oggi",
     nominal: "100 Dollars",
@@ -996,7 +996,7 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "libertad-1-oz",
-    name: "Libertad 1 oz",
+    name: "Libertad",
     country: "Messico",
     mintYears: "1981-oggi",
     nominal: "Onza",
@@ -1120,7 +1120,6 @@ const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS = new Set([
   "marengo-svizzero-vreneli",
   "krugerrand-1-oz",
   "american-eagle-1-oz",
-  "american-buffalo-1-oz",
   "arca-noe-armenia-2025-1-oz",
   "centenario-50-pesos",
   "ducato-austriaco",

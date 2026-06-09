@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260609-coin-side-labels-1";
+const STATIC_CACHE = "oroactive-static-v20260609-buffalo-images-short-names-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260609-coin-side-labels-1",
-  "/app.js?v=20260609-coin-side-labels-1",
+  "/styles.css?v=20260609-buffalo-images-short-names-1",
+  "/app.js?v=20260609-buffalo-images-short-names-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",
