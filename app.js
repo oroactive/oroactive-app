@@ -899,25 +899,6 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "profile", back: "leaf", frontText: "CAN", backText: "9999" }
   },
   {
-    id: "wiener-philharmoniker-1-oz",
-    name: "Wiener Philharmoniker 1 oz",
-    country: "Austria",
-    mintYears: "1989-oggi",
-    nominal: "100 Euro",
-    metal: "Oro",
-    purity: 0.9999,
-    purityLabel: "24 kt / 999,9‰",
-    grossWeight: 31.1035,
-    fineGold: 31.1035,
-    diameter: 37,
-    edge: "Zigrinato",
-    obverse: "Organo della Musikverein",
-    reverse: "Strumenti dell'orchestra filarmonica",
-    history: "La Filarmonica di Vienna e la bullion austriaca piu conosciuta. Gli strumenti musicali sul retro sono il suo elemento di riconoscimento principale.",
-    recognitionHints: ["philharmoniker", "wiener", "vienna", "organo", "strumenti", "100 euro"],
-    visual: { front: "organ", back: "music", frontText: "WIEN", backText: "9999" }
-  },
-  {
     id: "filarmonica-vienna-2026-1-oz",
     name: "Filarmonica di Vienna 2026 1 oz",
     country: "Austria",
@@ -1131,16 +1112,37 @@ const GOLD_COIN_CATALOG = [
 
 const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
 
-function bilanciaDoroCoinImages(slug, source = "La Bilancia d'Oro") {
+const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS = new Set([
+  "sterlina-oro-sovrana",
+  "marengo-20-lire-italia",
+  "marengo-francese-20-franchi",
+  "napoleone-20-franchi-gallo-marianne",
+  "marengo-svizzero-vreneli",
+  "krugerrand-1-oz",
+  "american-eagle-1-oz",
+  "american-buffalo-1-oz",
+  "arca-noe-armenia-2025-1-oz"
+]);
+
+function bilanciaDoroCoinImages(slug, source = "La Bilancia d'Oro", invertSides = false) {
+  const frontSide = invertSides ? "back" : "front";
+  const backSide = invertSides ? "front" : "back";
   return {
-    front: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-front.png`,
-    back: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-back.png`,
+    front: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-${frontSide}.png`,
+    back: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-${backSide}.png`,
     source
   };
 }
 
 function withBilanciaDoroImages(coin, slug, source) {
-  return { ...coin, bookImages: bilanciaDoroCoinImages(slug, source) };
+  return {
+    ...coin,
+    bookImages: bilanciaDoroCoinImages(
+      slug,
+      source,
+      INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS.has(coin.id)
+    )
+  };
 }
 
 const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
@@ -1153,7 +1155,6 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "american-eagle-1-oz": "american-eagle-1-oz",
   "american-buffalo-1-oz": "american-buffalo-1-oz",
   "maple-leaf-1-oz": "maple-leaf-1-oz",
-  "wiener-philharmoniker-1-oz": "wiener-philharmoniker-1-oz",
   "filarmonica-vienna-2026-1-oz": "filarmonica-vienna-2026-1-oz",
   "somalia-elephant-2023-1-oz": "somalia-elephant-2023-1-oz",
   "arca-noe-armenia-2025-1-oz": "arca-noe-armenia-2025-1-oz",
@@ -1433,7 +1434,13 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
 
 GOLD_COIN_CATALOG.forEach((coin) => {
   const slug = BILANCIA_DORO_IMAGE_SLUGS_BY_COIN[coin.id];
-  if (slug) coin.bookImages = bilanciaDoroCoinImages(slug, COIN_IMAGE_SOURCE_BY_COIN[coin.id]);
+  if (slug) {
+    coin.bookImages = bilanciaDoroCoinImages(
+      slug,
+      COIN_IMAGE_SOURCE_BY_COIN[coin.id],
+      INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS.has(coin.id)
+    );
+  }
 });
 GOLD_COIN_CATALOG.push(...BILANCIA_DORO_COIN_ADDITIONS);
 
