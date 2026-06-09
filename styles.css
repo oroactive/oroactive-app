@@ -1502,60 +1502,8 @@ textarea:disabled {
   color: #fff;
 }
 
-.aurum-tutor-toolbar,
-.aurum-price-toolbar {
-  flex: 0 1 auto;
-  display: grid;
-  gap: 8px;
-  max-height: 128px;
-  margin: 12px 12px 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  border: 1px solid rgba(255, 181, 72, 0.24);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  padding: 10px;
-}
-
-.aurum-price-toolbar {
-  border-color: rgba(255, 215, 0, 0.32);
-  background: rgba(255, 122, 0, 0.1);
-}
-
-.aurum-tutor-toolbar span,
-.aurum-price-toolbar span {
-  color: #ffd696;
-  font-size: 12px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
 .aurum-price-explanation-mode .aurum-chat-log {
   min-height: 220px;
-}
-
-.aurum-quick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.aurum-quick-actions button {
-  border: 1px solid rgba(255, 181, 72, 0.34);
-  border-radius: 8px;
-  background: rgba(255, 122, 0, 0.12);
-  color: #fff6e8;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-  padding: 7px 9px;
-}
-
-.aurum-quick-actions button:hover,
-.aurum-quick-actions button:focus-visible {
-  background: rgba(255, 122, 0, 0.22);
-  outline: 1px solid rgba(255, 181, 72, 0.6);
 }
 
 .aurum-consent-panel,
@@ -10567,11 +10515,6 @@ input.document-expired {
   .aurum-chat-log {
     min-height: 84px;
     max-height: 22vh;
-    margin: 10px 10px 0;
-  }
-
-  .aurum-tutor-toolbar {
-    max-height: 112px;
     margin: 10px 10px 0;
   }
 

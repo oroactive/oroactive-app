@@ -1564,8 +1564,6 @@ const aurumChatMessages = document.getElementById("aurumChatMessages");
 const aurumChatForm = document.getElementById("aurumChatForm");
 const aurumQuestion = document.getElementById("aurumQuestion");
 const aurumAskButton = document.getElementById("aurumAskButton");
-const aurumTutorToolbar = document.getElementById("aurumTutorToolbar");
-const aurumPriceToolbar = document.getElementById("aurumPriceToolbar");
 const aurumConsentPanel = document.getElementById("aurumConsentPanel");
 const aurumRememberYes = document.getElementById("aurumRememberYes");
 const aurumRememberNo = document.getElementById("aurumRememberNo");
@@ -5313,8 +5311,6 @@ function renderAurumMessages() {
   if (!aurumChatMessages) return;
   const isPriceExplanation = state.aurumMode === "price_explanation";
   if (aurumChatTitle) aurumChatTitle.textContent = isPriceExplanation ? "Aurum — Spiegazione prezzo" : "Aurum — Assistente OroActive";
-  if (aurumTutorToolbar) aurumTutorToolbar.hidden = isPriceExplanation;
-  if (aurumPriceToolbar) aurumPriceToolbar.hidden = !isPriceExplanation;
   aurumChatPanel?.classList.toggle("aurum-price-explanation-mode", isPriceExplanation);
   if (!state.aurumMessages.length) {
     aurumChatMessages.innerHTML = isPriceExplanation
@@ -16900,45 +16896,6 @@ aurumTipClose?.addEventListener("click", () => {
   if (aurumTipBubble) aurumTipBubble.hidden = true;
 });
 aurumChatForm?.addEventListener("submit", askAurum);
-aurumTutorToolbar?.addEventListener("click", (event) => {
-  const tutorialButton = event.target.closest("[data-aurum-tutorial]");
-  if (tutorialButton) {
-    const tutorialId = tutorialButton.dataset.aurumTutorial;
-    state.aurumMessages.push({ role: "assistant", content: formatAurumGuideResponse(AURUM_TUTORIAL_TO_GUIDE[tutorialId], tutorialId) });
-    renderAurumMessages();
-    startAurumTutorial(tutorialId);
-    return;
-  }
-  if (event.target.closest("[data-aurum-field-help]")) {
-    const activeKey = document.activeElement?.closest?.("[data-aurum-help]")?.dataset?.aurumHelp || "";
-    const fallbackKey = AURUM_HELP_TARGETS.find(({ selector }) => document.querySelector(selector))?.key || "";
-    const answer = explainAurumField(activeKey || fallbackKey);
-    state.aurumMessages.push({ role: "assistant", content: answer || "Seleziona un campo e poi chiedimi di spiegarlo." });
-    renderAurumMessages();
-    return;
-  }
-  if (event.target.closest("[data-aurum-quiz]")) {
-    startAurumCuriosityQuiz();
-  }
-});
-aurumPriceToolbar?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-aurum-price-followup]");
-  if (!button) return;
-  const context = state.aurumLastPriceContext || state.aurumPriceContext;
-  if (!context) {
-    showToast("Apri prima una spiegazione prezzo.", "warning");
-    return;
-  }
-  const followup = button.dataset.aurumPriceFollowup || "simple";
-  const question = buildPriceExplanationQuestion(context, followup);
-  state.aurumMessages.push({ role: "user", content: question });
-  state.aurumMessages.push({
-    role: "assistant",
-    content: generateLocalPriceExplanation(context, { followup }),
-    source: "Spiegazione locale OroActive"
-  });
-  renderAurumMessages();
-});
 aurumRememberYes?.addEventListener("click", saveAurumMemory);
 aurumRememberNo?.addEventListener("click", () => {
   showAurumMemoryConsent(null);
