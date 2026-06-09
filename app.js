@@ -1121,7 +1121,20 @@ const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS = new Set([
   "krugerrand-1-oz",
   "american-eagle-1-oz",
   "american-buffalo-1-oz",
-  "arca-noe-armenia-2025-1-oz"
+  "arca-noe-armenia-2025-1-oz",
+  "centenario-50-pesos",
+  "ducato-austriaco",
+  "20-dollari-double-eagle",
+  "20-mark-germania",
+  "marengo-belga-20-franchi",
+  "sterlina-vecchio-conio",
+  "sudafrica-2-rand",
+  "cile-100-pesos",
+  "austria-100-corone",
+  "4-ducati-austriaci",
+  "messico-20-pesos",
+  "austria-1000-scellini",
+  "ungheria-20-corone"
 ]);
 
 function bilanciaDoroCoinImages(slug, source = "La Bilancia d'Oro", invertSides = false) {
