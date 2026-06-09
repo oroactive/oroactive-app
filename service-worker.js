@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260609-expanded-coin-front-back-1";
+const STATIC_CACHE = "oroactive-static-v20260609-group-coins-by-country-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260609-expanded-coin-front-back-1",
-  "/app.js?v=20260609-expanded-coin-front-back-1",
+  "/styles.css?v=20260609-group-coins-by-country-1",
+  "/app.js?v=20260609-group-coins-by-country-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

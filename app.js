@@ -9175,7 +9175,24 @@ function coinCatalogFiltered() {
     const matchesCountry = !country || coin.country === country;
     const matchesPurity = !purity || coinPurityBucket(coin) === purity;
     return matchesSearch && matchesCountry && matchesPurity;
+  }).sort((a, b) => {
+    const countryOrder = String(a.country || "").localeCompare(String(b.country || ""), "it");
+    if (countryOrder) return countryOrder;
+    return String(a.name || "").localeCompare(String(b.name || ""), "it");
   });
+}
+
+function groupedCoinsByCountry(coins = []) {
+  return coins.reduce((groups, coin) => {
+    const country = coin.country || "Paese non indicato";
+    const existing = groups.find((group) => group.country === country);
+    if (existing) {
+      existing.coins.push(coin);
+    } else {
+      groups.push({ country, coins: [coin] });
+    }
+    return groups;
+  }, []);
 }
 
 function coinFaceMarkup(coin = {}, side = "front") {
@@ -9243,6 +9260,21 @@ function coinCardMarkup(coin = {}) {
       </div>
       <button type="button" class="ghost-button" data-open-coin="${escapeHtml(String(coin.id))}">Apri scheda</button>
     </article>
+  `;
+}
+
+function coinCountryGroupMarkup(group = {}) {
+  const coins = Array.isArray(group.coins) ? group.coins : [];
+  return `
+    <section class="coin-country-group" aria-label="${escapeHtml(group.country || "Paese")}">
+      <header class="coin-country-heading">
+        <h3>${escapeHtml(group.country || "Paese")}</h3>
+        <span>${coins.length} ${coins.length === 1 ? "moneta" : "monete"}</span>
+      </header>
+      <div class="coin-country-grid">
+        ${coins.map(coinCardMarkup).join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -9352,7 +9384,7 @@ function renderCoinEncyclopedia() {
   renderCoinOverview(visibleCoins);
   if (coinCatalogGrid) {
     coinCatalogGrid.innerHTML = visibleCoins.length
-      ? visibleCoins.map(coinCardMarkup).join("")
+      ? groupedCoinsByCountry(visibleCoins).map(coinCountryGroupMarkup).join("")
       : '<div class="empty-state">Nessuna moneta trovata. Modifica ricerca o filtri.</div>';
   }
   if (!visibleCoins.some((coin) => coin.id === state.coinSelectedId) && visibleCoins[0]) {
