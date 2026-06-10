@@ -15287,15 +15287,18 @@ async function saveGoldMasterCourseToAcademy(payload = {}, user = {}) {
   };
 }
 
-async function ensureGoldMasterCourseInCatalog() {
+async function ensureGoldMasterCourseInCatalog(options = {}) {
   const existing = await findGoldMasterCourse();
   if (!existing) {
     return generateGoldMasterCourseFromBilancia({ id: null, ruolo: "founder" }, { force: true });
   }
   const metadata = existing.metadata || {};
-  if (existing.active === false && metadata.publicationStatus !== "hidden_by_founder") {
+  const shouldRestoreVisibility = existing.active === false && (options.forceVisible || metadata.publicationStatus !== "hidden_by_founder");
+  if (shouldRestoreVisibility) {
     const nextMetadata = sanitizeForPostgres({
-      publicationStatus: metadata.publicationStatus || "draft_review",
+      publicationStatus: options.forceVisible && metadata.publicationStatus === "hidden_by_founder"
+        ? "draft_review"
+        : metadata.publicationStatus || "draft_review",
       visibleInAcademyCatalog: true,
       catalogVisibilityFixedAt: new Date().toISOString()
     });
@@ -19929,6 +19932,24 @@ app.post("/api/academy/gold-master/generate-from-bilancia", requireFounder, asyn
       afterData: result
     });
     response.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/gold-master/ensure-visible", requireFounder, async (request, response, next) => {
+  try {
+    const result = await ensureGoldMasterCourseInCatalog({ forceVisible: true });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "ensure_gold_master_course_visible",
+      entityType: "academy_course",
+      entityId: result.course_id || null,
+      entityLabel: GOLD_MASTER_COURSE_TITLE,
+      afterData: result
+    });
+    response.json({ ok: true, ...result });
   } catch (error) {
     next(error);
   }

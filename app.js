@@ -80,6 +80,7 @@ const state = {
   courseProgress: [],
   courseCertificates: [],
   courseBadges: [],
+  goldMasterCatalogNotice: "",
   courseActiveTab: "catalog",
   coinCatalogSearch: "",
   coinCatalogCountry: "",
@@ -9111,6 +9112,7 @@ function renderTraining() {
         </div>
       </article>
     `);
+    const courseRows = visibleCourses.length ? visibleCourses.map(renderCourseCard).join("") : renderGoldMasterRecoveryCard();
     trainingList.innerHTML = `
       <article class="course-card academy-course-card">
         <div>
@@ -9124,6 +9126,14 @@ function renderTraining() {
           </div>
         </div>
       </article>
+      <article class="course-card badge-card">
+        <div>
+          <span class="course-pill">Catalogo</span>
+          <h3>Corsi Academy</h3>
+          <p>Qui vedi i corsi disponibili nel catalogo, inclusi quelli in bozza visibile come Oro Master.</p>
+        </div>
+      </article>
+      ${courseRows || '<div class="empty-state">Nessun corso attivo.</div>'}
       ${facultyRows.join("") || '<div class="empty-state">Nessuna facoltà configurata.</div>'}
     `;
     return;
@@ -9157,7 +9167,9 @@ function renderTraining() {
     return;
   }
 
-  trainingList.innerHTML = visibleCourses.length ? visibleCourses.map(renderCourseCard).join("") : '<div class="empty-state">Nessun corso attivo.</div>';
+  trainingList.innerHTML = visibleCourses.length
+    ? visibleCourses.map(renderCourseCard).join("")
+    : (renderGoldMasterRecoveryCard() || '<div class="empty-state">Nessun corso attivo.</div>');
 }
 
 function renderCourseCard(course) {
@@ -9228,13 +9240,76 @@ function renderCourseCard(course) {
   `;
 }
 
+function isGoldMasterCourse(course = {}) {
+  const metadata = course.metadata || {};
+  return metadata.goldMaster === true
+    || metadata.courseCode === "ORO-MASTER-001"
+    || String(course.title || "").trim() === "Oro Master — Dalla Bilancia d’Oro";
+}
+
+function mergeGoldMasterCourseData(data = {}, course = null) {
+  if (!course?.id) return data;
+  const courses = Array.isArray(data.courses) ? [...data.courses] : [];
+  if (!courses.some((item) => String(item.id) === String(course.id) || isGoldMasterCourse(item))) {
+    courses.unshift(course);
+  }
+  return { ...data, courses };
+}
+
+async function ensureGoldMasterVisibleForAcademy(data = {}) {
+  if ((data.courses || []).some(isGoldMasterCourse)) {
+    state.goldMasterCatalogNotice = "";
+    return data;
+  }
+  if (!canManageCoursesUi()) return data;
+  try {
+    state.goldMasterCatalogNotice = "Sto preparando Oro Master nel catalogo Academy...";
+    await apiRequest("/academy/gold-master/ensure-visible", { method: "POST" });
+    const refreshed = await apiRequest("/corsi");
+    if ((refreshed.courses || []).some(isGoldMasterCourse)) {
+      state.goldMasterCatalogNotice = "";
+      return refreshed;
+    }
+    const goldMasterCourse = await apiRequest("/academy/gold-master/course");
+    state.goldMasterCatalogNotice = "";
+    return mergeGoldMasterCourseData(refreshed, goldMasterCourse);
+  } catch (error) {
+    state.goldMasterCatalogNotice = "Oro Master non è ancora visibile: usa Ripristina Oro Master o riavvia il server dopo il deploy.";
+    console.warn("Ripristino Oro Master non riuscito:", error);
+    return data;
+  }
+}
+
+function renderGoldMasterRecoveryCard() {
+  if (!canManageCoursesUi()) return "";
+  return `
+    <article class="course-card academy-course-card academy-gold-master-recovery">
+      <div class="course-card-main">
+        <span class="course-pill">OroActive Academy</span>
+        <h3>Oro Master — Dalla Bilancia d’Oro</h3>
+        <p>${escapeHtml(state.goldMasterCatalogNotice || "Il corso non è ancora visibile nel catalogo. Puoi generarlo o riportarlo nel catalogo Academy adesso.")}</p>
+        <div class="academy-gold-master-strip">
+          <strong>ORO-MASTER-001</strong>
+          <span>12 moduli</span>
+          <span>Corso avanzato</span>
+          <span>Bozza visibile</span>
+        </div>
+      </div>
+      <div class="course-progress-panel">
+        <button class="primary-button" type="button" data-ensure-gold-master>Ripristina Oro Master</button>
+      </div>
+    </article>
+  `;
+}
+
 async function loadTraining() {
-  const [data, scenarioData, myResultsData, teamResultsData] = await Promise.all([
+  const [rawCourseData, scenarioData, myResultsData, teamResultsData] = await Promise.all([
     apiRequest("/corsi"),
     apiRequest("/training/scenarios"),
     apiRequest("/training/my-results"),
     apiRequest("/training/team-results")
   ]);
+  const data = await ensureGoldMasterVisibleForAcademy(rawCourseData);
   state.courseFaculties = data.faculties || [];
   state.trainingCourses = data.courses || [];
   state.courseCategories = data.categories || [];
@@ -17122,6 +17197,7 @@ trainingList?.addEventListener("click", async (event) => {
   const certificate = event.target.closest("[data-download-certificate]");
   const noteButton = event.target.closest("[data-save-academy-note]");
   const aiButton = event.target.closest("[data-course-ai]");
+  const ensureGoldMasterButton = event.target.closest("[data-ensure-gold-master]");
   const createFaculty = event.target.closest("[data-create-academy-faculty]");
   const editFaculty = event.target.closest("[data-edit-academy-faculty]");
   const deleteFaculty = event.target.closest("[data-delete-academy-faculty]");
@@ -17145,6 +17221,7 @@ trainingList?.addEventListener("click", async (event) => {
     if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
     if (noteButton) return await saveAcademyNote(noteButton.dataset.saveAcademyNote, noteButton.dataset.academyLesson);
     if (aiButton) return askCourseAi(aiButton.dataset.courseAi);
+    if (ensureGoldMasterButton) return await withButtonBusy(ensureGoldMasterButton, "Ripristino...", loadTraining);
     if (createFaculty) return await createAcademyFaculty();
     if (editFaculty) return await editAcademyFaculty(editFaculty.dataset.editAcademyFaculty);
     if (deleteFaculty) return await deleteAcademyFaculty(deleteFaculty.dataset.deleteAcademyFaculty);
