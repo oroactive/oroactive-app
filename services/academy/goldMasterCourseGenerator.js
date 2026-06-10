@@ -607,7 +607,7 @@ export function buildGoldMasterCoursePayload({ sourceText = "", sourceDocument =
     duration_minutes: 2400,
     teacher: "OroActive Academy",
     final_certification: true,
-    active: false,
+    active: true,
     status: sourceFound ? "draft_review" : "draft_missing_source",
     warning: sourceFound ? "" : "File La Bilancia d'Oro non trovato. Caricare il libro per generare il corso completo.",
     source_found: sourceFound,

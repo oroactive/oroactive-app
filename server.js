@@ -8533,7 +8533,7 @@ async function initDatabase() {
   await seedDefaultCompetitorSources();
   await seedDefaultCompetitorExtractionRules();
   try {
-    await generateGoldMasterCourseFromBilancia({ id: null, ruolo: "founder" }, { force: false });
+    await ensureGoldMasterCourseInCatalog();
   } catch (error) {
     console.warn("Seed Oro Master non completato:", error.message);
   }
@@ -14455,6 +14455,7 @@ async function syncAcademyStructure(course, input = {}, user = {}) {
 }
 
 async function listCourses(user = {}) {
+  await ensureGoldMasterCourseInCatalog();
   const userId = user.id || null;
   const role = normalizeRole(user.ruolo);
   const faculties = await pool.query("SELECT * FROM academy_faculties WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
@@ -14772,9 +14773,10 @@ async function upsertGoldMasterCourse(payload = {}, user = {}) {
   const category = await ensureCourseCategory(payload.category || "Formazione Compro Oro");
   const section = await ensureCourseSection(category.id, payload.section || "Oro Master");
   let course = await findGoldMasterCourse();
-  const publicationStatus = course?.active === true || course?.metadata?.publicationStatus === "published"
+  const previousPublicationStatus = course?.metadata?.publicationStatus || "";
+  const publicationStatus = previousPublicationStatus === "published"
     ? "published"
-    : "draft_review";
+    : payload.status || previousPublicationStatus || "draft_review";
   const metadata = sanitizeForPostgres({
     courseCode: GOLD_MASTER_COURSE_CODE,
     goldMaster: true,
@@ -15285,6 +15287,51 @@ async function saveGoldMasterCourseToAcademy(payload = {}, user = {}) {
   };
 }
 
+async function ensureGoldMasterCourseInCatalog() {
+  const existing = await findGoldMasterCourse();
+  if (!existing) {
+    return generateGoldMasterCourseFromBilancia({ id: null, ruolo: "founder" }, { force: true });
+  }
+  const metadata = existing.metadata || {};
+  if (existing.active === false && metadata.publicationStatus !== "hidden_by_founder") {
+    const nextMetadata = sanitizeForPostgres({
+      publicationStatus: metadata.publicationStatus || "draft_review",
+      visibleInAcademyCatalog: true,
+      catalogVisibilityFixedAt: new Date().toISOString()
+    });
+    const updated = await pool.query(
+      `UPDATE courses
+       SET active = TRUE,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [existing.id, nextMetadata]
+    );
+    await pool.query(
+      `UPDATE academy_courses
+       SET active = TRUE,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+           updated_at = NOW()
+       WHERE course_id = $1::bigint`,
+      [existing.id, nextMetadata]
+    );
+    return {
+      ok: true,
+      course_id: updated.rows[0]?.id || existing.id,
+      active: true,
+      message: "Oro Master reso visibile nel catalogo Academy."
+    };
+  }
+  return {
+    ok: true,
+    skipped: true,
+    course_id: existing.id,
+    active: existing.active,
+    message: "Oro Master gia disponibile."
+  };
+}
+
 async function generateGoldMasterCourseFromBilancia(user = {}, options = {}) {
   if (options.requireFounder && !canManageCourses(user)) {
     const error = new Error("Solo il Founder puo generare Oro Master.");
@@ -15383,7 +15430,7 @@ async function publishGoldMasterCourse(user = {}, publish = true) {
     throw error;
   }
   const metadata = sanitizeForPostgres({
-    publicationStatus: publish ? "published" : "draft_review",
+    publicationStatus: publish ? "published" : "hidden_by_founder",
     publishedAt: publish ? new Date().toISOString() : null,
     unpublishedAt: publish ? null : new Date().toISOString()
   });

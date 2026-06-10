@@ -9168,6 +9168,12 @@ function renderCourseCard(course) {
   const canEvaluate = canEvaluateCoursesUi();
   const metadata = course.metadata || {};
   const isGoldMaster = metadata.goldMaster === true || metadata.courseCode === "ORO-MASTER-001";
+  const goldMasterPublicationStatus = String(metadata.publicationStatus || "").trim();
+  const goldMasterStatusLabel = goldMasterPublicationStatus === "published"
+    ? "Pubblicato"
+    : goldMasterPublicationStatus === "hidden_by_founder" || course.active === false
+      ? "Nascosto"
+      : "Bozza visibile";
   const lessonId = course.lesson_id && Number(course.lesson_id) > 0 ? String(course.lesson_id) : "";
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = course.academy_pdf_url || course.pdf_url || "";
@@ -9191,7 +9197,7 @@ function renderCourseCard(course) {
             <strong>Oro Master</strong>
             <span>${escapeHtml(String(metadata.modulesCount || 12))} moduli</span>
             <span>${escapeHtml(String(metadata.lessonsCount || "lezioni strutturate"))} lezioni</span>
-            <span>${course.active === false ? "Bozza Founder" : "Pubblicato"}</span>
+            <span>${escapeHtml(goldMasterStatusLabel)}</span>
           </div>
           ${metadata.sourceWarning ? `<p class="academy-gold-master-warning">${escapeHtml(metadata.sourceWarning)}</p>` : ""}
         ` : ""}
