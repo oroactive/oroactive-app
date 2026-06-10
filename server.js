@@ -25,6 +25,16 @@ import { createOroExpressExtractor } from "./services/competitors/extractors/oro
 import { createOroInEuroExtractor } from "./services/competitors/extractors/oroInEuroExtractor.js";
 import { createProntoGoldExtractor } from "./services/competitors/extractors/prontoGoldExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
+import {
+  GOLD_MASTER_BADGE_NAME,
+  GOLD_MASTER_CERTIFICATION_NAME,
+  GOLD_MASTER_COURSE_CODE,
+  GOLD_MASTER_COURSE_TITLE,
+  GOLD_MASTER_MEDIA_PROMPTS,
+  buildGoldMasterCoursePayload,
+  findBilanciaDOroSource,
+  slugifyGoldMaster
+} from "./services/academy/goldMasterCourseGenerator.js";
 
 dotenv.config();
 
@@ -250,6 +260,7 @@ const alphaVantageApiKey = process.env.ALPHA_VANTAGE_API_KEY || "";
 const customMetalApiUrl = process.env.CUSTOM_METAL_API_URL || "";
 const backupDirectory = process.env.BACKUP_DIR || "/data/oroactive/backups";
 const academyUploadDirectory = process.env.ACADEMY_UPLOAD_DIR || path.join(__dirname, "private_uploads", "academy");
+const goldMasterSlideDirectory = academyUploadDirectory;
 const trustPackDirectory = process.env.CUSTOMER_TRUST_PACK_DIR || path.join(__dirname, "private_uploads", "customer-trust-packs");
 const oroactiveSiteUrl = process.env.OROACTIVE_SITE_URL || "http://wcfme33owxz0wfkr0ysnzthy.188.213.161.151.sslip.io/";
 const privacyPolicyVersion = "v1.0";
@@ -540,6 +551,39 @@ const knowledgeCategories = [
   "Casi reali",
   "Procedure operative",
   "Formazione operatori"
+];
+const aurumBundledKnowledgeRoot = path.join(__dirname, "assets", "aurum-knowledge", "normative");
+const aurumBundledKnowledgeDocuments = [
+  {
+    titolo: "Decreto Legislativo n.92 del 25 Maggio 2017",
+    autore: "Normativa italiana",
+    filename: "Decreto Legislativo n.92 del 25 Maggio 2017.pdf",
+    category: "Normativa"
+  },
+  {
+    titolo: "Decreto Legislativo n.211 del 10 Dicembre 2024",
+    autore: "Normativa italiana",
+    filename: "Decreto Legislativo n.211 del 10 Dicembre 2024.pdf",
+    category: "Normativa"
+  },
+  {
+    titolo: "Elenco Monete d'Oro",
+    autore: "Normativa italiana",
+    filename: "Elenco Monete d'Oro.pdf",
+    category: "Monete d'oro"
+  },
+  {
+    titolo: "Normativa e legislazione 2017",
+    autore: "La Bilancia d'Oro",
+    filename: "Normativa e legislazione 2017.pdf",
+    category: "Normativa"
+  },
+  {
+    titolo: "Normativa e legislazione 2023",
+    autore: "La Bilancia d'Oro",
+    filename: "Normativa e legislazione 2023.pdf",
+    category: "Normativa"
+  }
 ];
 const defaultAurumShieldSettings = {
   cash_limit_amount: 500,
@@ -6680,8 +6724,7 @@ function bookFileKind(filename = "", mimeType = "") {
   return "";
 }
 
-async function extractBookText({ filename = "", dataUrl = "" }) {
-  const { mimeType, buffer } = uploadedDataUrlToBuffer(dataUrl);
+async function extractBookTextFromBuffer({ filename = "", mimeType = "", buffer }) {
   const kind = bookFileKind(filename, mimeType);
   if (!kind) {
     const error = new Error("Formato libro non supportato. Carica PDF, DOCX o TXT.");
@@ -6702,6 +6745,11 @@ async function extractBookText({ filename = "", dataUrl = "" }) {
   const pdfParse = pdfModule.default || pdfModule;
   const result = await pdfParse(buffer);
   return result.text || "";
+}
+
+async function extractBookText({ filename = "", dataUrl = "" }) {
+  const { mimeType, buffer } = uploadedDataUrlToBuffer(dataUrl);
+  return extractBookTextFromBuffer({ filename, mimeType, buffer });
 }
 
 function normalizeBookText(text = "") {
@@ -6843,10 +6891,10 @@ async function updateAiChunkEmbedding(id, embedding) {
   );
 }
 
-async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
-  const extractedText = normalizeBookText(await extractBookText({ filename, dataUrl }));
-  const bookHash = textHash(extractedText);
-  const chunks = chunkBookText(extractedText);
+async function indexAiDocument({ titolo, autore, filename, extractedText, uploadedBy = null, metadata = {} }) {
+  const normalizedText = normalizeBookText(extractedText);
+  const bookHash = textHash(normalizedText);
+  const chunks = chunkBookText(normalizedText);
   if (!chunks.length) {
     const error = new Error("Il libro non contiene testo estraibile sufficiente.");
     error.status = 400;
@@ -6855,8 +6903,12 @@ async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
   console.log("Chunks loaded:", chunks.length);
 
   const duplicate = await pool.query(
-    "SELECT id, titolo, autore, filename, uploaded_by, created_at, (metadata->>'chunks')::int AS chunks FROM ai_documents WHERE metadata->>'bookHash' = $1 ORDER BY created_at DESC LIMIT 1",
-    [bookHash]
+    `SELECT id, titolo, autore, filename, uploaded_by, created_at, (metadata->>'chunks')::int AS chunks
+     FROM ai_documents
+     WHERE (($1::text <> '' AND metadata->>'sourceKey' = $1::text) OR metadata->>'bookHash' = $2::text)
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [metadata.sourceKey || "", bookHash]
   );
   if (duplicate.rowCount) {
     return { ...duplicate.rows[0], chunks: duplicate.rows[0].chunks || chunks.length, duplicate: true, message: "Knowledge base pronta" };
@@ -6873,13 +6925,14 @@ async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
         titolo || "La bilancia d'oro",
         autore || "Christian Dinato",
         filename || "libro-ai",
-        user.id,
+        uploadedBy,
         {
           chunks: chunks.length,
           bookHash,
           sourceType: "book",
           searchMode: aiRuntime.pgvector ? "pgvector" : "full-text",
-          embeddingModel: aiRuntime.pgvector ? openaiEmbeddingModel : null
+          embeddingModel: aiRuntime.pgvector ? openaiEmbeddingModel : null,
+          ...metadata
         }
       ]
     );
@@ -6900,6 +6953,18 @@ async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
   }
 }
 
+async function uploadAiBook({ titolo, autore, filename, dataUrl }, user) {
+  const extractedText = await extractBookText({ filename, dataUrl });
+  return indexAiDocument({
+    titolo: titolo || "La bilancia d'oro",
+    autore: autore || "Christian Dinato",
+    filename: filename || "libro-ai",
+    extractedText,
+    uploadedBy: user?.id || null,
+    metadata: { sourceType: "book" }
+  });
+}
+
 async function aiKnowledgeStatus() {
   const result = await pool.query(`
     SELECT d.id, d.titolo, d.autore, d.filename, d.uploaded_by, d.created_at, COUNT(c.id)::int AS chunks,
@@ -6911,6 +6976,47 @@ async function aiKnowledgeStatus() {
     ORDER BY d.created_at DESC
   `);
   return result.rows;
+}
+
+async function seedAurumBundledKnowledgeDocuments() {
+  if (String(process.env.AURUM_BUNDLED_KNOWLEDGE_ENABLED || "true").toLowerCase() === "false") return [];
+  const results = [];
+  for (const source of aurumBundledKnowledgeDocuments) {
+    const filePath = path.join(aurumBundledKnowledgeRoot, source.filename);
+    try {
+      const buffer = await fs.readFile(filePath);
+      const extractedText = await extractBookTextFromBuffer({
+        filename: source.filename,
+        mimeType: "application/pdf",
+        buffer
+      });
+      const indexed = await indexAiDocument({
+        titolo: source.titolo,
+        autore: source.autore,
+        filename: source.filename,
+        extractedText,
+        uploadedBy: null,
+        metadata: {
+          sourceType: "book",
+          documentKind: "normativa",
+          sourceKey: `aurum-bundled-knowledge:${source.filename}`,
+          category: source.category,
+          bundled: true,
+          originalFilename: source.filename
+        }
+      });
+      results.push({ filename: source.filename, ok: true, duplicate: Boolean(indexed.duplicate), chunks: indexed.chunks || 0 });
+    } catch (error) {
+      console.warn(`Aurum knowledge document non indicizzato (${source.filename}):`, error.message || error);
+      results.push({ filename: source.filename, ok: false, error: error.message || "Documento non indicizzato" });
+    }
+  }
+  const indexedCount = results.filter((item) => item.ok && !item.duplicate).length;
+  const duplicateCount = results.filter((item) => item.ok && item.duplicate).length;
+  if (indexedCount || duplicateCount) {
+    console.log(`Aurum knowledge normativa pronta: ${indexedCount} nuovi documenti, ${duplicateCount} gia presenti.`);
+  }
+  return results;
 }
 
 async function reindexAiBook(documentId) {
@@ -7694,6 +7800,14 @@ async function searchAiChunks(question = "") {
   return [...bookChunks.slice(0, 5), ...noteChunks.slice(0, 4), ...academyChunks.slice(0, 3)].slice(0, 10);
 }
 
+function aiChunkSourceLabel(chunk = {}) {
+  const sourceType = chunk.metadata?.sourceType || "";
+  if (sourceType === "note") return "Procedura OroActive approvata";
+  if (sourceType === "academy") return "Materiale OroActive Academy";
+  if (chunk.metadata?.documentKind === "normativa") return "Normativa e documentazione OroActive";
+  return "La bilancia d'oro";
+}
+
 async function searchAcademyKnowledgeChunks(question = "", limit = 4) {
   const text = String(question || "").trim();
   if (!text) return [];
@@ -7710,14 +7824,15 @@ async function searchAcademyKnowledgeChunks(question = "", limit = 4) {
             COALESCE(l.title, '') AS lesson_title,
             COALESCE(l.description, '') AS lesson_description,
             COALESCE(m.title, '') AS material_title,
-            COALESCE(m.external_url, m.file_url, '') AS material_url
+            COALESCE(m.external_url, m.file_url, '') AS material_url,
+            COALESCE(m.metadata::text, '') AS material_metadata
      FROM courses c
      LEFT JOIN academy_lessons l ON l.course_id = c.id
      LEFT JOIN academy_materials m ON m.course_id = c.id
      WHERE c.active = TRUE
        AND EXISTS (
          SELECT 1 FROM unnest($1::text[]) term
-         WHERE LOWER(COALESCE(c.title, '') || ' ' || COALESCE(c.description, '') || ' ' || COALESCE(l.title, '') || ' ' || COALESCE(l.description, '') || ' ' || COALESCE(m.title, '')) LIKE '%' || term || '%'
+         WHERE LOWER(COALESCE(c.title, '') || ' ' || COALESCE(c.description, '') || ' ' || COALESCE(l.title, '') || ' ' || COALESCE(l.description, '') || ' ' || COALESCE(m.title, '') || ' ' || COALESCE(m.metadata::text, '')) LIKE '%' || term || '%'
        )
      ORDER BY c.updated_at DESC NULLS LAST, c.created_at DESC
      LIMIT $2::integer`,
@@ -7737,7 +7852,8 @@ async function searchAcademyKnowledgeChunks(question = "", limit = 4) {
       row.lesson_title,
       row.lesson_description,
       row.material_title,
-      row.material_url
+      row.material_url,
+      row.material_metadata
     ].filter(Boolean).join("\n")
   }));
 }
@@ -7853,7 +7969,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     ? `Modalita prezzo: spiega il prezzo in modo operativo da compro oro. Contesto prezzo JSON senza dati cliente:\n${JSON.stringify(priceExplanationContext).slice(0, 8000)}`
     : "";
   const context = chunks.map((chunk, index) => (
-    `[Fonte ${index + 1}: ${chunk.metadata?.sourceType === "note" ? "Procedura OroActive approvata" : chunk.metadata?.sourceType === "academy" ? "Materiale OroActive Academy" : "La bilancia d'oro"} - ${chunk.titolo || "Knowledge base"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
+    `[Fonte ${index + 1}: ${aiChunkSourceLabel(chunk)} - ${chunk.titolo || "Knowledge base"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
   )).join("\n\n---\n\n");
   const webContext = (web.results || []).map((item, index) => (
     `[Web ${index + 1}: ${item.title || "Fonte web"}]\n${item.snippet || ""}\n${item.url || ""}`
@@ -8410,11 +8526,17 @@ async function initDatabase() {
   const schema = await fs.readFile(path.join(__dirname, "schema.sql"), "utf8");
   await pool.query(schema);
   await setupAiVectorStorage();
+  await seedAurumBundledKnowledgeDocuments();
   await bootstrapStores();
   await bootstrapAdminUser();
   await bootstrapPrivacyPolicy();
   await seedDefaultCompetitorSources();
   await seedDefaultCompetitorExtractionRules();
+  try {
+    await generateGoldMasterCourseFromBilancia({ id: null, ruolo: "founder" }, { force: false });
+  } catch (error) {
+    console.warn("Seed Oro Master non completato:", error.message);
+  }
 }
 
 function backupTimestamp(date = new Date()) {
@@ -14497,6 +14619,794 @@ async function createCourse(input = {}, user = {}) {
   return result.rows[0];
 }
 
+async function findGoldMasterCourse() {
+  const result = await pool.query(
+    `SELECT *
+     FROM courses
+     WHERE COALESCE(metadata->>'courseCode', '') = $1::text
+        OR title = $2::text
+     ORDER BY id ASC
+     LIMIT 1`,
+    [GOLD_MASTER_COURSE_CODE, GOLD_MASTER_COURSE_TITLE]
+  );
+  return result.rows[0] || null;
+}
+
+async function findGoldMasterSourceInKnowledgeBase() {
+  const result = await pool.query(
+    `SELECT d.id, d.titolo, d.filename, d.metadata,
+            STRING_AGG(c.content, E'\n\n' ORDER BY c.chunk_index ASC) AS extracted_text
+     FROM ai_documents d
+     LEFT JOIN ai_document_chunks c ON c.document_id = d.id
+     WHERE LOWER(COALESCE(d.titolo, '')) LIKE '%bilancia%'
+       AND LOWER(COALESCE(d.titolo, '')) LIKE '%oro%'
+     GROUP BY d.id
+     ORDER BY d.created_at DESC
+     LIMIT 1`
+  );
+  const row = result.rows[0];
+  if (!row?.extracted_text) return null;
+  return {
+    found: true,
+    title: row.titolo || "La Bilancia d'Oro",
+    filePath: row.filename || "",
+    source_type: "knowledge_base",
+    size: String(row.extracted_text || "").length,
+    updated_at: null,
+    extractedText: row.extracted_text,
+    metadata: row.metadata || {}
+  };
+}
+
+async function loadGoldMasterSource() {
+  const localSource = await findBilanciaDOroSource({ fs, path, rootDir: __dirname });
+  if (localSource.found && localSource.filePath) {
+    const buffer = await fs.readFile(localSource.filePath);
+    const extractedText = await extractBookTextFromBuffer({
+      filename: localSource.filePath,
+      mimeType: "",
+      buffer
+    });
+    return {
+      ...localSource,
+      extractedText: normalizeBookText(extractedText)
+    };
+  }
+  const knowledgeSource = await findGoldMasterSourceInKnowledgeBase();
+  if (knowledgeSource?.found) {
+    return {
+      ...knowledgeSource,
+      extractedText: normalizeBookText(knowledgeSource.extractedText)
+    };
+  }
+  return {
+    ...localSource,
+    extractedText: ""
+  };
+}
+
+async function upsertGoldMasterSourceDocument(source = {}, user = {}) {
+  const extractedText = String(source.extractedText || "");
+  if (!extractedText.trim()) return null;
+  const hash = textHash(normalizeBookText(extractedText));
+  const metadata = sanitizeForPostgres({
+    sourceKey: "gold-master-bilancia-oro",
+    found: Boolean(source.found),
+    size: source.size || extractedText.length,
+    updated_at: source.updated_at || null
+  });
+  const result = await pool.query(
+    `INSERT INTO academy_source_documents
+      (title, source_type, file_path, content_hash, metadata, created_by)
+     VALUES ($1::text, $2::text, $3::text, $4::text, $5::jsonb, $6::bigint)
+     ON CONFLICT (content_hash)
+     DO UPDATE SET title = EXCLUDED.title,
+                   source_type = EXCLUDED.source_type,
+                   file_path = EXCLUDED.file_path,
+                   metadata = academy_source_documents.metadata || EXCLUDED.metadata
+     RETURNING *`,
+    [
+      source.title || "La Bilancia d'Oro",
+      source.source_type || "file",
+      source.filePath || source.file_path || "",
+      hash,
+      metadata,
+      user.id || null
+    ]
+  );
+  return result.rows[0];
+}
+
+function drawGoldMasterSlide(doc, slide = {}, index = 0, total = 1) {
+  doc.rect(0, 0, 960, 540).fill("#0e0c0a");
+  doc.rect(0, 0, 960, 88).fill("#1a1008");
+  doc.rect(0, 88, 960, 2).fill("#f97316");
+  doc.fillColor("#f97316").font("Helvetica-Bold").fontSize(16).text("OROACTIVE ACADEMY", 48, 32);
+  doc.fillColor("#f7d27a").font("Helvetica-Bold").fontSize(13).text(GOLD_MASTER_COURSE_TITLE, 720, 34, { width: 190, align: "right" });
+  doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(34).text(String(slide.title || "Lezione"), 54, 126, { width: 830, lineGap: 4 });
+  if (slide.subtitle) {
+    doc.fillColor("#f7d27a").font("Helvetica").fontSize(18).text(String(slide.subtitle), 56, 192, { width: 820 });
+  }
+  const bullets = Array.isArray(slide.bullets) ? slide.bullets.slice(0, 6) : [];
+  let y = slide.subtitle ? 245 : 210;
+  bullets.forEach((bullet) => {
+    const text = String(bullet || "").trim();
+    if (!text) return;
+    doc.circle(68, y + 8, 4).fill("#f97316");
+    doc.fillColor("#f5f2ed").font("Helvetica").fontSize(20).text(text, 88, y, { width: 790, lineGap: 6 });
+    y += 52;
+  });
+  doc.rect(48, 484, 864, 1).fill("#3b2c1f");
+  doc.fillColor("#a8a29e").font("Helvetica").fontSize(11).text(`Slide ${index + 1}/${total} - Certificazione interna OroActive Academy`, 56, 500, { width: 830, align: "right" });
+}
+
+async function writeGoldMasterLessonPdf(module = {}, lesson = {}) {
+  await fs.mkdir(goldMasterSlideDirectory, { recursive: true });
+  const filename = `oro-master-${slugifyGoldMaster(lesson.key || lesson.title)}.pdf`;
+  const fullPath = path.join(goldMasterSlideDirectory, filename);
+  await new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: [960, 540], margin: 0 });
+    const output = createWriteStream(fullPath);
+    output.on("finish", resolve);
+    output.on("error", reject);
+    doc.on("error", reject);
+    doc.pipe(output);
+    const slides = lesson.slides || [];
+    slides.forEach((slide, index) => {
+      if (index > 0) doc.addPage();
+      drawGoldMasterSlide(doc, slide, index, slides.length);
+    });
+    doc.end();
+  });
+  const stats = await fs.stat(fullPath);
+  return {
+    filename,
+    fileUrl: `/api/academy/materials/file/${filename}`,
+    size: stats.size,
+    mimeType: "application/pdf"
+  };
+}
+
+async function upsertGoldMasterCourse(payload = {}, user = {}) {
+  const faculty = await ensureAcademyFaculty(payload.faculty || "OroActive Academy");
+  const category = await ensureCourseCategory(payload.category || "Formazione Compro Oro");
+  const section = await ensureCourseSection(category.id, payload.section || "Oro Master");
+  let course = await findGoldMasterCourse();
+  const publicationStatus = course?.active === true || course?.metadata?.publicationStatus === "published"
+    ? "published"
+    : "draft_review";
+  const metadata = sanitizeForPostgres({
+    courseCode: GOLD_MASTER_COURSE_CODE,
+    goldMaster: true,
+    sourceFound: Boolean(payload.source_found),
+    sourceWarning: payload.warning || "",
+    generationStatus: payload.status || "draft_review",
+    publicationStatus,
+    modulesCount: payload.modules?.length || 0,
+    lessonsCount: (payload.modules || []).reduce((sum, item) => sum + (item.lessons?.length || 0), 0),
+    certificationName: GOLD_MASTER_CERTIFICATION_NAME,
+    badgeName: GOLD_MASTER_BADGE_NAME,
+    generatedAt: new Date().toISOString()
+  });
+  if (course) {
+    const result = await pool.query(
+      `UPDATE courses
+       SET category_id = $2::bigint,
+           section_id = $3::bigint,
+           faculty_id = $4::bigint,
+           title = $5::text,
+           description = $6::text,
+           level = $7::text,
+           duration_minutes = $8::integer,
+           duration_label = $9::text,
+           teacher = $10::text,
+           thumbnail_url = COALESCE(NULLIF(thumbnail_url, ''), $11::text),
+           final_certification = TRUE,
+           module_title = $12::text,
+           lesson_title = $13::text,
+           active = CASE WHEN active = TRUE THEN TRUE ELSE $14::boolean END,
+           order_index = 1,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $15::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [
+        course.id,
+        category.id,
+        section.id,
+        faculty.id,
+        payload.title,
+        "Corso avanzato interno OroActive Academy basato sul libro La Bilancia d'Oro, con moduli, lezioni, quiz, slide e certificazione interna.",
+        payload.level,
+        payload.duration_minutes,
+        payload.duration_label,
+        payload.teacher,
+        "",
+        payload.modules?.[0]?.title || "Fondamenti dell'oro",
+        payload.modules?.[0]?.lessons?.[0]?.title || "Introduzione",
+        payload.active !== false,
+        metadata
+      ]
+    );
+    course = result.rows[0];
+  } else {
+    const result = await pool.query(
+      `INSERT INTO courses
+        (category_id, section_id, faculty_id, title, description, level, duration_minutes,
+         duration_label, teacher, thumbnail_url, final_certification, module_title, lesson_title,
+         active, order_index, created_by, metadata)
+       VALUES ($1::bigint,$2::bigint,$3::bigint,$4::text,$5::text,$6::text,$7::integer,
+         $8::text,$9::text,$10::text,TRUE,$11::text,$12::text,$13::boolean,1,$14::bigint,$15::jsonb)
+       RETURNING *`,
+      [
+        category.id,
+        section.id,
+        faculty.id,
+        payload.title,
+        "Corso avanzato interno OroActive Academy basato sul libro La Bilancia d'Oro, con moduli, lezioni, quiz, slide e certificazione interna.",
+        payload.level,
+        payload.duration_minutes,
+        payload.duration_label,
+        payload.teacher,
+        "",
+        payload.modules?.[0]?.title || "Fondamenti dell'oro",
+        payload.modules?.[0]?.lessons?.[0]?.title || "Introduzione",
+        payload.active !== false,
+        user.id || null,
+        metadata
+      ]
+    );
+    course = result.rows[0];
+  }
+  await pool.query(
+    `INSERT INTO academy_courses
+      (course_id, faculty_id, title, description, level, duration_minutes, teacher,
+       thumbnail_url, final_certification, active, metadata, created_by)
+     VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::text,$6::integer,$7::text,$8::text,TRUE,$9::boolean,$10::jsonb,$11::bigint)
+     ON CONFLICT (course_id)
+     DO UPDATE SET faculty_id = EXCLUDED.faculty_id,
+                   title = EXCLUDED.title,
+                   description = EXCLUDED.description,
+                   level = EXCLUDED.level,
+                   duration_minutes = EXCLUDED.duration_minutes,
+                   teacher = EXCLUDED.teacher,
+                   active = EXCLUDED.active,
+                   metadata = COALESCE(academy_courses.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+                   updated_at = NOW()
+     RETURNING *`,
+    [
+      course.id,
+      faculty.id,
+      course.title,
+      course.description,
+      course.level,
+      course.duration_minutes,
+      course.teacher,
+      course.thumbnail_url || "",
+      course.active !== false,
+      metadata,
+      user.id || null
+    ]
+  );
+  return course;
+}
+
+async function upsertGoldMasterModule(course = {}, module = {}) {
+  const metadata = sanitizeForPostgres({
+    goldMaster: true,
+    goldMasterKey: module.key,
+    moduleNumber: module.number,
+    objective: module.objective,
+    prerequisites: module.prerequisites,
+    materials: module.materials || []
+  });
+  const existing = (await pool.query(
+    `SELECT *
+     FROM academy_modules
+     WHERE course_id = $1::bigint
+       AND COALESCE(metadata->>'goldMasterKey', '') = $2::text
+     LIMIT 1`,
+    [course.id, module.key]
+  )).rows[0];
+  if (existing) {
+    const updated = await pool.query(
+      `UPDATE academy_modules
+       SET title = $2::text,
+           description = $3::text,
+           sort_order = $4::integer,
+           active = TRUE,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $5::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [existing.id, module.title, module.objective, module.number, metadata]
+    );
+    return updated.rows[0];
+  }
+  const academyCourse = (await pool.query("SELECT id FROM academy_courses WHERE course_id = $1::bigint LIMIT 1", [course.id])).rows[0];
+  const inserted = await pool.query(
+    `INSERT INTO academy_modules
+      (academy_course_id, course_id, title, description, sort_order, active, metadata)
+     VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::integer,TRUE,$6::jsonb)
+     RETURNING *`,
+    [academyCourse?.id || null, course.id, module.title, module.objective, module.number, metadata]
+  );
+  return inserted.rows[0];
+}
+
+async function upsertGoldMasterLesson(course = {}, moduleRow = {}, module = {}, lesson = {}, sourceDocument = null) {
+  const metadata = sanitizeForPostgres({
+    goldMaster: true,
+    goldMasterKey: lesson.key,
+    moduleKey: module.key,
+    moduleNumber: module.number,
+    objective: lesson.objective,
+    keywords: lesson.keywords || [],
+    sourceStatus: lesson.source_ref?.status || "needs_review",
+    contentBlocks: lesson.content_blocks || [],
+    quizCount: lesson.quiz?.length || 0
+  });
+  const pdf = await writeGoldMasterLessonPdf(module, lesson);
+  const existing = (await pool.query(
+    `SELECT *
+     FROM academy_lessons
+     WHERE course_id = $1::bigint
+       AND COALESCE(metadata->>'goldMasterKey', '') = $2::text
+     LIMIT 1`,
+    [course.id, lesson.key]
+  )).rows[0];
+  let lessonRow;
+  if (existing) {
+    lessonRow = (await pool.query(
+      `UPDATE academy_lessons
+       SET academy_module_id = $2::bigint,
+           title = $3::text,
+           description = $4::text,
+           pdf_url = $5::text,
+           duration_minutes = $6::integer,
+           sort_order = $7::integer,
+           active = TRUE,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $8::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [
+        existing.id,
+        moduleRow.id,
+        lesson.title,
+        lesson.summary,
+        pdf.fileUrl,
+        lesson.duration_minutes,
+        lesson.order,
+        metadata
+      ]
+    )).rows[0];
+  } else {
+    lessonRow = (await pool.query(
+      `INSERT INTO academy_lessons
+        (academy_module_id, course_id, title, description, pdf_url, duration_minutes, sort_order, active, metadata)
+       VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::text,$6::integer,$7::integer,TRUE,$8::jsonb)
+       RETURNING *`,
+      [
+        moduleRow.id,
+        course.id,
+        lesson.title,
+        lesson.summary,
+        pdf.fileUrl,
+        lesson.duration_minutes,
+        lesson.order,
+        metadata
+      ]
+    )).rows[0];
+  }
+  await upsertGoldMasterMaterial(lessonRow, course, {
+    key: `${lesson.key}:slides`,
+    title: `Slide PDF - ${lesson.title}`,
+    material_type: "pdf",
+    file_url: pdf.fileUrl,
+    mime_type: pdf.mimeType,
+    size_bytes: pdf.size,
+    sort_order: 1,
+    metadata: {
+      goldMaster: true,
+      kind: "lesson_slides",
+      slides: lesson.slides || [],
+      sourceStatus: lesson.source_ref?.status || ""
+    }
+  });
+  await upsertGoldMasterMaterial(lessonRow, course, {
+    key: `${lesson.key}:source`,
+    title: `Scheda lezione - ${lesson.title}`,
+    material_type: "testo",
+    file_url: "",
+    mime_type: "application/json",
+    size_bytes: 0,
+    sort_order: 2,
+    metadata: {
+      goldMaster: true,
+      kind: "lesson_content",
+      objective: lesson.objective,
+      contentBlocks: lesson.content_blocks || [],
+      sourceRef: lesson.source_ref || null
+    }
+  });
+  await upsertGoldMasterMaterial(lessonRow, course, {
+    key: `${lesson.key}:quiz`,
+    title: `Quiz intermedio - ${lesson.title}`,
+    material_type: "testo",
+    file_url: "",
+    mime_type: "application/json",
+    size_bytes: 0,
+    sort_order: 3,
+    metadata: {
+      goldMaster: true,
+      kind: "lesson_quiz",
+      questions: lesson.quiz || []
+    }
+  });
+  if (sourceDocument?.id && lesson.source_ref?.excerpt) {
+    await pool.query(
+      "DELETE FROM academy_lesson_source_refs WHERE lesson_id = $1::bigint",
+      [lessonRow.id]
+    );
+    await pool.query(
+      `INSERT INTO academy_lesson_source_refs
+        (lesson_id, source_document_id, chapter, excerpt, confidence, metadata)
+       VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::numeric,$6::jsonb)`,
+      [
+        lessonRow.id,
+        sourceDocument.id,
+        lesson.source_ref.chapter || "",
+        lesson.source_ref.excerpt || "",
+        Number(lesson.source_ref.confidence || 0),
+        sanitizeForPostgres({ status: lesson.source_ref.status || "", lessonKey: lesson.key })
+      ]
+    );
+  }
+  return lessonRow;
+}
+
+async function upsertGoldMasterMaterial(lessonRow = {}, course = {}, material = {}) {
+  const metadata = sanitizeForPostgres({
+    ...(material.metadata || {}),
+    goldMasterKey: material.key
+  });
+  const existing = (await pool.query(
+    `SELECT *
+     FROM academy_materials
+     WHERE academy_lesson_id = $1::bigint
+       AND COALESCE(metadata->>'goldMasterKey', '') = $2::text
+     LIMIT 1`,
+    [lessonRow.id, material.key]
+  )).rows[0];
+  if (existing) {
+    const updated = await pool.query(
+      `UPDATE academy_materials
+       SET title = $2::text,
+           material_type = $3::text,
+           file_url = $4::text,
+           external_url = '',
+           mime_type = $5::text,
+           size_bytes = $6::bigint,
+           allow_download = TRUE,
+           sort_order = $7::integer,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $8::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [
+        existing.id,
+        material.title,
+        material.material_type,
+        material.file_url || "",
+        material.mime_type || "",
+        material.size_bytes || 0,
+        material.sort_order || 0,
+        metadata
+      ]
+    );
+    return updated.rows[0];
+  }
+  const inserted = await pool.query(
+    `INSERT INTO academy_materials
+      (academy_lesson_id, course_id, title, material_type, file_url, external_url,
+       mime_type, size_bytes, allow_download, sort_order, metadata)
+     VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::text,'',$6::text,$7::bigint,TRUE,$8::integer,$9::jsonb)
+     RETURNING *`,
+    [
+      lessonRow.id,
+      course.id,
+      material.title,
+      material.material_type,
+      material.file_url || "",
+      material.mime_type || "",
+      material.size_bytes || 0,
+      material.sort_order || 0,
+      metadata
+    ]
+  );
+  return inserted.rows[0];
+}
+
+async function upsertGoldMasterCourseMaterial(course = {}, material = {}) {
+  const metadata = sanitizeForPostgres({
+    ...(material.metadata || {}),
+    goldMaster: true,
+    goldMasterKey: material.key
+  });
+  const existing = (await pool.query(
+    `SELECT *
+     FROM course_materials
+     WHERE course_id = $1::bigint
+       AND COALESCE(metadata->>'goldMasterKey', '') = $2::text
+     LIMIT 1`,
+    [course.id, material.key]
+  )).rows[0];
+  if (existing) {
+    return (await pool.query(
+      `UPDATE course_materials
+       SET title = $2::text,
+           material_type = $3::text,
+           file_url = $4::text,
+           allow_download = TRUE,
+           sort_order = $5::integer,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $6::jsonb
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [existing.id, material.title, material.material_type, material.file_url || "", material.sort_order || 0, metadata]
+    )).rows[0];
+  }
+  return (await pool.query(
+    `INSERT INTO course_materials
+      (course_id, title, material_type, file_url, allow_download, sort_order, metadata)
+     VALUES ($1::bigint,$2::text,$3::text,$4::text,TRUE,$5::integer,$6::jsonb)
+     RETURNING *`,
+    [course.id, material.title, material.material_type, material.file_url || "", material.sort_order || 0, metadata]
+  )).rows[0];
+}
+
+async function upsertGoldMasterQuizzes(course = {}, modules = []) {
+  let sort = 1;
+  for (const module of modules) {
+    const moduleQuestions = [];
+    for (const lesson of module.lessons || []) {
+      moduleQuestions.push(...(lesson.quiz || []).slice(0, 2));
+    }
+    for (const question of moduleQuestions.slice(0, 12)) {
+      await pool.query(
+        `INSERT INTO course_quizzes
+          (course_id, question, options, correct_answer, sort_order, active)
+         SELECT $1::bigint,$2::text,$3::jsonb,$4::text,$5::integer,TRUE
+         WHERE NOT EXISTS (
+           SELECT 1 FROM course_quizzes
+           WHERE course_id = $1::bigint AND question = $2::text
+         )`,
+        [
+          course.id,
+          question.question,
+          sanitizeForPostgres(question.options || []),
+          question.correct_answer,
+          sort
+        ]
+      );
+      sort += 1;
+    }
+  }
+}
+
+async function upsertGoldMasterBadgeDefinition(course = {}, user = {}) {
+  await pool.query(
+    `INSERT INTO course_badges
+      (course_id, user_id, badge_name, badge_code, assigned_by, status)
+     VALUES ($1::bigint,NULL,$2::text,'GOLD-MASTER-SPECIALISTA',$3::bigint,'catalogo')
+     ON CONFLICT (badge_code)
+     DO UPDATE SET badge_name = EXCLUDED.badge_name,
+                   course_id = EXCLUDED.course_id,
+                   status = EXCLUDED.status`,
+    [course.id, GOLD_MASTER_BADGE_NAME, user.id || null]
+  );
+  await pool.query(
+    `INSERT INTO academy_badges
+      (course_id, user_id, badge_name, badge_code, assigned_by, status)
+     VALUES ($1::bigint,NULL,$2::text,'GOLD-MASTER-SPECIALISTA-ACADEMY',$3::bigint,'catalogo')
+     ON CONFLICT (badge_code)
+     DO UPDATE SET badge_name = EXCLUDED.badge_name,
+                   course_id = EXCLUDED.course_id,
+                   status = EXCLUDED.status`,
+    [course.id, GOLD_MASTER_BADGE_NAME, user.id || null]
+  );
+}
+
+async function saveGoldMasterCourseToAcademy(payload = {}, user = {}) {
+  const sourceDocument = await upsertGoldMasterSourceDocument(payload.source_document || {}, user);
+  const course = await upsertGoldMasterCourse(payload, user);
+  let firstLessonPdf = "";
+  const saved = { modules: 0, lessons: 0, materials: 0 };
+  for (const module of payload.modules || []) {
+    const moduleRow = await upsertGoldMasterModule(course, module);
+    saved.modules += 1;
+    for (const lesson of module.lessons || []) {
+      const lessonRow = await upsertGoldMasterLesson(course, moduleRow, module, lesson, sourceDocument);
+      firstLessonPdf ||= lessonRow.pdf_url || "";
+      saved.lessons += 1;
+      saved.materials += 3;
+    }
+  }
+  if (firstLessonPdf) {
+    await pool.query(
+      `UPDATE courses
+       SET pdf_url = $2::text,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint`,
+      [
+        course.id,
+        firstLessonPdf,
+        sanitizeForPostgres({ firstLessonPdf, goldMasterUpdatedAt: new Date().toISOString() })
+      ]
+    );
+  }
+  for (const scheme of payload.schemes || []) {
+    await upsertGoldMasterCourseMaterial(course, {
+      key: `scheme:${slugifyGoldMaster(scheme.title)}`,
+      title: `Schema - ${scheme.title}`,
+      material_type: "testo",
+      file_url: "",
+      sort_order: 100 + Number(scheme.moduleNumber || 0),
+      metadata: { kind: "summary_scheme", scheme }
+    });
+  }
+  await upsertGoldMasterCourseMaterial(course, {
+    key: "media-prompts",
+    title: "Prompt immagini realistiche Oro Master",
+    material_type: "testo",
+    file_url: "",
+    sort_order: 180,
+    metadata: { kind: "media_prompts", prompts: payload.media_prompts || [] }
+  });
+  await upsertGoldMasterCourseMaterial(course, {
+    key: "final-exam",
+    title: "Esame finale e certificazione interna",
+    material_type: "testo",
+    file_url: "",
+    sort_order: 200,
+    metadata: { kind: "final_exam", exam: payload.final_exam || {} }
+  });
+  await upsertGoldMasterQuizzes(course, payload.modules || []);
+  await upsertGoldMasterBadgeDefinition(course, user);
+  return {
+    course_id: course.id,
+    title: course.title,
+    active: course.active,
+    source_found: Boolean(payload.source_found),
+    warning: payload.warning || "",
+    saved,
+    status: payload.status || "draft_review"
+  };
+}
+
+async function generateGoldMasterCourseFromBilancia(user = {}, options = {}) {
+  if (options.requireFounder && !canManageCourses(user)) {
+    const error = new Error("Solo il Founder puo generare Oro Master.");
+    error.status = 403;
+    throw error;
+  }
+  const existing = await findGoldMasterCourse();
+  if (existing && !options.force) {
+    return {
+      ok: true,
+      skipped: true,
+      course_id: existing.id,
+      title: existing.title,
+      active: existing.active,
+      message: "Corso Oro Master gia presente.",
+      metadata: existing.metadata || {}
+    };
+  }
+  const source = await loadGoldMasterSource();
+  const payload = buildGoldMasterCoursePayload({
+    sourceText: source.extractedText || "",
+    sourceDocument: {
+      title: source.title || "La Bilancia d'Oro",
+      filePath: source.filePath || "",
+      source_type: source.source_type || "missing",
+      found: source.found
+    }
+  });
+  const sourceDocument = {
+    ...source,
+    title: source.title || "La Bilancia d'Oro",
+    file_path: source.filePath || ""
+  };
+  payload.source_document = sourceDocument;
+  const result = await saveGoldMasterCourseToAcademy(payload, user);
+  return {
+    ok: true,
+    ...result,
+    source: {
+      found: Boolean(source.found && source.extractedText),
+      title: source.title || "La Bilancia d'Oro",
+      file_path: source.filePath || "",
+      source_type: source.source_type || "missing",
+      chars: String(source.extractedText || "").length
+    }
+  };
+}
+
+async function goldMasterStatus(user = {}) {
+  const course = await findGoldMasterCourse();
+  const source = await loadGoldMasterSource().catch((error) => ({
+    found: false,
+    filePath: "",
+    source_type: "error",
+    extractedText: "",
+    error: error.message
+  }));
+  if (!course) {
+    return {
+      ok: true,
+      exists: false,
+      source_found: Boolean(source.found && source.extractedText),
+      source_path: source.filePath || "",
+      warning: source.extractedText ? "" : "File La Bilancia d'Oro non trovato. Caricare il libro per generare il corso completo."
+    };
+  }
+  const counts = await pool.query(
+    `SELECT
+       (SELECT COUNT(*)::int FROM academy_modules WHERE course_id = $1::bigint AND active = TRUE) AS modules,
+       (SELECT COUNT(*)::int FROM academy_lessons WHERE course_id = $1::bigint AND active = TRUE) AS lessons,
+       (SELECT COUNT(*)::int FROM academy_materials WHERE course_id = $1::bigint) AS materials,
+       (SELECT COUNT(*)::int FROM course_quizzes WHERE course_id = $1::bigint AND active = TRUE) AS quizzes`,
+    [course.id]
+  );
+  return {
+    ok: true,
+    exists: true,
+    course,
+    counts: counts.rows[0] || {},
+    source_found: Boolean(source.found && source.extractedText),
+    source_path: source.filePath || "",
+    warning: course.metadata?.sourceWarning || ""
+  };
+}
+
+async function publishGoldMasterCourse(user = {}, publish = true) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Solo il Founder puo pubblicare Oro Master.");
+    error.status = 403;
+    throw error;
+  }
+  const course = await findGoldMasterCourse();
+  if (!course) {
+    const error = new Error("Corso Oro Master non trovato.");
+    error.status = 404;
+    throw error;
+  }
+  const metadata = sanitizeForPostgres({
+    publicationStatus: publish ? "published" : "draft_review",
+    publishedAt: publish ? new Date().toISOString() : null,
+    unpublishedAt: publish ? null : new Date().toISOString()
+  });
+  const updated = await pool.query(
+    `UPDATE courses
+     SET active = $2::boolean,
+         metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [course.id, publish, metadata]
+  );
+  await pool.query(
+    `UPDATE academy_courses
+     SET active = $2::boolean,
+         metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+         updated_at = NOW()
+     WHERE course_id = $1::bigint`,
+    [course.id, publish, metadata]
+  );
+  return updated.rows[0];
+}
+
 async function updateCourse(id, input = {}, user = {}) {
   if (!canManageCourses(user)) {
     const error = new Error("Non autorizzato");
@@ -18916,6 +19826,125 @@ app.get("/api/gaming/overview", async (request, response, next) => {
 app.get("/api/corsi", async (request, response, next) => {
   try {
     response.json(await listCourses(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/gold-master/source-check", requireFounder, async (_request, response, next) => {
+  try {
+    const source = await loadGoldMasterSource();
+    response.json({
+      ok: true,
+      found: Boolean(source.found && source.extractedText),
+      title: source.title || "La Bilancia d'Oro",
+      source_type: source.source_type || "missing",
+      file_path: source.filePath || "",
+      characters: String(source.extractedText || "").length,
+      warning: source.extractedText ? "" : "File La Bilancia d'Oro non trovato. Caricare il libro per generare il corso completo."
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/gold-master/status", async (request, response, next) => {
+  try {
+    response.json(await goldMasterStatus(request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/gold-master/course", async (request, response, next) => {
+  try {
+    const course = await findGoldMasterCourse();
+    if (!course) return response.status(404).json({ error: "Corso Oro Master non trovato" });
+    response.json(await getAcademyCourse(course.id, request.user));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/gold-master/generate-from-bilancia", requireFounder, async (request, response, next) => {
+  try {
+    const result = await generateGoldMasterCourseFromBilancia(request.user, {
+      force: request.body?.force !== false,
+      requireFounder: true
+    });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "generate_gold_master_course",
+      entityType: "academy_course",
+      entityId: result.course_id || null,
+      entityLabel: GOLD_MASTER_COURSE_TITLE,
+      afterData: result
+    });
+    response.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/gold-master/regenerate-slides", requireFounder, async (request, response, next) => {
+  try {
+    const result = await generateGoldMasterCourseFromBilancia(request.user, {
+      force: true,
+      requireFounder: true,
+      regenerateSlides: true
+    });
+    response.status(201).json({ ok: true, message: "Slide Oro Master rigenerate.", ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/gold-master/generate-media-prompts", requireFounder, async (_request, response, next) => {
+  try {
+    const result = await generateGoldMasterCourseFromBilancia({ id: null, ruolo: "founder" }, { force: false });
+    response.status(201).json({
+      ok: true,
+      prompts: GOLD_MASTER_MEDIA_PROMPTS,
+      course_id: result.course_id || null,
+      message: "Prompt immagini Oro Master disponibili nei materiali del corso."
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/gold-master/publish", requireFounder, async (request, response, next) => {
+  try {
+    const course = await publishGoldMasterCourse(request.user, true);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "publish_gold_master_course",
+      entityType: "academy_course",
+      entityId: course.id,
+      entityLabel: course.title,
+      afterData: course
+    });
+    response.json({ ok: true, course });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/gold-master/unpublish", requireFounder, async (request, response, next) => {
+  try {
+    const course = await publishGoldMasterCourse(request.user, false);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "unpublish_gold_master_course",
+      entityType: "academy_course",
+      entityId: course.id,
+      entityLabel: course.title,
+      afterData: course
+    });
+    response.json({ ok: true, course });
   } catch (error) {
     next(error);
   }

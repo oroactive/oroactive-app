@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260609-main-menu-ux-1">
+  <link rel="stylesheet" href="styles.css?v=20260610-notification-dedicated-row-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -70,6 +70,12 @@
             </div>
           </div>
         </header>
+        <div class="main-menu-notification-row" aria-label="Notifiche menu principale">
+          <div class="main-menu-notification-pill">
+            <span>Notifiche</span>
+            <div class="main-menu-notification-slot" id="mainMenuNotificationSlot"></div>
+          </div>
+        </div>
         <section class="main-menu-hero" aria-label="OroActive Control Center">
           <div>
             <p class="eyebrow">OroActive Control Center</p>
@@ -1821,11 +1827,6 @@
         </label>
         <button class="primary-button" type="submit" id="aurumAskButton">Chiedi ad Aurum</button>
       </form>
-      <details class="aurum-memory-details">
-        <summary>Memorie Aurum</summary>
-        <label class="inline-check"><input id="aurumUserMemoryToggle" type="checkbox"> Memoria Aurum attiva</label>
-        <div class="aurum-admin-list" id="aurumUserMemories" aria-live="polite"></div>
-      </details>
       <button class="ghost-button aurum-reset-position-button" type="button" id="aurumResetPosition">Ripristina posizione Aurum</button>
     </section>
     <button class="aurum-mascot-button" id="aurumMascotButton" type="button" aria-label="Aurum Assistente OroActive">
@@ -1868,6 +1869,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260609-main-menu-ux-1"></script>
+  <script src="app.js?v=20260610-notification-dedicated-row-1"></script>
 </body>
 </html>

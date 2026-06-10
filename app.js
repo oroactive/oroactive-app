@@ -1492,6 +1492,7 @@ const mainMenuWelcome = document.getElementById("mainMenuWelcome");
 const mainMenuHeroRole = document.getElementById("mainMenuHeroRole");
 const mainMenuHeroStore = document.getElementById("mainMenuHeroStore");
 const mainMenuFounderKpis = document.getElementById("mainMenuFounderKpis");
+const mainMenuNotificationSlot = document.getElementById("mainMenuNotificationSlot");
 const installHint = document.getElementById("installHint");
 const quoteDashboard = document.getElementById("quoteDashboard");
 const bullionVaultChart = document.getElementById("bullionVaultChart");
@@ -1528,6 +1529,7 @@ const registerFaceIdButton = document.getElementById("registerFaceIdButton");
 const loggedUserName = document.getElementById("loggedUserName");
 const sessionUsername = document.getElementById("sessionUsername");
 const notificationCenter = document.getElementById("notificationCenter");
+const notificationDefaultParent = notificationCenter?.parentElement || document.body;
 const notificationBell = document.getElementById("notificationBell");
 const notificationUnreadBadge = document.getElementById("notificationUnreadBadge");
 const notificationDropdown = document.getElementById("notificationDropdown");
@@ -1566,8 +1568,6 @@ const aurumRememberNo = document.getElementById("aurumRememberNo");
 const aurumSupportActions = document.getElementById("aurumSupportActions");
 const aurumMessageRecipient = document.getElementById("aurumMessageRecipient");
 const aurumSendDirectMessage = document.getElementById("aurumSendDirectMessage");
-const aurumUserMemories = document.getElementById("aurumUserMemories");
-const aurumUserMemoryToggle = document.getElementById("aurumUserMemoryToggle");
 const aurumResetPosition = document.getElementById("aurumResetPosition");
 const aurumManagementPanel = document.getElementById("aurumManagementPanel");
 const aurumEnabledToggle = document.getElementById("aurumEnabledToggle");
@@ -2499,6 +2499,7 @@ function showLogin() {
   closeMainUserMenu();
   closeNotificationDropdown();
   updateAurumMascotVisibility();
+  syncNotificationPlacement();
   appShell.hidden = true;
   if (state.syncTimer) window.clearInterval(state.syncTimer);
   state.syncTimer = null;
@@ -2511,6 +2512,7 @@ function showAuthenticatedShell() {
   appShell.hidden = false;
   splashScreen.classList.remove("hidden");
   mainMenuScreen.hidden = true;
+  syncNotificationPlacement();
 }
 
 function normalizeRole(role = "commesso") {
@@ -3515,6 +3517,14 @@ function canUseApprovalSectionUi() {
   return Boolean(state.currentUser);
 }
 
+function syncNotificationPlacement() {
+  if (!notificationCenter) return;
+  const shouldDockInMainMenu = Boolean(mainMenuNotificationSlot && mainMenuScreen && !mainMenuScreen.hidden);
+  const target = shouldDockInMainMenu ? mainMenuNotificationSlot : notificationDefaultParent;
+  if (target && notificationCenter.parentElement !== target) target.appendChild(notificationCenter);
+  notificationCenter.classList.toggle("is-main-menu-docked", shouldDockInMainMenu);
+}
+
 function applyRolePermissions() {
   renderRoleBasedMenus();
   document.querySelectorAll(".user-directory-only").forEach((element) => {
@@ -3539,6 +3549,7 @@ function applyRolePermissions() {
     element.hidden = !canViewControlSectionsUi();
   });
   if (notificationCenter) notificationCenter.hidden = !state.currentUser;
+  syncNotificationPlacement();
 
   const storeCode = document.getElementById("storeCode");
   const archiveStore = document.getElementById("archiveStoreFilter");
@@ -3874,6 +3885,7 @@ function setScreen(id) {
   const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
   if (leavingArchive) clearActSearch();
   screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
+  syncNotificationPlacement();
   navItems.forEach((item) => item.classList.toggle("active", item.dataset.section === id));
   if (practiceTopbar) practiceTopbar.hidden = id !== "practice";
   if (id !== "quotazione" && bullionVaultChart) {
@@ -4282,6 +4294,7 @@ function showMainMenuFromSplash() {
   renderRoleBasedMenus();
   closeMainMenuSearchResults();
   mainMenuScreen.hidden = false;
+  syncNotificationPlacement();
   setAurumSection("menu");
   updateAurumMascotVisibility();
   maybeStartFirstRunTutorial();
@@ -4292,6 +4305,7 @@ async function enterSectionFromMainMenu(section) {
   if (route.fusionView) state.fusionView = route.fusionView;
   closeMainMenuSearchResults();
   mainMenuScreen.hidden = true;
+  syncNotificationPlacement();
   setAurumSection(section);
   updateAurumMascotVisibility();
   if (route.screen === "practice") {
@@ -4344,6 +4358,7 @@ async function returnToMainMenu() {
   renderRoleBasedMenus();
   closeMainMenuSearchResults();
   mainMenuScreen.hidden = false;
+  syncNotificationPlacement();
   setAurumSection("menu");
   updateAurumMascotVisibility();
 }
@@ -4677,7 +4692,6 @@ function renderAssistantMessages() {
   assistantChat.innerHTML = state.assistantMessages.map((message, index) => `
     <article class="assistant-message ${message.role === "user" ? "user" : "ai"}">
       ${escapeHtml(message.content)}
-      ${message.source ? `<span class="assistant-source">Fonte: ${escapeHtml(message.source)}</span>` : ""}
       ${message.role === "assistant" ? `
         <div class="assistant-feedback" data-assistant-feedback-index="${index}">
           <button type="button" data-ai-feedback="utile">Risposta utile</button>
@@ -5419,7 +5433,6 @@ function renderAurumMessages() {
     aurumChatMessages.innerHTML = state.aurumMessages.map((message) => `
       <article class="aurum-message ${message.role === "user" ? "user" : "assistant"}">
         ${escapeHtml(message.content || "")}
-        ${message.source ? `<span class="assistant-source">Fonte: ${escapeHtml(message.source)}</span>` : ""}
       </article>
     `).join("");
     aurumChatMessages.scrollTop = aurumChatMessages.scrollHeight;
@@ -5577,15 +5590,6 @@ function aurumMemoryTypeLabel(type = "") {
 }
 
 function renderAurumMemoryLists() {
-  const memories = state.aurumMemories || [];
-  const markup = memories.length ? memories.map((memory) => `
-    <article class="aurum-list-row">
-      <span>${escapeHtml(memory.memory_text || "")}</span>
-      <small>${escapeHtml(aurumMemoryTypeLabel(memory.memory_type))} · ${escapeHtml(formatDateTime(memory.updated_at || memory.created_at))}</small>
-      <button class="ghost-button" type="button" data-delete-aurum-memory="${escapeHtml(memory.id || "")}">Elimina</button>
-    </article>
-  `).join("") : '<div class="empty-state">Nessuna memoria salvata al momento.</div>';
-  if (aurumUserMemories) aurumUserMemories.innerHTML = markup;
   renderFounderAurumMemories();
 }
 
@@ -5699,7 +5703,6 @@ function renderAurumManagementPanel() {
   if (aurumMovementToggle) aurumMovementToggle.checked = Boolean(settings.movement);
   if (aurumGreetingToggle) aurumGreetingToggle.checked = Boolean(settings.greeting);
   if (aurumMemoryToggle) aurumMemoryToggle.checked = Boolean(settings.memory);
-  if (aurumUserMemoryToggle) aurumUserMemoryToggle.checked = Boolean(settings.memory);
   [aurumEnabledToggle, aurumMovementToggle, aurumGreetingToggle, aurumMemoryToggle].forEach((toggle) => {
     if (toggle) toggle.disabled = !isFounder();
   });
@@ -9163,6 +9166,8 @@ function renderCourseCard(course) {
   const status = progress.status || course.status || "non iniziato";
   const canManage = canManageCoursesUi();
   const canEvaluate = canEvaluateCoursesUi();
+  const metadata = course.metadata || {};
+  const isGoldMaster = metadata.goldMaster === true || metadata.courseCode === "ORO-MASTER-001";
   const lessonId = course.lesson_id && Number(course.lesson_id) > 0 ? String(course.lesson_id) : "";
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = course.academy_pdf_url || course.pdf_url || "";
@@ -9181,6 +9186,15 @@ function renderCourseCard(course) {
           <span>Durata ${escapeHtml(course.duration_label || (course.duration_minutes ? `${course.duration_minutes} min` : "Da definire"))}</span>
           <span>Docente ${escapeHtml(course.teacher || "OroActive")}</span>
         </div>
+        ${isGoldMaster ? `
+          <div class="academy-gold-master-strip">
+            <strong>Oro Master</strong>
+            <span>${escapeHtml(String(metadata.modulesCount || 12))} moduli</span>
+            <span>${escapeHtml(String(metadata.lessonsCount || "lezioni strutturate"))} lezioni</span>
+            <span>${course.active === false ? "Bozza Founder" : "Pubblicato"}</span>
+          </div>
+          ${metadata.sourceWarning ? `<p class="academy-gold-master-warning">${escapeHtml(metadata.sourceWarning)}</p>` : ""}
+        ` : ""}
         <small>${escapeHtml(moduleTitle)} · ${escapeHtml(lessonTitle)} · Stato: ${escapeHtml(status)}</small>
         ${isUploadedVideo ? `<video class="academy-video-player" controls playsinline preload="metadata" src="${escapeHtml(videoUrl)}"></video>` : ""}
         <div class="academy-materials">
@@ -14417,38 +14431,38 @@ function competitorExplanation(context = {}) {
   const approvalText = context.requires_founder_approval ? " Serve attenzione: per superare il limite sostenibile è richiesta approvazione Founder." : "";
   const oroExpress = context.oro_express_quote;
   const oroExpressText = oroExpress
-    ? ` Oro Express è stato aggiornato ${oroExpress.quote_date ? `il ${formatDateTime(oroExpress.quote_date)}` : "automaticamente"}: ${oroExpress.label || context.purity_code} a ${formatAurumGram(oroExpress.price_per_gram, currency)}. Fonte: ${oroExpress.source_url || "https://www.oro-express.it"}. ${Number(context.max_payable_per_gram || 0) && Number(oroExpress.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: non è consigliato superarlo senza autorizzazione." : "Rientra nel confronto con il massimo pagabile e il prezzo consigliato OroActive."}`
+    ? ` Oro Express è stato aggiornato ${oroExpress.quote_date ? `il ${formatDateTime(oroExpress.quote_date)}` : "automaticamente"}: ${oroExpress.label || context.purity_code} a ${formatAurumGram(oroExpress.price_per_gram, currency)}. ${Number(context.max_payable_per_gram || 0) && Number(oroExpress.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: non è consigliato superarlo senza autorizzazione." : "Rientra nel confronto con il massimo pagabile e il prezzo consigliato OroActive."}`
     : "";
   const oroDOro = context.oro_doro_quote;
   const oroDOroText = oroDOro
-    ? ` Oro D'Oro è stato aggiornato ${oroDOro.quote_date ? `il ${formatDateTime(oroDOro.quote_date)}` : "automaticamente"}: ${oroDOro.label || context.purity_code} a ${formatAurumGram(oroDOro.price_per_gram, currency)}. Fonte: ${oroDOro.source_url || "https://www.comproorodoro.it"}. ${Number(context.max_payable_per_gram || 0) && Number(oroDOro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: inseguirlo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    ? ` Oro D'Oro è stato aggiornato ${oroDOro.quote_date ? `il ${formatDateTime(oroDOro.quote_date)}` : "automaticamente"}: ${oroDOro.label || context.purity_code} a ${formatAurumGram(oroDOro.price_per_gram, currency)}. ${Number(context.max_payable_per_gram || 0) && Number(oroDOro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: inseguirlo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
   const amicoOro = context.amico_oro_quote;
   const amicoOroText = amicoOro
-    ? ` Amico Oro è stato aggiornato ${amicoOro.quote_date ? `il ${formatDateTime(amicoOro.quote_date)}` : "automaticamente"}: ${amicoOro.label || context.purity_code} a ${formatAurumGram(amicoOro.price_per_gram, currency)}. Fonte: ${amicoOro.source_url || "https://www.amico-oro.it"}. ${Number(context.max_payable_per_gram || 0) && Number(amicoOro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: non è consigliato superarlo senza autorizzazione." : "Rientra nel confronto con il massimo pagabile e il prezzo consigliato OroActive."}`
+    ? ` Amico Oro è stato aggiornato ${amicoOro.quote_date ? `il ${formatDateTime(amicoOro.quote_date)}` : "automaticamente"}: ${amicoOro.label || context.purity_code} a ${formatAurumGram(amicoOro.price_per_gram, currency)}. ${Number(context.max_payable_per_gram || 0) && Number(amicoOro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: non è consigliato superarlo senza autorizzazione." : "Rientra nel confronto con il massimo pagabile e il prezzo consigliato OroActive."}`
     : "";
   const prontoGold = context.pronto_gold_quote;
   const prontoGoldRange = prontoGold?.price_kind === "range" && Number(prontoGold.range_min_per_gram || 0) && Number(prontoGold.range_max_per_gram || 0)
     ? ` Il valore 18k è un range da ${formatAurumGram(prontoGold.range_min_per_gram, currency)} a ${formatAurumGram(prontoGold.range_max_per_gram, currency)}; per il confronto viene usato il massimo pubblicato.`
     : "";
   const prontoGoldText = prontoGold
-    ? ` Pronto Gold è stato aggiornato ${prontoGold.provider_timestamp ? `dal sito il ${formatDateTime(prontoGold.provider_timestamp)}` : prontoGold.quote_date ? `il ${formatDateTime(prontoGold.quote_date)}` : "automaticamente"}: ${prontoGold.label || context.purity_code} a ${formatAurumGram(prontoGold.price_per_gram, currency)}. Fonte: ${prontoGold.source_url || "https://www.prontogold.com/quotazioni"}.${prontoGoldRange} ${Number(context.max_payable_per_gram || 0) && Number(prontoGold.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: inseguirlo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    ? ` Pronto Gold è stato aggiornato ${prontoGold.provider_timestamp ? `dal sito il ${formatDateTime(prontoGold.provider_timestamp)}` : prontoGold.quote_date ? `il ${formatDateTime(prontoGold.quote_date)}` : "automaticamente"}: ${prontoGold.label || context.purity_code} a ${formatAurumGram(prontoGold.price_per_gram, currency)}.${prontoGoldRange} ${Number(context.max_payable_per_gram || 0) && Number(prontoGold.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: inseguirlo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
   const bordin = context.bordin_quote;
   const bordinText = bordin
-    ? ` Bordin è stato aggiornato ${bordin.provider_timestamp ? `dal sito il ${formatDateTime(bordin.provider_timestamp)}` : bordin.quote_date ? `il ${formatDateTime(bordin.quote_date)}` : "automaticamente"}: ${bordin.label || context.purity_code} a ${formatAurumGram(bordin.price_per_gram, currency)}. Fonte: ${bordin.source_url || "https://oroemetallipreziosi.com"}.${bordin.condition_text ? ` Nota Bordin: ${bordin.condition_text}` : ""} ${Number(context.max_payable_per_gram || 0) && Number(bordin.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    ? ` Bordin è stato aggiornato ${bordin.provider_timestamp ? `dal sito il ${formatDateTime(bordin.provider_timestamp)}` : bordin.quote_date ? `il ${formatDateTime(bordin.quote_date)}` : "automaticamente"}: ${bordin.label || context.purity_code} a ${formatAurumGram(bordin.price_per_gram, currency)}.${bordin.condition_text ? ` Nota Bordin: ${bordin.condition_text}` : ""} ${Number(context.max_payable_per_gram || 0) && Number(bordin.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
   const goldStandard = context.gold_standard_quote;
   const goldStandardText = goldStandard
-    ? ` Gold Standard è stato aggiornato ${goldStandard.quote_date ? `il ${formatDateTime(goldStandard.quote_date)}` : "automaticamente"}: ${goldStandard.label || context.purity_code} a ${formatAurumGram(goldStandard.price_per_gram, currency)}. Fonte: ${goldStandard.source_url || "https://www.goldstandard.gold"}. ${goldStandard.price_kind === "min_price" ? "Questo è un prezzo MIN di acquisto cliente, utile come benchmark ma da verificare con le condizioni in negozio." : ""} ${Number(context.max_payable_per_gram || 0) && Number(goldStandard.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    ? ` Gold Standard è stato aggiornato ${goldStandard.quote_date ? `il ${formatDateTime(goldStandard.quote_date)}` : "automaticamente"}: ${goldStandard.label || context.purity_code} a ${formatAurumGram(goldStandard.price_per_gram, currency)}. ${goldStandard.price_kind === "min_price" ? "Questo è un prezzo MIN di acquisto cliente, utile come benchmark ma da verificare con le condizioni in negozio." : ""} ${Number(context.max_payable_per_gram || 0) && Number(goldStandard.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo ridurrebbe il margine sotto policy senza autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
   const oroInEuro = context.oro_in_euro_quote;
   const oroInEuroText = oroInEuro
-    ? ` Oro in Euro è stato aggiornato ${oroInEuro.quote_date ? `il ${formatDateTime(oroInEuro.quote_date)}` : "automaticamente"}: ${oroInEuro.label || context.purity_code} a ${formatAurumGram(oroInEuro.price_per_gram, currency)}. Fonte: ${oroInEuro.source_url || "https://www.quotazioneritirooro.it"}. ${oroInEuro.fineness_per_mille ? `Finezza pubblicata: ${oroInEuro.fineness_per_mille}/1000.` : ""} ${Number(context.max_payable_per_gram || 0) && Number(oroInEuro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo richiede verifica del margine o autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    ? ` Oro in Euro è stato aggiornato ${oroInEuro.quote_date ? `il ${formatDateTime(oroInEuro.quote_date)}` : "automaticamente"}: ${oroInEuro.label || context.purity_code} a ${formatAurumGram(oroInEuro.price_per_gram, currency)}. ${oroInEuro.fineness_per_mille ? `Finezza pubblicata: ${oroInEuro.fineness_per_mille}/1000.` : ""} ${Number(context.max_payable_per_gram || 0) && Number(oroInEuro.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo richiede verifica del margine o autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
   const gruppoOro24k = context.gruppo_oro_24k_quote;
   const gruppoOro24kText = gruppoOro24k
-    ? ` Gruppo Oro 24K è stato aggiornato ${gruppoOro24k.provider_timestamp ? `dal sito il ${formatDateTime(gruppoOro24k.provider_timestamp)}` : gruppoOro24k.quote_date ? `il ${formatDateTime(gruppoOro24k.quote_date)}` : "automaticamente"}: ${gruppoOro24k.label || context.purity_code} a ${formatAurumGram(gruppoOro24k.price_per_gram, currency)}. Fonte: ${gruppoOro24k.source_url || "https://www.comprooromilano.org"}. Sono escluse monete e quotazioni borsa. ${Number(context.max_payable_per_gram || 0) && Number(gruppoOro24k.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo richiede verifica del margine o autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
+    ? ` Gruppo Oro 24K è stato aggiornato ${gruppoOro24k.provider_timestamp ? `dal sito il ${formatDateTime(gruppoOro24k.provider_timestamp)}` : gruppoOro24k.quote_date ? `il ${formatDateTime(gruppoOro24k.quote_date)}` : "automaticamente"}: ${gruppoOro24k.label || context.purity_code} a ${formatAurumGram(gruppoOro24k.price_per_gram, currency)}. Sono escluse monete e quotazioni borsa. ${Number(context.max_payable_per_gram || 0) && Number(gruppoOro24k.price_per_gram || 0) > Number(context.max_payable_per_gram) ? "Risulta sopra il massimo pagabile OroActive: avvicinarsi a quel prezzo richiede verifica del margine o autorizzazione." : "Rientra nel confronto con massimo pagabile e prezzo consigliato OroActive."}`
     : "";
   return `Confronto competitor: ${context.competitor_count} rilevazioni. Media ${formatAurumGram(avg, currency)}, minimo ${formatAurumGram(context.competitor_min_price, currency)}, massimo ${formatAurumGram(max, currency)}. Miglior competitor: ${bestName} a ${formatAurumGram(bestPrice, currency)}.${deltaText}${marketText}${approvalText}${oroExpressText}${oroDOroText}${amicoOroText}${prontoGoldText}${bordinText}${goldStandardText}${oroInEuroText}${gruppoOro24kText}${syncText}${aiText}`;
 }
@@ -14482,7 +14496,7 @@ function generateGeneralPriceExplanation(context = {}) {
   return `Spiegazione generale Analisi di mercato
 
 Scenario attivo
-Lo scenario operativo selezionato è ${context.scenario || "standard"}. La fonte dati indicata è ${context.source || "non disponibile"}${context.last_update ? `, ultimo aggiornamento ${formatDateTime(context.last_update)}` : ""}.
+Lo scenario operativo selezionato è ${context.scenario || "standard"}${context.last_update ? `, con ultimo aggiornamento ${formatDateTime(context.last_update)}` : ""}.
 
 Oro
 Per l'oro il riferimento operativo è ${gold.purity_code || "18kt"}: valore teorico ${formatAurumGram(gold.theoretical_value_per_gram, gold.currency)}, massimo pagabile ${formatAurumGram(gold.max_payable_per_gram, gold.currency)}, consigliato ${formatAurumGram(gold.recommended_payable_per_gram, gold.currency)}. ${trendExplanation(gold)}
@@ -17017,9 +17031,6 @@ userMessageForm?.addEventListener("submit", async (event) => {
     memory: Boolean(aurumMemoryToggle?.checked)
   }));
 });
-aurumUserMemoryToggle?.addEventListener("change", () => saveAurumSettings({
-  memory: Boolean(aurumUserMemoryToggle.checked)
-}));
 aurumRefreshAdminData?.addEventListener("click", refreshAurumAdminData);
 [
   aurumSupportRequestsList,
@@ -17039,7 +17050,7 @@ aurumResetLocalMemory?.addEventListener("click", () => {
     .forEach((key) => localStorage.removeItem(key));
   showToast("Saluto giornaliero Aurum resettato per il test.");
 });
-[aurumUserMemories, aurumMemoriesList].forEach((container) => {
+[aurumMemoriesList].forEach((container) => {
   container?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-delete-aurum-memory]");
     if (button) deleteAurumMemory(button.dataset.deleteAurumMemory);

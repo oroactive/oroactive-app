@@ -98,6 +98,46 @@ test("sezione OroActive Academy e certificazioni interne presenti", async () => 
   assert.match(schema, /CREATE TABLE IF NOT EXISTS course_badges/);
 });
 
+test("Oro Master da La Bilancia d'Oro è generato come corso Academy revisionabile", async () => {
+  const [server, schema, generator, app, styles, migration] = await Promise.all([
+    file("server.js"),
+    file("schema.sql"),
+    file("services/academy/goldMasterCourseGenerator.js"),
+    file("app.js"),
+    file("styles.css"),
+    file("migrations/20260610_gold_master_course.sql")
+  ]);
+
+  assert.match(generator, /GOLD_MASTER_COURSE_CODE = "ORO-MASTER-001"/);
+  assert.match(generator, /GOLD_MASTER_COURSE_TITLE = "Oro Master — Dalla Bilancia d’Oro"/);
+  assert.match(generator, /Fondamenti dell'oro/);
+  assert.match(generator, /Carature, purezza e titoli/);
+  assert.match(generator, /Esame finale e certificazione/);
+  assert.match(generator, /buildGoldMasterCoursePayload/);
+  assert.match(generator, /findBilanciaDOroSource/);
+  assert.match(generator, /source_review_needed/);
+  assert.match(generator, /Approfondimento OroActive/);
+  assert.match(generator, /buildGoldMasterFinalExam/);
+  assert.match(generator, /GOLD_MASTER_MEDIA_PROMPTS/);
+  assert.match(schema, /ALTER TABLE courses ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '\{\}'::jsonb/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS academy_source_documents/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS academy_lesson_source_refs/);
+  assert.match(migration, /academy_lesson_source_refs/);
+  assert.match(server, /generateGoldMasterCourseFromBilancia/);
+  assert.match(server, /writeGoldMasterLessonPdf/);
+  assert.match(server, /upsertGoldMasterQuizzes/);
+  assert.match(server, /GOLD-MASTER-SPECIALISTA/);
+  assert.match(server, /app\.post\("\/api\/academy\/gold-master\/generate-from-bilancia"/);
+  assert.match(server, /app\.get\("\/api\/academy\/gold-master\/status"/);
+  assert.match(server, /app\.get\("\/api\/academy\/gold-master\/course"/);
+  assert.match(server, /app\.post\("\/api\/academy\/gold-master\/publish"/);
+  assert.match(server, /app\.post\("\/api\/academy\/gold-master\/unpublish"/);
+  assert.match(server, /Seed Oro Master non completato/);
+  assert.match(app, /metadata\.courseCode === "ORO-MASTER-001"/);
+  assert.match(app, /academy-gold-master-strip/);
+  assert.match(styles, /\.academy-gold-master-strip/);
+});
+
 test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backend", async () => {
   const [index, app, server, styles] = await Promise.all([
     file("index.html"),
@@ -1055,6 +1095,16 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
     file("migrations/20260527_aurum_message_replies.sql"),
     file("migrations/20260527_direct_user_messages.sql")
   ]);
+  const aurumNormativeDocuments = [
+    "Decreto Legislativo n.92 del 25 Maggio 2017.pdf",
+    "Decreto Legislativo n.211 del 10 Dicembre 2024.pdf",
+    "Elenco Monete d'Oro.pdf",
+    "Normativa e legislazione 2017.pdf",
+    "Normativa e legislazione 2023.pdf"
+  ];
+  await Promise.all(aurumNormativeDocuments.map((filename) => (
+    access(new URL(`assets/aurum-knowledge/normative/${filename}`, root))
+  )));
 
   assert.match(index, /id="aurumMascotRoot"/);
   assert.match(index, /aria-label="Aurum Assistente OroActive"/);
@@ -1068,7 +1118,9 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(index, /id="userMessageRecipient"/);
   assert.match(index, /id="aurumMessageRecipient"/);
   assert.match(index, /id="aurumConsentPanel"/);
-  assert.match(index, /id="aurumUserMemoryToggle"/);
+  assert.match(index, /id="aurumMemoriesList"/);
+  assert.match(index, /Memorie Aurum per utente/);
+  assert.doesNotMatch(index, /id="aurumUserMemoryToggle"|id="aurumUserMemories"/);
   assert.doesNotMatch(index, /id="aurumTutorToolbar"|id="aurumPriceToolbar"/);
   assert.doesNotMatch(index, /data-aurum-price-followup|data-aurum-tutorial|data-aurum-field-help|data-aurum-quiz/);
   assert.doesNotMatch(styles, /\.aurum-tutor-toolbar|\.aurum-price-toolbar|\.aurum-quick-actions/);
@@ -1124,6 +1176,11 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(app, /apiRequest\("\/aurum\/memories\/all"/);
   assert.match(app, /apiRequest\("\/aurum\/support-requests"/);
   assert.match(server, /Sei Aurum, assistente operativo intelligente di OroActive/);
+  assert.match(server, /aurumBundledKnowledgeDocuments/);
+  assert.match(server, /seedAurumBundledKnowledgeDocuments/);
+  assert.match(server, /aurum-bundled-knowledge:\$\{source\.filename\}/);
+  assert.match(server, /documentKind: "normativa"/);
+  assert.match(server, /Normativa e documentazione OroActive/);
   assert.match(server, /Tutorial operativo\. Rispondi con guida concreta/);
   assert.match(server, /app\.get\("\/api\/aurum\/memories"/);
   assert.match(server, /app\.get\("\/api\/aurum\/memories\/all", requireFounder/);
@@ -1175,7 +1232,8 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(app, /function updateAurumAvoidance/);
   assert.match(app, /function resetAurumFloatingPosition/);
   assert.match(app, /aurumResetPosition\?\.addEventListener\("click"/);
-  assert.match(styles, /#aurumUserMemories[\s\S]*overflow-y: auto/);
+  assert.doesNotMatch(styles, /#aurumUserMemories|\.aurum-memory-details|\.assistant-source/);
+  assert.doesNotMatch(app, /assistant-source|Fonte: \$\{escapeHtml\(message\.source\)\}/);
   assert.match(styles, /\.aurum-list-row span[\s\S]*overflow-wrap: anywhere/);
   assert.match(styles, /\.aurum-list-row textarea/);
   assert.match(styles, /#aurumAskButton/);
@@ -1189,7 +1247,7 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(styles, /@keyframes aurum-wing-soft/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(app, /aurum-panel-open/);
-  assert.match(app, /Nessuna memoria salvata al momento/);
+  assert.match(app, /Nessuna memoria Aurum registrata/);
   assert.match(app, /event\.key === "Escape"[\s\S]*closeAurumChat/);
 });
 
@@ -1396,7 +1454,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -1449,7 +1507,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -1501,7 +1559,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -1571,9 +1629,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260609-main-menu-ux-1/);
-  assert.match(index, /styles\.css\?v=20260609-main-menu-ux-1/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(index, /app\.js\?v=20260610-notification-dedicated-row-1/);
+  assert.match(index, /styles\.css\?v=20260610-notification-dedicated-row-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -1619,8 +1677,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260609-main-menu-ux-1/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(index, /styles\.css\?v=20260610-notification-dedicated-row-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -1636,6 +1694,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(index, /id="mainMenuSearch"/);
   assert.match(index, /id="mainMenuSearchResults"/);
   assert.match(index, /id="mainMenuActions"/);
+  assert.match(index, /id="mainMenuNotificationSlot"/);
   assert.match(index, /OroActive Control Center/);
   assert.doesNotMatch(index, /main-menu-control-sidebar|id="mainMenuSidebarActions"|id="mainMenuQuickJump"|id="mainMenuSidebarUserName"/);
   assert.match(index, /<aside class="sidebar" aria-label="Navigazione principale">/);
@@ -1666,6 +1725,9 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /id: "search-open-aurum"[\s\S]*action: "aurum"/);
   assert.match(app, /function renderRoleBasedMenus/);
   assert.match(app, /function getMainMenuConfigForRole/);
+  assert.match(app, /function syncNotificationPlacement/);
+  assert.match(app, /mainMenuNotificationSlot[\s\S]*notificationDefaultParent/);
+  assert.match(app, /notificationCenter\.classList\.toggle\("is-main-menu-docked"/);
   assert.match(app, /showFounderMetrics: role === "founder"/);
   assert.match(app, /menuItemMatchesSearch/);
   assert.match(app, /function renderMainMenuSearchResults/);
@@ -1684,6 +1746,15 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-control-shell/);
   assert.match(styles, /\.main-menu-control-shell \{[\s\S]*grid-template-columns: minmax\(0, 1fr\)[\s\S]*width: min\(100%, 1320px\)/);
   assert.match(styles, /\.main-menu-quick-actions \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.notification-center\.is-main-menu-docked \{[\s\S]*position: relative/);
+  assert.match(styles, /\.notification-center\.is-main-menu-docked \{[\s\S]*width: 44px[\s\S]*height: 44px/);
+  assert.match(index, /class="main-menu-notification-row"[\s\S]*class="main-menu-notification-pill"[\s\S]*id="mainMenuNotificationSlot"/);
+  assert.match(styles, /\.main-menu-notification-slot \{/);
+  assert.match(styles, /\.main-menu-notification-row \{[\s\S]*justify-content: flex-end/);
+  assert.match(styles, /\.main-menu-notification-pill \{[\s\S]*border-radius: 999px/);
+  assert.match(styles, /\.main-menu-topbar \{[\s\S]*grid-template-columns: auto minmax\(0, 1fr\) max-content/);
+  assert.match(styles, /\.main-menu-top-actions \{[\s\S]*display: flex[\s\S]*justify-content: end/);
+  assert.match(styles, /\.main-user-button \{[\s\S]*max-width: 170px[\s\S]*text-overflow: ellipsis/);
   assert.match(styles, /\.main-menu-search-results/);
   assert.match(styles, /\.main-menu-hero/);
   assert.match(styles, /\.main-menu-founder-kpis/);
@@ -1697,7 +1768,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -1801,7 +1872,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -1852,9 +1923,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260609-main-menu-ux-1/);
-  assert.match(index, /styles\.css\?v=20260609-main-menu-ux-1/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(index, /app\.js\?v=20260610-notification-dedicated-row-1/);
+  assert.match(index, /styles\.css\?v=20260610-notification-dedicated-row-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -1911,9 +1982,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260609-main-menu-ux-1/);
-  assert.match(index, /styles\.css\?v=20260609-main-menu-ux-1/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(index, /app\.js\?v=20260610-notification-dedicated-row-1/);
+  assert.match(index, /styles\.css\?v=20260610-notification-dedicated-row-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -1991,7 +2062,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -2108,7 +2179,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -2152,7 +2223,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /main-menu-ux-1/);
+  assert.match(worker, /notification-dedicated-row-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
