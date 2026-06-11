@@ -80,6 +80,7 @@ const state = {
   courseProgress: [],
   courseCertificates: [],
   courseBadges: [],
+  goldMasterStatus: null,
   goldMasterCatalogNotice: "",
   goldMasterRestoring: false,
   courseActiveTab: "catalog",
@@ -9284,8 +9285,8 @@ async function ensureGoldMasterVisibleForAcademy(data = {}) {
     state.goldMasterCatalogNotice = "";
     return mergeGoldMasterCourseData(refreshed, goldMasterCourse);
   } catch (error) {
-    state.goldMasterCatalogNotice = "Oro Master non è ancora visibile: usa Ripristina Oro Master o riavvia il server dopo il deploy.";
-    console.warn("Ripristino Oro Master non riuscito:", error);
+    state.goldMasterCatalogNotice = "Oro Master non è ancora visibile: usa Rendi disponibile Oro Master o riavvia il server dopo il deploy.";
+    console.warn("Preparazione Oro Master non riuscita:", error);
     return data;
   }
 }
@@ -9302,7 +9303,51 @@ function currentTrainingDataSnapshot() {
   };
 }
 
+function normalizeTrainingCourseForState(course = {}, payload = {}) {
+  if (!course?.id) return null;
+  return {
+    ...course,
+    faculty_name: course.faculty_name || payload.faculty || payload.faculty_name || "OroActive Academy",
+    category_name: course.category_name || payload.category || "Formazione",
+    section_title: course.section_title || payload.section || payload.section_title || "Generale",
+    academy_module_title: course.academy_module_title || payload.module_title || payload.module || course.module_title || "Modulo introduttivo",
+    academy_lesson_title: course.academy_lesson_title || payload.lesson_title || payload.lesson || course.lesson_title || "Lezione principale",
+    academy_video_url: course.academy_video_url || payload.video_url || course.video_url || "",
+    academy_pdf_url: course.academy_pdf_url || payload.pdf_url || course.pdf_url || "",
+    material_url: course.material_url || payload.material_url || payload.material_data_url || "",
+    material_title: course.material_title || payload.material_filename || payload.material_title || "",
+    active: course.active !== false && payload.active !== false
+  };
+}
+
+function ensureLocalAcademyTaxonomy(course = {}) {
+  const facultyName = String(course.faculty_name || "").trim();
+  if (facultyName && !(state.courseFaculties || []).some((item) => item.name === facultyName)) {
+    state.courseFaculties = [{ id: `local-faculty-${Date.now()}`, name: facultyName, description: "Facoltà OroActive Academy" }, ...(state.courseFaculties || [])];
+  }
+  const categoryName = String(course.category_name || "").trim();
+  if (categoryName && !(state.courseCategories || []).some((item) => item.name === categoryName)) {
+    state.courseCategories = [{ id: `local-category-${Date.now()}`, name: categoryName }, ...(state.courseCategories || [])];
+  }
+  const sectionTitle = String(course.section_title || "").trim();
+  if (sectionTitle && !(state.courseSections || []).some((item) => item.title === sectionTitle)) {
+    state.courseSections = [{ id: `local-section-${Date.now()}`, title: sectionTitle, category_name: categoryName }, ...(state.courseSections || [])];
+  }
+}
+
+function mergeTrainingCourseInState(course = {}, payload = {}) {
+  const normalizedCourse = normalizeTrainingCourseForState(course, payload);
+  if (!normalizedCourse?.id) return null;
+  state.trainingCourses = [
+    normalizedCourse,
+    ...(state.trainingCourses || []).filter((item) => String(item.id) !== String(normalizedCourse.id))
+  ];
+  ensureLocalAcademyTaxonomy(normalizedCourse);
+  return normalizedCourse;
+}
+
 function applyTrainingData(data = {}, scenarioData = {}, myResultsData = {}, teamResultsData = {}) {
+  state.goldMasterStatus = data.gold_master_status || null;
   state.courseFaculties = data.faculties || [];
   state.trainingCourses = data.courses || [];
   state.courseCategories = data.categories || [];
@@ -9323,7 +9368,7 @@ function renderGoldMasterRecoveryCard() {
       <div class="course-card-main">
         <span class="course-pill">OroActive Academy</span>
         <h3>Oro Master — Dalla Bilancia d’Oro</h3>
-        <p>${escapeHtml(state.goldMasterCatalogNotice || "Il corso non è ancora visibile nel catalogo. Puoi generarlo o riportarlo nel catalogo Academy adesso.")}</p>
+        <p>${escapeHtml(state.goldMasterCatalogNotice || "Il corso non è ancora visibile nel catalogo. Puoi renderlo disponibile ora e completare i contenuti dalla gestione Academy.")}</p>
         <div class="academy-gold-master-strip">
           <strong>ORO-MASTER-001</strong>
           <span>12 moduli</span>
@@ -9332,7 +9377,7 @@ function renderGoldMasterRecoveryCard() {
         </div>
       </div>
       <div class="course-progress-panel">
-        <button class="primary-button" type="button" data-ensure-gold-master ${restoring ? "disabled" : ""}>${restoring ? "Ripristino..." : "Ripristina Oro Master"}</button>
+        <button class="primary-button" type="button" data-ensure-gold-master ${restoring ? "disabled" : ""}>${restoring ? "Preparazione..." : "Rendi disponibile Oro Master"}</button>
       </div>
     </article>
   `;
@@ -9365,7 +9410,7 @@ async function restoreGoldMasterCourse() {
   if (!canManageCoursesUi()) return;
   if (state.goldMasterRestoring) return;
   state.goldMasterRestoring = true;
-  state.goldMasterCatalogNotice = "Ripristino Oro Master in corso...";
+  state.goldMasterCatalogNotice = "Preparazione Oro Master nel catalogo Academy...";
   renderTraining();
   try {
     await apiRequest("/academy/gold-master/ensure-visible", {
@@ -9389,9 +9434,9 @@ async function restoreGoldMasterCourse() {
       { results: state.operatorTeamTrainingResults || [] }
     );
     renderTraining();
-    showToast("Oro Master ripristinato nel catalogo Academy.", "success");
+    showToast("Oro Master è disponibile nel catalogo Academy.", "success");
   } catch (error) {
-    state.goldMasterCatalogNotice = "Ripristino non completato: il server Academy non ha risposto. Il pulsante è di nuovo disponibile.";
+    state.goldMasterCatalogNotice = "Oro Master non è ancora disponibile: il server Academy non ha risposto. Il pulsante è di nuovo disponibile.";
     renderTraining();
     throw error;
   } finally {
@@ -10544,11 +10589,13 @@ async function createTrainingCourse(event) {
   if (!canManageCoursesUi()) return;
   const id = document.getElementById("trainingCourseId")?.value;
   const payload = await trainingCourseFormPayload();
-  await apiRequest(id ? `/corsi/${encodeURIComponent(id)}` : "/corsi", {
+  const savedCourse = await apiRequest(id ? `/corsi/${encodeURIComponent(id)}` : "/corsi", {
     method: id ? "PUT" : "POST",
     body: JSON.stringify(payload)
   });
+  mergeTrainingCourseInState(savedCourse, payload);
   resetTrainingCourseFormValues();
+  renderTraining();
   await loadTraining();
   showToast(id ? "Corso aggiornato correttamente" : "Corso creato.");
 }
@@ -10716,10 +10763,11 @@ async function publishCurrentCourseDraft() {
     return;
   }
   const payload = await trainingCourseFormPayload({ forceActive: true });
-  await apiRequest(`/corsi/${encodeURIComponent(id)}`, {
+  const savedCourse = await apiRequest(`/corsi/${encodeURIComponent(id)}`, {
     method: "PUT",
     body: JSON.stringify(payload)
   });
+  mergeTrainingCourseInState(savedCourse, payload);
   await publishCourse(id, { skipConfirm: true });
 }
 
@@ -10727,7 +10775,8 @@ async function publishCourse(courseId, options = {}) {
   if (!canManageCoursesUi()) return;
   const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
   if (!options.skipConfirm && !window.confirm(`Pubblicare il corso "${course?.title || "Academy"}" e renderlo disponibile agli utenti autorizzati?`)) return;
-  await apiRequest(`/corsi/${encodeURIComponent(courseId)}/publish`, { method: "POST" });
+  const publishedCourse = await apiRequest(`/corsi/${encodeURIComponent(courseId)}/publish`, { method: "POST" });
+  mergeTrainingCourseInState(publishedCourse, { active: true });
   await loadTraining();
   showToast("Corso pubblicato correttamente.", "success");
 }
@@ -17445,7 +17494,7 @@ trainingList?.addEventListener("click", async (event) => {
     if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
     if (noteButton) return await saveAcademyNote(noteButton.dataset.saveAcademyNote, noteButton.dataset.academyLesson);
     if (aiButton) return askCourseAi(aiButton.dataset.courseAi);
-    if (ensureGoldMasterButton) return await withButtonBusy(ensureGoldMasterButton, "Ripristino...", restoreGoldMasterCourse);
+    if (ensureGoldMasterButton) return await withButtonBusy(ensureGoldMasterButton, "Preparazione...", restoreGoldMasterCourse);
     if (createFaculty) return await createAcademyFaculty();
     if (editFaculty) return await editAcademyFaculty(editFaculty.dataset.editAcademyFaculty);
     if (deleteFaculty) return await deleteAcademyFaculty(deleteFaculty.dataset.deleteAcademyFaculty);

@@ -14455,7 +14455,7 @@ async function syncAcademyStructure(course, input = {}, user = {}) {
 }
 
 async function listCourses(user = {}) {
-  await ensureGoldMasterCourseInCatalog();
+  const goldMasterStatus = await safeEnsureGoldMasterCourseForCatalog({ forceVisible: true });
   const userId = user.id || null;
   const role = normalizeRole(user.ruolo);
   const faculties = await pool.query("SELECT * FROM academy_faculties WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
@@ -14540,7 +14540,8 @@ async function listCourses(user = {}) {
     courses: courses.rows,
     progress: progress.rows,
     certificates: certificates.rows,
-    badges: badges.rows
+    badges: badges.rows,
+    gold_master_status: goldMasterStatus
   };
 }
 
@@ -15333,6 +15334,59 @@ async function ensureGoldMasterCourseInCatalog(options = {}) {
     active: existing.active,
     message: "Oro Master gia disponibile."
   };
+}
+
+let goldMasterBackgroundGeneration = null;
+
+function scheduleGoldMasterBackgroundGeneration(reason = "academy_catalog") {
+  if (goldMasterBackgroundGeneration) return goldMasterBackgroundGeneration;
+  goldMasterBackgroundGeneration = generateGoldMasterCourseFromBilancia({ id: null, ruolo: "founder" }, { force: true })
+    .catch((error) => {
+      console.warn(`Generazione completa Oro Master non completata (${reason}):`, error.message);
+      return null;
+    })
+    .finally(() => {
+      goldMasterBackgroundGeneration = null;
+    });
+  return goldMasterBackgroundGeneration;
+}
+
+async function ensureGoldMasterCourseShellInCatalog(options = {}) {
+  const existing = await findGoldMasterCourse();
+  if (existing) {
+    return ensureGoldMasterCourseInCatalog({ forceVisible: options.forceVisible === true });
+  }
+  const payload = buildGoldMasterCoursePayload({
+    sourceText: "",
+    sourceDocument: {
+      title: "La Bilancia d'Oro",
+      source_type: "missing",
+      found: false
+    }
+  });
+  const course = await upsertGoldMasterCourse(payload, { id: null, ruolo: "founder" });
+  scheduleGoldMasterBackgroundGeneration("shell_created");
+  return {
+    ok: true,
+    course_id: course.id,
+    active: true,
+    shell: true,
+    message: "Oro Master disponibile nel catalogo Academy."
+  };
+}
+
+async function safeEnsureGoldMasterCourseForCatalog(options = {}) {
+  try {
+    return await ensureGoldMasterCourseShellInCatalog({ forceVisible: options.forceVisible === true });
+  } catch (error) {
+    console.warn("Oro Master non ha bloccato il catalogo Academy:", error.message);
+    return {
+      ok: false,
+      skipped: true,
+      error: error.message,
+      message: "Oro Master non inizializzato: il catalogo Academy resta disponibile."
+    };
+  }
 }
 
 async function generateGoldMasterCourseFromBilancia(user = {}, options = {}) {
@@ -19971,7 +20025,8 @@ app.post("/api/academy/gold-master/generate-from-bilancia", requireFounder, asyn
 
 app.post("/api/academy/gold-master/ensure-visible", requireFounder, async (request, response, next) => {
   try {
-    const result = await ensureGoldMasterCourseInCatalog({ forceVisible: true });
+    const result = await safeEnsureGoldMasterCourseForCatalog({ forceVisible: true });
+    scheduleGoldMasterBackgroundGeneration("ensure_visible");
     void writeAuditLog({
       req: request,
       user: request.user,
