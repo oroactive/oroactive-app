@@ -15598,6 +15598,38 @@ async function deleteCourse(id, user = {}) {
   return result.rowCount > 0;
 }
 
+async function publishCourseDraft(id, user = {}) {
+  if (!canManageCourses(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const metadata = sanitizeForPostgres({
+    publicationStatus: "published",
+    publishedAt: new Date().toISOString(),
+    publishedBy: user.id || null
+  });
+  const result = await pool.query(
+    `UPDATE courses
+     SET active = TRUE,
+         metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+         updated_at = NOW()
+     WHERE id = $1::bigint
+     RETURNING *`,
+    [id, metadata]
+  );
+  if (!result.rows[0]) return null;
+  await pool.query(
+    `UPDATE academy_courses
+     SET active = TRUE,
+         metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb,
+         updated_at = NOW()
+     WHERE course_id = $1::bigint`,
+    [id, metadata]
+  );
+  return result.rows[0];
+}
+
 async function deleteCourseMaterial(id, user = {}) {
   if (!canManageCourses(user)) {
     const error = new Error("Non autorizzato");
@@ -20623,6 +20655,25 @@ app.put("/api/corsi/:id", async (request, response, next) => {
       afterData: course
     });
     response.json(course);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/corsi/:id/publish", async (request, response, next) => {
+  try {
+    const course = await publishCourseDraft(request.params.id, request.user);
+    if (!course) return response.status(404).json({ error: "Corso non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "publish_course_draft",
+      entityType: "academy_course",
+      entityId: course.id || request.params.id,
+      entityLabel: course.title || "",
+      afterData: course
+    });
+    response.json({ ok: true, course });
   } catch (error) {
     next(error);
   }

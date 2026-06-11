@@ -81,6 +81,7 @@ const state = {
   courseCertificates: [],
   courseBadges: [],
   goldMasterCatalogNotice: "",
+  goldMasterRestoring: false,
   courseActiveTab: "catalog",
   coinCatalogSearch: "",
   coinCatalogCountry: "",
@@ -1632,6 +1633,8 @@ const courseCategoryFilter = document.getElementById("courseCategoryFilter");
 const courseToolbar = document.querySelector(".course-toolbar");
 const trainingCourseReset = document.getElementById("trainingCourseReset");
 const trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
+const trainingCoursePreviewButton = document.getElementById("trainingCoursePreviewButton");
+const trainingCoursePublishButton = document.getElementById("trainingCoursePublishButton");
 const trainingCourseFile = document.getElementById("trainingCourseFile");
 const trainingCourseThumbnailFile = document.getElementById("trainingCourseThumbnailFile");
 const trainingCourseVideoFile = document.getElementById("trainingCourseVideoFile");
@@ -8840,6 +8843,8 @@ function resetTrainingCourseFormValues() {
   if (trainingCourseVideoFile) trainingCourseVideoFile.value = "";
   if (trainingCoursePdfFile) trainingCoursePdfFile.value = "";
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Crea corso";
+  if (trainingCoursePreviewButton) trainingCoursePreviewButton.hidden = true;
+  if (trainingCoursePublishButton) trainingCoursePublishButton.hidden = true;
 }
 
 function renderCourseSummary() {
@@ -9231,8 +9236,13 @@ function renderCourseCard(course) {
         <button type="button" data-save-academy-note="${escapeHtml(String(course.id))}" data-academy-lesson="${escapeHtml(lessonId)}">Salva appunti</button>
         <button type="button" data-course-ai="${escapeHtml(String(course.id))}">Chiedi all'AI</button>
         ${canEvaluate ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Segna esame superato</button>` : ""}
-        ${canManage ? `<button type="button" data-edit-course="${escapeHtml(String(course.id))}">Modifica</button>` : ""}
-        ${canManage ? `<button class="danger-button" type="button" data-delete-course="${escapeHtml(String(course.id))}">Elimina corso</button>` : ""}
+        ${canManage ? `
+          <div class="academy-course-admin-actions" aria-label="Azioni gestione corso">
+            <button type="button" data-edit-course="${escapeHtml(String(course.id))}">Modifica</button>
+            <button class="primary-button" type="button" data-publish-course="${escapeHtml(String(course.id))}">Pubblica</button>
+            <button class="danger-button" type="button" data-delete-course="${escapeHtml(String(course.id))}">Elimina</button>
+          </div>
+        ` : ""}
         ${canManage && course.material_id ? `<button type="button" data-delete-course-material="${escapeHtml(String(course.material_id))}">Elimina materiale</button>` : ""}
         ${canManage && course.section_id ? `<button type="button" data-delete-course-section="${escapeHtml(String(course.section_id))}">Elimina sottosezione</button>` : ""}
       </div>
@@ -9280,8 +9290,34 @@ async function ensureGoldMasterVisibleForAcademy(data = {}) {
   }
 }
 
+function currentTrainingDataSnapshot() {
+  return {
+    faculties: state.courseFaculties || [],
+    courses: state.trainingCourses || [],
+    categories: state.courseCategories || [],
+    sections: state.courseSections || [],
+    progress: state.courseProgress || [],
+    certificates: state.courseCertificates || [],
+    badges: state.courseBadges || []
+  };
+}
+
+function applyTrainingData(data = {}, scenarioData = {}, myResultsData = {}, teamResultsData = {}) {
+  state.courseFaculties = data.faculties || [];
+  state.trainingCourses = data.courses || [];
+  state.courseCategories = data.categories || [];
+  state.courseSections = data.sections || [];
+  state.courseProgress = data.progress || [];
+  state.courseCertificates = data.certificates || [];
+  state.courseBadges = data.badges || [];
+  state.trainingScenarios = scenarioData.scenarios || [];
+  state.operatorTrainingResults = myResultsData.results || [];
+  state.operatorTeamTrainingResults = teamResultsData.results || [];
+}
+
 function renderGoldMasterRecoveryCard() {
   if (!canManageCoursesUi()) return "";
+  const restoring = Boolean(state.goldMasterRestoring);
   return `
     <article class="course-card academy-course-card academy-gold-master-recovery">
       <div class="course-card-main">
@@ -9296,31 +9332,72 @@ function renderGoldMasterRecoveryCard() {
         </div>
       </div>
       <div class="course-progress-panel">
-        <button class="primary-button" type="button" data-ensure-gold-master>Ripristina Oro Master</button>
+        <button class="primary-button" type="button" data-ensure-gold-master ${restoring ? "disabled" : ""}>${restoring ? "Ripristino..." : "Ripristina Oro Master"}</button>
       </div>
     </article>
   `;
 }
 
 async function loadTraining() {
-  const [rawCourseData, scenarioData, myResultsData, teamResultsData] = await Promise.all([
+  const [rawCourseDataResult, scenarioDataResult, myResultsDataResult, teamResultsDataResult] = await Promise.allSettled([
     apiRequest("/corsi"),
-    apiRequest("/training/scenarios"),
-    apiRequest("/training/my-results"),
-    apiRequest("/training/team-results")
+    apiRequest("/training/scenarios", { retries: 1 }),
+    apiRequest("/training/my-results", { retries: 1 }),
+    apiRequest("/training/team-results", { retries: 1 })
   ]);
-  const data = await ensureGoldMasterVisibleForAcademy(rawCourseData);
-  state.courseFaculties = data.faculties || [];
-  state.trainingCourses = data.courses || [];
-  state.courseCategories = data.categories || [];
-  state.courseSections = data.sections || [];
-  state.courseProgress = data.progress || [];
-  state.courseCertificates = data.certificates || [];
-  state.courseBadges = data.badges || [];
-  state.trainingScenarios = scenarioData.scenarios || [];
-  state.operatorTrainingResults = myResultsData.results || [];
-  state.operatorTeamTrainingResults = teamResultsData.results || [];
+  const courseDataLoaded = rawCourseDataResult.status === "fulfilled";
+  const rawCourseData = courseDataLoaded ? rawCourseDataResult.value : currentTrainingDataSnapshot();
+  if (!courseDataLoaded) {
+    state.goldMasterCatalogNotice = "Connessione Academy non disponibile: riprova il ripristino quando il server risponde.";
+    showToast(cleanUserMessage(rawCourseDataResult.reason?.message, "Catalogo Academy non caricato."), "error");
+  }
+  const data = courseDataLoaded ? await ensureGoldMasterVisibleForAcademy(rawCourseData) : rawCourseData;
+  applyTrainingData(
+    data,
+    scenarioDataResult.status === "fulfilled" ? scenarioDataResult.value : { scenarios: state.trainingScenarios || [] },
+    myResultsDataResult.status === "fulfilled" ? myResultsDataResult.value : { results: state.operatorTrainingResults || [] },
+    teamResultsDataResult.status === "fulfilled" ? teamResultsDataResult.value : { results: state.operatorTeamTrainingResults || [] }
+  );
   renderTraining();
+}
+
+async function restoreGoldMasterCourse() {
+  if (!canManageCoursesUi()) return;
+  if (state.goldMasterRestoring) return;
+  state.goldMasterRestoring = true;
+  state.goldMasterCatalogNotice = "Ripristino Oro Master in corso...";
+  renderTraining();
+  try {
+    await apiRequest("/academy/gold-master/ensure-visible", {
+      method: "POST",
+      retries: 1,
+      timeoutMs: 30000
+    });
+    let data = await apiRequest("/corsi", { retries: 1, timeoutMs: 30000 });
+    if (!(data.courses || []).some(isGoldMasterCourse)) {
+      const goldMasterCourse = await apiRequest("/academy/gold-master/course", { retries: 1, timeoutMs: 30000 });
+      data = mergeGoldMasterCourseData(data, goldMasterCourse);
+    }
+    if (!(data.courses || []).some(isGoldMasterCourse)) {
+      throw new Error("Oro Master non è stato trovato dopo il ripristino. Riprova o controlla il server.");
+    }
+    state.goldMasterCatalogNotice = "";
+    applyTrainingData(
+      data,
+      { scenarios: state.trainingScenarios || [] },
+      { results: state.operatorTrainingResults || [] },
+      { results: state.operatorTeamTrainingResults || [] }
+    );
+    renderTraining();
+    showToast("Oro Master ripristinato nel catalogo Academy.", "success");
+  } catch (error) {
+    state.goldMasterCatalogNotice = "Ripristino non completato: il server Academy non ha risposto. Il pulsante è di nuovo disponibile.";
+    renderTraining();
+    throw error;
+  } finally {
+    state.goldMasterRestoring = false;
+    renderTraining();
+  }
 }
 
 function formatCoinNumber(value, decimals = 2) {
@@ -10420,10 +10497,7 @@ async function loadGamingOroActive() {
   renderGamingAurumBlocks();
 }
 
-async function createTrainingCourse(event) {
-  event.preventDefault();
-  if (!canManageCoursesUi()) return;
-  const id = document.getElementById("trainingCourseId")?.value;
+async function trainingCourseFormPayload({ forceActive = null } = {}) {
   const selectedFile = trainingCourseFile?.files?.[0];
   const thumbnailFile = trainingCourseThumbnailFile?.files?.[0];
   const videoFile = trainingCourseVideoFile?.files?.[0];
@@ -10432,39 +10506,47 @@ async function createTrainingCourse(event) {
   const thumbnailDataUrl = thumbnailFile ? await fileToDataUrl(thumbnailFile) : "";
   const videoDataUrl = videoFile ? await fileToDataUrl(videoFile) : "";
   const pdfDataUrl = pdfFile ? await fileToDataUrl(pdfFile) : "";
+  return {
+    title: document.getElementById("trainingCourseTitle").value.trim(),
+    faculty: document.getElementById("trainingCourseFaculty").value.trim(),
+    category: document.getElementById("trainingCourseCategory").value.trim(),
+    section: document.getElementById("trainingCourseSection").value.trim(),
+    level: document.getElementById("trainingCourseLevel").value.trim(),
+    duration_label: document.getElementById("trainingCourseDuration").value.trim(),
+    teacher: document.getElementById("trainingCourseTeacher").value.trim(),
+    thumbnail_url: document.getElementById("trainingCourseThumbnail").value.trim(),
+    module_title: document.getElementById("trainingCourseModule").value.trim(),
+    lesson_title: document.getElementById("trainingCourseLesson").value.trim(),
+    description: document.getElementById("trainingCourseDescription").value.trim(),
+    video_url: document.getElementById("trainingCourseVideo").value.trim(),
+    pdf_url: document.getElementById("trainingCoursePdf").value.trim(),
+    material_url: document.getElementById("trainingCourseMaterial").value.trim(),
+    thumbnail_data_url: thumbnailDataUrl,
+    thumbnail_filename: thumbnailFile?.name || "",
+    thumbnail_mime_type: thumbnailFile?.type || "",
+    video_data_url: videoDataUrl,
+    video_filename: videoFile?.name || "",
+    video_mime_type: videoFile?.type || "",
+    pdf_data_url: pdfDataUrl,
+    pdf_filename: pdfFile?.name || "",
+    pdf_mime_type: pdfFile?.type || "",
+    material_data_url: materialDataUrl,
+    material_filename: selectedFile?.name || "",
+    material_type: selectedFile?.type || "",
+    material_mime_type: selectedFile?.type || "",
+    active: forceActive === null ? document.getElementById("trainingCourseActive").checked : Boolean(forceActive),
+    final_certification: document.getElementById("trainingCourseCertification").checked
+  };
+}
+
+async function createTrainingCourse(event) {
+  event.preventDefault();
+  if (!canManageCoursesUi()) return;
+  const id = document.getElementById("trainingCourseId")?.value;
+  const payload = await trainingCourseFormPayload();
   await apiRequest(id ? `/corsi/${encodeURIComponent(id)}` : "/corsi", {
     method: id ? "PUT" : "POST",
-    body: JSON.stringify({
-      title: document.getElementById("trainingCourseTitle").value.trim(),
-      faculty: document.getElementById("trainingCourseFaculty").value.trim(),
-      category: document.getElementById("trainingCourseCategory").value.trim(),
-      section: document.getElementById("trainingCourseSection").value.trim(),
-      level: document.getElementById("trainingCourseLevel").value.trim(),
-      duration_label: document.getElementById("trainingCourseDuration").value.trim(),
-      teacher: document.getElementById("trainingCourseTeacher").value.trim(),
-      thumbnail_url: document.getElementById("trainingCourseThumbnail").value.trim(),
-      module_title: document.getElementById("trainingCourseModule").value.trim(),
-      lesson_title: document.getElementById("trainingCourseLesson").value.trim(),
-      description: document.getElementById("trainingCourseDescription").value.trim(),
-      video_url: document.getElementById("trainingCourseVideo").value.trim(),
-      pdf_url: document.getElementById("trainingCoursePdf").value.trim(),
-      material_url: document.getElementById("trainingCourseMaterial").value.trim(),
-      thumbnail_data_url: thumbnailDataUrl,
-      thumbnail_filename: thumbnailFile?.name || "",
-      thumbnail_mime_type: thumbnailFile?.type || "",
-      video_data_url: videoDataUrl,
-      video_filename: videoFile?.name || "",
-      video_mime_type: videoFile?.type || "",
-      pdf_data_url: pdfDataUrl,
-      pdf_filename: pdfFile?.name || "",
-      pdf_mime_type: pdfFile?.type || "",
-      material_data_url: materialDataUrl,
-      material_filename: selectedFile?.name || "",
-      material_type: selectedFile?.type || "",
-      material_mime_type: selectedFile?.type || "",
-      active: document.getElementById("trainingCourseActive").checked,
-      final_certification: document.getElementById("trainingCourseCertification").checked
-    })
+    body: JSON.stringify(payload)
   });
   resetTrainingCourseFormValues();
   await loadTraining();
@@ -10498,6 +10580,7 @@ async function markCourseExamPassed(courseId) {
 function editCourse(courseId) {
   const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
   if (!course) return;
+  state.courseActiveTab = "management";
   document.getElementById("trainingCourseId").value = course.id;
   document.getElementById("trainingCourseTitle").value = course.title || "";
   document.getElementById("trainingCourseFaculty").value = course.faculty_name || "Facoltà Metalli Preziosi";
@@ -10515,7 +10598,138 @@ function editCourse(courseId) {
   document.getElementById("trainingCourseMaterial").value = course.material_url || "";
   document.getElementById("trainingCourseActive").checked = course.active !== false;
   document.getElementById("trainingCourseCertification").checked = course.final_certification !== false;
-  if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva modifiche";
+  if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva bozza";
+  if (trainingCoursePreviewButton) trainingCoursePreviewButton.hidden = false;
+  if (trainingCoursePublishButton) trainingCoursePublishButton.hidden = false;
+  renderTraining();
+  trainingCourseForm?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function trainingCoursePreviewPayload() {
+  return {
+    id: document.getElementById("trainingCourseId")?.value || "",
+    title: document.getElementById("trainingCourseTitle")?.value.trim() || "Corso Academy",
+    faculty_name: document.getElementById("trainingCourseFaculty")?.value.trim() || "OroActive Academy",
+    category_name: document.getElementById("trainingCourseCategory")?.value.trim() || "Formazione",
+    section_title: document.getElementById("trainingCourseSection")?.value.trim() || "Generale",
+    level: document.getElementById("trainingCourseLevel")?.value.trim() || "Base",
+    duration_label: document.getElementById("trainingCourseDuration")?.value.trim() || "Da definire",
+    teacher: document.getElementById("trainingCourseTeacher")?.value.trim() || "OroActive Academy",
+    thumbnail_url: document.getElementById("trainingCourseThumbnail")?.value.trim() || "",
+    module_title: document.getElementById("trainingCourseModule")?.value.trim() || "Modulo introduttivo",
+    lesson_title: document.getElementById("trainingCourseLesson")?.value.trim() || "Lezione principale",
+    description: document.getElementById("trainingCourseDescription")?.value.trim() || "",
+    video_url: document.getElementById("trainingCourseVideo")?.value.trim() || "",
+    pdf_url: document.getElementById("trainingCoursePdf")?.value.trim() || "",
+    material_url: document.getElementById("trainingCourseMaterial")?.value.trim() || "",
+    active: document.getElementById("trainingCourseActive")?.checked !== false,
+    final_certification: document.getElementById("trainingCourseCertification")?.checked !== false
+  };
+}
+
+async function loadCourseDetailsForPreview(courseId) {
+  if (!courseId) return null;
+  try {
+    return await apiRequest(`/academy/courses/${encodeURIComponent(courseId)}`);
+  } catch (error) {
+    console.warn("Dettaglio corso non disponibile, uso dati locali:", error);
+    return state.trainingCourses.find((item) => String(item.id) === String(courseId)) || null;
+  }
+}
+
+function coursePreviewModulesMarkup(course = {}) {
+  const modules = Array.isArray(course.modules) ? course.modules : [];
+  if (modules.length) {
+    return modules.map((module) => `
+      <section class="academy-preview-module">
+        <h4>${escapeHtml(module.title || "Modulo")}</h4>
+        <p>${escapeHtml(module.description || module.objective || "")}</p>
+        <ul>
+          ${(module.lessons || []).slice(0, 10).map((lesson) => `<li>${escapeHtml(lesson.title || "Lezione")}</li>`).join("") || "<li>Lezioni da completare</li>"}
+        </ul>
+      </section>
+    `).join("");
+  }
+  return `
+    <section class="academy-preview-module">
+      <h4>${escapeHtml(course.module_title || course.academy_module_title || "Modulo introduttivo")}</h4>
+      <ul><li>${escapeHtml(course.lesson_title || course.academy_lesson_title || "Lezione principale")}</li></ul>
+    </section>
+  `;
+}
+
+function showCoursePreviewModal(course = {}) {
+  document.querySelector(".academy-preview-backdrop")?.remove();
+  const status = course.active === false ? "Bozza non pubblicata" : "Visibile / pubblicabile";
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="academy-preview-backdrop" role="dialog" aria-modal="true" aria-label="Anteprima corso Academy">
+      <article class="academy-preview-modal">
+        <header>
+          <div>
+            <span class="course-pill">Anteprima corso</span>
+            <h3>${escapeHtml(course.title || "Corso Academy")}</h3>
+            <p>${escapeHtml(course.description || "Descrizione da completare.")}</p>
+          </div>
+          <button type="button" class="academy-preview-close" data-close-course-preview aria-label="Chiudi anteprima">×</button>
+        </header>
+        <div class="academy-preview-meta">
+          <span>${escapeHtml(course.faculty_name || "OroActive Academy")}</span>
+          <span>${escapeHtml(course.category_name || course.category || "Formazione")}</span>
+          <span>Livello ${escapeHtml(course.level || "Base")}</span>
+          <span>Durata ${escapeHtml(course.duration_label || "Da definire")}</span>
+          <span>${escapeHtml(status)}</span>
+        </div>
+        <div class="academy-preview-content">
+          ${course.thumbnail_url ? `<img src="${escapeHtml(course.thumbnail_url)}" alt="Anteprima corso ${escapeHtml(course.title || "")}">` : ""}
+          ${coursePreviewModulesMarkup(course)}
+          <section class="academy-preview-module">
+            <h4>Materiali collegati</h4>
+            <ul>
+              ${course.video_url || course.academy_video_url ? `<li>Video lezione disponibile</li>` : ""}
+              ${course.pdf_url || course.academy_pdf_url ? `<li>PDF lezione disponibile</li>` : ""}
+              ${course.material_url ? `<li>Materiale didattico collegato</li>` : ""}
+              ${!(course.video_url || course.academy_video_url || course.pdf_url || course.academy_pdf_url || course.material_url) ? "<li>Nessun materiale aggiuntivo collegato.</li>" : ""}
+            </ul>
+          </section>
+        </div>
+        <footer>
+          <button type="button" data-close-course-preview>Chiudi</button>
+          ${canManageCoursesUi() && course.id ? `<button class="primary-button" type="button" data-preview-publish-course="${escapeHtml(String(course.id))}">Pubblica questa versione</button>` : ""}
+        </footer>
+      </article>
+    </div>
+  `);
+}
+
+async function previewCurrentCourseDraft() {
+  if (!canManageCoursesUi()) return;
+  const draft = trainingCoursePreviewPayload();
+  const details = draft.id ? await loadCourseDetailsForPreview(draft.id) : null;
+  showCoursePreviewModal({ ...(details || {}), ...draft });
+}
+
+async function publishCurrentCourseDraft() {
+  if (!canManageCoursesUi()) return;
+  const id = document.getElementById("trainingCourseId")?.value;
+  if (!id) {
+    showToast("Prima seleziona Modifica su un corso oppure crea il corso.", "warning");
+    return;
+  }
+  const payload = await trainingCourseFormPayload({ forceActive: true });
+  await apiRequest(`/corsi/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+  await publishCourse(id, { skipConfirm: true });
+}
+
+async function publishCourse(courseId, options = {}) {
+  if (!canManageCoursesUi()) return;
+  const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
+  if (!options.skipConfirm && !window.confirm(`Pubblicare il corso "${course?.title || "Academy"}" e renderlo disponibile agli utenti autorizzati?`)) return;
+  await apiRequest(`/corsi/${encodeURIComponent(courseId)}/publish`, { method: "POST" });
+  await loadTraining();
+  showToast("Corso pubblicato correttamente.", "success");
 }
 
 async function saveAcademyNote(courseId, lessonId = "") {
@@ -10542,7 +10756,9 @@ function askCourseAi(courseId) {
 
 async function deleteCourse(courseId) {
   if (!canManageCoursesUi()) return;
-  if (!window.confirm("Sei sicuro di voler eliminare questo elemento?")) return;
+  const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
+  const title = course?.title || "questo corso";
+  if (!window.confirm(`Vuoi davvero eliminare definitivamente "${title}"?\n\nL'operazione rimuove il corso dal catalogo Academy e non può essere annullata.`)) return;
   await apiRequest(`/corsi/${encodeURIComponent(courseId)}`, { method: "DELETE" });
   await loadTraining();
   showToast("Corso eliminato correttamente.");
@@ -17174,6 +17390,12 @@ aurumShieldAlertsList?.addEventListener("change", async (event) => {
 });
 trainingCourseForm?.addEventListener("submit", createTrainingCourse);
 trainingCourseReset?.addEventListener("click", resetTrainingCourseFormValues);
+trainingCoursePreviewButton?.addEventListener("click", () => {
+  void previewCurrentCourseDraft().catch((error) => showToast(error.message || "Anteprima corso non disponibile.", "error"));
+});
+trainingCoursePublishButton?.addEventListener("click", () => {
+  void withButtonBusy(trainingCoursePublishButton, "Pubblico...", publishCurrentCourseDraft);
+});
 courseSearch?.addEventListener("input", renderTraining);
 courseCategoryFilter?.addEventListener("change", renderTraining);
 document.querySelectorAll("[data-course-tab]").forEach((button) => {
@@ -17191,6 +17413,7 @@ trainingList?.addEventListener("click", async (event) => {
   const progress = event.target.closest("[data-course-progress]");
   const exam = event.target.closest("[data-course-exam]");
   const edit = event.target.closest("[data-edit-course]");
+  const publishCourseButton = event.target.closest("[data-publish-course]");
   const deleteCourseButton = event.target.closest("[data-delete-course]");
   const deleteMaterialButton = event.target.closest("[data-delete-course-material]");
   const deleteSectionButton = event.target.closest("[data-delete-course-section]");
@@ -17215,18 +17438,39 @@ trainingList?.addEventListener("click", async (event) => {
     if (progress) return await updateCourseProgress(progress.dataset.courseProgress);
     if (exam) return await markCourseExamPassed(exam.dataset.courseExam);
     if (edit) return editCourse(edit.dataset.editCourse);
+    if (publishCourseButton) return await withButtonBusy(publishCourseButton, "Pubblico...", () => publishCourse(publishCourseButton.dataset.publishCourse));
     if (deleteCourseButton) return await deleteCourse(deleteCourseButton.dataset.deleteCourse);
     if (deleteMaterialButton) return await deleteCourseMaterial(deleteMaterialButton.dataset.deleteCourseMaterial);
     if (deleteSectionButton) return await deleteCourseSection(deleteSectionButton.dataset.deleteCourseSection);
     if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
     if (noteButton) return await saveAcademyNote(noteButton.dataset.saveAcademyNote, noteButton.dataset.academyLesson);
     if (aiButton) return askCourseAi(aiButton.dataset.courseAi);
-    if (ensureGoldMasterButton) return await withButtonBusy(ensureGoldMasterButton, "Ripristino...", loadTraining);
+    if (ensureGoldMasterButton) return await withButtonBusy(ensureGoldMasterButton, "Ripristino...", restoreGoldMasterCourse);
     if (createFaculty) return await createAcademyFaculty();
     if (editFaculty) return await editAcademyFaculty(editFaculty.dataset.editAcademyFaculty);
     if (deleteFaculty) return await deleteAcademyFaculty(deleteFaculty.dataset.deleteAcademyFaculty);
   } catch (error) {
     showToast(error.message || "Operazione corso non riuscita.");
+  }
+});
+document.addEventListener("click", (event) => {
+  const closePreview = event.target.closest("[data-close-course-preview]");
+  const backdrop = event.target.classList?.contains("academy-preview-backdrop") ? event.target : null;
+  const publishFromPreview = event.target.closest("[data-preview-publish-course]");
+  if (closePreview || backdrop) {
+    document.querySelector(".academy-preview-backdrop")?.remove();
+    return;
+  }
+  if (publishFromPreview) {
+    void withButtonBusy(publishFromPreview, "Pubblico...", async () => {
+      const editingId = document.getElementById("trainingCourseId")?.value || "";
+      if (editingId && String(editingId) === String(publishFromPreview.dataset.previewPublishCourse)) {
+        await publishCurrentCourseDraft();
+      } else {
+        await publishCourse(publishFromPreview.dataset.previewPublishCourse, { skipConfirm: true });
+      }
+      document.querySelector(".academy-preview-backdrop")?.remove();
+    });
   }
 });
 coinSearchInput?.addEventListener("input", () => {
