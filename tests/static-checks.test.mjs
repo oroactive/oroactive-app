@@ -130,6 +130,12 @@ test("Oro Master da La Bilancia d'Oro è generato come corso Academy revisionabi
   assert.match(server, /ensureGoldMasterCourseShellInCatalog/);
   assert.match(server, /safeEnsureGoldMasterCourseForCatalog/);
   assert.match(server, /gold_master_status/);
+  assert.match(server, /findGoldMasterSourceInKnowledgeBase/);
+  assert.match(server, /d\.filename/);
+  assert.match(server, /d\.metadata::text/);
+  assert.match(server, /ai_document_chunks c2/);
+  assert.match(server, /manuale completo per compro oro/);
+  assert.match(server, /source_missing_refresh/);
   assert.match(server, /Oro Master reso visibile nel catalogo Academy/);
   assert.match(server, /Oro Master disponibile nel catalogo Academy/);
   assert.match(server, /app\.post\("\/api\/academy\/gold-master\/ensure-visible"/);

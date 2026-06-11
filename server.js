@@ -14640,10 +14640,33 @@ async function findGoldMasterSourceInKnowledgeBase() {
             STRING_AGG(c.content, E'\n\n' ORDER BY c.chunk_index ASC) AS extracted_text
      FROM ai_documents d
      LEFT JOIN ai_document_chunks c ON c.document_id = d.id
-     WHERE LOWER(COALESCE(d.titolo, '')) LIKE '%bilancia%'
-       AND LOWER(COALESCE(d.titolo, '')) LIKE '%oro%'
+     WHERE (
+       LOWER(CONCAT_WS(' ', d.titolo, d.filename, d.autore, d.metadata::text)) LIKE '%bilancia%'
+       AND LOWER(CONCAT_WS(' ', d.titolo, d.filename, d.autore, d.metadata::text)) LIKE '%oro%'
+     )
+     OR LOWER(CONCAT_WS(' ', d.titolo, d.filename, d.autore, d.metadata::text)) LIKE '%manuale completo per compro oro%'
+     OR EXISTS (
+       SELECT 1
+       FROM ai_document_chunks c2
+       WHERE c2.document_id = d.id
+         AND (
+           (
+             LOWER(CONCAT_WS(' ', c2.title, c2.metadata::text)) LIKE '%bilancia%'
+             AND LOWER(CONCAT_WS(' ', c2.title, c2.metadata::text)) LIKE '%oro%'
+           )
+           OR LOWER(CONCAT_WS(' ', c2.title, c2.content)) LIKE '%manuale completo per compro oro%'
+           OR LOWER(CONCAT_WS(' ', c2.title, c2.content)) LIKE '%la bilancia d%oro%'
+         )
+     )
      GROUP BY d.id
-     ORDER BY d.created_at DESC
+     ORDER BY
+       CASE
+         WHEN LOWER(CONCAT_WS(' ', d.titolo, d.filename, d.autore, d.metadata::text)) LIKE '%bilancia%'
+          AND LOWER(CONCAT_WS(' ', d.titolo, d.filename, d.autore, d.metadata::text)) LIKE '%oro%' THEN 0
+         WHEN LOWER(CONCAT_WS(' ', d.titolo, d.filename, d.autore, d.metadata::text)) LIKE '%manuale completo per compro oro%' THEN 1
+         ELSE 2
+       END,
+       d.created_at DESC
      LIMIT 1`
   );
   const row = result.rows[0];
@@ -15337,9 +15360,16 @@ async function ensureGoldMasterCourseInCatalog(options = {}) {
 }
 
 let goldMasterBackgroundGeneration = null;
+let goldMasterLastBackgroundGenerationAt = 0;
 
-function scheduleGoldMasterBackgroundGeneration(reason = "academy_catalog") {
+function scheduleGoldMasterBackgroundGeneration(reason = "academy_catalog", options = {}) {
   if (goldMasterBackgroundGeneration) return goldMasterBackgroundGeneration;
+  const now = Date.now();
+  const throttleMs = 10 * 60 * 1000;
+  if (!options.force && goldMasterLastBackgroundGenerationAt && now - goldMasterLastBackgroundGenerationAt < throttleMs) {
+    return Promise.resolve(null);
+  }
+  goldMasterLastBackgroundGenerationAt = now;
   goldMasterBackgroundGeneration = generateGoldMasterCourseFromBilancia({ id: null, ruolo: "founder" }, { force: true })
     .catch((error) => {
       console.warn(`Generazione completa Oro Master non completata (${reason}):`, error.message);
@@ -15354,7 +15384,15 @@ function scheduleGoldMasterBackgroundGeneration(reason = "academy_catalog") {
 async function ensureGoldMasterCourseShellInCatalog(options = {}) {
   const existing = await findGoldMasterCourse();
   if (existing) {
-    return ensureGoldMasterCourseInCatalog({ forceVisible: options.forceVisible === true });
+    const result = await ensureGoldMasterCourseInCatalog({ forceVisible: options.forceVisible === true });
+    const metadata = existing.metadata || {};
+    const sourceMissing = metadata.sourceFound !== true
+      || metadata.generationStatus === "draft_missing_source"
+      || Boolean(metadata.sourceWarning);
+    if (sourceMissing) {
+      scheduleGoldMasterBackgroundGeneration("source_missing_refresh");
+    }
+    return { ...result, refresh_queued: sourceMissing };
   }
   const payload = buildGoldMasterCoursePayload({
     sourceText: "",
@@ -15365,7 +15403,7 @@ async function ensureGoldMasterCourseShellInCatalog(options = {}) {
     }
   });
   const course = await upsertGoldMasterCourse(payload, { id: null, ruolo: "founder" });
-  scheduleGoldMasterBackgroundGeneration("shell_created");
+  scheduleGoldMasterBackgroundGeneration("shell_created", { force: true });
   return {
     ok: true,
     course_id: course.id,
@@ -20026,7 +20064,7 @@ app.post("/api/academy/gold-master/generate-from-bilancia", requireFounder, asyn
 app.post("/api/academy/gold-master/ensure-visible", requireFounder, async (request, response, next) => {
   try {
     const result = await safeEnsureGoldMasterCourseForCatalog({ forceVisible: true });
-    scheduleGoldMasterBackgroundGeneration("ensure_visible");
+    scheduleGoldMasterBackgroundGeneration("ensure_visible", { force: true });
     void writeAuditLog({
       req: request,
       user: request.user,
