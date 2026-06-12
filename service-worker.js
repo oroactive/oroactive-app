@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260611-academy-course-visibility-1";
+const STATIC_CACHE = "oroactive-static-v20260612-remove-gold-master-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260611-academy-course-visibility-1",
-  "/app.js?v=20260611-academy-course-visibility-1",
+  "/styles.css?v=20260612-remove-gold-master-1",
+  "/app.js?v=20260612-remove-gold-master-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

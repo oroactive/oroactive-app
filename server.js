@@ -30,7 +30,6 @@ import {
   GOLD_MASTER_CERTIFICATION_NAME,
   GOLD_MASTER_COURSE_CODE,
   GOLD_MASTER_COURSE_TITLE,
-  GOLD_MASTER_MEDIA_PROMPTS,
   buildGoldMasterCoursePayload,
   findBilanciaDOroSource,
   slugifyGoldMaster
@@ -8533,9 +8532,9 @@ async function initDatabase() {
   await seedDefaultCompetitorSources();
   await seedDefaultCompetitorExtractionRules();
   try {
-    await ensureGoldMasterCourseInCatalog();
+    await removeGoldMasterCourseAndFaculty();
   } catch (error) {
-    console.warn("Seed Oro Master non completato:", error.message);
+    console.warn("Pulizia Oro Master non completata:", error.message);
   }
 }
 
@@ -14455,7 +14454,6 @@ async function syncAcademyStructure(course, input = {}, user = {}) {
 }
 
 async function listCourses(user = {}) {
-  const goldMasterStatus = await safeEnsureGoldMasterCourseForCatalog({ forceVisible: true });
   const userId = user.id || null;
   const role = normalizeRole(user.ruolo);
   const faculties = await pool.query("SELECT * FROM academy_faculties WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
@@ -14540,8 +14538,7 @@ async function listCourses(user = {}) {
     courses: courses.rows,
     progress: progress.rows,
     certificates: certificates.rows,
-    badges: badges.rows,
-    gold_master_status: goldMasterStatus
+    badges: badges.rows
   };
 }
 
@@ -14632,6 +14629,46 @@ async function findGoldMasterCourse() {
     [GOLD_MASTER_COURSE_CODE, GOLD_MASTER_COURSE_TITLE]
   );
   return result.rows[0] || null;
+}
+
+async function removeGoldMasterCourseAndFaculty() {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const courses = await client.query(
+      `SELECT id
+       FROM courses
+       WHERE COALESCE(metadata->>'courseCode', '') = $1::text
+          OR COALESCE(metadata->>'goldMaster', '') = 'true'
+          OR title = $2::text`,
+      [GOLD_MASTER_COURSE_CODE, GOLD_MASTER_COURSE_TITLE]
+    );
+    const courseIds = courses.rows.map((row) => Number(row.id)).filter(Number.isFinite);
+    if (courseIds.length) {
+      await client.query("DELETE FROM courses WHERE id = ANY($1::bigint[])", [courseIds]);
+    }
+
+    const faculty = await client.query(
+      "SELECT id FROM academy_faculties WHERE name = $1::text",
+      ["OroActive Academy"]
+    );
+    const facultyIds = faculty.rows.map((row) => Number(row.id)).filter(Number.isFinite);
+    if (facultyIds.length) {
+      await client.query("UPDATE courses SET faculty_id = NULL WHERE faculty_id = ANY($1::bigint[])", [facultyIds]);
+      await client.query("UPDATE academy_courses SET faculty_id = NULL WHERE faculty_id = ANY($1::bigint[])", [facultyIds]);
+      await client.query("DELETE FROM academy_faculties WHERE id = ANY($1::bigint[])", [facultyIds]);
+    }
+    await client.query("COMMIT");
+    if (courseIds.length || facultyIds.length) {
+      console.log(`Pulizia Academy: rimossi ${courseIds.length} corso/i Oro Master e ${facultyIds.length} facoltà OroActive Academy.`);
+    }
+    return { courses_removed: courseIds.length, faculties_removed: facultyIds.length };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function findGoldMasterSourceInKnowledgeBase() {
@@ -20000,144 +20037,6 @@ app.get("/api/gaming/overview", async (request, response, next) => {
 app.get("/api/corsi", async (request, response, next) => {
   try {
     response.json(await listCourses(request.user));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/academy/gold-master/source-check", requireFounder, async (_request, response, next) => {
-  try {
-    const source = await loadGoldMasterSource();
-    response.json({
-      ok: true,
-      found: Boolean(source.found && source.extractedText),
-      title: source.title || "La Bilancia d'Oro",
-      source_type: source.source_type || "missing",
-      file_path: source.filePath || "",
-      characters: String(source.extractedText || "").length,
-      warning: source.extractedText ? "" : "File La Bilancia d'Oro non trovato. Caricare il libro per generare il corso completo."
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/academy/gold-master/status", async (request, response, next) => {
-  try {
-    response.json(await goldMasterStatus(request.user));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/academy/gold-master/course", async (request, response, next) => {
-  try {
-    const course = await findGoldMasterCourse();
-    if (!course) return response.status(404).json({ error: "Corso Oro Master non trovato" });
-    response.json(await getAcademyCourse(course.id, request.user));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/academy/gold-master/generate-from-bilancia", requireFounder, async (request, response, next) => {
-  try {
-    const result = await generateGoldMasterCourseFromBilancia(request.user, {
-      force: request.body?.force !== false,
-      requireFounder: true
-    });
-    void writeAuditLog({
-      req: request,
-      user: request.user,
-      action: "generate_gold_master_course",
-      entityType: "academy_course",
-      entityId: result.course_id || null,
-      entityLabel: GOLD_MASTER_COURSE_TITLE,
-      afterData: result
-    });
-    response.status(201).json(result);
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/academy/gold-master/ensure-visible", requireFounder, async (request, response, next) => {
-  try {
-    const result = await safeEnsureGoldMasterCourseForCatalog({ forceVisible: true });
-    scheduleGoldMasterBackgroundGeneration("ensure_visible", { force: true });
-    void writeAuditLog({
-      req: request,
-      user: request.user,
-      action: "ensure_gold_master_course_visible",
-      entityType: "academy_course",
-      entityId: result.course_id || null,
-      entityLabel: GOLD_MASTER_COURSE_TITLE,
-      afterData: result
-    });
-    response.json({ ok: true, ...result });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/academy/gold-master/regenerate-slides", requireFounder, async (request, response, next) => {
-  try {
-    const result = await generateGoldMasterCourseFromBilancia(request.user, {
-      force: true,
-      requireFounder: true,
-      regenerateSlides: true
-    });
-    response.status(201).json({ ok: true, message: "Slide Oro Master rigenerate.", ...result });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/academy/gold-master/generate-media-prompts", requireFounder, async (_request, response, next) => {
-  try {
-    const result = await generateGoldMasterCourseFromBilancia({ id: null, ruolo: "founder" }, { force: false });
-    response.status(201).json({
-      ok: true,
-      prompts: GOLD_MASTER_MEDIA_PROMPTS,
-      course_id: result.course_id || null,
-      message: "Prompt immagini Oro Master disponibili nei materiali del corso."
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/academy/gold-master/publish", requireFounder, async (request, response, next) => {
-  try {
-    const course = await publishGoldMasterCourse(request.user, true);
-    void writeAuditLog({
-      req: request,
-      user: request.user,
-      action: "publish_gold_master_course",
-      entityType: "academy_course",
-      entityId: course.id,
-      entityLabel: course.title,
-      afterData: course
-    });
-    response.json({ ok: true, course });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/academy/gold-master/unpublish", requireFounder, async (request, response, next) => {
-  try {
-    const course = await publishGoldMasterCourse(request.user, false);
-    void writeAuditLog({
-      req: request,
-      user: request.user,
-      action: "unpublish_gold_master_course",
-      entityType: "academy_course",
-      entityId: course.id,
-      entityLabel: course.title,
-      afterData: course
-    });
-    response.json({ ok: true, course });
   } catch (error) {
     next(error);
   }

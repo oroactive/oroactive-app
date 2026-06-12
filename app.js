@@ -80,9 +80,6 @@ const state = {
   courseProgress: [],
   courseCertificates: [],
   courseBadges: [],
-  goldMasterStatus: null,
-  goldMasterCatalogNotice: "",
-  goldMasterRestoring: false,
   courseActiveTab: "catalog",
   coinCatalogSearch: "",
   coinCatalogCountry: "",
@@ -9109,7 +9106,7 @@ function renderTraining() {
         <div>
           <span class="course-pill">Facoltà</span>
           <h3>${escapeHtml(faculty.name)}</h3>
-          <p>${escapeHtml(faculty.description || "Facoltà OroActive Academy")}</p>
+          <p>${escapeHtml(faculty.description || "Facoltà Academy")}</p>
         </div>
         <div class="course-progress-panel">
           <strong>${state.trainingCourses.filter((course) => course.faculty_name === faculty.name).length} corsi</strong>
@@ -9118,7 +9115,7 @@ function renderTraining() {
         </div>
       </article>
     `);
-    const courseRows = visibleCourses.length ? visibleCourses.map(renderCourseCard).join("") : renderGoldMasterRecoveryCard();
+    const courseRows = visibleCourses.length ? visibleCourses.map(renderCourseCard).join("") : "";
     trainingList.innerHTML = `
       <article class="course-card academy-course-card">
         <div>
@@ -9136,7 +9133,7 @@ function renderTraining() {
         <div>
           <span class="course-pill">Catalogo</span>
           <h3>Corsi Academy</h3>
-          <p>Qui vedi i corsi disponibili nel catalogo, inclusi quelli in bozza visibile come Oro Master.</p>
+          <p>Qui vedi i corsi disponibili nel catalogo Academy.</p>
         </div>
       </article>
       ${courseRows || '<div class="empty-state">Nessun corso attivo.</div>'}
@@ -9175,7 +9172,7 @@ function renderTraining() {
 
   trainingList.innerHTML = visibleCourses.length
     ? visibleCourses.map(renderCourseCard).join("")
-    : (renderGoldMasterRecoveryCard() || '<div class="empty-state">Nessun corso attivo.</div>');
+    : '<div class="empty-state">Nessun corso attivo.</div>';
 }
 
 function renderCourseCard(course) {
@@ -9184,14 +9181,6 @@ function renderCourseCard(course) {
   const status = progress.status || course.status || "non iniziato";
   const canManage = canManageCoursesUi();
   const canEvaluate = canEvaluateCoursesUi();
-  const metadata = course.metadata || {};
-  const isGoldMaster = metadata.goldMaster === true || metadata.courseCode === "ORO-MASTER-001";
-  const goldMasterPublicationStatus = String(metadata.publicationStatus || "").trim();
-  const goldMasterStatusLabel = goldMasterPublicationStatus === "published"
-    ? "Pubblicato"
-    : goldMasterPublicationStatus === "hidden_by_founder" || course.active === false
-      ? "Nascosto"
-      : "Bozza visibile";
   const lessonId = course.lesson_id && Number(course.lesson_id) > 0 ? String(course.lesson_id) : "";
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = course.academy_pdf_url || course.pdf_url || "";
@@ -9201,7 +9190,7 @@ function renderCourseCard(course) {
   return `
     <article class="course-card academy-course-card">
       <div class="course-card-main">
-        <span class="course-pill">${escapeHtml(course.faculty_name || "OroActive Academy")}</span>
+        <span class="course-pill">${escapeHtml(course.faculty_name || "Academy")}</span>
         <h3>${escapeHtml(course.title)}</h3>
         <p>${escapeHtml(course.description || "")}</p>
         <div class="academy-course-meta">
@@ -9210,15 +9199,6 @@ function renderCourseCard(course) {
           <span>Durata ${escapeHtml(course.duration_label || (course.duration_minutes ? `${course.duration_minutes} min` : "Da definire"))}</span>
           <span>Docente ${escapeHtml(course.teacher || "OroActive")}</span>
         </div>
-        ${isGoldMaster ? `
-          <div class="academy-gold-master-strip">
-            <strong>Oro Master</strong>
-            <span>${escapeHtml(String(metadata.modulesCount || 12))} moduli</span>
-            <span>${escapeHtml(String(metadata.lessonsCount || "lezioni strutturate"))} lezioni</span>
-            <span>${escapeHtml(goldMasterStatusLabel)}</span>
-          </div>
-          ${metadata.sourceWarning ? `<p class="academy-gold-master-warning">${escapeHtml(metadata.sourceWarning)}</p>` : ""}
-        ` : ""}
         <small>${escapeHtml(moduleTitle)} · ${escapeHtml(lessonTitle)} · Stato: ${escapeHtml(status)}</small>
         ${isUploadedVideo ? `<video class="academy-video-player" controls playsinline preload="metadata" src="${escapeHtml(videoUrl)}"></video>` : ""}
         <div class="academy-materials">
@@ -9258,39 +9238,6 @@ function isGoldMasterCourse(course = {}) {
     || String(course.title || "").trim() === "Oro Master — Dalla Bilancia d’Oro";
 }
 
-function mergeGoldMasterCourseData(data = {}, course = null) {
-  if (!course?.id) return data;
-  const courses = Array.isArray(data.courses) ? [...data.courses] : [];
-  if (!courses.some((item) => String(item.id) === String(course.id) || isGoldMasterCourse(item))) {
-    courses.unshift(course);
-  }
-  return { ...data, courses };
-}
-
-async function ensureGoldMasterVisibleForAcademy(data = {}) {
-  if ((data.courses || []).some(isGoldMasterCourse)) {
-    state.goldMasterCatalogNotice = "";
-    return data;
-  }
-  if (!canManageCoursesUi()) return data;
-  try {
-    state.goldMasterCatalogNotice = "Sto preparando Oro Master nel catalogo Academy...";
-    await apiRequest("/academy/gold-master/ensure-visible", { method: "POST" });
-    const refreshed = await apiRequest("/corsi");
-    if ((refreshed.courses || []).some(isGoldMasterCourse)) {
-      state.goldMasterCatalogNotice = "";
-      return refreshed;
-    }
-    const goldMasterCourse = await apiRequest("/academy/gold-master/course");
-    state.goldMasterCatalogNotice = "";
-    return mergeGoldMasterCourseData(refreshed, goldMasterCourse);
-  } catch (error) {
-    state.goldMasterCatalogNotice = "Oro Master non è ancora visibile: usa Rendi disponibile Oro Master o riavvia il server dopo il deploy.";
-    console.warn("Preparazione Oro Master non riuscita:", error);
-    return data;
-  }
-}
-
 function currentTrainingDataSnapshot() {
   return {
     faculties: state.courseFaculties || [],
@@ -9307,7 +9254,7 @@ function normalizeTrainingCourseForState(course = {}, payload = {}) {
   if (!course?.id) return null;
   return {
     ...course,
-    faculty_name: course.faculty_name || payload.faculty || payload.faculty_name || "OroActive Academy",
+    faculty_name: course.faculty_name || payload.faculty || payload.faculty_name || "Academy",
     category_name: course.category_name || payload.category || "Formazione",
     section_title: course.section_title || payload.section || payload.section_title || "Generale",
     academy_module_title: course.academy_module_title || payload.module_title || payload.module || course.module_title || "Modulo introduttivo",
@@ -9323,7 +9270,7 @@ function normalizeTrainingCourseForState(course = {}, payload = {}) {
 function ensureLocalAcademyTaxonomy(course = {}) {
   const facultyName = String(course.faculty_name || "").trim();
   if (facultyName && !(state.courseFaculties || []).some((item) => item.name === facultyName)) {
-    state.courseFaculties = [{ id: `local-faculty-${Date.now()}`, name: facultyName, description: "Facoltà OroActive Academy" }, ...(state.courseFaculties || [])];
+    state.courseFaculties = [{ id: `local-faculty-${Date.now()}`, name: facultyName, description: "Facoltà Academy" }, ...(state.courseFaculties || [])];
   }
   const categoryName = String(course.category_name || "").trim();
   if (categoryName && !(state.courseCategories || []).some((item) => item.name === categoryName)) {
@@ -9347,9 +9294,8 @@ function mergeTrainingCourseInState(course = {}, payload = {}) {
 }
 
 function applyTrainingData(data = {}, scenarioData = {}, myResultsData = {}, teamResultsData = {}) {
-  state.goldMasterStatus = data.gold_master_status || null;
-  state.courseFaculties = data.faculties || [];
-  state.trainingCourses = data.courses || [];
+  state.courseFaculties = (data.faculties || []).filter((faculty) => String(faculty.name || "").trim() !== "OroActive Academy");
+  state.trainingCourses = (data.courses || []).filter((course) => !isGoldMasterCourse(course));
   state.courseCategories = data.categories || [];
   state.courseSections = data.sections || [];
   state.courseProgress = data.progress || [];
@@ -9358,29 +9304,6 @@ function applyTrainingData(data = {}, scenarioData = {}, myResultsData = {}, tea
   state.trainingScenarios = scenarioData.scenarios || [];
   state.operatorTrainingResults = myResultsData.results || [];
   state.operatorTeamTrainingResults = teamResultsData.results || [];
-}
-
-function renderGoldMasterRecoveryCard() {
-  if (!canManageCoursesUi()) return "";
-  const restoring = Boolean(state.goldMasterRestoring);
-  return `
-    <article class="course-card academy-course-card academy-gold-master-recovery">
-      <div class="course-card-main">
-        <span class="course-pill">OroActive Academy</span>
-        <h3>Oro Master — Dalla Bilancia d’Oro</h3>
-        <p>${escapeHtml(state.goldMasterCatalogNotice || "Il corso non è ancora visibile nel catalogo. Puoi renderlo disponibile ora e completare i contenuti dalla gestione Academy.")}</p>
-        <div class="academy-gold-master-strip">
-          <strong>ORO-MASTER-001</strong>
-          <span>12 moduli</span>
-          <span>Corso avanzato</span>
-          <span>Bozza visibile</span>
-        </div>
-      </div>
-      <div class="course-progress-panel">
-        <button class="primary-button" type="button" data-ensure-gold-master ${restoring ? "disabled" : ""}>${restoring ? "Preparazione..." : "Rendi disponibile Oro Master"}</button>
-      </div>
-    </article>
-  `;
 }
 
 async function loadTraining() {
@@ -9393,10 +9316,9 @@ async function loadTraining() {
   const courseDataLoaded = rawCourseDataResult.status === "fulfilled";
   const rawCourseData = courseDataLoaded ? rawCourseDataResult.value : currentTrainingDataSnapshot();
   if (!courseDataLoaded) {
-    state.goldMasterCatalogNotice = "Connessione Academy non disponibile: riprova il ripristino quando il server risponde.";
     showToast(cleanUserMessage(rawCourseDataResult.reason?.message, "Catalogo Academy non caricato."), "error");
   }
-  const data = courseDataLoaded ? await ensureGoldMasterVisibleForAcademy(rawCourseData) : rawCourseData;
+  const data = rawCourseData;
   applyTrainingData(
     data,
     scenarioDataResult.status === "fulfilled" ? scenarioDataResult.value : { scenarios: state.trainingScenarios || [] },
@@ -9404,45 +9326,6 @@ async function loadTraining() {
     teamResultsDataResult.status === "fulfilled" ? teamResultsDataResult.value : { results: state.operatorTeamTrainingResults || [] }
   );
   renderTraining();
-}
-
-async function restoreGoldMasterCourse() {
-  if (!canManageCoursesUi()) return;
-  if (state.goldMasterRestoring) return;
-  state.goldMasterRestoring = true;
-  state.goldMasterCatalogNotice = "Preparazione Oro Master nel catalogo Academy...";
-  renderTraining();
-  try {
-    await apiRequest("/academy/gold-master/ensure-visible", {
-      method: "POST",
-      retries: 1,
-      timeoutMs: 30000
-    });
-    let data = await apiRequest("/corsi", { retries: 1, timeoutMs: 30000 });
-    if (!(data.courses || []).some(isGoldMasterCourse)) {
-      const goldMasterCourse = await apiRequest("/academy/gold-master/course", { retries: 1, timeoutMs: 30000 });
-      data = mergeGoldMasterCourseData(data, goldMasterCourse);
-    }
-    if (!(data.courses || []).some(isGoldMasterCourse)) {
-      throw new Error("Oro Master non è stato trovato dopo il ripristino. Riprova o controlla il server.");
-    }
-    state.goldMasterCatalogNotice = "";
-    applyTrainingData(
-      data,
-      { scenarios: state.trainingScenarios || [] },
-      { results: state.operatorTrainingResults || [] },
-      { results: state.operatorTeamTrainingResults || [] }
-    );
-    renderTraining();
-    showToast("Oro Master è disponibile nel catalogo Academy.", "success");
-  } catch (error) {
-    state.goldMasterCatalogNotice = "Oro Master non è ancora disponibile: il server Academy non ha risposto. Il pulsante è di nuovo disponibile.";
-    renderTraining();
-    throw error;
-  } finally {
-    state.goldMasterRestoring = false;
-    renderTraining();
-  }
 }
 
 function formatCoinNumber(value, decimals = 2) {
@@ -10656,7 +10539,7 @@ function trainingCoursePreviewPayload() {
   return {
     id: document.getElementById("trainingCourseId")?.value || "",
     title: document.getElementById("trainingCourseTitle")?.value.trim() || "Corso Academy",
-    faculty_name: document.getElementById("trainingCourseFaculty")?.value.trim() || "OroActive Academy",
+    faculty_name: document.getElementById("trainingCourseFaculty")?.value.trim() || "Facoltà Metalli Preziosi",
     category_name: document.getElementById("trainingCourseCategory")?.value.trim() || "Formazione",
     section_title: document.getElementById("trainingCourseSection")?.value.trim() || "Generale",
     level: document.getElementById("trainingCourseLevel")?.value.trim() || "Base",
@@ -10720,7 +10603,7 @@ function showCoursePreviewModal(course = {}) {
           <button type="button" class="academy-preview-close" data-close-course-preview aria-label="Chiudi anteprima">×</button>
         </header>
         <div class="academy-preview-meta">
-          <span>${escapeHtml(course.faculty_name || "OroActive Academy")}</span>
+          <span>${escapeHtml(course.faculty_name || "Academy")}</span>
           <span>${escapeHtml(course.category_name || course.category || "Formazione")}</span>
           <span>Livello ${escapeHtml(course.level || "Base")}</span>
           <span>Durata ${escapeHtml(course.duration_label || "Da definire")}</span>
@@ -10799,7 +10682,7 @@ function askCourseAi(courseId) {
   const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
   if (!course) return;
   setScreen("assistant");
-  assistantQuestion.value = `Aiutami a studiare questa lezione OroActive Academy:\nCorso: ${course.title}\nFacoltà: ${course.faculty_name || "OroActive Academy"}\nModulo: ${course.academy_module_title || course.module_title || ""}\nLezione: ${course.academy_lesson_title || course.lesson_title || ""}\n\nRiassumi i punti chiave e preparami 5 domande di ripasso.`;
+  assistantQuestion.value = `Aiutami a studiare questa lezione OroActive Academy:\nCorso: ${course.title}\nFacoltà: ${course.faculty_name || "Academy"}\nModulo: ${course.academy_module_title || course.module_title || ""}\nLezione: ${course.academy_lesson_title || course.lesson_title || ""}\n\nRiassumi i punti chiave e preparami 5 domande di ripasso.`;
   assistantQuestion.focus();
 }
 
@@ -17469,7 +17352,6 @@ trainingList?.addEventListener("click", async (event) => {
   const certificate = event.target.closest("[data-download-certificate]");
   const noteButton = event.target.closest("[data-save-academy-note]");
   const aiButton = event.target.closest("[data-course-ai]");
-  const ensureGoldMasterButton = event.target.closest("[data-ensure-gold-master]");
   const createFaculty = event.target.closest("[data-create-academy-faculty]");
   const editFaculty = event.target.closest("[data-edit-academy-faculty]");
   const deleteFaculty = event.target.closest("[data-delete-academy-faculty]");
@@ -17494,7 +17376,6 @@ trainingList?.addEventListener("click", async (event) => {
     if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
     if (noteButton) return await saveAcademyNote(noteButton.dataset.saveAcademyNote, noteButton.dataset.academyLesson);
     if (aiButton) return askCourseAi(aiButton.dataset.courseAi);
-    if (ensureGoldMasterButton) return await withButtonBusy(ensureGoldMasterButton, "Preparazione...", restoreGoldMasterCourse);
     if (createFaculty) return await createAcademyFaculty();
     if (editFaculty) return await editAcademyFaculty(editFaculty.dataset.editAcademyFaculty);
     if (deleteFaculty) return await deleteAcademyFaculty(deleteFaculty.dataset.deleteAcademyFaculty);

@@ -4379,30 +4379,6 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   color: #fff;
 }
 
-.academy-gold-master-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 10px 0;
-}
-
-.academy-gold-master-strip span,
-.academy-gold-master-strip strong {
-  border: 1px solid rgba(249, 115, 22, 0.28);
-  border-radius: 999px;
-  padding: 7px 10px;
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(247, 210, 122, 0.16));
-  color: var(--gold-dark);
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.academy-gold-master-warning {
-  margin: 8px 0 0;
-  color: #b45309;
-  font-weight: 850;
-}
-
 .academy-course-admin-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

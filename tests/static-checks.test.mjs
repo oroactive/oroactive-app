@@ -98,7 +98,7 @@ test("sezione OroActive Academy e certificazioni interne presenti", async () => 
   assert.match(schema, /CREATE TABLE IF NOT EXISTS course_badges/);
 });
 
-test("Oro Master da La Bilancia d'Oro è generato come corso Academy revisionabile", async () => {
+test("Oro Master e facoltà generata vengono rimossi dal catalogo Academy", async () => {
   const [server, schema, generator, app, index, styles, migration] = await Promise.all([
     file("server.js"),
     file("schema.sql"),
@@ -106,60 +106,39 @@ test("Oro Master da La Bilancia d'Oro è generato come corso Academy revisionabi
     file("app.js"),
     file("index.html"),
     file("styles.css"),
-    file("migrations/20260610_gold_master_course.sql")
+    file("migrations/20260612_remove_gold_master_course.sql")
   ]);
 
   assert.match(generator, /GOLD_MASTER_COURSE_CODE = "ORO-MASTER-001"/);
   assert.match(generator, /GOLD_MASTER_COURSE_TITLE = "Oro Master — Dalla Bilancia d’Oro"/);
-  assert.match(generator, /Fondamenti dell'oro/);
-  assert.match(generator, /Carature, purezza e titoli/);
-  assert.match(generator, /Esame finale e certificazione/);
-  assert.match(generator, /buildGoldMasterCoursePayload/);
-  assert.match(generator, /findBilanciaDOroSource/);
-  assert.match(generator, /source_review_needed/);
-  assert.match(generator, /Approfondimento OroActive/);
-  assert.match(generator, /active: true/);
-  assert.match(generator, /buildGoldMasterFinalExam/);
-  assert.match(generator, /GOLD_MASTER_MEDIA_PROMPTS/);
   assert.match(schema, /ALTER TABLE courses ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '\{\}'::jsonb/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS academy_source_documents/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS academy_lesson_source_refs/);
-  assert.match(migration, /academy_lesson_source_refs/);
-  assert.match(server, /generateGoldMasterCourseFromBilancia/);
-  assert.match(server, /ensureGoldMasterCourseInCatalog/);
-  assert.match(server, /ensureGoldMasterCourseShellInCatalog/);
-  assert.match(server, /safeEnsureGoldMasterCourseForCatalog/);
-  assert.match(server, /gold_master_status/);
-  assert.match(server, /findGoldMasterSourceInKnowledgeBase/);
-  assert.match(server, /d\.filename/);
-  assert.match(server, /d\.metadata::text/);
-  assert.match(server, /ai_document_chunks c2/);
-  assert.match(server, /manuale completo per compro oro/);
-  assert.match(server, /source_missing_refresh/);
-  assert.match(server, /Oro Master reso visibile nel catalogo Academy/);
-  assert.match(server, /Oro Master disponibile nel catalogo Academy/);
-  assert.match(server, /app\.post\("\/api\/academy\/gold-master\/ensure-visible"/);
-  assert.match(server, /ensure_gold_master_course_visible/);
+  assert.match(migration, /DELETE FROM courses/);
+  assert.match(migration, /ORO-MASTER-001/);
+  assert.match(migration, /OroActive Academy/);
+  assert.match(server, /removeGoldMasterCourseAndFaculty/);
+  assert.match(server, /Pulizia Oro Master non completata/);
+  assert.match(server, /DELETE FROM courses WHERE id = ANY/);
+  assert.match(server, /UPDATE courses SET faculty_id = NULL/);
+  assert.doesNotMatch(server, /await ensureGoldMasterCourseInCatalog\(\)/);
+  assert.doesNotMatch(server, /safeEnsureGoldMasterCourseForCatalog\(\{ forceVisible: true \}\)/);
+  assert.doesNotMatch(server, /gold_master_status/);
+  assert.doesNotMatch(server, /app\.post\("\/api\/academy\/gold-master\/ensure-visible"/);
+  assert.doesNotMatch(server, /app\.post\("\/api\/academy\/gold-master\/generate-from-bilancia"/);
+  assert.doesNotMatch(server, /app\.get\("\/api\/academy\/gold-master\/course"/);
   assert.match(server, /publishCourseDraft/);
   assert.match(server, /app\.post\("\/api\/corsi\/:id\/publish"/);
-  assert.match(server, /writeGoldMasterLessonPdf/);
-  assert.match(server, /upsertGoldMasterQuizzes/);
-  assert.match(server, /GOLD-MASTER-SPECIALISTA/);
-  assert.match(server, /app\.post\("\/api\/academy\/gold-master\/generate-from-bilancia"/);
-  assert.match(server, /app\.get\("\/api\/academy\/gold-master\/status"/);
-  assert.match(server, /app\.get\("\/api\/academy\/gold-master\/course"/);
-  assert.match(server, /app\.post\("\/api\/academy\/gold-master\/publish"/);
-  assert.match(server, /app\.post\("\/api\/academy\/gold-master\/unpublish"/);
-  assert.match(server, /hidden_by_founder/);
-  assert.match(server, /Seed Oro Master non completato/);
   assert.match(app, /metadata\.courseCode === "ORO-MASTER-001"/);
-  assert.match(app, /ensureGoldMasterVisibleForAcademy/);
-  assert.match(app, /restoreGoldMasterCourse/);
-  assert.match(app, /goldMasterRestoring/);
+  assert.match(app, /filter\(\(course\) => !isGoldMasterCourse\(course\)\)/);
+  assert.match(app, /filter\(\(faculty\) => String\(faculty\.name \|\| ""\)\.trim\(\) !== "OroActive Academy"\)/);
+  assert.doesNotMatch(app, /ensureGoldMasterVisibleForAcademy/);
+  assert.doesNotMatch(app, /restoreGoldMasterCourse/);
+  assert.doesNotMatch(app, /goldMasterRestoring/);
   assert.match(app, /mergeTrainingCourseInState/);
-  assert.match(app, /Rendi disponibile Oro Master/);
-  assert.match(app, /renderGoldMasterRecoveryCard/);
-  assert.match(app, /data-ensure-gold-master/);
+  assert.doesNotMatch(app, /Rendi disponibile Oro Master/);
+  assert.doesNotMatch(app, /renderGoldMasterRecoveryCard/);
+  assert.doesNotMatch(app, /data-ensure-gold-master/);
   assert.match(app, /data-publish-course/);
   assert.match(app, /trainingCoursePreviewButton/);
   assert.match(app, /previewCurrentCourseDraft/);
@@ -169,9 +148,8 @@ test("Oro Master da La Bilancia d'Oro è generato come corso Academy revisionabi
   assert.match(index, /id="trainingCoursePublishButton"[\s\S]*Pubblica/);
   assert.match(styles, /\.academy-preview-modal/);
   assert.match(styles, /\.academy-course-admin-actions/);
-  assert.match(app, /Bozza visibile/);
-  assert.match(app, /academy-gold-master-strip/);
-  assert.match(styles, /\.academy-gold-master-strip/);
+  assert.doesNotMatch(app, /academy-gold-master-strip/);
+  assert.doesNotMatch(styles, /\.academy-gold-master-strip/);
 });
 
 test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backend", async () => {
@@ -1490,7 +1468,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -1543,7 +1521,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-bell/);
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -1595,7 +1573,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -1665,9 +1643,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260611-academy-course-visibility-1/);
-  assert.match(index, /styles\.css\?v=20260611-academy-course-visibility-1/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(index, /app\.js\?v=20260612-remove-gold-master-1/);
+  assert.match(index, /styles\.css\?v=20260612-remove-gold-master-1/);
+  assert.match(worker, /remove-gold-master-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -1713,8 +1691,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260611-academy-course-visibility-1/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(index, /styles\.css\?v=20260612-remove-gold-master-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -1804,7 +1782,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -1908,7 +1886,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -1959,9 +1937,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260611-academy-course-visibility-1/);
-  assert.match(index, /styles\.css\?v=20260611-academy-course-visibility-1/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(index, /app\.js\?v=20260612-remove-gold-master-1/);
+  assert.match(index, /styles\.css\?v=20260612-remove-gold-master-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -2018,9 +1996,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260611-academy-course-visibility-1/);
-  assert.match(index, /styles\.css\?v=20260611-academy-course-visibility-1/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(index, /app\.js\?v=20260612-remove-gold-master-1/);
+  assert.match(index, /styles\.css\?v=20260612-remove-gold-master-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -2098,7 +2076,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(worker, /remove-gold-master-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -2215,7 +2193,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(worker, /remove-gold-master-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -2259,7 +2237,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /academy-course-visibility-1/);
+  assert.match(worker, /remove-gold-master-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
