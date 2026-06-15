@@ -449,6 +449,15 @@ textarea:disabled {
   box-shadow: 0 24px 62px rgba(0, 0, 0, 0.4);
 }
 
+.notification-dropdown.is-viewport-anchored {
+  position: fixed;
+  top: var(--notification-dropdown-top, 74px);
+  left: var(--notification-dropdown-left, 12px);
+  right: auto;
+  width: var(--notification-dropdown-width, min(390px, calc(100vw - 24px)));
+  max-height: var(--notification-dropdown-max-height, min(620px, calc(100vh - 90px)));
+}
+
 .notification-dropdown-heading {
   display: flex;
   align-items: center;
@@ -10431,7 +10440,7 @@ input.document-expired {
   }
 
   .notification-dropdown {
-    right: -4px;
+    right: 0;
     width: min(360px, calc(100vw - 16px));
   }
 

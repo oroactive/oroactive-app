@@ -3525,6 +3525,31 @@ function syncNotificationPlacement() {
   const target = shouldDockInMainMenu ? mainMenuNotificationSlot : notificationDefaultParent;
   if (target && notificationCenter.parentElement !== target) target.appendChild(notificationCenter);
   notificationCenter.classList.toggle("is-main-menu-docked", shouldDockInMainMenu);
+  if (notificationDropdown && !notificationDropdown.hidden) positionNotificationDropdown();
+}
+
+function positionNotificationDropdown() {
+  if (!notificationDropdown || notificationDropdown.hidden || !notificationBell) return;
+  const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+  const viewportHeight = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+  const margin = 12;
+  const preferredWidth = viewportWidth <= 520 ? viewportWidth - (margin * 2) : 390;
+  const width = Math.max(280, Math.min(preferredWidth, viewportWidth - (margin * 2)));
+  const bellRect = notificationBell.getBoundingClientRect();
+  const top = Math.min(
+    Math.max(margin, bellRect.bottom + 10),
+    Math.max(margin, viewportHeight - 240)
+  );
+  const left = Math.min(
+    Math.max(margin, bellRect.right - width),
+    Math.max(margin, viewportWidth - width - margin)
+  );
+  const maxHeight = Math.max(220, viewportHeight - top - margin);
+  notificationDropdown.classList.add("is-viewport-anchored");
+  notificationDropdown.style.setProperty("--notification-dropdown-width", `${width}px`);
+  notificationDropdown.style.setProperty("--notification-dropdown-left", `${left}px`);
+  notificationDropdown.style.setProperty("--notification-dropdown-top", `${top}px`);
+  notificationDropdown.style.setProperty("--notification-dropdown-max-height", `${maxHeight}px`);
 }
 
 function applyRolePermissions() {
@@ -7228,7 +7253,14 @@ function notificationCardMarkup(notification = {}, compact = false) {
 }
 
 function closeNotificationDropdown() {
-  if (notificationDropdown) notificationDropdown.hidden = true;
+  if (notificationDropdown) {
+    notificationDropdown.hidden = true;
+    notificationDropdown.classList.remove("is-viewport-anchored");
+    notificationDropdown.style.removeProperty("--notification-dropdown-width");
+    notificationDropdown.style.removeProperty("--notification-dropdown-left");
+    notificationDropdown.style.removeProperty("--notification-dropdown-top");
+    notificationDropdown.style.removeProperty("--notification-dropdown-max-height");
+  }
   if (notificationBell) notificationBell.setAttribute("aria-expanded", "false");
 }
 
@@ -17595,7 +17627,13 @@ notificationBell?.addEventListener("click", async (event) => {
   const opening = notificationDropdown?.hidden !== false;
   if (notificationDropdown) notificationDropdown.hidden = !opening;
   if (notificationBell) notificationBell.setAttribute("aria-expanded", opening ? "true" : "false");
-  if (opening) await loadNotificationDropdown();
+  if (opening) {
+    positionNotificationDropdown();
+    await loadNotificationDropdown();
+    positionNotificationDropdown();
+  } else {
+    closeNotificationDropdown();
+  }
 });
 notificationDropdown?.addEventListener("click", (event) => {
   event.stopPropagation();
@@ -17925,6 +17963,7 @@ brandDropdown?.addEventListener("click", (event) => {
 });
 
 window.addEventListener("resize", () => {
+  if (notificationDropdown && !notificationDropdown.hidden) positionNotificationDropdown();
   restoreAurumFloatingPosition();
   scheduleAurumViewportClamp();
   scheduleAurumAvoidance();
