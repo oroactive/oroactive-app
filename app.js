@@ -7264,6 +7264,12 @@ function closeNotificationDropdown() {
   if (notificationBell) notificationBell.setAttribute("aria-expanded", "false");
 }
 
+function renderNotificationDropdownEmpty(message = "Nessuna notifica non letta.") {
+  if (!notificationDropdownList) return;
+  notificationDropdownList.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
+  if (notificationDropdown && !notificationDropdown.hidden) positionNotificationDropdown();
+}
+
 async function loadNotificationCount() {
   if (!state.currentUser || !notificationCenter) return;
   try {
@@ -7300,13 +7306,14 @@ async function loadNotificationDropdown() {
   if (!state.currentUser || !notificationDropdownList) return;
   notificationDropdownList.innerHTML = '<div class="empty-state">Caricamento notifiche...</div>';
   try {
-    const data = await apiRequest("/notifications?limit=6&page=1", { retries: 1 });
+    const data = await apiRequest("/notifications?limit=6&page=1&unread=true", { retries: 1 });
     state.notificationUnreadCount = Number(data.unread_count || 0);
     renderNotificationBadge();
     const notifications = data.notifications || [];
     notificationDropdownList.innerHTML = notifications.length
       ? notifications.map((notification) => notificationCardMarkup(notification, true)).join("")
-      : '<div class="empty-state">Nessuna notifica al momento.</div>';
+      : '<div class="empty-state">Nessuna notifica non letta.</div>';
+    if (notificationDropdown && !notificationDropdown.hidden) positionNotificationDropdown();
   } catch (error) {
     notificationDropdownList.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "Notifiche non caricate.")}</div>`;
   }
@@ -7425,7 +7432,11 @@ async function markAllNotificationsAsRead() {
     const data = await apiRequest("/notifications/read-all", { method: "PUT", body: JSON.stringify({}) });
     state.notificationUnreadCount = Number(data.unread_count || 0);
     renderNotificationBadge();
-    await loadNotificationDropdown();
+    if (state.notificationUnreadCount > 0) {
+      await loadNotificationDropdown();
+    } else {
+      renderNotificationDropdownEmpty("Tutte le notifiche sono state lette.");
+    }
     if (document.getElementById("notifications")?.classList.contains("active-screen")) {
       await loadNotificationsPage(state.notificationPagination?.page || 1);
     }
