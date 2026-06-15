@@ -1511,7 +1511,6 @@ const askAurumGoldPredictionButton = document.getElementById("askAurumGoldPredic
 const buybackScenarioSelect = document.getElementById("buybackScenarioSelect");
 const buybackSimulatorForm = document.getElementById("buybackSimulatorForm");
 const buybackSimulatorOutput = document.getElementById("buybackSimulatorOutput");
-const explainBuybackSimulationButton = document.getElementById("explainBuybackSimulation");
 const buybackPolicyEditor = document.getElementById("buybackPolicyEditor");
 const competitorSourceForm = document.getElementById("competitorSourceForm");
 const competitorQuoteForm = document.getElementById("competitorQuoteForm");
@@ -14827,7 +14826,7 @@ Se lo storico è insufficiente o la fonte non è configurata, la confidence rest
     ? `${context.purity_code || "titolo"} / 1000 = ${formatAurumNumber(context.purity_value, 3)}`
     : `${String(context.purity_code || "").replace(/kt/i, "") || "kt"} / 24 = ${formatAurumNumber(context.purity_value, 3)}`;
   const simulatorText = context.type === "simulator" && aurumHasNumber(context.grams)
-    ? `\n\nSimulatore\nPer ${formatAurumNumber(context.grams, 2)} grammi il valore teorico totale è ${formatEuro(context.theoretical_total)}, il massimo pagabile totale è ${formatEuro(context.max_payable_total)}, il consigliato totale è ${formatEuro(context.recommended_total)}, il miglior prezzo mercato sostenibile è ${formatEuro(context.best_market_total)} e il margine stimato totale è ${formatEuro(context.margin_total)}.${context.best_competitor_total ? ` Il miglior competitor rilevato equivale a ${formatEuro(context.best_competitor_total)}.` : ""}`
+    ? `\n\nSimulatore: calcolo visualizzato\nPer ${formatAurumNumber(context.grams, 2)} grammi il valore teorico totale è ${formatEuro(context.displayed_values?.theoretical_total ?? context.theoretical_total)}.\nMassimo pagabile totale: ${formatEuro(context.displayed_values?.max_payable_total ?? context.max_payable_total)}.\nPrezzo consigliato totale: ${formatEuro(context.displayed_values?.recommended_total ?? context.recommended_total)}.\nMiglior prezzo mercato stimato: ${formatEuro(context.displayed_values?.best_market_total ?? context.best_market_total)}.\nMargine stimato totale: ${formatEuro(context.displayed_values?.margin_total ?? context.margin_total)}.\nMargine residuo sul mercato: ${formatEuro(context.displayed_values?.residual_margin_total ?? context.residual_margin_total)}.\nRientro previsto totale: ${formatEuro(context.displayed_values?.recoverable_total ?? context.recoverable_total)}.${context.best_competitor_total ? `\nMiglior competitor rilevato: ${formatEuro(context.displayed_values?.best_competitor_total ?? context.best_competitor_total)}.` : ""}${context.displayed_values?.competitor_avg_price ? `\nCompetitor medio: ${formatAurumGram(context.displayed_values.competitor_avg_price, currency)}.` : ""}`
     : "";
   return `Spiegazione prezzo ${metal} ${purity} — Scenario ${context.scenario || "standard"}
 
@@ -14862,6 +14861,15 @@ Questa è una stima operativa e non una garanzia di prezzo. Il prezzo finale res
 async function explainPriceWithAurum(context = {}, options = {}) {
   const question = options.question || buildPriceExplanationQuestion(context, options.followup);
   openAurumPanel({ mode: "price_explanation", initialMessage: question, context });
+  if (options.immediateLocal) {
+    state.aurumMessages.push({
+      role: "assistant",
+      content: generateLocalPriceExplanation(context, options),
+      source: "Spiegazione locale OroActive"
+    });
+    renderAurumMessages();
+    if (options.skipRemote) return;
+  }
   const loadingIndex = state.aurumMessages.push({ role: "assistant", content: "Sto preparando la spiegazione del prezzo..." }) - 1;
   renderAurumMessages();
   try {
@@ -15676,12 +15684,31 @@ function renderBuybackSimulation(event) {
   if (!row || !grams) {
     state.buybackSimulationContext = null;
     buybackSimulatorOutput.textContent = "Calcolo non disponibile. Aggiorna i prezzi e inserisci un peso valido.";
-    return;
+    return null;
   }
-  state.buybackSimulationContext = buildPriceExplanationContext(row, { type: "simulator", grams, scenario });
   const bestMarket = buybackMarketPrice(row);
   const bestCompetitor = Number(row.best_competitor_price || row.competitor_max_price || 0);
   const residualMargin = Math.max(0, Number(row.recoverable_value_per_gram || 0) - bestMarket);
+  state.buybackSimulationContext = buildPriceExplanationContext(row, { type: "simulator", grams, scenario });
+  Object.assign(state.buybackSimulationContext, {
+    best_market_client_price_per_gram: bestMarket || state.buybackSimulationContext.best_market_client_price_per_gram,
+    best_market_total: bestMarket ? bestMarket * grams : state.buybackSimulationContext.best_market_total,
+    best_competitor_price: bestCompetitor || state.buybackSimulationContext.best_competitor_price,
+    best_competitor_total: bestCompetitor ? bestCompetitor * grams : state.buybackSimulationContext.best_competitor_total,
+    residual_margin_per_gram: residualMargin,
+    residual_margin_total: residualMargin * grams,
+    displayed_values: {
+      theoretical_total: Number(row.theoretical_value_per_gram || 0) * grams,
+      max_payable_total: Number(row.max_payable_per_gram || 0) * grams,
+      recommended_total: Number(row.recommended_payable_per_gram || 0) * grams,
+      best_market_total: bestMarket * grams,
+      best_competitor_total: bestCompetitor ? bestCompetitor * grams : null,
+      margin_total: Number(row.margin_estimated_per_gram || 0) * grams,
+      residual_margin_total: residualMargin * grams,
+      recoverable_total: Number(row.recoverable_value_per_gram || 0) * grams,
+      competitor_avg_price: row.competitor_count ? Number(row.competitor_avg_price || 0) : null
+    }
+  });
   const bordinQuote = state.buybackSimulationContext?.bordin_quote || null;
   const bordinMinGrams = Number(bordinQuote?.min_quantity_grams || 0);
   const bordinWarning = bordinQuote && bordinMinGrams && grams < bordinMinGrams
@@ -15703,6 +15730,7 @@ function renderBuybackSimulation(event) {
     ${warning}
     ${bordinWarning}
   `;
+  return state.buybackSimulationContext;
 }
 
 async function saveCompetitorSource(event) {
@@ -16152,13 +16180,15 @@ function askAurumGoldPrediction() {
 }
 
 function explainBuybackSimulation() {
-  if (!state.buybackSimulationContext && buybackSimulatorForm) renderBuybackSimulation();
-  if (!state.buybackSimulationContext) {
+  const context = renderBuybackSimulation();
+  if (!context) {
     showToast("Prima esegui una simulazione prezzo valida.", "warning");
     return;
   }
-  void explainPriceWithAurum(state.buybackSimulationContext, {
-    question: buildPriceExplanationQuestion(state.buybackSimulationContext)
+  void explainPriceWithAurum(context, {
+    question: buildPriceExplanationQuestion(context),
+    immediateLocal: true,
+    skipRemote: true
   });
 }
 
@@ -17739,7 +17769,11 @@ buybackScenarioSelect?.addEventListener("change", () => {
   withButtonBusy(runGoldPredictionButton, "Calcolo...", runGoldPrediction);
 });
 buybackSimulatorForm?.addEventListener("submit", renderBuybackSimulation);
-explainBuybackSimulationButton?.addEventListener("click", explainBuybackSimulation);
+buybackSimulatorForm?.addEventListener("click", (event) => {
+  if (!event.target.closest("#explainBuybackSimulation")) return;
+  event.preventDefault();
+  explainBuybackSimulation();
+});
 competitorSourceForm?.addEventListener("submit", (event) => {
   withButtonBusy(event.submitter || competitorSourceForm.querySelector('button[type="submit"]'), "Salvo...", () => saveCompetitorSource(event));
 });

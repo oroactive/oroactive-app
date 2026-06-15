@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260615-notification-read-clear-1";
+const STATIC_CACHE = "oroactive-static-v20260615-aurum-buyback-explain-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260615-notification-read-clear-1",
-  "/app.js?v=20260615-notification-read-clear-1",
+  "/styles.css?v=20260615-aurum-buyback-explain-1",
+  "/app.js?v=20260615-aurum-buyback-explain-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",
