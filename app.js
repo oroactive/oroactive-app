@@ -9217,6 +9217,20 @@ function renderTraining() {
     : '<div class="empty-state">Nessun corso attivo.</div>';
 }
 
+function courseFinalExamQuestions(course = {}) {
+  if (Array.isArray(course.final_exam_questions)) return course.final_exam_questions;
+  if (Array.isArray(course.final_exam?.questions)) return course.final_exam.questions;
+  return [];
+}
+
+function courseExamPassed(course = {}) {
+  return course.final_exam_passed === true || Boolean(course.certificate_id);
+}
+
+function courseSlidesUrl(course = {}) {
+  return course.slides_download_url || course.academy_pdf_url || course.pdf_url || "";
+}
+
 function renderCourseCard(course) {
   const progress = courseProgressFor(course.id);
   const percent = Math.max(0, Math.min(100, Number(progress.percentuale || course.percentuale || 0)));
@@ -9225,10 +9239,20 @@ function renderCourseCard(course) {
   const canEvaluate = canEvaluateCoursesUi();
   const lessonId = course.lesson_id && Number(course.lesson_id) > 0 ? String(course.lesson_id) : "";
   const videoUrl = course.academy_video_url || course.video_url || "";
-  const pdfUrl = course.academy_pdf_url || course.pdf_url || "";
+  const pdfUrl = courseSlidesUrl(course);
+  const finalExamQuestions = courseFinalExamQuestions(course);
+  const hasFinalExam = finalExamQuestions.length > 0;
+  const examPassed = courseExamPassed(course);
+  const slidesLocked = Boolean(course.slides_locked) && !canManage;
+  const canOpenSlides = Boolean(pdfUrl) && !slidesLocked;
   const isUploadedVideo = /^\/api\/academy\/materials\/file\//.test(String(videoUrl)) || /\.(mp4|mov)(\?|#|$)/i.test(String(videoUrl));
   const moduleTitle = course.academy_module_title || course.module_title || course.section_title || "Modulo introduttivo";
   const lessonTitle = course.academy_lesson_title || course.lesson_title || "Lezione principale";
+  const testStatus = hasFinalExam
+    ? examPassed
+      ? `<span class="academy-test-status passed">Test finale superato${course.final_exam_score ? ` · ${escapeHtml(String(course.final_exam_score))}%` : ""}</span>`
+      : `<span class="academy-test-status">Test finale richiesto per sbloccare slide, download, badge e certificato</span>`
+    : "";
   return `
     <article class="course-card academy-course-card">
       <div class="course-card-main">
@@ -9242,10 +9266,15 @@ function renderCourseCard(course) {
           <span>Docente ${escapeHtml(course.teacher || "OroActive")}</span>
         </div>
         <small>${escapeHtml(moduleTitle)} · ${escapeHtml(lessonTitle)} · Stato: ${escapeHtml(status)}</small>
+        ${testStatus}
         ${isUploadedVideo ? `<video class="academy-video-player" controls playsinline preload="metadata" src="${escapeHtml(videoUrl)}"></video>` : ""}
         <div class="academy-materials">
           ${videoUrl ? `<a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener">Guarda video lezione</a>` : ""}
-          ${pdfUrl ? `<a href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener" download>Scarica PDF lezione</a>` : ""}
+          ${pdfUrl && canOpenSlides ? `
+            <button type="button" data-view-course-slides="${escapeHtml(String(course.id))}">Visualizza slide PDF</button>
+            <button type="button" data-download-course-slides="${escapeHtml(String(course.id))}">Scarica PDF corso</button>
+          ` : ""}
+          ${pdfUrl && !canOpenSlides ? `<span class="academy-locked-material">Slide PDF bloccate fino al superamento del test finale</span>` : ""}
           ${course.material_url ? `<a href="${escapeHtml(course.material_url)}" target="_blank" rel="noopener">Apri materiale didattico</a>` : ""}
         </div>
         <label class="academy-note-label">Appunti personali
@@ -9258,7 +9287,9 @@ function renderCourseCard(course) {
         <button type="button" data-course-progress="${escapeHtml(String(course.id))}">${percent > 0 ? "Continua corso" : "Inizia corso"}</button>
         <button type="button" data-save-academy-note="${escapeHtml(String(course.id))}" data-academy-lesson="${escapeHtml(lessonId)}">Salva appunti</button>
         <button type="button" data-course-ai="${escapeHtml(String(course.id))}">Chiedi all'AI</button>
-        ${canEvaluate ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Segna esame superato</button>` : ""}
+        ${hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Sostieni test finale</button>` : ""}
+        ${hasFinalExam && examPassed ? `<button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(course.certificate_id || ""))}" ${course.certificate_id ? "" : "disabled"}>Scarica certificato</button>` : ""}
+        ${!hasFinalExam && canEvaluate ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Segna esame superato</button>` : ""}
         ${canManage ? `
           <div class="academy-course-admin-actions" aria-label="Azioni gestione corso">
             <button type="button" data-edit-course="${escapeHtml(String(course.id))}">Modifica</button>
@@ -10549,6 +10580,134 @@ async function markCourseExamPassed(courseId) {
   showToast("Esame superato, certificazione e badge assegnati.");
 }
 
+function showCourseExamModal(courseId) {
+  const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
+  if (!course) return;
+  const questions = courseFinalExamQuestions(course);
+  if (!questions.length) {
+    void markCourseExamPassed(courseId);
+    return;
+  }
+  const passScore = Number(course.final_exam?.pass_score || 80);
+  document.querySelector(".academy-preview-backdrop")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="academy-preview-backdrop" role="dialog" aria-modal="true" aria-label="Test finale corso Academy">
+      <article class="academy-preview-modal academy-exam-modal">
+        <header>
+          <div>
+            <span class="course-pill">Test finale</span>
+            <h3>${escapeHtml(course.title || "Corso Academy")}</h3>
+            <p>Supera il test con almeno ${escapeHtml(String(passScore))}% per sbloccare slide PDF, download, certificato e badge.</p>
+          </div>
+          <button type="button" class="academy-preview-close" data-close-course-preview aria-label="Chiudi test">×</button>
+        </header>
+        <form class="academy-exam-form" data-course-final-exam-form="${escapeHtml(String(course.id))}">
+          ${questions.map((question, index) => `
+            <fieldset class="academy-exam-question">
+              <legend>${index + 1}. ${escapeHtml(question.question || "Domanda")}</legend>
+              <div class="academy-exam-options">
+                ${(Array.isArray(question.options) ? question.options : []).map((option) => {
+                  const optionId = `academy-exam-${question.id}-${String(option).replace(/[^a-z0-9]+/gi, "-").slice(0, 24)}`;
+                  return `
+                    <label for="${escapeHtml(optionId)}">
+                      <input
+                        id="${escapeHtml(optionId)}"
+                        type="radio"
+                        name="academy-exam-${escapeHtml(String(question.id))}"
+                        value="${escapeHtml(String(option))}"
+                        data-academy-exam-answer="${escapeHtml(String(question.id))}">
+                      <span>${escapeHtml(String(option))}</span>
+                    </label>
+                  `;
+                }).join("")}
+              </div>
+            </fieldset>
+          `).join("")}
+          <div class="academy-exam-feedback" data-academy-exam-feedback hidden></div>
+        </form>
+        <footer>
+          <button type="button" data-close-course-preview>Chiudi</button>
+          <button class="primary-button" type="button" data-submit-course-final-exam="${escapeHtml(String(course.id))}">Consegna test</button>
+        </footer>
+      </article>
+    </div>
+  `);
+}
+
+async function submitCourseFinalExam(courseId) {
+  const form = document.querySelector(`[data-course-final-exam-form="${cssEscape(courseId)}"]`);
+  const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
+  const questions = courseFinalExamQuestions(course);
+  if (!form || !course || !questions.length) return;
+  const answers = questions.map((question) => {
+    const selected = form.querySelector(`[data-academy-exam-answer="${cssEscape(String(question.id))}"]:checked`);
+    return {
+      question_id: question.id,
+      answer: selected?.value || ""
+    };
+  });
+  if (answers.some((answer) => !answer.answer)) {
+    const feedback = form.querySelector("[data-academy-exam-feedback]");
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.className = "academy-exam-feedback error";
+      feedback.textContent = "Rispondi a tutte le domande prima di consegnare il test.";
+    }
+    return;
+  }
+  const result = await apiRequest("/academy/exams", {
+    method: "POST",
+    body: JSON.stringify({ course_id: courseId, answers })
+  });
+  const feedback = form.querySelector("[data-academy-exam-feedback]");
+  if (feedback) {
+    feedback.hidden = false;
+    feedback.className = `academy-exam-feedback ${result.passed ? "success" : "error"}`;
+    feedback.textContent = result.passed
+      ? `Test superato: ${result.score}%. Slide, badge e certificato sono ora disponibili.`
+      : `Test non superato: ${result.score}%. Servono almeno ${result.pass_score}%. Puoi riprovare.`;
+  }
+  if (result.passed) {
+    await loadTraining();
+    window.setTimeout(() => document.querySelector(".academy-preview-backdrop")?.remove(), 900);
+    showToast("Test superato: certificato, badge e slide sbloccati.", "success");
+  }
+}
+
+async function downloadCourseSlides(courseId, options = {}) {
+  const download = options.download !== false;
+  const response = await fetch(`${apiBase}/academy/courses/${encodeURIComponent(courseId)}/slides/download${download ? "?download=1" : ""}`, {
+    headers: state.authToken ? { Authorization: `Bearer ${state.authToken}` } : {}
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "Slide PDF non disponibili.");
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  if (download) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `corso-oroactive-${courseId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
+  const opened = window.open(url, "_blank", "noopener");
+  if (!opened) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function editCourse(courseId) {
   const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
   if (!course) return;
@@ -10795,7 +10954,7 @@ async function deleteAcademyFaculty(facultyId) {
 }
 
 async function downloadCourseCertificate(certificateId) {
-  const response = await fetch(`${apiBase}/corsi/certificati/${encodeURIComponent(certificateId)}/pdf`, {
+  const response = await fetch(`${apiBase}/academy/certificates/${encodeURIComponent(certificateId)}/download`, {
     headers: state.authToken ? { Authorization: `Bearer ${state.authToken}` } : {}
   });
   if (!response.ok) {
@@ -17417,6 +17576,8 @@ trainingList?.addEventListener("click", async (event) => {
   const openTrainingResult = event.target.closest("[data-open-training-result]");
   const progress = event.target.closest("[data-course-progress]");
   const exam = event.target.closest("[data-course-exam]");
+  const viewSlides = event.target.closest("[data-view-course-slides]");
+  const downloadSlides = event.target.closest("[data-download-course-slides]");
   const edit = event.target.closest("[data-edit-course]");
   const publishCourseButton = event.target.closest("[data-publish-course]");
   const deleteCourseButton = event.target.closest("[data-delete-course]");
@@ -17440,7 +17601,12 @@ trainingList?.addEventListener("click", async (event) => {
     }
     if (openTrainingResult) return await openOperatorTrainingResult(openTrainingResult.dataset.openTrainingResult);
     if (progress) return await updateCourseProgress(progress.dataset.courseProgress);
-    if (exam) return await markCourseExamPassed(exam.dataset.courseExam);
+    if (exam) {
+      const course = state.trainingCourses.find((item) => String(item.id) === String(exam.dataset.courseExam));
+      return courseFinalExamQuestions(course).length ? showCourseExamModal(exam.dataset.courseExam) : await markCourseExamPassed(exam.dataset.courseExam);
+    }
+    if (viewSlides) return await withButtonBusy(viewSlides, "Apro...", () => downloadCourseSlides(viewSlides.dataset.viewCourseSlides, { download: false }));
+    if (downloadSlides) return await withButtonBusy(downloadSlides, "Scarico...", () => downloadCourseSlides(downloadSlides.dataset.downloadCourseSlides, { download: true }));
     if (edit) return editCourse(edit.dataset.editCourse);
     if (publishCourseButton) return await withButtonBusy(publishCourseButton, "Pubblico...", () => publishCourse(publishCourseButton.dataset.publishCourse));
     if (deleteCourseButton) return await deleteCourse(deleteCourseButton.dataset.deleteCourse);
@@ -17460,8 +17626,13 @@ document.addEventListener("click", (event) => {
   const closePreview = event.target.closest("[data-close-course-preview]");
   const backdrop = event.target.classList?.contains("academy-preview-backdrop") ? event.target : null;
   const publishFromPreview = event.target.closest("[data-preview-publish-course]");
+  const submitCourseExam = event.target.closest("[data-submit-course-final-exam]");
   if (closePreview || backdrop) {
     document.querySelector(".academy-preview-backdrop")?.remove();
+    return;
+  }
+  if (submitCourseExam) {
+    void withButtonBusy(submitCourseExam, "Correggo...", () => submitCourseFinalExam(submitCourseExam.dataset.submitCourseFinalExam));
     return;
   }
   if (publishFromPreview) {

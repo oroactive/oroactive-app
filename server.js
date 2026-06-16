@@ -13873,6 +13873,143 @@ function canEvaluateCourses(user = {}) {
   return ["founder", "responsabile"].includes(normalizeRole(user.ruolo));
 }
 
+const baseAcademyCourseAssetsDirectory = path.join(__dirname, "assets", "academy", "courses");
+
+const OROACTIVE_BASE_ACADEMY_COURSES = [
+  {
+    code: "OROACTIVE-BASE-ORO",
+    title: "Corso Base sull'Oro — OroActive",
+    category: "Oro",
+    section: "Corsi base",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Base",
+    durationLabel: "Corso base · slide PDF ufficiali",
+    teacher: "OroActive Academy",
+    assetFile: "corso-base-oro-oroactive.pdf",
+    description: "Percorso introduttivo OroActive dedicato a oro, carature, purezza, valutazione operativa e controlli di base.",
+    moduleTitle: "Fondamenti dell'oro",
+    lessonTitle: "Slide ufficiali del Corso Base sull'Oro",
+    badgeName: "Badge Corso Base Oro",
+    certificateName: "Corso Base sull'Oro — OroActive",
+    orderIndex: 20,
+    quiz: [
+      {
+        question: "Che cosa indica la caratura dell'oro?",
+        options: ["La quota di oro puro nella lega", "Il peso totale dell'oggetto", "Il valore numismatico della moneta", "Il colore commerciale del gioiello"],
+        correct_answer: "La quota di oro puro nella lega"
+      },
+      {
+        question: "A quale purezza teorica corrisponde l'oro 18kt?",
+        options: ["75%", "58,33%", "91,67%", "37,5%"],
+        correct_answer: "75%"
+      },
+      {
+        question: "Perché il prezzo pagato al cliente non coincide con il prezzo di borsa dell'oro puro?",
+        options: ["Perché si applicano purezza, costi, spread, rischio e margine operativo", "Perché il prezzo di borsa vale solo per i diamanti", "Perché il peso non conta", "Perché l'oro usato non contiene mai oro"],
+        correct_answer: "Perché si applicano purezza, costi, spread, rischio e margine operativo"
+      },
+      {
+        question: "Quale controllo è coerente con una verifica preliminare dell'oro?",
+        options: ["Controllo punzonatura e test adeguati", "Solo fotografia estetica", "Solo dichiarazione verbale del cliente", "Solo il colore a occhio"],
+        correct_answer: "Controllo punzonatura e test adeguati"
+      },
+      {
+        question: "Chi definisce il prezzo finale applicato secondo le policy OroActive?",
+        options: ["Le policy OroActive e l'operatore autorizzato", "Il competitor più alto", "Il cliente in autonomia", "Una quotazione casuale"],
+        correct_answer: "Le policy OroActive e l'operatore autorizzato"
+      }
+    ]
+  },
+  {
+    code: "OROACTIVE-BASE-ARGENTO",
+    title: "Corso Base sull'Argento — OroActive",
+    category: "Argento",
+    section: "Corsi base",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Base",
+    durationLabel: "Corso base · slide PDF ufficiali",
+    teacher: "OroActive Academy",
+    assetFile: "corso-base-argento-oroactive.pdf",
+    description: "Percorso introduttivo OroActive su argento, titoli, purezza, riconoscimento e valutazione operativa.",
+    moduleTitle: "Fondamenti dell'argento",
+    lessonTitle: "Slide ufficiali del Corso Base sull'Argento",
+    badgeName: "Badge Corso Base Argento",
+    certificateName: "Corso Base sull'Argento — OroActive",
+    orderIndex: 21,
+    quiz: [
+      {
+        question: "Che cosa significa argento 925?",
+        options: ["925 parti su 1000 sono argento", "925 grammi obbligatori", "9,25% argento", "Titolo non utilizzabile nel compro oro"],
+        correct_answer: "925 parti su 1000 sono argento"
+      },
+      {
+        question: "Come si calcola il valore teorico dell'argento 925?",
+        options: ["Prezzo argento puro al grammo x 0,925", "Prezzo oro puro x 925", "Peso x 24/18", "Prezzo argento puro diviso 925"],
+        correct_answer: "Prezzo argento puro al grammo x 0,925"
+      },
+      {
+        question: "Quale titolo indica argento quasi puro?",
+        options: ["999", "800", "585", "375"],
+        correct_answer: "999"
+      },
+      {
+        question: "Perché anche sull'argento si applicano costi e margini?",
+        options: ["Per coprire lavorazione, rientro, rischio e sostenibilità operativa", "Per trasformarlo automaticamente in oro", "Perché l'argento non ha quotazione", "Perché non serve pesarlo"],
+        correct_answer: "Per coprire lavorazione, rientro, rischio e sostenibilità operativa"
+      },
+      {
+        question: "Quale dato è essenziale nella valutazione di argento usato?",
+        options: ["Titolo e peso", "Solo il colore", "Solo la forma dell'oggetto", "Solo l'anno di acquisto"],
+        correct_answer: "Titolo e peso"
+      }
+    ]
+  },
+  {
+    code: "OROACTIVE-BASE-DIAMANTI",
+    title: "Corso Base sui Diamanti — OroActive",
+    category: "Diamanti",
+    section: "Corsi base",
+    faculty: "Facoltà Gemmologia",
+    level: "Base",
+    durationLabel: "Corso base · slide PDF ufficiali",
+    teacher: "OroActive Academy",
+    assetFile: "corso-base-diamanti-oroactive.pdf",
+    description: "Percorso introduttivo OroActive sui criteri base di lettura, descrizione e gestione operativa dei diamanti.",
+    moduleTitle: "Fondamenti sui diamanti",
+    lessonTitle: "Slide ufficiali del Corso Base sui Diamanti",
+    badgeName: "Badge Corso Base Diamanti",
+    certificateName: "Corso Base sui Diamanti — OroActive",
+    orderIndex: 22,
+    quiz: [
+      {
+        question: "Quali sono le 4C comunemente usate per descrivere un diamante?",
+        options: ["Carat, Color, Clarity, Cut", "Carati oro, costo, colore, cliente", "Peso, fonderia, titolo, spread", "Forma, moneta, lega, margine"],
+        correct_answer: "Carat, Color, Clarity, Cut"
+      },
+      {
+        question: "Nel diamante, il carato indica principalmente:",
+        options: ["Il peso della pietra", "La purezza dell'oro", "Il titolo dell'argento", "La quotazione borsa metalli"],
+        correct_answer: "Il peso della pietra"
+      },
+      {
+        question: "Perché una certificazione gemmologica è importante?",
+        options: ["Aiuta a documentare caratteristiche e autenticità della pietra", "Sostituisce sempre il pagamento", "Trasforma il diamante in oro", "Rende inutile ogni controllo"],
+        correct_answer: "Aiuta a documentare caratteristiche e autenticità della pietra"
+      },
+      {
+        question: "Quale comportamento è più corretto davanti a una pietra non verificabile con sicurezza?",
+        options: ["Segnalare la necessità di verifica specializzata", "Attribuire un valore certo senza controlli", "Usare il prezzo oro 18kt", "Ignorare la documentazione"],
+        correct_answer: "Segnalare la necessità di verifica specializzata"
+      },
+      {
+        question: "Il corso sui diamanti deve essere usato per:",
+        options: ["Formazione e riconoscimento operativo di base", "Reinserire quotazioni diamanti nel menu quotazioni", "Garantire un prezzo certo", "Sostituire una perizia professionale"],
+        correct_answer: "Formazione e riconoscimento operativo di base"
+      }
+    ]
+  }
+];
+
 const aurumBlocksDefaultQuestions = [
   {
     question: "Il 18kt contiene circa quale percentuale di oro puro?",
@@ -14453,9 +14590,308 @@ async function syncAcademyStructure(course, input = {}, user = {}) {
   }
 }
 
+function academyBaseSlidesRoute(courseId) {
+  return `/api/academy/courses/${encodeURIComponent(String(courseId))}/slides/download`;
+}
+
+function sanitizeQuizQuestionsForClient(questions = []) {
+  return questions.map((question) => ({
+    id: question.id,
+    course_id: question.course_id,
+    question: question.question,
+    options: Array.isArray(question.options) ? question.options : [],
+    sort_order: question.sort_order
+  }));
+}
+
+function normalizeQuizAnswerValue(value = "") {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+async function ensureOroActiveBaseAcademyCourses() {
+  for (const courseDefinition of OROACTIVE_BASE_ACADEMY_COURSES) {
+    const faculty = await ensureAcademyFaculty(courseDefinition.faculty);
+    const category = await ensureCourseCategory(courseDefinition.category);
+    const section = await ensureCourseSection(category.id, courseDefinition.section);
+    const assetPath = path.join(baseAcademyCourseAssetsDirectory, courseDefinition.assetFile);
+    const assetExists = await fs.access(assetPath).then(() => true).catch(() => false);
+    const metadata = sanitizeForPostgres({
+      seedCode: courseDefinition.code,
+      oroactiveBaseCourse: true,
+      pdfAssetFile: courseDefinition.assetFile,
+      pdfAssetPath: assetPath,
+      pdfRequiresFinalTest: true,
+      certificateName: courseDefinition.certificateName,
+      badgeName: courseDefinition.badgeName,
+      finalExamPassScore: 80,
+      finalExamQuestionCount: courseDefinition.quiz.length,
+      assetAvailable: assetExists,
+      updatedAt: new Date().toISOString()
+    });
+    let course = (await pool.query(
+      `SELECT *
+       FROM courses
+       WHERE COALESCE(metadata->>'seedCode', '') = $1::text
+          OR title = $2::text
+       ORDER BY id ASC
+       LIMIT 1`,
+      [courseDefinition.code, courseDefinition.title]
+    )).rows[0];
+    if (course) {
+      course = (await pool.query(
+        `UPDATE courses
+         SET category_id = $2::bigint,
+             section_id = $3::bigint,
+             faculty_id = $4::bigint,
+             title = $5::text,
+             description = $6::text,
+             level = $7::text,
+             duration_minutes = $8::integer,
+             duration_label = $9::text,
+             teacher = $10::text,
+             final_certification = TRUE,
+             module_title = $11::text,
+             lesson_title = $12::text,
+             active = TRUE,
+             order_index = $13::integer,
+             metadata = COALESCE(metadata, '{}'::jsonb) || $14::jsonb,
+             updated_at = NOW()
+         WHERE id = $1::bigint
+         RETURNING *`,
+        [
+          course.id,
+          category.id,
+          section.id,
+          faculty.id,
+          courseDefinition.title,
+          courseDefinition.description,
+          courseDefinition.level,
+          durationMinutesFromLabel(courseDefinition.durationLabel),
+          courseDefinition.durationLabel,
+          courseDefinition.teacher,
+          courseDefinition.moduleTitle,
+          courseDefinition.lessonTitle,
+          courseDefinition.orderIndex,
+          metadata
+        ]
+      )).rows[0];
+    } else {
+      course = (await pool.query(
+        `INSERT INTO courses
+          (category_id, section_id, faculty_id, title, description, level, duration_minutes,
+           duration_label, teacher, final_certification, module_title, lesson_title, active,
+           order_index, metadata)
+         VALUES ($1::bigint,$2::bigint,$3::bigint,$4::text,$5::text,$6::text,$7::integer,
+           $8::text,$9::text,TRUE,$10::text,$11::text,TRUE,$12::integer,$13::jsonb)
+         RETURNING *`,
+        [
+          category.id,
+          section.id,
+          faculty.id,
+          courseDefinition.title,
+          courseDefinition.description,
+          courseDefinition.level,
+          durationMinutesFromLabel(courseDefinition.durationLabel),
+          courseDefinition.durationLabel,
+          courseDefinition.teacher,
+          courseDefinition.moduleTitle,
+          courseDefinition.lessonTitle,
+          courseDefinition.orderIndex,
+          metadata
+        ]
+      )).rows[0];
+    }
+
+    const slidesRoute = academyBaseSlidesRoute(course.id);
+    await pool.query(
+      `UPDATE courses
+       SET pdf_url = $2::text,
+           metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint`,
+      [
+        course.id,
+        slidesRoute,
+        sanitizeForPostgres({ pdfUrl: slidesRoute, pdfLockedUntilFinalTest: true })
+      ]
+    );
+    await pool.query(
+      `INSERT INTO academy_courses
+        (course_id, faculty_id, title, description, level, duration_minutes, teacher,
+         final_certification, active, metadata)
+       VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::text,$6::integer,$7::text,TRUE,TRUE,$8::jsonb)
+       ON CONFLICT (course_id)
+       DO UPDATE SET faculty_id = EXCLUDED.faculty_id,
+                     title = EXCLUDED.title,
+                     description = EXCLUDED.description,
+                     level = EXCLUDED.level,
+                     duration_minutes = EXCLUDED.duration_minutes,
+                     teacher = EXCLUDED.teacher,
+                     final_certification = TRUE,
+                     active = TRUE,
+                     metadata = COALESCE(academy_courses.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+                     updated_at = NOW()`,
+      [
+        course.id,
+        faculty.id,
+        courseDefinition.title,
+        courseDefinition.description,
+        courseDefinition.level,
+        durationMinutesFromLabel(courseDefinition.durationLabel),
+        courseDefinition.teacher,
+        metadata
+      ]
+    );
+    const academyCourse = (await pool.query("SELECT id FROM academy_courses WHERE course_id = $1::bigint LIMIT 1", [course.id])).rows[0];
+    let moduleRow = (await pool.query(
+      `SELECT *
+       FROM academy_modules
+       WHERE course_id = $1::bigint
+         AND COALESCE(metadata->>'seedCode', '') = $2::text
+       LIMIT 1`,
+      [course.id, courseDefinition.code]
+    )).rows[0];
+    const moduleMetadata = sanitizeForPostgres({ seedCode: courseDefinition.code, oroactiveBaseCourse: true });
+    if (moduleRow) {
+      moduleRow = (await pool.query(
+        `UPDATE academy_modules
+         SET academy_course_id = $2::bigint,
+             title = $3::text,
+             description = $4::text,
+             sort_order = 1,
+             active = TRUE,
+             metadata = COALESCE(metadata, '{}'::jsonb) || $5::jsonb,
+             updated_at = NOW()
+         WHERE id = $1::bigint
+         RETURNING *`,
+        [moduleRow.id, academyCourse?.id || null, courseDefinition.moduleTitle, courseDefinition.description, moduleMetadata]
+      )).rows[0];
+    } else {
+      moduleRow = (await pool.query(
+        `INSERT INTO academy_modules
+          (academy_course_id, course_id, title, description, sort_order, active, metadata)
+         VALUES ($1::bigint,$2::bigint,$3::text,$4::text,1,TRUE,$5::jsonb)
+         RETURNING *`,
+        [academyCourse?.id || null, course.id, courseDefinition.moduleTitle, courseDefinition.description, moduleMetadata]
+      )).rows[0];
+    }
+
+    let lessonRow = (await pool.query(
+      `SELECT *
+       FROM academy_lessons
+       WHERE course_id = $1::bigint
+         AND COALESCE(metadata->>'seedCode', '') = $2::text
+       LIMIT 1`,
+      [course.id, courseDefinition.code]
+    )).rows[0];
+    const lessonMetadata = sanitizeForPostgres({
+      seedCode: courseDefinition.code,
+      oroactiveBaseCourse: true,
+      pdfRequiresFinalTest: true
+    });
+    if (lessonRow) {
+      lessonRow = (await pool.query(
+        `UPDATE academy_lessons
+         SET academy_module_id = $2::bigint,
+             title = $3::text,
+             description = $4::text,
+             pdf_url = $5::text,
+             duration_minutes = $6::integer,
+             sort_order = 1,
+             active = TRUE,
+             metadata = COALESCE(metadata, '{}'::jsonb) || $7::jsonb,
+             updated_at = NOW()
+         WHERE id = $1::bigint
+         RETURNING *`,
+        [
+          lessonRow.id,
+          moduleRow.id,
+          courseDefinition.lessonTitle,
+          "Lezione basata sulle slide PDF ufficiali del corso. Il PDF si sblocca dopo il superamento del test finale.",
+          slidesRoute,
+          durationMinutesFromLabel(courseDefinition.durationLabel),
+          lessonMetadata
+        ]
+      )).rows[0];
+    } else {
+      lessonRow = (await pool.query(
+        `INSERT INTO academy_lessons
+          (academy_module_id, course_id, title, description, pdf_url, duration_minutes, sort_order, active, metadata)
+         VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::text,$6::integer,1,TRUE,$7::jsonb)
+         RETURNING *`,
+        [
+          moduleRow.id,
+          course.id,
+          courseDefinition.lessonTitle,
+          "Lezione basata sulle slide PDF ufficiali del corso. Il PDF si sblocca dopo il superamento del test finale.",
+          slidesRoute,
+          durationMinutesFromLabel(courseDefinition.durationLabel),
+          lessonMetadata
+        ]
+      )).rows[0];
+    }
+
+    const materialMetadata = sanitizeForPostgres({
+      seedCode: courseDefinition.code,
+      oroactiveBaseCourse: true,
+      kind: "official_course_slides",
+      lockedUntilFinalTestPassed: true,
+      pdfAssetFile: courseDefinition.assetFile
+    });
+    await pool.query(
+      `DELETE FROM course_materials
+       WHERE course_id = $1::bigint
+         AND sort_order BETWEEN 1000 AND 1099`,
+      [course.id]
+    );
+    await pool.query(
+      `INSERT INTO course_materials
+        (course_id, title, material_type, file_url, allow_download, sort_order, metadata)
+       VALUES ($1::bigint,$2::text,'pdf',$3::text,TRUE,1000,$4::jsonb)`,
+      [course.id, `Slide PDF ufficiali - ${courseDefinition.title}`, slidesRoute, materialMetadata]
+    );
+    await pool.query(
+      `DELETE FROM academy_materials
+       WHERE course_id = $1::bigint
+         AND sort_order BETWEEN 1000 AND 1099`,
+      [course.id]
+    );
+    await pool.query(
+      `INSERT INTO academy_materials
+        (academy_lesson_id, course_id, title, material_type, file_url, mime_type, allow_download, sort_order, metadata)
+       VALUES ($1::bigint,$2::bigint,$3::text,'pdf',$4::text,'application/pdf',TRUE,1000,$5::jsonb)`,
+      [lessonRow.id, course.id, `Slide PDF ufficiali - ${courseDefinition.title}`, slidesRoute, materialMetadata]
+    );
+
+    await pool.query(
+      `DELETE FROM course_quizzes
+       WHERE course_id = $1::bigint
+         AND sort_order BETWEEN 1000 AND 1099`,
+      [course.id]
+    );
+    for (const [index, question] of courseDefinition.quiz.entries()) {
+      await pool.query(
+        `INSERT INTO course_quizzes
+          (course_id, question, options, correct_answer, sort_order, active)
+         VALUES ($1::bigint,$2::text,$3::jsonb,$4::text,$5::integer,TRUE)`,
+        [
+          course.id,
+          question.question,
+          sanitizeForPostgres(question.options),
+          question.correct_answer,
+          1000 + index
+        ]
+      );
+    }
+  }
+}
+
 async function listCourses(user = {}) {
   const userId = user.id || null;
   const role = normalizeRole(user.ruolo);
+  await ensureOroActiveBaseAcademyCourses().catch((error) => {
+    console.warn("Corsi base OroActive Academy non inizializzati:", error.message);
+  });
   const faculties = await pool.query("SELECT * FROM academy_faculties WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
   const categories = await pool.query("SELECT * FROM course_categories WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
   const sections = await pool.query(
@@ -14510,13 +14946,100 @@ async function listCourses(user = {}) {
      ORDER BY cat.sort_order ASC, c.order_index ASC, c.created_at DESC`,
     [userId, role]
   );
+  const courseRows = courses.rows;
+  const courseIds = courseRows.map((course) => Number(course.id)).filter(Number.isFinite);
+  const quizByCourse = new Map();
+  const passedByCourse = new Map();
+  const certificateByCourse = new Map();
+  const badgeByCourse = new Map();
+  if (courseIds.length) {
+    const quizRows = await pool.query(
+      `SELECT id, course_id, question, options, sort_order
+       FROM course_quizzes
+       WHERE active = TRUE
+         AND course_id = ANY($1::bigint[])
+       ORDER BY course_id ASC, sort_order ASC, id ASC`,
+      [courseIds]
+    );
+    for (const row of quizRows.rows) {
+      const key = String(row.course_id);
+      if (!quizByCourse.has(key)) quizByCourse.set(key, []);
+      quizByCourse.get(key).push(row);
+    }
+    const passedRows = await pool.query(
+      `SELECT DISTINCT ON (course_id) course_id, score, esito, completed_at
+       FROM course_quiz_results
+       WHERE user_id = $1::bigint
+         AND course_id = ANY($2::bigint[])
+       ORDER BY course_id ASC, completed_at DESC NULLS LAST, id DESC`,
+      [userId, courseIds]
+    );
+    for (const row of passedRows.rows) {
+      passedByCourse.set(String(row.course_id), {
+        passed: String(row.esito || "").toLowerCase() === "superato",
+        score: Number(row.score || 0),
+        completed_at: row.completed_at || null
+      });
+    }
+    const certificateRows = await pool.query(
+      `SELECT DISTINCT ON (course_id) id, course_id, certificate_code, issued_at
+       FROM academy_certificates
+       WHERE user_id = $1::bigint
+         AND course_id = ANY($2::bigint[])
+         AND status = 'valido'
+       ORDER BY course_id ASC, issued_at DESC, id DESC`,
+      [userId, courseIds]
+    );
+    for (const row of certificateRows.rows) {
+      certificateByCourse.set(String(row.course_id), row);
+    }
+    const badgeRows = await pool.query(
+      `SELECT DISTINCT ON (course_id) id, course_id, badge_name, badge_code, assigned_at
+       FROM academy_badges
+       WHERE user_id = $1::bigint
+         AND course_id = ANY($2::bigint[])
+         AND status = 'valido'
+       ORDER BY course_id ASC, assigned_at DESC, id DESC`,
+      [userId, courseIds]
+    );
+    for (const row of badgeRows.rows) {
+      badgeByCourse.set(String(row.course_id), row);
+    }
+  }
+  const enrichedCourses = courseRows.map((course) => {
+    const courseKey = String(course.id);
+    const finalExamQuestions = sanitizeQuizQuestionsForClient(quizByCourse.get(courseKey) || []);
+    const certificate = certificateByCourse.get(courseKey) || null;
+    const badge = badgeByCourse.get(courseKey) || null;
+    const quizResult = passedByCourse.get(courseKey) || null;
+    const finalExamPassed = Boolean(certificate || quizResult?.passed);
+    const requiresFinalTest = Boolean(course.metadata?.pdfRequiresFinalTest || course.metadata?.pdfLockedUntilFinalTest || finalExamQuestions.length);
+    const officialSlidesUrl = course.metadata?.pdfAssetFile ? academyBaseSlidesRoute(course.id) : "";
+    return {
+      ...course,
+      final_exam: {
+        pass_score: Number(course.metadata?.finalExamPassScore || 80),
+        questions: finalExamQuestions
+      },
+      final_exam_questions: finalExamQuestions,
+      final_exam_passed: finalExamPassed,
+      final_exam_score: quizResult?.score || 0,
+      final_exam_completed_at: quizResult?.completed_at || null,
+      slides_locked: Boolean(officialSlidesUrl) && requiresFinalTest && !finalExamPassed && role !== "founder",
+      slides_download_url: officialSlidesUrl,
+      certificate_id: certificate?.id || null,
+      certificate_code: certificate?.certificate_code || "",
+      badge_id: badge?.id || null,
+      badge_name: badge?.badge_name || course.metadata?.badgeName || ""
+    };
+  });
   const progress = await pool.query(
     "SELECT * FROM user_course_progress WHERE user_id = $1::bigint ORDER BY updated_at DESC",
     [userId]
   );
   const certificates = await pool.query(
     `SELECT cert.*, c.title AS course_title, cat.name AS category_name
-     FROM course_certificates cert
+     FROM academy_certificates cert
      JOIN courses c ON c.id = cert.course_id
      LEFT JOIN course_categories cat ON cat.id = c.category_id
      WHERE cert.user_id = $1::bigint AND cert.status = 'valido'
@@ -14535,7 +15058,7 @@ async function listCourses(user = {}) {
     faculties: faculties.rows,
     categories: categories.rows,
     sections: sections.rows,
-    courses: courses.rows,
+    courses: enrichedCourses,
     progress: progress.rows,
     certificates: certificates.rows,
     badges: badges.rows
@@ -16461,7 +16984,266 @@ async function saveCourseProgress(input = {}, user = {}) {
   return result.rows[0];
 }
 
+function deterministicAcademyCourseCode(prefix = "OA", course = {}, userId = null) {
+  const metadata = course.metadata || {};
+  const seed = metadata.seedCode || metadata.courseCode || `COURSE-${course.id || "0"}`;
+  return `${prefix}-${String(seed).replace(/[^A-Z0-9-]/gi, "-").toUpperCase()}-${userId || "USER"}`;
+}
+
+async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examType = "online", score = null, payload = {} } = {}) {
+  const course = (await pool.query(
+    `SELECT c.*, cat.name AS category_name
+     FROM courses c
+     LEFT JOIN course_categories cat ON cat.id = c.category_id
+     WHERE c.id = $1::bigint
+     LIMIT 1`,
+    [courseId]
+  )).rows[0];
+  if (!course) {
+    const error = new Error("Corso non trovato.");
+    error.status = 404;
+    throw error;
+  }
+
+  await pool.query(
+    `INSERT INTO user_course_progress
+      (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
+     VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
+     ON CONFLICT (course_id, user_id)
+     DO UPDATE SET percentuale = 100, status = 'certificato', last_access_at = NOW(), completed_at = NOW(), updated_at = NOW()`,
+    [courseId, userId]
+  );
+  await pool.query(
+    `INSERT INTO academy_user_progress
+      (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
+     VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
+     ON CONFLICT (course_id, user_id)
+     DO UPDATE SET percentuale = 100, status = 'certificato', last_access_at = NOW(), completed_at = NOW(), updated_at = NOW()`,
+    [courseId, userId]
+  );
+
+  const certificateCode = deterministicAcademyCourseCode("CERT-OA", course, userId);
+  const badgeCode = deterministicAcademyCourseCode("BADGE-OA", course, userId);
+  const badgeName = course.metadata?.badgeName || `Operatore OroActive - ${course.title || "Corso certificato"}`;
+  const certificateMetadata = sanitizeForPostgres({
+    exam_type: examType,
+    score,
+    awarded_from: payload.awarded_from || "academy_final_test",
+    certificate_name: course.metadata?.certificateName || course.title || "Certificazione OroActive Academy",
+    evaluated_at: new Date().toISOString(),
+    ...(payload.metadata || {})
+  });
+
+  await pool.query(
+    `INSERT INTO course_certificates (course_id, user_id, certificate_code, issued_by)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint)
+     ON CONFLICT (certificate_code)
+     DO UPDATE SET status = 'valido',
+                   issued_by = COALESCE(EXCLUDED.issued_by, course_certificates.issued_by),
+                   revoked_by = NULL,
+                   revoked_at = NULL`,
+    [courseId, userId, certificateCode, issuedBy || null]
+  );
+  const certificate = (await pool.query(
+    `INSERT INTO academy_certificates (course_id, user_id, certificate_code, issued_by, metadata)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint, $5::jsonb)
+     ON CONFLICT (certificate_code)
+     DO UPDATE SET status = 'valido',
+                   issued_by = COALESCE(EXCLUDED.issued_by, academy_certificates.issued_by),
+                   metadata = COALESCE(academy_certificates.metadata, '{}'::jsonb) || EXCLUDED.metadata
+     RETURNING *`,
+    [courseId, userId, certificateCode, issuedBy || null, certificateMetadata]
+  )).rows[0];
+
+  await pool.query(
+    `INSERT INTO course_badges (course_id, user_id, badge_name, badge_code, assigned_by)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
+     ON CONFLICT (badge_code)
+     DO UPDATE SET status = 'valido',
+                   badge_name = EXCLUDED.badge_name,
+                   assigned_by = COALESCE(EXCLUDED.assigned_by, course_badges.assigned_by)`,
+    [courseId, userId, badgeName, badgeCode, issuedBy || null]
+  );
+  const badge = (await pool.query(
+    `INSERT INTO academy_badges (course_id, user_id, badge_name, badge_code, assigned_by)
+     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
+     ON CONFLICT (badge_code)
+     DO UPDATE SET status = 'valido',
+                   badge_name = EXCLUDED.badge_name,
+                   assigned_by = COALESCE(EXCLUDED.assigned_by, academy_badges.assigned_by)
+     RETURNING *`,
+    [courseId, userId, badgeName, badgeCode, issuedBy || null]
+  )).rows[0];
+
+  await recalculateAcademyOperatorLevel(userId);
+  return { course, certificate, badge };
+}
+
+async function evaluateCourseFinalQuiz(input = {}, user = {}) {
+  const courseId = input.course_id || input.courseId;
+  const targetUserId = user.id;
+  if (!courseId || !targetUserId) {
+    const error = new Error("Corso o utente non valido.");
+    error.status = 400;
+    throw error;
+  }
+  const course = await academyCourseById(courseId);
+  if (!course || (normalizeRole(user.ruolo) !== "founder" && course.active === false)) {
+    const error = new Error("Corso non disponibile.");
+    error.status = 404;
+    throw error;
+  }
+  const questions = (await pool.query(
+    `SELECT id, course_id, question, options, correct_answer, sort_order
+     FROM course_quizzes
+     WHERE course_id = $1::bigint AND active = TRUE
+     ORDER BY sort_order ASC, id ASC`,
+    [courseId]
+  )).rows;
+  if (!questions.length) {
+    const error = new Error("Test finale non configurato per questo corso.");
+    error.status = 400;
+    throw error;
+  }
+
+  const answers = Array.isArray(input.answers) ? input.answers : [];
+  const answersByQuestion = new Map();
+  for (const answer of answers) {
+    const questionId = answer?.question_id || answer?.questionId || answer?.id;
+    if (questionId) answersByQuestion.set(String(questionId), String(answer.answer ?? answer.value ?? ""));
+  }
+  let correct = 0;
+  const details = questions.map((question) => {
+    const given = answersByQuestion.get(String(question.id)) || "";
+    const isCorrect = normalizeQuizAnswerValue(given) === normalizeQuizAnswerValue(question.correct_answer);
+    if (isCorrect) correct += 1;
+    return {
+      question_id: question.id,
+      question: question.question,
+      answer: given,
+      correct_answer: question.correct_answer,
+      correct: isCorrect
+    };
+  });
+  const total = questions.length;
+  const score = total ? Math.round((correct / total) * 100) : 0;
+  const passScore = Number(course.metadata?.finalExamPassScore || 80);
+  const passed = score >= passScore;
+  const esito = passed ? "superato" : "non_superato";
+  const payload = sanitizeForPostgres({
+    mode: "academy_final_test",
+    pass_score: passScore,
+    correct,
+    total,
+    answers: details
+  });
+
+  const quizResult = (await pool.query(
+    `INSERT INTO course_quiz_results (course_id, user_id, score, esito, completed_at, payload)
+     VALUES ($1::bigint, $2::bigint, $3::numeric, $4::text, NOW(), $5::jsonb)
+     RETURNING *`,
+    [courseId, targetUserId, score, esito, payload]
+  )).rows[0];
+  const exam = (await pool.query(
+    `INSERT INTO course_exam_sessions (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
+     VALUES ($1::bigint, $2::bigint, 'online', $3::text, $2::bigint, NOW(), $4::text)
+     RETURNING *`,
+    [courseId, targetUserId, esito, `Test finale online: ${score}% (${correct}/${total})`]
+  )).rows[0];
+  await pool.query(
+    `INSERT INTO academy_exam_results (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
+     VALUES ($1::bigint, $2::bigint, 'online', $3::text, $2::bigint, NOW(), $4::text)`,
+    [courseId, targetUserId, esito, `Test finale online: ${score}% (${correct}/${total})`]
+  );
+
+  let completion = null;
+  if (passed) {
+    completion = await awardAcademyCourseCompletion({
+      courseId,
+      userId: targetUserId,
+      issuedBy: targetUserId,
+      examType: "online",
+      score,
+      payload: { awarded_from: "academy_final_test", metadata: { quiz_result_id: quizResult.id } }
+    });
+  }
+
+  return {
+    ok: true,
+    mode: "online_quiz",
+    passed,
+    score,
+    pass_score: passScore,
+    correct,
+    total,
+    quiz_result: quizResult,
+    exam,
+    certificate: completion?.certificate || null,
+    badge: completion?.badge || null
+  };
+}
+
+async function getAcademyCourseSlidesAccess(courseId, user = {}) {
+  const course = await academyCourseById(courseId);
+  if (!course) {
+    const error = new Error("Corso non trovato.");
+    error.status = 404;
+    throw error;
+  }
+  const role = normalizeRole(user.ruolo);
+  if (role !== "founder" && course.active === false) {
+    const error = new Error("Corso non disponibile.");
+    error.status = 403;
+    throw error;
+  }
+  const metadata = course.metadata || {};
+  const assetFile = String(metadata.pdfAssetFile || "").trim();
+  if (!assetFile) {
+    const error = new Error("PDF ufficiale non configurato per questo corso.");
+    error.status = 404;
+    throw error;
+  }
+  const filePath = path.join(baseAcademyCourseAssetsDirectory, path.basename(assetFile));
+  await fs.access(filePath).catch(() => {
+    const error = new Error("File PDF corso non trovato sul server.");
+    error.status = 404;
+    throw error;
+  });
+  const requiresFinalTest = Boolean(metadata.pdfRequiresFinalTest || metadata.pdfLockedUntilFinalTest);
+  if (requiresFinalTest && role !== "founder") {
+    const passed = (await pool.query(
+      `SELECT 1
+       WHERE EXISTS (
+         SELECT 1 FROM course_quiz_results
+         WHERE course_id = $1::bigint AND user_id = $2::bigint AND esito = 'superato'
+       )
+       OR EXISTS (
+         SELECT 1 FROM academy_certificates
+         WHERE course_id = $1::bigint AND user_id = $2::bigint AND status = 'valido'
+       )
+       OR EXISTS (
+         SELECT 1 FROM academy_exam_results
+         WHERE course_id = $1::bigint AND user_id = $2::bigint AND esito = 'superato'
+       )`,
+      [courseId, user.id]
+    )).rowCount > 0;
+    if (!passed) {
+      const error = new Error("Supera il test finale per sbloccare le slide PDF ufficiali.");
+      error.status = 403;
+      throw error;
+    }
+  }
+  return {
+    course,
+    filePath,
+    downloadName: `${String(course.title || "corso-oroactive").replace(/[^\w.-]+/g, "-").replace(/-+/g, "-")}.pdf`
+  };
+}
+
 async function evaluateCourseExam(input = {}, user = {}) {
+  if (Array.isArray(input.answers)) {
+    return evaluateCourseFinalQuiz(input, user);
+  }
   if (!canEvaluateCourses(user)) {
     const error = new Error("Non autorizzato");
     error.status = 403;
@@ -16488,57 +17270,13 @@ async function evaluateCourseExam(input = {}, user = {}) {
     [courseId, targetUserId, examType, esito, user.id, String(input.note || "")]
   );
   if (esito === "superato") {
-    await pool.query(
-      `INSERT INTO user_course_progress
-        (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
-       VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
-       ON CONFLICT (course_id, user_id)
-       DO UPDATE SET percentuale = 100, status = 'certificato', last_access_at = NOW(), completed_at = NOW(), updated_at = NOW()`,
-      [courseId, targetUserId]
-    );
-    await pool.query(
-      `INSERT INTO academy_user_progress
-        (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
-       VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
-       ON CONFLICT (course_id, user_id)
-       DO UPDATE SET percentuale = 100, status = 'certificato', last_access_at = NOW(), completed_at = NOW(), updated_at = NOW()`,
-      [courseId, targetUserId]
-    );
-    const certificateCode = courseCode("CERT-OA");
-    const badgeCode = courseCode("BADGE-OA");
-    await pool.query(
-      `INSERT INTO course_certificates (course_id, user_id, certificate_code, issued_by)
-       VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint)
-       ON CONFLICT (certificate_code) DO NOTHING`,
-      [courseId, targetUserId, certificateCode, user.id]
-    );
-    await pool.query(
-      `INSERT INTO academy_certificates (course_id, user_id, certificate_code, issued_by, metadata)
-       VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint, $5::jsonb)
-       ON CONFLICT (certificate_code) DO NOTHING`,
-      [courseId, targetUserId, certificateCode, user.id, sanitizeForPostgres({ exam_type: examType, evaluated_at: new Date().toISOString() })]
-    );
-    const course = await pool.query(
-      `SELECT c.title, cat.name AS category_name
-       FROM courses c
-       LEFT JOIN course_categories cat ON cat.id = c.category_id
-       WHERE c.id = $1::bigint`,
-      [courseId]
-    );
-    const badgeName = `Operatore OroActive - ${course.rows[0]?.title || "Corso certificato"}`;
-    await pool.query(
-      `INSERT INTO course_badges (course_id, user_id, badge_name, badge_code, assigned_by)
-       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
-       ON CONFLICT (badge_code) DO NOTHING`,
-      [courseId, targetUserId, badgeName, badgeCode, user.id]
-    );
-    await pool.query(
-      `INSERT INTO academy_badges (course_id, user_id, badge_name, badge_code, assigned_by)
-       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
-       ON CONFLICT (badge_code) DO NOTHING`,
-      [courseId, targetUserId, badgeName, badgeCode, user.id]
-    );
-    await recalculateAcademyOperatorLevel(targetUserId);
+    await awardAcademyCourseCompletion({
+      courseId,
+      userId: targetUserId,
+      issuedBy: user.id,
+      examType,
+      payload: { awarded_from: "manual_exam_evaluation" }
+    });
   }
   return exam.rows[0];
 }
@@ -20120,6 +20858,18 @@ app.get("/api/academy/courses/:id", async (request, response, next) => {
     const course = await getAcademyCourse(request.params.id, request.user);
     if (!course) return response.status(404).json({ error: "Corso non trovato" });
     response.json(course);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/courses/:id/slides/download", async (request, response, next) => {
+  try {
+    const access = await getAcademyCourseSlidesAccess(request.params.id, request.user);
+    const disposition = request.query.download === "1" ? "attachment" : "inline";
+    response.setHeader("Content-Type", "application/pdf");
+    response.setHeader("Content-Disposition", `${disposition}; filename="${access.downloadName}"`);
+    response.sendFile(access.filePath);
   } catch (error) {
     next(error);
   }

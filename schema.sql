@@ -1364,8 +1364,11 @@ CREATE TABLE IF NOT EXISTS course_quizzes (
   correct_answer TEXT,
   sort_order INTEGER DEFAULT 0,
   active BOOLEAN DEFAULT TRUE,
+  metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE course_quizzes ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 
 CREATE TABLE IF NOT EXISTS course_quiz_results (
   id BIGSERIAL PRIMARY KEY,
@@ -1420,6 +1423,8 @@ CREATE INDEX IF NOT EXISTS user_course_progress_user_idx ON user_course_progress
 CREATE INDEX IF NOT EXISTS course_certificates_user_idx ON course_certificates (user_id);
 CREATE INDEX IF NOT EXISTS course_badges_user_idx ON course_badges (user_id);
 CREATE INDEX IF NOT EXISTS course_exam_sessions_user_idx ON course_exam_sessions (user_id);
+CREATE INDEX IF NOT EXISTS course_quizzes_course_sort_idx ON course_quizzes (course_id, sort_order, id);
+CREATE INDEX IF NOT EXISTS course_quiz_results_course_user_idx ON course_quiz_results (course_id, user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS courses_faculty_idx ON courses (faculty_id);
 CREATE INDEX IF NOT EXISTS academy_courses_course_idx ON academy_courses (course_id);
 CREATE INDEX IF NOT EXISTS academy_modules_course_idx ON academy_modules (course_id);
