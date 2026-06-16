@@ -139,15 +139,17 @@ test("Oro Master e facoltà generata vengono rimossi dal catalogo Academy", asyn
   assert.doesNotMatch(app, /Rendi disponibile Oro Master/);
   assert.doesNotMatch(app, /renderGoldMasterRecoveryCard/);
   assert.doesNotMatch(app, /data-ensure-gold-master/);
-  assert.match(app, /data-publish-course/);
+  assert.doesNotMatch(app, /data-edit-course/);
+  assert.doesNotMatch(app, /data-publish-course/);
+  assert.doesNotMatch(app, /data-delete-course/);
+  assert.doesNotMatch(app, /data-delete-course-material/);
+  assert.doesNotMatch(app, /data-delete-course-section/);
   assert.match(app, /trainingCoursePreviewButton/);
   assert.match(app, /previewCurrentCourseDraft/);
   assert.match(app, /showCoursePreviewModal/);
-  assert.match(app, /Vuoi davvero eliminare definitivamente/);
   assert.match(index, /id="trainingCoursePreviewButton"[\s\S]*Visualizza bozza/);
-  assert.match(index, /id="trainingCoursePublishButton"[\s\S]*Pubblica/);
+  assert.doesNotMatch(index, /trainingCoursePublishButton/);
   assert.match(styles, /\.academy-preview-modal/);
-  assert.match(styles, /\.academy-course-admin-actions/);
   assert.doesNotMatch(app, /academy-gold-master-strip/);
   assert.doesNotMatch(styles, /\.academy-gold-master-strip/);
 });
@@ -179,6 +181,7 @@ test("corsi base PDF OroActive Academy richiedono test finale prima delle slide"
   assert.match(server, /academy_badges/);
 
   assert.match(app, /Sostieni test finale/);
+  assert.match(app, /Visualizza Corso/);
   assert.match(app, /data-view-course-slides/);
   assert.match(app, /data-download-course-slides/);
   assert.match(app, /data-submit-course-final-exam/);
@@ -186,6 +189,15 @@ test("corsi base PDF OroActive Academy richiedono test finale prima delle slide"
   assert.match(app, /submitCourseFinalExam/);
   assert.match(app, /downloadCourseSlides/);
   assert.match(app, /academy\/certificates\/\$\{encodeURIComponent\(certificateId\)\}\/download/);
+  assert.doesNotMatch(app, /Visualizza slide PDF/);
+  assert.doesNotMatch(app, /Apri materiale didattico/);
+  assert.doesNotMatch(app, /Inizia corso/);
+  assert.doesNotMatch(app, /Salva appunti/);
+  assert.doesNotMatch(app, /Chiedi all'AI/);
+  assert.doesNotMatch(app, /Segna esame superato/);
+  assert.doesNotMatch(app, /data-course-progress/);
+  assert.doesNotMatch(app, /data-save-academy-note/);
+  assert.doesNotMatch(app, /data-course-ai/);
   assert.match(styles, /\.academy-exam-modal/);
   assert.match(styles, /\.academy-locked-material/);
   assert.match(schema, /ALTER TABLE course_quizzes ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '\{\}'::jsonb/);

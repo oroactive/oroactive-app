@@ -1631,7 +1631,6 @@ const courseToolbar = document.querySelector(".course-toolbar");
 const trainingCourseReset = document.getElementById("trainingCourseReset");
 const trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
 const trainingCoursePreviewButton = document.getElementById("trainingCoursePreviewButton");
-const trainingCoursePublishButton = document.getElementById("trainingCoursePublishButton");
 const trainingCourseFile = document.getElementById("trainingCourseFile");
 const trainingCourseThumbnailFile = document.getElementById("trainingCourseThumbnailFile");
 const trainingCourseVideoFile = document.getElementById("trainingCourseVideoFile");
@@ -8884,7 +8883,6 @@ function resetTrainingCourseFormValues() {
   if (trainingCoursePdfFile) trainingCoursePdfFile.value = "";
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Crea corso";
   if (trainingCoursePreviewButton) trainingCoursePreviewButton.hidden = true;
-  if (trainingCoursePublishButton) trainingCoursePublishButton.hidden = true;
 }
 
 function renderCourseSummary() {
@@ -9152,8 +9150,6 @@ function renderTraining() {
         </div>
         <div class="course-progress-panel">
           <strong>${state.trainingCourses.filter((course) => course.faculty_name === faculty.name).length} corsi</strong>
-          <button type="button" data-edit-academy-faculty="${escapeHtml(String(faculty.id))}">Modifica facoltà</button>
-          <button class="danger-button" type="button" data-delete-academy-faculty="${escapeHtml(String(faculty.id))}">Elimina facoltà</button>
         </div>
       </article>
     `);
@@ -9236,8 +9232,6 @@ function renderCourseCard(course) {
   const percent = Math.max(0, Math.min(100, Number(progress.percentuale || course.percentuale || 0)));
   const status = progress.status || course.status || "non iniziato";
   const canManage = canManageCoursesUi();
-  const canEvaluate = canEvaluateCoursesUi();
-  const lessonId = course.lesson_id && Number(course.lesson_id) > 0 ? String(course.lesson_id) : "";
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = courseSlidesUrl(course);
   const finalExamQuestions = courseFinalExamQuestions(course);
@@ -9271,34 +9265,17 @@ function renderCourseCard(course) {
         <div class="academy-materials">
           ${videoUrl ? `<a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener">Guarda video lezione</a>` : ""}
           ${pdfUrl && canOpenSlides ? `
-            <button type="button" data-view-course-slides="${escapeHtml(String(course.id))}">Visualizza slide PDF</button>
+            <button type="button" data-view-course-slides="${escapeHtml(String(course.id))}">Visualizza Corso</button>
             <button type="button" data-download-course-slides="${escapeHtml(String(course.id))}">Scarica PDF corso</button>
           ` : ""}
           ${pdfUrl && !canOpenSlides ? `<span class="academy-locked-material">Slide PDF bloccate fino al superamento del test finale</span>` : ""}
-          ${course.material_url ? `<a href="${escapeHtml(course.material_url)}" target="_blank" rel="noopener">Apri materiale didattico</a>` : ""}
         </div>
-        <label class="academy-note-label">Appunti personali
-          <textarea data-academy-note="${escapeHtml(String(course.id))}" data-academy-lesson="${escapeHtml(lessonId)}" rows="3" placeholder="Scrivi appunti sulla lezione">${escapeHtml(course.user_note || "")}</textarea>
-        </label>
       </div>
       <div class="course-progress-panel">
         <div class="course-progress"><span style="width:${percent}%"></span></div>
         <strong>${percent}%</strong>
-        <button type="button" data-course-progress="${escapeHtml(String(course.id))}">${percent > 0 ? "Continua corso" : "Inizia corso"}</button>
-        <button type="button" data-save-academy-note="${escapeHtml(String(course.id))}" data-academy-lesson="${escapeHtml(lessonId)}">Salva appunti</button>
-        <button type="button" data-course-ai="${escapeHtml(String(course.id))}">Chiedi all'AI</button>
         ${hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Sostieni test finale</button>` : ""}
         ${hasFinalExam && examPassed ? `<button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(course.certificate_id || ""))}" ${course.certificate_id ? "" : "disabled"}>Scarica certificato</button>` : ""}
-        ${!hasFinalExam && canEvaluate ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Segna esame superato</button>` : ""}
-        ${canManage ? `
-          <div class="academy-course-admin-actions" aria-label="Azioni gestione corso">
-            <button type="button" data-edit-course="${escapeHtml(String(course.id))}">Modifica</button>
-            <button class="primary-button" type="button" data-publish-course="${escapeHtml(String(course.id))}">Pubblica</button>
-            <button class="danger-button" type="button" data-delete-course="${escapeHtml(String(course.id))}">Elimina</button>
-          </div>
-        ` : ""}
-        ${canManage && course.material_id ? `<button type="button" data-delete-course-material="${escapeHtml(String(course.material_id))}">Elimina materiale</button>` : ""}
-        ${canManage && course.section_id ? `<button type="button" data-delete-course-section="${escapeHtml(String(course.section_id))}">Elimina sottosezione</button>` : ""}
       </div>
     </article>
   `;
@@ -10731,7 +10708,6 @@ function editCourse(courseId) {
   document.getElementById("trainingCourseCertification").checked = course.final_certification !== false;
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva bozza";
   if (trainingCoursePreviewButton) trainingCoursePreviewButton.hidden = false;
-  if (trainingCoursePublishButton) trainingCoursePublishButton.hidden = false;
   renderTraining();
   trainingCourseForm?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -10825,7 +10801,6 @@ function showCoursePreviewModal(course = {}) {
         </div>
         <footer>
           <button type="button" data-close-course-preview>Chiudi</button>
-          ${canManageCoursesUi() && course.id ? `<button class="primary-button" type="button" data-preview-publish-course="${escapeHtml(String(course.id))}">Pubblica questa versione</button>` : ""}
         </footer>
       </article>
     </div>
@@ -17557,9 +17532,6 @@ trainingCourseReset?.addEventListener("click", resetTrainingCourseFormValues);
 trainingCoursePreviewButton?.addEventListener("click", () => {
   void previewCurrentCourseDraft().catch((error) => showToast(error.message || "Anteprima corso non disponibile.", "error"));
 });
-trainingCoursePublishButton?.addEventListener("click", () => {
-  void withButtonBusy(trainingCoursePublishButton, "Pubblico...", publishCurrentCourseDraft);
-});
 courseSearch?.addEventListener("input", renderTraining);
 courseCategoryFilter?.addEventListener("change", renderTraining);
 document.querySelectorAll("[data-course-tab]").forEach((button) => {
@@ -17574,21 +17546,11 @@ trainingList?.addEventListener("click", async (event) => {
   const completeOperator = event.target.closest("[data-complete-operator-training]");
   const cancelOperator = event.target.closest("[data-cancel-operator-training]");
   const openTrainingResult = event.target.closest("[data-open-training-result]");
-  const progress = event.target.closest("[data-course-progress]");
   const exam = event.target.closest("[data-course-exam]");
   const viewSlides = event.target.closest("[data-view-course-slides]");
   const downloadSlides = event.target.closest("[data-download-course-slides]");
-  const edit = event.target.closest("[data-edit-course]");
-  const publishCourseButton = event.target.closest("[data-publish-course]");
-  const deleteCourseButton = event.target.closest("[data-delete-course]");
-  const deleteMaterialButton = event.target.closest("[data-delete-course-material]");
-  const deleteSectionButton = event.target.closest("[data-delete-course-section]");
   const certificate = event.target.closest("[data-download-certificate]");
-  const noteButton = event.target.closest("[data-save-academy-note]");
-  const aiButton = event.target.closest("[data-course-ai]");
   const createFaculty = event.target.closest("[data-create-academy-faculty]");
-  const editFaculty = event.target.closest("[data-edit-academy-faculty]");
-  const deleteFaculty = event.target.closest("[data-delete-academy-faculty]");
   try {
     if (startOperator) return await withButtonBusy(startOperator, "Avvio...", () => startOperatorTraining(startOperator.dataset.startOperatorTraining));
     if (saveOperator) return await withButtonBusy(saveOperator, "Salvo...", () => saveOperatorTrainingProgress(saveOperator.dataset.saveOperatorTraining));
@@ -17600,24 +17562,14 @@ trainingList?.addEventListener("click", async (event) => {
       return;
     }
     if (openTrainingResult) return await openOperatorTrainingResult(openTrainingResult.dataset.openTrainingResult);
-    if (progress) return await updateCourseProgress(progress.dataset.courseProgress);
     if (exam) {
       const course = state.trainingCourses.find((item) => String(item.id) === String(exam.dataset.courseExam));
       return courseFinalExamQuestions(course).length ? showCourseExamModal(exam.dataset.courseExam) : await markCourseExamPassed(exam.dataset.courseExam);
     }
     if (viewSlides) return await withButtonBusy(viewSlides, "Apro...", () => downloadCourseSlides(viewSlides.dataset.viewCourseSlides, { download: false }));
     if (downloadSlides) return await withButtonBusy(downloadSlides, "Scarico...", () => downloadCourseSlides(downloadSlides.dataset.downloadCourseSlides, { download: true }));
-    if (edit) return editCourse(edit.dataset.editCourse);
-    if (publishCourseButton) return await withButtonBusy(publishCourseButton, "Pubblico...", () => publishCourse(publishCourseButton.dataset.publishCourse));
-    if (deleteCourseButton) return await deleteCourse(deleteCourseButton.dataset.deleteCourse);
-    if (deleteMaterialButton) return await deleteCourseMaterial(deleteMaterialButton.dataset.deleteCourseMaterial);
-    if (deleteSectionButton) return await deleteCourseSection(deleteSectionButton.dataset.deleteCourseSection);
     if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
-    if (noteButton) return await saveAcademyNote(noteButton.dataset.saveAcademyNote, noteButton.dataset.academyLesson);
-    if (aiButton) return askCourseAi(aiButton.dataset.courseAi);
     if (createFaculty) return await createAcademyFaculty();
-    if (editFaculty) return await editAcademyFaculty(editFaculty.dataset.editAcademyFaculty);
-    if (deleteFaculty) return await deleteAcademyFaculty(deleteFaculty.dataset.deleteAcademyFaculty);
   } catch (error) {
     showToast(error.message || "Operazione corso non riuscita.");
   }
@@ -17625,7 +17577,6 @@ trainingList?.addEventListener("click", async (event) => {
 document.addEventListener("click", (event) => {
   const closePreview = event.target.closest("[data-close-course-preview]");
   const backdrop = event.target.classList?.contains("academy-preview-backdrop") ? event.target : null;
-  const publishFromPreview = event.target.closest("[data-preview-publish-course]");
   const submitCourseExam = event.target.closest("[data-submit-course-final-exam]");
   if (closePreview || backdrop) {
     document.querySelector(".academy-preview-backdrop")?.remove();
@@ -17634,17 +17585,6 @@ document.addEventListener("click", (event) => {
   if (submitCourseExam) {
     void withButtonBusy(submitCourseExam, "Correggo...", () => submitCourseFinalExam(submitCourseExam.dataset.submitCourseFinalExam));
     return;
-  }
-  if (publishFromPreview) {
-    void withButtonBusy(publishFromPreview, "Pubblico...", async () => {
-      const editingId = document.getElementById("trainingCourseId")?.value || "";
-      if (editingId && String(editingId) === String(publishFromPreview.dataset.previewPublishCourse)) {
-        await publishCurrentCourseDraft();
-      } else {
-        await publishCourse(publishFromPreview.dataset.previewPublishCourse, { skipConfirm: true });
-      }
-      document.querySelector(".academy-preview-backdrop")?.remove();
-    });
   }
 });
 coinSearchInput?.addEventListener("input", () => {
