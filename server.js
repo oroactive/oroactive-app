@@ -15013,8 +15013,12 @@ async function listCourses(user = {}) {
     const badge = badgeByCourse.get(courseKey) || null;
     const quizResult = passedByCourse.get(courseKey) || null;
     const finalExamPassed = Boolean(certificate || quizResult?.passed);
-    const requiresFinalTest = Boolean(course.metadata?.pdfRequiresFinalTest || course.metadata?.pdfLockedUntilFinalTest || finalExamQuestions.length);
     const officialSlidesUrl = course.metadata?.pdfAssetFile ? academyBaseSlidesRoute(course.id) : "";
+    const lastExamCompletedAt = quizResult?.completed_at ? new Date(quizResult.completed_at) : null;
+    const retryAvailableAt = !finalExamPassed && quizResult && !quizResult.passed && lastExamCompletedAt
+      ? new Date(lastExamCompletedAt.getTime() + 48 * 60 * 60 * 1000)
+      : null;
+    const retryBlocked = Boolean(retryAvailableAt && retryAvailableAt.getTime() > Date.now());
     return {
       ...course,
       final_exam: {
@@ -15025,7 +15029,9 @@ async function listCourses(user = {}) {
       final_exam_passed: finalExamPassed,
       final_exam_score: quizResult?.score || 0,
       final_exam_completed_at: quizResult?.completed_at || null,
-      slides_locked: Boolean(officialSlidesUrl) && requiresFinalTest && !finalExamPassed && role !== "founder",
+      final_exam_retry_blocked: retryBlocked,
+      final_exam_retry_available_at: retryAvailableAt ? retryAvailableAt.toISOString() : null,
+      slides_locked: false,
       slides_download_url: officialSlidesUrl,
       certificate_id: certificate?.id || null,
       certificate_code: certificate?.certificate_code || "",
@@ -17105,6 +17111,35 @@ async function evaluateCourseFinalQuiz(input = {}, user = {}) {
     error.status = 400;
     throw error;
   }
+  const retryGate = await pool.query(
+    `SELECT latest.completed_at,
+            latest.completed_at + INTERVAL '48 hours' AS retry_available_at
+     FROM (
+       SELECT completed_at, esito
+       FROM course_quiz_results
+       WHERE course_id = $1::bigint
+         AND user_id = $2::bigint
+       ORDER BY completed_at DESC NULLS LAST, id DESC
+       LIMIT 1
+     ) latest
+     WHERE latest.esito <> 'superato'
+       AND latest.completed_at > NOW() - INTERVAL '48 hours'
+       AND NOT EXISTS (
+         SELECT 1
+         FROM academy_certificates
+         WHERE course_id = $1::bigint
+           AND user_id = $2::bigint
+           AND status = 'valido'
+       )`,
+    [courseId, targetUserId]
+  );
+  if (retryGate.rowCount) {
+    const retryAt = retryGate.rows[0].retry_available_at;
+    const error = new Error(`Test non superato. Puoi ripeterlo dopo 48 ore, dal ${new Date(retryAt).toLocaleString("it-IT")}.`);
+    error.status = 429;
+    error.retry_available_at = retryAt;
+    throw error;
+  }
 
   const answers = Array.isArray(input.answers) ? input.answers : [];
   const answersByQuestion = new Map();
@@ -17167,6 +17202,9 @@ async function evaluateCourseFinalQuiz(input = {}, user = {}) {
       payload: { awarded_from: "academy_final_test", metadata: { quiz_result_id: quizResult.id } }
     });
   }
+  const retryAvailableAt = !passed && quizResult.completed_at
+    ? new Date(new Date(quizResult.completed_at).getTime() + 48 * 60 * 60 * 1000).toISOString()
+    : null;
 
   return {
     ok: true,
@@ -17176,6 +17214,7 @@ async function evaluateCourseFinalQuiz(input = {}, user = {}) {
     pass_score: passScore,
     correct,
     total,
+    retry_available_at: retryAvailableAt,
     quiz_result: quizResult,
     exam,
     certificate: completion?.certificate || null,
@@ -17209,30 +17248,6 @@ async function getAcademyCourseSlidesAccess(courseId, user = {}) {
     error.status = 404;
     throw error;
   });
-  const requiresFinalTest = Boolean(metadata.pdfRequiresFinalTest || metadata.pdfLockedUntilFinalTest);
-  if (requiresFinalTest && role !== "founder") {
-    const passed = (await pool.query(
-      `SELECT 1
-       WHERE EXISTS (
-         SELECT 1 FROM course_quiz_results
-         WHERE course_id = $1::bigint AND user_id = $2::bigint AND esito = 'superato'
-       )
-       OR EXISTS (
-         SELECT 1 FROM academy_certificates
-         WHERE course_id = $1::bigint AND user_id = $2::bigint AND status = 'valido'
-       )
-       OR EXISTS (
-         SELECT 1 FROM academy_exam_results
-         WHERE course_id = $1::bigint AND user_id = $2::bigint AND esito = 'superato'
-       )`,
-      [courseId, user.id]
-    )).rowCount > 0;
-    if (!passed) {
-      const error = new Error("Supera il test finale per sbloccare le slide PDF ufficiali.");
-      error.status = 403;
-      throw error;
-    }
-  }
   return {
     course,
     filePath,

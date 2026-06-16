@@ -9227,25 +9227,30 @@ function courseSlidesUrl(course = {}) {
   return course.slides_download_url || course.academy_pdf_url || course.pdf_url || "";
 }
 
+function courseExamRetryMessage(course = {}) {
+  if (!course.final_exam_retry_blocked || !course.final_exam_retry_available_at) return "";
+  return `Test ripetibile dal ${formatDateTime(course.final_exam_retry_available_at)}`;
+}
+
 function renderCourseCard(course) {
   const progress = courseProgressFor(course.id);
   const percent = Math.max(0, Math.min(100, Number(progress.percentuale || course.percentuale || 0)));
-  const status = progress.status || course.status || "non iniziato";
-  const canManage = canManageCoursesUi();
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = courseSlidesUrl(course);
   const finalExamQuestions = courseFinalExamQuestions(course);
   const hasFinalExam = finalExamQuestions.length > 0;
   const examPassed = courseExamPassed(course);
-  const slidesLocked = Boolean(course.slides_locked) && !canManage;
-  const canOpenSlides = Boolean(pdfUrl) && !slidesLocked;
+  const retryMessage = courseExamRetryMessage(course);
+  const canOpenSlides = Boolean(pdfUrl);
   const isUploadedVideo = /^\/api\/academy\/materials\/file\//.test(String(videoUrl)) || /\.(mp4|mov)(\?|#|$)/i.test(String(videoUrl));
   const moduleTitle = course.academy_module_title || course.module_title || course.section_title || "Modulo introduttivo";
   const lessonTitle = course.academy_lesson_title || course.lesson_title || "Lezione principale";
   const testStatus = hasFinalExam
     ? examPassed
       ? `<span class="academy-test-status passed">Test finale superato${course.final_exam_score ? ` · ${escapeHtml(String(course.final_exam_score))}%` : ""}</span>`
-      : `<span class="academy-test-status">Test finale richiesto per sbloccare slide, download, badge e certificato</span>`
+      : retryMessage
+        ? `<span class="academy-test-status">Test finale non superato · ${escapeHtml(retryMessage)}</span>`
+        : `<span class="academy-test-status">Test finale richiesto per ottenere badge e certificazione</span>`
     : "";
   return `
     <article class="course-card academy-course-card">
@@ -9259,7 +9264,7 @@ function renderCourseCard(course) {
           <span>Durata ${escapeHtml(course.duration_label || (course.duration_minutes ? `${course.duration_minutes} min` : "Da definire"))}</span>
           <span>Docente ${escapeHtml(course.teacher || "OroActive")}</span>
         </div>
-        <small>${escapeHtml(moduleTitle)} · ${escapeHtml(lessonTitle)} · Stato: ${escapeHtml(status)}</small>
+        <small>${escapeHtml(moduleTitle)} · ${escapeHtml(lessonTitle)}</small>
         ${testStatus}
         ${isUploadedVideo ? `<video class="academy-video-player" controls playsinline preload="metadata" src="${escapeHtml(videoUrl)}"></video>` : ""}
         <div class="academy-materials">
@@ -9268,13 +9273,12 @@ function renderCourseCard(course) {
             <button type="button" data-view-course-slides="${escapeHtml(String(course.id))}">Visualizza Corso</button>
             <button type="button" data-download-course-slides="${escapeHtml(String(course.id))}">Scarica PDF corso</button>
           ` : ""}
-          ${pdfUrl && !canOpenSlides ? `<span class="academy-locked-material">Slide PDF bloccate fino al superamento del test finale</span>` : ""}
         </div>
       </div>
       <div class="course-progress-panel">
         <div class="course-progress"><span style="width:${percent}%"></span></div>
         <strong>${percent}%</strong>
-        ${hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}">Sostieni test finale</button>` : ""}
+        ${hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}" ${course.final_exam_retry_blocked ? "disabled" : ""}>${course.final_exam_retry_blocked ? "Test disponibile tra 48 ore" : "Sostieni test finale"}</button>` : ""}
         ${hasFinalExam && examPassed ? `<button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(course.certificate_id || ""))}" ${course.certificate_id ? "" : "disabled"}>Scarica certificato</button>` : ""}
       </div>
     </article>
@@ -10565,6 +10569,11 @@ function showCourseExamModal(courseId) {
     void markCourseExamPassed(courseId);
     return;
   }
+  const retryMessage = courseExamRetryMessage(course);
+  if (retryMessage) {
+    showToast(retryMessage, "warning");
+    return;
+  }
   const passScore = Number(course.final_exam?.pass_score || 80);
   document.querySelector(".academy-preview-backdrop")?.remove();
   document.body.insertAdjacentHTML("beforeend", `
@@ -10574,7 +10583,7 @@ function showCourseExamModal(courseId) {
           <div>
             <span class="course-pill">Test finale</span>
             <h3>${escapeHtml(course.title || "Corso Academy")}</h3>
-            <p>Supera il test con almeno ${escapeHtml(String(passScore))}% per sbloccare slide PDF, download, certificato e badge.</p>
+            <p>Supera il test con almeno ${escapeHtml(String(passScore))}% per ottenere badge e certificazione interna OroActive Academy.</p>
           </div>
           <button type="button" class="academy-preview-close" data-close-course-preview aria-label="Chiudi test">×</button>
         </header>
@@ -10640,14 +10649,24 @@ async function submitCourseFinalExam(courseId) {
   if (feedback) {
     feedback.hidden = false;
     feedback.className = `academy-exam-feedback ${result.passed ? "success" : "error"}`;
+    const retryText = result.retry_available_at
+      ? ` Potrai ripetere il test dal ${formatDateTime(result.retry_available_at)}.`
+      : " Potrai ripetere il test dopo 48 ore.";
     feedback.textContent = result.passed
-      ? `Test superato: ${result.score}%. Slide, badge e certificato sono ora disponibili.`
-      : `Test non superato: ${result.score}%. Servono almeno ${result.pass_score}%. Puoi riprovare.`;
+      ? `Test superato: ${result.score}%. Badge e certificato sono ora disponibili.`
+      : `Test non superato: ${result.score}%. Servono almeno ${result.pass_score}%.${retryText}`;
+  }
+  if (!result.passed) {
+    const submitButton = document.querySelector(`[data-submit-course-final-exam="${cssEscape(courseId)}"]`);
+    if (submitButton) submitButton.disabled = true;
+    await loadTraining();
+    showToast("Test non superato. Potrai ripeterlo dopo 48 ore.", "warning");
+    return;
   }
   if (result.passed) {
     await loadTraining();
     window.setTimeout(() => document.querySelector(".academy-preview-backdrop")?.remove(), 900);
-    showToast("Test superato: certificato, badge e slide sbloccati.", "success");
+    showToast("Test superato: certificato e badge assegnati.", "success");
   }
 }
 

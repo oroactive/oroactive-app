@@ -154,7 +154,7 @@ test("Oro Master e facoltà generata vengono rimossi dal catalogo Academy", asyn
   assert.doesNotMatch(styles, /\.academy-gold-master-strip/);
 });
 
-test("corsi base PDF OroActive Academy richiedono test finale prima delle slide", async () => {
+test("corsi base PDF OroActive Academy sono consultabili e test finale assegna badge certificazione", async () => {
   const [server, app, styles, schema, migration] = await Promise.all([
     file("server.js"),
     file("app.js"),
@@ -176,11 +176,19 @@ test("corsi base PDF OroActive Academy richiedono test finale prima delle slide"
   assert.match(server, /app\.get\("\/api\/academy\/courses\/:id\/slides\/download"/);
   assert.match(server, /evaluateCourseFinalQuiz/);
   assert.match(server, /awardAcademyCourseCompletion/);
+  assert.match(server, /INTERVAL '48 hours'/);
+  assert.match(server, /final_exam_retry_blocked/);
+  assert.match(server, /final_exam_retry_available_at/);
+  assert.match(server, /retry_available_at/);
   assert.match(server, /course_quiz_results/);
   assert.match(server, /academy_certificates/);
   assert.match(server, /academy_badges/);
+  assert.doesNotMatch(server, /Supera il test finale per sbloccare le slide PDF ufficiali/);
 
   assert.match(app, /Sostieni test finale/);
+  assert.match(app, /Test disponibile tra 48 ore/);
+  assert.match(app, /Test finale richiesto per ottenere badge e certificazione/);
+  assert.match(app, /courseExamRetryMessage/);
   assert.match(app, /Visualizza Corso/);
   assert.match(app, /data-view-course-slides/);
   assert.match(app, /data-download-course-slides/);
@@ -191,6 +199,9 @@ test("corsi base PDF OroActive Academy richiedono test finale prima delle slide"
   assert.match(app, /academy\/certificates\/\$\{encodeURIComponent\(certificateId\)\}\/download/);
   assert.doesNotMatch(app, /Visualizza slide PDF/);
   assert.doesNotMatch(app, /Apri materiale didattico/);
+  assert.doesNotMatch(app, /Slide PDF bloccate/);
+  assert.doesNotMatch(app, /sbloccare slide/);
+  assert.doesNotMatch(app, /Stato: \$\{escapeHtml\(status\)\}/);
   assert.doesNotMatch(app, /Inizia corso/);
   assert.doesNotMatch(app, /Salva appunti/);
   assert.doesNotMatch(app, /Chiedi all'AI/);
@@ -199,7 +210,6 @@ test("corsi base PDF OroActive Academy richiedono test finale prima delle slide"
   assert.doesNotMatch(app, /data-save-academy-note/);
   assert.doesNotMatch(app, /data-course-ai/);
   assert.match(styles, /\.academy-exam-modal/);
-  assert.match(styles, /\.academy-locked-material/);
   assert.match(schema, /ALTER TABLE course_quizzes ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '\{\}'::jsonb/);
   assert.match(migration, /ALTER TABLE course_quizzes[\s\S]*ADD COLUMN IF NOT EXISTS metadata/);
   await Promise.all([
