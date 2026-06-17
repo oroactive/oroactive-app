@@ -10612,6 +10612,35 @@ async function markCourseExamPassed(courseId) {
   showToast("Esame superato, certificazione e badge assegnati.");
 }
 
+function academyExamHashSeed(seed = "") {
+  let hash = 2166136261;
+  for (const char of String(seed)) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function academyExamMixedOptions(question = {}, courseId = "", questionIndex = 0) {
+  const rawOptions = Array.isArray(question.options) ? question.options.map((option) => String(option)) : [];
+  const options = rawOptions.map((option, originalIndex) => ({ option, originalIndex }));
+  if (options.length < 2) return options;
+
+  let seed = academyExamHashSeed(`${courseId}:${question.id || question.question || questionIndex}:${questionIndex}`);
+  for (let index = options.length - 1; index > 0; index -= 1) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const swapIndex = seed % (index + 1);
+    [options[index], options[swapIndex]] = [options[swapIndex], options[index]];
+  }
+
+  if (options[0]?.originalIndex === 0) {
+    const targetIndex = (academyExamHashSeed(`${seed}:first-answer-offset`) % (options.length - 1)) + 1;
+    [options[0], options[targetIndex]] = [options[targetIndex], options[0]];
+  }
+
+  return options;
+}
+
 function showCourseExamModal(courseId) {
   const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
   if (!course) return;
@@ -10644,8 +10673,8 @@ function showCourseExamModal(courseId) {
             <fieldset class="academy-exam-question">
               <legend>${index + 1}. ${escapeHtml(question.question || "Domanda")}</legend>
               <div class="academy-exam-options">
-                ${(Array.isArray(question.options) ? question.options : []).map((option) => {
-                  const optionId = `academy-exam-${question.id}-${String(option).replace(/[^a-z0-9]+/gi, "-").slice(0, 24)}`;
+                ${academyExamMixedOptions(question, course.id, index).map(({ option, originalIndex }, optionIndex) => {
+                  const optionId = `academy-exam-${question.id}-${optionIndex}-${originalIndex}-${String(option).replace(/[^a-z0-9]+/gi, "-").slice(0, 24)}`;
                   return `
                     <label for="${escapeHtml(optionId)}">
                       <input
@@ -10653,6 +10682,7 @@ function showCourseExamModal(courseId) {
                         type="radio"
                         name="academy-exam-${escapeHtml(String(question.id))}"
                         value="${escapeHtml(String(option))}"
+                        data-academy-option-original-index="${escapeHtml(String(originalIndex))}"
                         data-academy-exam-answer="${escapeHtml(String(question.id))}">
                       <span>${escapeHtml(String(option))}</span>
                     </label>
