@@ -14835,8 +14835,40 @@ function normalizeQuizAnswerValue(value = "") {
   return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function oroactiveBaseCourseMetadata(course = {}) {
+  return course?.metadata && typeof course.metadata === "object" && !Array.isArray(course.metadata)
+    ? course.metadata
+    : {};
+}
+
+function oroactiveBaseCourseDefinitionFor(course = {}) {
+  const metadata = oroactiveBaseCourseMetadata(course);
+  const seedCode = String(metadata.seedCode || metadata.courseCode || "").trim();
+  const title = String(course.title || "").trim();
+  return OROACTIVE_BASE_ACADEMY_COURSES.find((definition) => (
+    definition.code === seedCode || definition.title === title
+  )) || null;
+}
+
+function oroactiveBaseCourseQuizQuestions(course = {}, { includeAnswers = false } = {}) {
+  const definition = oroactiveBaseCourseDefinitionFor(course);
+  if (!definition) return [];
+  return definition.quiz.map((question, index) => {
+    const payload = {
+      id: `base:${definition.code}:${index + 1}`,
+      course_id: course.id,
+      question: question.question,
+      options: Array.isArray(question.options) ? question.options : [],
+      sort_order: 1000 + index
+    };
+    if (includeAnswers) payload.correct_answer = question.correct_answer;
+    return payload;
+  });
+}
+
 async function ensureOroActiveBaseAcademyCourses() {
   for (const courseDefinition of OROACTIVE_BASE_ACADEMY_COURSES) {
+    try {
     const faculty = await ensureAcademyFaculty(courseDefinition.faculty);
     const category = await ensureCourseCategory(courseDefinition.category);
     const section = await ensureCourseSection(category.id, courseDefinition.section);
@@ -15111,6 +15143,9 @@ async function ensureOroActiveBaseAcademyCourses() {
         ]
       );
     }
+    } catch (error) {
+      console.warn(`Corso base OroActive non inizializzato (${courseDefinition.code}):`, error.message);
+    }
   }
 }
 
@@ -15236,12 +15271,17 @@ async function listCourses(user = {}) {
   }
   const enrichedCourses = courseRows.map((course) => {
     const courseKey = String(course.id);
-    const finalExamQuestions = sanitizeQuizQuestionsForClient(quizByCourse.get(courseKey) || []);
+    const baseCourseDefinition = oroactiveBaseCourseDefinitionFor(course);
+    const storedExamQuestions = sanitizeQuizQuestionsForClient(quizByCourse.get(courseKey) || []);
+    const finalExamQuestions = storedExamQuestions.length
+      ? storedExamQuestions
+      : oroactiveBaseCourseQuizQuestions(course);
     const certificate = certificateByCourse.get(courseKey) || null;
     const badge = badgeByCourse.get(courseKey) || null;
     const quizResult = passedByCourse.get(courseKey) || null;
     const finalExamPassed = Boolean(certificate || quizResult?.passed);
-    const officialSlidesUrl = course.metadata?.pdfAssetFile ? academyBaseSlidesRoute(course.id) : "";
+    const metadata = oroactiveBaseCourseMetadata(course);
+    const officialSlidesUrl = (metadata.pdfAssetFile || baseCourseDefinition) ? academyBaseSlidesRoute(course.id) : "";
     const lastExamCompletedAt = quizResult?.completed_at ? new Date(quizResult.completed_at) : null;
     const retryAvailableAt = !finalExamPassed && quizResult && !quizResult.passed && lastExamCompletedAt
       ? new Date(lastExamCompletedAt.getTime() + 48 * 60 * 60 * 1000)
@@ -15250,7 +15290,8 @@ async function listCourses(user = {}) {
     return {
       ...course,
       final_exam: {
-        pass_score: Number(course.metadata?.finalExamPassScore || 80),
+        pass_score: Number(metadata.finalExamPassScore || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE : 80)),
+        required_correct: Number(metadata.finalExamRequiredCorrect || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT : 0)),
         questions: finalExamQuestions
       },
       final_exam_questions: finalExamQuestions,
@@ -15264,7 +15305,7 @@ async function listCourses(user = {}) {
       certificate_id: certificate?.id || null,
       certificate_code: certificate?.certificate_code || "",
       badge_id: badge?.id || null,
-      badge_name: badge?.badge_name || course.metadata?.badgeName || ""
+      badge_name: badge?.badge_name || metadata.badgeName || baseCourseDefinition?.badgeName || ""
     };
   });
   const progress = await pool.query(
@@ -17327,13 +17368,16 @@ async function evaluateCourseFinalQuiz(input = {}, user = {}) {
     error.status = 404;
     throw error;
   }
-  const questions = (await pool.query(
+  let questions = (await pool.query(
     `SELECT id, course_id, question, options, correct_answer, sort_order
      FROM course_quizzes
      WHERE course_id = $1::bigint AND active = TRUE
      ORDER BY sort_order ASC, id ASC`,
     [courseId]
   )).rows;
+  if (!questions.length) {
+    questions = oroactiveBaseCourseQuizQuestions(course, { includeAnswers: true });
+  }
   if (!questions.length) {
     const error = new Error("Test finale non configurato per questo corso.");
     error.status = 400;
@@ -17390,7 +17434,9 @@ async function evaluateCourseFinalQuiz(input = {}, user = {}) {
   });
   const total = questions.length;
   const score = total ? Math.round((correct / total) * 100) : 0;
-  const passScore = Number(course.metadata?.finalExamPassScore || 80);
+  const baseCourseDefinition = oroactiveBaseCourseDefinitionFor(course);
+  const metadata = oroactiveBaseCourseMetadata(course);
+  const passScore = Number(metadata.finalExamPassScore || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE : 80));
   const passed = score >= passScore;
   const esito = passed ? "superato" : "non_superato";
   const payload = sanitizeForPostgres({
@@ -21017,6 +21063,9 @@ app.get("/api/gaming/overview", async (request, response, next) => {
 
 app.get("/api/corsi", async (request, response, next) => {
   try {
+    response.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    response.set("Pragma", "no-cache");
+    response.set("Expires", "0");
     response.json(await listCourses(request.user));
   } catch (error) {
     next(error);
@@ -23995,6 +24044,13 @@ app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) =
   } catch (error) {
     next(error);
   }
+});
+
+app.get("/service-worker.js", (request, response, next) => {
+  response.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  response.set("Pragma", "no-cache");
+  response.set("Expires", "0");
+  next();
 });
 
 app.use(express.static(__dirname, { extensions: ["html"] }));
