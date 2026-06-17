@@ -13874,6 +13874,8 @@ function canEvaluateCourses(user = {}) {
 }
 
 const baseAcademyCourseAssetsDirectory = path.join(__dirname, "assets", "academy", "courses");
+const OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE = 85;
+const OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT = 17;
 
 const OROACTIVE_BASE_ACADEMY_COURSES = [
   {
@@ -13904,9 +13906,24 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
         correct_answer: "75%"
       },
       {
-        question: "Perché il prezzo pagato al cliente non coincide con il prezzo di borsa dell'oro puro?",
-        options: ["Perché si applicano purezza, costi, spread, rischio e margine operativo", "Perché il prezzo di borsa vale solo per i diamanti", "Perché il peso non conta", "Perché l'oro usato non contiene mai oro"],
-        correct_answer: "Perché si applicano purezza, costi, spread, rischio e margine operativo"
+        question: "A quale titolo in millesimi corrisponde normalmente l'oro 14kt?",
+        options: ["585‰", "750‰", "916‰", "375‰"],
+        correct_answer: "585‰"
+      },
+      {
+        question: "Quale titolo identifica l'oro praticamente puro nel corso?",
+        options: ["24K / 999‰", "18K / 750‰", "14K / 585‰", "9K / 375‰"],
+        correct_answer: "24K / 999‰"
+      },
+      {
+        question: "Qual è la regola madre indicata per non commettere errori su un oggetto dorato?",
+        options: ["Non pagare mai come oro massiccio solo per colore o punzone", "Pagare sempre se il colore è giallo", "Ignorare peso e test", "Accettare sempre la dichiarazione del cliente"],
+        correct_answer: "Non pagare mai come oro massiccio solo per colore o punzone"
+      },
+      {
+        question: "Perché il punzone non basta da solo?",
+        options: ["È un indizio, ma può essere falso o incoerente", "Indica sempre il prezzo finale", "Sostituisce tutti i test", "Vale solo per l'argento"],
+        correct_answer: "È un indizio, ma può essere falso o incoerente"
       },
       {
         question: "Quale controllo è coerente con una verifica preliminare dell'oro?",
@@ -13914,9 +13931,69 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
         correct_answer: "Controllo punzonatura e test adeguati"
       },
       {
-        question: "Chi definisce il prezzo finale applicato secondo le policy OroActive?",
-        options: ["Le policy OroActive e l'operatore autorizzato", "Il competitor più alto", "Il cliente in autonomia", "Una quotazione casuale"],
-        correct_answer: "Le policy OroActive e l'operatore autorizzato"
+        question: "Quale sequenza operativa è più prudente nella valutazione dell'oro?",
+        options: ["Osservazione, peso, punzoni, test coerenti e verifica superiore se serve", "Solo prezzo competitor", "Solo magnete", "Solo foto dell'oggetto"],
+        correct_answer: "Osservazione, peso, punzoni, test coerenti e verifica superiore se serve"
+      },
+      {
+        question: "Quale proprietà dell'oro può aiutare nei controlli ma non è sufficiente da sola?",
+        options: ["Densità elevata", "Odore", "Temperatura al tatto", "Forma del gioiello"],
+        correct_answer: "Densità elevata"
+      },
+      {
+        question: "Perché l'oro puro viene spesso legato con altri metalli in gioielleria?",
+        options: ["Per aumentare durezza e resistenza", "Per renderlo sempre magnetico", "Per eliminare il valore", "Per trasformarlo in argento"],
+        correct_answer: "Per aumentare durezza e resistenza"
+      },
+      {
+        question: "Quale segnale può essere un campanello d'allarme su un oggetto dichiarato oro?",
+        options: ["Perdita di colore o ossidazione anomala", "Presenza di una foto", "Peso dichiarato dal cliente", "Forma circolare"],
+        correct_answer: "Perdita di colore o ossidazione anomala"
+      },
+      {
+        question: "Che cosa deve fare l'operatore quando i test danno risultati incoerenti?",
+        options: ["Sospendere, documentare e chiedere verifica superiore", "Completare comunque l'acquisto", "Aumentare il prezzo", "Ignorare l'anomalia"],
+        correct_answer: "Sospendere, documentare e chiedere verifica superiore"
+      },
+      {
+        question: "Quale differenza deve saper spiegare l'operatore al cliente?",
+        options: ["Prezzo di borsa, valore teorico e prezzo pagato al cliente", "Prezzo oro e prezzo diamanti nel menu", "Peso netto e numero tessera", "Solo colore giallo e rosa"],
+        correct_answer: "Prezzo di borsa, valore teorico e prezzo pagato al cliente"
+      },
+      {
+        question: "Perché il prezzo pagato al cliente non coincide con il prezzo di borsa dell'oro puro?",
+        options: ["Perché si applicano purezza, costi, spread, rischio e margine operativo", "Perché il prezzo di borsa vale solo per i diamanti", "Perché il peso non conta", "Perché l'oro usato non contiene mai oro"],
+        correct_answer: "Perché si applicano purezza, costi, spread, rischio e margine operativo"
+      },
+      {
+        question: "Nel calcolo del valore teorico di un oggetto 18kt quale fattore di purezza si usa?",
+        options: ["18/24", "24/18", "14/24", "9/18"],
+        correct_answer: "18/24"
+      },
+      {
+        question: "Quale categoria richiede attenzione perché può avere valore oltre al solo metallo?",
+        options: ["Monete d'oro e oggetti da investimento", "Rottami anonimi sempre uguali", "Oggetti placcati", "Oggetti senza peso"],
+        correct_answer: "Monete d'oro e oggetti da investimento"
+      },
+      {
+        question: "Quale rischio è citato tra i falsi e le anomalie da individuare?",
+        options: ["Placcature, gold filled, nuclei sospetti e punzoni falsi", "Solo graffi estetici", "Solo custodie mancanti", "Solo foto sfocate"],
+        correct_answer: "Placcature, gold filled, nuclei sospetti e punzoni falsi"
+      },
+      {
+        question: "Che cosa deve proteggere la procedura operativa corretta?",
+        options: ["Negozio e cliente", "Solo la velocità della pratica", "Solo il prezzo competitor", "Solo la vetrina"],
+        correct_answer: "Negozio e cliente"
+      },
+      {
+        question: "Quale documentazione rientra nella procedura operativa del corso?",
+        options: ["Atto di vendita, foto, allegati e controllo qualità", "Solo messaggio WhatsApp", "Solo preventivo verbale", "Solo appunto su carta libera"],
+        correct_answer: "Atto di vendita, foto, allegati e controllo qualità"
+      },
+      {
+        question: "Qual è l'esito atteso del Corso Base Oro?",
+        options: ["Riconoscere carature, oggetti, anomalie, falsi e limiti dei test", "Garantire sempre un prezzo certo", "Sostituire ogni perizia ufficiale", "Evitare ogni controllo documentale"],
+        correct_answer: "Riconoscere carature, oggetti, anomalie, falsi e limiti dei test"
       }
     ]
   },
@@ -13953,14 +14030,89 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
         correct_answer: "999"
       },
       {
-        question: "Perché anche sull'argento si applicano costi e margini?",
-        options: ["Per coprire lavorazione, rientro, rischio e sostenibilità operativa", "Per trasformarlo automaticamente in oro", "Perché l'argento non ha quotazione", "Perché non serve pesarlo"],
-        correct_answer: "Per coprire lavorazione, rientro, rischio e sostenibilità operativa"
+        question: "Quale titolo viene comunemente associato all'argento sterling?",
+        options: ["925", "800", "999", "585"],
+        correct_answer: "925"
       },
       {
-        question: "Quale dato è essenziale nella valutazione di argento usato?",
+        question: "Che cosa indica il titolo dell'argento?",
+        options: ["La quota di argento fino su 1000 parti", "Il numero di oggetti nel lotto", "La data di acquisto", "Il colore della patina"],
+        correct_answer: "La quota di argento fino su 1000 parti"
+      },
+      {
+        question: "Qual è la regola madre del corso Argento?",
+        options: ["Non pagare come argento massiccio solo per colore chiaro o punzone", "Pagare sempre se annerisce", "Accettare ogni posata come 925", "Usare solo il peso dichiarato"],
+        correct_answer: "Non pagare come argento massiccio solo per colore chiaro o punzone"
+      },
+      {
+        question: "Perché il tarnish non dimostra da solo il titolo dell'argento?",
+        options: ["Può essere normale, ma non prova purezza o autenticità", "È impossibile sull'argento", "Indica sempre argento 999", "Sostituisce il test XRF"],
+        correct_answer: "Può essere normale, ma non prova purezza o autenticità"
+      },
+      {
+        question: "Qual è la densità indicativa dell'argento puro citata nel corso?",
+        options: ["Circa 10,49 g/cm3", "Circa 19,30 g/cm3", "Circa 2,70 g/cm3", "Circa 1,00 g/cm3"],
+        correct_answer: "Circa 10,49 g/cm3"
+      },
+      {
+        question: "Quali materiali possono imitare visivamente l'argento?",
+        options: ["Acciaio, alpacca, nickel silver, zama o metalli argentati", "Solo oro 24K", "Solo platino 950", "Solo rame puro"],
+        correct_answer: "Acciaio, alpacca, nickel silver, zama o metalli argentati"
+      },
+      {
+        question: "Quale controllo è essenziale nella valutazione di argento usato?",
         options: ["Titolo e peso", "Solo il colore", "Solo la forma dell'oggetto", "Solo l'anno di acquisto"],
         correct_answer: "Titolo e peso"
+      },
+      {
+        question: "Quali oggetti sono citati come tipologie da riconoscere nel corso Argento?",
+        options: ["Gioielli, posateria, monete, lingotti, cornici, vassoi e rottami", "Solo anelli in oro", "Solo diamanti certificati", "Solo orologi digitali"],
+        correct_answer: "Gioielli, posateria, monete, lingotti, cornici, vassoi e rottami"
+      },
+      {
+        question: "Quale rischio è tipico degli oggetti in argento da valutare?",
+        options: ["Parti miste, riempimenti e componenti non argento", "Sempre oro nascosto", "Peso sempre identico al valore", "Assenza totale di falsi"],
+        correct_answer: "Parti miste, riempimenti e componenti non argento"
+      },
+      {
+        question: "Quali falsi o anomalie sono citati nel corso Argento?",
+        options: ["Silver plated, alpacca, Sheffield, EPNS e parti miste", "Solo tungsteno", "Solo moissanite", "Solo oro bianco"],
+        correct_answer: "Silver plated, alpacca, Sheffield, EPNS e parti miste"
+      },
+      {
+        question: "Qual è una sequenza prudente per testare l'argento?",
+        options: ["Ispezione, magnete, acidi, densità, XRF e laboratorio se serve", "Solo fotografia", "Solo annusare l'oggetto", "Solo quotazione online"],
+        correct_answer: "Ispezione, magnete, acidi, densità, XRF e laboratorio se serve"
+      },
+      {
+        question: "Quando l'operatore deve sospendere e chiedere verifica superiore?",
+        options: ["Quando titolo, punzone, peso, test o oggetto non sono coerenti", "Quando il cliente ha fretta", "Quando l'oggetto è lucido", "Sempre dopo ogni foto"],
+        correct_answer: "Quando titolo, punzone, peso, test o oggetto non sono coerenti"
+      },
+      {
+        question: "Perché il prezzo pagato per argento usato è diverso dalla quotazione dell'argento puro?",
+        options: ["Perché si considerano titolo, costi, rischio, margine e sostenibilità", "Perché l'argento non ha valore", "Perché la quotazione è sempre diamanti", "Perché il peso non viene misurato"],
+        correct_answer: "Perché si considerano titolo, costi, rischio, margine e sostenibilità"
+      },
+      {
+        question: "Quale formula descrive il valore teorico di un oggetto in argento 800?",
+        options: ["Prezzo argento puro al grammo x 0,800", "Prezzo oro puro x 18/24", "Prezzo argento puro x 8", "Peso diviso 999"],
+        correct_answer: "Prezzo argento puro al grammo x 0,800"
+      },
+      {
+        question: "Che cosa deve contenere una descrizione corretta dell'oggetto in argento?",
+        options: ["Tipologia, titolo, peso, parti e anomalie rilevate", "Solo nome cliente", "Solo prezzo finale", "Solo colore bianco"],
+        correct_answer: "Tipologia, titolo, peso, parti e anomalie rilevate"
+      },
+      {
+        question: "Qual è l'esito atteso del Corso Base Argento?",
+        options: ["Distinguere 800, 925, 999, placcati/falsi e descrivere correttamente le parti", "Garantire sempre il titolo senza test", "Sostituire laboratorio e autorizzazioni", "Usare solo la patina come prova"],
+        correct_answer: "Distinguere 800, 925, 999, placcati/falsi e descrivere correttamente le parti"
+      },
+      {
+        question: "Quale comportamento è corretto se un oggetto sembra argento ma il test non conferma?",
+        options: ["Non trattarlo come argento massiccio e documentare l'anomalia", "Pagarlo come 999", "Ignorare il test", "Attribuire automaticamente 925"],
+        correct_answer: "Non trattarlo come argento massiccio e documentare l'anomalia"
       }
     ]
   },
@@ -13969,7 +14121,7 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
     title: "Corso Base sui Diamanti — OroActive",
     category: "Diamanti",
     section: "Corsi base",
-    faculty: "Facoltà Gemmologia",
+    faculty: "Facoltà Metalli Preziosi",
     level: "Base",
     durationLabel: "Corso base · slide PDF ufficiali",
     teacher: "OroActive Academy",
@@ -13992,9 +14144,79 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
         correct_answer: "Il peso della pietra"
       },
       {
+        question: "Qual è l'obiettivo operativo del Corso Base Diamanti?",
+        options: ["Rendere l'operatore prudente nella lettura di certificati, 4C, autenticità e anomalie", "Sostituire ogni laboratorio gemmologico", "Garantire sempre un prezzo certo", "Reinserire quotazioni diamanti nelle quotazioni metalli"],
+        correct_answer: "Rendere l'operatore prudente nella lettura di certificati, 4C, autenticità e anomalie"
+      },
+      {
+        question: "Quando serve una verifica superiore su un diamante?",
+        options: ["Report non trovato, dati incoerenti, origine incerta o pietra importante", "Sempre solo per pietre piccole", "Mai se il cliente è sicuro", "Solo se manca la scatola"],
+        correct_answer: "Report non trovato, dati incoerenti, origine incerta o pietra importante"
+      },
+      {
+        question: "Che cosa significa autonomia corretta secondo il corso?",
+        options: ["Sapere quando procedere e quando fermarsi", "Decidere sempre da soli", "Ignorare certificati e tester", "Dare sempre una certezza al cliente"],
+        correct_answer: "Sapere quando procedere e quando fermarsi"
+      },
+      {
         question: "Perché una certificazione gemmologica è importante?",
         options: ["Aiuta a documentare caratteristiche e autenticità della pietra", "Sostituisce sempre il pagamento", "Trasforma il diamante in oro", "Rende inutile ogni controllo"],
         correct_answer: "Aiuta a documentare caratteristiche e autenticità della pietra"
+      },
+      {
+        question: "Quali laboratori sono citati tra i report da leggere e verificare?",
+        options: ["GIA e IGI", "Solo zecca austriaca", "Solo BullionVault", "Solo fonderia"],
+        correct_answer: "GIA e IGI"
+      },
+      {
+        question: "Che cosa va verificato in un certificato gemmologico?",
+        options: ["Numero report, 4C, misure, proporzioni, iscrizioni laser e commenti", "Solo il colore della carta", "Solo il prezzo scritto dal cliente", "Solo il peso dell'anello"],
+        correct_answer: "Numero report, 4C, misure, proporzioni, iscrizioni laser e commenti"
+      },
+      {
+        question: "Quale strumento è indicato per osservare inclusioni, danni e inscription?",
+        options: ["Lente 10x", "Bilancia per oro 18kt", "Calamita da banco", "Stampante PDF"],
+        correct_answer: "Lente 10x"
+      },
+      {
+        question: "Quali elementi rientrano nel controllo operativo di una pietra senza certificato?",
+        options: ["Lente, misure, peso stimato e tester", "Solo prezzo del metallo", "Solo dichiarazione del cliente", "Solo fotografia estetica"],
+        correct_answer: "Lente, misure, peso stimato e tester"
+      },
+      {
+        question: "Quale distinzione richiede prudenza e strumenti o certificati adeguati?",
+        options: ["Naturale vs lab-grown", "Oro 18kt vs 14kt", "Argento 925 vs 800", "Documento fronte vs retro"],
+        correct_answer: "Naturale vs lab-grown"
+      },
+      {
+        question: "Quali simulanti o alternative sono citati nel corso?",
+        options: ["Moissanite, zirconia cubica, vetro e imitazioni comuni", "Solo oro placcato", "Solo argento 925", "Solo rame"],
+        correct_answer: "Moissanite, zirconia cubica, vetro e imitazioni comuni"
+      },
+      {
+        question: "Quali metodi avanzati sono indicati per approfondire un diamante?",
+        options: ["Tester termico/elettrico, UV, microscopia, spettroscopia e laboratorio", "Solo prezzo competitor", "Solo acido per oro", "Solo punzone 750"],
+        correct_answer: "Tester termico/elettrico, UV, microscopia, spettroscopia e laboratorio"
+      },
+      {
+        question: "Che cosa descrive la C 'Color'?",
+        options: ["La scala colore del diamante, come D-Z e fancy color", "Il peso della montatura", "Il titolo dell'oro", "La quotazione argento"],
+        correct_answer: "La scala colore del diamante, come D-Z e fancy color"
+      },
+      {
+        question: "Che cosa descrive la C 'Clarity'?",
+        options: ["Purezza, inclusioni e caratteristiche interne/esterne", "Solo il colore della montatura", "Solo il prezzo al grammo", "Solo il diametro dell'anello"],
+        correct_answer: "Purezza, inclusioni e caratteristiche interne/esterne"
+      },
+      {
+        question: "Che cosa descrive la C 'Cut'?",
+        options: ["Taglio, proporzioni e qualità della lavorazione", "Il titolo dell'argento", "Il peso dell'oro", "Il numero di telefono del cliente"],
+        correct_answer: "Taglio, proporzioni e qualità della lavorazione"
+      },
+      {
+        question: "Quali danni o anomalie devono essere osservati con attenzione?",
+        options: ["Fratture, scheggiature, abrasioni, cavity e feather", "Solo custodia rovinata", "Solo colore della fattura", "Solo graffi del banco"],
+        correct_answer: "Fratture, scheggiature, abrasioni, cavity e feather"
       },
       {
         question: "Quale comportamento è più corretto davanti a una pietra non verificabile con sicurezza?",
@@ -14002,9 +14224,14 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
         correct_answer: "Segnalare la necessità di verifica specializzata"
       },
       {
-        question: "Il corso sui diamanti deve essere usato per:",
-        options: ["Formazione e riconoscimento operativo di base", "Reinserire quotazioni diamanti nel menu quotazioni", "Garantire un prezzo certo", "Sostituire una perizia professionale"],
-        correct_answer: "Formazione e riconoscimento operativo di base"
+        question: "Che cosa non deve fare l'operatore quando ha dubbi su un diamante?",
+        options: ["Comunicare certezze non verificate", "Documentare il dubbio", "Chiedere verifica superiore", "Sospendere la pratica se necessario"],
+        correct_answer: "Comunicare certezze non verificate"
+      },
+      {
+        question: "Qual è il rischio principale nei diamanti indicato dal corso?",
+        options: ["Confondere apparenza, certificato e identità reale della pietra", "Confondere oro 18kt e argento 925", "Dimenticare il valore del rame", "Usare troppe fotografie"],
+        correct_answer: "Confondere apparenza, certificato e identità reale della pietra"
       }
     ]
   }
@@ -14623,7 +14850,8 @@ async function ensureOroActiveBaseAcademyCourses() {
       pdfRequiresFinalTest: true,
       certificateName: courseDefinition.certificateName,
       badgeName: courseDefinition.badgeName,
-      finalExamPassScore: 80,
+      finalExamPassScore: OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE,
+      finalExamRequiredCorrect: OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT,
       finalExamQuestionCount: courseDefinition.quiz.length,
       assetAvailable: assetExists,
       updatedAt: new Date().toISOString()
@@ -14712,7 +14940,7 @@ async function ensureOroActiveBaseAcademyCourses() {
       [
         course.id,
         slidesRoute,
-        sanitizeForPostgres({ pdfUrl: slidesRoute, pdfLockedUntilFinalTest: true })
+        sanitizeForPostgres({ pdfUrl: slidesRoute, pdfLockedUntilFinalTest: false })
       ]
     );
     await pool.query(
@@ -14807,7 +15035,7 @@ async function ensureOroActiveBaseAcademyCourses() {
           lessonRow.id,
           moduleRow.id,
           courseDefinition.lessonTitle,
-          "Lezione basata sulle slide PDF ufficiali del corso. Il PDF si sblocca dopo il superamento del test finale.",
+          "Lezione basata sulle slide PDF ufficiali del corso. Il test finale assegna badge e certificazione al superamento.",
           slidesRoute,
           durationMinutesFromLabel(courseDefinition.durationLabel),
           lessonMetadata
@@ -14823,7 +15051,7 @@ async function ensureOroActiveBaseAcademyCourses() {
           moduleRow.id,
           course.id,
           courseDefinition.lessonTitle,
-          "Lezione basata sulle slide PDF ufficiali del corso. Il PDF si sblocca dopo il superamento del test finale.",
+          "Lezione basata sulle slide PDF ufficiali del corso. Il test finale assegna badge e certificazione al superamento.",
           slidesRoute,
           durationMinutesFromLabel(courseDefinition.durationLabel),
           lessonMetadata
@@ -14835,7 +15063,7 @@ async function ensureOroActiveBaseAcademyCourses() {
       seedCode: courseDefinition.code,
       oroactiveBaseCourse: true,
       kind: "official_course_slides",
-      lockedUntilFinalTestPassed: true,
+      lockedUntilFinalTestPassed: false,
       pdfAssetFile: courseDefinition.assetFile
     });
     await pool.query(

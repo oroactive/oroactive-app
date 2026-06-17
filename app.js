@@ -10575,6 +10575,7 @@ function showCourseExamModal(courseId) {
     return;
   }
   const passScore = Number(course.final_exam?.pass_score || 80);
+  const requiredCorrect = Math.ceil((questions.length * passScore) / 100);
   document.querySelector(".academy-preview-backdrop")?.remove();
   document.body.insertAdjacentHTML("beforeend", `
     <div class="academy-preview-backdrop" role="dialog" aria-modal="true" aria-label="Test finale corso Academy">
@@ -10583,7 +10584,7 @@ function showCourseExamModal(courseId) {
           <div>
             <span class="course-pill">Test finale</span>
             <h3>${escapeHtml(course.title || "Corso Academy")}</h3>
-            <p>Supera il test con almeno ${escapeHtml(String(passScore))}% per ottenere badge e certificazione interna OroActive Academy.</p>
+            <p>Rispondi correttamente ad almeno ${escapeHtml(String(requiredCorrect))} domande su ${escapeHtml(String(questions.length))} (${escapeHtml(String(passScore))}%) per ottenere badge e certificazione interna OroActive Academy.</p>
           </div>
           <button type="button" class="academy-preview-close" data-close-course-preview aria-label="Chiudi test">×</button>
         </header>
@@ -10653,8 +10654,8 @@ async function submitCourseFinalExam(courseId) {
       ? ` Potrai ripetere il test dal ${formatDateTime(result.retry_available_at)}.`
       : " Potrai ripetere il test dopo 48 ore.";
     feedback.textContent = result.passed
-      ? `Test superato: ${result.score}%. Badge e certificato sono ora disponibili.`
-      : `Test non superato: ${result.score}%. Servono almeno ${result.pass_score}%.${retryText}`;
+      ? `Test superato: ${result.correct}/${result.total} risposte corrette (${result.score}%). Badge e certificato sono ora disponibili.`
+      : `Test non superato: ${result.correct}/${result.total} risposte corrette (${result.score}%). Servono almeno ${Math.ceil((Number(result.total || 0) * Number(result.pass_score || 0)) / 100)} risposte corrette su ${result.total}.${retryText}`;
   }
   if (!result.passed) {
     const submitButton = document.querySelector(`[data-submit-course-final-exam="${cssEscape(courseId)}"]`);

@@ -171,6 +171,8 @@ test("corsi base PDF OroActive Academy sono consultabili e test finale assegna b
   assert.match(server, /OROACTIVE-BASE-DIAMANTI/);
   assert.match(server, /Corso Base sui Diamanti — OroActive/);
   assert.match(server, /ensureOroActiveBaseAcademyCourses/);
+  assert.match(server, /OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE = 85/);
+  assert.match(server, /OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT = 17/);
   assert.match(server, /pdfRequiresFinalTest/);
   assert.match(server, /academyBaseSlidesRoute/);
   assert.match(server, /app\.get\("\/api\/academy\/courses\/:id\/slides\/download"/);
@@ -184,10 +186,19 @@ test("corsi base PDF OroActive Academy sono consultabili e test finale assegna b
   assert.match(server, /academy_certificates/);
   assert.match(server, /academy_badges/);
   assert.doesNotMatch(server, /Supera il test finale per sbloccare le slide PDF ufficiali/);
+  for (const code of ["OROACTIVE-BASE-ORO", "OROACTIVE-BASE-ARGENTO", "OROACTIVE-BASE-DIAMANTI"]) {
+    const start = server.indexOf(`code: "${code}"`);
+    assert.notEqual(start, -1);
+    const nextCourse = server.indexOf('code: "OROACTIVE-BASE-', start + 1);
+    const end = nextCourse === -1 ? server.indexOf("const aurumBlocksDefaultQuestions", start) : nextCourse;
+    const block = server.slice(start, end);
+    assert.equal((block.match(/question:/g) || []).length, 20);
+  }
 
   assert.match(app, /Sostieni test finale/);
   assert.match(app, /Test disponibile tra 48 ore/);
   assert.match(app, /Test finale richiesto per ottenere badge e certificazione/);
+  assert.match(app, /Rispondi correttamente ad almeno/);
   assert.match(app, /courseExamRetryMessage/);
   assert.match(app, /Visualizza Corso/);
   assert.match(app, /data-view-course-slides/);
