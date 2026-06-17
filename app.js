@@ -2495,6 +2495,7 @@ function showLogin() {
   loginScreen.hidden = false;
   splashScreen.classList.add("hidden");
   mainMenuScreen.hidden = true;
+  document.body.classList.remove("main-menu-active");
   closeMainMenuDropdowns();
   closeMainUserMenu();
   closeNotificationDropdown();
@@ -2509,9 +2510,10 @@ function showLogin() {
 
 function showAuthenticatedShell() {
   loginScreen.hidden = true;
-  appShell.hidden = false;
+  appShell.hidden = true;
   splashScreen.classList.remove("hidden");
   mainMenuScreen.hidden = true;
+  document.body.classList.remove("main-menu-active");
   syncNotificationPlacement();
 }
 
@@ -2593,7 +2595,6 @@ function tutorialRoleIntro() {
 
 function openPracticeForTutorial(step = 0) {
   splashScreen.classList.add("hidden");
-  mainMenuScreen.hidden = true;
   setScreen("practice");
   state.step = step;
   renderStep();
@@ -3905,6 +3906,7 @@ function setScreen(id) {
     showToast("Sezione non disponibile per il tuo ruolo.");
     return;
   }
+  prepareInternalSectionLayout();
   closeMainMenuDropdowns();
   closeMainUserMenu();
   const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
@@ -4314,23 +4316,82 @@ function openOroActiveWebsite() {
   window.open(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer");
 }
 
-function showMainMenuFromSplash() {
-  splashScreen.classList.add("hidden");
-  renderRoleBasedMenus();
+function safeScrollTopInstant() {
+  try {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  } catch {
+    window.scrollTo(0, 0);
+  }
+}
+
+function setMainMenuMode(active) {
+  document.body.classList.toggle("main-menu-active", active);
+  if (appShell) appShell.hidden = active;
+  if (mainMenuScreen) mainMenuScreen.hidden = !active;
+}
+
+function cleanupUiBeforeMainMenu() {
+  closeBrandMenu();
+  closeMainUserMenu();
+  closeNotificationDropdown();
+  closeMainMenuDropdowns();
   closeMainMenuSearchResults();
-  mainMenuScreen.hidden = false;
+  clearActSearch();
+  if (previewModal) previewModal.hidden = true;
+  if (tutorialOverlay) tutorialOverlay.hidden = true;
+  screens.forEach((screen) => screen.classList.remove("active-screen"));
+  navItems.forEach((item) => item.classList.remove("active"));
+  if (practiceTopbar) practiceTopbar.hidden = true;
+  if (bullionVaultChart) {
+    bullionVaultChart.innerHTML = "";
+    state.bullionChartLoaded = false;
+  }
+  if (typeof stopAurumBlocksLoop === "function") stopAurumBlocksLoop();
+  if (typeof updateAurumBlocksUiState === "function") updateAurumBlocksUiState(true);
+  document.body.classList.remove(
+    "modal-open",
+    "drawer-open",
+    "section-overlay-open",
+    "aurum-blocks-playing",
+    "aurum-blocks-paused",
+    "sale-deed-active",
+    "academy-view-active"
+  );
+  safeScrollTopInstant();
+}
+
+function openMainMenuCleanly(options = {}) {
+  const { renderMenus = true } = options;
+  loginScreen.hidden = true;
+  splashScreen.classList.add("hidden");
+  cleanupUiBeforeMainMenu();
+  if (renderMenus) renderRoleBasedMenus();
+  setMainMenuMode(true);
   syncNotificationPlacement();
   setAurumSection("menu");
   updateAurumMascotVisibility();
+}
+
+function prepareInternalSectionLayout() {
+  document.body.classList.remove("main-menu-active");
+  splashScreen.classList.add("hidden");
+  if (appShell) appShell.hidden = false;
+  if (mainMenuScreen) mainMenuScreen.hidden = true;
+  closeMainMenuDropdowns();
+  closeMainMenuSearchResults();
+  closeMainUserMenu();
+  syncNotificationPlacement();
+}
+
+function showMainMenuFromSplash() {
+  openMainMenuCleanly();
   maybeStartFirstRunTutorial();
 }
 
 async function enterSectionFromMainMenu(section) {
   const route = resolveSectionRoute(section);
   if (route.fusionView) state.fusionView = route.fusionView;
-  closeMainMenuSearchResults();
-  mainMenuScreen.hidden = true;
-  syncNotificationPlacement();
+  prepareInternalSectionLayout();
   setAurumSection(section);
   updateAurumMascotVisibility();
   if (route.screen === "practice") {
@@ -4378,14 +4439,7 @@ async function returnToMainMenu() {
       showToast("Atto di vendita in fase di compilazione archiviato. Puoi completarlo successivamente tramite Elenco.");
     }
   }
-  closeBrandMenu();
-  clearActSearch();
-  renderRoleBasedMenus();
-  closeMainMenuSearchResults();
-  mainMenuScreen.hidden = false;
-  syncNotificationPlacement();
-  setAurumSection("menu");
-  updateAurumMascotVisibility();
+  openMainMenuCleanly();
 }
 
 function askEditingExitChoice() {
@@ -4908,7 +4962,6 @@ function aurumTutorialAllowed(tutorialId = "") {
 
 function runAurumTutorialStepAction(step = {}) {
   if (step.screen) {
-    if (mainMenuScreen) mainMenuScreen.hidden = true;
     setScreen(step.screen);
   }
   if (Number.isInteger(step.practiceStep)) {
@@ -7401,8 +7454,6 @@ async function openNotificationById(id) {
     closeNotificationDropdown();
     const section = sectionFromNotificationAction(notification?.action_url || known?.action_url || "");
     if (section) {
-      if (mainMenuScreen) mainMenuScreen.hidden = true;
-      updateAurumMascotVisibility();
       setScreen(section);
     } else {
       showToast("Notifica segnata come letta.", "success");
@@ -17345,7 +17396,6 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
       setScreen("archive");
     }
   }
-  if (wasEditing && options.destination === "menu") mainMenuScreen.hidden = false;
   const successMessage = targetStatus === "archived_incomplete"
     ? "Atto archiviato. Puoi riaprirlo e completarlo dall'elenco."
     : targetStatus === "suspended"
@@ -17819,8 +17869,6 @@ notificationDropdown?.addEventListener("click", (event) => {
 markAllNotificationsRead?.addEventListener("click", markAllNotificationsAsRead);
 viewAllNotifications?.addEventListener("click", () => {
   closeNotificationDropdown();
-  if (mainMenuScreen) mainMenuScreen.hidden = true;
-  updateAurumMascotVisibility();
   setScreen("notifications");
 });
 notificationFilters?.addEventListener("submit", (event) => {
@@ -18000,7 +18048,7 @@ async function openBrandMenuItem(button) {
   }
   if (button.dataset.menuAction === "tutorial") {
     closeBrandMenu();
-    mainMenuScreen.hidden = true;
+    prepareInternalSectionLayout();
     updateAurumMascotVisibility();
     startTutorial({ firstRun: false });
     return;
@@ -18071,20 +18119,14 @@ document.querySelectorAll("[data-login-privacy]").forEach((button) => {
 mainUserDropdown?.addEventListener("click", (event) => {
   event.stopPropagation();
   if (event.target.closest("[data-user-profile]")) {
-    mainMenuScreen.hidden = true;
-    updateAurumMascotVisibility();
     setScreen("profile");
     return;
   }
   if (event.target.closest("[data-user-privacy]")) {
-    mainMenuScreen.hidden = true;
-    updateAurumMascotVisibility();
     setScreen("privacyCenter");
     return;
   }
   if (event.target.closest("[data-user-users]")) {
-    mainMenuScreen.hidden = true;
-    updateAurumMascotVisibility();
     setScreen("users");
     return;
   }
@@ -18097,7 +18139,7 @@ document.querySelectorAll("[data-start-tutorial]").forEach((button) => {
   button.addEventListener("click", () => {
     closeMainMenuDropdowns();
     closeBrandMenu();
-    if (!button.closest(".main-menu-actions")) mainMenuScreen.hidden = true;
+    if (!button.closest(".main-menu-actions")) prepareInternalSectionLayout();
     updateAurumMascotVisibility();
     startTutorial({ firstRun: false });
   });
@@ -18488,7 +18530,6 @@ previewBody.addEventListener("click", async (event) => {
   }
   if (event.target.closest("[data-open-privacy-center]")) {
     previewModal.hidden = true;
-    mainMenuScreen.hidden = true;
     setScreen("privacyCenter");
     return;
   }
