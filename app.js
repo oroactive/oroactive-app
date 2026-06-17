@@ -8938,11 +8938,7 @@ function resetTrainingCourseFormValues() {
 
 function renderCourseSummary() {
   if (!courseSummary) return;
-  const progresses = state.courseProgress || [];
-  const average = progresses.length
-    ? Math.round(progresses.reduce((sum, item) => sum + Number(item.percentuale || 0), 0) / progresses.length)
-    : 0;
-  courseSummary.innerHTML = `<span>Livello ${escapeHtml(operatorAcademyLevel())}</span><strong>${average}%</strong><small>Completamento medio</small>`;
+  courseSummary.innerHTML = `<span>Livello ${escapeHtml(operatorAcademyLevel())}</span><strong>Test finali</strong><small>Badge e certificazioni</small>`;
 }
 
 const ACADEMY_TAB_LABELS = {
@@ -9174,7 +9170,7 @@ function renderTraining() {
           <div>
             <span class="course-pill">Storico formazione</span>
             <h3>${escapeHtml(course.title || "Corso OroActive")}</h3>
-            <p>${escapeHtml(progress.status || "non iniziato")} · ${Number(progress.percentuale || 0)}% · Ultimo accesso ${progress.last_access_at ? new Date(progress.last_access_at).toLocaleDateString("it-IT") : "Dato non inserito"}</p>
+            <p>${escapeHtml(progress.status || "non iniziato")} · Ultimo accesso ${progress.last_access_at ? new Date(progress.last_access_at).toLocaleDateString("it-IT") : "Dato non inserito"}</p>
           </div>
           <strong>${escapeHtml(course.faculty_name || "Academy")}</strong>
         </article>
@@ -9284,8 +9280,6 @@ function courseExamRetryMessage(course = {}) {
 }
 
 function renderCourseCard(course) {
-  const progress = courseProgressFor(course.id);
-  const percent = Math.max(0, Math.min(100, Number(progress.percentuale || course.percentuale || 0)));
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = courseSlidesUrl(course);
   const finalExamQuestions = courseFinalExamQuestions(course);
@@ -9327,8 +9321,6 @@ function renderCourseCard(course) {
         </div>
       </div>
       <div class="course-progress-panel">
-        <div class="course-progress"><span style="width:${percent}%"></span></div>
-        <strong>${percent}%</strong>
         ${hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}" ${course.final_exam_retry_blocked ? "disabled" : ""}>${course.final_exam_retry_blocked ? "Test disponibile tra 48 ore" : "Sostieni test finale"}</button>` : ""}
         ${hasFinalExam && examPassed ? `<button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(course.certificate_id || ""))}" ${course.certificate_id ? "" : "disabled"}>Scarica certificato</button>` : ""}
       </div>

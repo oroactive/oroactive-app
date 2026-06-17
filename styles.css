@@ -4651,18 +4651,9 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   gap: 10px;
 }
 
-.course-progress {
-  height: 12px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-}
-
-.course-progress span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #ff6a00, #d4af37);
+.academy-course-card .course-progress,
+.academy-course-card .course-progress-panel > strong {
+  display: none !important;
 }
 
 .badge-card {
