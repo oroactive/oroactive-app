@@ -4840,6 +4840,56 @@ function aurumNormalize(value = "") {
     .trim();
 }
 
+function isAurumNormativeQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  const hasNormativeIntent = /(legge|normativa|decreto|d lgs|dlgs|legislativo|antiriciclaggio|adempiment|obblig|norma|compliance|compro oro|registro|questura|oro usato)/.test(normalized);
+  const hasQuestionIntent = /(quale|quando|anno|emessa|emanata|ultima|recente|cosa dice|spiegami|riguarda|devo|bisogna|obbliga|prevede)/.test(normalized);
+  return hasNormativeIntent && hasQuestionIntent;
+}
+
+function isAurumNormativeAnswerAdequate(answer = "") {
+  const normalized = aurumNormalize(answer);
+  if (!normalized) return false;
+  return /(decreto legislativo|d lgs|dlgs|normativa|legge)/.test(normalized)
+    && /(2017|92|2024|211|compro oro|antiriciclaggio)/.test(normalized);
+}
+
+function buildAurumNormativeAnswer(question = "") {
+  const normalized = aurumNormalize(question);
+  const asksLatest = /(ultima|ultimo|recente|nuova|aggiornat|2024)/.test(normalized);
+  const asksYear = /(anno|quando|emessa|emanata|fatta)/.test(normalized);
+  const opening = asksYear && !asksLatest
+    ? "La normativa organica di riferimento per i compro oro e stata emanata nel 2017: Decreto Legislativo 25 maggio 2017, n. 92."
+    : asksLatest
+      ? "Nel materiale normativo caricato in OroActive il riferimento piu recente e il Decreto Legislativo 10 dicembre 2024, n. 211; il quadro base per i compro oro resta il Decreto Legislativo 25 maggio 2017, n. 92."
+      : "Per i compro oro il riferimento operativo principale caricato in Aurum e il Decreto Legislativo 25 maggio 2017, n. 92, con aggiornamenti normativi successivi presenti nei materiali OroActive.";
+
+  return [
+    "Risposta normativa OroActive",
+    "",
+    opening,
+    "",
+    "In pratica, per l'operatore significa lavorare sempre con questi controlli minimi:",
+    "1. identificare correttamente il cliente e verificare il documento;",
+    "2. registrare l'operazione con descrizione chiara degli oggetti, metallo, titolo/caratura, peso e prezzo;",
+    "3. conservare documenti, foto, firme e tracciabilita secondo procedura OroActive;",
+    "4. rispettare limiti, mezzi di pagamento e controlli antiriciclaggio previsti dalle policy interne;",
+    "5. sospendere o far autorizzare la pratica quando emergono anomalie, documenti scaduti, operazioni frazionate o rischio Aurum Shield.",
+    "",
+    "Se la domanda riguarda l'ultima norma caricata: il documento piu recente nei materiali Aurum e il D.Lgs. 211/2024. Se invece chiedi la legge base dei compro oro, la risposta e il 2017, D.Lgs. 92/2017.",
+    "",
+    "Nota: questa e una spiegazione operativa interna, non consulenza legale. Per decisioni formali usa sempre il testo ufficiale e le procedure approvate dal Founder."
+  ].join("\n");
+}
+
+function isAurumFieldHelpQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  if (/(questo campo|campo selezionato|campo attuale|spiegami.*campo|a cosa serve.*campo|cosa significa.*campo|che significa.*campo)/.test(normalized)) return true;
+  return /(campo|voce|selezione|input|form|compilare|inserire|dove scrivo|dove metto)/.test(normalized);
+}
+
 function aurumSectionKey(section = state.aurumCurrentSection) {
   return AURUM_SECTION_MAP[section] || section || "nuovo_atto_vendita";
 }
@@ -4914,6 +4964,7 @@ function aurumFieldByQuestion(question = "") {
   const normalized = aurumNormalize(question);
   const activeKey = document.activeElement?.closest?.("[data-aurum-help]")?.dataset?.aurumHelp || "";
   if (/questo campo|campo selezionato|campo attuale/.test(normalized) && activeKey) return activeKey;
+  if (!isAurumFieldHelpQuestion(question)) return "";
   return Object.entries(AURUM_FIELD_HELP).find(([, help]) => (
     help.labels.some((label) => normalized.includes(aurumNormalize(label)))
   ))?.[0] || "";
@@ -5998,11 +6049,12 @@ function evaluateAurumQuizAnswer(answer = "") {
 function aurumContextPayload(question) {
   const guide = currentAurumGuide();
   const tutorialId = inferAurumTutorialId(question);
+  const normativeQuestion = isAurumNormativeQuestion(question);
   const isPriceExplanation = state.aurumMode === "price_explanation";
   return {
     domanda: question,
     message: question,
-    mode: isPriceExplanation ? "price_explanation" : tutorialId ? "tutorial_operativo" : "chat",
+    mode: isPriceExplanation ? "price_explanation" : normativeQuestion ? "normativa_operativa" : tutorialId ? "tutorial_operativo" : "chat",
     interface: "aurum_operational_tutor",
     section: isPriceExplanation ? "quotazione" : aurumSectionKey(),
     userId: state.currentUser?.id || null,
@@ -6029,6 +6081,15 @@ function aurumContextPayload(question) {
       tutorialRequested: Boolean(tutorialId),
       tutorialId,
       priceExplanationContext: isPriceExplanation ? state.aurumPriceContext : null,
+      normativeContext: normativeQuestion ? {
+        documenti: [
+          "Decreto Legislativo 25 maggio 2017, n. 92",
+          "Decreto Legislativo 10 dicembre 2024, n. 211",
+          "Normativa e legislazione 2017",
+          "Normativa e legislazione 2023"
+        ],
+        rispostaLocale: buildAurumNormativeAnswer(question)
+      } : null,
       availableMemories: (state.aurumMemories || []).map((memory) => memory.memory_text).filter(Boolean).slice(0, 8)
     }
   };
@@ -6053,6 +6114,7 @@ async function askAurum(event) {
   }
 
   recordAurumInteractionMemory("user_question", question, `Sezione: ${aurumSectionKey()}`);
+  const normativeQuestion = isAurumNormativeQuestion(question);
 
   if (/(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
     startAurumCuriosityQuiz();
@@ -6064,7 +6126,7 @@ async function askAurum(event) {
     return;
   }
 
-  if (handleAurumTutorRequest(question)) {
+  if (!normativeQuestion && handleAurumTutorRequest(question)) {
     return;
   }
 
@@ -6078,14 +6140,18 @@ async function askAurum(event) {
     });
     state.aurumMessages.push({
       role: "assistant",
-      content: data.risposta || "Risposta non disponibile.",
+      content: normativeQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
+        ? buildAurumNormativeAnswer(question)
+        : data.risposta || "Risposta non disponibile.",
       source: data.fonte || ""
     });
     showAurumMemoryConsent(detectAurumMemoryCandidate(question));
   } catch (error) {
     state.aurumMessages.push({
       role: "assistant",
-      content: error.message || "Aurum non riesce a contattare l'Assistente IA in questo momento."
+      content: normativeQuestion
+        ? buildAurumNormativeAnswer(question)
+        : error.message || "Aurum non riesce a contattare l'Assistente IA in questo momento."
     });
   } finally {
     state.aurumSending = false;

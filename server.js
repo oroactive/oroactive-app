@@ -7914,6 +7914,51 @@ async function webSearchFallback(question = "") {
   return { available: false, results: [] };
 }
 
+function normalizeAssistantIntentText(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isComproOroNormativeQuestion(question = "") {
+  const normalized = normalizeAssistantIntentText(question);
+  if (!normalized) return false;
+  const hasNormativeIntent = /(legge|normativa|decreto|d lgs|dlgs|legislativo|antiriciclaggio|adempiment|obblig|norma|compliance|compro oro|registro|questura|oro usato)/.test(normalized);
+  const hasQuestionIntent = /(quale|quando|anno|emessa|emanata|ultima|recente|cosa dice|spiegami|riguarda|devo|bisogna|obbliga|prevede)/.test(normalized);
+  return hasNormativeIntent && hasQuestionIntent;
+}
+
+function buildComproOroNormativeAnswer(question = "") {
+  const normalized = normalizeAssistantIntentText(question);
+  const asksLatest = /(ultima|ultimo|recente|nuova|aggiornat|2024)/.test(normalized);
+  const asksYear = /(anno|quando|emessa|emanata|fatta)/.test(normalized);
+  const opening = asksYear && !asksLatest
+    ? "La normativa organica di riferimento per i compro oro e stata emanata nel 2017: Decreto Legislativo 25 maggio 2017, n. 92."
+    : asksLatest
+      ? "Nel materiale normativo caricato in OroActive il riferimento piu recente e il Decreto Legislativo 10 dicembre 2024, n. 211; il quadro base per i compro oro resta il Decreto Legislativo 25 maggio 2017, n. 92."
+      : "Per i compro oro il riferimento operativo principale caricato in Aurum e il Decreto Legislativo 25 maggio 2017, n. 92, con aggiornamenti normativi successivi presenti nei materiali OroActive.";
+
+  return [
+    "Risposta normativa OroActive",
+    "",
+    opening,
+    "",
+    "Per l'operatore OroActive questo si traduce in una gestione rigorosa della pratica:",
+    "1. identificazione del cliente e verifica del documento;",
+    "2. registrazione completa dell'operazione, con oggetti, metallo, titolo/caratura, peso e importo;",
+    "3. conservazione di documenti, foto, firme e tracciabilita secondo procedura interna;",
+    "4. rispetto di mezzi di pagamento, limiti, controlli antiriciclaggio e policy del Founder;",
+    "5. blocco, sospensione o richiesta di autorizzazione quando emergono anomalie, documenti scaduti, pagamenti non coerenti o rischio Aurum Shield.",
+    "",
+    "Se la domanda riguarda l'ultima norma caricata, il riferimento piu recente nei materiali Aurum e il D.Lgs. 211/2024. Se invece riguarda la legge base dei compro oro, la risposta e il 2017, D.Lgs. 92/2017.",
+    "",
+    "Questa e una spiegazione operativa interna e non sostituisce il testo ufficiale della norma o una consulenza legale."
+  ].join("\n");
+}
+
 async function askOroActiveAssistant(question = "", options = {}) {
   const domanda = String(question || "").trim();
   if (!domanda) {
@@ -7935,10 +7980,16 @@ async function askOroActiveAssistant(question = "", options = {}) {
       ? "tutorial_operativo"
       : options.mode === "price_explanation"
         ? "price_explanation"
-        : "chat";
+        : options.mode === "normativa_operativa"
+          ? "normativa_operativa"
+          : "chat";
   const aurumContext = sanitizeForPostgres(options.context || {});
+  const isNormativeQuestion = mode === "normativa_operativa" || isComproOroNormativeQuestion(domanda);
   const priceExplanationContext = aurumContext.priceExplanationContext && typeof aurumContext.priceExplanationContext === "object"
     ? aurumContext.priceExplanationContext
+    : {};
+  const normativeContext = aurumContext.normativeContext && typeof aurumContext.normativeContext === "object"
+    ? aurumContext.normativeContext
     : {};
   const aurumMemories = Array.isArray(aurumContext.availableMemories)
     ? aurumContext.availableMemories.map((item) => String(item || "").slice(0, 240)).filter(Boolean).slice(0, 8)
@@ -7967,6 +8018,9 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const priceExplanationText = mode === "price_explanation"
     ? `Modalita prezzo: spiega il prezzo in modo operativo da compro oro. Contesto prezzo JSON senza dati cliente:\n${JSON.stringify(priceExplanationContext).slice(0, 8000)}`
     : "";
+  const normativeText = isNormativeQuestion
+    ? `Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nFallback operativo:\n${buildComproOroNormativeAnswer(domanda)}`
+    : "";
   const context = chunks.map((chunk, index) => (
     `[Fonte ${index + 1}: ${aiChunkSourceLabel(chunk)} - ${chunk.titolo || "Knowledge base"}, chunk ${chunk.chunk_index}]\n${chunk.content}`
   )).join("\n\n---\n\n");
@@ -7975,6 +8029,21 @@ async function askOroActiveAssistant(question = "", options = {}) {
   )).join("\n\n---\n\n");
 
   if (!openai) {
+    if (isNormativeQuestion) {
+      return {
+        risposta: buildComproOroNormativeAnswer(domanda),
+        fonte: "Normativa e documentazione OroActive",
+        dal_libro: false,
+        citazioni: [],
+        risultati: chunks.map((chunk) => ({
+          titolo: chunk.titolo,
+          autore: chunk.autore,
+          chunk_index: chunk.chunk_index,
+          score: Number(chunk.score || 0)
+        })),
+        error: "OpenAI non configurato"
+      };
+    }
     return {
       risposta: "Questa informazione non è presente nella knowledge base OroActive.",
       fonte: web.available && web.results?.length ? "Fonti interne non sufficienti, risposta basata su ricerca esterna" : hasAcademyContext ? "Procedura OroActive approvata" : hasApprovedKnowledge ? (hasBookContext ? "La bilancia d'oro + Procedura OroActive approvata" : "Procedura OroActive approvata") : hasBookContext ? "La bilancia d'oro" : "Integrazione generale",
@@ -7994,7 +8063,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const client = openai;
     const result = await client.responses.create({
       model: openaiModel,
-      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.`}
+      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Prima di rispondere devi capire l'intento reale della domanda: normativa, procedura, campo dell'app, prezzo, corso o supporto generale. Rispondi alla domanda dell'utente, non al campo visibile sullo schermo, salvo quando l'utente chiede esplicitamente "questo campo" o "spiegami il campo". Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}${isNormativeQuestion ? " Quando la domanda riguarda legge, normativa, decreti, antiriciclaggio o compro oro, rispondi prima con il riferimento normativo corretto e poi con gli effetti pratici per l'operatore. Non trasformare una domanda normativa in una spiegazione di un campo app." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.`}
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Usa prima il libro "La bilancia d'oro" di Christian Dinato, poi le procedure/conoscenze OroActive approvate.
 Le conoscenze OroActive approvate possono essere piu recenti e operative del libro: se sono piu dettagliate, integrale alla risposta senza ignorarle.
@@ -8004,13 +8073,16 @@ Se il contesto non contiene abbastanza informazioni e non sono presenti risultat
 Non inventare fonti web aggiornate: usa soltanto i risultati web forniti nel contesto.
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
-Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : mode === "price_explanation" ? "Spiegazione prezzo Quotazione. Rispondi con questa struttura: titolo, punto di partenza, calcolo purezza, valore teorico, costi e rientro compro oro, massimo pagabile, prezzo consigliato, fluttuazione prevista, confronto competitor se disponibile, avviso finale. Usa solo i dati nel contesto prezzo; se un dato manca, dichiaralo." : "Assistente operativo."}
+Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : mode === "price_explanation" ? "Spiegazione prezzo Quotazione. Rispondi con questa struttura: titolo, punto di partenza, calcolo purezza, valore teorico, costi e rientro compro oro, massimo pagabile, prezzo consigliato, fluttuazione prevista, confronto competitor se disponibile, avviso finale. Usa solo i dati nel contesto prezzo; se un dato manca, dichiaralo." : mode === "normativa_operativa" ? "Normativa operativa. Rispondi con il riferimento normativo, anno, decreto, implicazioni operative e avviso di verifica professionale. Se il contesto e parziale, usa i riferimenti normativi caricati e dichiarane il limite." : "Assistente operativo."}
 
 CONTESTO APP AURUM:
 ${aurumSectionContext || "Nessun contesto app fornito."}
 
 CONTESTO PREZZO AURUM:
 ${priceExplanationText || "Nessun contesto prezzo specifico."}
+
+CONTESTO NORMATIVO AURUM:
+${normativeText || "Nessun contesto normativo specifico."}
 
 CONTESTO KNOWLEDGE BASE:
 ${hasContext ? context : "Nessun passaggio trovato per questa domanda."}
@@ -8045,6 +8117,21 @@ ${domanda}`,
       web: { available: Boolean(web.available), provider: web.provider || "", results: web.results || [] }
     };
   } catch (error) {
+    if (isNormativeQuestion) {
+      return {
+        risposta: buildComproOroNormativeAnswer(domanda),
+        fonte: "Normativa e documentazione OroActive",
+        dal_libro: false,
+        citazioni: [],
+        risultati: chunks.map((chunk) => ({
+          titolo: chunk.titolo,
+          autore: chunk.autore,
+          chunk_index: chunk.chunk_index,
+          score: Number(chunk.score || 0)
+        })),
+        error: error.message || "OpenAI non disponibile"
+      };
+    }
     return {
       risposta: web.available && web.results?.length
         ? "Ho trovato risultati web, ma l'AI non ha completato la risposta. Riprova tra poco."
