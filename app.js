@@ -397,10 +397,10 @@ const OROACTIVE_APP_GUIDE = {
   },
   academy: {
     title: "OroActive Academy",
-    description: "Catalogo corsi, avanzamento, certificazioni, badge e gestione formazione.",
-    fields: ["catalogo corsi", "i miei corsi", "certificazioni", "badge", "storico formazione", "materiali"],
-    actions: ["apri corso", "completa corso", "sostieni esame", "crea/modifica corso", "carica materiali"],
-    steps: ["Apri catalogo Academy", "Scegli corso o facoltà", "Completa lezioni e materiali", "Sostieni verifica se prevista", "Controlla badge e certificazioni"],
+    description: "Catalogo corsi, certificazioni, badge e gestione formazione.",
+    fields: ["catalogo corsi", "certificazioni", "badge", "materiali"],
+    actions: ["apri corso", "sostieni esame", "modifica corso", "elimina corso"],
+    steps: ["Apri catalogo Academy", "Scegli un corso disponibile", "Consulta materiali e lezioni", "Sostieni verifica se prevista", "Controlla badge e certificazioni"],
     checks: ["materiali validi", "corso attivo", "permesso gestione Academy"],
     commonErrors: ["file non valido", "corso non trovato", "permesso insufficiente"],
     permissions: ["commesso", "responsabile", "supervisore", "founder"]
@@ -662,11 +662,10 @@ const AURUM_LIVE_TUTORIALS = {
     title: "OroActive Academy",
     intro: "Ti spiego catalogo, corsi, badge e certificazioni.",
     steps: [
-      { title: "Catalogo", text: "Apri il catalogo e scegli corso o facoltà.", screen: "training", selector: "#trainingList" },
-      { title: "I miei corsi", text: "Controlla avanzamento e materiali da completare.", screen: "training", selector: "#courseSummary" },
+      { title: "Catalogo", text: "Apri il catalogo e scegli un corso disponibile.", screen: "training", selector: "#trainingList" },
       { title: "Certificazioni", text: "Le certificazioni confermano percorsi o esami completati.", screen: "training", selector: "#courseSummary" },
       { title: "Badge", text: "I badge mostrano competenze e traguardi interni.", screen: "training", selector: "#courseSummary" },
-      { title: "Gestione Academy", text: "Solo ruoli autorizzati possono creare o modificare corsi e materiali.", screen: "training", selector: "#trainingCourseForm" }
+      { title: "Gestione Academy", text: "Solo ruoli autorizzati possono visualizzare, modificare o eliminare corsi.", screen: "training", selector: "#trainingList" }
     ]
   },
   tutorial_backup: {
@@ -3148,7 +3147,7 @@ const MENU_GROUPS = [
     order: 30,
     roles: MENU_ROLES.all,
     items: [
-      { id: "academy", label: "OroActive Academy", description: "Ingresso unico a catalogo, corsi, certificazioni, badge, storico e training.", icon: "OA", order: 10, section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo academy corsi miei corsi certificazioni attestati badge storico formazione training operatore gestione academy" },
+      { id: "academy", label: "OroActive Academy", description: "Ingresso unico a catalogo, certificazioni, badge e training.", icon: "OA", order: 10, section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo academy corsi certificazioni attestati badge training operatore gestione academy" },
       { id: "gold-coin-encyclopedia", label: "Elenco Monete", description: "Enciclopedia monete d'oro con schede, storia e ricerca fotografica AI.", icon: "EM", order: 60, section: "coinEncyclopedia", roles: MENU_ROLES.all, keywords: "elenco monete monete oro enciclopedia numismatica sterlina marengo krugerrand sovereign riconoscimento fotocamera" },
       { id: "gaming-oroactive", label: "Gaming OroActive", description: "Aurum Blocks arcade formativo.", icon: "GO", order: 70, section: "gaming", roles: MENU_ROLES.all, keywords: "gaming oroactive giochi arcade formazione punteggi carature" },
       { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "AI", order: 80, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
@@ -8932,8 +8931,9 @@ function resetTrainingCourseFormValues() {
   if (trainingCourseThumbnailFile) trainingCourseThumbnailFile.value = "";
   if (trainingCourseVideoFile) trainingCourseVideoFile.value = "";
   if (trainingCoursePdfFile) trainingCoursePdfFile.value = "";
-  if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Crea corso";
+  if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva modifiche";
   if (trainingCoursePreviewButton) trainingCoursePreviewButton.hidden = true;
+  trainingCourseForm.hidden = true;
 }
 
 function renderCourseSummary() {
@@ -8943,10 +8943,8 @@ function renderCourseSummary() {
 
 const ACADEMY_TAB_LABELS = {
   catalog: "Catalogo Academy",
-  mine: "I miei corsi",
   certifications: "Certificazioni",
   badges: "Badge",
-  history: "Storico formazione",
   operatorTraining: "Training Operatore",
   management: "Gestione Academy"
 };
@@ -9132,12 +9130,16 @@ function renderOperatorTraining() {
 
 function renderTraining() {
   if (!trainingList) return;
+  if (!ACADEMY_TAB_LABELS[state.courseActiveTab]) {
+    state.courseActiveTab = "catalog";
+  }
   renderCourseSummary();
   updateAcademyLocation();
   if (trainingCourseForm) {
-    trainingCourseForm.hidden = !(state.courseActiveTab === "management" && canManageCoursesUi());
+    const editingCourseId = document.getElementById("trainingCourseId")?.value;
+    trainingCourseForm.hidden = !(state.courseActiveTab === "management" && canManageCoursesUi() && editingCourseId);
   }
-  if (courseToolbar) courseToolbar.hidden = state.courseActiveTab === "operatorTraining";
+  if (courseToolbar) courseToolbar.hidden = !["catalog", "management"].includes(state.courseActiveTab);
   document.querySelectorAll("[data-course-tab]").forEach((button) => {
     button.classList.toggle("active", button.dataset.courseTab === state.courseActiveTab);
   });
@@ -9156,30 +9158,6 @@ function renderTraining() {
     return matchesSearch && matchesCategory;
   });
 
-  if (state.courseActiveTab === "mine") {
-    const mine = visibleCourses.filter((course) => Number(courseProgressFor(course.id).percentuale || 0) > 0 || courseProgressFor(course.id).status);
-    trainingList.innerHTML = mine.length ? mine.map(renderCourseCard).join("") : '<div class="empty-state">Non hai ancora iniziato corsi.</div>';
-    return;
-  }
-
-  if (state.courseActiveTab === "history") {
-    const rows = (state.courseProgress || []).map((progress) => {
-      const course = state.trainingCourses.find((item) => String(item.id) === String(progress.course_id)) || {};
-      return `
-        <article class="course-card badge-card">
-          <div>
-            <span class="course-pill">Storico formazione</span>
-            <h3>${escapeHtml(course.title || "Corso OroActive")}</h3>
-            <p>${escapeHtml(progress.status || "non iniziato")} · Ultimo accesso ${progress.last_access_at ? new Date(progress.last_access_at).toLocaleDateString("it-IT") : "Dato non inserito"}</p>
-          </div>
-          <strong>${escapeHtml(course.faculty_name || "Academy")}</strong>
-        </article>
-      `;
-    });
-    trainingList.innerHTML = rows.length ? rows.join("") : '<div class="empty-state">Nessuno storico formazione disponibile.</div>';
-    return;
-  }
-
   if (state.courseActiveTab === "management") {
     if (!canManageCoursesUi()) {
       trainingList.innerHTML = '<div class="empty-state">Gestione Academy riservata al Founder.</div>';
@@ -9188,41 +9166,16 @@ function renderTraining() {
     const facultyOptions = (state.courseFaculties || []).map((faculty) => `<option>${escapeHtml(faculty.name)}</option>`).join("");
     const facultySelect = document.getElementById("trainingCourseFaculty");
     if (facultySelect && facultyOptions) facultySelect.innerHTML = facultyOptions;
-    const facultyRows = (state.courseFaculties || []).map((faculty) => `
-      <article class="course-card badge-card">
-        <div>
-          <span class="course-pill">Facoltà</span>
-          <h3>${escapeHtml(faculty.name)}</h3>
-          <p>${escapeHtml(faculty.description || "Facoltà Academy")}</p>
-        </div>
-        <div class="course-progress-panel">
-          <strong>${state.trainingCourses.filter((course) => course.faculty_name === faculty.name).length} corsi</strong>
-        </div>
-      </article>
-    `);
     const courseRows = visibleCourses.length ? visibleCourses.map(renderCourseCard).join("") : "";
     trainingList.innerHTML = `
       <article class="course-card academy-course-card">
         <div>
           <span class="course-pill">Gestione Academy</span>
-          <h3>Crea facoltà</h3>
-          <p>Le facoltà ordinano corsi, moduli, lezioni e certificazioni come una piccola università interna.</p>
-          <div class="academy-faculty-form">
-            <input id="academyFacultyName" placeholder="Nome facoltà">
-            <input id="academyFacultyDescription" placeholder="Descrizione facoltà">
-            <button class="primary-button" type="button" data-create-academy-faculty>Crea facoltà</button>
-          </div>
+          <h3>Corsi disponibili</h3>
+          <p>Visualizza i corsi presenti in Academy, modifica i contenuti oppure elimina quelli non più necessari.</p>
         </div>
       </article>
-      <article class="course-card badge-card">
-        <div>
-          <span class="course-pill">Catalogo</span>
-          <h3>Corsi Academy</h3>
-          <p>Qui vedi i corsi disponibili nel catalogo Academy.</p>
-        </div>
-      </article>
-      ${courseRows || '<div class="empty-state">Nessun corso attivo.</div>'}
-      ${facultyRows.join("") || '<div class="empty-state">Nessuna facoltà configurata.</div>'}
+      ${courseRows || '<div class="empty-state">Nessun corso disponibile.</div>'}
     `;
     return;
   }
@@ -9290,6 +9243,13 @@ function renderCourseCard(course) {
   const isUploadedVideo = /^\/api\/academy\/materials\/file\//.test(String(videoUrl)) || /\.(mp4|mov)(\?|#|$)/i.test(String(videoUrl));
   const moduleTitle = course.academy_module_title || course.module_title || course.section_title || "Modulo introduttivo";
   const lessonTitle = course.academy_lesson_title || course.lesson_title || "Lezione principale";
+  const showManagementActions = state.courseActiveTab === "management" && canManageCoursesUi();
+  const managementActions = showManagementActions ? `
+    <div class="academy-course-admin-actions">
+      <button type="button" data-edit-course="${escapeHtml(String(course.id))}">Modifica</button>
+      <button class="danger-button" type="button" data-delete-course="${escapeHtml(String(course.id))}">Elimina</button>
+    </div>
+  ` : "";
   const testStatus = hasFinalExam
     ? examPassed
       ? `<span class="academy-test-status passed">Test finale superato${course.final_exam_score ? ` · ${escapeHtml(String(course.final_exam_score))}%` : ""}</span>`
@@ -9318,6 +9278,7 @@ function renderCourseCard(course) {
             <button type="button" data-view-course-slides="${escapeHtml(String(course.id))}">Visualizza Corso</button>
             <button type="button" data-download-course-slides="${escapeHtml(String(course.id))}">Scarica PDF corso</button>
           ` : ""}
+          ${managementActions}
         </div>
       </div>
       <div class="course-progress-panel">
@@ -10568,16 +10529,20 @@ async function createTrainingCourse(event) {
   event.preventDefault();
   if (!canManageCoursesUi()) return;
   const id = document.getElementById("trainingCourseId")?.value;
+  if (!id) {
+    showToast("Seleziona un corso da Gestione Academy per modificarlo.", "warning");
+    return;
+  }
   const payload = await trainingCourseFormPayload();
-  const savedCourse = await apiRequest(id ? `/corsi/${encodeURIComponent(id)}` : "/corsi", {
-    method: id ? "PUT" : "POST",
+  const savedCourse = await apiRequest(`/corsi/${encodeURIComponent(id)}`, {
+    method: "PUT",
     body: JSON.stringify(payload)
   });
   mergeTrainingCourseInState(savedCourse, payload);
   resetTrainingCourseFormValues();
   renderTraining();
   await loadTraining();
-  showToast(id ? "Corso aggiornato correttamente" : "Corso creato.");
+  showToast("Corso aggiornato correttamente.");
 }
 
 async function updateCourseProgress(courseId) {
@@ -10799,9 +10764,10 @@ function editCourse(courseId) {
   document.getElementById("trainingCourseMaterial").value = course.material_url || "";
   document.getElementById("trainingCourseActive").checked = course.active !== false;
   document.getElementById("trainingCourseCertification").checked = course.final_certification !== false;
-  if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva bozza";
-  if (trainingCoursePreviewButton) trainingCoursePreviewButton.hidden = false;
+  if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva modifiche";
+  if (trainingCoursePreviewButton) trainingCoursePreviewButton.hidden = true;
   renderTraining();
+  if (trainingCourseForm) trainingCourseForm.hidden = false;
   trainingCourseForm?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -17629,6 +17595,7 @@ courseCategoryFilter?.addEventListener("change", renderTraining);
 document.querySelectorAll("[data-course-tab]").forEach((button) => {
   button.addEventListener("click", () => {
     state.courseActiveTab = button.dataset.courseTab || "catalog";
+    if (state.courseActiveTab !== "management") resetTrainingCourseFormValues();
     renderTraining();
   });
 });
@@ -17642,7 +17609,8 @@ trainingList?.addEventListener("click", async (event) => {
   const viewSlides = event.target.closest("[data-view-course-slides]");
   const downloadSlides = event.target.closest("[data-download-course-slides]");
   const certificate = event.target.closest("[data-download-certificate]");
-  const createFaculty = event.target.closest("[data-create-academy-faculty]");
+  const editCourseButton = event.target.closest("[data-edit-course]");
+  const deleteCourseButton = event.target.closest("[data-delete-course]");
   try {
     if (startOperator) return await withButtonBusy(startOperator, "Avvio...", () => startOperatorTraining(startOperator.dataset.startOperatorTraining));
     if (saveOperator) return await withButtonBusy(saveOperator, "Salvo...", () => saveOperatorTrainingProgress(saveOperator.dataset.saveOperatorTraining));
@@ -17661,7 +17629,11 @@ trainingList?.addEventListener("click", async (event) => {
     if (viewSlides) return await withButtonBusy(viewSlides, "Apro...", () => downloadCourseSlides(viewSlides.dataset.viewCourseSlides, { download: false }));
     if (downloadSlides) return await withButtonBusy(downloadSlides, "Scarico...", () => downloadCourseSlides(downloadSlides.dataset.downloadCourseSlides, { download: true }));
     if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
-    if (createFaculty) return await createAcademyFaculty();
+    if (editCourseButton) {
+      editCourse(editCourseButton.dataset.editCourse);
+      return;
+    }
+    if (deleteCourseButton) return await withButtonBusy(deleteCourseButton, "Elimino...", () => deleteCourse(deleteCourseButton.dataset.deleteCourse));
   } catch (error) {
     showToast(error.message || "Operazione corso non riuscita.");
   }

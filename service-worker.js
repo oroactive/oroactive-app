@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260617-academy-no-course-percent-2";
+const STATIC_CACHE = "oroactive-static-v20260618-academy-simplified-catalog-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260617-academy-no-course-percent-2",
-  "/app.js?v=20260617-academy-no-course-percent-2",
+  "/styles.css?v=20260618-academy-simplified-catalog-1",
+  "/app.js?v=20260618-academy-simplified-catalog-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

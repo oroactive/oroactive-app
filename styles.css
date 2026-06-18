@@ -2074,6 +2074,10 @@ textarea:disabled {
   margin-bottom: 18px;
 }
 
+.course-editor[hidden] {
+  display: none !important;
+}
+
 .course-editor textarea,
 .course-editor .user-form-actions {
   grid-column: 1 / -1;
@@ -4423,7 +4427,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
 
 .academy-course-admin-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 4px;
 }

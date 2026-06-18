@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260617-academy-no-course-percent-2">
+  <link rel="stylesheet" href="styles.css?v=20260618-academy-simplified-catalog-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -1292,7 +1292,7 @@
           <div>
             <p class="eyebrow">Università aziendale interna</p>
             <h2>OroActive Academy</h2>
-            <p class="muted">Facoltà, corsi, moduli, lezioni, materiali, certificazioni e livelli operatore.</p>
+            <p class="muted">Corsi disponibili, materiali, certificazioni, badge e livelli operatore.</p>
           </div>
           <div class="course-summary" id="courseSummary">
             <span>Academy</span>
@@ -1301,15 +1301,13 @@
         </div>
         <div class="course-tabs" role="tablist" aria-label="Sezioni OroActive Academy">
           <button class="active" type="button" data-course-tab="catalog">Catalogo Academy</button>
-          <button type="button" data-course-tab="mine">I miei corsi</button>
           <button type="button" data-course-tab="certifications">Certificazioni</button>
           <button type="button" data-course-tab="badges">Badge</button>
-          <button type="button" data-course-tab="history">Storico formazione</button>
           <button type="button" data-course-tab="operatorTraining">Training Operatore</button>
           <button class="founder-only" type="button" data-course-tab="management">Gestione Academy</button>
         </div>
         <div class="course-current-location" id="courseCurrentLocation" aria-live="polite">OroActive Academy / Catalogo Academy</div>
-        <form class="course-editor founder-only" id="trainingCourseForm">
+        <form class="course-editor founder-only" id="trainingCourseForm" hidden>
           <input type="hidden" id="trainingCourseId">
           <label>Titolo corso <input id="trainingCourseTitle" required></label>
           <label>Facoltà
@@ -1357,9 +1355,8 @@
           <label class="inline-check"><input id="trainingCourseActive" type="checkbox" checked> Corso attivo</label>
           <label class="inline-check"><input id="trainingCourseCertification" type="checkbox" checked> Certificazione finale disponibile</label>
           <div class="user-form-actions">
-            <button class="primary-button" type="submit" id="trainingCourseSaveButton">Crea corso</button>
-            <button class="ghost-button" type="button" id="trainingCoursePreviewButton" hidden>Visualizza bozza</button>
-            <button class="ghost-button" type="button" id="trainingCourseReset">Nuovo corso</button>
+            <button class="primary-button" type="submit" id="trainingCourseSaveButton">Salva modifiche</button>
+            <button class="ghost-button" type="button" id="trainingCourseReset">Chiudi modifica</button>
           </div>
         </form>
         <div class="course-toolbar">
@@ -1872,6 +1869,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260617-academy-no-course-percent-2"></script>
+  <script src="app.js?v=20260618-academy-simplified-catalog-1"></script>
 </body>
 </html>
