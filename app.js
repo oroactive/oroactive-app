@@ -22,6 +22,9 @@ const state = {
   editingDirty: false,
   suppressDirtyTracking: false,
   loggingIn: false,
+  splashStartedAt: 0,
+  splashReady: false,
+  splashError: null,
   cashLimitWarningShown: false,
   amlCashCheck: null,
   amlCashCheckTimer: null,
@@ -202,6 +205,11 @@ const PRIVACY_POLICY_FALLBACK = {
   ]
 };
 const ENABLE_AURUM_MASCOT = true;
+const OROACTIVE_SPLASH_SESSION_KEY = "oroactive_splash_seen";
+const OROACTIVE_SPLASH_MIN_MS = 1400;
+const OROACTIVE_SPLASH_BRIEF_MS = 650;
+const OROACTIVE_SPLASH_READY_MS = 180;
+const OROACTIVE_SPLASH_EXIT_MS = 430;
 const AURUM_SETTINGS_KEY = "oroactive-aurum-settings";
 const AURUM_FLOATING_POSITION_KEY = "aurum_floating_position";
 const AURUM_AVOID_EVENT = "aurum:avoid-elements-updated";
@@ -1477,7 +1485,10 @@ const previewTitle = document.getElementById("previewTitle");
 const brandMenuButton = document.getElementById("brandMenuButton");
 const brandDropdown = document.getElementById("brandDropdown");
 const splashScreen = document.getElementById("splashScreen");
-const enterSoftware = document.getElementById("enterSoftware");
+const splashStatus = document.getElementById("splashStatus");
+const splashError = document.getElementById("splashError");
+const splashRetry = document.getElementById("splashRetry");
+const splashLoginFallback = document.getElementById("splashLoginFallback");
 const mainMenuScreen = document.getElementById("mainMenuScreen");
 const mainUserMenuButton = document.getElementById("mainUserMenuButton");
 const mainUserDropdown = document.getElementById("mainUserDropdown");
@@ -2105,6 +2116,75 @@ function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function hasSeenStartupSplashThisSession() {
+  try {
+    return sessionStorage.getItem(OROACTIVE_SPLASH_SESSION_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function markStartupSplashSeen() {
+  try {
+    sessionStorage.setItem(OROACTIVE_SPLASH_SESSION_KEY, "true");
+  } catch {
+    // sessionStorage can be unavailable in private or restricted browser modes.
+  }
+}
+
+function setSplashStatus(message, options = {}) {
+  if (!splashStatus) return;
+  splashStatus.textContent = message || "";
+  splashStatus.classList.toggle("is-ready", Boolean(options.ready));
+}
+
+function showStartupSplash() {
+  if (!splashScreen) return;
+  state.splashStartedAt = performance.now();
+  state.splashReady = false;
+  state.splashError = null;
+  splashScreen.classList.remove("hidden", "is-exiting", "is-error");
+  splashScreen.classList.toggle("is-brief", hasSeenStartupSplashThisSession());
+  if (splashError) splashError.hidden = true;
+  setSplashStatus("Verifica sessione");
+  document.body.classList.add("splash-active");
+}
+
+async function hideStartupSplash() {
+  if (!splashScreen || splashScreen.classList.contains("hidden")) return;
+  state.splashReady = true;
+  setSplashStatus("OroActive pronto", { ready: true });
+  await wait(OROACTIVE_SPLASH_READY_MS);
+  splashScreen.classList.add("is-exiting");
+  await wait(OROACTIVE_SPLASH_EXIT_MS);
+  splashScreen.classList.add("hidden");
+  splashScreen.classList.remove("is-exiting", "is-error", "is-brief");
+  document.body.classList.remove("splash-active");
+  markStartupSplashSeen();
+}
+
+async function completeStartupSplash(targetView) {
+  const minimumDuration = hasSeenStartupSplashThisSession() ? OROACTIVE_SPLASH_BRIEF_MS : OROACTIVE_SPLASH_MIN_MS;
+  const elapsed = performance.now() - (state.splashStartedAt || performance.now());
+  if (elapsed < minimumDuration) await wait(minimumDuration - elapsed);
+  if (targetView === "main") {
+    openMainMenuCleanly({ keepSplash: true });
+    maybeStartFirstRunTutorial();
+  }
+  await hideStartupSplash();
+}
+
+function showStartupSplashError(error) {
+  console.error("OroActive startup error", error);
+  state.splashError = error;
+  if (!splashScreen) return;
+  splashScreen.classList.remove("hidden", "is-exiting");
+  splashScreen.classList.add("is-error");
+  document.body.classList.add("splash-active");
+  setSplashStatus("", { ready: true });
+  if (splashError) splashError.hidden = false;
+}
+
 function shouldRetryApi(error, responseStatus) {
   if (responseStatus && responseStatus < 500 && responseStatus !== 429) return false;
   return error?.name === "AbortError" || !navigator.onLine || !responseStatus || responseStatus >= 500 || responseStatus === 429;
@@ -2475,7 +2555,8 @@ async function withButtonBusy(button, busyText, task) {
   }
 }
 
-function showLogin() {
+function showLogin(options = {}) {
+  const { keepSplash = false } = options;
   clearStoredAuthToken();
   state.currentUser = null;
   if (mainUserMenuButton) mainUserMenuButton.textContent = "Elite";
@@ -2492,7 +2573,10 @@ function showLogin() {
   renderNotificationBadge();
   if (notificationCenter) notificationCenter.hidden = true;
   loginScreen.hidden = false;
-  splashScreen.classList.add("hidden");
+  if (!keepSplash) {
+    splashScreen.classList.add("hidden");
+    document.body.classList.remove("splash-active");
+  }
   mainMenuScreen.hidden = true;
   document.body.classList.remove("main-menu-active");
   closeMainMenuDropdowns();
@@ -2507,10 +2591,16 @@ function showLogin() {
   state.sessionTimeoutTimer = null;
 }
 
-function showAuthenticatedShell() {
+function showAuthenticatedShell(options = {}) {
+  const { keepSplash = false } = options;
   loginScreen.hidden = true;
   appShell.hidden = true;
-  splashScreen.classList.remove("hidden");
+  if (keepSplash) {
+    splashScreen.classList.remove("hidden");
+  } else {
+    splashScreen.classList.add("hidden");
+    document.body.classList.remove("splash-active");
+  }
   mainMenuScreen.hidden = true;
   document.body.classList.remove("main-menu-active");
   syncNotificationPlacement();
@@ -2594,6 +2684,7 @@ function tutorialRoleIntro() {
 
 function openPracticeForTutorial(step = 0) {
   splashScreen.classList.add("hidden");
+  document.body.classList.remove("splash-active");
   setScreen("practice");
   state.step = step;
   renderStep();
@@ -3634,8 +3725,9 @@ function applyRolePermissions() {
   renderFounderMenuKpis();
 }
 
-async function startAuthenticatedApp() {
-  showAuthenticatedShell();
+async function startAuthenticatedApp(options = {}) {
+  const { keepSplash = false, openMainMenu = true } = options;
+  showAuthenticatedShell({ keepSplash });
   resetSessionTimeout();
   state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
   applyRolePermissions();
@@ -3672,21 +3764,27 @@ async function startAuthenticatedApp() {
       await syncActsFromServer();
     }, 30000);
   }
+  if (openMainMenu && !keepSplash) showMainMenuFromSplash();
 }
 
-async function restoreSession() {
+async function restoreSession(options = {}) {
+  const { keepSplash = false } = options;
   await loadStoredAuthToken();
   if (!state.authToken) {
-    showLogin();
+    setSplashStatus("Preparazione login");
+    showLogin({ keepSplash });
     return false;
   }
+  setSplashStatus("Caricamento profilo");
   try {
     const data = await apiRequest("/auth/me");
     state.currentUser = data.user;
-    await startAuthenticatedApp();
+    setSplashStatus("Preparazione area operativa");
+    await startAuthenticatedApp({ keepSplash, openMainMenu: !keepSplash });
     return true;
   } catch {
-    showLogin();
+    setSplashStatus("Preparazione login");
+    showLogin({ keepSplash });
     return false;
   }
 }
@@ -4360,9 +4458,12 @@ function cleanupUiBeforeMainMenu() {
 }
 
 function openMainMenuCleanly(options = {}) {
-  const { renderMenus = true } = options;
+  const { renderMenus = true, keepSplash = false } = options;
   loginScreen.hidden = true;
-  splashScreen.classList.add("hidden");
+  if (!keepSplash) {
+    splashScreen.classList.add("hidden");
+    document.body.classList.remove("splash-active");
+  }
   cleanupUiBeforeMainMenu();
   if (renderMenus) renderRoleBasedMenus();
   setMainMenuMode(true);
@@ -5080,7 +5181,7 @@ function stopAurumTips() {
   window.clearTimeout(state.aurumTipHideTimer);
   state.aurumTipTimer = null;
   state.aurumTipHideTimer = null;
-  if (aurumTipBubble) aurumTipBubble.hidden = true;
+  hideAurumTip();
 }
 
 function stopAurumMovement() {
@@ -5092,6 +5193,16 @@ function stopAurumMovement() {
     aurumMascotRoot.style.setProperty("--aurum-x", "0px");
     aurumMascotRoot.style.setProperty("--aurum-y", "0px");
   }
+}
+
+function hideAurumTip() {
+  if (!aurumTipBubble) return;
+  aurumTipBubble.hidden = true;
+  aurumTipBubble.classList.remove("aurum-tip-side-left", "aurum-tip-side-right");
+  aurumTipBubble.style.removeProperty("left");
+  aurumTipBubble.style.removeProperty("top");
+  aurumTipBubble.style.removeProperty("right");
+  aurumTipBubble.style.removeProperty("bottom");
 }
 
 function loadAurumSettings() {
@@ -5179,6 +5290,7 @@ function applyAurumPosition(position, options = {}) {
     state.aurumAutoMoved = false;
     saveAurumFloatingPosition(clamped);
   }
+  constrainAurumTipToViewport();
 }
 
 function restoreAurumFloatingPosition() {
@@ -5304,10 +5416,14 @@ function updateAurumAvoidance() {
   state.aurumAvoidActive = avoidActive;
   aurumMascotRoot.classList.toggle("aurum-avoid-active", avoidActive);
   aurumMascotRoot.classList.toggle("aurum-compact", compact);
-  if (compact && aurumTipBubble) aurumTipBubble.hidden = true;
+  if (compact) hideAurumTip();
   if (!avoidActive && state.aurumAutoMoved) {
     restoreAurumFloatingPosition();
     state.aurumAutoMoved = false;
+    return;
+  }
+  if (aurumTipBubble && !aurumTipBubble.hidden) {
+    constrainAurumTipToViewport();
     return;
   }
   if (!avoidActive || !aurumChatPanel?.hidden) return;
@@ -5367,19 +5483,32 @@ function constrainAurumPanelToViewport() {
 }
 
 function constrainAurumTipToViewport() {
-  if (!aurumTipBubble || aurumTipBubble.hidden) return;
-  aurumTipBubble.style.setProperty("--aurum-tip-shift-x", "0px");
-  aurumTipBubble.style.setProperty("--aurum-tip-shift-y", "0px");
-  const rect = aurumTipBubble.getBoundingClientRect();
-  const margin = AURUM_SAFE_MARGIN;
-  let shiftX = 0;
-  let shiftY = 0;
-  if (rect.left < margin) shiftX = margin - rect.left;
-  if (rect.right > window.innerWidth - margin) shiftX = window.innerWidth - margin - rect.right;
-  if (rect.top < margin) shiftY = margin - rect.top;
-  if (rect.bottom > window.innerHeight - margin) shiftY = window.innerHeight - margin - rect.bottom;
-  aurumTipBubble.style.setProperty("--aurum-tip-shift-x", `${Math.round(shiftX)}px`);
-  aurumTipBubble.style.setProperty("--aurum-tip-shift-y", `${Math.round(shiftY)}px`);
+  if (!aurumTipBubble || !aurumMascotRoot || aurumTipBubble.hidden || aurumMascotRoot.hidden) return;
+  const mascotRect = aurumMascotRoot.getBoundingClientRect();
+  const tipRect = aurumTipBubble.getBoundingClientRect();
+  if (!mascotRect.width || !mascotRect.height || !tipRect.width || !tipRect.height) return;
+  const margin = Math.max(12, AURUM_SAFE_MARGIN);
+  const safeLeft = AURUM_SAFE_MARGIN + safeViewportInset("left");
+  const safeRight = AURUM_SAFE_MARGIN + safeViewportInset("right");
+  const safeTop = AURUM_SAFE_MARGIN + safeViewportInset("top");
+  const safeBottom = AURUM_SAFE_MARGIN + safeViewportInset("bottom");
+  const hasLeftSpace = mascotRect.left - tipRect.width - margin >= safeLeft;
+  const hasRightSpace = mascotRect.right + tipRect.width + margin <= window.innerWidth - safeRight;
+  const side = hasLeftSpace || !hasRightSpace ? "left" : "right";
+  const requestedLeft = side === "left"
+    ? mascotRect.left - tipRect.width - margin
+    : mascotRect.right + margin;
+  const requestedTop = mascotRect.top + (mascotRect.height - tipRect.height) / 2;
+  const maxLeft = Math.max(safeLeft, window.innerWidth - tipRect.width - safeRight);
+  const maxTop = Math.max(safeTop, window.innerHeight - tipRect.height - safeBottom);
+  const left = Math.min(Math.max(requestedLeft, safeLeft), maxLeft);
+  const top = Math.min(Math.max(requestedTop, safeTop), maxTop);
+  aurumTipBubble.classList.toggle("aurum-tip-side-left", side === "left");
+  aurumTipBubble.classList.toggle("aurum-tip-side-right", side === "right");
+  aurumTipBubble.style.left = `${Math.round(left)}px`;
+  aurumTipBubble.style.top = `${Math.round(top)}px`;
+  aurumTipBubble.style.right = "auto";
+  aurumTipBubble.style.bottom = "auto";
 }
 
 function scheduleAurumViewportClamp() {
@@ -5437,6 +5566,7 @@ function handleAurumPointerMove(event) {
   } else {
     applyAurumPosition({ x: drag.originX + dx, y: drag.originY + dy }, { save: false });
   }
+  constrainAurumTipToViewport();
 }
 
 function handleAurumPointerUp(event) {
@@ -5521,7 +5651,12 @@ function setAurumSection(section = "menu") {
 function updateAurumMovement() {
   window.clearTimeout(state.aurumMovementTimer);
   const settings = loadAurumSettings();
-  const canRoam = shouldShowAurumMascot() && settings.movement && mainMenuScreen && !mainMenuScreen.hidden && (!aurumChatPanel || aurumChatPanel.hidden);
+  const canRoam = shouldShowAurumMascot()
+    && settings.movement
+    && mainMenuScreen
+    && !mainMenuScreen.hidden
+    && (!aurumChatPanel || aurumChatPanel.hidden)
+    && (!aurumTipBubble || aurumTipBubble.hidden);
   if (!canRoam) {
     stopAurumMovement();
     return;
@@ -5576,7 +5711,7 @@ function openAurumChat() {
   stopAurumMovement();
   aurumMascotRoot?.classList.add("aurum-panel-open");
   if (aurumChatPanel) aurumChatPanel.hidden = false;
-  if (aurumTipBubble) aurumTipBubble.hidden = true;
+  hideAurumTip();
   renderAurumMessages();
   window.setTimeout(scheduleAurumViewportClamp, 0);
   window.setTimeout(() => aurumQuestion?.focus(), 60);
@@ -5624,18 +5759,22 @@ function closeAurumChat() {
 function showAurumTip(text = "") {
   if (!shouldShowAurumMascot() || !aurumTipBubble || !aurumTipText || !text && aurumChatPanel && !aurumChatPanel.hidden) return;
   if (state.aurumAvoidActive && aurumChatPanel?.hidden) {
-    aurumTipBubble.hidden = true;
+    hideAurumTip();
     return;
   }
+  stopAurumMovement();
   const tips = sectionTipPool();
   const message = text || tips[state.aurumTipIndex % tips.length] || AURUM_TIPS[state.aurumTipIndex % AURUM_TIPS.length];
   state.aurumTipIndex += 1;
   aurumTipText.textContent = message;
   aurumTipBubble.hidden = false;
   scheduleAurumViewportClamp();
+  window.requestAnimationFrame(constrainAurumTipToViewport);
   window.clearTimeout(state.aurumTipHideTimer);
   state.aurumTipHideTimer = window.setTimeout(() => {
-    if (aurumTipBubble) aurumTipBubble.hidden = true;
+    hideAurumTip();
+    updateAurumMovement();
+    scheduleAurumAvoidance();
   }, 6500);
 }
 
@@ -17566,7 +17705,9 @@ aurumMascotButton?.addEventListener("click", () => {
 aurumChatClose?.addEventListener("click", closeAurumChat);
 aurumResetPosition?.addEventListener("click", () => resetAurumFloatingPosition());
 aurumTipClose?.addEventListener("click", () => {
-  if (aurumTipBubble) aurumTipBubble.hidden = true;
+  hideAurumTip();
+  updateAurumMovement();
+  scheduleAurumAvoidance();
 });
 aurumChatForm?.addEventListener("submit", askAurum);
 aurumRememberYes?.addEventListener("click", saveAurumMemory);
@@ -18124,7 +18265,14 @@ brandMenuButton.addEventListener("click", (event) => {
   toggleBrandMenu();
 });
 
-enterSoftware.addEventListener("click", showMainMenuFromSplash);
+splashRetry?.addEventListener("click", () => {
+  window.location.reload();
+});
+
+splashLoginFallback?.addEventListener("click", () => {
+  showLogin({ keepSplash: true });
+  void hideStartupSplash();
+});
 
 mainMenuQuickActions?.addEventListener("click", (event) => {
   const button = event.target.closest("button");
@@ -18886,21 +19034,27 @@ document.getElementById("closePreview").addEventListener("click", () => {
 });
 
 async function initializeApp() {
-  registerServiceWorker();
-  removeLegacySearchMenu();
-  upgradeProvinceFields();
-  populateAutocompleteLists();
-  markAurumAvoidElements();
-  startMainMenuClock();
-  appShell.hidden = true;
-  await restoreSession();
-  maybeShowInstallHint();
-  window.addEventListener("focus", () => {
-    if (state.authToken) syncActsFromServer();
-  });
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && state.authToken) syncActsFromServer();
-  });
+  showStartupSplash();
+  try {
+    registerServiceWorker();
+    removeLegacySearchMenu();
+    upgradeProvinceFields();
+    populateAutocompleteLists();
+    markAurumAvoidElements();
+    startMainMenuClock();
+    appShell.hidden = true;
+    const sessionRestored = await restoreSession({ keepSplash: true });
+    maybeShowInstallHint();
+    window.addEventListener("focus", () => {
+      if (state.authToken) syncActsFromServer();
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && state.authToken) syncActsFromServer();
+    });
+    await completeStartupSplash(sessionRestored ? "main" : "login");
+  } catch (error) {
+    showStartupSplashError(error);
+  }
 }
 
 initializeApp();

@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260618-academy-simplified-catalog-1">
+  <link rel="stylesheet" href="styles.css?v=20260619-splash-screen-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -36,12 +36,39 @@
     </footer>
   </section>
 
-  <section class="splash-screen" id="splashScreen" aria-label="Accesso OroActive">
-    <button class="splash-logo-button" id="enterSoftware" type="button" aria-label="Entra nel software OroActive">
-      <img src="oroactive-logo.png" alt="OroActive Compro Oro">
-    </button>
-    <p class="splash-motto">La differenza non la fanno i preziosi che acquisti, ma il valore che porti ogni giorno.<br>Cresci come persona, evolvi come professionista, brilla come OroActive.</p>
-    <footer class="software-footer dark-footer">© 2026 OroActive Tech - Software gestionale proprietario</footer>
+  <section class="splash-screen" id="splashScreen" aria-label="Avvio OroActive">
+    <div class="oa-splash-particles" aria-hidden="true">
+      <span style="--x: 12%; --y: 22%; --d: 0ms; --s: 3px;"></span>
+      <span style="--x: 20%; --y: 70%; --d: 180ms; --s: 2px;"></span>
+      <span style="--x: 32%; --y: 18%; --d: 360ms; --s: 4px;"></span>
+      <span style="--x: 42%; --y: 78%; --d: 540ms; --s: 2px;"></span>
+      <span style="--x: 54%; --y: 16%; --d: 720ms; --s: 3px;"></span>
+      <span style="--x: 62%; --y: 72%; --d: 900ms; --s: 2px;"></span>
+      <span style="--x: 74%; --y: 25%; --d: 1080ms; --s: 4px;"></span>
+      <span style="--x: 84%; --y: 64%; --d: 1260ms; --s: 3px;"></span>
+      <span style="--x: 16%; --y: 46%; --d: 1440ms; --s: 2px;"></span>
+      <span style="--x: 88%; --y: 40%; --d: 1620ms; --s: 2px;"></span>
+    </div>
+    <div class="oa-splash-content">
+      <div class="oa-splash-logo-stage">
+        <span class="oa-splash-logo-orbit oa-splash-logo-orbit-inner" aria-hidden="true"></span>
+        <span class="oa-splash-logo-orbit oa-splash-logo-orbit-scan" aria-hidden="true"></span>
+        <span class="oa-splash-logo-orbit oa-splash-logo-orbit-outer" aria-hidden="true"></span>
+        <span class="oa-splash-metal-sheen" aria-hidden="true"></span>
+        <img class="oa-splash-logo" src="oroactive-logo.png" alt="OroActive">
+      </div>
+      <span class="oa-splash-accent" aria-hidden="true"></span>
+      <h1 class="oa-splash-tagline">Precisione. Trasparenza. Valore.</h1>
+      <p class="oa-splash-subtitle">Il gestionale intelligente per il compro oro.</p>
+      <p class="oa-splash-status" id="splashStatus" aria-live="polite">Verifica sessione</p>
+      <div class="oa-splash-error" id="splashError" hidden>
+        <strong>OroActive non riesce a completare l'avvio.</strong>
+        <div class="oa-splash-error-actions">
+          <button type="button" id="splashRetry">Riprova</button>
+          <button type="button" id="splashLoginFallback">Torna al login</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="main-menu-screen" id="mainMenuScreen" hidden aria-label="Menu principale OroActive">
@@ -1869,6 +1896,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260618-academy-simplified-catalog-1"></script>
+  <script src="app.js?v=20260619-splash-screen-1"></script>
 </body>
 </html>
