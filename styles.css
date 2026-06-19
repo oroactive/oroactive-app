@@ -1873,10 +1873,14 @@ body.splash-active {
 }
 
 .aurum-tip {
-  position: fixed;
-  right: auto;
+  --aurum-tip-gap: 12px;
+  --aurum-tip-offset-y: 0px;
+  position: absolute;
+  top: 50%;
+  right: calc(100% + var(--aurum-tip-gap));
   bottom: auto;
-  z-index: 8001;
+  left: auto;
+  z-index: 3;
   width: min(280px, calc(100vw - 34px));
   max-height: min(220px, calc(100dvh - 32px));
   overflow-y: auto;
@@ -1893,8 +1897,18 @@ body.splash-active {
   font-size: 13px;
   line-height: 1.35;
   pointer-events: auto;
-  transform: none;
-  will-change: left, top;
+  transform: translateY(calc(-50% + var(--aurum-tip-offset-y)));
+  will-change: transform;
+}
+
+.aurum-tip.aurum-tip-side-left {
+  right: calc(100% + var(--aurum-tip-gap));
+  left: auto;
+}
+
+.aurum-tip.aurum-tip-side-right {
+  right: auto;
+  left: calc(100% + var(--aurum-tip-gap));
 }
 
 .aurum-tip button,

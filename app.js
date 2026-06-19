@@ -5199,6 +5199,7 @@ function hideAurumTip() {
   if (!aurumTipBubble) return;
   aurumTipBubble.hidden = true;
   aurumTipBubble.classList.remove("aurum-tip-side-left", "aurum-tip-side-right");
+  aurumTipBubble.style.removeProperty("--aurum-tip-offset-y");
   aurumTipBubble.style.removeProperty("left");
   aurumTipBubble.style.removeProperty("top");
   aurumTipBubble.style.removeProperty("right");
@@ -5484,31 +5485,29 @@ function constrainAurumPanelToViewport() {
 
 function constrainAurumTipToViewport() {
   if (!aurumTipBubble || !aurumMascotRoot || aurumTipBubble.hidden || aurumMascotRoot.hidden) return;
+  aurumTipBubble.style.removeProperty("left");
+  aurumTipBubble.style.removeProperty("top");
+  aurumTipBubble.style.removeProperty("right");
+  aurumTipBubble.style.removeProperty("bottom");
+  aurumTipBubble.style.removeProperty("--aurum-tip-offset-y");
   const mascotRect = aurumMascotRoot.getBoundingClientRect();
   const tipRect = aurumTipBubble.getBoundingClientRect();
   if (!mascotRect.width || !mascotRect.height || !tipRect.width || !tipRect.height) return;
-  const margin = Math.max(12, AURUM_SAFE_MARGIN);
   const safeLeft = AURUM_SAFE_MARGIN + safeViewportInset("left");
   const safeRight = AURUM_SAFE_MARGIN + safeViewportInset("right");
   const safeTop = AURUM_SAFE_MARGIN + safeViewportInset("top");
   const safeBottom = AURUM_SAFE_MARGIN + safeViewportInset("bottom");
-  const hasLeftSpace = mascotRect.left - tipRect.width - margin >= safeLeft;
-  const hasRightSpace = mascotRect.right + tipRect.width + margin <= window.innerWidth - safeRight;
-  const side = hasLeftSpace || !hasRightSpace ? "left" : "right";
-  const requestedLeft = side === "left"
-    ? mascotRect.left - tipRect.width - margin
-    : mascotRect.right + margin;
+  const gap = Math.max(12, AURUM_SAFE_MARGIN);
+  const leftSpace = mascotRect.left - safeLeft - gap;
+  const rightSpace = window.innerWidth - safeRight - mascotRect.right - gap;
+  const side = leftSpace >= tipRect.width || leftSpace >= rightSpace ? "left" : "right";
   const requestedTop = mascotRect.top + (mascotRect.height - tipRect.height) / 2;
-  const maxLeft = Math.max(safeLeft, window.innerWidth - tipRect.width - safeRight);
+  const minTop = safeTop;
   const maxTop = Math.max(safeTop, window.innerHeight - tipRect.height - safeBottom);
-  const left = Math.min(Math.max(requestedLeft, safeLeft), maxLeft);
-  const top = Math.min(Math.max(requestedTop, safeTop), maxTop);
+  const offsetY = Math.round(Math.min(Math.max(requestedTop, minTop), maxTop) - requestedTop);
   aurumTipBubble.classList.toggle("aurum-tip-side-left", side === "left");
   aurumTipBubble.classList.toggle("aurum-tip-side-right", side === "right");
-  aurumTipBubble.style.left = `${Math.round(left)}px`;
-  aurumTipBubble.style.top = `${Math.round(top)}px`;
-  aurumTipBubble.style.right = "auto";
-  aurumTipBubble.style.bottom = "auto";
+  aurumTipBubble.style.setProperty("--aurum-tip-offset-y", `${offsetY}px`);
 }
 
 function scheduleAurumViewportClamp() {
