@@ -4791,6 +4791,26 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   color: #166534;
 }
 
+.academy-test-status.locked,
+.academy-course-lock {
+  background: rgba(120, 53, 15, 0.14);
+  color: #7c2d12;
+}
+
+.academy-course-lock {
+  display: block;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.academy-materials button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
 .academy-course-admin-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

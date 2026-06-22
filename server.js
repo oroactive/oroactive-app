@@ -14321,6 +14321,130 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
         correct_answer: "Confondere apparenza, certificato e identità reale della pietra"
       }
     ]
+  },
+  {
+    code: "OROACTIVE-COMPLETO-COMPRO-ORO",
+    title: "Corso Completo Compro Oro — OroActive",
+    category: "Formazione Compro Oro",
+    section: "Corsi avanzati",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Avanzato",
+    durationLabel: "Corso completo · PDF ufficiale",
+    teacher: "OroActive Academy",
+    assetFile: "corso-completo-compro-oro.pdf",
+    description: "Percorso avanzato OroActive sulla procedura completa di compro oro: accoglienza, identificazione, valutazione, pagamento, controlli, rischi e chiusura pratica.",
+    moduleTitle: "Procedura completa compro oro",
+    lessonTitle: "Slide ufficiali del Corso Completo Compro Oro",
+    badgeName: "Badge Corso Completo Compro Oro",
+    certificateName: "Corso Completo Compro Oro — OroActive",
+    orderIndex: 30,
+    prerequisiteCourseCodes: [
+      "OROACTIVE-BASE-ORO",
+      "OROACTIVE-BASE-ARGENTO",
+      "OROACTIVE-BASE-DIAMANTI"
+    ],
+    quiz: [
+      {
+        question: "Qual è l'obiettivo principale del corso completo compro oro?",
+        options: ["Imparare solo il prezzo dell'oro", "Sostituire ogni controllo documentale", "Gestire l'intera pratica dall'accoglienza alla chiusura in modo sicuro", "Ignorare i casi anomali se il cliente è abituale"],
+        correct_answer: "Gestire l'intera pratica dall'accoglienza alla chiusura in modo sicuro"
+      },
+      {
+        question: "Prima di procedere con una pratica di compro oro, quale verifica è essenziale?",
+        options: ["Identificare correttamente il cliente e verificare il documento", "Scegliere il prezzo più alto dei competitor", "Saltare le firme per velocizzare", "Archiviare solo una foto del banco"],
+        correct_answer: "Identificare correttamente il cliente e verificare il documento"
+      },
+      {
+        question: "Quali dati devono essere coerenti durante la compilazione dell'atto?",
+        options: ["Solo il colore degli oggetti", "Dati cliente, documento, oggetti, pagamento, firme e allegati", "Solo il peso dichiarato dal cliente", "Solo il nome del negozio"],
+        correct_answer: "Dati cliente, documento, oggetti, pagamento, firme e allegati"
+      },
+      {
+        question: "Una descrizione operativa corretta degli oggetti preziosi deve includere:",
+        options: ["Tipologia, metallo, titolo/caratura, peso e anomalie rilevate", "Solo il valore finale pagato", "Solo una nota generica", "Solo il numero di pezzi senza dettagli"],
+        correct_answer: "Tipologia, metallo, titolo/caratura, peso e anomalie rilevate"
+      },
+      {
+        question: "Perché è importante distinguere peso lordo e peso utile alla valutazione?",
+        options: ["Per ignorare le parti non preziose", "Per pagare sempre il peso più alto", "Per separare eventuali componenti non preziose o non valutabili", "Per evitare il controllo qualità"],
+        correct_answer: "Per separare eventuali componenti non preziose o non valutabili"
+      },
+      {
+        question: "Il prezzo pagato al cliente non coincide con il prezzo puro di borsa perché:",
+        options: ["Il prezzo di borsa non esiste", "Si applicano purezza, costi, spread, rischio e margine operativo", "Tutte le carature valgono uguale", "Il valore dipende solo dal nome del cliente"],
+        correct_answer: "Si applicano purezza, costi, spread, rischio e margine operativo"
+      },
+      {
+        question: "Se il documento del cliente è scaduto o incoerente, l'operatore deve:",
+        options: ["Procedere se il cliente promette di rinnovarlo", "Aumentare lo sconto", "Fermare o correggere la pratica secondo procedura", "Ignorare il documento se il peso è basso"],
+        correct_answer: "Fermare o correggere la pratica secondo procedura"
+      },
+      {
+        question: "Quale elemento rende il pagamento più tracciabile e controllabile?",
+        options: ["Un pagamento coerente con normativa, atto e contabile", "Un accordo verbale senza ricevuta", "Una cifra diversa da quella registrata", "La sola promessa del cliente"],
+        correct_answer: "Un pagamento coerente con normativa, atto e contabile"
+      },
+      {
+        question: "Cosa bisogna fare davanti a operazioni ravvicinate, frazionate o sospette?",
+        options: ["Completare sempre senza note", "Documentare, valutare il rischio e chiedere eventuale autorizzazione", "Eliminare gli allegati", "Ridurre il prezzo senza spiegazioni"],
+        correct_answer: "Documentare, valutare il rischio e chiedere eventuale autorizzazione"
+      },
+      {
+        question: "Le firme nella pratica servono a:",
+        options: ["Rendere più bella la stampa", "Sostituire il documento", "Confermare e rendere tracciabile l'accettazione delle parti previste", "Evitare le foto degli oggetti"],
+        correct_answer: "Confermare e rendere tracciabile l'accettazione delle parti previste"
+      },
+      {
+        question: "Perché le foto degli oggetti sono importanti?",
+        options: ["Documentano cosa è stato presentato e acquistato", "Sostituiscono sempre la pesatura", "Servono solo per marketing", "Permettono di evitare la descrizione"],
+        correct_answer: "Documentano cosa è stato presentato e acquistato"
+      },
+      {
+        question: "Il controllo qualità finale deve verificare soprattutto:",
+        options: ["Solo il nome del file PDF", "Solo il colore della UI", "Completezza, coerenza e assenza di errori bloccanti nella pratica", "Solo la velocità dell'operatore"],
+        correct_answer: "Completezza, coerenza e assenza di errori bloccanti nella pratica"
+      },
+      {
+        question: "Nel rientro economico, la giacenza e la fusione servono a:",
+        options: ["Tracciare e trasformare i lotti mantenendo controllo su peso, titolo e margine", "Cancellare la pratica", "Sostituire l'identificazione cliente", "Nascondere le anomalie"],
+        correct_answer: "Tracciare e trasformare i lotti mantenendo controllo su peso, titolo e margine"
+      },
+      {
+        question: "Aurum Shield e i controlli automatici devono essere considerati:",
+        options: ["Avvisi operativi da leggere e gestire, non decorazioni", "Messaggi da ignorare sempre", "Solo notifiche estetiche", "Sostituti assoluti della responsabilità dell'operatore"],
+        correct_answer: "Avvisi operativi da leggere e gestire, non decorazioni"
+      },
+      {
+        question: "Il confronto competitor va usato per:",
+        options: ["Superare sempre ogni prezzo del mercato", "Capire il posizionamento commerciale senza superare il massimo sostenibile", "Calcolare il documento cliente", "Eliminare margini e costi"],
+        correct_answer: "Capire il posizionamento commerciale senza superare il massimo sostenibile"
+      },
+      {
+        question: "Se manca la contabile di un pagamento tracciabile, la pratica deve:",
+        options: ["Essere gestita come completa", "Essere corretta o sospesa finché la prova non è caricata", "Essere archiviata senza note", "Essere duplicata"],
+        correct_answer: "Essere corretta o sospesa finché la prova non è caricata"
+      },
+      {
+        question: "La privacy nella pratica di compro oro richiede di:",
+        options: ["Condividere dati cliente liberamente", "Limitare dati e documenti a usi autorizzati e procedure previste", "Inviare documenti a competitor", "Stampare copie non necessarie"],
+        correct_answer: "Limitare dati e documenti a usi autorizzati e procedure previste"
+      },
+      {
+        question: "Come va spiegato il prezzo al cliente in modo professionale?",
+        options: ["Con riferimento a purezza, peso, quotazione, costi e policy operative", "Dicendo solo che decide il sistema", "Evitando ogni dettaglio", "Promettendo un prezzo certo per sempre"],
+        correct_answer: "Con riferimento a purezza, peso, quotazione, costi e policy operative"
+      },
+      {
+        question: "Quando un oggetto può avere valore oltre al solo metallo?",
+        options: ["Mai", "Solo se è rotto", "Quando può avere rilevanza numismatica, storica, da investimento o collezionistica", "Quando manca il peso"],
+        correct_answer: "Quando può avere rilevanza numismatica, storica, da investimento o collezionistica"
+      },
+      {
+        question: "Qual è l'esito atteso del corso completo?",
+        options: ["Saltare i passaggi per fare prima", "Gestire una pratica completa con controlli, prezzo, documenti, rischio e chiusura corretti", "Eliminare il controllo qualità", "Usare solo una risposta di Aurum"],
+        correct_answer: "Gestire una pratica completa con controlli, prezzo, documenti, rischio e chiusura corretti"
+      }
+    ]
   }
 ];
 
@@ -14953,6 +15077,100 @@ function oroactiveBaseCourseQuizQuestions(course = {}, { includeAnswers = false 
   });
 }
 
+function oroactiveCourseSeedCode(course = {}) {
+  const metadata = oroactiveBaseCourseMetadata(course);
+  const definition = oroactiveBaseCourseDefinitionFor(course);
+  return String(metadata.seedCode || metadata.courseCode || definition?.code || "").trim();
+}
+
+function oroactiveCourseTitleByCode(code = "") {
+  const normalized = String(code || "").trim();
+  const definition = OROACTIVE_BASE_ACADEMY_COURSES.find((course) => course.code === normalized);
+  return definition?.title || normalized;
+}
+
+function oroactiveCoursePrerequisiteCodes(course = {}) {
+  const metadata = oroactiveBaseCourseMetadata(course);
+  const rawPrerequisites = metadata.prerequisiteCourseCodes
+    || metadata.requiredCourseCodes
+    || metadata.prerequisites
+    || [];
+  if (!Array.isArray(rawPrerequisites)) return [];
+  return rawPrerequisites.map((code) => String(code || "").trim()).filter(Boolean);
+}
+
+async function completedOroActiveCourseCodesForUser(userId, courseCodes = []) {
+  const codes = [...new Set(courseCodes.map((code) => String(code || "").trim()).filter(Boolean))];
+  if (!userId || !codes.length) return new Set();
+  const result = await pool.query(
+    `SELECT DISTINCT COALESCE(c.metadata->>'seedCode', c.metadata->>'courseCode') AS code
+     FROM courses c
+     WHERE COALESCE(c.metadata->>'seedCode', c.metadata->>'courseCode') = ANY($1::text[])
+       AND (
+         EXISTS (
+           SELECT 1
+           FROM academy_certificates cert
+           WHERE cert.course_id = c.id
+             AND cert.user_id = $2::bigint
+             AND cert.status = 'valido'
+         )
+         OR EXISTS (
+           SELECT 1
+           FROM course_certificates cert
+           WHERE cert.course_id = c.id
+             AND cert.user_id = $2::bigint
+             AND COALESCE(cert.status, 'valido') = 'valido'
+         )
+         OR EXISTS (
+           SELECT 1
+           FROM course_quiz_results quiz
+           WHERE quiz.course_id = c.id
+             AND quiz.user_id = $2::bigint
+             AND quiz.esito = 'superato'
+         )
+       )`,
+    [codes, userId]
+  );
+  return new Set(result.rows.map((row) => String(row.code || "").trim()).filter(Boolean));
+}
+
+async function academyCoursePrerequisiteStatus(course = {}, user = {}, completedCodes = null) {
+  const prerequisiteCodes = oroactiveCoursePrerequisiteCodes(course);
+  if (!prerequisiteCodes.length || normalizeRole(user?.ruolo) === "founder") {
+    return {
+      prerequisiteCodes,
+      missingCodes: [],
+      missing: [],
+      satisfied: true,
+      locked: false,
+      reason: ""
+    };
+  }
+  const completed = completedCodes || await completedOroActiveCourseCodesForUser(user.id, prerequisiteCodes);
+  const missingCodes = prerequisiteCodes.filter((code) => !completed.has(code));
+  const missing = missingCodes.map((code) => ({ code, title: oroactiveCourseTitleByCode(code) }));
+  return {
+    prerequisiteCodes,
+    missingCodes,
+    missing,
+    satisfied: missingCodes.length === 0,
+    locked: missingCodes.length > 0,
+    reason: missingCodes.length
+      ? `Completa prima: ${missing.map((item) => item.title).join(", ")}.`
+      : ""
+  };
+}
+
+async function assertAcademyCoursePrerequisites(course = {}, user = {}) {
+  const status = await academyCoursePrerequisiteStatus(course, user);
+  if (!status.locked) return status;
+  const error = new Error(status.reason || "Completa prima i corsi propedeutici.");
+  error.status = 403;
+  error.code = "academy_prerequisites_missing";
+  error.missing_prerequisites = status.missing;
+  throw error;
+}
+
 async function ensureOroActiveBaseAcademyCourses() {
   for (const courseDefinition of OROACTIVE_BASE_ACADEMY_COURSES) {
     try {
@@ -14969,6 +15187,9 @@ async function ensureOroActiveBaseAcademyCourses() {
       pdfRequiresFinalTest: true,
       certificateName: courseDefinition.certificateName,
       badgeName: courseDefinition.badgeName,
+      prerequisiteCourseCodes: Array.isArray(courseDefinition.prerequisiteCourseCodes)
+        ? courseDefinition.prerequisiteCourseCodes
+        : [],
       finalExamPassScore: OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE,
       finalExamRequiredCorrect: OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT,
       finalExamQuestionCount: courseDefinition.quiz.length,
@@ -15356,6 +15577,15 @@ async function listCourses(user = {}) {
       badgeByCourse.set(String(row.course_id), row);
     }
   }
+  const completedCourseCodes = new Set();
+  for (const course of courseRows) {
+    const courseKey = String(course.id);
+    const passed = passedByCourse.get(courseKey);
+    if (certificateByCourse.has(courseKey) || passed?.passed) {
+      const seedCode = oroactiveCourseSeedCode(course);
+      if (seedCode) completedCourseCodes.add(seedCode);
+    }
+  }
   const enrichedCourses = courseRows.map((course) => {
     const courseKey = String(course.id);
     const baseCourseDefinition = oroactiveBaseCourseDefinitionFor(course);
@@ -15368,6 +15598,16 @@ async function listCourses(user = {}) {
     const quizResult = passedByCourse.get(courseKey) || null;
     const finalExamPassed = Boolean(certificate || quizResult?.passed);
     const metadata = oroactiveBaseCourseMetadata(course);
+    const prerequisiteCodes = oroactiveCoursePrerequisiteCodes(course);
+    const missingPrerequisiteCodes = role === "founder"
+      ? []
+      : prerequisiteCodes.filter((code) => !completedCourseCodes.has(code));
+    const missingPrerequisites = missingPrerequisiteCodes.map((code) => ({
+      code,
+      title: oroactiveCourseTitleByCode(code)
+    }));
+    const courseLocked = missingPrerequisiteCodes.length > 0;
+    const visibleFinalExamQuestions = courseLocked ? [] : finalExamQuestions;
     const officialSlidesUrl = (metadata.pdfAssetFile || baseCourseDefinition) ? academyBaseSlidesRoute(course.id) : "";
     const lastExamCompletedAt = quizResult?.completed_at ? new Date(quizResult.completed_at) : null;
     const retryAvailableAt = !finalExamPassed && quizResult && !quizResult.passed && lastExamCompletedAt
@@ -15379,15 +15619,22 @@ async function listCourses(user = {}) {
       final_exam: {
         pass_score: Number(metadata.finalExamPassScore || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE : 80)),
         required_correct: Number(metadata.finalExamRequiredCorrect || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT : 0)),
-        questions: finalExamQuestions
+        questions: visibleFinalExamQuestions
       },
-      final_exam_questions: finalExamQuestions,
+      final_exam_questions: visibleFinalExamQuestions,
       final_exam_passed: finalExamPassed,
       final_exam_score: quizResult?.score || 0,
       final_exam_completed_at: quizResult?.completed_at || null,
       final_exam_retry_blocked: retryBlocked,
       final_exam_retry_available_at: retryAvailableAt ? retryAvailableAt.toISOString() : null,
-      slides_locked: false,
+      prerequisite_course_codes: prerequisiteCodes,
+      missing_prerequisites: missingPrerequisites,
+      prerequisites_satisfied: !courseLocked,
+      course_locked: courseLocked,
+      course_lock_reason: courseLocked
+        ? `Completa prima: ${missingPrerequisites.map((item) => item.title).join(", ")}.`
+        : "",
+      slides_locked: courseLocked,
       slides_download_url: officialSlidesUrl,
       certificate_id: certificate?.id || null,
       certificate_code: certificate?.certificate_code || "",
@@ -16830,6 +17077,7 @@ async function getAcademyCourse(courseId, user = {}) {
     error.status = 403;
     throw error;
   }
+  await assertAcademyCoursePrerequisites(course, user);
   const modules = await listAcademyModules(courseId);
   for (const module of modules) {
     module.lessons = await listAcademyLessons(module.id);
@@ -17455,6 +17703,7 @@ async function evaluateCourseFinalQuiz(input = {}, user = {}) {
     error.status = 404;
     throw error;
   }
+  await assertAcademyCoursePrerequisites(course, user);
   let questions = (await pool.query(
     `SELECT id, course_id, question, options, correct_answer, sort_order
      FROM course_quizzes
@@ -17596,6 +17845,7 @@ async function getAcademyCourseSlidesAccess(courseId, user = {}) {
     error.status = 403;
     throw error;
   }
+  await assertAcademyCoursePrerequisites(course, user);
   const metadata = course.metadata || {};
   const assetFile = String(metadata.pdfAssetFile || "").trim();
   if (!assetFile) {

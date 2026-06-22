@@ -9439,11 +9439,16 @@ function courseExamRetryMessage(course = {}) {
 function renderCourseCard(course) {
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = courseSlidesUrl(course);
+  const isLocked = Boolean(course.course_locked || course.prerequisites_satisfied === false || course.slides_locked);
+  const lockReason = course.course_lock_reason
+    || (Array.isArray(course.missing_prerequisites) && course.missing_prerequisites.length
+      ? `Completa prima: ${course.missing_prerequisites.map((item) => item.title || item.code).join(", ")}.`
+      : "Completa prima i corsi propedeutici.");
   const finalExamQuestions = courseFinalExamQuestions(course);
   const hasFinalExam = finalExamQuestions.length > 0;
   const examPassed = courseExamPassed(course);
   const retryMessage = courseExamRetryMessage(course);
-  const canOpenSlides = Boolean(pdfUrl);
+  const canOpenSlides = Boolean(pdfUrl) && !isLocked;
   const isUploadedVideo = /^\/api\/academy\/materials\/file\//.test(String(videoUrl)) || /\.(mp4|mov)(\?|#|$)/i.test(String(videoUrl));
   const moduleTitle = course.academy_module_title || course.module_title || course.section_title || "Modulo introduttivo";
   const lessonTitle = course.academy_lesson_title || course.lesson_title || "Lezione principale";
@@ -9454,13 +9459,15 @@ function renderCourseCard(course) {
       <button class="danger-button" type="button" data-delete-course="${escapeHtml(String(course.id))}">Elimina</button>
     </div>
   ` : "";
-  const testStatus = hasFinalExam
-    ? examPassed
-      ? `<span class="academy-test-status passed">Test finale superato${course.final_exam_score ? ` · ${escapeHtml(String(course.final_exam_score))}%` : ""}</span>`
-      : retryMessage
-        ? `<span class="academy-test-status">Test finale non superato · ${escapeHtml(retryMessage)}</span>`
-        : `<span class="academy-test-status">Test finale richiesto per ottenere badge e certificazione</span>`
-    : "";
+  const testStatus = isLocked
+    ? `<span class="academy-test-status locked">Corso avanzato bloccato · ${escapeHtml(lockReason)}</span>`
+    : hasFinalExam
+      ? examPassed
+        ? `<span class="academy-test-status passed">Test finale superato${course.final_exam_score ? ` · ${escapeHtml(String(course.final_exam_score))}%` : ""}</span>`
+        : retryMessage
+          ? `<span class="academy-test-status">Test finale non superato · ${escapeHtml(retryMessage)}</span>`
+          : `<span class="academy-test-status">Test finale richiesto per ottenere badge e certificazione</span>`
+      : "";
   return `
     <article class="course-card academy-course-card">
       <div class="course-card-main">
@@ -9478,15 +9485,16 @@ function renderCourseCard(course) {
         ${isUploadedVideo ? `<video class="academy-video-player" controls playsinline preload="metadata" src="${escapeHtml(videoUrl)}"></video>` : ""}
         <div class="academy-materials">
           ${videoUrl ? `<a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener">Guarda video lezione</a>` : ""}
-          ${pdfUrl && canOpenSlides ? `
-            <button type="button" data-view-course-slides="${escapeHtml(String(course.id))}">Visualizza Corso</button>
-            <button type="button" data-download-course-slides="${escapeHtml(String(course.id))}">Scarica PDF corso</button>
+          ${pdfUrl ? `
+            <button type="button" ${canOpenSlides ? `data-view-course-slides="${escapeHtml(String(course.id))}"` : "disabled"} title="${canOpenSlides ? "" : escapeHtml(lockReason)}">Visualizza Corso</button>
+            <button type="button" ${canOpenSlides ? `data-download-course-slides="${escapeHtml(String(course.id))}"` : "disabled"} title="${canOpenSlides ? "" : escapeHtml(lockReason)}">Scarica PDF corso</button>
           ` : ""}
           ${managementActions}
         </div>
       </div>
       <div class="course-progress-panel">
-        ${hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}" ${course.final_exam_retry_blocked ? "disabled" : ""}>${course.final_exam_retry_blocked ? "Test disponibile tra 48 ore" : "Sostieni test finale"}</button>` : ""}
+        ${isLocked ? `<span class="academy-course-lock">${escapeHtml(lockReason)}</span>` : ""}
+        ${!isLocked && hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}" ${course.final_exam_retry_blocked ? "disabled" : ""}>${course.final_exam_retry_blocked ? "Test disponibile tra 48 ore" : "Sostieni test finale"}</button>` : ""}
         ${hasFinalExam && examPassed ? `<button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(course.certificate_id || ""))}" ${course.certificate_id ? "" : "disabled"}>Scarica certificato</button>` : ""}
       </div>
     </article>
