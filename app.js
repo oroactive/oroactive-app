@@ -1631,21 +1631,22 @@ const guidedQualityActions = document.getElementById("guidedQualityActions");
 const storeForm = document.getElementById("storeForm");
 const storesList = document.getElementById("storesList");
 const antifraudList = document.getElementById("antifraudList");
-const trainingCourseForm = document.getElementById("trainingCourseForm");
 const trainingList = document.getElementById("trainingList");
 const courseSummary = document.getElementById("courseSummary");
 const courseCurrentLocation = document.getElementById("courseCurrentLocation");
 const courseSearch = document.getElementById("courseSearch");
 const courseCategoryFilter = document.getElementById("courseCategoryFilter");
 const courseToolbar = document.querySelector(".course-toolbar");
-const trainingCourseReset = document.getElementById("trainingCourseReset");
-const trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
-const trainingCoursePreviewButton = document.getElementById("trainingCoursePreviewButton");
-const trainingCourseFile = document.getElementById("trainingCourseFile");
-const trainingCourseThumbnailFile = document.getElementById("trainingCourseThumbnailFile");
-const trainingCourseVideoFile = document.getElementById("trainingCourseVideoFile");
-const trainingCoursePdfFile = document.getElementById("trainingCoursePdfFile");
-const trainingCourseFormPanel = document.getElementById("trainingCourseForm");
+const trainingCourseEditHost = document.getElementById("trainingCourseEditHost");
+const trainingCourseEditTemplate = document.getElementById("trainingCourseEditTemplate");
+let trainingCourseForm = document.getElementById("trainingCourseForm");
+let trainingCourseReset = document.getElementById("trainingCourseReset");
+let trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
+let trainingCoursePreviewButton = document.getElementById("trainingCoursePreviewButton");
+let trainingCourseFile = document.getElementById("trainingCourseFile");
+let trainingCourseThumbnailFile = document.getElementById("trainingCourseThumbnailFile");
+let trainingCourseVideoFile = document.getElementById("trainingCourseVideoFile");
+let trainingCoursePdfFile = document.getElementById("trainingCoursePdfFile");
 const aurumBlocksShell = document.getElementById("aurumBlocksShell");
 const aurumBlocksGame = document.getElementById("aurumBlocksGame");
 const aurumBlocksBoard = document.getElementById("aurumBlocksBoard");
@@ -9125,6 +9126,46 @@ function operatorAcademyLevel() {
   return "Junior";
 }
 
+function bindTrainingCourseEditFormElements() {
+  trainingCourseForm = document.getElementById("trainingCourseForm");
+  trainingCourseReset = document.getElementById("trainingCourseReset");
+  trainingCourseSaveButton = document.getElementById("trainingCourseSaveButton");
+  trainingCoursePreviewButton = document.getElementById("trainingCoursePreviewButton");
+  trainingCourseFile = document.getElementById("trainingCourseFile");
+  trainingCourseThumbnailFile = document.getElementById("trainingCourseThumbnailFile");
+  trainingCourseVideoFile = document.getElementById("trainingCourseVideoFile");
+  trainingCoursePdfFile = document.getElementById("trainingCoursePdfFile");
+  if (trainingCourseForm && !trainingCourseForm.dataset.bound) {
+    trainingCourseForm.addEventListener("submit", createTrainingCourse);
+    trainingCourseForm.dataset.bound = "true";
+  }
+  if (trainingCourseReset && !trainingCourseReset.dataset.bound) {
+    trainingCourseReset.addEventListener("click", resetTrainingCourseFormValues);
+    trainingCourseReset.dataset.bound = "true";
+  }
+  if (trainingCoursePreviewButton && !trainingCoursePreviewButton.dataset.bound) {
+    trainingCoursePreviewButton.addEventListener("click", () => {
+      void previewCurrentCourseDraft().catch((error) => showToast(error.message || "Anteprima corso non disponibile.", "error"));
+    });
+    trainingCoursePreviewButton.dataset.bound = "true";
+  }
+}
+
+function ensureTrainingCourseEditForm() {
+  if (!trainingCourseEditHost || !trainingCourseEditTemplate) return null;
+  if (!document.getElementById("trainingCourseForm")) {
+    const fragment = trainingCourseEditTemplate.content.cloneNode(true);
+    trainingCourseEditHost.replaceChildren(fragment);
+  }
+  bindTrainingCourseEditFormElements();
+  return trainingCourseForm;
+}
+
+function removeTrainingCourseEditForm() {
+  trainingCourseEditHost?.replaceChildren();
+  bindTrainingCourseEditFormElements();
+}
+
 function resetTrainingCourseFormValues() {
   if (!trainingCourseForm) return;
   trainingCourseForm.reset();
@@ -9138,6 +9179,7 @@ function resetTrainingCourseFormValues() {
   if (trainingCourseSaveButton) trainingCourseSaveButton.textContent = "Salva modifiche";
   if (trainingCoursePreviewButton) trainingCoursePreviewButton.hidden = true;
   trainingCourseForm.hidden = true;
+  removeTrainingCourseEditForm();
 }
 
 function renderCourseSummary() {
@@ -9339,9 +9381,10 @@ function renderTraining() {
   }
   renderCourseSummary();
   updateAcademyLocation();
-  if (trainingCourseForm) {
-    const editingCourseId = document.getElementById("trainingCourseId")?.value;
-    trainingCourseForm.hidden = !(state.courseActiveTab === "management" && canManageCoursesUi() && editingCourseId);
+  if (state.courseActiveTab !== "management") {
+    removeTrainingCourseEditForm();
+  } else if (trainingCourseForm && !document.getElementById("trainingCourseId")?.value) {
+    removeTrainingCourseEditForm();
   }
   if (courseToolbar) courseToolbar.hidden = !["catalog", "management"].includes(state.courseActiveTab);
   document.querySelectorAll("[data-course-tab]").forEach((button) => {
@@ -11019,6 +11062,11 @@ function editCourse(courseId) {
   const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
   if (!course) return;
   state.courseActiveTab = "management";
+  const form = ensureTrainingCourseEditForm();
+  if (!form) {
+    showToast("Modifica corso non disponibile.", "error");
+    return;
+  }
   document.getElementById("trainingCourseId").value = course.id;
   document.getElementById("trainingCourseTitle").value = course.title || "";
   document.getElementById("trainingCourseFaculty").value = course.faculty_name || "Facoltà Metalli Preziosi";

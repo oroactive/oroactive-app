@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260622-advanced-academy-courses-1">
+  <link rel="stylesheet" href="styles.css?v=20260623-academy-form-cleanup-1">
   <script src="frontend-config.js?v=20260524-login-1"></script>
 </head>
 <body>
@@ -1334,58 +1334,61 @@
           <button class="founder-only" type="button" data-course-tab="management">Gestione Academy</button>
         </div>
         <div class="course-current-location" id="courseCurrentLocation" aria-live="polite">OroActive Academy / Catalogo Academy</div>
-        <form class="course-editor founder-only" id="trainingCourseForm" hidden>
-          <input type="hidden" id="trainingCourseId">
-          <label>Titolo corso <input id="trainingCourseTitle" required></label>
-          <label>Facoltà
-            <select id="trainingCourseFaculty">
-              <option>Facoltà Metalli Preziosi</option>
-              <option>Facoltà Gemmologia</option>
-              <option>Facoltà Operativa</option>
-              <option>Facoltà Business</option>
-            </select>
-          </label>
-          <label>Categoria
-            <select id="trainingCourseCategory">
-              <option>Oro</option>
-              <option>Formazione Compro Oro</option>
-              <option>Argento</option>
-              <option>Platino</option>
-              <option>Diamanti</option>
-              <option>Procedure Operative</option>
-              <option>Normative</option>
-              <option>Coaching Aziendale</option>
-            </select>
-          </label>
-          <label>Sottosezione <input id="trainingCourseSection" placeholder="Esempio: Oro base, Antiriciclaggio, Cliente"></label>
-          <label>Livello
-            <select id="trainingCourseLevel">
-              <option>Base</option>
-              <option>Intermedio</option>
-              <option>Avanzato</option>
-              <option>Master</option>
-            </select>
-          </label>
-          <label>Durata stimata <input id="trainingCourseDuration" placeholder="Esempio: 2h 35m"></label>
-          <label>Docente / formatore <input id="trainingCourseTeacher" placeholder="Nome formatore"></label>
-          <label>Thumbnail corso <input id="trainingCourseThumbnail" placeholder="Link immagine opzionale"></label>
-          <label>Carica immagine corso <input id="trainingCourseThumbnailFile" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"></label>
-          <label>Modulo <input id="trainingCourseModule" placeholder="Esempio: Introduzione all'oro 18KT"></label>
-          <label>Lezione <input id="trainingCourseLesson" placeholder="Titolo lezione principale"></label>
-          <label>Descrizione <textarea id="trainingCourseDescription" rows="4"></textarea></label>
-          <label>Video lezione <input id="trainingCourseVideo" placeholder="Link YouTube/Vimeo/Bunny/Cloudflare o video esterno"></label>
-          <label>Carica video lezione <input id="trainingCourseVideoFile" type="file" accept=".mp4,.mov,video/mp4,video/quicktime"></label>
-          <label>PDF lezione <input id="trainingCoursePdf" placeholder="Link PDF scaricabile"></label>
-          <label>Carica PDF lezione <input id="trainingCoursePdfFile" type="file" accept=".pdf,application/pdf"></label>
-          <label>Materiale o link video <input id="trainingCourseMaterial" placeholder="Link PDF, video o materiale esterno https"></label>
-          <label>Carica materiale corso <input id="trainingCourseFile" type="file" accept=".pdf,.mp4,.mov,.txt,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,application/pdf,video/mp4,video/quicktime,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/jpeg,image/png,image/webp"></label>
-          <label class="inline-check"><input id="trainingCourseActive" type="checkbox" checked> Corso attivo</label>
-          <label class="inline-check"><input id="trainingCourseCertification" type="checkbox" checked> Certificazione finale disponibile</label>
-          <div class="user-form-actions">
-            <button class="primary-button" type="submit" id="trainingCourseSaveButton">Salva modifiche</button>
-            <button class="ghost-button" type="button" id="trainingCourseReset">Chiudi modifica</button>
-          </div>
-        </form>
+        <div id="trainingCourseEditHost"></div>
+        <template id="trainingCourseEditTemplate">
+          <form class="course-editor founder-only" id="trainingCourseForm">
+            <input type="hidden" id="trainingCourseId">
+            <label>Titolo corso <input id="trainingCourseTitle" required></label>
+            <label>Facoltà
+              <select id="trainingCourseFaculty">
+                <option>Facoltà Metalli Preziosi</option>
+                <option>Facoltà Gemmologia</option>
+                <option>Facoltà Operativa</option>
+                <option>Facoltà Business</option>
+              </select>
+            </label>
+            <label>Categoria
+              <select id="trainingCourseCategory">
+                <option>Oro</option>
+                <option>Formazione Compro Oro</option>
+                <option>Argento</option>
+                <option>Platino</option>
+                <option>Diamanti</option>
+                <option>Procedure Operative</option>
+                <option>Normative</option>
+                <option>Coaching Aziendale</option>
+              </select>
+            </label>
+            <label>Sottosezione <input id="trainingCourseSection" placeholder="Esempio: Oro base, Antiriciclaggio, Cliente"></label>
+            <label>Livello
+              <select id="trainingCourseLevel">
+                <option>Base</option>
+                <option>Intermedio</option>
+                <option>Avanzato</option>
+                <option>Master</option>
+              </select>
+            </label>
+            <label>Durata stimata <input id="trainingCourseDuration" placeholder="Esempio: 2h 35m"></label>
+            <label>Docente / formatore <input id="trainingCourseTeacher" placeholder="Nome formatore"></label>
+            <label>Thumbnail corso <input id="trainingCourseThumbnail" placeholder="Link immagine opzionale"></label>
+            <label>Carica immagine corso <input id="trainingCourseThumbnailFile" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"></label>
+            <label>Modulo <input id="trainingCourseModule" placeholder="Esempio: Introduzione all'oro 18KT"></label>
+            <label>Lezione <input id="trainingCourseLesson" placeholder="Titolo lezione principale"></label>
+            <label>Descrizione <textarea id="trainingCourseDescription" rows="4"></textarea></label>
+            <label>Video lezione <input id="trainingCourseVideo" placeholder="Link YouTube/Vimeo/Bunny/Cloudflare o video esterno"></label>
+            <label>Carica video lezione <input id="trainingCourseVideoFile" type="file" accept=".mp4,.mov,video/mp4,video/quicktime"></label>
+            <label>PDF lezione <input id="trainingCoursePdf" placeholder="Link PDF scaricabile"></label>
+            <label>Carica PDF lezione <input id="trainingCoursePdfFile" type="file" accept=".pdf,application/pdf"></label>
+            <label>Materiale o link video <input id="trainingCourseMaterial" placeholder="Link PDF, video o materiale esterno https"></label>
+            <label>Carica materiale corso <input id="trainingCourseFile" type="file" accept=".pdf,.mp4,.mov,.txt,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,application/pdf,video/mp4,video/quicktime,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/jpeg,image/png,image/webp"></label>
+            <label class="inline-check"><input id="trainingCourseActive" type="checkbox" checked> Corso attivo</label>
+            <label class="inline-check"><input id="trainingCourseCertification" type="checkbox" checked> Certificazione finale disponibile</label>
+            <div class="user-form-actions">
+              <button class="primary-button" type="submit" id="trainingCourseSaveButton">Salva modifiche</button>
+              <button class="ghost-button" type="button" id="trainingCourseReset">Chiudi modifica</button>
+            </div>
+          </form>
+        </template>
         <div class="course-toolbar">
           <input class="search" id="courseSearch" placeholder="Cerca corso">
           <select id="courseCategoryFilter">
@@ -1896,6 +1899,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260622-advanced-academy-courses-1"></script>
+  <script src="app.js?v=20260623-academy-form-cleanup-1"></script>
 </body>
 </html>

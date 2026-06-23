@@ -2421,6 +2421,10 @@ body.splash-active {
   overflow-wrap: anywhere;
 }
 
+#trainingCourseEditHost:empty {
+  display: none !important;
+}
+
 #trainingCourseSaveButton {
   background: #ff6a00;
   color: #fff;
