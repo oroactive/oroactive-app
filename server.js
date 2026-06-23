@@ -13963,6 +13963,9 @@ function canEvaluateCourses(user = {}) {
 const baseAcademyCourseAssetsDirectory = path.join(__dirname, "assets", "academy", "courses");
 const OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE = 85;
 const OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT = 17;
+const OROACTIVE_OPERATIVE_COURSE_CODE = "OA-OPERATIVO-COMPLETO";
+const OROACTIVE_OPERATIVE_COURSE_SLUG = "corso-operativo-completo-compro-oro";
+const OROACTIVE_OPERATIVE_COURSE_LEGACY_CODES = ["OROACTIVE-COMPLETO-COMPRO-ORO"];
 
 const OROACTIVE_BASE_ACADEMY_COURSES = [
   {
@@ -14323,20 +14326,23 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
     ]
   },
   {
-    code: "OROACTIVE-COMPLETO-COMPRO-ORO",
-    title: "Corso Completo Compro Oro — OroActive",
+    code: OROACTIVE_OPERATIVE_COURSE_CODE,
+    legacyCodes: OROACTIVE_OPERATIVE_COURSE_LEGACY_CODES,
+    legacyTitles: ["Corso Completo Compro Oro — OroActive"],
+    slug: OROACTIVE_OPERATIVE_COURSE_SLUG,
+    title: "Corso Operativo Completo Compro Oro",
     category: "Formazione Compro Oro",
-    section: "Corsi avanzati",
+    section: "Corso propedeutico",
     faculty: "Facoltà Metalli Preziosi",
-    level: "Avanzato",
-    durationLabel: "Corso completo · PDF ufficiale",
+    level: "Specializzazione operativa",
+    durationLabel: "Corso propedeutico · PDF ufficiale",
     teacher: "OroActive Academy",
     assetFile: "corso-completo-compro-oro.pdf",
-    description: "Percorso avanzato OroActive sulla procedura completa di compro oro: accoglienza, identificazione, valutazione, pagamento, controlli, rischi e chiusura pratica.",
+    description: "Percorso propedeutico OroActive sulla procedura completa di compro oro: accoglienza, identificazione, valutazione, pagamento, controlli, rischi e chiusura pratica.",
     moduleTitle: "Procedura completa compro oro",
-    lessonTitle: "Slide ufficiali del Corso Completo Compro Oro",
-    badgeName: "Badge Corso Completo Compro Oro",
-    certificateName: "Corso Completo Compro Oro — OroActive",
+    lessonTitle: "Slide ufficiali del Corso Operativo Completo Compro Oro",
+    badgeName: "Badge Corso Operativo Completo Compro Oro",
+    certificateName: "Corso Operativo Completo Compro Oro",
     orderIndex: 30,
     prerequisiteCourseCodes: [
       "OROACTIVE-BASE-ORO",
@@ -14445,6 +14451,132 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
         correct_answer: "Gestire una pratica completa con controlli, prezzo, documenti, rischio e chiusura corretti"
       }
     ]
+  },
+  {
+    code: "OA-ADV-ANTIFRODE",
+    slug: "antifrode-e-falsi-avanzati",
+    title: "Corso Avanzato Antifrode e Falsi",
+    category: "Formazione Compro Oro",
+    section: "Percorso Avanzato Compro Oro",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Avanzato",
+    durationLabel: "Corso avanzato · PDF ufficiale",
+    teacher: "OroActive Academy",
+    assetFile: "corso-avanzato-antifrode-falsi.pdf",
+    description: "Punzoni falsificati, oggetti placcati o riempiti, nuclei interni, lingotti e monete contraffatti, diamanti lab-grown non dichiarati, simulanti, documenti e comportamenti anomali.",
+    moduleTitle: "Antifrode e falsi avanzati",
+    lessonTitle: "Slide ufficiali del Corso Avanzato Antifrode e Falsi",
+    badgeName: "Badge Antifrode e Falsi Avanzati",
+    certificateName: "Corso Avanzato Antifrode e Falsi",
+    orderIndex: 40,
+    isAdvancedPathCourse: true,
+    prerequisiteCourseCodes: [OROACTIVE_OPERATIVE_COURSE_CODE],
+    quiz: []
+  },
+  {
+    code: "OA-ADV-INVESTIMENTO",
+    slug: "monete-lingotti-metalli-investimento",
+    title: "Corso Avanzato Monete, Lingotti e Metalli da Investimento",
+    category: "Formazione Compro Oro",
+    section: "Percorso Avanzato Compro Oro",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Avanzato",
+    durationLabel: "Corso avanzato · PDF ufficiale",
+    teacher: "OroActive Academy",
+    assetFile: "corso-avanzato-monete-lingotti-metalli-investimento.pdf",
+    description: "Sterline, marenghi, Krugerrand, monete bullion, lingotti, titolo, peso fino, valore numismatico, blister, seriali, certificati, controlli dimensionali, densità e falsi.",
+    moduleTitle: "Monete, lingotti e metalli da investimento",
+    lessonTitle: "Slide ufficiali del Corso Avanzato Monete, Lingotti e Metalli da Investimento",
+    badgeName: "Badge Metalli da Investimento",
+    certificateName: "Corso Avanzato Monete, Lingotti e Metalli da Investimento",
+    orderIndex: 41,
+    isAdvancedPathCourse: true,
+    prerequisiteCourseCodes: [OROACTIVE_OPERATIVE_COURSE_CODE],
+    quiz: []
+  },
+  {
+    code: "OA-ADV-PRICING",
+    slug: "quotazioni-margini-prezzo-massimo-pagabile",
+    title: "Corso Avanzato Quotazioni, Margini e Prezzo Massimo Pagabile",
+    category: "Formazione Compro Oro",
+    section: "Percorso Avanzato Compro Oro",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Avanzato",
+    durationLabel: "Corso avanzato · PDF ufficiale",
+    teacher: "OroActive Academy",
+    assetFile: "corso-avanzato-quotazioni-margini-prezzo-massimo-pagabile.pdf",
+    description: "Prezzo spot, conversioni, carature, titoli, costi di fonderia, perdite, margini, competitor, massimo pagabile, prezzo consigliato e simulazioni.",
+    moduleTitle: "Quotazioni, margini e prezzo massimo pagabile",
+    lessonTitle: "Slide ufficiali del Corso Avanzato Quotazioni, Margini e Prezzo Massimo Pagabile",
+    badgeName: "Badge Pricing OroActive Avanzato",
+    certificateName: "Corso Avanzato Quotazioni, Margini e Prezzo Massimo Pagabile",
+    orderIndex: 42,
+    isAdvancedPathCourse: true,
+    prerequisiteCourseCodes: [OROACTIVE_OPERATIVE_COURSE_CODE],
+    quiz: []
+  },
+  {
+    code: "OA-ADV-GIACENZA",
+    slug: "giacenza-fusione-rientro-economico",
+    title: "Corso Avanzato Giacenza, Fusione e Rientro Economico",
+    category: "Formazione Compro Oro",
+    section: "Percorso Avanzato Compro Oro",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Avanzato",
+    durationLabel: "Corso avanzato · PDF ufficiale",
+    teacher: "OroActive Academy",
+    assetFile: "corso-avanzato-giacenza-fusione-rientro-economico.pdf",
+    description: "Separazione materiali, titoli, lotti, peso atteso e reale, raffineria, resa di fusione, anomalie, margine reale e riconciliazione economica.",
+    moduleTitle: "Giacenza, fusione e rientro economico",
+    lessonTitle: "Slide ufficiali del Corso Avanzato Giacenza, Fusione e Rientro Economico",
+    badgeName: "Badge Giacenza e Rientro Economico",
+    certificateName: "Corso Avanzato Giacenza, Fusione e Rientro Economico",
+    orderIndex: 43,
+    isAdvancedPathCourse: true,
+    prerequisiteCourseCodes: [OROACTIVE_OPERATIVE_COURSE_CODE],
+    quiz: []
+  },
+  {
+    code: "OA-ADV-NORMATIVA",
+    slug: "normativa-e-sicurezza-operativa",
+    title: "Corso Avanzato Normativa e Sicurezza Operativa",
+    category: "Formazione Compro Oro",
+    section: "Percorso Avanzato Compro Oro",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Avanzato",
+    durationLabel: "Corso avanzato · PDF ufficiale",
+    teacher: "OroActive Academy",
+    assetFile: "corso-avanzato-normativa-sicurezza-operativa.pdf",
+    description: "Identificazione cliente, tracciabilità, pagamenti, antiriciclaggio, privacy, conservazione, autorità, audit trail, pratiche sospese e data breach.",
+    moduleTitle: "Normativa e sicurezza operativa",
+    lessonTitle: "Slide ufficiali del Corso Avanzato Normativa e Sicurezza Operativa",
+    badgeName: "Badge Normativa e Sicurezza Operativa",
+    certificateName: "Corso Avanzato Normativa e Sicurezza Operativa",
+    orderIndex: 44,
+    isAdvancedPathCourse: true,
+    prerequisiteCourseCodes: [OROACTIVE_OPERATIVE_COURSE_CODE],
+    quiz: []
+  },
+  {
+    code: "OA-ADV-COMUNICAZIONE",
+    slug: "comunicazione-e-gestione-del-cliente",
+    title: "Corso Avanzato Comunicazione e Gestione del Cliente",
+    category: "Formazione Compro Oro",
+    section: "Percorso Avanzato Compro Oro",
+    faculty: "Facoltà Metalli Preziosi",
+    level: "Avanzato",
+    durationLabel: "Corso avanzato · PDF ufficiale",
+    teacher: "OroActive Academy",
+    assetFile: "corso-avanzato-comunicazione-gestione-cliente.pdf",
+    description: "Spiegazione dei test e dei prezzi, gestione delle obiezioni, esiti negativi, clienti sospetti o aggressivi, trasparenza e Customer Trust Pack.",
+    moduleTitle: "Comunicazione e gestione del cliente",
+    lessonTitle: "Slide ufficiali del Corso Avanzato Comunicazione e Gestione del Cliente",
+    badgeName: "Badge Comunicazione Cliente Avanzata",
+    certificateName: "Corso Avanzato Comunicazione e Gestione del Cliente",
+    orderIndex: 45,
+    isAdvancedPathCourse: true,
+    prerequisiteCourseCodes: [OROACTIVE_OPERATIVE_COURSE_CODE],
+    quiz: []
   }
 ];
 
@@ -15052,12 +15184,41 @@ function oroactiveBaseCourseMetadata(course = {}) {
     : {};
 }
 
+function academyCourseDefinitionCodes(definition = {}) {
+  return [
+    definition.code,
+    ...(Array.isArray(definition.legacyCodes) ? definition.legacyCodes : [])
+  ].map((code) => String(code || "").trim()).filter(Boolean);
+}
+
+function academyCourseDefinitionTitles(definition = {}) {
+  return [
+    definition.title,
+    ...(Array.isArray(definition.legacyTitles) ? definition.legacyTitles : [])
+  ].map((title) => String(title || "").trim()).filter(Boolean);
+}
+
+function oroactiveDefinitionByCode(code = "") {
+  const normalized = String(code || "").trim();
+  return OROACTIVE_BASE_ACADEMY_COURSES.find((definition) => (
+    academyCourseDefinitionCodes(definition).includes(normalized)
+  )) || null;
+}
+
+function canonicalOroactiveCourseCode(code = "") {
+  const definition = oroactiveDefinitionByCode(code);
+  return definition?.code || String(code || "").trim();
+}
+
 function oroactiveBaseCourseDefinitionFor(course = {}) {
   const metadata = oroactiveBaseCourseMetadata(course);
   const seedCode = String(metadata.seedCode || metadata.courseCode || "").trim();
+  const slug = String(metadata.slug || "").trim();
   const title = String(course.title || "").trim();
   return OROACTIVE_BASE_ACADEMY_COURSES.find((definition) => (
-    definition.code === seedCode || definition.title === title
+    academyCourseDefinitionCodes(definition).includes(seedCode)
+      || academyCourseDefinitionTitles(definition).includes(title)
+      || (slug && definition.slug === slug)
   )) || null;
 }
 
@@ -15085,7 +15246,7 @@ function oroactiveCourseSeedCode(course = {}) {
 
 function oroactiveCourseTitleByCode(code = "") {
   const normalized = String(code || "").trim();
-  const definition = OROACTIVE_BASE_ACADEMY_COURSES.find((course) => course.code === normalized);
+  const definition = oroactiveDefinitionByCode(normalized);
   return definition?.title || normalized;
 }
 
@@ -15096,42 +15257,122 @@ function oroactiveCoursePrerequisiteCodes(course = {}) {
     || metadata.prerequisites
     || [];
   if (!Array.isArray(rawPrerequisites)) return [];
-  return rawPrerequisites.map((code) => String(code || "").trim()).filter(Boolean);
+  return rawPrerequisites.map((code) => canonicalOroactiveCourseCode(code)).filter(Boolean);
+}
+
+async function oroactiveCourseByLogicalCode(code = "") {
+  const definition = oroactiveDefinitionByCode(code);
+  const codes = definition ? academyCourseDefinitionCodes(definition) : [String(code || "").trim()].filter(Boolean);
+  const titles = definition ? academyCourseDefinitionTitles(definition) : [];
+  const slug = definition?.slug || "";
+  const result = await pool.query(
+    `SELECT *
+     FROM courses
+     WHERE COALESCE(metadata->>'seedCode', '') = ANY($1::text[])
+        OR COALESCE(metadata->>'courseCode', '') = ANY($1::text[])
+        OR ($2::text <> '' AND COALESCE(metadata->>'slug', '') = $2::text)
+        OR title = ANY($3::text[])
+     ORDER BY id ASC
+     LIMIT 1`,
+    [codes, slug, titles]
+  );
+  return result.rows[0] || null;
+}
+
+function academyProgressIsCompleted(progress = {}) {
+  const status = String(progress?.status || "").trim().toLowerCase();
+  const percent = Number(progress?.percentuale || 0);
+  return Boolean(progress?.completed_at) && percent >= 100 && ["completed", "completato", "certificato"].includes(status);
+}
+
+async function isCourseCompletedForUser(userId, courseIdentifier) {
+  if (!userId || !courseIdentifier) {
+    return { completed: false, reason: "course_not_found", completedAt: null, certificationId: null };
+  }
+  const course = /^\d+$/.test(String(courseIdentifier))
+    ? await academyCourseById(courseIdentifier)
+    : await oroactiveCourseByLogicalCode(courseIdentifier);
+  if (!course?.id) {
+    return { completed: false, reason: "course_not_found", completedAt: null, certificationId: null };
+  }
+  const [quizResult, progressResult, certificateResult, revokedResult] = await Promise.all([
+    pool.query(
+      `SELECT id, completed_at
+       FROM course_quiz_results
+       WHERE course_id = $1::bigint
+         AND user_id = $2::bigint
+         AND esito = 'superato'
+       ORDER BY completed_at DESC NULLS LAST, id DESC
+       LIMIT 1`,
+      [course.id, userId]
+    ),
+    pool.query(
+      `SELECT *
+       FROM user_course_progress
+       WHERE course_id = $1::bigint
+         AND user_id = $2::bigint
+       ORDER BY updated_at DESC NULLS LAST, id DESC
+       LIMIT 1`,
+      [course.id, userId]
+    ),
+    pool.query(
+      `SELECT id, issued_at
+       FROM academy_certificates
+       WHERE course_id = $1::bigint
+         AND user_id = $2::bigint
+         AND status = 'valido'
+       UNION ALL
+       SELECT id, issued_at
+       FROM course_certificates
+       WHERE course_id = $1::bigint
+         AND user_id = $2::bigint
+         AND COALESCE(status, 'valido') = 'valido'
+       ORDER BY issued_at DESC NULLS LAST, id DESC
+       LIMIT 1`,
+      [course.id, userId]
+    ),
+    pool.query(
+      `SELECT id
+       FROM academy_certificates
+       WHERE course_id = $1::bigint
+         AND user_id = $2::bigint
+         AND status <> 'valido'
+       LIMIT 1`,
+      [course.id, userId]
+    )
+  ]);
+  const quiz = quizResult.rows[0] || null;
+  if (!quiz) return { completed: false, reason: "exam_not_passed", completedAt: null, certificationId: null };
+  const certificate = certificateResult.rows[0] || null;
+  if (!certificate) {
+    return {
+      completed: false,
+      reason: revokedResult.rowCount ? "certification_revoked" : "certification_missing",
+      completedAt: null,
+      certificationId: null
+    };
+  }
+  const progress = progressResult.rows[0] || null;
+  if (!academyProgressIsCompleted(progress)) {
+    return { completed: false, reason: "course_not_started", completedAt: null, certificationId: certificate.id };
+  }
+  return {
+    completed: true,
+    reason: "completed",
+    completedAt: progress.completed_at || quiz.completed_at || certificate.issued_at || null,
+    certificationId: certificate.id
+  };
 }
 
 async function completedOroActiveCourseCodesForUser(userId, courseCodes = []) {
-  const codes = [...new Set(courseCodes.map((code) => String(code || "").trim()).filter(Boolean))];
-  if (!userId || !codes.length) return new Set();
-  const result = await pool.query(
-    `SELECT DISTINCT COALESCE(c.metadata->>'seedCode', c.metadata->>'courseCode') AS code
-     FROM courses c
-     WHERE COALESCE(c.metadata->>'seedCode', c.metadata->>'courseCode') = ANY($1::text[])
-       AND (
-         EXISTS (
-           SELECT 1
-           FROM academy_certificates cert
-           WHERE cert.course_id = c.id
-             AND cert.user_id = $2::bigint
-             AND cert.status = 'valido'
-         )
-         OR EXISTS (
-           SELECT 1
-           FROM course_certificates cert
-           WHERE cert.course_id = c.id
-             AND cert.user_id = $2::bigint
-             AND COALESCE(cert.status, 'valido') = 'valido'
-         )
-         OR EXISTS (
-           SELECT 1
-           FROM course_quiz_results quiz
-           WHERE quiz.course_id = c.id
-             AND quiz.user_id = $2::bigint
-             AND quiz.esito = 'superato'
-         )
-       )`,
-    [codes, userId]
-  );
-  return new Set(result.rows.map((row) => String(row.code || "").trim()).filter(Boolean));
+  const codes = [...new Set(courseCodes.map((code) => canonicalOroactiveCourseCode(code)).filter(Boolean))];
+  const completed = new Set();
+  if (!userId || !codes.length) return completed;
+  for (const code of codes) {
+    const status = await isCourseCompletedForUser(userId, code);
+    if (status.completed) completed.add(code);
+  }
+  return completed;
 }
 
 async function academyCoursePrerequisiteStatus(course = {}, user = {}, completedCodes = null) {
@@ -15149,14 +15390,17 @@ async function academyCoursePrerequisiteStatus(course = {}, user = {}, completed
   const completed = completedCodes || await completedOroActiveCourseCodesForUser(user.id, prerequisiteCodes);
   const missingCodes = prerequisiteCodes.filter((code) => !completed.has(code));
   const missing = missingCodes.map((code) => ({ code, title: oroactiveCourseTitleByCode(code) }));
+  const operativeCourseMissing = missingCodes.includes(OROACTIVE_OPERATIVE_COURSE_CODE);
   return {
     prerequisiteCodes,
     missingCodes,
     missing,
     satisfied: missingCodes.length === 0,
     locked: missingCodes.length > 0,
-    reason: missingCodes.length
-      ? `Completa prima: ${missing.map((item) => item.title).join(", ")}.`
+    reason: operativeCourseMissing
+      ? "Completa e supera l'esame del Corso Operativo Completo Compro Oro per sbloccare questo corso."
+      : missingCodes.length
+        ? `Completa prima: ${missing.map((item) => item.title).join(", ")}.`
       : ""
   };
 }
@@ -15166,44 +15410,56 @@ async function assertAcademyCoursePrerequisites(course = {}, user = {}) {
   if (!status.locked) return status;
   const error = new Error(status.reason || "Completa prima i corsi propedeutici.");
   error.status = 403;
-  error.code = "academy_prerequisites_missing";
+  error.code = "COURSE_PREREQUISITE_REQUIRED";
   error.missing_prerequisites = status.missing;
+  error.prerequisite = status.missing[0] || null;
   throw error;
 }
 
 async function ensureOroActiveBaseAcademyCourses() {
   for (const courseDefinition of OROACTIVE_BASE_ACADEMY_COURSES) {
     try {
+    const definitionCodes = academyCourseDefinitionCodes(courseDefinition);
+    const definitionTitles = academyCourseDefinitionTitles(courseDefinition);
     const faculty = await ensureAcademyFaculty(courseDefinition.faculty);
     const category = await ensureCourseCategory(courseDefinition.category);
     const section = await ensureCourseSection(category.id, courseDefinition.section);
     const assetPath = path.join(baseAcademyCourseAssetsDirectory, courseDefinition.assetFile);
     const assetExists = await fs.access(assetPath).then(() => true).catch(() => false);
+    const quizCount = Array.isArray(courseDefinition.quiz) ? courseDefinition.quiz.length : 0;
     const metadata = sanitizeForPostgres({
       seedCode: courseDefinition.code,
+      courseCode: courseDefinition.code,
+      legacyCodes: Array.isArray(courseDefinition.legacyCodes) ? courseDefinition.legacyCodes : [],
+      slug: courseDefinition.slug || "",
       oroactiveBaseCourse: true,
+      isAdvancedPathCourse: Boolean(courseDefinition.isAdvancedPathCourse),
+      isAdvanced: Boolean(courseDefinition.isAdvancedPathCourse),
       pdfAssetFile: courseDefinition.assetFile,
       pdfAssetPath: assetPath,
-      pdfRequiresFinalTest: true,
+      pdfRequiresFinalTest: false,
       certificateName: courseDefinition.certificateName,
       badgeName: courseDefinition.badgeName,
       prerequisiteCourseCodes: Array.isArray(courseDefinition.prerequisiteCourseCodes)
         ? courseDefinition.prerequisiteCourseCodes
         : [],
       finalExamPassScore: OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE,
-      finalExamRequiredCorrect: OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT,
-      finalExamQuestionCount: courseDefinition.quiz.length,
+      finalExamRequiredCorrect: quizCount ? OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT : 0,
+      finalExamQuestionCount: quizCount,
+      examConfigured: quizCount > 0,
       assetAvailable: assetExists,
       updatedAt: new Date().toISOString()
     });
     let course = (await pool.query(
       `SELECT *
        FROM courses
-       WHERE COALESCE(metadata->>'seedCode', '') = $1::text
-          OR title = $2::text
+       WHERE COALESCE(metadata->>'seedCode', '') = ANY($1::text[])
+          OR COALESCE(metadata->>'courseCode', '') = ANY($1::text[])
+          OR ($2::text <> '' AND COALESCE(metadata->>'slug', '') = $2::text)
+          OR title = ANY($3::text[])
        ORDER BY id ASC
        LIMIT 1`,
-      [courseDefinition.code, courseDefinition.title]
+      [definitionCodes, courseDefinition.slug || "", definitionTitles]
     )).rows[0];
     if (course) {
       course = (await pool.query(
@@ -15315,11 +15571,17 @@ async function ensureOroActiveBaseAcademyCourses() {
       `SELECT *
        FROM academy_modules
        WHERE course_id = $1::bigint
-         AND COALESCE(metadata->>'seedCode', '') = $2::text
+         AND COALESCE(metadata->>'seedCode', '') = ANY($2::text[])
        LIMIT 1`,
-      [course.id, courseDefinition.code]
+      [course.id, definitionCodes]
     )).rows[0];
-    const moduleMetadata = sanitizeForPostgres({ seedCode: courseDefinition.code, oroactiveBaseCourse: true });
+    const moduleMetadata = sanitizeForPostgres({
+      seedCode: courseDefinition.code,
+      courseCode: courseDefinition.code,
+      slug: courseDefinition.slug || "",
+      oroactiveBaseCourse: true,
+      isAdvancedPathCourse: Boolean(courseDefinition.isAdvancedPathCourse)
+    });
     if (moduleRow) {
       moduleRow = (await pool.query(
         `UPDATE academy_modules
@@ -15348,15 +15610,21 @@ async function ensureOroActiveBaseAcademyCourses() {
       `SELECT *
        FROM academy_lessons
        WHERE course_id = $1::bigint
-         AND COALESCE(metadata->>'seedCode', '') = $2::text
+         AND COALESCE(metadata->>'seedCode', '') = ANY($2::text[])
        LIMIT 1`,
-      [course.id, courseDefinition.code]
+      [course.id, definitionCodes]
     )).rows[0];
     const lessonMetadata = sanitizeForPostgres({
       seedCode: courseDefinition.code,
+      courseCode: courseDefinition.code,
+      slug: courseDefinition.slug || "",
       oroactiveBaseCourse: true,
-      pdfRequiresFinalTest: true
+      pdfRequiresFinalTest: false,
+      isAdvancedPathCourse: Boolean(courseDefinition.isAdvancedPathCourse)
     });
+    const lessonDescription = quizCount
+      ? "Lezione basata sulle slide PDF ufficiali del corso. Il test finale assegna badge e certificazione al superamento."
+      : "Lezione basata sulle slide PDF ufficiali del percorso avanzato. Il materiale resta protetto dal prerequisito Academy.";
     if (lessonRow) {
       lessonRow = (await pool.query(
         `UPDATE academy_lessons
@@ -15375,7 +15643,7 @@ async function ensureOroActiveBaseAcademyCourses() {
           lessonRow.id,
           moduleRow.id,
           courseDefinition.lessonTitle,
-          "Lezione basata sulle slide PDF ufficiali del corso. Il test finale assegna badge e certificazione al superamento.",
+          lessonDescription,
           slidesRoute,
           durationMinutesFromLabel(courseDefinition.durationLabel),
           lessonMetadata
@@ -15391,7 +15659,7 @@ async function ensureOroActiveBaseAcademyCourses() {
           moduleRow.id,
           course.id,
           courseDefinition.lessonTitle,
-          "Lezione basata sulle slide PDF ufficiali del corso. Il test finale assegna badge e certificazione al superamento.",
+          lessonDescription,
           slidesRoute,
           durationMinutesFromLabel(courseDefinition.durationLabel),
           lessonMetadata
@@ -15401,9 +15669,11 @@ async function ensureOroActiveBaseAcademyCourses() {
 
     const materialMetadata = sanitizeForPostgres({
       seedCode: courseDefinition.code,
+      courseCode: courseDefinition.code,
       oroactiveBaseCourse: true,
       kind: "official_course_slides",
       lockedUntilFinalTestPassed: false,
+      isAdvancedPathCourse: Boolean(courseDefinition.isAdvancedPathCourse),
       pdfAssetFile: courseDefinition.assetFile
     });
     await pool.query(
@@ -15437,7 +15707,7 @@ async function ensureOroActiveBaseAcademyCourses() {
          AND sort_order BETWEEN 1000 AND 1099`,
       [course.id]
     );
-    for (const [index, question] of courseDefinition.quiz.entries()) {
+    for (const [index, question] of (courseDefinition.quiz || []).entries()) {
       await pool.query(
         `INSERT INTO course_quizzes
           (course_id, question, options, correct_answer, sort_order, active)
@@ -15577,15 +15847,10 @@ async function listCourses(user = {}) {
       badgeByCourse.set(String(row.course_id), row);
     }
   }
-  const completedCourseCodes = new Set();
-  for (const course of courseRows) {
-    const courseKey = String(course.id);
-    const passed = passedByCourse.get(courseKey);
-    if (certificateByCourse.has(courseKey) || passed?.passed) {
-      const seedCode = oroactiveCourseSeedCode(course);
-      if (seedCode) completedCourseCodes.add(seedCode);
-    }
-  }
+  const prerequisiteUniverse = [
+    ...new Set(courseRows.flatMap((course) => oroactiveCoursePrerequisiteCodes(course)))
+  ];
+  const completedCourseCodes = await completedOroActiveCourseCodesForUser(userId, prerequisiteUniverse);
   const enrichedCourses = courseRows.map((course) => {
     const courseKey = String(course.id);
     const baseCourseDefinition = oroactiveBaseCourseDefinitionFor(course);
@@ -15598,6 +15863,7 @@ async function listCourses(user = {}) {
     const quizResult = passedByCourse.get(courseKey) || null;
     const finalExamPassed = Boolean(certificate || quizResult?.passed);
     const metadata = oroactiveBaseCourseMetadata(course);
+    const seedCode = oroactiveCourseSeedCode(course);
     const prerequisiteCodes = oroactiveCoursePrerequisiteCodes(course);
     const missingPrerequisiteCodes = role === "founder"
       ? []
@@ -15607,6 +15873,7 @@ async function listCourses(user = {}) {
       title: oroactiveCourseTitleByCode(code)
     }));
     const courseLocked = missingPrerequisiteCodes.length > 0;
+    const operativeCourseMissing = missingPrerequisiteCodes.includes(OROACTIVE_OPERATIVE_COURSE_CODE);
     const visibleFinalExamQuestions = courseLocked ? [] : finalExamQuestions;
     const officialSlidesUrl = (metadata.pdfAssetFile || baseCourseDefinition) ? academyBaseSlidesRoute(course.id) : "";
     const lastExamCompletedAt = quizResult?.completed_at ? new Date(quizResult.completed_at) : null;
@@ -15616,6 +15883,11 @@ async function listCourses(user = {}) {
     const retryBlocked = Boolean(retryAvailableAt && retryAvailableAt.getTime() > Date.now());
     return {
       ...course,
+      course_code: seedCode,
+      course_slug: metadata.slug || baseCourseDefinition?.slug || "",
+      advanced_path_course: Boolean(metadata.isAdvancedPathCourse || baseCourseDefinition?.isAdvancedPathCourse),
+      founder_access: role === "founder" && Boolean(metadata.isAdvancedPathCourse || baseCourseDefinition?.isAdvancedPathCourse),
+      final_exam_configured: finalExamQuestions.length > 0,
       final_exam: {
         pass_score: Number(metadata.finalExamPassScore || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE : 80)),
         required_correct: Number(metadata.finalExamRequiredCorrect || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT : 0)),
@@ -15632,7 +15904,9 @@ async function listCourses(user = {}) {
       prerequisites_satisfied: !courseLocked,
       course_locked: courseLocked,
       course_lock_reason: courseLocked
-        ? `Completa prima: ${missingPrerequisites.map((item) => item.title).join(", ")}.`
+        ? operativeCourseMissing
+          ? "Completa e supera l'esame del Corso Operativo Completo Compro Oro per sbloccare questo corso."
+          : `Completa prima: ${missingPrerequisites.map((item) => item.title).join(", ")}.`
         : "",
       slides_locked: courseLocked,
       slides_download_url: officialSlidesUrl,
@@ -17686,6 +17960,20 @@ async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examTy
   )).rows[0];
 
   await recalculateAcademyOperatorLevel(userId);
+  if (oroactiveCourseSeedCode(course) === OROACTIVE_OPERATIVE_COURSE_CODE) {
+    void createNotification({
+      userId,
+      title: "Percorso avanzato sbloccato",
+      message: "Hai completato il Corso Operativo Completo Compro Oro. Ora puoi accedere a tutte le specializzazioni avanzate OroActive Academy.",
+      type: "academy_unlock",
+      severity: "success",
+      entityType: "academy_course",
+      entityId: courseId,
+      actionUrl: "#academy",
+      createdBy: issuedBy || userId,
+      audit: false
+    }).catch(() => {});
+  }
   return { course, certificate, badge };
 }
 

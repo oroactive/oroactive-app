@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260622-complete-buyback-course-1";
+const STATIC_CACHE = "oroactive-static-v20260622-advanced-academy-courses-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260622-complete-buyback-course-1",
-  "/app.js?v=20260622-complete-buyback-course-1",
+  "/styles.css?v=20260622-advanced-academy-courses-1",
+  "/app.js?v=20260622-advanced-academy-courses-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",

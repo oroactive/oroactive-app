@@ -9412,8 +9412,12 @@ function renderTraining() {
     return;
   }
 
-  trainingList.innerHTML = visibleCourses.length
-    ? visibleCourses.map(renderCourseCard).join("")
+  const advancedCourses = visibleCourses.filter(isAdvancedPathCourseUi);
+  const standardCourses = visibleCourses.filter((course) => !isAdvancedPathCourseUi(course));
+  const standardRows = standardCourses.map(renderCourseCard).join("");
+  const advancedRows = renderAdvancedAcademyPath(advancedCourses);
+  trainingList.innerHTML = standardRows || advancedRows
+    ? `${standardRows}${advancedRows}`
     : '<div class="empty-state">Nessun corso attivo.</div>';
 }
 
@@ -9436,9 +9440,56 @@ function courseExamRetryMessage(course = {}) {
   return `Test ripetibile dal ${formatDateTime(course.final_exam_retry_available_at)}`;
 }
 
+function academyCourseCodeUi(course = {}) {
+  const metadata = course.metadata || {};
+  return String(course.course_code || metadata.seedCode || metadata.courseCode || "").trim();
+}
+
+function isAdvancedPathCourseUi(course = {}) {
+  const metadata = course.metadata || {};
+  return Boolean(course.advanced_path_course || metadata.isAdvancedPathCourse);
+}
+
+function renderAdvancedAcademyPath(courses = []) {
+  if (!courses.length) return "";
+  const founderAccess = courses.some((course) => course.founder_access);
+  const locked = courses.some((course) => course.course_locked || course.prerequisites_satisfied === false);
+  const banner = founderAccess
+    ? {
+      label: "Accesso Founder",
+      title: "Percorso Avanzato Compro Oro",
+      text: "Come Founder puoi visualizzare subito tutte le specializzazioni avanzate senza sbloccare il prerequisito."
+    }
+    : locked
+      ? {
+        label: "Percorso avanzato bloccato",
+        title: "Completa il corso propedeutico",
+        text: "Per accedere alle specializzazioni avanzate devi completare il Corso Operativo Completo Compro Oro e superare il relativo esame finale."
+      }
+      : {
+        label: "Percorso avanzato sbloccato",
+        title: "Specializzazioni disponibili",
+        text: "Hai completato il Corso Operativo Completo Compro Oro. Tutte le specializzazioni avanzate sono disponibili."
+      };
+  return `
+    <section class="academy-advanced-path">
+      <div class="academy-advanced-path-banner ${locked && !founderAccess ? "locked" : "unlocked"}">
+        <span class="course-pill">${escapeHtml(banner.label)}</span>
+        <h3>${escapeHtml(banner.title)}</h3>
+        <p>${escapeHtml(banner.text)}</p>
+      </div>
+      <div class="academy-advanced-path-grid">
+        ${courses.map(renderCourseCard).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderCourseCard(course) {
   const videoUrl = course.academy_video_url || course.video_url || "";
   const pdfUrl = courseSlidesUrl(course);
+  const courseCode = academyCourseCodeUi(course);
+  const isAdvancedPath = isAdvancedPathCourseUi(course);
   const isLocked = Boolean(course.course_locked || course.prerequisites_satisfied === false || course.slides_locked);
   const lockReason = course.course_lock_reason
     || (Array.isArray(course.missing_prerequisites) && course.missing_prerequisites.length
@@ -9446,6 +9497,7 @@ function renderCourseCard(course) {
       : "Completa prima i corsi propedeutici.");
   const finalExamQuestions = courseFinalExamQuestions(course);
   const hasFinalExam = finalExamQuestions.length > 0;
+  const showExamUnavailable = !isLocked && isAdvancedPath && !hasFinalExam;
   const examPassed = courseExamPassed(course);
   const retryMessage = courseExamRetryMessage(course);
   const canOpenSlides = Boolean(pdfUrl) && !isLocked;
@@ -9460,16 +9512,22 @@ function renderCourseCard(course) {
     </div>
   ` : "";
   const testStatus = isLocked
-    ? `<span class="academy-test-status locked">Corso avanzato bloccato · ${escapeHtml(lockReason)}</span>`
+    ? `<span class="academy-test-status locked">Bloccato · ${escapeHtml(lockReason)}</span>`
     : hasFinalExam
       ? examPassed
         ? `<span class="academy-test-status passed">Test finale superato${course.final_exam_score ? ` · ${escapeHtml(String(course.final_exam_score))}%` : ""}</span>`
         : retryMessage
           ? `<span class="academy-test-status">Test finale non superato · ${escapeHtml(retryMessage)}</span>`
           : `<span class="academy-test-status">Test finale richiesto per ottenere badge e certificazione</span>`
-      : "";
+      : showExamUnavailable
+        ? `<span class="academy-test-status">Esame da configurare</span>`
+        : "";
+  const firstMissingPrerequisite = Array.isArray(course.missing_prerequisites) ? course.missing_prerequisites[0] : null;
+  const prerequisiteButton = isLocked && firstMissingPrerequisite?.code
+    ? `<button class="secondary-button" type="button" data-open-prerequisite-course="${escapeHtml(String(firstMissingPrerequisite.code))}">Vai al corso propedeutico</button>`
+    : "";
   return `
-    <article class="course-card academy-course-card">
+    <article class="course-card academy-course-card ${isLocked ? "is-locked" : ""}" data-course-code="${escapeHtml(courseCode)}">
       <div class="course-card-main">
         <span class="course-pill">${escapeHtml(course.faculty_name || "Academy")}</span>
         <h3>${escapeHtml(course.title)}</h3>
@@ -9479,6 +9537,7 @@ function renderCourseCard(course) {
           <span>Livello ${escapeHtml(course.level || "Base")}</span>
           <span>Durata ${escapeHtml(course.duration_label || (course.duration_minutes ? `${course.duration_minutes} min` : "Da definire"))}</span>
           <span>Docente ${escapeHtml(course.teacher || "OroActive")}</span>
+          ${course.founder_access ? "<span>Accesso Founder</span>" : ""}
         </div>
         <small>${escapeHtml(moduleTitle)} · ${escapeHtml(lessonTitle)}</small>
         ${testStatus}
@@ -9493,8 +9552,9 @@ function renderCourseCard(course) {
         </div>
       </div>
       <div class="course-progress-panel">
-        ${isLocked ? `<span class="academy-course-lock">${escapeHtml(lockReason)}</span>` : ""}
+        ${isLocked ? `<span class="academy-course-lock">${escapeHtml(lockReason)}</span>${prerequisiteButton}` : ""}
         ${!isLocked && hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}" ${course.final_exam_retry_blocked ? "disabled" : ""}>${course.final_exam_retry_blocked ? "Test disponibile tra 48 ore" : "Sostieni test finale"}</button>` : ""}
+        ${showExamUnavailable ? '<button class="primary-button" type="button" disabled>Esame non disponibile</button>' : ""}
         ${hasFinalExam && examPassed ? `<button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(course.certificate_id || ""))}" ${course.certificate_id ? "" : "disabled"}>Scarica certificato</button>` : ""}
       </div>
     </article>
@@ -17825,6 +17885,7 @@ trainingList?.addEventListener("click", async (event) => {
   const certificate = event.target.closest("[data-download-certificate]");
   const editCourseButton = event.target.closest("[data-edit-course]");
   const deleteCourseButton = event.target.closest("[data-delete-course]");
+  const prerequisiteButton = event.target.closest("[data-open-prerequisite-course]");
   try {
     if (startOperator) return await withButtonBusy(startOperator, "Avvio...", () => startOperatorTraining(startOperator.dataset.startOperatorTraining));
     if (saveOperator) return await withButtonBusy(saveOperator, "Salvo...", () => saveOperatorTrainingProgress(saveOperator.dataset.saveOperatorTraining));
@@ -17843,6 +17904,19 @@ trainingList?.addEventListener("click", async (event) => {
     if (viewSlides) return await withButtonBusy(viewSlides, "Apro...", () => downloadCourseSlides(viewSlides.dataset.viewCourseSlides, { download: false }));
     if (downloadSlides) return await withButtonBusy(downloadSlides, "Scarico...", () => downloadCourseSlides(downloadSlides.dataset.downloadCourseSlides, { download: true }));
     if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
+    if (prerequisiteButton) {
+      const prerequisiteCode = prerequisiteButton.dataset.openPrerequisiteCourse || "";
+      const card = [...document.querySelectorAll("[data-course-code]")]
+        .find((item) => item.dataset.courseCode === prerequisiteCode);
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.classList.add("academy-course-highlight");
+        window.setTimeout(() => card.classList.remove("academy-course-highlight"), 1600);
+      } else {
+        showToast("Corso propedeutico non disponibile nel catalogo.", "warning");
+      }
+      return;
+    }
     if (editCourseButton) {
       editCourse(editCourseButton.dataset.editCourse);
       return;
