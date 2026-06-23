@@ -13963,13 +13963,23 @@ function canEvaluateCourses(user = {}) {
 const baseAcademyCourseAssetsDirectory = path.join(__dirname, "assets", "academy", "courses");
 const OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE = 85;
 const OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT = 17;
+const ACADEMY_QUALIFICATION_SYSTEM_ENABLED = String(process.env.ACADEMY_QUALIFICATION_SYSTEM_ENABLED ?? "true").toLowerCase() === "true";
+const ACADEMY_PILOT_MODE = String(process.env.ACADEMY_PILOT_MODE || "false").toLowerCase() === "true";
+const ACADEMY_ENFORCEMENT_MODE = ["shadow", "warn", "enforce"].includes(String(process.env.ACADEMY_ENFORCEMENT_MODE || "shadow").toLowerCase())
+  ? String(process.env.ACADEMY_ENFORCEMENT_MODE || "shadow").toLowerCase()
+  : "shadow";
 const OROACTIVE_OPERATIVE_COURSE_CODE = "OA-OPERATIVO-COMPLETO";
 const OROACTIVE_OPERATIVE_COURSE_SLUG = "corso-operativo-completo-compro-oro";
 const OROACTIVE_OPERATIVE_COURSE_LEGACY_CODES = ["OROACTIVE-COMPLETO-COMPRO-ORO"];
 
+function isFounder(user = {}) {
+  return normalizeRole(user?.ruolo || user?.role || user?.role_code) === "founder";
+}
+
 const OROACTIVE_BASE_ACADEMY_COURSES = [
   {
-    code: "OROACTIVE-BASE-ORO",
+    code: "OA-BASE-ORO",
+    legacyCodes: ["OROACTIVE-BASE-ORO"],
     title: "Corso Base sull'Oro — OroActive",
     category: "Oro",
     section: "Corsi base",
@@ -14088,7 +14098,8 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
     ]
   },
   {
-    code: "OROACTIVE-BASE-ARGENTO",
+    code: "OA-BASE-ARGENTO",
+    legacyCodes: ["OROACTIVE-BASE-ARGENTO"],
     title: "Corso Base sull'Argento — OroActive",
     category: "Argento",
     section: "Corsi base",
@@ -14207,7 +14218,8 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
     ]
   },
   {
-    code: "OROACTIVE-BASE-DIAMANTI",
+    code: "OA-BASE-DIAMANTI",
+    legacyCodes: ["OROACTIVE-BASE-DIAMANTI"],
     title: "Corso Base sui Diamanti — OroActive",
     category: "Diamanti",
     section: "Corsi base",
@@ -14345,9 +14357,9 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
     certificateName: "Corso Operativo Completo Compro Oro",
     orderIndex: 30,
     prerequisiteCourseCodes: [
-      "OROACTIVE-BASE-ORO",
-      "OROACTIVE-BASE-ARGENTO",
-      "OROACTIVE-BASE-DIAMANTI"
+      "OA-BASE-ORO",
+      "OA-BASE-ARGENTO",
+      "OA-BASE-DIAMANTI"
     ],
     quiz: [
       {
@@ -14579,6 +14591,201 @@ const OROACTIVE_BASE_ACADEMY_COURSES = [
     quiz: []
   }
 ];
+
+const ACADEMY_LEARNING_PATH_DEFINITIONS = [
+  {
+    code: "OA-PATH-AIUTO-COMMESSO",
+    name: "Percorso Aiuto Commesso",
+    targetRole: "aiuto_commesso",
+    description: "Preparazione assistita, descrizione oggetti, supporto pratica, comunicazione cliente ed escalation.",
+    courses: ["OA-BASE-ORO", "OA-BASE-ARGENTO", "OA-BASE-DIAMANTI", OROACTIVE_OPERATIVE_COURSE_CODE, "OA-ADV-COMUNICAZIONE"]
+  },
+  {
+    code: "OA-PATH-COMMESSO",
+    name: "Percorso Commesso",
+    targetRole: "commesso",
+    description: "Operatore autonomo sulle pratiche standard entro ruolo, policy e autorizzazioni.",
+    courses: ["OA-BASE-ORO", "OA-BASE-ARGENTO", "OA-BASE-DIAMANTI", OROACTIVE_OPERATIVE_COURSE_CODE, "OA-ADV-COMUNICAZIONE", "OA-ADV-ANTIFRODE", "OA-ADV-NORMATIVA", "OA-ADV-PRICING"]
+  },
+  {
+    code: "OA-PATH-RESPONSABILE",
+    name: "Percorso Responsabile",
+    targetRole: "responsabile",
+    description: "Gestione negozio, autorizzazioni, pricing, giacenza, fusioni, anomalie e verifica operatori.",
+    courses: ["OA-BASE-ORO", "OA-BASE-ARGENTO", "OA-BASE-DIAMANTI", OROACTIVE_OPERATIVE_COURSE_CODE, "OA-ADV-COMUNICAZIONE", "OA-ADV-ANTIFRODE", "OA-ADV-NORMATIVA", "OA-ADV-PRICING", "OA-ADV-GIACENZA", "OA-ADV-INVESTIMENTO"]
+  },
+  {
+    code: "OA-PATH-SUPERVISORE",
+    name: "Percorso Supervisore",
+    targetRole: "supervisore",
+    description: "Controllo rete, audit, affiancamento, verifica responsabili e monitoraggio competenze.",
+    courses: ["OA-BASE-ORO", "OA-BASE-ARGENTO", "OA-BASE-DIAMANTI", OROACTIVE_OPERATIVE_COURSE_CODE, "OA-ADV-COMUNICAZIONE", "OA-ADV-ANTIFRODE", "OA-ADV-NORMATIVA", "OA-ADV-PRICING", "OA-ADV-GIACENZA", "OA-ADV-INVESTIMENTO"]
+  }
+];
+
+const ACADEMY_COMPETENCY_DEFINITIONS = [
+  ["GOLD_EVALUATION", "Valutazione oro", "Carature, punzoni, test e limiti operativi."],
+  ["SILVER_EVALUATION", "Valutazione argento", "Titoli argento, parti miste, plated e verifiche."],
+  ["DIAMOND_INTAKE", "Gestione diamanti", "Presa in carico prudente, certificati, lab-grown e verifica superiore."],
+  ["CUSTOMER_COMMUNICATION", "Comunicazione cliente", "Spiegazione prezzo, test, obiezioni e trasparenza."],
+  ["SALE_DEED_OPERATION", "Operatività atto vendita", "Compilazione, documenti, firme, pagamento e chiusura pratica."],
+  ["ADVANCED_ANTIFRAUD", "Antifrode avanzata", "Falsi, anomalie, comportamenti sospetti ed escalation."],
+  ["PRICING_AND_MARGIN", "Prezzi, margini e deroghe", "Quotazioni, massimo pagabile, spread, costi e margini."],
+  ["COMPLIANCE_AND_SECURITY", "Normativa e sicurezza", "Tracciabilità, antiriciclaggio, privacy, audit e sospensioni."],
+  ["STOCK_AND_FUSION", "Giacenza e fusioni", "Lotti, titoli, resa, raffineria, anomalie e rientro economico."],
+  ["INVESTMENT_METALS", "Metalli da investimento", "Monete, lingotti, blister, seriali, valore numismatico e falsi."],
+  ["OPERATIONAL_AUTHORIZATION", "Autorizzazioni operative", "Deroghe, approvazioni, escalation e secondo livello."],
+  ["OPERATOR_ASSESSMENT", "Valutazione operatori", "Prove pratiche, affiancamento e rubrica valutativa."],
+  ["AUDIT_AND_COACHING", "Audit e coaching", "Controllo rete, anomalie formative e accompagnamento operatori."]
+].map(([code, name, description]) => ({ code, name, description }));
+
+const ACADEMY_COURSE_COMPETENCY_MAP = {
+  "OA-BASE-ORO": ["GOLD_EVALUATION"],
+  "OA-BASE-ARGENTO": ["SILVER_EVALUATION"],
+  "OA-BASE-DIAMANTI": ["DIAMOND_INTAKE"],
+  [OROACTIVE_OPERATIVE_COURSE_CODE]: ["SALE_DEED_OPERATION", "CUSTOMER_COMMUNICATION", "COMPLIANCE_AND_SECURITY"],
+  "OA-ADV-COMUNICAZIONE": ["CUSTOMER_COMMUNICATION"],
+  "OA-ADV-ANTIFRODE": ["ADVANCED_ANTIFRAUD"],
+  "OA-ADV-NORMATIVA": ["COMPLIANCE_AND_SECURITY"],
+  "OA-ADV-PRICING": ["PRICING_AND_MARGIN"],
+  "OA-ADV-GIACENZA": ["STOCK_AND_FUSION"],
+  "OA-ADV-INVESTIMENTO": ["INVESTMENT_METALS"]
+};
+
+const ACADEMY_PRACTICAL_REQUIRED_COURSE_CODES = new Set([OROACTIVE_OPERATIVE_COURSE_CODE, "OA-ADV-GIACENZA"]);
+
+const ACADEMY_OPERATIONAL_CAPABILITY_DEFINITIONS = [
+  ["SALE_DEED_CREATE", "Creazione atto vendita", false],
+  ["SALE_DEED_EDIT", "Modifica atto vendita", false],
+  ["SALE_DEED_COMPLETE", "Chiusura autonoma pratica", true],
+  ["SALE_DEED_ARCHIVE", "Archiviazione pratica", false],
+  ["DIAMOND_RECORD", "Inserimento dati diamante", false],
+  ["DIAMOND_EVALUATE_AUTONOMOUSLY", "Valutazione autonoma diamanti", true],
+  ["PRICE_VIEW", "Visualizzazione prezzi", false],
+  ["PRICE_OVERRIDE", "Modifica prezzo", true],
+  ["PRICE_DEROGATION", "Deroga prezzo", true],
+  ["ANTIFRAUD_CHECK", "Controllo antifrode", true],
+  ["ANTIFRAUD_CRITICAL_AUTHORIZE", "Autorizzazione antifrode critica", true],
+  ["STOCK_VIEW", "Visualizzazione giacenza", false],
+  ["STOCK_MANAGE", "Gestione giacenza", true],
+  ["FUSION_CREATE", "Creazione fusione", true],
+  ["FUSION_AUTHORIZE", "Autorizzazione fusione", true],
+  ["SUSPENDED_CASE_REOPEN", "Riapertura pratica sospesa", true],
+  ["SUSPENDED_CASE_AUTHORIZE", "Autorizzazione pratica sospesa", true],
+  ["USER_PRACTICAL_ASSESS", "Valutazione prova pratica", true],
+  ["ACADEMY_AUDIT_VIEW", "Audit Academy", true]
+].map(([code, name, sensitive]) => ({ code, name, sensitive }));
+
+const ACADEMY_CAPABILITY_REQUIREMENT_DEFINITIONS = {
+  SALE_DEED_COMPLETE: {
+    roles: ["commesso", "responsabile", "supervisore", "founder"],
+    competencies: ["SALE_DEED_OPERATION", "COMPLIANCE_AND_SECURITY"],
+    practicalRequired: true,
+    managerApprovalRequired: true
+  },
+  DIAMOND_EVALUATE_AUTONOMOUSLY: {
+    roles: ["commesso", "responsabile", "supervisore", "founder"],
+    competencies: ["DIAMOND_INTAKE"],
+    managerApprovalRequired: true
+  },
+  PRICE_OVERRIDE: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["PRICING_AND_MARGIN"],
+    managerApprovalRequired: true
+  },
+  PRICE_DEROGATION: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["PRICING_AND_MARGIN"],
+    managerApprovalRequired: true
+  },
+  STOCK_MANAGE: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["STOCK_AND_FUSION"],
+    practicalRequired: true,
+    managerApprovalRequired: true
+  },
+  FUSION_CREATE: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["STOCK_AND_FUSION"],
+    practicalRequired: true,
+    managerApprovalRequired: true
+  },
+  FUSION_AUTHORIZE: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["STOCK_AND_FUSION", "OPERATIONAL_AUTHORIZATION"],
+    managerApprovalRequired: true
+  },
+  ANTIFRAUD_CHECK: {
+    roles: ["commesso", "responsabile", "supervisore", "founder"],
+    competencies: ["ADVANCED_ANTIFRAUD"]
+  },
+  ANTIFRAUD_CRITICAL_AUTHORIZE: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["ADVANCED_ANTIFRAUD"],
+    managerApprovalRequired: true
+  },
+  SUSPENDED_CASE_REOPEN: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["COMPLIANCE_AND_SECURITY"],
+    managerApprovalRequired: true
+  },
+  SUSPENDED_CASE_AUTHORIZE: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["COMPLIANCE_AND_SECURITY", "OPERATIONAL_AUTHORIZATION"],
+    managerApprovalRequired: true
+  },
+  USER_PRACTICAL_ASSESS: {
+    roles: ["responsabile", "supervisore", "founder"],
+    competencies: ["OPERATOR_ASSESSMENT"],
+    managerApprovalRequired: true
+  },
+  ACADEMY_AUDIT_VIEW: {
+    roles: ["founder", "supervisore"],
+    competencies: ["AUDIT_AND_COACHING"]
+  }
+};
+
+const ACADEMY_PRACTICAL_ASSESSMENT_DEFINITIONS = [
+  {
+    code: "OA-PRACTICAL-OPERATIVO-COMPLETO",
+    courseCode: OROACTIVE_OPERATIVE_COURSE_CODE,
+    title: "Prova pratica Corso Operativo Completo",
+    description: "Simulazione completa di accoglienza, documenti, test, calcolo, rischio, atto e spiegazione prezzo.",
+    rubric: [
+      ["welcoming", "Accoglienza e chiarezza", 10],
+      ["identification", "Identificazione e documenti", 15],
+      ["description", "Descrizione oggetti", 10],
+      ["tests", "Scelta test", 15],
+      ["pricing", "Calcolo economico", 15],
+      ["risk", "Analisi rischio", 15],
+      ["deed", "Compilazione pratica", 10],
+      ["price_explanation", "Comunicazione prezzo", 5],
+      ["escalation", "Escalation corretta", 5]
+    ]
+  }
+];
+
+const ACADEMY_SIMULATION_SCENARIO_DEFINITIONS = [
+  ["OA-SIM-COLLANA-750-CHIUSURA", "Collana 750 con chiusura non coerente", "Riconoscere componenti misti e motivare la sospensione.", "intermedio", "suspend"],
+  ["OA-SIM-LINGOTTO-DIMENSIONI", "Lingotto con peso corretto ma dimensioni anomale", "Verificare densità, dimensioni, certificato e seriale.", "avanzato", "escalate"],
+  ["OA-SIM-MONETA-NUMISMATICA", "Moneta con possibile valore numismatico", "Non trattare automaticamente solo a peso.", "intermedio", "escalate"],
+  ["OA-SIM-DIAMANTE-CERTIFICATO", "Diamante con certificato non verificabile", "Richiedere verifica gemmologica superiore.", "intermedio", "escalate"],
+  ["OA-SIM-DOCUMENTO-SCADUTO", "Cliente con documento scaduto", "Bloccare o correggere la pratica prima della chiusura.", "base", "suspend"],
+  ["OA-SIM-VENDITE-RAVVICINATE", "Più vendite ravvicinate", "Rilevare pattern e attivare controllo antifrode.", "avanzato", "escalate"],
+  ["OA-SIM-PAGAMENTO-TERZO", "Pagamento richiesto a favore di terzo", "Rifiutare la chiusura senza autorizzazione prevista.", "avanzato", "suspend"],
+  ["OA-SIM-ARGENTO-RIEMPITO", "Argento 925 con componenti riempiti", "Separare parti e non pagare peso non prezioso.", "intermedio", "revise"],
+  ["OA-SIM-COMPETITOR-SOPRA-MAX", "Competitor sopra massimo sostenibile", "Non superare policy senza deroga autorizzata.", "avanzato", "request_authorization"],
+  ["OA-SIM-PRATICA-SOSPENDERE", "Pratica da sospendere", "Documentare anomalie e chiedere verifica superiore.", "base", "suspend"]
+].map(([code, title, description, difficulty, expectedDecision]) => ({
+  code,
+  title,
+  description,
+  difficulty,
+  expectedDecision,
+  targetRoles: ["aiuto_commesso", "commesso", "responsabile", "supervisore"],
+  expectedControls: ["documenti", "descrizione", "test", "calcolo", "rischio", "escalation"],
+  scoringConfig: { decision: 25, controls: 25, documentation: 20, pricing: 15, escalation: 15 }
+}));
 
 const aurumBlocksDefaultQuestions = [
   {
@@ -15169,9 +15376,22 @@ function sanitizeQuizQuestionsForClient(questions = []) {
     id: question.id,
     course_id: question.course_id,
     question: question.question,
-    options: Array.isArray(question.options) ? question.options : [],
+    options: academyShuffleExamOptions(Array.isArray(question.options) ? question.options : [], question),
     sort_order: question.sort_order
   }));
+}
+
+function academyShuffleExamOptions(options = [], question = {}) {
+  const mixed = [...options];
+  if (mixed.length <= 1) return mixed;
+  const seedText = `${question.id || ""}:${question.question || ""}:${question.sort_order || 0}`;
+  let seed = crypto.createHash("sha256").update(seedText).digest().readUInt32BE(0);
+  for (let index = mixed.length - 1; index > 0; index -= 1) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const swapIndex = seed % (index + 1);
+    [mixed[index], mixed[swapIndex]] = [mixed[swapIndex], mixed[index]];
+  }
+  return mixed;
 }
 
 function normalizeQuizAnswerValue(value = "") {
@@ -15361,6 +15581,663 @@ async function isCourseCompletedForUser(userId, courseIdentifier) {
     reason: "completed",
     completedAt: progress.completed_at || quiz.completed_at || certificate.issued_at || null,
     certificationId: certificate.id
+  };
+}
+
+function academyQualificationSettings() {
+  return {
+    enabled: ACADEMY_QUALIFICATION_SYSTEM_ENABLED,
+    mode: ACADEMY_ENFORCEMENT_MODE,
+    pilot_mode: ACADEMY_PILOT_MODE
+  };
+}
+
+async function seedAcademyQualificationSystem() {
+  if (!ACADEMY_QUALIFICATION_SYSTEM_ENABLED) {
+    return { skipped: true, reason: "disabled" };
+  }
+  await ensureOroActiveBaseAcademyCourses();
+  const report = {
+    course_codes: 0,
+    prerequisites: 0,
+    learning_paths: 0,
+    competencies: 0,
+    capabilities: 0,
+    simulations: 0,
+    practical_assessments: 0,
+    warnings: []
+  };
+  try {
+    for (const definition of OROACTIVE_BASE_ACADEMY_COURSES) {
+      const course = await oroactiveCourseByLogicalCode(definition.code);
+      if (!course?.id) continue;
+      await pool.query(
+        `UPDATE courses
+         SET course_code = $2::text,
+             slug = NULLIF($3::text, ''),
+             difficulty = $4::text,
+             is_advanced = $5::boolean,
+             is_published = TRUE,
+             sort_order = $6::integer,
+             category = $7::text,
+             version_number = COALESCE(version_number, 1),
+             version_label = COALESCE(version_label, 'v1'),
+             version_status = COALESCE(version_status, 'published'),
+             updated_at = NOW()
+         WHERE id = $1::bigint`,
+        [
+          course.id,
+          definition.code,
+          definition.slug || "",
+          definition.isAdvancedPathCourse ? "advanced" : String(definition.level || "base").toLowerCase(),
+          Boolean(definition.isAdvancedPathCourse),
+          definition.orderIndex || 0,
+          definition.category || "Formazione"
+        ]
+      );
+      report.course_codes += 1;
+    }
+
+    for (const courseDefinition of OROACTIVE_BASE_ACADEMY_COURSES) {
+      const course = await oroactiveCourseByLogicalCode(courseDefinition.code);
+      if (!course?.id) continue;
+      for (const prerequisiteCode of courseDefinition.prerequisiteCourseCodes || []) {
+        const prerequisite = await oroactiveCourseByLogicalCode(prerequisiteCode);
+        if (!prerequisite?.id) continue;
+        await pool.query(
+          `INSERT INTO academy_course_prerequisites
+            (course_id, prerequisite_course_id, completion_rule, active)
+           VALUES ($1::bigint,$2::bigint,'course_completed',TRUE)
+           ON CONFLICT (course_id, prerequisite_course_id)
+           DO UPDATE SET completion_rule = 'course_completed', active = TRUE, updated_at = NOW()`,
+          [course.id, prerequisite.id]
+        );
+        report.prerequisites += 1;
+      }
+    }
+
+    for (const competency of ACADEMY_COMPETENCY_DEFINITIONS) {
+      await pool.query(
+        `INSERT INTO academy_competencies (code, name, description, sensitive, active)
+         VALUES ($1::text,$2::text,$3::text,$4::boolean,TRUE)
+         ON CONFLICT (code)
+         DO UPDATE SET name = EXCLUDED.name,
+                       description = EXCLUDED.description,
+                       sensitive = EXCLUDED.sensitive,
+                       active = TRUE`,
+        [competency.code, competency.name, competency.description, /ANTIFRAUD|PRICING|COMPLIANCE|STOCK|AUTHORIZATION|AUDIT/.test(competency.code)]
+      );
+      report.competencies += 1;
+    }
+
+    for (const [courseCode, competencyCodes] of Object.entries(ACADEMY_COURSE_COMPETENCY_MAP)) {
+      const course = await oroactiveCourseByLogicalCode(courseCode);
+      if (!course?.id) continue;
+      for (const competencyCode of competencyCodes) {
+        const competency = (await pool.query("SELECT id FROM academy_competencies WHERE code = $1::text LIMIT 1", [competencyCode])).rows[0];
+        if (!competency?.id) continue;
+        await pool.query(
+          `INSERT INTO academy_course_competencies
+            (course_id, competency_id, theory_required, practical_required, certification_required)
+           VALUES ($1::bigint,$2::bigint,TRUE,$3::boolean,TRUE)
+           ON CONFLICT (course_id, competency_id)
+           DO UPDATE SET practical_required = EXCLUDED.practical_required,
+                         certification_required = TRUE`,
+          [course.id, competency.id, ACADEMY_PRACTICAL_REQUIRED_COURSE_CODES.has(courseCode)]
+        );
+      }
+    }
+
+    for (const pathDefinition of ACADEMY_LEARNING_PATH_DEFINITIONS) {
+      const pathRow = (await pool.query(
+        `INSERT INTO academy_learning_paths (code, name, target_role, description, active)
+         VALUES ($1::text,$2::text,$3::text,$4::text,TRUE)
+         ON CONFLICT (code)
+         DO UPDATE SET name = EXCLUDED.name,
+                       target_role = EXCLUDED.target_role,
+                       description = EXCLUDED.description,
+                       active = TRUE,
+                       updated_at = NOW()
+         RETURNING *`,
+        [pathDefinition.code, pathDefinition.name, pathDefinition.targetRole, pathDefinition.description]
+      )).rows[0];
+      report.learning_paths += 1;
+      for (const [index, courseCode] of pathDefinition.courses.entries()) {
+        const course = await oroactiveCourseByLogicalCode(courseCode);
+        if (!course?.id) continue;
+        const previousCode = index > 0 ? pathDefinition.courses[index - 1] : "";
+        const prerequisite = previousCode ? await oroactiveCourseByLogicalCode(previousCode) : null;
+        await pool.query(
+          `INSERT INTO academy_learning_path_courses
+            (learning_path_id, course_id, sort_order, mandatory, prerequisite_course_id, practical_required, active)
+           VALUES ($1::bigint,$2::bigint,$3::integer,TRUE,$4::bigint,$5::boolean,TRUE)
+           ON CONFLICT (learning_path_id, course_id)
+           DO UPDATE SET sort_order = EXCLUDED.sort_order,
+                         mandatory = TRUE,
+                         prerequisite_course_id = EXCLUDED.prerequisite_course_id,
+                         practical_required = EXCLUDED.practical_required,
+                         active = TRUE`,
+          [pathRow.id, course.id, index + 1, prerequisite?.id || null, ACADEMY_PRACTICAL_REQUIRED_COURSE_CODES.has(courseCode)]
+        );
+      }
+    }
+
+    for (const capability of ACADEMY_OPERATIONAL_CAPABILITY_DEFINITIONS) {
+      await pool.query(
+        `INSERT INTO academy_operational_capabilities (code, name, description, sensitive, active)
+         VALUES ($1::text,$2::text,$3::text,$4::boolean,TRUE)
+         ON CONFLICT (code)
+         DO UPDATE SET name = EXCLUDED.name,
+                       description = EXCLUDED.description,
+                       sensitive = EXCLUDED.sensitive,
+                       active = TRUE`,
+        [capability.code, capability.name, capability.name, capability.sensitive]
+      );
+      report.capabilities += 1;
+    }
+
+    for (const [capabilityCode, requirement] of Object.entries(ACADEMY_CAPABILITY_REQUIREMENT_DEFINITIONS)) {
+      const capability = (await pool.query("SELECT id FROM academy_operational_capabilities WHERE code = $1::text LIMIT 1", [capabilityCode])).rows[0];
+      if (!capability?.id) continue;
+      for (const competencyCode of requirement.competencies || []) {
+        const competency = (await pool.query("SELECT id FROM academy_competencies WHERE code = $1::text LIMIT 1", [competencyCode])).rows[0];
+        if (!competency?.id) continue;
+        await pool.query(
+          `INSERT INTO academy_capability_requirements
+            (capability_id, competency_id, required_role, certification_required, practical_required, manager_approval_required, active)
+           VALUES ($1::bigint,$2::bigint,NULL,TRUE,$3::boolean,$4::boolean,TRUE)
+           ON CONFLICT DO NOTHING`,
+          [capability.id, competency.id, Boolean(requirement.practicalRequired), Boolean(requirement.managerApprovalRequired)]
+        );
+      }
+    }
+
+    for (const assessmentDefinition of ACADEMY_PRACTICAL_ASSESSMENT_DEFINITIONS) {
+      const course = await oroactiveCourseByLogicalCode(assessmentDefinition.courseCode);
+      if (!course?.id) continue;
+      const assessment = (await pool.query(
+        `INSERT INTO academy_practical_assessments
+          (code, course_id, title, description, passing_score, requires_human_approval, active)
+         VALUES ($1::text,$2::bigint,$3::text,$4::text,80,TRUE,TRUE)
+         ON CONFLICT (code)
+         DO UPDATE SET course_id = EXCLUDED.course_id,
+                       title = EXCLUDED.title,
+                       description = EXCLUDED.description,
+                       active = TRUE
+         RETURNING *`,
+        [assessmentDefinition.code, course.id, assessmentDefinition.title, assessmentDefinition.description]
+      )).rows[0];
+      report.practical_assessments += 1;
+      for (const [index, item] of assessmentDefinition.rubric.entries()) {
+        await pool.query(
+          `INSERT INTO academy_practical_rubric_items
+            (assessment_id, code, label, max_score, critical_failure, sort_order)
+           VALUES ($1::bigint,$2::text,$3::text,$4::integer,FALSE,$5::integer)
+           ON CONFLICT (assessment_id, code)
+           DO UPDATE SET label = EXCLUDED.label,
+                         max_score = EXCLUDED.max_score,
+                         sort_order = EXCLUDED.sort_order`,
+          [assessment.id, item[0], item[1], item[2], index + 1]
+        );
+      }
+    }
+
+    for (const scenario of ACADEMY_SIMULATION_SCENARIO_DEFINITIONS) {
+      await pool.query(
+        `INSERT INTO academy_simulation_scenarios
+          (code, title, description, difficulty, target_roles, scenario_data, expected_controls, expected_decision, expected_escalation, scoring_config, version, active)
+         VALUES ($1::text,$2::text,$3::text,$4::text,$5::jsonb,$6::jsonb,$7::jsonb,$8::text,$9::text,$10::jsonb,1,TRUE)
+         ON CONFLICT (code)
+         DO UPDATE SET title = EXCLUDED.title,
+                       description = EXCLUDED.description,
+                       difficulty = EXCLUDED.difficulty,
+                       target_roles = EXCLUDED.target_roles,
+                       scenario_data = EXCLUDED.scenario_data,
+                       expected_controls = EXCLUDED.expected_controls,
+                       expected_decision = EXCLUDED.expected_decision,
+                       scoring_config = EXCLUDED.scoring_config,
+                       active = TRUE`,
+        [
+          scenario.code,
+          scenario.title,
+          scenario.description,
+          scenario.difficulty,
+          sanitizeForPostgres(scenario.targetRoles),
+          sanitizeForPostgres({ demo_only: true, no_real_customer_data: true, watermark: "SIMULAZIONE — DATI NON REALI" }),
+          sanitizeForPostgres(scenario.expectedControls),
+          scenario.expectedDecision,
+          "Richiedere verifica superiore se emergono criticità.",
+          sanitizeForPostgres(scenario.scoringConfig)
+        ]
+      );
+      report.simulations += 1;
+    }
+  } catch (error) {
+    report.warnings.push(error.message);
+    console.warn("Qualification Academy seed non completato:", error.message);
+  }
+  return report;
+}
+
+function learningPathCodeForRole(role = "") {
+  const normalized = normalizeRole(role);
+  if (normalized === "aiuto_commesso") return "OA-PATH-AIUTO-COMMESSO";
+  if (normalized === "commesso") return "OA-PATH-COMMESSO";
+  if (normalized === "responsabile") return "OA-PATH-RESPONSABILE";
+  if (normalized === "supervisore" || normalized === "founder") return "OA-PATH-SUPERVISORE";
+  return "OA-PATH-COMMESSO";
+}
+
+async function latestPracticalApprovalForCourse(userId, courseId) {
+  const result = await pool.query(
+    `SELECT pa.*
+     FROM academy_practical_attempts pa
+     JOIN academy_practical_assessments aa ON aa.id = pa.assessment_id
+     WHERE pa.user_id = $1::bigint
+       AND aa.course_id = $2::bigint
+       AND pa.status = 'approved'
+       AND pa.passed = TRUE
+       AND pa.critical_failure = FALSE
+     ORDER BY pa.reviewed_at DESC NULLS LAST, pa.id DESC
+     LIMIT 1`,
+    [userId, courseId]
+  ).catch(() => ({ rows: [] }));
+  return result.rows[0] || null;
+}
+
+async function getCourseCompletionState(userId, courseIdentifier) {
+  const course = /^\d+$/.test(String(courseIdentifier))
+    ? await academyCourseById(courseIdentifier)
+    : await oroactiveCourseByLogicalCode(courseIdentifier);
+  if (!course?.id) return { state: "not_started", completed: false, reason: "course_not_found", course: null };
+  const baseCompletion = await isCourseCompletedForUser(userId, course.id);
+  const courseCode = canonicalOroactiveCourseCode(oroactiveCourseSeedCode(course));
+  const practicalRequired = ACADEMY_PRACTICAL_REQUIRED_COURSE_CODES.has(courseCode);
+  const practicalAttempt = practicalRequired ? await latestPracticalApprovalForCourse(userId, course.id) : null;
+  let state = "not_started";
+  if (baseCompletion.reason === "exam_not_passed") state = "exam_pending";
+  if (baseCompletion.reason === "certification_missing") state = "theory_passed";
+  if (baseCompletion.reason === "certification_revoked") state = "certification_revoked";
+  if (baseCompletion.completed) state = practicalRequired && !practicalAttempt ? "practical_pending" : "completed";
+  return {
+    state,
+    completed: state === "completed",
+    reason: baseCompletion.reason,
+    course: {
+      id: course.id,
+      code: courseCode,
+      title: course.title
+    },
+    theoryPassed: baseCompletion.completed || baseCompletion.reason === "certification_missing",
+    practicalRequired,
+    practicalApproved: practicalRequired ? Boolean(practicalAttempt) : true,
+    certificationStatus: baseCompletion.completed ? "active" : baseCompletion.reason === "certification_revoked" ? "revoked" : "missing",
+    certificationId: baseCompletion.certificationId || null,
+    completedAt: baseCompletion.completedAt || null
+  };
+}
+
+async function getUserLearningPath(userId, actor = {}) {
+  const role = normalizeRole(actor?.ruolo || actor?.role || "commesso");
+  const pathCode = learningPathCodeForRole(role);
+  const pathDefinition = ACADEMY_LEARNING_PATH_DEFINITIONS.find((item) => item.code === pathCode) || ACADEMY_LEARNING_PATH_DEFINITIONS[1];
+  const courseStates = [];
+  let previousCompleted = true;
+  for (const courseCode of pathDefinition.courses) {
+    const completion = await getCourseCompletionState(userId, courseCode);
+    const locked = !isFounder(actor) && !previousCompleted;
+    courseStates.push({
+      code: courseCode,
+      title: completion.course?.title || oroactiveCourseTitleByCode(courseCode),
+      state: completion.state,
+      completed: completion.completed,
+      locked,
+      practical_required: completion.practicalRequired,
+      practical_approved: completion.practicalApproved,
+      certification_status: completion.certificationStatus,
+      missing_requirements: locked
+        ? [{ type: "prerequisite", status: "not_completed" }]
+        : completion.completed
+          ? []
+          : [{ type: completion.practicalRequired && !completion.practicalApproved ? "practical" : "exam", status: completion.state }]
+    });
+    previousCompleted = previousCompleted && completion.completed;
+  }
+  const completedCourses = courseStates.filter((item) => item.completed);
+  const lockedCourses = courseStates.filter((item) => item.locked);
+  const nextCourse = courseStates.find((item) => !item.completed && !item.locked) || lockedCourses[0] || null;
+  const status = completedCourses.length === courseStates.length ? "completed" : completedCourses.length ? "in_progress" : "not_started";
+  return {
+    currentRole: role,
+    assignedPath: {
+      code: pathDefinition.code,
+      name: pathDefinition.name,
+      description: pathDefinition.description
+    },
+    targetRole: pathDefinition.targetRole,
+    mandatoryCourses: courseStates,
+    completedCourses,
+    lockedCourses,
+    expiringCertifications: [],
+    nextObjective: nextCourse
+      ? `Prossimo obiettivo: ${nextCourse.locked ? "completa il prerequisito per" : "sostieni il percorso di"} ${nextCourse.title}.`
+      : "Percorso completato.",
+    pathCompletionStatus: status
+  };
+}
+
+async function activeOperationalApproval(userId, capabilityCode) {
+  const result = await pool.query(
+    `SELECT uoa.*
+     FROM academy_user_operational_approvals uoa
+     JOIN academy_operational_capabilities cap ON cap.id = uoa.capability_id
+     WHERE uoa.user_id = $1::bigint
+       AND cap.code = $2::text
+       AND uoa.status = 'active'
+       AND (uoa.expires_at IS NULL OR uoa.expires_at > NOW())
+     ORDER BY uoa.approved_at DESC NULLS LAST, uoa.id DESC
+     LIMIT 1`,
+    [userId, capabilityCode]
+  ).catch(() => ({ rows: [] }));
+  return result.rows[0] || null;
+}
+
+async function computeUserCompetencyState(userId, competencyCode, actor = {}) {
+  const courseCodes = Object.entries(ACADEMY_COURSE_COMPETENCY_MAP)
+    .filter(([, competencies]) => competencies.includes(competencyCode))
+    .map(([courseCode]) => courseCode);
+  const courseStates = [];
+  for (const courseCode of courseCodes) {
+    courseStates.push(await getCourseCompletionState(userId, courseCode));
+  }
+  const requiredCourse = courseStates.find((item) => item.completed) || courseStates[0] || null;
+  const theoryPassed = courseStates.some((item) => item.theoryPassed);
+  const practicalRequired = courseStates.some((item) => item.practicalRequired);
+  const practicalApproved = !practicalRequired || courseStates.some((item) => item.practicalApproved && item.practicalRequired);
+  const certificationStatus = courseStates.some((item) => item.certificationStatus === "active") ? "active" : "missing";
+  const missingRequirements = [];
+  if (!theoryPassed) missingRequirements.push({ type: "exam", code: requiredCourse?.course?.code || courseCodes[0], status: "not_passed" });
+  if (practicalRequired && !practicalApproved) missingRequirements.push({ type: "practical", status: "pending" });
+  if (certificationStatus !== "active") missingRequirements.push({ type: "certification", status: certificationStatus });
+  const learningState = missingRequirements.length
+    ? theoryPassed
+      ? practicalRequired && !practicalApproved
+        ? "Prova pratica da sostenere"
+        : "Teoria superata"
+      : "In formazione"
+    : "Certificato";
+  return {
+    competencyCode,
+    name: ACADEMY_COMPETENCY_DEFINITIONS.find((item) => item.code === competencyCode)?.name || competencyCode,
+    learningState,
+    theoryPassed,
+    practicalRequired,
+    practicalApproved,
+    certificationStatus,
+    roleAuthorized: true,
+    managerApprovalStatus: "not_required",
+    operationalStatus: missingRequirements.length ? "not_enabled" : "certified",
+    missingRequirements,
+    expiresAt: null,
+    course: requiredCourse?.course || null
+  };
+}
+
+async function listUserCompetencies(userId, actor = {}) {
+  const rows = [];
+  for (const competency of ACADEMY_COMPETENCY_DEFINITIONS) {
+    rows.push(await computeUserCompetencyState(userId, competency.code, actor));
+  }
+  return rows;
+}
+
+async function checkCapability(user = {}, capabilityCode = "", context = {}) {
+  const code = String(capabilityCode || "").trim().toUpperCase();
+  const settings = academyQualificationSettings();
+  const requirement = ACADEMY_CAPABILITY_REQUIREMENT_DEFINITIONS[code] || null;
+  if (!settings.enabled) {
+    return { ok: true, allowed: true, qualified: true, mode: settings.mode, capability: code, missing_requirements: [] };
+  }
+  if (isFounder(user)) {
+    return { ok: true, allowed: true, qualified: true, mode: settings.mode, capability: code, reason: "FOUNDER_BYPASS", missing_requirements: [] };
+  }
+  if (!requirement) {
+    return { ok: true, allowed: true, qualified: true, mode: settings.mode, capability: code, reason: "NO_RULE", missing_requirements: [] };
+  }
+  const role = normalizeRole(user.ruolo);
+  const missing = [];
+  if (Array.isArray(requirement.roles) && !requirement.roles.includes(role)) {
+    missing.push({ type: "role", code: role, status: "not_authorized" });
+  }
+  for (const competencyCode of requirement.competencies || []) {
+    const competency = await computeUserCompetencyState(user.id, competencyCode, user);
+    if (competency.missingRequirements.length) {
+      missing.push({ type: "competency", code: competencyCode, status: competency.operationalStatus, missing: competency.missingRequirements });
+    }
+  }
+  if (requirement.managerApprovalRequired && !(await activeOperationalApproval(user.id, code))) {
+    missing.push({ type: "manager_approval", code, status: "missing" });
+  }
+  const qualified = missing.length === 0;
+  const blocked = settings.mode === "enforce" && !qualified;
+  if (!qualified) {
+    void writeAuditLog({
+      user,
+      action: "academy_capability_denied",
+      entityType: "academy_capability",
+      entityId: code,
+      entityLabel: code,
+      metadata: { mode: settings.mode, context, missing }
+    }).catch(() => {});
+  }
+  return {
+    ok: true,
+    allowed: !blocked,
+    qualified,
+    mode: settings.mode,
+    capability: code,
+    missing_requirements: missing,
+    available_actions: ["OPEN_ACADEMY", "VIEW_REQUIREMENTS", "REQUEST_SUPERVISOR_APPROVAL"],
+    shadow_blocked: settings.mode === "shadow" && !qualified,
+    warning: settings.mode === "warn" && !qualified
+  };
+}
+
+function requireOperationalQualification(capabilityCode) {
+  return async (request, response, next) => {
+    try {
+      const result = await checkCapability(request.user, capabilityCode, {
+        store_id: request.body?.store_id || request.params?.storeId || null,
+        record_id: request.params?.id || request.body?.id || null
+      });
+      request.academyQualification = result;
+      if (!result.allowed) {
+        return response.status(403).json({
+          ok: false,
+          code: "OPERATIONAL_QUALIFICATION_REQUIRED",
+          message: "Non possiedi ancora i requisiti per completare questa azione.",
+          capability: capabilityCode,
+          missing_requirements: result.missing_requirements,
+          available_actions: result.available_actions
+        });
+      }
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  };
+}
+
+function operationalQualificationDeniedError(result = {}, capabilityCode = "") {
+  const error = new Error("Non possiedi ancora i requisiti per completare questa azione.");
+  error.status = 403;
+  error.code = "OPERATIONAL_QUALIFICATION_REQUIRED";
+  error.capability = capabilityCode;
+  error.missing_requirements = result.missing_requirements || [];
+  error.available_actions = result.available_actions || ["OPEN_ACADEMY", "VIEW_REQUIREMENTS", "REQUEST_SUPERVISOR_APPROVAL"];
+  return error;
+}
+
+async function assertOperationalQualificationForFinalAct({ user = {}, capabilityCode = "SALE_DEED_COMPLETE", context = {} } = {}) {
+  const result = await checkCapability(user, capabilityCode, context);
+  if (!result.allowed) throw operationalQualificationDeniedError(result, capabilityCode);
+  return result;
+}
+
+async function listUserOperationalCapabilities(user = {}) {
+  const output = [];
+  for (const capability of ACADEMY_OPERATIONAL_CAPABILITY_DEFINITIONS) {
+    if (!capability.sensitive) continue;
+    output.push({
+      ...capability,
+      access: await checkCapability(user, capability.code)
+    });
+  }
+  return output;
+}
+
+async function listUserPracticalAssessments(user = {}) {
+  const result = await pool.query(
+    `SELECT aa.*, c.title AS course_title,
+            latest.id AS latest_attempt_id,
+            latest.status AS latest_status,
+            latest.total_score,
+            latest.passed,
+            latest.reviewed_at
+     FROM academy_practical_assessments aa
+     JOIN courses c ON c.id = aa.course_id
+     LEFT JOIN LATERAL (
+       SELECT *
+       FROM academy_practical_attempts pa
+       WHERE pa.assessment_id = aa.id
+         AND pa.user_id = $1::bigint
+       ORDER BY pa.created_at DESC, pa.id DESC
+       LIMIT 1
+     ) latest ON TRUE
+     WHERE aa.active = TRUE
+     ORDER BY aa.id ASC`,
+    [user.id]
+  ).catch(() => ({ rows: [] }));
+  return result.rows;
+}
+
+async function listAcademySimulationScenarios(user = {}) {
+  const role = normalizeRole(user.ruolo);
+  const result = await pool.query(
+    `SELECT *
+     FROM academy_simulation_scenarios
+     WHERE active = TRUE
+       AND ($1::text = 'founder' OR target_roles ? $1::text OR target_roles = '[]'::jsonb)
+     ORDER BY difficulty ASC, title ASC`,
+    [role]
+  ).catch(() => ({ rows: [] }));
+  return result.rows;
+}
+
+async function startAcademySimulationAttempt(scenarioId, input = {}, user = {}) {
+  const scenario = (await pool.query(
+    `SELECT * FROM academy_simulation_scenarios WHERE id = $1::bigint AND active = TRUE LIMIT 1`,
+    [scenarioId]
+  )).rows[0];
+  if (!scenario) {
+    const error = new Error("Scenario simulazione non trovato.");
+    error.status = 404;
+    throw error;
+  }
+  const attempt = (await pool.query(
+    `INSERT INTO academy_simulation_attempts (scenario_id, user_id, mode, status)
+     VALUES ($1::bigint,$2::bigint,$3::text,'started')
+     RETURNING *`,
+    [scenario.id, user.id, String(input.mode || "training") === "assessment" ? "assessment" : "training"]
+  )).rows[0];
+  await pool.query(
+    `INSERT INTO academy_simulation_events (attempt_id, event_type, event_data)
+     VALUES ($1::bigint,'simulation_started',$2::jsonb)`,
+    [attempt.id, sanitizeForPostgres({ demo_only: true, no_real_customer_data: true })]
+  );
+  return { scenario, attempt };
+}
+
+async function submitAcademySimulationAttempt(attemptId, input = {}, user = {}) {
+  const attempt = (await pool.query(
+    `SELECT a.*, s.expected_decision, s.scoring_config
+     FROM academy_simulation_attempts a
+     JOIN academy_simulation_scenarios s ON s.id = a.scenario_id
+     WHERE a.id = $1::bigint AND a.user_id = $2::bigint
+     LIMIT 1`,
+    [attemptId, user.id]
+  )).rows[0];
+  if (!attempt) {
+    const error = new Error("Tentativo simulazione non trovato.");
+    error.status = 404;
+    throw error;
+  }
+  const controls = Array.isArray(input.controls_executed) ? input.controls_executed : [];
+  const decision = String(input.decision || "");
+  const score = Math.max(0, Math.min(100,
+    (decision === attempt.expected_decision ? 25 : 0)
+    + Math.min(25, controls.length * 4)
+    + (input.documentation ? 20 : 0)
+    + (input.economic_calculation ? 15 : 0)
+    + (input.escalation ? 15 : 0)
+  ));
+  const updated = (await pool.query(
+    `UPDATE academy_simulation_attempts
+     SET status = 'submitted',
+         decision = $3::text,
+         controls_executed = $4::jsonb,
+         documentation = $5::jsonb,
+         economic_calculation = $6::jsonb,
+         escalation = $7::text,
+         score = $8::integer,
+         passed = $8::integer >= 80,
+         submitted_at = NOW()
+     WHERE id = $1::bigint AND user_id = $2::bigint
+     RETURNING *`,
+    [
+      attemptId,
+      user.id,
+      decision,
+      sanitizeForPostgres(controls),
+      sanitizeForPostgres(input.documentation || {}),
+      sanitizeForPostgres(input.economic_calculation || {}),
+      String(input.escalation || ""),
+      score
+    ]
+  )).rows[0];
+  return { attempt: updated, score, passed: score >= 80 };
+}
+
+async function founderQualificationDashboard(user = {}) {
+  if (!isFounder(user)) {
+    const error = new Error("Dashboard formazione riservata al Founder.");
+    error.status = 403;
+    throw error;
+  }
+  const [users, certificates, exams, practicals, simulations] = await Promise.all([
+    pool.query("SELECT ruolo, COUNT(*)::int AS total FROM utenti WHERE COALESCE(attivo, TRUE) = TRUE GROUP BY ruolo").catch(() => ({ rows: [] })),
+    pool.query("SELECT status, COUNT(*)::int AS total FROM academy_certificates GROUP BY status").catch(() => ({ rows: [] })),
+    pool.query("SELECT esito, COUNT(*)::int AS total, ROUND(AVG(NULLIF((regexp_match(note, '([0-9]+)%'))[1], '')::numeric), 2) AS average_score FROM academy_exam_results GROUP BY esito").catch(() => ({ rows: [] })),
+    pool.query("SELECT status, COUNT(*)::int AS total FROM academy_practical_attempts GROUP BY status").catch(() => ({ rows: [] })),
+    pool.query("SELECT status, COUNT(*)::int AS total FROM academy_simulation_attempts GROUP BY status").catch(() => ({ rows: [] }))
+  ]);
+  return {
+    settings: academyQualificationSettings(),
+    users_by_role: users.rows,
+    certifications: certificates.rows,
+    exams: exams.rows,
+    practical_assessments: practicals.rows,
+    simulations: simulations.rows,
+    pilot_mode: ACADEMY_PILOT_MODE
+  };
+}
+
+async function backfillAcademyQualificationData() {
+  const seedReport = await seedAcademyQualificationSystem();
+  return {
+    ok: true,
+    seedReport,
+    note: "Backfill idempotente: corsi mappati, percorsi e competenze collegati senza modifiche distruttive."
   };
 }
 
@@ -15730,8 +16607,8 @@ async function ensureOroActiveBaseAcademyCourses() {
 async function listCourses(user = {}) {
   const userId = user.id || null;
   const role = normalizeRole(user.ruolo);
-  await ensureOroActiveBaseAcademyCourses().catch((error) => {
-    console.warn("Corsi base OroActive Academy non inizializzati:", error.message);
+  await seedAcademyQualificationSystem().catch((error) => {
+    console.warn("Sistema qualifiche OroActive Academy non inizializzato:", error.message);
   });
   const faculties = await pool.query("SELECT * FROM academy_faculties WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
   const categories = await pool.query("SELECT * FROM course_categories WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
@@ -19391,6 +20268,30 @@ async function saveAct(input, user, req = null) {
   const approvalCheck = ["completed", "archived_completed"].includes(statusCode)
     ? await assertApprovalAllowsFinalSave({ saleDeedId: null, draftData: { ...act.payload, status: statusCode }, user, req })
     : { approved: false };
+  const qualificationCheck = ["completed", "archived_completed"].includes(statusCode)
+    ? await assertOperationalQualificationForFinalAct({
+      user,
+      capabilityCode: "SALE_DEED_COMPLETE",
+      context: {
+        store_id: act.negozioId || null,
+        practice_number: act.practiceNumber || null,
+        status: statusCode,
+        approved_override: Boolean(approvalCheck.approved)
+      }
+    })
+    : null;
+  if (qualificationCheck) {
+    act.payload = {
+      ...(act.payload || {}),
+      academyQualification: {
+        mode: qualificationCheck.mode,
+        qualified: qualificationCheck.qualified,
+        shadow_blocked: qualificationCheck.shadow_blocked,
+        warning: qualificationCheck.warning,
+        missing_requirements: qualificationCheck.missing_requirements || []
+      }
+    };
+  }
   const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing, { allowApproved: Boolean(approvalCheck.approved) });
   if (["completed", "archived_completed"].includes(statusCode)) {
     await assertQualityAllowsFinalSave({ draft_data: { ...act.payload, status: statusCode } }, user, { allowApproved: Boolean(approvalCheck.approved) });
@@ -19596,6 +20497,31 @@ async function updateAct(identifier, input, user, req = null) {
   const approvalCheck = ["completed", "archived_completed"].includes(normalizedStatus)
     ? await assertApprovalAllowsFinalSave({ saleDeedId: existing.id, draftData: { ...act.payload, status: normalizedStatus }, user, req })
     : { approved: false };
+  const qualificationCheck = ["completed", "archived_completed"].includes(normalizedStatus)
+    ? await assertOperationalQualificationForFinalAct({
+      user,
+      capabilityCode: "SALE_DEED_COMPLETE",
+      context: {
+        store_id: act.negozioId || existing.negozio_id || null,
+        record_id: existing.id,
+        practice_number: act.practiceNumber || existing.practice_number || null,
+        status: normalizedStatus,
+        approved_override: Boolean(approvalCheck.approved)
+      }
+    })
+    : null;
+  if (qualificationCheck) {
+    act.payload = {
+      ...(act.payload || {}),
+      academyQualification: {
+        mode: qualificationCheck.mode,
+        qualified: qualificationCheck.qualified,
+        shadow_blocked: qualificationCheck.shadow_blocked,
+        warning: qualificationCheck.warning,
+        missing_requirements: qualificationCheck.missing_requirements || []
+      }
+    };
+  }
   if (["completed", "archived_completed"].includes(normalizedStatus)) {
     await assertQualityAllowsFinalSave({ sale_deed_id: existing.id, draft_data: { ...act.payload, status: normalizedStatus } }, user, { allowApproved: Boolean(approvalCheck.approved) });
   }
@@ -21697,6 +22623,510 @@ app.get("/api/corsi", async (request, response, next) => {
   }
 });
 
+app.get("/api/academy/qualification/settings", async (_request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json({ ok: true, settings: academyQualificationSettings() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/qualification/backfill", requireFounder, async (_request, response, next) => {
+  try {
+    response.json(await backfillAcademyQualificationData());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-learning-path", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json({ ok: true, learning_path: await getUserLearningPath(request.user.id, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-next-objective", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    const learningPath = await getUserLearningPath(request.user.id, request.user);
+    response.json({ ok: true, next_objective: learningPath.nextObjective, learning_path: learningPath.assignedPath });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-competencies", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json({ ok: true, competencies: await listUserCompetencies(request.user.id, request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-practical-assessments", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json({ ok: true, practical_assessments: await listUserPracticalAssessments(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/my-operational-capabilities", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json({ ok: true, capabilities: await listUserOperationalCapabilities(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/capabilities/check", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json(await checkCapability(request.user, request.body?.capability, request.body?.context || {}));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/simulations", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json({ ok: true, scenarios: await listAcademySimulationScenarios(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/simulations/:scenarioId/start", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    const result = await startAcademySimulationAttempt(request.params.scenarioId, request.body || {}, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "academy_simulation_started",
+      entityType: "academy_simulation",
+      entityId: result.attempt?.id,
+      entityLabel: result.scenario?.title,
+      metadata: { scenario_id: result.scenario?.id, mode: result.attempt?.mode }
+    });
+    response.status(201).json({ ok: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/simulation-attempts/:attemptId/submit", async (request, response, next) => {
+  try {
+    const result = await submitAcademySimulationAttempt(request.params.attemptId, request.body || {}, request.user);
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "academy_simulation_completed",
+      entityType: "academy_simulation_attempt",
+      entityId: result.attempt?.id,
+      entityLabel: `Simulazione ${result.attempt?.id}`,
+      metadata: { score: result.score, passed: result.passed }
+    });
+    response.json({ ok: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/practical-assessments", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json({ ok: true, practical_assessments: await listUserPracticalAssessments(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/practical-assessments/:assessmentId/request", async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    const assessment = (await pool.query(
+      "SELECT * FROM academy_practical_assessments WHERE id = $1::bigint AND active = TRUE LIMIT 1",
+      [request.params.assessmentId]
+    )).rows[0];
+    if (!assessment) return response.status(404).json({ error: "Prova pratica non trovata" });
+    const attempt = (await pool.query(
+      `INSERT INTO academy_practical_attempts
+        (assessment_id, user_id, status, candidate_notes, created_at)
+       VALUES ($1::bigint,$2::bigint,'scheduled',$3::text,NOW())
+       RETURNING *`,
+      [assessment.id, request.user.id, String(request.body?.notes || "")]
+    )).rows[0];
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "academy_practical_requested",
+      entityType: "academy_practical_attempt",
+      entityId: attempt.id,
+      entityLabel: assessment.title
+    });
+    response.status(201).json({ ok: true, attempt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/practical-attempts/:attemptId/start", async (request, response, next) => {
+  try {
+    const attempt = (await pool.query(
+      `UPDATE academy_practical_attempts
+       SET status = 'in_progress', started_at = COALESCE(started_at, NOW())
+       WHERE id = $1::bigint AND user_id = $2::bigint
+       RETURNING *`,
+      [request.params.attemptId, request.user.id]
+    )).rows[0];
+    if (!attempt) return response.status(404).json({ error: "Tentativo prova pratica non trovato" });
+    response.json({ ok: true, attempt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/practical-attempts/:attemptId/submit", async (request, response, next) => {
+  try {
+    const attempt = (await pool.query(
+      `UPDATE academy_practical_attempts
+       SET status = 'submitted',
+           candidate_notes = $3::text,
+           submitted_at = NOW()
+       WHERE id = $1::bigint AND user_id = $2::bigint
+       RETURNING *`,
+      [request.params.attemptId, request.user.id, String(request.body?.notes || "")]
+    )).rows[0];
+    if (!attempt) return response.status(404).json({ error: "Tentativo prova pratica non trovato" });
+    response.json({ ok: true, attempt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/practical-attempts/:attemptId/review", async (request, response, next) => {
+  try {
+    if (!["founder", "responsabile", "supervisore"].includes(normalizeRole(request.user.ruolo))) {
+      return response.status(403).json({ error: "Non autorizzato" });
+    }
+    const score = Math.max(0, Math.min(100, Math.round(Number(request.body?.score || 0))));
+    const approved = String(request.body?.status || "").toLowerCase() === "approved" || (request.body?.approved === true && score >= 80);
+    const attempt = (await pool.query(
+      `UPDATE academy_practical_attempts
+       SET evaluator_id = $2::bigint,
+           status = $3::text,
+           total_score = $4::integer,
+           passed = $5::boolean,
+           critical_failure = $6::boolean,
+           evaluator_notes = $7::text,
+           reviewed_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [
+        request.params.attemptId,
+        request.user.id,
+        approved ? "approved" : "rejected",
+        score,
+        approved,
+        Boolean(request.body?.critical_failure),
+        String(request.body?.notes || "")
+      ]
+    )).rows[0];
+    if (!attempt) return response.status(404).json({ error: "Tentativo prova pratica non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: approved ? "academy_practical_approved" : "academy_practical_rejected",
+      entityType: "academy_practical_attempt",
+      entityId: attempt.id,
+      metadata: { score, approved }
+    });
+    response.json({ ok: true, attempt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/practical-assessments/pending-review", async (request, response, next) => {
+  try {
+    if (!["founder", "responsabile", "supervisore"].includes(normalizeRole(request.user.ruolo))) {
+      return response.status(403).json({ error: "Non autorizzato" });
+    }
+    const result = await pool.query(
+      `SELECT pa.*, aa.title AS assessment_title, c.title AS course_title, u.username, u.nome, u.cognome
+       FROM academy_practical_attempts pa
+       JOIN academy_practical_assessments aa ON aa.id = pa.assessment_id
+       JOIN courses c ON c.id = aa.course_id
+       LEFT JOIN utenti u ON u.id = pa.user_id
+       WHERE pa.status IN ('submitted','under_review')
+       ORDER BY pa.submitted_at ASC NULLS LAST, pa.created_at ASC`
+    );
+    response.json({ ok: true, attempts: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/practical-attempts/:attemptId", async (request, response, next) => {
+  try {
+    const role = normalizeRole(request.user.ruolo);
+    const values = [request.params.attemptId];
+    const ownerFilter = ["founder", "responsabile", "supervisore"].includes(role) ? "" : "AND pa.user_id = $2::bigint";
+    if (ownerFilter) values.push(request.user.id);
+    const attempt = (await pool.query(
+      `SELECT pa.*, aa.title AS assessment_title, aa.description AS assessment_description, c.title AS course_title
+       FROM academy_practical_attempts pa
+       JOIN academy_practical_assessments aa ON aa.id = pa.assessment_id
+       JOIN courses c ON c.id = aa.course_id
+       WHERE pa.id = $1::bigint ${ownerFilter}
+       LIMIT 1`,
+      values
+    )).rows[0];
+    if (!attempt) return response.status(404).json({ error: "Tentativo prova pratica non trovato" });
+    response.json({ ok: true, attempt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/courses/:courseId/exam", async (request, response, next) => {
+  try {
+    const course = await academyCourseById(request.params.courseId);
+    if (!course) return response.status(404).json({ error: "Corso non trovato" });
+    await assertAcademyCoursePrerequisites(course, request.user);
+    let questions = (await pool.query(
+      `SELECT id, course_id, question, options, sort_order
+       FROM course_quizzes
+       WHERE course_id = $1::bigint AND active = TRUE
+       ORDER BY sort_order ASC, id ASC`,
+      [course.id]
+    )).rows;
+    if (!questions.length) questions = oroactiveBaseCourseQuizQuestions(course);
+    response.json({
+      ok: true,
+      course: { id: course.id, title: course.title },
+      exam: {
+        question_count: questions.length,
+        pass_score: Number((course.metadata || {}).finalExamPassScore || 80),
+        questions: sanitizeQuizQuestionsForClient(questions)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/courses/:courseId/exam/start", async (request, response, next) => {
+  try {
+    const course = await academyCourseById(request.params.courseId);
+    if (!course) return response.status(404).json({ error: "Corso non trovato" });
+    await assertAcademyCoursePrerequisites(course, request.user);
+    let questions = (await pool.query(
+      `SELECT id, course_id, question, options, correct_answer, sort_order
+       FROM course_quizzes
+       WHERE course_id = $1::bigint AND active = TRUE
+       ORDER BY sort_order ASC, id ASC`,
+      [course.id]
+    )).rows;
+    if (!questions.length) questions = oroactiveBaseCourseQuizQuestions(course, { includeAnswers: true });
+    if (!questions.length) return response.status(400).json({ error: "Esame non configurato" });
+    const active = (await pool.query(
+      `SELECT id
+       FROM academy_exam_attempts
+       WHERE course_id = $1::bigint AND user_id = $2::bigint AND status = 'started'
+       ORDER BY started_at DESC
+       LIMIT 1`,
+      [course.id, request.user.id]
+    )).rows[0];
+    if (active) return response.status(409).json({ error: "Esiste già un tentativo esame attivo.", attempt_id: active.id });
+    const snapshot = questions.map((question) => ({
+      id: String(question.id),
+      question: question.question,
+      options: academyShuffleExamOptions(Array.isArray(question.options) ? question.options : [], question),
+      correct_answer: question.correct_answer
+    }));
+    const attempt = (await pool.query(
+      `INSERT INTO academy_exam_attempts
+        (course_id, user_id, status, question_snapshot, started_at, metadata)
+       VALUES ($1::bigint,$2::bigint,'started',$3::jsonb,NOW(),$4::jsonb)
+       RETURNING id, course_id, user_id, status, started_at`,
+      [course.id, request.user.id, sanitizeForPostgres(snapshot), sanitizeForPostgres({ correct_answers_server_only: true })]
+    )).rows[0];
+    response.status(201).json({
+      ok: true,
+      attempt,
+      questions: snapshot.map(({ correct_answer: _correctAnswer, ...question }) => question)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/exam-attempts/:attemptId/answer", async (request, response, next) => {
+  try {
+    const attempt = (await pool.query(
+      `SELECT * FROM academy_exam_attempts
+       WHERE id = $1::bigint AND user_id = $2::bigint AND status = 'started'
+       LIMIT 1`,
+      [request.params.attemptId, request.user.id]
+    )).rows[0];
+    if (!attempt) return response.status(404).json({ error: "Tentativo esame non trovato o già consegnato" });
+    const questionId = String(request.body?.question_id || "");
+    const answer = String(request.body?.answer || "");
+    await pool.query(
+      `INSERT INTO academy_exam_attempt_answers (attempt_id, question_id, answer)
+       VALUES ($1::bigint,$2::text,$3::text)
+       ON CONFLICT (attempt_id, question_id)
+       DO UPDATE SET answer = EXCLUDED.answer, updated_at = NOW()`,
+      [attempt.id, questionId, answer]
+    );
+    response.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/exam-attempts/:attemptId/submit", async (request, response, next) => {
+  try {
+    const attempt = (await pool.query(
+      `SELECT * FROM academy_exam_attempts
+       WHERE id = $1::bigint AND user_id = $2::bigint AND status = 'started'
+       LIMIT 1`,
+      [request.params.attemptId, request.user.id]
+    )).rows[0];
+    if (!attempt) return response.status(404).json({ error: "Tentativo esame non trovato o già consegnato" });
+    const savedAnswers = await pool.query(
+      "SELECT question_id, answer FROM academy_exam_attempt_answers WHERE attempt_id = $1::bigint",
+      [attempt.id]
+    );
+    const requestAnswers = Array.isArray(request.body?.answers) ? request.body.answers : [];
+    const answers = requestAnswers.length
+      ? requestAnswers
+      : savedAnswers.rows.map((row) => ({ question_id: row.question_id, answer: row.answer }));
+    const result = await evaluateCourseFinalQuiz({ course_id: attempt.course_id, answers }, request.user);
+    await pool.query(
+      `UPDATE academy_exam_attempts
+       SET status = 'submitted',
+           score = $2::numeric,
+           passed = $3::boolean,
+           submitted_at = NOW(),
+           metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb
+       WHERE id = $1::bigint`,
+      [attempt.id, result.score, result.passed, sanitizeForPostgres({ quiz_result_id: result.quiz_result?.id || null })]
+    );
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/exam-attempts/:attemptId/result", async (request, response, next) => {
+  try {
+    const attempt = (await pool.query(
+      `SELECT id, course_id, user_id, status, score, passed, started_at, submitted_at
+       FROM academy_exam_attempts
+       WHERE id = $1::bigint AND (user_id = $2::bigint OR $3::text IN ('founder','responsabile','supervisore'))
+       LIMIT 1`,
+      [request.params.attemptId, request.user.id, normalizeRole(request.user.ruolo)]
+    )).rows[0];
+    if (!attempt) return response.status(404).json({ error: "Risultato esame non trovato" });
+    response.json({ ok: true, attempt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/exam-attempts/history", async (request, response, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT a.id, a.course_id, c.title AS course_title, a.status, a.score, a.passed, a.started_at, a.submitted_at
+       FROM academy_exam_attempts a
+       JOIN courses c ON c.id = a.course_id
+       WHERE a.user_id = $1::bigint
+       ORDER BY a.started_at DESC
+       LIMIT 50`,
+      [request.user.id]
+    ).catch(() => ({ rows: [] }));
+    response.json({ ok: true, attempts: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/founder/qualification-dashboard", requireFounder, async (request, response, next) => {
+  try {
+    await seedAcademyQualificationSystem();
+    response.json({ ok: true, dashboard: await founderQualificationDashboard(request.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/founder/competency-gaps", requireFounder, async (_request, response, next) => {
+  try {
+    response.json({ ok: true, gaps: [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/founder/expiring-certifications", requireFounder, async (_request, response, next) => {
+  try {
+    response.json({ ok: true, certifications: [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/founder/exam-analytics", requireFounder, async (request, response, next) => {
+  try {
+    response.json({ ok: true, analytics: (await founderQualificationDashboard(request.user)).exams || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/founder/practical-assessments", requireFounder, async (request, response, next) => {
+  try {
+    response.json({ ok: true, practical_assessments: (await founderQualificationDashboard(request.user)).practical_assessments || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/founder/store-training-status", requireFounder, async (request, response, next) => {
+  try {
+    response.json({ ok: true, status: (await founderQualificationDashboard(request.user)).users_by_role || [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/founder/course-difficulty", requireFounder, async (_request, response, next) => {
+  try {
+    response.json({ ok: true, courses: [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/founder/attempt-anomalies", requireFounder, async (_request, response, next) => {
+  try {
+    response.json({ ok: true, anomalies: [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/academy/faculties", async (_request, response, next) => {
   try {
     const result = await pool.query("SELECT * FROM academy_faculties ORDER BY sort_order ASC, name ASC");
@@ -22555,7 +23985,7 @@ app.post("/api/crm/clienti/:id/note", async (request, response, next) => {
   }
 });
 
-app.post("/api/giacenza/trasferimenti", async (request, response, next) => {
+app.post("/api/giacenza/trasferimenti", requireOperationalQualification("STOCK_MANAGE"), async (request, response, next) => {
   try {
     response.status(201).json(await createInventoryTransfer(request.body, request.user));
   } catch (error) {
@@ -23745,7 +25175,7 @@ app.get("/api/fusioni/riepilogo", async (request, response, next) => {
   }
 });
 
-app.post("/api/fusioni/lotti", async (request, response, next) => {
+app.post("/api/fusioni/lotti", requireOperationalQualification("FUSION_CREATE"), async (request, response, next) => {
   try {
     if (!["founder", "supervisore", "responsabile"].includes(normalizeRole(request.user?.ruolo))) {
       return response.status(403).json({ error: "Non autorizzato" });

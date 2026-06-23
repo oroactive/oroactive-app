@@ -83,6 +83,15 @@ const state = {
   courseProgress: [],
   courseCertificates: [],
   courseBadges: [],
+  academyQualificationSettings: { enabled: true, mode: "shadow", pilot_mode: false },
+  academyLearningPath: null,
+  academyNextObjective: null,
+  academyCompetencies: [],
+  academyPracticalAssessments: [],
+  academyOperationalCapabilities: [],
+  academySimulationScenarios: [],
+  academyExamHistory: [],
+  academyFounderDashboard: null,
   courseActiveTab: "catalog",
   coinCatalogSearch: "",
   coinCatalogCountry: "",
@@ -9188,11 +9197,18 @@ function renderCourseSummary() {
 }
 
 const ACADEMY_TAB_LABELS = {
+  path: "Il mio percorso",
   catalog: "Catalogo Academy",
+  competencies: "Matrice competenze",
   certifications: "Certificazioni",
   badges: "Badge",
+  exams: "Esami",
+  practicals: "Prove pratiche",
+  simulations: "Laboratorio simulazioni",
+  history: "Storico formazione",
   operatorTraining: "Training Operatore",
-  management: "Gestione Academy"
+  management: "Gestione Academy",
+  dashboard: "Dashboard formazione"
 };
 
 function updateAcademyLocation() {
@@ -9374,6 +9390,228 @@ function renderOperatorTraining() {
   `;
 }
 
+function qualificationStateClass(value = "") {
+  const normalized = String(value || "").toLowerCase();
+  if (/completed|certified|active|approved|abilitato|superato|sbloccato|passed/.test(normalized)) return "good";
+  if (/expired|revoked|rejected|failed|scaduto|revocato|non_enabled|not_enabled/.test(normalized)) return "bad";
+  if (/pending|progress|review|warning|shadow|warn|attesa|formazione|practical/.test(normalized)) return "warn";
+  return "neutral";
+}
+
+function renderQualificationStatus(value = "", label = "") {
+  const text = label || value || "Non iniziato";
+  return `<span class="qualification-status ${qualificationStateClass(value || text)}">${escapeHtml(text)}</span>`;
+}
+
+function renderMyLearningPath() {
+  const path = state.academyLearningPath || {};
+  const courses = Array.isArray(path.mandatoryCourses) ? path.mandatoryCourses : [];
+  const settings = state.academyQualificationSettings || {};
+  trainingList.innerHTML = `
+    <section class="academy-qualification-shell">
+      <article class="academy-qualification-hero">
+        <span class="course-pill">Qualificazione operativa</span>
+        <h3>Il mio percorso</h3>
+        <p>${escapeHtml(path.nextObjective || state.academyNextObjective || "Percorso formativo in preparazione.")}</p>
+        <div class="academy-course-meta">
+          <span>Ruolo ${escapeHtml(path.currentRole || state.currentUser?.ruolo || "utente")}</span>
+          <span>${escapeHtml(path.assignedPath?.name || "Percorso non assegnato")}</span>
+          <span>Modalità ${escapeHtml(settings.mode || "shadow")}</span>
+        </div>
+      </article>
+      <div class="academy-path-grid">
+        ${courses.length ? courses.map((course, index) => `
+          <article class="academy-qualification-card">
+            <span class="course-pill">${String(index + 1).padStart(2, "0")}</span>
+            <h4>${escapeHtml(course.title || course.code || "Corso")}</h4>
+            <p>${escapeHtml(course.code || "")}</p>
+            <div class="academy-course-meta">
+              ${renderQualificationStatus(course.state, course.completed ? "Completato" : course.locked ? "Bloccato" : course.state || "Da completare")}
+              ${course.practical_required ? renderQualificationStatus(course.practical_approved ? "approved" : "pending", course.practical_approved ? "Pratica approvata" : "Pratica richiesta") : "<span>Solo teoria</span>"}
+              ${renderQualificationStatus(course.certification_status, `Certificazione ${course.certification_status || "assente"}`)}
+            </div>
+          </article>
+        `).join("") : '<div class="empty-state">Nessun percorso assegnato. Il Founder può assegnare o verificare il ruolo dell’utente.</div>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderCompetencyMatrix() {
+  const competencies = state.academyCompetencies || [];
+  trainingList.innerHTML = `
+    <section class="academy-qualification-shell">
+      <article class="academy-qualification-hero">
+        <span class="course-pill">Matrice competenze</span>
+        <h3>Competenze operative</h3>
+        <p>Le competenze sono distinte dalle autorizzazioni operative: un corso superato non abilita automaticamente funzioni sensibili.</p>
+      </article>
+      <div class="competency-matrix" role="table" aria-label="Matrice competenze OroActive">
+        <div class="competency-row competency-head" role="row">
+          <span>Competenza</span>
+          <span>Teoria</span>
+          <span>Pratica</span>
+          <span>Certificazione</span>
+          <span>Operatività</span>
+        </div>
+        ${competencies.length ? competencies.map((item) => `
+          <article class="competency-row" role="row">
+            <span><strong>${escapeHtml(item.name || item.competencyCode)}</strong><small>${escapeHtml(item.competencyCode || "")}</small></span>
+            <span>${renderQualificationStatus(item.theoryPassed ? "passed" : "pending", item.theoryPassed ? "Superata" : "Da sostenere")}</span>
+            <span>${renderQualificationStatus(item.practicalRequired ? (item.practicalApproved ? "approved" : "pending") : "neutral", item.practicalRequired ? (item.practicalApproved ? "Approvata" : "Da sostenere") : "Non prevista")}</span>
+            <span>${renderQualificationStatus(item.certificationStatus, item.certificationStatus || "Assente")}</span>
+            <span>${renderQualificationStatus(item.operationalStatus, item.operationalStatus === "certified" ? "Certificato" : "Non abilitato")}</span>
+          </article>
+        `).join("") : '<div class="empty-state">Matrice competenze non disponibile.</div>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderAcademyExams() {
+  const attempts = state.academyExamHistory || [];
+  trainingList.innerHTML = `
+    <section class="academy-qualification-shell">
+      <article class="academy-qualification-hero">
+        <span class="course-pill">Esami teorici</span>
+        <h3>Storico tentativi</h3>
+        <p>Gli esami vengono corretti lato backend. Le risposte corrette non sono inviate al dispositivo prima della consegna.</p>
+      </article>
+      <div class="academy-path-grid">
+        ${attempts.length ? attempts.map((attempt) => `
+          <article class="academy-qualification-card">
+            <h4>${escapeHtml(attempt.course_title || "Esame Academy")}</h4>
+            <p>${escapeHtml(formatDateTime(attempt.submitted_at || attempt.started_at || ""))}</p>
+            <div class="academy-course-meta">
+              ${renderQualificationStatus(attempt.passed ? "passed" : attempt.status, attempt.passed ? "Superato" : attempt.status || "In corso")}
+              ${attempt.score !== null && attempt.score !== undefined ? `<span>Punteggio ${escapeHtml(String(attempt.score))}%</span>` : ""}
+            </div>
+          </article>
+        `).join("") : '<div class="empty-state">Nessun tentativo esame registrato.</div>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderPracticalAssessments() {
+  const assessments = state.academyPracticalAssessments || [];
+  trainingList.innerHTML = `
+    <section class="academy-qualification-shell">
+      <article class="academy-qualification-hero">
+        <span class="course-pill">Prove pratiche</span>
+        <h3>Valutazioni operative</h3>
+        <p>Le prove pratiche richiedono valutazione di Responsabile, Supervisore o Founder qualificato.</p>
+      </article>
+      <div class="academy-path-grid">
+        ${assessments.length ? assessments.map((assessment) => `
+          <article class="academy-qualification-card">
+            <h4>${escapeHtml(assessment.title || assessment.assessment_title || "Prova pratica")}</h4>
+            <p>${escapeHtml(assessment.course_title || assessment.description || "")}</p>
+            <div class="academy-course-meta">
+              ${renderQualificationStatus(assessment.latest_status || "not_started", assessment.latest_status || "Da richiedere")}
+              ${assessment.total_score !== null && assessment.total_score !== undefined ? `<span>Punteggio ${escapeHtml(String(assessment.total_score))}/100</span>` : ""}
+            </div>
+            <div class="training-card-actions">
+              <button type="button" data-request-practical-assessment="${escapeHtml(String(assessment.id))}">Richiedi prova pratica</button>
+            </div>
+          </article>
+        `).join("") : '<div class="empty-state">Nessuna prova pratica configurata.</div>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderSimulationLab() {
+  const scenarios = state.academySimulationScenarios || [];
+  trainingList.innerHTML = `
+    <section class="academy-qualification-shell">
+      <article class="academy-qualification-hero">
+        <span class="course-pill">SIMULAZIONE — dati non reali</span>
+        <h3>Laboratorio simulazioni</h3>
+        <p>Scenari fittizi per allenare controlli, decisioni ed escalation senza creare atti, clienti, giacenza o movimenti reali.</p>
+      </article>
+      <div class="academy-path-grid">
+        ${scenarios.length ? scenarios.map((scenario) => `
+          <article class="academy-qualification-card simulation-card">
+            <span class="training-mode-badge">${escapeHtml(trainingDifficultyLabel(scenario.difficulty))}</span>
+            <h4>${escapeHtml(scenario.title || "Scenario")}</h4>
+            <p>${escapeHtml(scenario.description || "")}</p>
+            <div class="academy-course-meta">
+              <span>${escapeHtml(scenario.expected_decision || "Decisione da valutare")}</span>
+              <span>Versione ${escapeHtml(String(scenario.version || 1))}</span>
+            </div>
+            <div class="training-card-actions">
+              <button class="primary-button" type="button" data-start-academy-simulation="${escapeHtml(String(scenario.id))}">Avvia simulazione</button>
+            </div>
+          </article>
+        `).join("") : '<div class="empty-state">Nessuno scenario simulazione disponibile.</div>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderTrainingHistory() {
+  const path = state.academyLearningPath || {};
+  const completed = Array.isArray(path.completedCourses) ? path.completedCourses : [];
+  const attempts = state.academyExamHistory || [];
+  trainingList.innerHTML = `
+    <section class="academy-qualification-shell">
+      <article class="academy-qualification-hero">
+        <span class="course-pill">Storico formazione</span>
+        <h3>Attività formative</h3>
+        <p>Corsi completati, esami consegnati e progressi utili alla qualificazione operativa.</p>
+      </article>
+      <div class="academy-path-grid">
+        <article class="academy-qualification-card">
+          <h4>Corsi completati</h4>
+          ${completed.length ? `<ul>${completed.map((course) => `<li>${escapeHtml(course.title || course.code)}</li>`).join("")}</ul>` : "<p>Nessun corso completato registrato.</p>"}
+        </article>
+        <article class="academy-qualification-card">
+          <h4>Esami consegnati</h4>
+          ${attempts.length ? `<ul>${attempts.map((attempt) => `<li>${escapeHtml(attempt.course_title || "Esame")} · ${escapeHtml(attempt.passed ? "Superato" : attempt.status || "Consegnato")}</li>`).join("")}</ul>` : "<p>Nessun esame consegnato.</p>"}
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function renderFounderQualificationDashboard() {
+  if (!canManageCoursesUi()) {
+    trainingList.innerHTML = '<div class="empty-state">Dashboard formazione riservata al Founder.</div>';
+    return;
+  }
+  const dashboard = state.academyFounderDashboard || {};
+  const metricGroups = [
+    ["Utenti per ruolo", dashboard.users_by_role || [], "ruolo"],
+    ["Certificazioni", dashboard.certifications || [], "status"],
+    ["Esami", dashboard.exams || [], "esito"],
+    ["Prove pratiche", dashboard.practical_assessments || [], "status"],
+    ["Simulazioni", dashboard.simulations || [], "status"]
+  ];
+  trainingList.innerHTML = `
+    <section class="academy-qualification-shell">
+      <article class="academy-qualification-hero">
+        <span class="course-pill">Founder</span>
+        <h3>Dashboard formazione</h3>
+        <p>Modalità qualifica: ${escapeHtml(dashboard.settings?.mode || state.academyQualificationSettings?.mode || "shadow")}. In shadow vengono registrati i requisiti senza bloccare le funzioni operative.</p>
+      </article>
+      <div class="founder-dashboard-grid">
+        ${metricGroups.map(([title, rows, labelKey]) => `
+          <article class="academy-qualification-card">
+            <h4>${escapeHtml(title)}</h4>
+            ${rows.length ? rows.map((row) => `
+              <div class="founder-dashboard-row">
+                <span>${escapeHtml(row[labelKey] || "Non definito")}</span>
+                <strong>${escapeHtml(String(row.total || 0))}</strong>
+              </div>
+            `).join("") : '<p>Nessun dato disponibile.</p>'}
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderTraining() {
   if (!trainingList) return;
   if (!ACADEMY_TAB_LABELS[state.courseActiveTab]) {
@@ -9391,8 +9629,43 @@ function renderTraining() {
     button.classList.toggle("active", button.dataset.courseTab === state.courseActiveTab);
   });
 
+  if (state.courseActiveTab === "path") {
+    renderMyLearningPath();
+    return;
+  }
+
+  if (state.courseActiveTab === "competencies") {
+    renderCompetencyMatrix();
+    return;
+  }
+
+  if (state.courseActiveTab === "exams") {
+    renderAcademyExams();
+    return;
+  }
+
+  if (state.courseActiveTab === "practicals") {
+    renderPracticalAssessments();
+    return;
+  }
+
+  if (state.courseActiveTab === "simulations") {
+    renderSimulationLab();
+    return;
+  }
+
+  if (state.courseActiveTab === "history") {
+    renderTrainingHistory();
+    return;
+  }
+
   if (state.courseActiveTab === "operatorTraining") {
     renderOperatorTraining();
+    return;
+  }
+
+  if (state.courseActiveTab === "dashboard") {
+    renderFounderQualificationDashboard();
     return;
   }
 
@@ -9666,7 +9939,28 @@ function mergeTrainingCourseInState(course = {}, payload = {}) {
   return normalizedCourse;
 }
 
-function applyTrainingData(data = {}, scenarioData = {}, myResultsData = {}, teamResultsData = {}) {
+function applyAcademyQualificationData({
+  settingsData = {},
+  learningPathData = {},
+  competenciesData = {},
+  practicalsData = {},
+  capabilitiesData = {},
+  simulationsData = {},
+  examHistoryData = {},
+  founderDashboardData = {}
+} = {}) {
+  state.academyQualificationSettings = settingsData.settings || state.academyQualificationSettings || { enabled: true, mode: "shadow", pilot_mode: false };
+  state.academyLearningPath = learningPathData.learning_path || state.academyLearningPath || null;
+  state.academyNextObjective = learningPathData.next_objective || state.academyLearningPath?.nextObjective || null;
+  state.academyCompetencies = competenciesData.competencies || state.academyCompetencies || [];
+  state.academyPracticalAssessments = practicalsData.practical_assessments || state.academyPracticalAssessments || [];
+  state.academyOperationalCapabilities = capabilitiesData.capabilities || state.academyOperationalCapabilities || [];
+  state.academySimulationScenarios = simulationsData.scenarios || state.academySimulationScenarios || [];
+  state.academyExamHistory = examHistoryData.attempts || state.academyExamHistory || [];
+  state.academyFounderDashboard = founderDashboardData.dashboard || state.academyFounderDashboard || null;
+}
+
+function applyTrainingData(data = {}, scenarioData = {}, myResultsData = {}, teamResultsData = {}, qualificationData = {}) {
   state.courseFaculties = (data.faculties || []).filter((faculty) => String(faculty.name || "").trim() !== "OroActive Academy");
   state.trainingCourses = (data.courses || []).filter((course) => !isGoldMasterCourse(course));
   state.courseCategories = data.categories || [];
@@ -9677,14 +9971,36 @@ function applyTrainingData(data = {}, scenarioData = {}, myResultsData = {}, tea
   state.trainingScenarios = scenarioData.scenarios || [];
   state.operatorTrainingResults = myResultsData.results || [];
   state.operatorTeamTrainingResults = teamResultsData.results || [];
+  applyAcademyQualificationData(qualificationData);
 }
 
 async function loadTraining() {
-  const [rawCourseDataResult, scenarioDataResult, myResultsDataResult, teamResultsDataResult] = await Promise.allSettled([
+  const [
+    rawCourseDataResult,
+    scenarioDataResult,
+    myResultsDataResult,
+    teamResultsDataResult,
+    settingsResult,
+    learningPathResult,
+    competenciesResult,
+    practicalsResult,
+    capabilitiesResult,
+    simulationsResult,
+    examHistoryResult,
+    founderDashboardResult
+  ] = await Promise.allSettled([
     apiRequest("/corsi"),
     apiRequest("/training/scenarios", { retries: 1 }),
     apiRequest("/training/my-results", { retries: 1 }),
-    apiRequest("/training/team-results", { retries: 1 })
+    apiRequest("/training/team-results", { retries: 1 }),
+    apiRequest("/academy/qualification/settings", { retries: 1 }),
+    apiRequest("/academy/my-learning-path", { retries: 1 }),
+    apiRequest("/academy/my-competencies", { retries: 1 }),
+    apiRequest("/academy/my-practical-assessments", { retries: 1 }),
+    apiRequest("/academy/my-operational-capabilities", { retries: 1 }),
+    apiRequest("/academy/simulations", { retries: 1 }),
+    apiRequest("/academy/exam-attempts/history", { retries: 1 }),
+    apiRequest("/academy/founder/qualification-dashboard", { retries: 1 })
   ]);
   const courseDataLoaded = rawCourseDataResult.status === "fulfilled";
   const rawCourseData = courseDataLoaded ? rawCourseDataResult.value : currentTrainingDataSnapshot();
@@ -9696,7 +10012,17 @@ async function loadTraining() {
     data,
     scenarioDataResult.status === "fulfilled" ? scenarioDataResult.value : { scenarios: state.trainingScenarios || [] },
     myResultsDataResult.status === "fulfilled" ? myResultsDataResult.value : { results: state.operatorTrainingResults || [] },
-    teamResultsDataResult.status === "fulfilled" ? teamResultsDataResult.value : { results: state.operatorTeamTrainingResults || [] }
+    teamResultsDataResult.status === "fulfilled" ? teamResultsDataResult.value : { results: state.operatorTeamTrainingResults || [] },
+    {
+      settingsData: settingsResult.status === "fulfilled" ? settingsResult.value : {},
+      learningPathData: learningPathResult.status === "fulfilled" ? learningPathResult.value : {},
+      competenciesData: competenciesResult.status === "fulfilled" ? competenciesResult.value : {},
+      practicalsData: practicalsResult.status === "fulfilled" ? practicalsResult.value : {},
+      capabilitiesData: capabilitiesResult.status === "fulfilled" ? capabilitiesResult.value : {},
+      simulationsData: simulationsResult.status === "fulfilled" ? simulationsResult.value : {},
+      examHistoryData: examHistoryResult.status === "fulfilled" ? examHistoryResult.value : {},
+      founderDashboardData: founderDashboardResult.status === "fulfilled" ? founderDashboardResult.value : {}
+    }
   );
   renderTraining();
 }
@@ -17934,6 +18260,8 @@ trainingList?.addEventListener("click", async (event) => {
   const editCourseButton = event.target.closest("[data-edit-course]");
   const deleteCourseButton = event.target.closest("[data-delete-course]");
   const prerequisiteButton = event.target.closest("[data-open-prerequisite-course]");
+  const requestPractical = event.target.closest("[data-request-practical-assessment]");
+  const startSimulation = event.target.closest("[data-start-academy-simulation]");
   try {
     if (startOperator) return await withButtonBusy(startOperator, "Avvio...", () => startOperatorTraining(startOperator.dataset.startOperatorTraining));
     if (saveOperator) return await withButtonBusy(saveOperator, "Salvo...", () => saveOperatorTrainingProgress(saveOperator.dataset.saveOperatorTraining));
@@ -17952,6 +18280,26 @@ trainingList?.addEventListener("click", async (event) => {
     if (viewSlides) return await withButtonBusy(viewSlides, "Apro...", () => downloadCourseSlides(viewSlides.dataset.viewCourseSlides, { download: false }));
     if (downloadSlides) return await withButtonBusy(downloadSlides, "Scarico...", () => downloadCourseSlides(downloadSlides.dataset.downloadCourseSlides, { download: true }));
     if (certificate) return await downloadCourseCertificate(certificate.dataset.downloadCertificate);
+    if (requestPractical) {
+      return await withButtonBusy(requestPractical, "Richiedo...", async () => {
+        await apiRequest(`/academy/practical-assessments/${requestPractical.dataset.requestPracticalAssessment}/request`, {
+          method: "POST",
+          body: JSON.stringify({ notes: "Richiesta prova pratica da OroActive Academy" })
+        });
+        showToast("Prova pratica richiesta.");
+        await loadTraining();
+      });
+    }
+    if (startSimulation) {
+      return await withButtonBusy(startSimulation, "Avvio...", async () => {
+        await apiRequest(`/academy/simulations/${startSimulation.dataset.startAcademySimulation}/start`, {
+          method: "POST",
+          body: JSON.stringify({ mode: "training" })
+        });
+        showToast("Simulazione avviata in modalità training.");
+        await loadTraining();
+      });
+    }
     if (prerequisiteButton) {
       const prerequisiteCode = prerequisiteButton.dataset.openPrerequisiteCourse || "";
       const card = [...document.querySelectorAll("[data-course-code]")]
