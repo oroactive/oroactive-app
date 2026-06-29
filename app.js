@@ -915,6 +915,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "profile", back: "leaf", frontText: "CAN", backText: "9999" }
   },
   {
+    id: "canada-maple-leaf-20-dollari",
+    name: "Canada Foglia d'Acero d'oro 20 Dollari",
+    country: "Canada",
+    mintYears: "Anni misti / 1979-oggi",
+    nominal: "20 Dollars",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 15.55,
+    fineGold: 15.548,
+    diameter: 25,
+    edge: "Zigrinato",
+    obverse: "Foglia d'acero canadese con diciture Canada, Fine Gold, 1/2 oz, Or Pur e 9999",
+    reverse: "Ritratto reale canadese con valore nominale 20 Dollars",
+    history: "La Gold Maple Leaf, o Foglia d'Acero d'oro, e la bullion simbolo della Royal Canadian Mint. Introdotta nel 1979, e coniata in oro puro 999,9/1000 proveniente da miniere canadesi e riconosciuta per il motivo iconico della foglia d'acero. La serie e prodotta in vari tagli, tra cui 1 oz, 1/2 oz, 1/4 oz e 1/10 oz; le emissioni moderne integrano elementi di sicurezza come micro-incisioni laser a forma di foglia d'acero e linee radiali complesse.",
+    recognitionHints: ["maple leaf", "foglia acero", "foglia d'acero", "canada", "20 dollars", "1/2 oz", "fine gold", "or pur", "9999", "royal canadian mint"],
+    visual: { front: "leaf", back: "profile", frontText: "1/2", backText: "20$" }
+  },
+  {
     id: "filarmonica-vienna-2026-1-oz",
     name: "Filarmonica di Vienna 2026",
     country: "Austria",
@@ -1257,6 +1276,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "american-eagle-1-oz": "american-eagle-1-oz",
   "american-buffalo-1-oz": "american-buffalo-1-oz",
   "maple-leaf-1-oz": "maple-leaf-1-oz",
+  "canada-maple-leaf-20-dollari": "canada-maple-leaf-20-dollari",
   "filarmonica-vienna-2026-1-oz": "filarmonica-vienna-2026-1-oz",
   "somalia-elephant-2023-1-oz": "somalia-elephant-2023-1-oz",
   "arca-noe-armenia-2025-1-oz": "arca-noe-armenia-2025-1-oz",
@@ -1277,6 +1297,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
 const COIN_IMAGE_SOURCE_BY_COIN = {
   "american-buffalo-1-oz": "Archivio OroActive",
   "maple-leaf-1-oz": "Archivio OroActive",
+  "canada-maple-leaf-20-dollari": "Archivio OroActive",
   "kangaroo-nugget-1-oz": "Archivio OroActive",
   "australia-nugget-kangaroo-50-dollari": "Archivio OroActive",
   "australia-nugget-kangaroo-50-dollari-fdc": "Archivio OroActive",
