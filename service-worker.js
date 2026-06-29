@@ -1,8 +1,8 @@
-const STATIC_CACHE = "oroactive-static-v20260629-australia-nugget-coin-4";
+const STATIC_CACHE = "oroactive-static-v20260629-4-ducati-austriaci-1";
 const STATIC_ASSETS = [
   "/index.html",
-  "/styles.css?v=20260629-australia-nugget-coin-4",
-  "/app.js?v=20260629-australia-nugget-coin-4",
+  "/styles.css?v=20260629-4-ducati-austriaci-1",
+  "/app.js?v=20260629-4-ducati-austriaci-1",
   "/manifest.json",
   "/manifest.webmanifest",
   "/oroactive-logo.png",
