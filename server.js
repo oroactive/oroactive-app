@@ -6488,7 +6488,7 @@ const GOLD_COIN_AI_CATALOG = [
 ];
 
 GOLD_COIN_AI_CATALOG.push(
-  { id: "marengo-belga-20-franchi", name: "Marengo belga 20 Franchi", country: "Belgio", purity: "900 per mille", obverse: "regnante belga", reverse: "stemma o figura allegorica 20 Francs", hints: ["belgio", "belgique", "20 francs", "leopold"] },
+  { id: "marengo-belga-20-franchi", name: "Marengo 20 Franchi Albert (Belgio)", country: "Belgio", purity: "900 per mille", obverse: "Re Alberto I, ALBERT ROI DES BELGES", reverse: "stemma coronato del Belgio, 20 F, 1914", hints: ["marengo belga", "marengo 20 franchi", "20 francs", "20 f", "albert roi", "des belges", "alberto primo", "albert i", "belgio", "belgique", "belgie", "1914", "stemma belga"] },
   { id: "marengo-austriaco-20-franchi", name: "Marengo austriaco", country: "Austria", purity: "900 per mille", obverse: "Francesco Giuseppe", reverse: "aquila imperiale o valore", hints: ["austria", "franz joseph", "8 florins", "20 francs"] },
   { id: "sterlina-vecchio-conio", name: "Sterlina vecchio conio", country: "Regno Unito", purity: "22 kt / 916,7 per mille", obverse: "sovrano britannico storico", reverse: "San Giorgio e drago", hints: ["sterlina", "sovereign", "georgius", "victoria", "san giorgio"] },
   { id: "sudafrica-2-rand", name: "Sudafrica 2 Rand", country: "Sud Africa", purity: "22 kt / 916,7 per mille", obverse: "Jan van Riebeeck", reverse: "springbok e 2 Rand", hints: ["2 rand", "south africa", "jan van riebeeck", "springbok"] },
