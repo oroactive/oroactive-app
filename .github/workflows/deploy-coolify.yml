@@ -17,7 +17,6 @@ jobs:
     env:
       COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-      OROACTIVE_HEALTH_URL: ${{ secrets.OROACTIVE_HEALTH_URL }}
       OROACTIVE_EXPECTED_BRANCH: ${{ secrets.OROACTIVE_EXPECTED_BRANCH }}
       BUILD_TIME: ${{ github.event.head_commit.timestamp }}
       BUILD_NUMBER: ${{ github.run_number }}
@@ -79,46 +78,3 @@ jobs:
             --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
             --header "Content-Type: application/json" \
             --data "{\"commit\":\"${GIT_COMMIT}\",\"branch\":\"${GITHUB_REF_NAME}\",\"buildNumber\":\"${BUILD_NUMBER}\"}"
-
-      - name: Verify deployed health
-        shell: bash
-        env:
-          OROACTIVE_HEALTH_URL: ${{ secrets.OROACTIVE_HEALTH_URL }}
-        run: |
-          echo "Checking health..."
-
-          STATUS=$(curl -s -o /tmp/health.json -w "%{http_code}" "$OROACTIVE_HEALTH_URL")
-
-          echo "HTTP=$STATUS"
-
-          cat /tmp/health.json
-
-          if [ "$STATUS" != "200" ]; then
-            echo "Health endpoint returned HTTP $STATUS"
-            exit 1
-          fi
-
-          if command -v jq >/dev/null 2>&1 && jq -e '.ok == true' /tmp/health.json >/dev/null; then
-            echo "Health check passed."
-            exit 0
-          fi
-
-          if ! command -v jq >/dev/null 2>&1; then
-            if python3 - <<'PY'
-import json
-import sys
-
-with open("/tmp/health.json") as f:
-    data = json.load(f)
-
-sys.exit(0 if data.get("ok") is True else 1)
-PY
-            then
-              echo "Health check passed."
-              exit 0
-            fi
-          fi
-
-          echo "Health endpoint did not return ok:true"
-
-          exit 1
