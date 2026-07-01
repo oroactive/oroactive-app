@@ -1534,7 +1534,6 @@ const appVersionLabel = document.getElementById("appVersionLabel");
 const appVersionDetail = document.getElementById("appVersionDetail");
 const appUpdateBanner = document.getElementById("appUpdateBanner");
 const appUpdateBannerText = document.getElementById("appUpdateBannerText");
-const founderFooterBuilds = document.querySelectorAll("[data-founder-footer-build]");
 const mainMenuQuickActions = document.getElementById("mainMenuQuickActions");
 const mainMenuActions = document.getElementById("mainMenuActions");
 const mainMenuSearch = document.getElementById("mainMenuSearch");
@@ -2158,14 +2157,6 @@ function renderAppVersionUi() {
   if (appVersionPanel) appVersionPanel.hidden = !isFounder();
   const client = state.clientVersion || {};
   const server = state.serverVersion || client;
-  const footerVersion = server.shortCommit || client.shortCommit || "locale";
-  const footerBuild = server.buildNumber || client.buildNumber || "local";
-  const footerBranch = server.branch || client.branch || "main";
-  founderFooterBuilds.forEach((element) => {
-    element.hidden = !isFounder();
-    element.textContent = `Build ${footerVersion} · #${footerBuild} · ${footerBranch}`;
-    element.title = formatBuildVersion(server);
-  });
   if (!isFounder()) return;
   if (appVersionLabel) appVersionLabel.textContent = `Build ${server.shortCommit || client.shortCommit || "locale"}`;
   if (appVersionDetail) {

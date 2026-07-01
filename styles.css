@@ -7169,14 +7169,6 @@ body.main-menu-active .app-shell {
   font-weight: 700;
 }
 
-.app-footer-build {
-  display: inline-block;
-  margin-left: 8px;
-  color: rgba(255, 122, 0, 0.9);
-  font-weight: 900;
-  overflow-wrap: anywhere;
-}
-
 .stepper {
   list-style: none;
   display: grid;
