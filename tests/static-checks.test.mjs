@@ -517,6 +517,9 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /Cina Panda oro 1 grammo \(Fior di Conio\)/);
   assert.match(app, /id: "cina-panda-oro-1-grammo-fdc"[\s\S]*grossWeight: 1,[\s\S]*fineGold: 0\.999,[\s\S]*diameter: 10/);
   assert.match(app, /panda-cinese-30g/);
+  assert.match(app, /id: "american-eagle-1-oz"[\s\S]*name: "America Aquila 50 Dollari d'oro"[\s\S]*mintYears: "Anni misti"[\s\S]*grossWeight: 33\.92,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /Gold Bullion Coin Act del 1985/);
+  assert.match(app, /1 OZ FINE GOLD/);
   assert.match(app, /BILANCIA_DORO_COIN_IMAGE_BASE/);
   assert.match(app, /COIN_IMAGE_SOURCE_BY_COIN/);
   assert.match(app, /INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS/);
@@ -583,6 +586,9 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /arca-noe-armenia-2025-1-oz/);
   assert.match(server, /canada-maple-leaf-20-dollari/);
   assert.match(server, /maple leaf 20 dollars/);
+  assert.match(server, /America Aquila 50 Dollari d'oro/);
+  assert.match(server, /gold bullion coin act/);
+  assert.match(server, /1 oz fine gold/);
   assert.match(server, /australia-nugget-kangaroo-50-dollari/);
   assert.match(server, /kangaroo 50 dollars/);
   assert.match(server, /australia-nugget-kangaroo-50-dollari-fdc/);
@@ -667,6 +673,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/ducato-austriaco-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/4-ducati-austriaci-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/4-ducati-austriaci-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-eagle-1-oz-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-eagle-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/maple-leaf-1-oz-front.png", root)),
