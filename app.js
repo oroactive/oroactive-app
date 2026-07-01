@@ -4267,6 +4267,29 @@ function safeUi(component, task, fallback) {
   }
 }
 
+function recoverMainLayoutAfterError(error) {
+  if (!state.authToken) return;
+  if (!mainMenuScreen || mainMenuScreen.hidden) return;
+  if (mainMenuActions && !mainMenuActions.children.length) {
+    renderMainMenuFallback(error);
+  }
+  forceHideStartupSplash();
+  setMainMenuMode(true);
+}
+
+function installGlobalErrorGuards() {
+  window.addEventListener("error", (event) => {
+    const error = event.error || new Error(event.message || "Errore frontend");
+    reportUiComponentError("window-error", error, { source: event.filename || "", line: event.lineno || 0 });
+    recoverMainLayoutAfterError(error);
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason || "Promise non gestita"));
+    reportUiComponentError("unhandledrejection", reason);
+    recoverMainLayoutAfterError(reason);
+  });
+}
+
 function minimalMainMenuButton({ id, label, description, icon, section, action }) {
   const attributes = [
     `type="button"`,
@@ -4675,8 +4698,12 @@ async function finishAuthenticatedStartup() {
   await runStartupTask("sincronizzazione pendente", flushPendingSync);
   if (!state.syncTimer) {
     state.syncTimer = window.setInterval(async () => {
-      await flushPendingSync();
-      await syncActsFromServer();
+      try {
+        await flushPendingSync();
+        await syncActsFromServer();
+      } catch (error) {
+        reportUiComponentError("background-sync", error);
+      }
     }, 30000);
   }
 }
@@ -20478,6 +20505,7 @@ document.getElementById("closePreview").addEventListener("click", () => {
 async function initializeApp() {
   showStartupSplash();
   try {
+    installGlobalErrorGuards();
     registerServiceWorker();
     startAppVersionChecker();
     removeLegacySearchMenu();
@@ -20490,11 +20518,11 @@ async function initializeApp() {
     const sessionRestored = await restoreSession({ keepSplash: true });
     maybeShowInstallHint();
     window.addEventListener("focus", () => {
-      if (state.authToken) syncActsFromServer();
+      if (state.authToken) void syncActsFromServer().catch((error) => reportUiComponentError("focus-sync", error));
       if (state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
     });
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && state.authToken) syncActsFromServer();
+      if (!document.hidden && state.authToken) void syncActsFromServer().catch((error) => reportUiComponentError("visibility-sync", error));
       if (!document.hidden && state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
     });
     await completeStartupSplash(sessionRestored ? "main" : "login");
