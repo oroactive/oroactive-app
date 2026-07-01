@@ -21915,6 +21915,20 @@ app.get("/api/auth/me", authenticate, (request, response) => {
   response.json({ user: publicUser(request.user) });
 });
 
+app.post("/api/frontend-errors", authenticate, (request, response) => {
+  const body = request.body || {};
+  console.error("FRONTEND UI ERROR", {
+    component: String(body.component || "unknown").slice(0, 120),
+    message: String(body.message || "").slice(0, 300),
+    route: String(body.route || "").slice(0, 160),
+    userRole: normalizeRole(request.user?.ruolo),
+    userId: request.user?.id || null,
+    hasUser: Boolean(body.hasUser),
+    stack: String(body.stack || "").slice(0, 600)
+  });
+  response.json({ ok: true });
+});
+
 app.use("/api", authenticate);
 app.use("/api", auditApiRequest);
 

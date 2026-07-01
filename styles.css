@@ -1674,6 +1674,46 @@ body.splash-active {
   font-weight: 900;
 }
 
+.main-menu-loading-state,
+.main-menu-render-fallback {
+  grid-column: 1 / -1;
+  min-height: 84px;
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  padding: 16px;
+  border: 1px solid rgba(255, 106, 0, 0.32);
+  border-radius: 8px;
+  background: rgba(18, 18, 18, 0.9);
+  color: rgba(255, 247, 239, 0.82);
+  font-weight: 900;
+}
+
+.main-menu-render-fallback {
+  margin-bottom: 12px;
+}
+
+.main-menu-render-fallback strong {
+  color: #fff;
+  font-size: 16px;
+}
+
+.main-menu-render-fallback span {
+  color: rgba(255, 247, 239, 0.72);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.main-menu-fallback-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.main-menu-fallback-button {
+  min-height: 86px;
+}
+
 .main-menu-sidebar-user {
   margin-top: auto;
   display: grid;
