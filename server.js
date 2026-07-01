@@ -51,26 +51,120 @@ const runtimeStatus = {
   databaseError: "",
   startedAt: new Date().toISOString()
 };
-const buildTime = process.env.BUILD_TIME || process.env.GITHUB_BUILD_TIME || new Date().toISOString();
-const buildCommit = process.env.GITHUB_SHA || process.env.COOLIFY_GIT_COMMIT || process.env.COMMIT_SHA || process.env.SOURCE_COMMIT || "unknown";
-const buildNumber = process.env.GITHUB_RUN_NUMBER || process.env.COOLIFY_DEPLOYMENT_ID || process.env.BUILD_NUMBER || process.env.npm_package_version || "local";
-const buildBranch = process.env.GITHUB_REF_NAME || process.env.COOLIFY_GIT_BRANCH || process.env.BRANCH || "main";
-const buildInfo = {
-  ok: true,
-  app: "OroActive",
-  commit: buildCommit,
-  shortCommit: buildCommit !== "unknown" ? buildCommit.slice(0, 12) : "unknown",
-  buildNumber,
-  buildTime,
-  branch: buildBranch,
-  environment: process.env.NODE_ENV || "development"
-};
+const versionFilePath = path.join(__dirname, "version.json");
+let buildMetadataCache = null;
+let buildMetadataCacheAt = 0;
 const missingJwtSecretMessage = "JWT_SECRET obbligatorio: configura una chiave lunga e casuale nelle variabili ambiente.";
 const jwtSecret = process.env.JWT_SECRET || (isProduction
   ? crypto.createHash("sha256").update(`oroactive:${process.env.DATABASE_URL || "database"}:${process.env.ADMIN_USERNAME || "Elite"}`).digest("hex")
   : "oroactive-dev-jwt-secret-change-me");
 if (!process.env.JWT_SECRET && isProduction) {
   console.error(`${missingJwtSecretMessage} Uso fallback temporaneo per evitare blocco avvio.`);
+}
+
+async function readOptionalJson(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function isUsefulBuildValue(value, options = {}) {
+  const normalized = String(value || "").trim();
+  const blocked = new Set(["", "unknown", "undefined", "null", "HEAD"]);
+  if (options.rejectLocal) blocked.add("local");
+  return !blocked.has(normalized);
+}
+
+function firstUsefulBuildValue(values = [], options = {}) {
+  return values.find((value) => isUsefulBuildValue(value, options)) || "";
+}
+
+function shortCommit(commit = "") {
+  const value = String(commit || "").trim();
+  return isUsefulBuildValue(value) ? value.slice(0, 12) : "unknown";
+}
+
+async function readGitCommitFromDisk() {
+  const gitDir = path.join(__dirname, ".git");
+  try {
+    const head = String(await fs.readFile(path.join(gitDir, "HEAD"), "utf8")).trim();
+    if (!head.startsWith("ref:")) return head;
+    const ref = head.replace(/^ref:\s*/, "").trim();
+    const refPath = path.join(gitDir, ref);
+    try {
+      return String(await fs.readFile(refPath, "utf8")).trim();
+    } catch {
+      const packedRefs = String(await fs.readFile(path.join(gitDir, "packed-refs"), "utf8"));
+      const line = packedRefs.split(/\r?\n/).find((entry) => entry.endsWith(` ${ref}`));
+      return line ? line.split(" ")[0] : "";
+    }
+  } catch {
+    return "";
+  }
+}
+
+async function readGitValue(args = []) {
+  try {
+    const { stdout } = await execFileAsync("git", args, { cwd: __dirname });
+    return String(stdout || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function getBuildMetadata() {
+  const now = Date.now();
+  if (buildMetadataCache && now - buildMetadataCacheAt < 30000) return buildMetadataCache;
+  const fileMetadata = await readOptionalJson(versionFilePath);
+  const gitCommit = await readGitCommitFromDisk();
+  const gitBuildNumber = await readGitValue(["rev-list", "--count", "HEAD"]);
+  const gitBranch = await readGitValue(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const commit = firstUsefulBuildValue([
+    process.env.OROACTIVE_GIT_COMMIT,
+    process.env.GIT_COMMIT,
+    process.env.GITHUB_SHA,
+    process.env.SOURCE_COMMIT,
+    fileMetadata.commit,
+    gitCommit
+  ]) || "unknown";
+  const commitShort = shortCommit(commit);
+  const buildTime = firstUsefulBuildValue([
+    process.env.OROACTIVE_BUILD_TIME,
+    process.env.BUILD_TIME,
+    process.env.GITHUB_RUN_STARTED_AT,
+    fileMetadata.buildTime,
+    fileMetadata.builtAt
+  ]) || runtimeStatus.startedAt;
+  const buildNumber = firstUsefulBuildValue([
+    process.env.OROACTIVE_BUILD_NUMBER,
+    process.env.BUILD_NUMBER,
+    process.env.GITHUB_RUN_NUMBER,
+    process.env.COOLIFY_BUILD_NUMBER,
+    fileMetadata.buildNumber,
+    gitBuildNumber
+  ], { rejectLocal: true }) || (commitShort !== "unknown" ? `git-${commitShort}` : "local");
+  const branch = firstUsefulBuildValue([
+    process.env.OROACTIVE_BRANCH,
+    process.env.SOURCE_BRANCH,
+    process.env.GITHUB_REF_NAME,
+    fileMetadata.branch,
+    gitBranch
+  ]) || "main";
+  buildMetadataCache = {
+    app: "OroActive",
+    service: "oroactive-gestionale",
+    commit,
+    shortCommit: commitShort,
+    buildTime,
+    buildNumber,
+    branch,
+    packageVersion: process.env.npm_package_version || fileMetadata.packageVersion || "1.0.0",
+    environment: process.env.NODE_ENV || "development"
+  };
+  buildMetadataCacheAt = now;
+  return buildMetadataCache;
 }
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
@@ -6573,6 +6667,7 @@ const GOLD_COIN_AI_CATALOG = [
   { id: "somalia-elephant-2023-1-oz", name: "Somalia Elephant 2023", country: "Somalia", purity: "999,9 per mille", obverse: "stemma Somali Republic e 1.000 Shillings", reverse: "elefante African Wildlife 1 oz Au 999.9", hints: ["somalia elephant 2023", "african wildlife", "elephant", "somali republic", "1000 shillings", "1 oz au 999.9"] },
   { id: "arca-noe-armenia-2025-1-oz", name: "Arca di Noe Armenia 2025", country: "Armenia", purity: "999,9 per mille", obverse: "stemma Repubblica d'Armenia 50.000 Dram 2025", reverse: "Arca di Noe Monte Ararat e colomba", hints: ["arca di noe", "noah's ark", "armenia 2025", "50000 dram", "republic of armenia", "ararat", "colomba", "geiger edelmetalle"] },
   { id: "britannia-1-oz", name: "Britannia", country: "Regno Unito", purity: "999,9 per mille dal 2013", obverse: "sovrano britannico", reverse: "Britannia con tridente", hints: ["britannia", "tridente", "100 pounds"] },
+  { id: "100-lire-vittorio-emanuele-iii-fascione", name: "100 Lire Vittorio Emanuele III Fascione", country: "Italia", purity: "900 per mille", obverse: "Vittorio Emanuele III Re d'Italia", reverse: "fascio littorio con Lire 100 e date Ottobre 1922 - 1923", hints: ["100 lire", "vittorio emanuele iii", "fascione", "lire 100", "fascio", "1923"] },
   { id: "kangaroo-nugget-1-oz", name: "Australian Kangaroo", country: "Australia", purity: "999,9 per mille", obverse: "ritratto reale", reverse: "canguro", hints: ["kangaroo", "nugget", "australia"] },
   { id: "australia-nugget-kangaroo-50-dollari", name: "Australia Nugget d'oro (Kangaroo) 50 Dollari", country: "Australia", purity: "999,9 per mille", obverse: "canguro rosso The Australian Nugget 1/2 oz 9999 Gold", reverse: "Regina Elisabetta II Australia 50 Dollars", hints: ["australia nugget", "gold kangaroo", "kangaroo 50 dollars", "50 dollars australia", "1/2 oz", "9999 gold", "red kangaroo", "perth mint", "nugget d'oro"] },
   { id: "australia-nugget-kangaroo-50-dollari-fdc", name: "Australia Nugget d'oro (Kangaroo) 50 Dollari (Fior di Conio)", country: "Australia", purity: "999,9 per mille", obverse: "canguro australiano 2024 Kangaroo 1/2 oz 9999 Gold", reverse: "Carlo III Australia 50 Dollars", hints: ["australia nugget fdc", "gold kangaroo fdc", "kangaroo 50 dollars fdc", "50 dollars australia fdc", "1/2 oz", "2024 kangaroo", "charles iii", "carlo iii", "9999 gold", "perth mint"] },
@@ -21698,25 +21793,50 @@ async function userFromAuthorizationHeader(header = "") {
   return findUserById(decoded.sub);
 }
 
-app.get("/api/health", (_request, response) => {
+app.get("/api/health", async (_request, response) => {
+  const version = await getBuildMetadata();
   response.json({
     ok: true,
     service: "oroactive-gestionale",
+    status: runtimeStatus.databaseReady ? "healthy" : "starting",
     database: runtimeStatus.databaseReady ? "ready" : "initializing_or_unavailable",
     database_error: runtimeStatus.databaseError || null,
     started_at: runtimeStatus.startedAt,
-    version: buildInfo
+    checked_at: new Date().toISOString(),
+    version
   });
 });
 
-app.get("/api/version", (_request, response) => {
+app.get("/api/version", async (_request, response) => {
+  const version = await getBuildMetadata();
   setNoStoreHeaders(response);
-  response.json(buildInfo);
+  response.json({
+    ok: true,
+    app: version.app,
+    commit: version.commit,
+    shortCommit: version.shortCommit,
+    buildNumber: version.buildNumber,
+    buildTime: version.buildTime,
+    branch: version.branch,
+    environment: version.environment,
+    packageVersion: version.packageVersion
+  });
 });
 
-app.get("/version.json", (_request, response) => {
+app.get("/version.json", async (_request, response) => {
+  const version = await getBuildMetadata();
   setNoStoreHeaders(response);
-  response.json(buildInfo);
+  response.json({
+    ok: true,
+    app: version.app,
+    commit: version.commit,
+    shortCommit: version.shortCommit,
+    buildNumber: version.buildNumber,
+    buildTime: version.buildTime,
+    branch: version.branch,
+    environment: version.environment,
+    packageVersion: version.packageVersion
+  });
 });
 
 app.post("/api/auth/login", async (request, response, next) => {
@@ -26221,14 +26341,18 @@ app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) =
 });
 
 app.get("/service-worker.js", (request, response, next) => {
-  response.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  response.set("Pragma", "no-cache");
-  response.set("Expires", "0");
+  setNoStoreHeaders(response);
   next();
 });
 
-app.use(express.static(__dirname, { extensions: ["html"], setHeaders: staticCacheHeaders }));
-app.get("*", (_request, response) => response.sendFile(path.join(__dirname, "index.html")));
+app.use(express.static(__dirname, {
+  extensions: ["html"],
+  setHeaders: staticCacheHeaders
+}));
+app.get("*", (_request, response) => {
+  setNoStoreHeaders(response);
+  response.sendFile(path.join(__dirname, "index.html"));
+});
 
 function friendlyDatabaseError(error, request) {
   const url = request?.originalUrl || "";

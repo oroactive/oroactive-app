@@ -1213,6 +1213,32 @@ body.splash-active {
   background: #22150f;
 }
 
+.app-version-panel {
+  margin: 4px 0 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 115, 28, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 115, 28, 0.1);
+  color: #fff7ef;
+}
+
+.app-version-panel span,
+.app-version-panel small {
+  display: block;
+  line-height: 1.25;
+}
+
+.app-version-panel span {
+  font-weight: 900;
+}
+
+.app-version-panel small {
+  margin-top: 3px;
+  color: rgba(255, 247, 239, 0.72);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
 .login-privacy-links {
   position: absolute;
   bottom: max(18px, env(safe-area-inset-bottom));
@@ -9515,6 +9541,55 @@ button.quality-review-badge {
   color: #fff;
 }
 
+.app-update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: max(82px, calc(env(safe-area-inset-bottom) + 22px));
+  z-index: 21000;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(620px, calc(100vw - 28px));
+  padding: 12px;
+  border: 1px solid rgba(255, 122, 0, 0.34);
+  border-radius: 8px;
+  background: #17130d;
+  color: #fff8eb;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+  transform: translateX(-50%);
+}
+
+.app-update-banner[hidden] {
+  display: none;
+}
+
+.app-update-banner span {
+  flex: 1;
+  min-width: 0;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.app-update-banner div {
+  display: flex;
+  gap: 8px;
+}
+
+.app-update-banner button {
+  min-height: 38px;
+  border: 1px solid rgba(255, 122, 0, 0.42);
+  border-radius: 8px;
+  background: #ff8a1f;
+  color: #17130d;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.app-update-banner button[data-app-update-dismiss] {
+  background: transparent;
+  color: #fff8eb;
+}
+
 .tutorial-overlay {
   position: fixed;
   inset: 0;
@@ -11637,6 +11712,20 @@ input.document-expired {
     bottom: 12px;
     min-width: 0;
     max-width: none;
+  }
+
+  .app-update-banner {
+    align-items: stretch;
+    flex-direction: column;
+    bottom: max(72px, calc(env(safe-area-inset-bottom) + 16px));
+  }
+
+  .app-update-banner div {
+    width: 100%;
+  }
+
+  .app-update-banner button {
+    flex: 1;
   }
 
   .loading-indicator {

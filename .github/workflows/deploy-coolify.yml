@@ -1,0 +1,81 @@
+name: Deploy OroActive to Coolify
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: oroactive-coolify-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Test and deploy
+    runs-on: ubuntu-latest
+    env:
+      COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+      OROACTIVE_HEALTH_URL: ${{ secrets.OROACTIVE_HEALTH_URL }}
+      OROACTIVE_EXPECTED_BRANCH: ${{ secrets.OROACTIVE_EXPECTED_BRANCH }}
+      BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+      BUILD_NUMBER: ${{ github.run_number }}
+      GIT_COMMIT: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate branch
+        run: |
+          expected_branch="${OROACTIVE_EXPECTED_BRANCH:-main}"
+          if [ "${GITHUB_REF_NAME}" != "${expected_branch}" ]; then
+            echo "Expected branch ${expected_branch}, got ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static syntax checks
+        run: |
+          node --check app.js
+          node --check server.js
+
+      - name: Run tests
+        run: npm test
+
+      - name: Write build metadata
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const metadata = {
+            app: "OroActive",
+            service: "oroactive-gestionale",
+            commit: process.env.GIT_COMMIT,
+            shortCommit: process.env.GIT_COMMIT.slice(0, 12),
+            buildTime: process.env.BUILD_TIME || new Date().toISOString(),
+            buildNumber: process.env.BUILD_NUMBER,
+            packageVersion: require("./package.json").version,
+            environment: "production"
+          };
+          fs.writeFileSync("version.json", `${JSON.stringify(metadata, null, 2)}\n`);
+          NODE
+
+      - name: Trigger Coolify deploy
+        run: |
+          if [ -z "${COOLIFY_WEBHOOK}" ] || [ -z "${COOLIFY_TOKEN}" ]; then
+            echo "COOLIFY_WEBHOOK and COOLIFY_TOKEN secrets are required."
+            exit 1
+          fi
+          curl --fail --silent --show-error --request POST "${COOLIFY_WEBHOOK}" \
+            --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data "{\"commit\":\"${GIT_COMMIT}\",\"branch\":\"${GITHUB_REF_NAME}\",\"buildNumber\":\"${BUILD_NUMBER}\"}"

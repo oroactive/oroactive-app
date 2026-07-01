@@ -11,6 +11,11 @@ const state = {
   authToken: "",
   currentUser: null,
   syncTimer: null,
+  appVersionTimer: null,
+  clientVersion: null,
+  serverVersion: null,
+  updateAvailable: false,
+  serviceWorkerReloading: false,
   actsCache: new Map(),
   archivePage: 1,
   archivePageSize: 10,
@@ -1627,6 +1632,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "somalia-elephant-2023-1-oz": "somalia-elephant-2023-1-oz",
   "arca-noe-armenia-2025-1-oz": "arca-noe-armenia-2025-1-oz",
   "britannia-1-oz": "britannia-1-oz",
+  "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "kangaroo-nugget-1-oz",
   "australia-nugget-kangaroo-50-dollari": "australia-nugget-kangaroo-50-dollari",
   "australia-nugget-kangaroo-50-dollari-fdc": "australia-nugget-kangaroo-50-dollari-fdc",
@@ -1674,6 +1680,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "filarmonica-vienna-2026-1-oz": "Archivio OroActive",
   "somalia-elephant-2023-1-oz": "Archivio OroActive",
   "arca-noe-armenia-2025-1-oz": "Archivio OroActive",
+  "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
 };
@@ -1990,6 +1997,11 @@ const mainUserMenuButton = document.getElementById("mainUserMenuButton");
 const mainUserDropdown = document.getElementById("mainUserDropdown");
 const mainMenuClock = document.getElementById("mainMenuClock");
 const mainMenuLogoRefresh = document.getElementById("mainMenuLogoRefresh");
+const appVersionPanel = document.getElementById("appVersionPanel");
+const appVersionLabel = document.getElementById("appVersionLabel");
+const appVersionDetail = document.getElementById("appVersionDetail");
+const appUpdateBanner = document.getElementById("appUpdateBanner");
+const appUpdateBannerText = document.getElementById("appUpdateBannerText");
 const mainMenuQuickActions = document.getElementById("mainMenuQuickActions");
 const mainMenuActions = document.getElementById("mainMenuActions");
 const mainMenuSearch = document.getElementById("mainMenuSearch");
@@ -2364,6 +2376,7 @@ const apiBase = oroactiveConfig.apiBase || `${API_BASE_URL}/api`;
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
+const APP_VERSION_CHECK_INTERVAL_MS = 30000;
 const API_RETRY_ATTEMPTS = 3;
 const NOTIFICATION_POLL_INTERVAL_MS = 60000;
 const QUALITY_FLAG_POINTS = 1;
@@ -2479,6 +2492,17 @@ function removeLegacySearchMenu() {
   });
 }
 
+function removeFooterBuildMetadata() {
+  document.querySelectorAll(".software-footer .app-footer-build, .software-footer [data-founder-footer-build]").forEach((element) => {
+    element.remove();
+  });
+  document.querySelectorAll(".software-footer").forEach((footer) => {
+    if (/Build\s+[a-f0-9]{7,}|#git-|·\s*main/i.test(footer.textContent || "")) {
+      footer.textContent = "© 2026 OroActive Tech - Software gestionale proprietario";
+    }
+  });
+}
+
 function showLoading(message = "Caricamento in corso...") {
   if (!loadingIndicator) return;
   loadingIndicator.querySelector("span").textContent = message;
@@ -2500,8 +2524,25 @@ function isAppleTouchDevice() {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+    navigator.serviceWorker.register("/service-worker.js").then((registration) => {
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            state.updateAvailable = true;
+            showAppUpdateBanner("Aggiornamento pronto. Ricarica OroActive quando hai terminato l'operazione in corso.");
+          }
+        });
+      });
+      void registration.update();
+    }).catch(() => {
       // La PWA resta utilizzabile anche senza service worker.
+    });
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (state.serviceWorkerReloading) return;
+      state.serviceWorkerReloading = true;
+      window.location.reload();
     });
   });
 }
@@ -2620,6 +2661,7 @@ function hideAppUpdateBanner() {
 
 function showAppUpdateBanner(serverVersion = {}) {
   if (state.appUpdateBannerDismissed) return;
+  const customMessage = typeof serverVersion === "string" ? serverVersion : "";
   let banner = document.getElementById("oroactiveUpdateBanner");
   if (!banner) {
     banner = document.createElement("aside");
@@ -2643,11 +2685,11 @@ function showAppUpdateBanner(serverVersion = {}) {
     document.body.appendChild(banner);
   }
   const dirty = syncDirtyState();
-  const copy = dirty
+  const copy = customMessage || (dirty
     ? "Aggiornamento disponibile. Salva la pratica prima di aggiornare."
-    : "Nuova versione OroActive disponibile";
+    : "Nuova versione OroActive disponibile");
   banner.querySelector("[data-update-copy]").textContent = copy;
-  state.serverVersion = normalizeAppVersion(serverVersion);
+  if (!customMessage) state.serverVersion = normalizeAppVersion(serverVersion);
 }
 
 async function appUpdateDebugInfo() {
@@ -2707,6 +2749,7 @@ async function openAppVersionPreview() {
 
 async function checkForAppUpdate(options = {}) {
   try {
+    const showResult = Boolean(options.showResult || options.manual);
     const client = await ensureClientVersion();
     const server = await fetchAppVersion("/api/version");
     state.serverVersion = server;
@@ -2717,16 +2760,19 @@ async function checkForAppUpdate(options = {}) {
     if (changed) {
       state.appUpdateBannerDismissed = false;
       showAppUpdateBanner(server);
+      if (options.autoReload && !syncDirtyState() && !document.hidden) {
+        window.setTimeout(() => void performAppUpdateReload(), 1200);
+      }
     } else {
       hideAppUpdateBanner();
     }
-    if (options.showResult) {
+    if (showResult) {
       showToast(changed ? "Nuova versione OroActive disponibile." : "App aggiornata.", changed ? "warning" : "success");
       await openAppVersionPreview();
     }
     return changed;
   } catch {
-    if (options.showResult) {
+    if (options.showResult || options.manual) {
       showToast("Impossibile verificare l'aggiornamento app.", "error");
       await openAppVersionPreview();
     }
@@ -2744,17 +2790,25 @@ function startAppVersionChecker() {
   });
 }
 
+function startAppVersionChecks() {
+  startAppVersionChecker();
+}
+
+async function handleAppUpdateNow() {
+  return performAppUpdateReload();
+}
+
 function triggerLogoRefresh() {
   if (mainMenuLogoRefresh?.classList) {
     mainMenuLogoRefresh.classList.add("logo-refresh-clicked");
   }
   aurumLookAtLogo("Aggiornamento in corso, controllo che sia tutto pronto.");
-  showToast("Aggiornamento app in corso...", "warning");
+  showToast("Verifico l'ultima versione dell'app...", "warning");
   window.setTimeout(() => {
     mainMenuLogoRefresh?.classList?.remove("logo-refresh-clicked");
   }, 220);
   window.setTimeout(() => {
-    refreshApp({ silent: true });
+    void checkForAppUpdate({ manual: true });
   }, 280);
 }
 
@@ -4443,6 +4497,7 @@ function applyRolePermissions() {
   renderAurumManagementPanel();
   updateAurumMascotVisibility();
   renderFounderMenuKpis();
+  renderAppVersionUi();
 }
 
 async function startAuthenticatedApp(options = {}) {
@@ -4473,6 +4528,7 @@ async function startAuthenticatedApp(options = {}) {
   await loadAurumSupportRequests();
   await loadNotificationCount();
   startNotificationPolling();
+  startAppVersionChecks();
   if (isFounder()) await loadAurumAllMemories();
   void maybeShowPrivacyPolicyNotice();
   maybeShowAurumDailyGreeting();
@@ -19550,8 +19606,23 @@ mainUserDropdown?.addEventListener("click", (event) => {
     setScreen("users");
     return;
   }
+  if (event.target.closest("[data-user-check-update]")) {
+    closeMainUserMenu();
+    void checkForAppUpdate({ manual: true });
+    return;
+  }
   if (event.target.closest("[data-user-logout]")) {
     handleLogout();
+  }
+});
+
+appUpdateBanner?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-app-update-now]")) {
+    void handleAppUpdateNow();
+    return;
+  }
+  if (event.target.closest("[data-app-update-dismiss]")) {
+    hideAppUpdateBanner();
   }
 });
 
@@ -20251,6 +20322,7 @@ async function initializeApp() {
     registerServiceWorker();
     startAppVersionChecker();
     removeLegacySearchMenu();
+    removeFooterBuildMetadata();
     upgradeProvinceFields();
     populateAutocompleteLists();
     markAurumAvoidElements();
@@ -20260,9 +20332,11 @@ async function initializeApp() {
     maybeShowInstallHint();
     window.addEventListener("focus", () => {
       if (state.authToken) syncActsFromServer();
+      if (state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
     });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && state.authToken) syncActsFromServer();
+      if (!document.hidden && state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
     });
     await completeStartupSplash(sessionRestored ? "main" : "login");
   } catch (error) {
