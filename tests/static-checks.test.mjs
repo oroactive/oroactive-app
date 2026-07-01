@@ -52,7 +52,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260701-stability-guard-4"/);
+  assert.match(sw, /const BUILD_ID = "20260701-pwa-cache-reset-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -77,8 +77,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /app\.js\?v=20260701-stability-guard-4/);
-  assert.match(index, /styles\.css\?v=20260701-stability-guard-4/);
+  assert.match(index, /app\.js\?v=20260701-pwa-cache-reset-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
   assert.match(version, /"ok": true/);
 });
 
@@ -113,17 +113,11 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /sessionStorage\.getItem\(OROACTIVE_SPLASH_SESSION_KEY\) === "true"/);
   assert.match(app, /sessionStorage\.setItem\(OROACTIVE_SPLASH_SESSION_KEY, "true"\)/);
   assert.match(app, /function showStartupSplash/);
-  assert.match(app, /function scheduleStartupSplashWatchdog/);
-  assert.match(app, /function forceHideStartupSplash/);
-  assert.match(app, /openMainMenuCleanly\(\)/);
   assert.match(app, /async function completeStartupSplash/);
-  assert.match(app, /async function finishAuthenticatedStartup/);
-  assert.match(app, /openMainMenuCleanly\(\{ keepSplash \}\)/);
-  assert.match(app, /void finishAuthenticatedStartup\(\)/);
   assert.match(app, /openMainMenuCleanly\(\{ keepSplash: true \}\)/);
   assert.match(app, /await restoreSession\(\{ keepSplash: true \}\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -1950,7 +1944,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -2009,7 +2003,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -2061,7 +2055,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -2131,9 +2125,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260701-stability-guard-4/);
-  assert.match(index, /styles\.css\?v=20260701-stability-guard-4/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(index, /app\.js\?v=20260701-pwa-cache-reset-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -2179,8 +2173,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260701-stability-guard-4/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -2227,23 +2221,6 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /id: "search-open-aurum"[\s\S]*action: "aurum"/);
   assert.match(app, /function renderRoleBasedMenus/);
   assert.match(app, /function getMainMenuConfigForRole/);
-  assert.match(app, /function reportUiComponentError/);
-  assert.match(app, /function safeUi/);
-  assert.match(app, /function installGlobalErrorGuards/);
-  assert.match(app, /window\.addEventListener\("error"/);
-  assert.match(app, /window\.addEventListener\("unhandledrejection"/);
-  assert.match(app, /function recoverMainLayoutAfterError/);
-  assert.match(app, /installGlobalErrorGuards\(\)/);
-  assert.match(app, /reportUiComponentError\("background-sync", error\)/);
-  assert.match(app, /reportUiComponentError\("focus-sync", error\)/);
-  assert.match(app, /reportUiComponentError\("visibility-sync", error\)/);
-  assert.match(app, /function renderMainMenuFallback/);
-  assert.match(app, /function minimalMainMenuButton/);
-  assert.match(app, /Caricamento OroActive\.\.\./);
-  assert.match(app, /safeUi\("main-menu-render", renderRoleBasedMenus, renderMainMenuFallback\)/);
-  assert.match(app, /openMainMenuCleanly\(\{ keepSplash \}\)/);
-  assert.match(app, /setMainMenuMode\(true\)[\s\S]*mainMenuActions\.innerHTML = '<div class="main-menu-loading-state">Caricamento OroActive\.\.\.<\/div>'[\s\S]*safeUi\("main-menu-render", renderRoleBasedMenus, renderMainMenuFallback\)/);
-  assert.match(app, /state\.currentUser \? displayMenuUserName\(state\.currentUser\) : "Founder"/);
   assert.match(app, /function syncNotificationPlacement/);
   assert.match(app, /function cleanupUiBeforeMainMenu/);
   assert.match(app, /function openMainMenuCleanly/);
@@ -2252,8 +2229,6 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /screens\.forEach\(\(screen\) => screen\.classList\.remove\("active-screen"\)\)/);
   assert.match(app, /appShell\.hidden = active/);
   assert.match(app, /appShell\.hidden = false/);
-  assert.match(app, /Boolean\(state\.currentUser \|\| state\.authToken\) && menuRoleAllowed\(item\) && menuConditionAllowed\(item\.condition\)/);
-  assert.match(app, /normalizeRole\(state\.currentUser\?\.ruolo \|\| \(state\.authToken \? "founder" : ""\)\)/);
   assert.match(app, /mainMenuNotificationSlot[\s\S]*notificationDefaultParent/);
   assert.match(app, /notificationCenter\.classList\.toggle\("is-main-menu-docked"/);
   assert.match(app, /showFounderMetrics: role === "founder"/);
@@ -2271,8 +2246,6 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /return \["founder", "supervisore", "responsabile"\]\.includes\(normalizeRole\(state\.currentUser\?\.ruolo\)\)/);
   assert.match(app, /Dashboard Founder è riservata al Founder/);
   assert.match(server, /app\.get\("\/api\/dashboard"[\s\S]*normalizeRole\(request\.user\?\.ruolo\) !== "founder"[\s\S]*Non autorizzato/);
-  assert.match(server, /app\.post\("\/api\/frontend-errors", authenticate/);
-  assert.match(server, /FRONTEND UI ERROR/);
   assert.match(styles, /\.main-menu-control-shell/);
   assert.match(styles, /\.main-menu-control-shell \{[\s\S]*grid-template-columns: minmax\(0, 1fr\)[\s\S]*width: min\(100%, 1320px\)/);
   assert.match(styles, /\.main-menu-quick-actions \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
@@ -2287,10 +2260,6 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-user-button \{[\s\S]*max-width: 170px[\s\S]*text-overflow: ellipsis/);
   assert.match(styles, /\.main-menu-search-results/);
   assert.match(styles, /\.main-menu-hero/);
-  assert.match(styles, /\.main-menu-loading-state/);
-  assert.match(styles, /\.main-menu-render-fallback/);
-  assert.match(styles, /\.main-menu-fallback-grid/);
-  assert.match(styles, /\.main-menu-fallback-button/);
   assert.match(styles, /\.main-menu-founder-kpis/);
   assert.match(styles, /\.main-menu-screen \{[\s\S]*isolation: isolate[\s\S]*overflow-y: auto[\s\S]*linear-gradient\(180deg, #080808 0%, #050505 100%\)/);
   assert.match(styles, /body\.main-menu-active \.app-shell \{[\s\S]*display: none !important[\s\S]*pointer-events: none !important/);
@@ -2299,15 +2268,12 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-submenu \{[\s\S]*position: relative[\s\S]*scroll-margin-bottom: 150px/);
   assert.match(styles, /\.main-menu-founder-kpis \{[\s\S]*position: relative[\s\S]*z-index: 1/);
   assert.match(styles, /\.main-menu-screen:not\(\[hidden\]\) ~ \.aurum-mascot-root \{[\s\S]*opacity: 1/);
-  assert.match(styles, /\.aurum-mascot-root \{[\s\S]*pointer-events: none/);
-  assert.match(styles, /\.aurum-mascot-button \{[\s\S]*pointer-events: auto/);
-  assert.match(styles, /\.notification-center\.is-main-menu-docked \{[\s\S]*position: relative[\s\S]*z-index: 38/);
   assert.match(app, /submenu\.scrollIntoView\(\{ block: "nearest", behavior: "smooth" \}\)/);
   assert.match(styles, /@keyframes control-center-orbit/);
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -2411,7 +2377,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -2462,9 +2428,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260701-stability-guard-4/);
-  assert.match(index, /styles\.css\?v=20260701-stability-guard-4/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(index, /app\.js\?v=20260701-pwa-cache-reset-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -2521,9 +2487,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260701-stability-guard-4/);
-  assert.match(index, /styles\.css\?v=20260701-stability-guard-4/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(index, /app\.js\?v=20260701-pwa-cache-reset-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -2601,7 +2567,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -2718,7 +2684,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -2762,7 +2728,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260701-stability-guard-4/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i

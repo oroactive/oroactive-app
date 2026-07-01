@@ -30,7 +30,6 @@ const state = {
   splashStartedAt: 0,
   splashReady: false,
   splashError: null,
-  splashWatchdogTimer: null,
   cashLimitWarningShown: false,
   amlCashCheck: null,
   amlCashCheckTimer: null,
@@ -2909,34 +2908,6 @@ function setSplashStatus(message, options = {}) {
   splashStatus.classList.toggle("is-ready", Boolean(options.ready));
 }
 
-function forceHideStartupSplash() {
-  window.clearTimeout(state.splashWatchdogTimer);
-  state.splashWatchdogTimer = null;
-  if (splashScreen) {
-    splashScreen.classList.add("hidden");
-    splashScreen.classList.remove("is-exiting", "is-error", "is-brief");
-  }
-  document.body.classList.remove("splash-active");
-  markStartupSplashSeen();
-}
-
-function scheduleStartupSplashWatchdog() {
-  window.clearTimeout(state.splashWatchdogTimer);
-  state.splashWatchdogTimer = window.setTimeout(() => {
-    if (!splashScreen || splashScreen.classList.contains("hidden")) return;
-    if (state.currentUser && state.authToken) {
-      openMainMenuCleanly();
-      maybeStartFirstRunTutorial();
-      forceHideStartupSplash();
-      return;
-    }
-    if (!state.loggingIn) {
-      showLogin();
-      forceHideStartupSplash();
-    }
-  }, 9000);
-}
-
 function showStartupSplash() {
   if (!splashScreen) return;
   state.splashStartedAt = performance.now();
@@ -2947,7 +2918,6 @@ function showStartupSplash() {
   if (splashError) splashError.hidden = true;
   setSplashStatus("Verifica sessione");
   document.body.classList.add("splash-active");
-  scheduleStartupSplashWatchdog();
 }
 
 async function hideStartupSplash() {
@@ -2960,8 +2930,6 @@ async function hideStartupSplash() {
   splashScreen.classList.add("hidden");
   splashScreen.classList.remove("is-exiting", "is-error", "is-brief");
   document.body.classList.remove("splash-active");
-  window.clearTimeout(state.splashWatchdogTimer);
-  state.splashWatchdogTimer = null;
   markStartupSplashSeen();
 }
 
@@ -4119,7 +4087,7 @@ const MAIN_MENU_SEARCH_SHORTCUTS = [
 ];
 
 function menuRoleAllowed(item = {}) {
-  const role = normalizeRole(state.currentUser?.ruolo || (state.authToken ? "founder" : ""));
+  const role = normalizeRole(state.currentUser?.ruolo);
   return !item.roles || item.roles.includes(role);
 }
 
@@ -4136,7 +4104,7 @@ function menuConditionAllowed(condition = "") {
 }
 
 function isMenuItemVisible(item = {}) {
-  return Boolean(state.currentUser || state.authToken) && menuRoleAllowed(item) && menuConditionAllowed(item.condition);
+  return Boolean(state.currentUser) && menuRoleAllowed(item) && menuConditionAllowed(item.condition);
 }
 
 function menuItemMatchesSearch(item = {}, search = "") {
@@ -4233,119 +4201,6 @@ function mainMenuSearchResultMarkup(item = {}) {
       </span>
     </button>
   `;
-}
-
-function reportUiComponentError(component, error, context = {}) {
-  const payload = {
-    component,
-    message: error?.message || String(error || "Errore sconosciuto"),
-    stack: String(error?.stack || "").slice(0, 1200),
-    route: location.pathname,
-    userRole: normalizeRole(state.currentUser?.ruolo || ""),
-    hasUser: Boolean(state.currentUser),
-    ...context
-  };
-  console.error("OroActive UI component failed", payload, error);
-  if (!state.authToken) return;
-  fetch(`${apiBase}/frontend-errors`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${state.authToken}`
-    },
-    body: JSON.stringify(payload),
-    keepalive: true
-  }).catch(() => {});
-}
-
-function safeUi(component, task, fallback) {
-  try {
-    return task();
-  } catch (error) {
-    reportUiComponentError(component, error);
-    return fallback?.(error);
-  }
-}
-
-function recoverMainLayoutAfterError(error) {
-  if (!state.authToken) return;
-  if (!mainMenuScreen || mainMenuScreen.hidden) return;
-  if (mainMenuActions && !mainMenuActions.children.length) {
-    renderMainMenuFallback(error);
-  }
-  forceHideStartupSplash();
-  setMainMenuMode(true);
-}
-
-function installGlobalErrorGuards() {
-  window.addEventListener("error", (event) => {
-    const error = event.error || new Error(event.message || "Errore frontend");
-    reportUiComponentError("window-error", error, { source: event.filename || "", line: event.lineno || 0 });
-    recoverMainLayoutAfterError(error);
-  });
-  window.addEventListener("unhandledrejection", (event) => {
-    const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason || "Promise non gestita"));
-    reportUiComponentError("unhandledrejection", reason);
-    recoverMainLayoutAfterError(reason);
-  });
-}
-
-function minimalMainMenuButton({ id, label, description, icon, section, action }) {
-  const attributes = [
-    `type="button"`,
-    `data-menu-item="${escapeHtml(id)}"`
-  ];
-  if (section) attributes.push(`data-section="${escapeHtml(section)}"`);
-  if (action) attributes.push(`data-menu-action="${escapeHtml(action)}"`);
-  return `
-    <button class="main-menu-item-button main-menu-fallback-button" ${attributes.join(" ")} aria-label="${escapeHtml(label)}">
-      <span class="main-menu-item-icon" aria-hidden="true">${escapeHtml(icon || "OA")}</span>
-      <span class="main-menu-item-copy">
-        <strong>${escapeHtml(label)}</strong>
-        <small>${escapeHtml(description || "Funzione disponibile")}</small>
-      </span>
-    </button>
-  `;
-}
-
-function renderMainMenuFallback(error) {
-  const quickActions = [
-    { id: "fallback-dashboard", label: "Dashboard", description: "Apri area principale", icon: "KPI", section: "dashboard" },
-    { id: "fallback-new-sale", label: "Nuovo atto", description: "Crea pratica", icon: "+", section: "practice" },
-    { id: "fallback-archive", label: "Elenco atti", description: "Archivio pratiche", icon: "Lista", section: "archive" },
-    { id: "fallback-quote", label: "Quotazioni", description: "Prezzi metalli", icon: "EUR", section: "quotazione" }
-  ];
-  const macroAreas = [
-    { id: "fallback-training", label: "Formazione", description: "Academy ed Elenco Monete", icon: "OA", section: "training" },
-    { id: "fallback-coins", label: "Elenco Monete", description: "Archivio monete d'oro", icon: "EM", section: "coinEncyclopedia" },
-    { id: "fallback-users", label: "Utenti", description: "Gestione permessi", icon: "UT", section: "users" },
-    { id: "fallback-update", label: "Verifica aggiornamento app", description: "Controllo versione", icon: "UP", action: "app-update" }
-  ];
-  if (mainMenuWelcome) mainMenuWelcome.textContent = `Bentornato, ${state.currentUser ? displayMenuUserName(state.currentUser) : "Founder"}`;
-  if (mainMenuHeroRole) mainMenuHeroRole.textContent = roleLabel(state.currentUser?.ruolo || "founder");
-  if (mainMenuHeroStore) mainMenuHeroStore.textContent = userSeesAllStores() ? "Tutti i negozi" : (state.currentUser?.negozio || "Negozio assegnato");
-  if (mainMenuQuickActions) mainMenuQuickActions.innerHTML = quickActions.map(minimalMainMenuButton).join("");
-  if (mainMenuActions) {
-    mainMenuActions.innerHTML = `
-      <div class="main-menu-render-fallback">
-        <strong>Caricamento OroActive completato in modalità sicura</strong>
-        <span>Il menu avanzato non è stato caricato, ma le funzioni principali restano disponibili.</span>
-      </div>
-      <div class="main-menu-fallback-grid">
-        ${macroAreas.map(minimalMainMenuButton).join("")}
-      </div>
-    `;
-  }
-  if (mainMenuFounderKpis) {
-    mainMenuFounderKpis.hidden = false;
-    mainMenuFounderKpis.innerHTML = `
-      <div class="main-menu-founder-empty">
-        <strong>Dashboard disponibile</strong>
-        <small>Apri la Dashboard mentre OroActive completa il caricamento dei dati.</small>
-      </div>
-      <button class="main-menu-dashboard-link" type="button" data-section="dashboard">Vai alla Dashboard</button>
-    `;
-  }
 }
 
 function closeMainMenuSearchResults() {
@@ -4455,44 +4310,31 @@ function renderFounderMenuKpis() {
 
 function renderRoleBasedMenus() {
   const search = String(mainMenuSearch?.value || "").trim().toLowerCase();
-  const menuConfig = safeUi("main-menu-config", () => getMainMenuConfigForRole(), () => ({
-    quickActions: [],
-    macroAreas: [],
-    showFounderMetrics: true,
-    showDirection: true,
-    showAdmin: true,
-    searchScope: []
-  }));
+  const menuConfig = getMainMenuConfigForRole();
   if (mainMenuQuickActions) {
-    safeUi("main-menu-quick-actions", () => {
-      mainMenuQuickActions.innerHTML = menuConfig.quickActions
-        .map((item) => menuButtonMarkup(item, "main-menu-quick-button"))
-        .join("");
-    }, renderMainMenuFallback);
+    mainMenuQuickActions.innerHTML = menuConfig.quickActions
+      .map((item) => menuButtonMarkup(item, "main-menu-quick-button"))
+      .join("");
   }
   const groups = menuConfig.macroAreas;
   if (mainMenuActions) {
-    safeUi("main-menu-macro-areas", () => {
-      mainMenuActions.innerHTML = groups.length
-        ? groups.map((group) => menuGroupMarkup(group)).join("")
-        : '<div class="main-menu-empty">Caricamento OroActive...</div>';
-    }, renderMainMenuFallback);
+    mainMenuActions.innerHTML = groups.length
+      ? groups.map((group) => menuGroupMarkup(group)).join("")
+      : '<div class="main-menu-empty">Nessuna funzione disponibile per questa ricerca.</div>';
   }
-  safeUi("main-menu-search-results", () => renderMainMenuSearchResults(search));
+  renderMainMenuSearchResults(search);
   if (brandDropdown) {
-    safeUi("brand-dropdown-menu", () => {
-      const brandGroups = visibleMenuGroups();
-      brandDropdown.innerHTML = brandGroups.map((group) => `
-        <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="${escapeHtml(`brandMenu-${group.id}`)}" aria-expanded="false">
-          ${escapeHtml(group.label)}
-        </button>
-        <div class="brand-submenu" id="${escapeHtml(`brandMenu-${group.id}`)}" hidden>
-          ${group.items.map((item) => menuButtonMarkup(item, "user-menu-button")).join("")}
-        </div>
-      `).join("");
-    });
+    const brandGroups = visibleMenuGroups();
+    brandDropdown.innerHTML = brandGroups.map((group) => `
+      <button class="brand-dropdown-title brand-dropdown-toggle" type="button" data-brand-submenu-toggle="${escapeHtml(`brandMenu-${group.id}`)}" aria-expanded="false">
+        ${escapeHtml(group.label)}
+      </button>
+      <div class="brand-submenu" id="${escapeHtml(`brandMenu-${group.id}`)}" hidden>
+        ${group.items.map((item) => menuButtonMarkup(item, "user-menu-button")).join("")}
+      </div>
+    `).join("");
   }
-  safeUi("main-menu-founder-kpis", renderFounderMenuKpis);
+  renderFounderMenuKpis();
 }
 
 function currentUserNeedsApprovalForRisk() {
@@ -4574,60 +4416,58 @@ function positionNotificationDropdown() {
 }
 
 function applyRolePermissions() {
-  safeUi("role-menu-render", renderRoleBasedMenus, renderMainMenuFallback);
-  safeUi("role-user-directory", () => document.querySelectorAll(".user-directory-only").forEach((element) => {
+  renderRoleBasedMenus();
+  document.querySelectorAll(".user-directory-only").forEach((element) => {
     element.hidden = !canViewUsersDirectory();
-  }));
-  safeUi("role-admin-elements", () => document.querySelectorAll(".admin-only").forEach((element) => {
-    element.hidden = !isAdmin();
-  }));
-  safeUi("role-founder-elements", () => document.querySelectorAll(".founder-only").forEach((element) => {
-    element.hidden = !isFounder();
-  }));
-  safeUi("role-backup-elements", () => document.querySelectorAll(".backup-manager-only").forEach((element) => {
-    element.hidden = !canManageBackupsUi();
-  }));
-  safeUi("role-approval-elements", () => document.querySelectorAll(".approval-section-only").forEach((element) => {
-    element.hidden = !canUseApprovalSectionUi();
-  }));
-  safeUi("role-knowledge-elements", () => document.querySelectorAll(".knowledge-editor-only").forEach((element) => {
-    element.hidden = !canManageKnowledgeUi();
-  }));
-  safeUi("role-control-elements", () => document.querySelectorAll(".control-only").forEach((element) => {
-    element.hidden = !canViewControlSectionsUi();
-  }));
-  if (notificationCenter) notificationCenter.hidden = !state.currentUser;
-  safeUi("notification-placement", syncNotificationPlacement);
-
-  safeUi("store-permission-fields", () => {
-    const storeCode = document.getElementById("storeCode");
-    const archiveStore = document.getElementById("archiveStoreFilter");
-    const fusionStore = document.getElementById("fusionStoreFilter");
-    if (!userSeesAllStores()) {
-      const code = currentUserStoreCode();
-      if (storeCode) {
-        storeCode.value = code;
-        storeCode.disabled = true;
-      }
-      if (archiveStore) {
-        archiveStore.value = state.currentUser?.negozio || "";
-        archiveStore.disabled = true;
-      }
-      if (fusionStore) {
-        fusionStore.value = state.currentUser?.negozio || "";
-        fusionStore.disabled = true;
-      }
-    } else {
-      if (storeCode) storeCode.disabled = false;
-      if (archiveStore) {
-        archiveStore.disabled = false;
-        if (archiveStore.querySelector('option[value="Tutti"]') && archiveStore.dataset.userSelected !== "true") {
-          archiveStore.value = "Tutti";
-        }
-      }
-      if (fusionStore) fusionStore.disabled = false;
-    }
   });
+  document.querySelectorAll(".admin-only").forEach((element) => {
+    element.hidden = !isAdmin();
+  });
+  document.querySelectorAll(".founder-only").forEach((element) => {
+    element.hidden = !isFounder();
+  });
+  document.querySelectorAll(".backup-manager-only").forEach((element) => {
+    element.hidden = !canManageBackupsUi();
+  });
+  document.querySelectorAll(".approval-section-only").forEach((element) => {
+    element.hidden = !canUseApprovalSectionUi();
+  });
+  document.querySelectorAll(".knowledge-editor-only").forEach((element) => {
+    element.hidden = !canManageKnowledgeUi();
+  });
+  document.querySelectorAll(".control-only").forEach((element) => {
+    element.hidden = !canViewControlSectionsUi();
+  });
+  if (notificationCenter) notificationCenter.hidden = !state.currentUser;
+  syncNotificationPlacement();
+
+  const storeCode = document.getElementById("storeCode");
+  const archiveStore = document.getElementById("archiveStoreFilter");
+  const fusionStore = document.getElementById("fusionStoreFilter");
+  if (!userSeesAllStores()) {
+    const code = currentUserStoreCode();
+    if (storeCode) {
+      storeCode.value = code;
+      storeCode.disabled = true;
+    }
+    if (archiveStore) {
+      archiveStore.value = state.currentUser.negozio;
+      archiveStore.disabled = true;
+    }
+    if (fusionStore) {
+      fusionStore.value = state.currentUser.negozio;
+      fusionStore.disabled = true;
+    }
+  } else {
+    if (storeCode) storeCode.disabled = false;
+    if (archiveStore) {
+      archiveStore.disabled = false;
+      if (archiveStore.querySelector('option[value="Tutti"]') && archiveStore.dataset.userSelected !== "true") {
+        archiveStore.value = "Tutti";
+      }
+    }
+    if (fusionStore) fusionStore.disabled = false;
+  }
 
   if (loggedUserName && state.currentUser) {
     loggedUserName.textContent = `${displayMenuUserName(state.currentUser)} - ${roleLabel(state.currentUser.ruolo)}`;
@@ -4653,27 +4493,25 @@ function applyRolePermissions() {
   }
   const qualityPanel = document.getElementById("qualityReviewPanel");
   if (qualityPanel) qualityPanel.hidden = !canReviewActs();
-  safeUi("user-form-permissions", configureUserFormPermissions);
-  safeUi("aurum-management-panel", renderAurumManagementPanel);
-  safeUi("aurum-visibility", updateAurumMascotVisibility);
-  safeUi("main-menu-founder-kpis", renderFounderMenuKpis);
-  safeUi("app-version-ui", renderAppVersionUi);
+  configureUserFormPermissions();
+  renderAurumManagementPanel();
+  updateAurumMascotVisibility();
+  renderFounderMenuKpis();
+  renderAppVersionUi();
 }
 
-async function runStartupTask(label, task) {
-  try {
-    return await task();
-  } catch (error) {
-    console.warn(`OroActive startup task failed: ${label}`, error);
-    return null;
-  }
-}
-
-async function finishAuthenticatedStartup() {
-  await runStartupTask("pending sync locale", loadPendingSyncQueue);
-  await runStartupTask("negozi disponibili", loadAvailableStores);
+async function startAuthenticatedApp(options = {}) {
+  const { keepSplash = false, openMainMenu = true } = options;
+  showAuthenticatedShell({ keepSplash });
+  resetSessionTimeout();
+  state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
+  applyRolePermissions();
+  startMainMenuClock();
+  maybeShowInstallHint();
+  await loadPendingSyncQueue();
+  await loadAvailableStores();
   renderStep();
-  await runStartupTask("metadati pratica", () => setPracticeMeta({ deferPracticeNumber: true }));
+  await setPracticeMeta({ deferPracticeNumber: true });
   applyRolePermissions();
   updateSignatureState();
   updateDocumentCaptureCards();
@@ -4685,44 +4523,24 @@ async function finishAuthenticatedStartup() {
   updateChecklistState();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   ensureAurumHelpAttributes();
-  if (canViewUsersDirectory()) void loadUsers().catch((error) => console.warn("OroActive startup task failed: utenti", error));
-  await runStartupTask("memorie Aurum", loadAurumMemories);
-  await runStartupTask("richieste supporto Aurum", loadAurumSupportRequests);
-  await runStartupTask("conteggio notifiche", loadNotificationCount);
+  if (canViewUsersDirectory()) loadUsers();
+  await loadAurumMemories();
+  await loadAurumSupportRequests();
+  await loadNotificationCount();
   startNotificationPolling();
   startAppVersionChecks();
-  if (isFounder()) await runStartupTask("memorie Founder Aurum", loadAurumAllMemories);
-  void maybeShowPrivacyPolicyNotice().catch((error) => console.warn("OroActive startup task failed: privacy", error));
+  if (isFounder()) await loadAurumAllMemories();
+  void maybeShowPrivacyPolicyNotice();
   maybeShowAurumDailyGreeting();
   maybeShowLevelUnlockMessage();
-  await runStartupTask("sincronizzazione pendente", flushPendingSync);
+  await flushPendingSync();
   if (!state.syncTimer) {
     state.syncTimer = window.setInterval(async () => {
-      try {
-        await flushPendingSync();
-        await syncActsFromServer();
-      } catch (error) {
-        reportUiComponentError("background-sync", error);
-      }
+      await flushPendingSync();
+      await syncActsFromServer();
     }, 30000);
   }
-}
-
-async function startAuthenticatedApp(options = {}) {
-  const { keepSplash = false, openMainMenu = true } = options;
-  showAuthenticatedShell({ keepSplash });
-  resetSessionTimeout();
-  state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
-  applyRolePermissions();
-  startMainMenuClock();
-  maybeShowInstallHint();
-  if (openMainMenu) {
-    openMainMenuCleanly({ keepSplash });
-    if (!keepSplash) maybeStartFirstRunTutorial();
-  }
-  void finishAuthenticatedStartup().catch((error) => {
-    console.warn("OroActive startup background failed", error);
-  });
+  if (openMainMenu && !keepSplash) showMainMenuFromSplash();
 }
 
 async function restoreSession(options = {}) {
@@ -4738,7 +4556,7 @@ async function restoreSession(options = {}) {
     const data = await apiRequest("/auth/me");
     state.currentUser = data.user;
     setSplashStatus("Preparazione area operativa");
-    await startAuthenticatedApp({ keepSplash, openMainMenu: true });
+    await startAuthenticatedApp({ keepSplash, openMainMenu: !keepSplash });
     return true;
   } catch {
     setSplashStatus("Preparazione login");
@@ -5386,23 +5204,23 @@ function setMainMenuMode(active) {
 }
 
 function cleanupUiBeforeMainMenu() {
-  safeUi("cleanup-brand-menu", closeBrandMenu);
-  safeUi("cleanup-user-menu", closeMainUserMenu);
-  safeUi("cleanup-notification-dropdown", closeNotificationDropdown);
-  safeUi("cleanup-main-menu-dropdowns", closeMainMenuDropdowns);
-  safeUi("cleanup-main-menu-search", closeMainMenuSearchResults);
-  safeUi("cleanup-act-search", clearActSearch);
+  closeBrandMenu();
+  closeMainUserMenu();
+  closeNotificationDropdown();
+  closeMainMenuDropdowns();
+  closeMainMenuSearchResults();
+  clearActSearch();
   if (previewModal) previewModal.hidden = true;
   if (tutorialOverlay) tutorialOverlay.hidden = true;
-  safeUi("cleanup-active-screens", () => screens.forEach((screen) => screen.classList.remove("active-screen")));
-  safeUi("cleanup-nav-items", () => navItems.forEach((item) => item.classList.remove("active")));
+  screens.forEach((screen) => screen.classList.remove("active-screen"));
+  navItems.forEach((item) => item.classList.remove("active"));
   if (practiceTopbar) practiceTopbar.hidden = true;
   if (bullionVaultChart) {
     bullionVaultChart.innerHTML = "";
     state.bullionChartLoaded = false;
   }
-  if (typeof stopAurumBlocksLoop === "function") safeUi("cleanup-aurum-blocks-loop", stopAurumBlocksLoop);
-  if (typeof updateAurumBlocksUiState === "function") safeUi("cleanup-aurum-blocks-ui", () => updateAurumBlocksUiState(true));
+  if (typeof stopAurumBlocksLoop === "function") stopAurumBlocksLoop();
+  if (typeof updateAurumBlocksUiState === "function") updateAurumBlocksUiState(true);
   document.body.classList.remove(
     "modal-open",
     "drawer-open",
@@ -5412,26 +5230,22 @@ function cleanupUiBeforeMainMenu() {
     "sale-deed-active",
     "academy-view-active"
   );
-  safeUi("cleanup-scroll", safeScrollTopInstant);
+  safeScrollTopInstant();
 }
 
 function openMainMenuCleanly(options = {}) {
   const { renderMenus = true, keepSplash = false } = options;
   loginScreen.hidden = true;
-  setMainMenuMode(true);
-  if (mainMenuActions) mainMenuActions.innerHTML = '<div class="main-menu-loading-state">Caricamento OroActive...</div>';
   if (!keepSplash) {
     splashScreen.classList.add("hidden");
     document.body.classList.remove("splash-active");
   }
-  safeUi("main-menu-cleanup", cleanupUiBeforeMainMenu);
+  cleanupUiBeforeMainMenu();
+  if (renderMenus) renderRoleBasedMenus();
   setMainMenuMode(true);
-  if (renderMenus) safeUi("main-menu-render", renderRoleBasedMenus, renderMainMenuFallback);
-  if (mainMenuActions && !mainMenuActions.children.length) renderMainMenuFallback(new Error("Main menu rendered empty"));
-  setMainMenuMode(true);
-  safeUi("main-menu-notification-placement", syncNotificationPlacement);
-  safeUi("main-menu-aurum-section", () => setAurumSection("menu"));
-  safeUi("main-menu-aurum-visibility", updateAurumMascotVisibility);
+  syncNotificationPlacement();
+  setAurumSection("menu");
+  updateAurumMascotVisibility();
 }
 
 function prepareInternalSectionLayout() {
@@ -20505,7 +20319,6 @@ document.getElementById("closePreview").addEventListener("click", () => {
 async function initializeApp() {
   showStartupSplash();
   try {
-    installGlobalErrorGuards();
     registerServiceWorker();
     startAppVersionChecker();
     removeLegacySearchMenu();
@@ -20518,11 +20331,11 @@ async function initializeApp() {
     const sessionRestored = await restoreSession({ keepSplash: true });
     maybeShowInstallHint();
     window.addEventListener("focus", () => {
-      if (state.authToken) void syncActsFromServer().catch((error) => reportUiComponentError("focus-sync", error));
+      if (state.authToken) syncActsFromServer();
       if (state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
     });
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && state.authToken) void syncActsFromServer().catch((error) => reportUiComponentError("visibility-sync", error));
+      if (!document.hidden && state.authToken) syncActsFromServer();
       if (!document.hidden && state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
     });
     await completeStartupSplash(sessionRestored ? "main" : "login");
