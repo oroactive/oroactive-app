@@ -92,6 +92,11 @@
                 <button type="button" data-user-profile>Dati utente</button>
                 <button type="button" data-user-privacy>Privacy e dati personali</button>
                 <button class="user-directory-only" type="button" data-user-users>Utenti</button>
+                <div class="app-version-panel founder-only" id="appVersionPanel" hidden>
+                  <span id="appVersionLabel">Build locale</span>
+                  <small id="appVersionDetail">Versione in verifica</small>
+                </div>
+                <button class="founder-only" type="button" data-user-check-update>Verifica aggiornamento app</button>
                 <button type="button" data-user-logout>Logout</button>
               </div>
             </div>
@@ -1893,6 +1898,13 @@
         <path class="aurum-circuit" d="M41 82h11l8 8 8-8h11M60 32v-9M36 63h-8M92 63h-8"></path>
       </svg>
     </button>
+  </div>
+  <div class="app-update-banner" id="appUpdateBanner" hidden>
+    <span id="appUpdateBannerText">Nuova versione disponibile.</span>
+    <div>
+      <button type="button" data-app-update-now>Ricarica</button>
+      <button type="button" data-app-update-dismiss>Più tardi</button>
+    </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="loading-indicator" id="loadingIndicator" hidden>

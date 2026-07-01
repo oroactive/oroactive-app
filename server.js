@@ -51,12 +51,61 @@ const runtimeStatus = {
   databaseError: "",
   startedAt: new Date().toISOString()
 };
+const versionFilePath = path.join(__dirname, "version.json");
+let buildMetadataCache = null;
+let buildMetadataCacheAt = 0;
 const missingJwtSecretMessage = "JWT_SECRET obbligatorio: configura una chiave lunga e casuale nelle variabili ambiente.";
 const jwtSecret = process.env.JWT_SECRET || (isProduction
   ? crypto.createHash("sha256").update(`oroactive:${process.env.DATABASE_URL || "database"}:${process.env.ADMIN_USERNAME || "Elite"}`).digest("hex")
   : "oroactive-dev-jwt-secret-change-me");
 if (!process.env.JWT_SECRET && isProduction) {
   console.error(`${missingJwtSecretMessage} Uso fallback temporaneo per evitare blocco avvio.`);
+}
+
+async function readOptionalJson(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function shortCommit(commit = "") {
+  const value = String(commit || "").trim();
+  return value && value !== "unknown" ? value.slice(0, 12) : "unknown";
+}
+
+async function getBuildMetadata() {
+  const now = Date.now();
+  if (buildMetadataCache && now - buildMetadataCacheAt < 30000) return buildMetadataCache;
+  const fileMetadata = await readOptionalJson(versionFilePath);
+  const commit = process.env.OROACTIVE_GIT_COMMIT
+    || process.env.GIT_COMMIT
+    || process.env.GITHUB_SHA
+    || fileMetadata.commit
+    || "unknown";
+  const buildTime = process.env.OROACTIVE_BUILD_TIME
+    || process.env.BUILD_TIME
+    || fileMetadata.buildTime
+    || fileMetadata.builtAt
+    || "unknown";
+  const buildNumber = process.env.OROACTIVE_BUILD_NUMBER
+    || process.env.BUILD_NUMBER
+    || process.env.GITHUB_RUN_NUMBER
+    || fileMetadata.buildNumber
+    || "local";
+  buildMetadataCache = {
+    app: "OroActive",
+    service: "oroactive-gestionale",
+    commit,
+    shortCommit: shortCommit(commit),
+    buildTime,
+    buildNumber,
+    packageVersion: process.env.npm_package_version || fileMetadata.packageVersion || "1.0.0",
+    environment: process.env.NODE_ENV || "development"
+  };
+  buildMetadataCacheAt = now;
+  return buildMetadataCache;
 }
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
@@ -642,6 +691,44 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: jsonBodyLimit }));
+
+function setNoStoreHeaders(response) {
+  response.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  response.set("Pragma", "no-cache");
+  response.set("Expires", "0");
+}
+
+function staticCacheHeaders(response, filePath) {
+  const relativePath = `/${path.relative(__dirname, filePath).replace(/\\/g, "/")}`.toLowerCase();
+  if (relativePath === "/index.html"
+    || relativePath === "/manifest.json"
+    || relativePath === "/manifest.webmanifest"
+    || relativePath === "/service-worker.js"
+    || relativePath === "/version.json"
+    || relativePath.endsWith(".html")
+    || relativePath.endsWith(".js")
+    || relativePath.endsWith(".css")) {
+    setNoStoreHeaders(response);
+    return;
+  }
+  if (relativePath.startsWith("/assets/") || relativePath.startsWith("/icons/")) {
+    response.set("Cache-Control", "public, max-age=31536000, immutable");
+  }
+}
+
+app.use((request, response, next) => {
+  const requestPath = request.path.toLowerCase();
+  if (requestPath.startsWith("/api/")
+    || requestPath === "/"
+    || requestPath === "/index.html"
+    || requestPath === "/service-worker.js"
+    || requestPath === "/manifest.json"
+    || requestPath === "/manifest.webmanifest"
+    || requestPath === "/version.json") {
+    setNoStoreHeaders(response);
+  }
+  next();
+});
 const apiRateBuckets = new Map();
 
 function apiRateLimit(request, response, next) {
@@ -6474,6 +6561,7 @@ const GOLD_COIN_AI_CATALOG = [
   { id: "somalia-elephant-2023-1-oz", name: "Somalia Elephant 2023", country: "Somalia", purity: "999,9 per mille", obverse: "stemma Somali Republic e 1.000 Shillings", reverse: "elefante African Wildlife 1 oz Au 999.9", hints: ["somalia elephant 2023", "african wildlife", "elephant", "somali republic", "1000 shillings", "1 oz au 999.9"] },
   { id: "arca-noe-armenia-2025-1-oz", name: "Arca di Noe Armenia 2025", country: "Armenia", purity: "999,9 per mille", obverse: "stemma Repubblica d'Armenia 50.000 Dram 2025", reverse: "Arca di Noe Monte Ararat e colomba", hints: ["arca di noe", "noah's ark", "armenia 2025", "50000 dram", "republic of armenia", "ararat", "colomba", "geiger edelmetalle"] },
   { id: "britannia-1-oz", name: "Britannia", country: "Regno Unito", purity: "999,9 per mille dal 2013", obverse: "sovrano britannico", reverse: "Britannia con tridente", hints: ["britannia", "tridente", "100 pounds"] },
+  { id: "100-lire-vittorio-emanuele-iii-fascione", name: "100 Lire Vittorio Emanuele III Fascione", country: "Italia", purity: "900 per mille", obverse: "Vittorio Emanuele III Re d'Italia", reverse: "fascio littorio con Lire 100 e date Ottobre 1922 - 1923", hints: ["100 lire", "vittorio emanuele iii", "fascione", "lire 100", "fascio", "1923"] },
   { id: "kangaroo-nugget-1-oz", name: "Australian Kangaroo", country: "Australia", purity: "999,9 per mille", obverse: "ritratto reale", reverse: "canguro", hints: ["kangaroo", "nugget", "australia"] },
   { id: "libertad-1-oz", name: "Libertad", country: "Messico", purity: "999 per mille", obverse: "stemma messicano", reverse: "Vittoria alata", hints: ["libertad", "onza", "mexico"] },
   { id: "panda-cinese-30g", name: "Panda cinese 30 g", country: "Cina", purity: "999 per mille", obverse: "Tempio del Cielo", reverse: "panda", hints: ["panda", "china", "500 yuan"] },
@@ -21590,14 +21678,22 @@ async function userFromAuthorizationHeader(header = "") {
   return findUserById(decoded.sub);
 }
 
-app.get("/api/health", (_request, response) => {
+app.get("/api/health", async (_request, response) => {
+  const version = await getBuildMetadata();
   response.json({
     ok: true,
     service: "oroactive-gestionale",
+    status: runtimeStatus.databaseReady ? "healthy" : "starting",
     database: runtimeStatus.databaseReady ? "ready" : "initializing_or_unavailable",
     database_error: runtimeStatus.databaseError || null,
-    started_at: runtimeStatus.startedAt
+    started_at: runtimeStatus.startedAt,
+    checked_at: new Date().toISOString(),
+    version
   });
+});
+
+app.get("/api/version", async (_request, response) => {
+  response.json(await getBuildMetadata());
 });
 
 app.post("/api/auth/login", async (request, response, next) => {
@@ -26102,14 +26198,18 @@ app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) =
 });
 
 app.get("/service-worker.js", (request, response, next) => {
-  response.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  response.set("Pragma", "no-cache");
-  response.set("Expires", "0");
+  setNoStoreHeaders(response);
   next();
 });
 
-app.use(express.static(__dirname, { extensions: ["html"] }));
-app.get("*", (_request, response) => response.sendFile(path.join(__dirname, "index.html")));
+app.use(express.static(__dirname, {
+  extensions: ["html"],
+  setHeaders: staticCacheHeaders
+}));
+app.get("*", (_request, response) => {
+  setNoStoreHeaders(response);
+  response.sendFile(path.join(__dirname, "index.html"));
+});
 
 function friendlyDatabaseError(error, request) {
   const url = request?.originalUrl || "";

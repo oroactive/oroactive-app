@@ -412,6 +412,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /Somalia Elephant 2023/);
   assert.match(app, /arca-noe-armenia-2025-1-oz/);
   assert.match(app, /Arca di Noe Armenia 2025/);
+  assert.match(app, /100-lire-vittorio-emanuele-iii-fascione/);
+  assert.match(app, /100 Lire Vittorio Emanuele III Fascione/);
   assert.match(app, /american-buffalo-1-oz/);
   assert.match(app, /kangaroo-nugget-1-oz/);
   assert.match(app, /libertad-1-oz/);
@@ -444,6 +446,7 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /filarmonica-vienna-2026-1-oz/);
   assert.match(server, /somalia-elephant-2023-1-oz/);
   assert.match(server, /arca-noe-armenia-2025-1-oz/);
+  assert.match(server, /100-lire-vittorio-emanuele-iii-fascione/);
   assert.doesNotMatch(server, /id: "wiener-philharmoniker-1-oz"/);
   assert.doesNotMatch(server, /name: "Wiener Philharmoniker 1 oz"/);
   assert.match(server, /GOLD_COIN_AI_CATALOG\.push/);
@@ -476,6 +479,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/somalia-elephant-2023-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/arca-noe-armenia-2025-1-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/arca-noe-armenia-2025-1-oz-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/100-lire-vittorio-emanuele-iii-fascione-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/100-lire-vittorio-emanuele-iii-fascione-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/ducato-austriaco-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/ducato-austriaco-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/4-ducati-austriaci-front.png", root)),
@@ -2519,4 +2524,61 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
   );
+});
+
+test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", async () => {
+  const [workflow, server, app, index, styles, worker, dockerfile, docs] = await Promise.all([
+    file(".github/workflows/deploy-coolify.yml"),
+    file("server.js"),
+    file("app.js"),
+    file("index.html"),
+    file("styles.css"),
+    file("service-worker.js"),
+    file("Dockerfile"),
+    file("docs/deploy-oroactive-coolify.md")
+  ]);
+
+  assert.match(workflow, /COOLIFY_WEBHOOK/);
+  assert.match(workflow, /COOLIFY_TOKEN/);
+  assert.match(workflow, /OROACTIVE_HEALTH_URL/);
+  assert.match(workflow, /OROACTIVE_EXPECTED_BRANCH/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm test/);
+  assert.match(workflow, /curl --fail[\s\S]*COOLIFY_WEBHOOK/);
+  assert.match(workflow, /version\?\.commit/);
+  assert.doesNotMatch(workflow, /deployment\/|coolify\.|https:\/\/app\.oroactive\.it/);
+
+  assert.match(dockerfile, /ARG GIT_COMMIT/);
+  assert.match(dockerfile, /OROACTIVE_GIT_COMMIT/);
+  assert.match(dockerfile, /OROACTIVE_BUILD_TIME/);
+  assert.match(dockerfile, /OROACTIVE_BUILD_NUMBER/);
+
+  assert.match(server, /async function getBuildMetadata/);
+  assert.match(server, /app\.get\("\/api\/version"/);
+  assert.match(server, /app\.get\("\/api\/health"[\s\S]*version/);
+  assert.match(server, /setNoStoreHeaders/);
+  assert.match(server, /requestPath\.startsWith\("\/api\/"\)/);
+  assert.match(server, /public, max-age=31536000, immutable/);
+
+  assert.match(worker, /CACHE_VERSION/);
+  assert.match(worker, /skipWaiting/);
+  assert.match(worker, /clients\.claim/);
+  assert.match(worker, /cache: "no-store"/);
+  assert.match(worker, /event\.request\.mode === "navigate"/);
+  const staticAssetsBlock = worker.slice(worker.indexOf("const STATIC_ASSETS"), worker.indexOf("const HTML_PATHS"));
+  assert.doesNotMatch(staticAssetsBlock, /"\/index\.html"/);
+
+  assert.match(app, /async function checkForAppUpdate/);
+  assert.match(app, /fetchAppVersion/);
+  assert.match(app, /\/version/);
+  assert.match(app, /showAppUpdateBanner/);
+  assert.match(app, /isCriticalUnsavedWorkflow/);
+  assert.match(app, /data-user-check-update/);
+  assert.match(index, /id="appVersionPanel"/);
+  assert.match(index, /data-user-check-update/);
+  assert.match(index, /id="appUpdateBanner"/);
+  assert.match(styles, /\.app-update-banner/);
+  assert.match(styles, /\.app-version-panel/);
+  assert.match(docs, /Deploy OroActive su Coolify/);
+  assert.doesNotMatch(docs, /Bearer\s+[A-Za-z0-9]/);
 });

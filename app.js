@@ -11,6 +11,11 @@ const state = {
   authToken: "",
   currentUser: null,
   syncTimer: null,
+  appVersionTimer: null,
+  clientVersion: null,
+  serverVersion: null,
+  updateAvailable: false,
+  serviceWorkerReloading: false,
   actsCache: new Map(),
   archivePage: 1,
   archivePageSize: 10,
@@ -992,6 +997,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "profile", back: "britannia", frontText: "GB", backText: "BRI" }
   },
   {
+    id: "100-lire-vittorio-emanuele-iii-fascione",
+    name: "100 Lire Vittorio Emanuele III Fascione",
+    country: "Italia",
+    mintYears: "1923",
+    nominal: "100 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 32.25,
+    fineGold: 29.025,
+    diameter: 35,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Vittorio Emanuele III con legenda VITTORIO EMANUELE III RE D'ITALIA",
+    reverse: "Fascio littorio con scure, valore Lire 100, data Ottobre 1922 - 1923 e segno R della Zecca di Roma",
+    history: "La 100 Lire Vittorio Emanuele III Fascione fu coniata nel 1923 per commemorare il primo anniversario della marcia su Roma del 28 ottobre 1922. Gli esemplari, originariamente satinati, non entrarono in circolazione perche il valore intrinseco dell'oro superava il valore nominale. La moneta ha titolo 900/1000, peso di 32,25 g e diametro di 35 mm.",
+    recognitionHints: ["100 lire", "vittorio emanuele iii", "fascione", "lire 100", "ottobre 1922", "1923", "fascio", "scure", "regno d'italia", "italia"],
+    visual: { front: "profile", back: "symbol", frontText: "VEIII", backText: "L100" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australian Kangaroo",
     country: "Australia",
@@ -1187,6 +1211,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "somalia-elephant-2023-1-oz": "somalia-elephant-2023-1-oz",
   "arca-noe-armenia-2025-1-oz": "arca-noe-armenia-2025-1-oz",
   "britannia-1-oz": "britannia-1-oz",
+  "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "kangaroo-nugget-1-oz",
   "libertad-1-oz": "libertad-1-oz",
   "panda-cinese-30g": "panda-cinese-30g",
@@ -1206,6 +1231,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "filarmonica-vienna-2026-1-oz": "Archivio OroActive",
   "somalia-elephant-2023-1-oz": "Archivio OroActive",
   "arca-noe-armenia-2025-1-oz": "Archivio OroActive",
+  "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
 };
@@ -1503,6 +1529,11 @@ const mainUserMenuButton = document.getElementById("mainUserMenuButton");
 const mainUserDropdown = document.getElementById("mainUserDropdown");
 const mainMenuClock = document.getElementById("mainMenuClock");
 const mainMenuLogoRefresh = document.getElementById("mainMenuLogoRefresh");
+const appVersionPanel = document.getElementById("appVersionPanel");
+const appVersionLabel = document.getElementById("appVersionLabel");
+const appVersionDetail = document.getElementById("appVersionDetail");
+const appUpdateBanner = document.getElementById("appUpdateBanner");
+const appUpdateBannerText = document.getElementById("appUpdateBannerText");
 const mainMenuQuickActions = document.getElementById("mainMenuQuickActions");
 const mainMenuActions = document.getElementById("mainMenuActions");
 const mainMenuSearch = document.getElementById("mainMenuSearch");
@@ -1877,6 +1908,7 @@ const apiBase = oroactiveConfig.apiBase || `${API_BASE_URL}/api`;
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
+const APP_VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const API_RETRY_ATTEMPTS = 3;
 const NOTIFICATION_POLL_INTERVAL_MS = 60000;
 const QUALITY_FLAG_POINTS = 1;
@@ -2013,8 +2045,25 @@ function isAppleTouchDevice() {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+    navigator.serviceWorker.register("/service-worker.js").then((registration) => {
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            state.updateAvailable = true;
+            showAppUpdateBanner("Aggiornamento pronto. Ricarica OroActive quando hai terminato l'operazione in corso.");
+          }
+        });
+      });
+      void registration.update();
+    }).catch(() => {
       // La PWA resta utilizzabile anche senza service worker.
+    });
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (state.serviceWorkerReloading) return;
+      state.serviceWorkerReloading = true;
+      window.location.reload();
     });
   });
 }
@@ -2043,13 +2092,149 @@ function triggerLogoRefresh() {
     mainMenuLogoRefresh.classList.add("logo-refresh-clicked");
   }
   aurumLookAtLogo("Aggiornamento in corso, controllo che sia tutto pronto.");
-  showToast("Aggiornamento app in corso...", "warning");
+  showToast("Verifico l'ultima versione dell'app...", "warning");
   window.setTimeout(() => {
     mainMenuLogoRefresh?.classList?.remove("logo-refresh-clicked");
   }, 220);
   window.setTimeout(() => {
-    refreshApp({ silent: true });
+    void checkForAppUpdate({ manual: true });
   }, 280);
+}
+
+function versionSignature(version = {}) {
+  return [
+    version.commit || version.shortCommit || "unknown",
+    version.buildNumber || "local",
+    version.buildTime || "unknown"
+  ].join("|");
+}
+
+function formatBuildVersion(version = {}) {
+  const commit = version.shortCommit || (version.commit ? String(version.commit).slice(0, 12) : "unknown");
+  const buildNumber = version.buildNumber || "local";
+  const buildTime = version.buildTime && version.buildTime !== "unknown" ? version.buildTime : "build locale";
+  return `${commit} / ${buildNumber} / ${buildTime}`;
+}
+
+async function fetchJsonNoStore(url) {
+  const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) throw new Error("Versione app non disponibile.");
+  return response.json();
+}
+
+async function fetchAppVersion() {
+  try {
+    return await fetchJsonNoStore(`${apiBase}/version`);
+  } catch {
+    return fetchJsonNoStore(`${API_BASE_URL}/version.json`);
+  }
+}
+
+function renderAppVersionUi() {
+  if (appVersionPanel) appVersionPanel.hidden = !isFounder();
+  if (!isFounder()) return;
+  const client = state.clientVersion || {};
+  const server = state.serverVersion || client;
+  if (appVersionLabel) appVersionLabel.textContent = `Build ${server.shortCommit || client.shortCommit || "locale"}`;
+  if (appVersionDetail) {
+    appVersionDetail.textContent = state.updateAvailable
+      ? `Nuova versione pronta: ${formatBuildVersion(server)}`
+      : `Versione caricata: ${formatBuildVersion(client)}`;
+  }
+}
+
+function isCriticalUnsavedWorkflow() {
+  const activeScreen = document.querySelector(".screen.active, .screen.active-screen");
+  const isPracticeActive = activeScreen?.id === "practice";
+  return Boolean(
+    state.saving
+    || state.editingDirty
+    || state.captureGroup
+    || state.captureFiles.size
+    || state.uploadedCaptures.size
+    || state.signatures.some(Boolean)
+    || (isPracticeActive && !isPracticeFormEmpty())
+  );
+}
+
+function showAppUpdateBanner(message = "Nuova versione disponibile. Ricarica OroActive per completare l'aggiornamento.") {
+  if (!appUpdateBanner) return;
+  if (appUpdateBannerText) appUpdateBannerText.textContent = message;
+  appUpdateBanner.hidden = false;
+}
+
+function hideAppUpdateBanner() {
+  if (appUpdateBanner) appUpdateBanner.hidden = true;
+}
+
+async function performAppUpdateReload() {
+  if ("serviceWorker" in navigator) {
+    const registration = await navigator.serviceWorker.getRegistration();
+    registration?.waiting?.postMessage({ type: "SKIP_WAITING" });
+  }
+  await refreshApp({ silent: true });
+}
+
+function openAppVersionPreview() {
+  if (!previewModal || !previewBody || !previewTitle) return;
+  const client = state.clientVersion || {};
+  const server = state.serverVersion || client;
+  previewTitle.textContent = "Versione OroActive";
+  previewBody.innerHTML = `
+    <div class="app-version-preview">
+      <p><strong>Versione caricata:</strong> ${escapeHtml(formatBuildVersion(client))}</p>
+      <p><strong>Versione server:</strong> ${escapeHtml(formatBuildVersion(server))}</p>
+      <p>${state.updateAvailable ? "Aggiornamento disponibile." : "L'app risulta allineata."}</p>
+      <button class="primary-button" type="button" data-app-update-reload>Ricarica app</button>
+    </div>
+  `;
+  previewBody.querySelector("[data-app-update-reload]")?.addEventListener("click", () => {
+    void performAppUpdateReload();
+  });
+  previewModal.hidden = false;
+}
+
+async function checkForAppUpdate(options = {}) {
+  const { manual = false, autoReload = false } = options;
+  try {
+    const version = await fetchAppVersion();
+    if (!state.clientVersion) state.clientVersion = version;
+    state.serverVersion = version;
+    state.updateAvailable = versionSignature(version) !== versionSignature(state.clientVersion);
+    renderAppVersionUi();
+    if (state.updateAvailable) {
+      const critical = isCriticalUnsavedWorkflow();
+      showAppUpdateBanner(critical
+        ? "Nuova versione pronta. Completa o salva l'operazione, poi ricarica OroActive."
+        : "Nuova versione pronta. Puoi ricaricare OroActive.");
+      if (autoReload && !critical) {
+        window.setTimeout(() => void performAppUpdateReload(), 1200);
+      }
+      if (manual && isFounder()) openAppVersionPreview();
+      else if (manual) showToast("Aggiornamento pronto. Ricarica l'app quando hai salvato il lavoro.", "warning");
+      return true;
+    }
+    hideAppUpdateBanner();
+    if (manual) {
+      if (isFounder()) openAppVersionPreview();
+      showToast("OroActive è già aggiornato.", "success");
+    }
+    return false;
+  } catch (error) {
+    if (manual) showToast(error.message || "Controllo aggiornamento non disponibile.", "error");
+    return false;
+  }
+}
+
+function startAppVersionChecks() {
+  void checkForAppUpdate({ manual: false });
+  if (state.appVersionTimer) return;
+  state.appVersionTimer = window.setInterval(() => {
+    void checkForAppUpdate({ manual: false });
+  }, APP_VERSION_CHECK_INTERVAL_MS);
 }
 
 async function loadStoredAuthToken() {
@@ -3733,6 +3918,7 @@ function applyRolePermissions() {
   renderAurumManagementPanel();
   updateAurumMascotVisibility();
   renderFounderMenuKpis();
+  renderAppVersionUi();
 }
 
 async function startAuthenticatedApp(options = {}) {
@@ -3763,6 +3949,7 @@ async function startAuthenticatedApp(options = {}) {
   await loadAurumSupportRequests();
   await loadNotificationCount();
   startNotificationPolling();
+  startAppVersionChecks();
   if (isFounder()) await loadAurumAllMemories();
   void maybeShowPrivacyPolicyNotice();
   maybeShowAurumDailyGreeting();
@@ -18815,8 +19002,23 @@ mainUserDropdown?.addEventListener("click", (event) => {
     setScreen("users");
     return;
   }
+  if (event.target.closest("[data-user-check-update]")) {
+    closeMainUserMenu();
+    void checkForAppUpdate({ manual: true });
+    return;
+  }
   if (event.target.closest("[data-user-logout]")) {
     handleLogout();
+  }
+});
+
+appUpdateBanner?.addEventListener("click", (event) => {
+  if (event.target.closest("[data-app-update-now]")) {
+    void performAppUpdateReload();
+    return;
+  }
+  if (event.target.closest("[data-app-update-dismiss]")) {
+    hideAppUpdateBanner();
   }
 });
 
@@ -19524,9 +19726,11 @@ async function initializeApp() {
     maybeShowInstallHint();
     window.addEventListener("focus", () => {
       if (state.authToken) syncActsFromServer();
+      if (state.authToken) void checkForAppUpdate({ manual: false });
     });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && state.authToken) syncActsFromServer();
+      if (!document.hidden && state.authToken) void checkForAppUpdate({ manual: false });
     });
     await completeStartupSplash(sessionRestored ? "main" : "login");
   } catch (error) {
