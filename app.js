@@ -2955,6 +2955,28 @@ function showStartupSplashError(error) {
   if (splashError) splashError.hidden = false;
 }
 
+function reportFrontendFailure(area, error) {
+  console.error(`OroActive ${area} error`, error);
+}
+
+async function runSafeStartupTask(area, task) {
+  try {
+    return await task();
+  } catch (error) {
+    reportFrontendFailure(area, error);
+    return null;
+  }
+}
+
+function runSafeUiTask(area, task) {
+  try {
+    return task();
+  } catch (error) {
+    reportFrontendFailure(area, error);
+    return null;
+  }
+}
+
 function shouldRetryApi(error, responseStatus) {
   if (responseStatus && responseStatus < 500 && responseStatus !== 429) return false;
   return error?.name === "AbortError" || !navigator.onLine || !responseStatus || responseStatus >= 500 || responseStatus === 429;
@@ -4337,6 +4359,45 @@ function renderRoleBasedMenus() {
   renderFounderMenuKpis();
 }
 
+function renderMainMenuFallback() {
+  if (mainMenuQuickActions && !mainMenuQuickActions.querySelector("button")) {
+    mainMenuQuickActions.innerHTML = `
+      <button class="main-menu-item-button main-menu-quick-button" type="button" data-section="practice">
+        <span class="main-menu-item-icon" aria-hidden="true">+</span>
+        <span class="main-menu-item-copy">
+          <strong>Nuovo atto</strong>
+          <small>Crea subito</small>
+        </span>
+      </button>
+      <button class="main-menu-item-button main-menu-quick-button" type="button" data-section="archive">
+        <span class="main-menu-item-icon" aria-hidden="true">Lista</span>
+        <span class="main-menu-item-copy">
+          <strong>Elenco atti</strong>
+          <small>Archivio pratiche</small>
+        </span>
+      </button>
+    `;
+  }
+  if (mainMenuActions && !mainMenuActions.querySelector("button")) {
+    mainMenuActions.innerHTML = `
+      <button class="main-menu-item-button" type="button" data-section="dashboard">
+        <span class="main-menu-item-icon" aria-hidden="true">KPI</span>
+        <span class="main-menu-item-copy">
+          <strong>Dashboard</strong>
+          <small>Panoramica operativa</small>
+        </span>
+      </button>
+      <button class="main-menu-item-button" type="button" data-section="quotazione">
+        <span class="main-menu-item-icon" aria-hidden="true">EUR</span>
+        <span class="main-menu-item-copy">
+          <strong>Quotazioni</strong>
+          <small>Prezzi metalli</small>
+        </span>
+      </button>
+    `;
+  }
+}
+
 function currentUserNeedsApprovalForRisk() {
   return ["commesso", "aiuto_commesso"].includes(normalizeRole(state.currentUser?.ruolo));
 }
@@ -4505,42 +4566,50 @@ async function startAuthenticatedApp(options = {}) {
   showAuthenticatedShell({ keepSplash });
   resetSessionTimeout();
   state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
-  applyRolePermissions();
+  runSafeUiTask("role permissions", applyRolePermissions);
   startMainMenuClock();
   maybeShowInstallHint();
-  await loadPendingSyncQueue();
-  await loadAvailableStores();
-  renderStep();
-  await setPracticeMeta({ deferPracticeNumber: true });
-  applyRolePermissions();
-  updateSignatureState();
-  updateDocumentCaptureCards();
-  updateAttachmentState();
-  updateCededItems();
-  updateSaleTotal();
-  updateCustomerSummary();
-  renderPaymentCaptureCard();
-  updateChecklistState();
-  document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
-  ensureAurumHelpAttributes();
-  if (canViewUsersDirectory()) loadUsers();
-  await loadAurumMemories();
-  await loadAurumSupportRequests();
-  await loadNotificationCount();
+  if (openMainMenu && !keepSplash) showMainMenuFromSplash();
+  void hydrateAuthenticatedAppInBackground().catch((error) => reportFrontendFailure("authenticated background load", error));
+}
+
+async function hydrateAuthenticatedAppInBackground() {
+  await runSafeStartupTask("pending sync queue", loadPendingSyncQueue);
+  await runSafeStartupTask("available stores", loadAvailableStores);
+  runSafeUiTask("practice render", () => {
+    renderStep();
+    updateSignatureState();
+    updateDocumentCaptureCards();
+    updateAttachmentState();
+    updateCededItems();
+    updateSaleTotal();
+    updateCustomerSummary();
+    renderPaymentCaptureCard();
+    updateChecklistState();
+    document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
+    ensureAurumHelpAttributes();
+  });
+  await runSafeStartupTask("practice metadata", () => setPracticeMeta({ deferPracticeNumber: true }));
+  runSafeUiTask("role permissions refresh", applyRolePermissions);
+  await Promise.allSettled([
+    canViewUsersDirectory() ? runSafeStartupTask("users preload", loadUsers) : Promise.resolve(),
+    runSafeStartupTask("Aurum memories", loadAurumMemories),
+    runSafeStartupTask("Aurum support requests", loadAurumSupportRequests),
+    runSafeStartupTask("notification count", loadNotificationCount),
+    isFounder() ? runSafeStartupTask("Aurum founder memories", loadAurumAllMemories) : Promise.resolve()
+  ]);
   startNotificationPolling();
   startAppVersionChecks();
-  if (isFounder()) await loadAurumAllMemories();
   void maybeShowPrivacyPolicyNotice();
-  maybeShowAurumDailyGreeting();
-  maybeShowLevelUnlockMessage();
-  await flushPendingSync();
+  runSafeUiTask("Aurum daily greeting", maybeShowAurumDailyGreeting);
+  runSafeUiTask("level unlock message", maybeShowLevelUnlockMessage);
+  await runSafeStartupTask("pending sync flush", flushPendingSync);
   if (!state.syncTimer) {
     state.syncTimer = window.setInterval(async () => {
-      await flushPendingSync();
-      await syncActsFromServer();
+      await runSafeStartupTask("pending sync flush", flushPendingSync);
+      await runSafeStartupTask("acts sync", syncActsFromServer);
     }, 30000);
   }
-  if (openMainMenu && !keepSplash) showMainMenuFromSplash();
 }
 
 async function restoreSession(options = {}) {
@@ -5241,7 +5310,10 @@ function openMainMenuCleanly(options = {}) {
     document.body.classList.remove("splash-active");
   }
   cleanupUiBeforeMainMenu();
-  if (renderMenus) renderRoleBasedMenus();
+  if (renderMenus) {
+    runSafeUiTask("main menu render", renderRoleBasedMenus);
+    renderMainMenuFallback();
+  }
   setMainMenuMode(true);
   syncNotificationPlacement();
   setAurumSection("menu");
@@ -18859,13 +18931,13 @@ navItems.forEach((item) => {
   });
 });
 
-loginForm.addEventListener("submit", handleLogin);
-faceIdLoginButton.addEventListener("click", loginWithFaceId);
-logoutButton.addEventListener("click", handleLogout);
-registerFaceIdButton.addEventListener("click", registerFaceId);
-document.getElementById("userForm").addEventListener("submit", saveUser);
-document.getElementById("resetUserForm").addEventListener("click", resetUserForm);
-document.getElementById("usersList").addEventListener("click", (event) => {
+loginForm?.addEventListener("submit", handleLogin);
+faceIdLoginButton?.addEventListener("click", loginWithFaceId);
+logoutButton?.addEventListener("click", handleLogout);
+registerFaceIdButton?.addEventListener("click", registerFaceId);
+document.getElementById("userForm")?.addEventListener("submit", saveUser);
+document.getElementById("resetUserForm")?.addEventListener("click", resetUserForm);
+document.getElementById("usersList")?.addEventListener("click", (event) => {
   const goalButton = event.target.closest("[data-goal-message]");
   if (goalButton) {
     previewGoalMessage(goalButton.dataset.goalMessage);
@@ -18884,7 +18956,7 @@ document.getElementById("usersList").addEventListener("click", (event) => {
   const deleteButton = event.target.closest("[data-delete-user]");
   if (deleteButton) deleteUser(deleteButton.dataset.deleteUser);
 });
-document.getElementById("usersList").addEventListener("change", (event) => {
+document.getElementById("usersList")?.addEventListener("change", (event) => {
   const select = event.target.closest("[data-user-action]");
   if (!select || !select.value) return;
   const id = select.dataset.userAction;
@@ -18893,7 +18965,7 @@ document.getElementById("usersList").addEventListener("change", (event) => {
   if (select.value === "delete") deleteUser(id);
   select.value = "";
 });
-document.getElementById("userRole").addEventListener("change", configureUserFormPermissions);
+document.getElementById("userRole")?.addEventListener("change", configureUserFormPermissions);
 mainMenuLogoRefresh?.addEventListener("click", triggerLogoRefresh);
 mainMenuLogoRefresh?.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
@@ -19528,7 +19600,7 @@ async function openBrandMenuItem(button) {
   closeBrandMenu();
 }
 
-brandMenuButton.addEventListener("click", (event) => {
+brandMenuButton?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleBrandMenu();
 });
@@ -19636,7 +19708,7 @@ document.querySelectorAll("[data-start-tutorial]").forEach((button) => {
   });
 });
 
-tutorialNext.addEventListener("click", () => {
+tutorialNext?.addEventListener("click", () => {
   if (!state.tutorial.active) return;
   if (state.tutorial.index >= state.tutorial.steps.length - 1) {
     const isAurumTutorial = state.tutorial.source === "aurum";
@@ -19648,13 +19720,13 @@ tutorialNext.addEventListener("click", () => {
   renderTutorialStep();
 });
 
-tutorialBack.addEventListener("click", () => {
+tutorialBack?.addEventListener("click", () => {
   if (!state.tutorial.active || state.tutorial.index === 0) return;
   state.tutorial.index -= 1;
   renderTutorialStep();
 });
 
-tutorialSkip.addEventListener("click", () => {
+tutorialSkip?.addEventListener("click", () => {
   const isAurumTutorial = state.tutorial.source === "aurum";
   finishTutorial({ remember: !isAurumTutorial });
   showToast(isAurumTutorial ? "Guida Aurum chiusa." : "Tutorial chiuso. Puoi riaprirlo dal menu quando vuoi.");
@@ -19734,7 +19806,7 @@ steps.forEach((step) => {
   });
 });
 
-document.getElementById("nextStep").addEventListener("click", async () => {
+document.getElementById("nextStep")?.addEventListener("click", async () => {
   if (state.step === 2 && state.signatures.some((signed) => !signed)) {
     showToast("Prima di procedere servono le tre firme cliente e la firma operatore.");
     return;
@@ -19747,15 +19819,15 @@ document.getElementById("nextStep").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("previousStep").addEventListener("click", () => {
+document.getElementById("previousStep")?.addEventListener("click", () => {
   if (state.step > 0) {
     state.step -= 1;
     renderStep();
   }
 });
 
-document.getElementById("deleteCurrentPractice").addEventListener("click", deleteCurrentPractice);
-document.getElementById("saveQualityReview").addEventListener("click", saveQualityReview);
+document.getElementById("deleteCurrentPractice")?.addEventListener("click", deleteCurrentPractice);
+document.getElementById("saveQualityReview")?.addEventListener("click", saveQualityReview);
 document.getElementById("privacyAcceptButton")?.addEventListener("click", () => withButtonBusy(document.getElementById("privacyAcceptButton"), "Registro...", acceptPrivacyPolicy));
 document.getElementById("privacyPdfButton")?.addEventListener("click", () => withButtonBusy(document.getElementById("privacyPdfButton"), "Scarico...", downloadPrivacyPolicyPdf));
 document.querySelector("[data-open-customer-privacy]")?.addEventListener("click", async () => {
@@ -19772,13 +19844,13 @@ guidedQualityList?.addEventListener("click", (event) => {
   if (button) focusQualityTarget(button.dataset.qualityTarget);
 });
 
-document.getElementById("printCustomerCopySummary").addEventListener("click", printCustomerCopy);
-document.getElementById("printCompanyCopySummary").addEventListener("click", printCompanyCopy);
+document.getElementById("printCustomerCopySummary")?.addEventListener("click", printCustomerCopy);
+document.getElementById("printCompanyCopySummary")?.addEventListener("click", printCompanyCopy);
 
-document.getElementById("archivePractice").addEventListener("click", () => archiveCurrentPractice("Archiviata"));
+document.getElementById("archivePractice")?.addEventListener("click", () => archiveCurrentPractice("Archiviata"));
 saveSuspendedPracticeButton?.addEventListener("click", () => saveCurrentPracticeAsSuspended({ manual: true }));
 
-document.getElementById("addCededItem").addEventListener("click", () => {
+document.getElementById("addCededItem")?.addEventListener("click", () => {
   markPracticeDirty();
   const row = document.createElement("article");
   row.className = "ceded-item-row";
@@ -19790,14 +19862,14 @@ document.getElementById("addCededItem").addEventListener("click", () => {
   showToast("Nuova riga oggetto aggiunta alla scheda cliente.");
 });
 
-document.getElementById("cededItemsTable").addEventListener("input", (event) => {
+document.getElementById("cededItemsTable")?.addEventListener("input", (event) => {
   markPracticeDirty();
   updateCededItems();
   updateChecklistState();
   scheduleAurumShieldEvaluation();
 });
 
-document.getElementById("cededItemsTable").addEventListener("change", (event) => {
+document.getElementById("cededItemsTable")?.addEventListener("change", (event) => {
   markPracticeDirty();
   const row = event.target.closest(".ceded-item-row");
   if (!row || !event.target.matches("select")) return;
@@ -19812,7 +19884,7 @@ document.getElementById("cededItemsTable").addEventListener("change", (event) =>
   }
 });
 
-document.getElementById("saleTotal").addEventListener("input", () => {
+document.getElementById("saleTotal")?.addEventListener("input", () => {
   markPracticeDirty();
   updateSaleTotal();
   notifyCashPaymentLimitIfNeeded();
@@ -19820,7 +19892,7 @@ document.getElementById("saleTotal").addEventListener("input", () => {
   scheduleAurumShieldEvaluation();
 });
 
-document.getElementById("materialAmountFields").addEventListener("input", () => {
+document.getElementById("materialAmountFields")?.addEventListener("input", () => {
   markPracticeDirty();
   updateChecklistState();
   scheduleAurumShieldEvaluation();
@@ -19888,7 +19960,7 @@ document.querySelector(".form-panel").addEventListener("change", (event) => {
   scheduleAurumShieldEvaluation();
 });
 
-document.getElementById("paymentMethod").addEventListener("change", () => {
+document.getElementById("paymentMethod")?.addEventListener("change", () => {
   markPracticeDirty();
   scheduleAmlCashCheck();
   notifyCashPaymentLimitIfNeeded();
@@ -19900,13 +19972,13 @@ document.getElementById("paymentMethod").addEventListener("change", () => {
   scheduleAurumShieldEvaluation();
 });
 
-document.getElementById("storeCode").addEventListener("change", async () => {
+document.getElementById("storeCode")?.addEventListener("change", async () => {
   markPracticeDirty();
   await updatePracticeNumber();
   updateChecklistState();
   scheduleAurumShieldEvaluation();
 });
-document.getElementById("practiceDate").addEventListener("change", async () => {
+document.getElementById("practiceDate")?.addEventListener("change", async () => {
   markPracticeDirty();
   await updatePracticeNumber();
   scheduleAmlCashCheck();
@@ -19914,7 +19986,7 @@ document.getElementById("practiceDate").addEventListener("change", async () => {
   scheduleAurumShieldEvaluation();
 });
 
-document.getElementById("archiveStoreFilter").addEventListener("change", async () => {
+document.getElementById("archiveStoreFilter")?.addEventListener("change", async () => {
   document.getElementById("archiveStoreFilter").dataset.userSelected = "true";
   state.archivePage = 1;
   state.searchActive = false;
@@ -19924,12 +19996,12 @@ document.getElementById("archiveStoreFilter").addEventListener("change", async (
   await loadArchiveScreenData({ force: true });
   renderArchiveGroups();
 });
-document.getElementById("fusionStoreFilter").addEventListener("change", async () => {
+document.getElementById("fusionStoreFilter")?.addEventListener("change", async () => {
   await loadFusionScreenData({ force: true });
   renderFusionGroups();
 });
 
-document.getElementById("archiveGroups").addEventListener("click", (event) => {
+document.getElementById("archiveGroups")?.addEventListener("click", (event) => {
   const pageButton = event.target.closest("[data-archive-page]");
   if (pageButton) {
     state.archivePage = Number(pageButton.dataset.archivePage) || 1;
@@ -19971,7 +20043,7 @@ document.getElementById("archiveGroups").addEventListener("click", (event) => {
   openArchivedAct(openButton.dataset.openAct);
 });
 
-document.getElementById("fusionGroups").addEventListener("click", (event) => {
+document.getElementById("fusionGroups")?.addEventListener("click", (event) => {
   const fuseSelectedButton = event.target.closest("[data-fuse-selected-store]");
   if (fuseSelectedButton) {
     confirmSelectedFusion(fuseSelectedButton.dataset.fuseSelectedStore);
@@ -20012,7 +20084,7 @@ document.getElementById("fusionGroups").addEventListener("click", (event) => {
   openArchivedAct(openButton.dataset.openAct);
 });
 
-previewBody.addEventListener("click", async (event) => {
+previewBody?.addEventListener("click", async (event) => {
   const acceptPrivacy = event.target.closest("[data-accept-privacy-policy]");
   if (acceptPrivacy) {
     await withButtonBusy(acceptPrivacy, "Registro...", acceptPrivacyPolicy);
@@ -20106,17 +20178,17 @@ previewBody.addEventListener("click", async (event) => {
   deleteAct(deleteButton.dataset.deleteAct);
 });
 
-document.getElementById("exportDailyPdf").addEventListener("click", exportDailySearchPdf);
-document.getElementById("exportMonthlyPdf").addEventListener("click", exportMonthlySearchPdf);
-document.getElementById("clearActSearch").addEventListener("click", clearActSearch);
+document.getElementById("exportDailyPdf")?.addEventListener("click", exportDailySearchPdf);
+document.getElementById("exportMonthlyPdf")?.addEventListener("click", exportMonthlySearchPdf);
+document.getElementById("clearActSearch")?.addEventListener("click", clearActSearch);
 
-document.getElementById("documentType").addEventListener("change", () => {
+document.getElementById("documentType")?.addEventListener("change", () => {
   updateDocumentCaptureCards();
   updateAttachmentState();
 });
 
-document.getElementById("runActSearch").addEventListener("click", runActSearch);
-document.getElementById("searchField").addEventListener("change", () => {
+document.getElementById("runActSearch")?.addEventListener("click", runActSearch);
+document.getElementById("searchField")?.addEventListener("change", () => {
   state.searchActive = false;
   state.lastSearchResults = [];
   state.archivePage = 1;
@@ -20131,17 +20203,17 @@ document.getElementById("archiveIncludeSuspended")?.addEventListener("change", a
   renderArchiveGroups();
 });
 
-document.getElementById("searchKeyword").addEventListener("keydown", (event) => {
+document.getElementById("searchKeyword")?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") runActSearch();
 });
 
-document.getElementById("searchKeyword").addEventListener("input", () => {
+document.getElementById("searchKeyword")?.addEventListener("input", () => {
   state.searchActive = false;
   state.lastSearchResults = [];
   state.archivePage = 1;
 });
 
-document.getElementById("cededItemsTable").addEventListener("click", (event) => {
+document.getElementById("cededItemsTable")?.addEventListener("click", (event) => {
   if (!event.target.classList.contains("remove-row") || event.target.disabled) return;
   markPracticeDirty();
   event.target.closest(".ceded-item-row").remove();
@@ -20312,7 +20384,7 @@ document.querySelectorAll("[data-preview-copy]").forEach((button) => {
   });
 });
 
-document.getElementById("closePreview").addEventListener("click", () => {
+document.getElementById("closePreview")?.addEventListener("click", () => {
   previewModal.hidden = true;
 });
 
