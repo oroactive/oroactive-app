@@ -17,6 +17,7 @@ jobs:
     env:
       COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+      OROACTIVE_HEALTH_URL: ${{ secrets.OROACTIVE_HEALTH_URL }}
       OROACTIVE_EXPECTED_BRANCH: ${{ secrets.OROACTIVE_EXPECTED_BRANCH }}
       BUILD_TIME: ${{ github.event.head_commit.timestamp }}
       BUILD_NUMBER: ${{ github.run_number }}
