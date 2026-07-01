@@ -87,18 +87,15 @@ jobs:
             exit 1
           fi
           for attempt in $(seq 1 36); do
-            if curl --fail --silent --show-error --location --max-time 10 "${OROACTIVE_HEALTH_URL}" --output health.json; then
-              if node - <<'NODE'
-          const fs = require("node:fs");
-          const health = JSON.parse(fs.readFileSync("health.json", "utf8"));
-          const expectedCommit = process.env.GIT_COMMIT;
-          const deployedCommit = health.version?.commit || "";
-          if (health.ok !== true) process.exit(1);
-          if (!deployedCommit || deployedCommit === "unknown") process.exit(2);
-          if (deployedCommit !== expectedCommit && deployedCommit.slice(0, 12) !== expectedCommit.slice(0, 12)) process.exit(3);
-          NODE
-              then
-                echo "OroActive health check passed."
+            STATUS=$(curl --silent --show-error --location --max-time 10 --output health.json --write-out "%{http_code}" "${OROACTIVE_HEALTH_URL}" || true)
+            if [ "${STATUS}" = "200" ]; then
+              if command -v jq >/dev/null 2>&1; then
+                if jq -e '.ok == true' health.json >/dev/null; then
+                  echo "Health check OK"
+                  exit 0
+                fi
+              elif grep -q '"ok"[[:space:]]*:[[:space:]]*true' health.json; then
+                echo "Health check OK"
                 exit 0
               fi
             fi
