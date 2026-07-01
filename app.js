@@ -2024,6 +2024,17 @@ function removeLegacySearchMenu() {
   });
 }
 
+function removeFooterBuildMetadata() {
+  document.querySelectorAll(".software-footer .app-footer-build, .software-footer [data-founder-footer-build]").forEach((element) => {
+    element.remove();
+  });
+  document.querySelectorAll(".software-footer").forEach((footer) => {
+    if (/Build\s+[a-f0-9]{7,}|#git-|·\s*main/i.test(footer.textContent || "")) {
+      footer.textContent = "© 2026 OroActive Tech - Software gestionale proprietario";
+    }
+  });
+}
+
 function showLoading(message = "Caricamento in corso...") {
   if (!loadingIndicator) return;
   loadingIndicator.querySelector("span").textContent = message;
@@ -19753,6 +19764,7 @@ async function initializeApp() {
   try {
     registerServiceWorker();
     removeLegacySearchMenu();
+    removeFooterBuildMetadata();
     upgradeProvinceFields();
     populateAutocompleteLists();
     markAurumAvoidElements();

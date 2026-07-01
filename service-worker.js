@@ -1,4 +1,4 @@
-const CACHE_VERSION = "20260701-deploy-health-pwa-update-2";
+const CACHE_VERSION = "20260701-footer-build-cleanup-1";
 const STATIC_CACHE = `oroactive-static-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   "/styles.css?v=20260623-academy-form-cleanup-1",

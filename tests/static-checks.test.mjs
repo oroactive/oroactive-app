@@ -2596,7 +2596,10 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(app, /performAppUpdateReload/);
   assert.match(app, /isCriticalUnsavedWorkflow/);
   assert.match(app, /data-user-check-update/);
-  assert.doesNotMatch(app, /founderFooterBuilds|data-founder-footer-build|app-footer-build/);
+  assert.match(app, /function removeFooterBuildMetadata/);
+  assert.match(app, /removeFooterBuildMetadata\(\)/);
+  assert.match(app, /#git-\|·\\s\*main/);
+  assert.doesNotMatch(app, /founderFooterBuilds/);
   assert.match(index, /id="appVersionPanel"/);
   assert.match(index, /data-user-check-update/);
   assert.match(index, /id="appUpdateBanner"/);
