@@ -4500,18 +4500,20 @@ function applyRolePermissions() {
   renderAppVersionUi();
 }
 
-async function startAuthenticatedApp(options = {}) {
-  const { keepSplash = false, openMainMenu = true } = options;
-  showAuthenticatedShell({ keepSplash });
-  resetSessionTimeout();
-  state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
-  applyRolePermissions();
-  startMainMenuClock();
-  maybeShowInstallHint();
-  await loadPendingSyncQueue();
-  await loadAvailableStores();
+async function runStartupTask(label, task) {
+  try {
+    return await task();
+  } catch (error) {
+    console.warn(`OroActive startup task failed: ${label}`, error);
+    return null;
+  }
+}
+
+async function finishAuthenticatedStartup() {
+  await runStartupTask("pending sync locale", loadPendingSyncQueue);
+  await runStartupTask("negozi disponibili", loadAvailableStores);
   renderStep();
-  await setPracticeMeta({ deferPracticeNumber: true });
+  await runStartupTask("metadati pratica", () => setPracticeMeta({ deferPracticeNumber: true }));
   applyRolePermissions();
   updateSignatureState();
   updateDocumentCaptureCards();
@@ -4523,24 +4525,40 @@ async function startAuthenticatedApp(options = {}) {
   updateChecklistState();
   document.querySelectorAll(".ceded-item-row").forEach(updateTitleOptions);
   ensureAurumHelpAttributes();
-  if (canViewUsersDirectory()) loadUsers();
-  await loadAurumMemories();
-  await loadAurumSupportRequests();
-  await loadNotificationCount();
+  if (canViewUsersDirectory()) void loadUsers().catch((error) => console.warn("OroActive startup task failed: utenti", error));
+  await runStartupTask("memorie Aurum", loadAurumMemories);
+  await runStartupTask("richieste supporto Aurum", loadAurumSupportRequests);
+  await runStartupTask("conteggio notifiche", loadNotificationCount);
   startNotificationPolling();
   startAppVersionChecks();
-  if (isFounder()) await loadAurumAllMemories();
-  void maybeShowPrivacyPolicyNotice();
+  if (isFounder()) await runStartupTask("memorie Founder Aurum", loadAurumAllMemories);
+  void maybeShowPrivacyPolicyNotice().catch((error) => console.warn("OroActive startup task failed: privacy", error));
   maybeShowAurumDailyGreeting();
   maybeShowLevelUnlockMessage();
-  await flushPendingSync();
+  await runStartupTask("sincronizzazione pendente", flushPendingSync);
   if (!state.syncTimer) {
     state.syncTimer = window.setInterval(async () => {
       await flushPendingSync();
       await syncActsFromServer();
     }, 30000);
   }
-  if (openMainMenu && !keepSplash) showMainMenuFromSplash();
+}
+
+async function startAuthenticatedApp(options = {}) {
+  const { keepSplash = false, openMainMenu = true } = options;
+  showAuthenticatedShell({ keepSplash });
+  resetSessionTimeout();
+  state.tutorial.pendingFirstRun = !localStorage.getItem(tutorialStorageKey());
+  applyRolePermissions();
+  startMainMenuClock();
+  maybeShowInstallHint();
+  if (openMainMenu) {
+    openMainMenuCleanly({ keepSplash });
+    if (!keepSplash) maybeStartFirstRunTutorial();
+  }
+  void finishAuthenticatedStartup().catch((error) => {
+    console.warn("OroActive startup background failed", error);
+  });
 }
 
 async function restoreSession(options = {}) {
@@ -4556,7 +4574,7 @@ async function restoreSession(options = {}) {
     const data = await apiRequest("/auth/me");
     state.currentUser = data.user;
     setSplashStatus("Preparazione area operativa");
-    await startAuthenticatedApp({ keepSplash, openMainMenu: !keepSplash });
+    await startAuthenticatedApp({ keepSplash, openMainMenu: true });
     return true;
   } catch {
     setSplashStatus("Preparazione login");

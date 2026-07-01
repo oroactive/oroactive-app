@@ -114,6 +114,9 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /sessionStorage\.setItem\(OROACTIVE_SPLASH_SESSION_KEY, "true"\)/);
   assert.match(app, /function showStartupSplash/);
   assert.match(app, /async function completeStartupSplash/);
+  assert.match(app, /async function finishAuthenticatedStartup/);
+  assert.match(app, /openMainMenuCleanly\(\{ keepSplash \}\)/);
+  assert.match(app, /void finishAuthenticatedStartup\(\)/);
   assert.match(app, /openMainMenuCleanly\(\{ keepSplash: true \}\)/);
   assert.match(app, /await restoreSession\(\{ keepSplash: true \}\)/);
   assert.match(app, /showStartupSplashError/);
