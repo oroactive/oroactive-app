@@ -30,6 +30,7 @@ const state = {
   splashStartedAt: 0,
   splashReady: false,
   splashError: null,
+  splashWatchdogTimer: null,
   cashLimitWarningShown: false,
   amlCashCheck: null,
   amlCashCheckTimer: null,
@@ -2908,6 +2909,34 @@ function setSplashStatus(message, options = {}) {
   splashStatus.classList.toggle("is-ready", Boolean(options.ready));
 }
 
+function forceHideStartupSplash() {
+  window.clearTimeout(state.splashWatchdogTimer);
+  state.splashWatchdogTimer = null;
+  if (splashScreen) {
+    splashScreen.classList.add("hidden");
+    splashScreen.classList.remove("is-exiting", "is-error", "is-brief");
+  }
+  document.body.classList.remove("splash-active");
+  markStartupSplashSeen();
+}
+
+function scheduleStartupSplashWatchdog() {
+  window.clearTimeout(state.splashWatchdogTimer);
+  state.splashWatchdogTimer = window.setTimeout(() => {
+    if (!splashScreen || splashScreen.classList.contains("hidden")) return;
+    if (state.currentUser && state.authToken) {
+      openMainMenuCleanly();
+      maybeStartFirstRunTutorial();
+      forceHideStartupSplash();
+      return;
+    }
+    if (!state.loggingIn) {
+      showLogin();
+      forceHideStartupSplash();
+    }
+  }, 9000);
+}
+
 function showStartupSplash() {
   if (!splashScreen) return;
   state.splashStartedAt = performance.now();
@@ -2918,6 +2947,7 @@ function showStartupSplash() {
   if (splashError) splashError.hidden = true;
   setSplashStatus("Verifica sessione");
   document.body.classList.add("splash-active");
+  scheduleStartupSplashWatchdog();
 }
 
 async function hideStartupSplash() {
@@ -2930,6 +2960,8 @@ async function hideStartupSplash() {
   splashScreen.classList.add("hidden");
   splashScreen.classList.remove("is-exiting", "is-error", "is-brief");
   document.body.classList.remove("splash-active");
+  window.clearTimeout(state.splashWatchdogTimer);
+  state.splashWatchdogTimer = null;
   markStartupSplashSeen();
 }
 
