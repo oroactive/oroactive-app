@@ -1987,7 +1987,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(index, /<aside class="sidebar" aria-label="Navigazione principale">/);
   assert.match(index, /id="mainMenuFounderKpis"/);
   assert.doesNotMatch(index, /id="mainMenuAurumButton"/);
-  assert.match(index, /Bentornato, \[Nome Utente\]|Bentornato, Elite/);
+  assert.match(index, /Bentornato, \[Nome Utente\]|Bentornato, Founder/);
   assert.match(index, /id="brandDropdown" hidden><\/div>/);
   assert.match(app, /const MENU_GROUPS = \[/);
   assert.match(app, /label: "Operatività"/);
@@ -2540,15 +2540,11 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
 
   assert.match(workflow, /COOLIFY_WEBHOOK/);
   assert.match(workflow, /COOLIFY_TOKEN/);
-  assert.match(workflow, /OROACTIVE_HEALTH_URL/);
   assert.match(workflow, /OROACTIVE_EXPECTED_BRANCH/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /curl --fail[\s\S]*COOLIFY_WEBHOOK/);
-  assert.match(workflow, /STATUS=\$\(curl -s -o \/tmp\/health\.json -w "%\{http_code\}"/);
-  assert.match(workflow, /\[ "\$STATUS" = "200" \] && grep -q '"ok":\[.*space.*\]\*true' \/tmp\/health\.json/);
-  assert.match(workflow, /Health check OK/);
-  assert.doesNotMatch(workflow, /seq 1 36|Waiting for deployed app health|version\?\.commit|jq -e/);
+  assert.doesNotMatch(workflow, /OROACTIVE_HEALTH_URL|Verify deployed health|health\.json|Health check|seq 1 36|Waiting for deployed app health|version\?\.commit|jq -e|python3|grep -q/);
   assert.doesNotMatch(workflow, /deployment\/|coolify\.|https:\/\/app\.oroactive\.it/);
 
   assert.match(dockerfile, /ARG GIT_COMMIT/);
@@ -2610,5 +2606,7 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(styles, /\.app-footer-build/);
   assert.match(docs, /Deploy OroActive su Coolify/);
   assert.match(docs, /Include Source Commit in Build/);
+  assert.match(docs, /Healthcheck configurato in Coolify/);
+  assert.doesNotMatch(docs, /OROACTIVE_HEALTH_URL|commit esposto da \/api\/health.*unknown|Attende che \/api\/health/);
   assert.doesNotMatch(docs, /Bearer\s+[A-Za-z0-9]/);
 });
