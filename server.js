@@ -21752,7 +21752,18 @@ app.get("/api/health", async (_request, response) => {
 });
 
 app.get("/api/version", async (_request, response) => {
-  response.json(await getBuildMetadata());
+  const version = await getBuildMetadata();
+  response.json({
+    ok: true,
+    app: version.app,
+    commit: version.commit,
+    shortCommit: version.shortCommit,
+    buildNumber: version.buildNumber,
+    buildTime: version.buildTime,
+    branch: version.branch,
+    environment: version.environment,
+    packageVersion: version.packageVersion
+  });
 });
 
 app.post("/api/auth/login", async (request, response, next) => {

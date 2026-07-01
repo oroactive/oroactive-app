@@ -2545,9 +2545,10 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /curl --fail[\s\S]*COOLIFY_WEBHOOK/);
-  assert.match(workflow, /STATUS=.*%{http_code}/);
-  assert.match(workflow, /jq -e '\.ok == true'/);
-  assert.match(workflow, /"ok"\[.*space.*\].*true/);
+  assert.match(workflow, /STATUS=\$\(curl -s -o \/tmp\/health\.json -w "%\{http_code\}"/);
+  assert.match(workflow, /\[ "\$STATUS" = "200" \] && grep -q '"ok":\[.*space.*\]\*true' \/tmp\/health\.json/);
+  assert.match(workflow, /Health check OK/);
+  assert.doesNotMatch(workflow, /seq 1 36|Waiting for deployed app health|version\?\.commit|jq -e/);
   assert.doesNotMatch(workflow, /deployment\/|coolify\.|https:\/\/app\.oroactive\.it/);
 
   assert.match(dockerfile, /ARG GIT_COMMIT/);
@@ -2571,6 +2572,7 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(server, /rev-list", "--count", "HEAD"/);
   assert.match(server, /buildNumber[\s\S]*git-\$\{commitShort\}/);
   assert.match(server, /app\.get\("\/api\/version"/);
+  assert.match(server, /ok: true[\s\S]*app: version\.app[\s\S]*commit: version\.commit[\s\S]*buildNumber: version\.buildNumber/);
   assert.match(server, /app\.get\("\/api\/health"[\s\S]*version/);
   assert.match(server, /setNoStoreHeaders/);
   assert.match(server, /requestPath\.startsWith\("\/api\/"\)/);
@@ -2585,10 +2587,15 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.doesNotMatch(staticAssetsBlock, /"\/index\.html"/);
 
   assert.match(app, /async function checkForAppUpdate/);
+  assert.match(app, /const APP_VERSION_CHECK_INTERVAL_MS = 30000/);
+  assert.match(app, /function normalizeAppVersion/);
   assert.match(app, /fetchAppVersion/);
   assert.match(app, /\/version/);
   assert.match(app, /showAppUpdateBanner/);
+  assert.match(app, /Nuova versione OroActive disponibile/);
+  assert.match(app, /Aggiornamento disponibile\. Salva la pratica prima di aggiornare\./);
   assert.match(app, /autoReload/);
+  assert.match(app, /handleAppUpdateNow/);
   assert.match(app, /performAppUpdateReload/);
   assert.match(app, /isCriticalUnsavedWorkflow/);
   assert.match(app, /data-user-check-update/);

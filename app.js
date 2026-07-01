@@ -1909,7 +1909,7 @@ const apiBase = oroactiveConfig.apiBase || `${API_BASE_URL}/api`;
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
-const APP_VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const APP_VERSION_CHECK_INTERVAL_MS = 30000;
 const API_RETRY_ATTEMPTS = 3;
 const NOTIFICATION_POLL_INTERVAL_MS = 60000;
 const QUALITY_FLAG_POINTS = 1;
@@ -2128,10 +2128,30 @@ async function fetchJsonNoStore(url) {
 
 async function fetchAppVersion() {
   try {
-    return await fetchJsonNoStore(`${apiBase}/version`);
+    return normalizeAppVersion(await fetchJsonNoStore(`${apiBase}/version`));
   } catch {
-    return fetchJsonNoStore(`${API_BASE_URL}/version.json`);
+    return normalizeAppVersion(await fetchJsonNoStore(`${API_BASE_URL}/version.json`));
   }
+}
+
+function normalizeAppVersion(version = {}) {
+  const source = version.version && typeof version.version === "object" ? version.version : version;
+  return {
+    ok: source.ok === true || version.ok === true,
+    app: source.app || "OroActive",
+    commit: source.commit || "unknown",
+    shortCommit: source.shortCommit || shortVersionCommit(source.commit),
+    buildNumber: source.buildNumber || "local",
+    buildTime: source.buildTime || source.builtAt || "unknown",
+    branch: source.branch || "main",
+    environment: source.environment || "production",
+    packageVersion: source.packageVersion || "1.0.0"
+  };
+}
+
+function shortVersionCommit(commit = "") {
+  const value = String(commit || "").trim();
+  return value && value !== "unknown" ? value.slice(0, 12) : "unknown";
 }
 
 function renderAppVersionUi() {
@@ -2175,8 +2195,23 @@ function showAppUpdateBanner(message = "Nuova versione disponibile. Premi Aggior
   appUpdateBanner.hidden = false;
 }
 
+function updateAvailableMessage(isCritical) {
+  return isCritical
+    ? "Aggiornamento disponibile. Salva la pratica prima di aggiornare."
+    : "Nuova versione OroActive disponibile";
+}
+
 function hideAppUpdateBanner() {
   if (appUpdateBanner) appUpdateBanner.hidden = true;
+}
+
+async function handleAppUpdateNow() {
+  if (isCriticalUnsavedWorkflow()) {
+    showAppUpdateBanner(updateAvailableMessage(true));
+    showToast("Aggiornamento disponibile. Salva la pratica prima di aggiornare.", "warning");
+    return;
+  }
+  await performAppUpdateReload();
 }
 
 async function performAppUpdateReload() {
@@ -2196,12 +2231,15 @@ function openAppVersionPreview() {
     <div class="app-version-preview">
       <p><strong>Versione caricata:</strong> ${escapeHtml(formatBuildVersion(client))}</p>
       <p><strong>Versione server:</strong> ${escapeHtml(formatBuildVersion(server))}</p>
-      <p>${state.updateAvailable ? "Aggiornamento disponibile." : "L'app risulta allineata."}</p>
+      <p><strong>Commit:</strong> ${escapeHtml(server.commit || "unknown")}</p>
+      <p><strong>Build:</strong> ${escapeHtml(server.buildNumber || "local")}</p>
+      <p><strong>Data build:</strong> ${escapeHtml(server.buildTime || "unknown")}</p>
+      <p><strong>Stato:</strong> ${state.updateAvailable ? "Nuova versione disponibile" : "Aggiornata"}</p>
       <button class="primary-button" type="button" data-app-update-reload>Aggiorna ora</button>
     </div>
   `;
   previewBody.querySelector("[data-app-update-reload]")?.addEventListener("click", () => {
-    void performAppUpdateReload();
+    void handleAppUpdateNow();
   });
   previewModal.hidden = false;
 }
@@ -2216,14 +2254,12 @@ async function checkForAppUpdate(options = {}) {
     renderAppVersionUi();
     if (state.updateAvailable) {
       const critical = isCriticalUnsavedWorkflow();
-      showAppUpdateBanner(critical
-        ? "Nuova versione pronta. Completa o salva l'operazione, poi premi Aggiorna ora."
-        : "Nuova versione pronta. Aggiornamento automatico in corso.");
+      showAppUpdateBanner(updateAvailableMessage(critical));
       if (autoReload && !critical) {
         window.setTimeout(() => void performAppUpdateReload(), 1200);
       }
       if (manual && isFounder()) openAppVersionPreview();
-      else if (manual) showToast("Aggiornamento pronto. Premi Aggiorna ora quando hai salvato il lavoro.", "warning");
+      else if (manual) showToast(updateAvailableMessage(critical), "warning");
       return true;
     }
     hideAppUpdateBanner();
@@ -19023,7 +19059,7 @@ mainUserDropdown?.addEventListener("click", (event) => {
 
 appUpdateBanner?.addEventListener("click", (event) => {
   if (event.target.closest("[data-app-update-now]")) {
-    void performAppUpdateReload();
+    void handleAppUpdateNow();
     return;
   }
   if (event.target.closest("[data-app-update-dismiss]")) {
