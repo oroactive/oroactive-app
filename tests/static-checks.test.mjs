@@ -40,12 +40,46 @@ test("configurazione produzione non contiene password Founder reale", async () =
 });
 
 test("PWA non cachea API e dati sensibili", async () => {
-  const sw = await file("service-worker.js");
+  const [sw, app, server, index, version] = await Promise.all([
+    file("service-worker.js"),
+    file("app.js"),
+    file("server.js"),
+    file("index.html"),
+    file("version.json")
+  ]);
 
   assert.match(sw, /\/api\//);
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
+  assert.match(sw, /const BUILD_ID = "20260701-pwa-cache-reset-1"/);
+  assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
+  assert.match(sw, /self\.skipWaiting\(\)/);
+  assert.match(sw, /self\.clients\.claim\(\)/);
+  assert.match(sw, /keys\.filter\(shouldDeleteCache\)/);
+  assert.match(sw, /request\.mode === "navigate"/);
+  assert.match(sw, /HASHED_ASSET_PATTERN/);
+  assert.match(sw, /NEVER_CACHE_PATHS = \[[\s\S]*"\/index\.html"/);
+  assert.doesNotMatch(sw, /cache\.addAll|STATIC_ASSETS/);
+  assert.match(server, /const buildInfo = \{/);
+  assert.match(server, /app\.get\("\/api\/version"/);
+  assert.match(server, /app\.get\("\/version\.json"/);
+  assert.match(server, /function setNoStoreHeaders/);
+  assert.match(server, /function staticCacheHeaders/);
+  assert.match(server, /isHashedStaticPath/);
+  assert.match(server, /express\.static\(__dirname, \{ extensions: \["html"\], setHeaders: staticCacheHeaders \}\)/);
+  assert.match(app, /window\.__OROACTIVE_DIRTY_STATE__ = false/);
+  assert.match(app, /window\.__OROACTIVE_VERSION__ = null/);
+  assert.match(app, /const OROACTIVE_UPDATE_INTERVAL_MS = 30000/);
+  assert.match(app, /async function checkForAppUpdate/);
+  assert.match(app, /Nuova versione OroActive disponibile/);
+  assert.match(app, /Salva la pratica prima di aggiornare l'app\./);
+  assert.match(app, /data-app-update-now/);
+  assert.match(app, /label: "Verifica aggiornamento app"/);
+  assert.match(app, /visibilitychange/);
+  assert.match(index, /app\.js\?v=20260701-pwa-cache-reset-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(version, /"ok": true/);
 });
 
 test("splash screen iniziale premium animata e senza ghost screen", async () => {
@@ -83,7 +117,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /openMainMenuCleanly\(\{ keepSplash: true \}\)/);
   assert.match(app, /await restoreSession\(\{ keepSplash: true \}\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -402,8 +436,38 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /const GOLD_COIN_CATALOG = \[/);
   assert.match(app, /sterlina-oro-sovrana/);
   assert.match(app, /marengo-20-lire-italia/);
+  assert.match(app, /marengo-20-lire-vittorio-emanuele-ii/);
+  assert.match(app, /Marengo 20 Lire Vittorio Emanuele II/);
+  assert.match(app, /id: "marengo-20-lire-vittorio-emanuele-ii"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
+  assert.match(app, /marengo-20-lire-vittorio-emanuele-ii-regno-sardegna/);
+  assert.match(app, /Marengo 20 Lire Vittorio Emanuele II Regno di Sardegna/);
+  assert.match(app, /id: "marengo-20-lire-vittorio-emanuele-ii-regno-sardegna"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
+  assert.match(app, /marengo-20-lire-vittorio-emanuele-iii-aratrice/);
+  assert.match(app, /Marengo 20 Lire Vittorio Emanuele III Aratrice/);
+  assert.match(app, /id: "marengo-20-lire-vittorio-emanuele-iii-aratrice"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
+  assert.match(app, /100-lire-vittorio-emanuele-iii-fascione/);
+  assert.match(app, /100 Lire Vittorio Emanuele III Fascione/);
+  assert.match(app, /id: "100-lire-vittorio-emanuele-iii-fascione"[\s\S]*grossWeight: 32\.25,[\s\S]*fineGold: 29\.025,[\s\S]*diameter: 35/);
+  assert.match(app, /40-lire-oro-napoleone-i/);
+  assert.match(app, /40 Lire oro Napoleone I/);
+  assert.match(app, /id: "40-lire-oro-napoleone-i"[\s\S]*grossWeight: 12\.9,[\s\S]*fineGold: 11\.61,[\s\S]*diameter: 26/);
+  assert.match(app, /marengo-20-lire-carlo-alberto/);
+  assert.match(app, /Marengo 20 Lire Carlo Alberto/);
+  assert.match(app, /id: "marengo-20-lire-carlo-alberto"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
+  assert.match(app, /marengo-20-lire-carlo-felice/);
+  assert.match(app, /Marengo 20 Lire Carlo Felice/);
+  assert.match(app, /id: "marengo-20-lire-carlo-felice"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
   assert.match(app, /napoleone-20-franchi-gallo-marianne/);
   assert.match(app, /Napoleone d'oro 20 Franchi Francesi/);
+  assert.match(app, /marengo-20-franchi-napoleone-iii-testa-laureata/);
+  assert.match(app, /Marengo 20 Franchi Napoleone III testa laureata/);
+  assert.match(app, /NAPOLEON III EMPEREUR/);
+  assert.match(app, /EMPIRE FRANCAIS/);
+  assert.match(app, /id: "marengo-20-franchi-napoleone-iii-testa-laureata"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
+  assert.match(app, /marengo-20-franchi-napoleone-iii-testa-nuda/);
+  assert.match(app, /Marengo 20 Franchi Napoleone III testa nuda/);
+  assert.match(app, /testa nuda/);
+  assert.match(app, /id: "marengo-20-franchi-napoleone-iii-testa-nuda"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
   assert.match(app, /krugerrand-1-oz/);
   assert.match(app, /maple-leaf-1-oz/);
   assert.match(app, /canada-maple-leaf-20-dollari/);
@@ -435,6 +499,21 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /3\.11/);
   assert.match(app, /diameter: 16/);
   assert.match(app, /libertad-1-oz/);
+  assert.match(app, /cina-panda-oro-1-oz-30g/);
+  assert.match(app, /Cina Panda oro 1 oz \| 30 grammi/);
+  assert.match(app, /grossWeight: 31\.11/);
+  assert.match(app, /fineGold: 31\.079/);
+  assert.match(app, /cina-panda-oro-1-2-oz-15g/);
+  assert.match(app, /Cina Panda oro 1\/2 oz \| 15 grammi/);
+  assert.match(app, /grossWeight: 15\.55/);
+  assert.match(app, /fineGold: 15\.534/);
+  assert.match(app, /diameter: 27/);
+  assert.match(app, /cina-panda-oro-1-20-oz-1g/);
+  assert.match(app, /Cina Panda oro 1\/20 oz \| 1 grammo/);
+  assert.match(app, /id: "cina-panda-oro-1-20-oz-1g"[\s\S]*grossWeight: 1\.55,[\s\S]*fineGold: 1\.548,[\s\S]*diameter: 17\.95/);
+  assert.match(app, /cina-panda-oro-1-grammo-fdc/);
+  assert.match(app, /Cina Panda oro 1 grammo \(Fior di Conio\)/);
+  assert.match(app, /id: "cina-panda-oro-1-grammo-fdc"[\s\S]*grossWeight: 1,[\s\S]*fineGold: 0\.999,[\s\S]*diameter: 10/);
   assert.match(app, /panda-cinese-30g/);
   assert.match(app, /BILANCIA_DORO_COIN_IMAGE_BASE/);
   assert.match(app, /COIN_IMAGE_SOURCE_BY_COIN/);
@@ -444,7 +523,7 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /"centenario-50-pesos"[\s\S]*"ducato-austriaco"[\s\S]*"20-dollari-double-eagle"[\s\S]*"20-mark-germania"/);
   assert.match(app, /"marengo-belga-20-franchi"[\s\S]*"sterlina-vecchio-conio"[\s\S]*"sudafrica-2-rand"[\s\S]*"cile-100-pesos"/);
   assert.doesNotMatch(app.slice(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS"), app.indexOf("function bilanciaDoroCoinImages")), /"marengo-belga-20-franchi"/);
-  assert.match(app, /"austria-100-corone"[\s\S]*"messico-20-pesos"[\s\S]*"austria-1000-scellini"[\s\S]*"ungheria-20-corone"/);
+  assert.match(app, /"austria-100-corone"[\s\S]*"messico-20-pesos"[\s\S]*"messico-10-pesos-oro"[\s\S]*"austria-1000-scellini"[\s\S]*"ungheria-20-corone"/);
   assert.doesNotMatch(app.slice(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS"), app.indexOf("function bilanciaDoroCoinImages")), /"4-ducati-austriaci"/);
   assert.match(app, /const frontSide = invertSides \? "back" : "front"/);
   assert.match(app, /const backSide = invertSides \? "front" : "back"/);
@@ -461,6 +540,13 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /fineGold: 13\.7773/);
   assert.match(app, /diameter: 39\.5/);
   assert.match(app, /messico-20-pesos/);
+  assert.match(app, /messico-10-pesos-oro/);
+  assert.match(app, /Messico 10 Pesos oro/);
+  assert.match(app, /grossWeight: 8\.33/);
+  assert.match(app, /fineGold: 7\.5/);
+  assert.match(app, /diameter: 22\.5/);
+  assert.match(server, /messico-10-pesos-oro/);
+  assert.match(server, /Messico 10 Pesos oro/);
   assert.match(app, /Foto fronte\/retro estratte da/);
   assert.match(app, /function renderCoinEncyclopedia/);
   assert.match(app, /function groupedCoinsByCountry/);
@@ -469,7 +555,27 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /async function identifyCoinFromCamera/);
   assert.match(app, /apiRequest\("\/training\/gold-coins\/identify"/);
   assert.match(server, /const GOLD_COIN_AI_CATALOG = \[/);
+  assert.match(server, /marengo-20-lire-vittorio-emanuele-ii/);
+  assert.match(server, /Marengo 20 Lire Vittorio Emanuele II/);
+  assert.match(server, /marengo-20-lire-vittorio-emanuele-ii-regno-sardegna/);
+  assert.match(server, /Marengo 20 Lire Vittorio Emanuele II Regno di Sardegna/);
+  assert.match(server, /marengo-20-lire-vittorio-emanuele-iii-aratrice/);
+  assert.match(server, /Marengo 20 Lire Vittorio Emanuele III Aratrice/);
+  assert.match(server, /100-lire-vittorio-emanuele-iii-fascione/);
+  assert.match(server, /100 Lire Vittorio Emanuele III Fascione/);
+  assert.match(server, /40-lire-oro-napoleone-i/);
+  assert.match(server, /40 Lire oro Napoleone I/);
+  assert.match(server, /marengo-20-lire-carlo-alberto/);
+  assert.match(server, /Marengo 20 Lire Carlo Alberto/);
+  assert.match(server, /marengo-20-lire-carlo-felice/);
+  assert.match(server, /Marengo 20 Lire Carlo Felice/);
   assert.match(server, /napoleone-20-franchi-gallo-marianne/);
+  assert.match(server, /marengo-20-franchi-napoleone-iii-testa-laureata/);
+  assert.match(server, /Marengo 20 Franchi Napoleone III testa laureata/);
+  assert.match(server, /NAPOLEON III EMPEREUR/);
+  assert.match(server, /EMPIRE FRANCAIS 20 FR/);
+  assert.match(server, /marengo-20-franchi-napoleone-iii-testa-nuda/);
+  assert.match(server, /Marengo 20 Franchi Napoleone III testa nuda/);
   assert.match(server, /filarmonica-vienna-2026-1-oz/);
   assert.match(server, /somalia-elephant-2023-1-oz/);
   assert.match(server, /arca-noe-armenia-2025-1-oz/);
@@ -483,6 +589,21 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /kangaroo 25 dollars/);
   assert.match(server, /australia-nugget-kangaroo-15-dollari/);
   assert.match(server, /kangaroo 15 dollars/);
+  assert.match(server, /cina-panda-oro-1-oz-30g/);
+  assert.match(server, /Cina Panda oro 1 oz \| 30 grammi/);
+  assert.match(server, /1oz au \.999/);
+  assert.match(server, /cina-panda-oro-1-2-oz-15g/);
+  assert.match(server, /Cina Panda oro 1\/2 oz \| 15 grammi/);
+  assert.match(server, /200 yuan/);
+  assert.match(server, /1\/2 oz/);
+  assert.match(server, /cina-panda-oro-1-20-oz-1g/);
+  assert.match(server, /Cina Panda oro 1\/20 oz \| 1 grammo/);
+  assert.match(server, /20 yuan/);
+  assert.match(server, /1\/20 oz/);
+  assert.match(server, /cina-panda-oro-1-grammo-fdc/);
+  assert.match(server, /Cina Panda oro 1 grammo \(Fior di Conio\)/);
+  assert.match(server, /10 yuan/);
+  assert.match(server, /1g au \.999/);
   assert.doesNotMatch(server, /id: "wiener-philharmoniker-1-oz"/);
   assert.doesNotMatch(server, /name: "Wiener Philharmoniker 1 oz"/);
   assert.match(server, /GOLD_COIN_AI_CATALOG\.push/);
@@ -511,8 +632,26 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/sterlina-oro-sovrana-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/sterlina-oro-sovrana-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-20-lire-italia-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-vittorio-emanuele-ii-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-vittorio-emanuele-ii-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-vittorio-emanuele-ii-regno-sardegna-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-vittorio-emanuele-ii-regno-sardegna-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-vittorio-emanuele-iii-aratrice-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-vittorio-emanuele-iii-aratrice-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/100-lire-vittorio-emanuele-iii-fascione-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/100-lire-vittorio-emanuele-iii-fascione-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/40-lire-oro-napoleone-i-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/40-lire-oro-napoleone-i-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-carlo-alberto-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-carlo-alberto-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-carlo-felice-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-lire-carlo-felice-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/napoleone-20-franchi-gallo-marianne-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/napoleone-20-franchi-gallo-marianne-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-napoleone-iii-testa-laureata-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-napoleone-iii-testa-laureata-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-napoleone-iii-testa-nuda-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-napoleone-iii-testa-nuda-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/filarmonica-vienna-2026-1-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/filarmonica-vienna-2026-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/somalia-elephant-2023-1-oz-front.png", root)),
@@ -543,6 +682,14 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/australia-nugget-kangaroo-15-dollari-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/libertad-1-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/libertad-1-oz-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/cina-panda-oro-1-oz-30g-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/cina-panda-oro-1-oz-30g-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/cina-panda-oro-1-2-oz-15g-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/cina-panda-oro-1-2-oz-15g-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/cina-panda-oro-1-20-oz-1g-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/cina-panda-oro-1-20-oz-1g-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/cina-panda-oro-1-grammo-fdc-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/cina-panda-oro-1-grammo-fdc-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/panda-cinese-30g-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/panda-cinese-30g-back.png", root))
   ]);
@@ -1786,7 +1933,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -1845,7 +1992,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -1897,7 +2044,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -1967,9 +2114,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260629-maple-leaf-20-dollari-1/);
-  assert.match(index, /styles\.css\?v=20260629-maple-leaf-20-dollari-1/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(index, /app\.js\?v=20260701-pwa-cache-reset-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -2015,8 +2162,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260629-maple-leaf-20-dollari-1/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -2115,7 +2262,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -2219,7 +2366,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -2270,9 +2417,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260629-maple-leaf-20-dollari-1/);
-  assert.match(index, /styles\.css\?v=20260629-maple-leaf-20-dollari-1/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(index, /app\.js\?v=20260701-pwa-cache-reset-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -2329,9 +2476,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260629-maple-leaf-20-dollari-1/);
-  assert.match(index, /styles\.css\?v=20260629-maple-leaf-20-dollari-1/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(index, /app\.js\?v=20260701-pwa-cache-reset-1/);
+  assert.match(index, /styles\.css\?v=20260701-pwa-cache-reset-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -2409,7 +2556,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -2526,7 +2673,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -2570,7 +2717,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260629-maple-leaf-20-dollari-1/);
+  assert.match(worker, /20260701-pwa-cache-reset-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i

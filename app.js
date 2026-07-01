@@ -166,6 +166,12 @@ const state = {
   pendingSync: [],
   syncingPending: false,
   sessionTimeoutTimer: null,
+  clientVersion: null,
+  serverVersion: null,
+  appUpdateAvailable: false,
+  appUpdateBannerDismissed: false,
+  appUpdateTimer: null,
+  appUpdateLastCheckedAt: null,
   tutorial: {
     active: false,
     source: "",
@@ -175,6 +181,9 @@ const state = {
     pendingFirstRun: false
   }
 };
+
+window.__OROACTIVE_DIRTY_STATE__ = false;
+window.__OROACTIVE_VERSION__ = null;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
@@ -219,6 +228,7 @@ const OROACTIVE_SPLASH_MIN_MS = 5000;
 const OROACTIVE_SPLASH_BRIEF_MS = 5000;
 const OROACTIVE_SPLASH_READY_MS = 180;
 const OROACTIVE_SPLASH_EXIT_MS = 430;
+const OROACTIVE_UPDATE_INTERVAL_MS = 30000;
 const AURUM_SETTINGS_KEY = "oroactive-aurum-settings";
 const AURUM_FLOATING_POSITION_KEY = "aurum_floating_position";
 const AURUM_AVOID_EVENT = "aurum:avoid-elements-updated";
@@ -781,6 +791,139 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "profile", back: "shield", frontText: "20L", backText: "SAV" }
   },
   {
+    id: "marengo-20-lire-vittorio-emanuele-ii",
+    name: "Marengo 20 Lire Vittorio Emanuele II",
+    country: "Italia",
+    mintYears: "1861-1878",
+    nominal: "20 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 6.45,
+    fineGold: 5.805,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Vittorio Emanuele II, Re d'Italia",
+    reverse: "Stemma sabaudo coronato con collare dell'Annunziata, rami di alloro e valore L.20",
+    history: "Il marengo italiano da 20 Lire nasce nello standard dell'Unione Monetaria Latina, con titolo 900‰, peso di circa 6,45 g e diametro di 21 mm. Le emissioni di Vittorio Emanuele II accompagnano i primi anni del Regno d'Italia: al dritto compare il profilo del primo re d'Italia, mentre al rovescio e raffigurato lo stemma sabaudo con valore L.20. Come gli altri marenghi europei, contiene circa 5,80 g di oro fino ed e una tipologia storica ricorrente nelle verifiche da banco.",
+    recognitionHints: ["marengo", "20 lire", "vittorio emanuele ii", "vittorio emanuele", "regno d'italia", "regno d italia", "l.20", "l 20", "1874", "stemma sabaudo", "collare annunziata", "alloro", "italia"],
+    visual: { front: "profile", back: "shield", frontText: "VEII", backText: "L20" }
+  },
+  {
+    id: "marengo-20-lire-vittorio-emanuele-ii-regno-sardegna",
+    name: "Marengo 20 Lire Vittorio Emanuele II Regno di Sardegna",
+    country: "Italia",
+    mintYears: "1849-1861",
+    nominal: "20 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 6.45,
+    fineGold: 5.805,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Vittorio Emanuele II, Re di Sardegna",
+    reverse: "Stemma sabaudo coronato con rami di alloro e valore L.20",
+    history: "Il Marengo 20 Lire di Vittorio Emanuele II del Regno di Sardegna appartiene alle emissioni sabaude precedenti alla proclamazione del Regno d'Italia. Rientra nello standard dei marenghi europei: oro 900/1000, peso di circa 6,45 g, circa 5,80 g di oro fino e diametro di 21 mm. Al dritto presenta il profilo del sovrano con legenda VICTORIUS EMMANUEL II D.G. REX SARD. CYP. ET HIER., mentre al rovescio compare lo stemma sabaudo coronato con rami di alloro e valore L.20. E una tipologia utile da distinguere dal 20 Lire del Regno d'Italia per legenda e contesto storico.",
+    recognitionHints: ["marengo", "20 lire", "vittorio emanuele ii", "vittorio emanuele", "regno di sardegna", "rex sard", "sardegna", "savoia", "l.20", "l 20", "1852", "stemma sabaudo", "alloro", "italia"],
+    visual: { front: "profile", back: "shield", frontText: "VEIIS", backText: "L20" }
+  },
+  {
+    id: "marengo-20-lire-vittorio-emanuele-iii-aratrice",
+    name: "Marengo 20 Lire Vittorio Emanuele III Aratrice",
+    country: "Italia",
+    mintYears: "1910-1912",
+    nominal: "20 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 6.45,
+    fineGold: 5.805,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Vittorio Emanuele III con legenda VITTORIO EMANUELE III",
+    reverse: "Figura dell'Aratrice con aratro, fascio di spighe, valore Lire 20 e legenda REGNO D'ITALIA",
+    history: "Il Marengo 20 Lire Vittorio Emanuele III Aratrice appartiene alle emissioni italiane in oro da 20 Lire coniate secondo lo standard dell'Unione Monetaria Latina: titolo 900/1000, peso di circa 6,45 g, circa 5,80 g di oro fino e diametro di 21 mm. Al dritto mostra il profilo di Vittorio Emanuele III; al rovescio la figura dell'Aratrice, allegoria agricola del Regno d'Italia, con aratro, spighe e valore Lire 20. E una tipologia riconoscibile per il rovescio figurativo, diverso dallo stemma sabaudo dei marenghi italiani piu comuni.",
+    recognitionHints: ["marengo", "20 lire", "vittorio emanuele iii", "aratrice", "regno d'italia", "regno italia", "lire 20", "1912", "aratro", "spighe", "italia"],
+    visual: { front: "profile", back: "figure", frontText: "VEIII", backText: "ARAT" }
+  },
+  {
+    id: "100-lire-vittorio-emanuele-iii-fascione",
+    name: "100 Lire Vittorio Emanuele III Fascione",
+    country: "Italia",
+    mintYears: "1923",
+    nominal: "100 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 32.25,
+    fineGold: 29.025,
+    diameter: 35,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Vittorio Emanuele III con legenda VITTORIO EMANUELE III RE D'ITALIA",
+    reverse: "Fascio littorio con scure, valore Lire 100, data Ottobre 1922 - 1923 e segno R della Zecca di Roma",
+    history: "La 100 Lire Vittorio Emanuele III Fascione fu coniata nel 1923 insieme al pezzo da 20 Lire dello stesso tipo per commemorare il primo anniversario della marcia su Roma del 28 ottobre 1922. Gli esemplari, originariamente satinati, non entrarono in circolazione perche il valore intrinseco dell'oro superava il valore nominale; la Zecca li distribui ai privati al prezzo di 400 Lire. La moneta ha titolo 900/1000, peso di 32,25 g e diametro di 35 mm.",
+    recognitionHints: ["100 lire", "vittorio emanuele iii", "fascione", "lire 100", "ottobre 1922", "1923", "fascio", "scure", "regno d'italia", "italia"],
+    visual: { front: "profile", back: "symbol", frontText: "VEIII", backText: "L100" }
+  },
+  {
+    id: "40-lire-oro-napoleone-i",
+    name: "40 Lire oro Napoleone I",
+    country: "Italia",
+    mintYears: "1810",
+    nominal: "40 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 12.9,
+    fineGold: 11.61,
+    diameter: 26,
+    edge: "Zigrinato",
+    obverse: "Profilo di Napoleone Bonaparte verso sinistra con legenda NAPOLEONE IMPERATORE E RE, anno 1810 e segno di zecca M",
+    reverse: "Stemma del Regno d'Italia con legenda REGNO D'ITALIA e valore 40 Lire",
+    history: "Le 40 Lire oro Napoleone I del 1810 furono prodotte dalla zecca di Milano durante il Regno d'Italia napoleonico. Sono note anche come doppio marengo: valore nominale, peso e contenuto d'oro sono il doppio del marengo da 20 Lire. La tiratura indicata e' di 157.750 esemplari, rendendola comune ma molto ricercata da collezionisti e investitori. La moneta richiama il periodo in cui Napoleone, incoronato Re d'Italia nel Duomo di Milano il 26 maggio 1805 con la Corona Ferrea, governo' uno Stato satellite dell'Impero Francese. Ha titolo 900/1000, peso di 12,90 g, circa 11,60 g d'oro fino e diametro di 26 mm.",
+    recognitionHints: ["40 lire", "napoleone i", "napoleone imperatore e re", "regno d'italia", "regno italia", "1810", "zecca milano", "segno m", "doppio marengo", "italia"],
+    visual: { front: "profile", back: "coat", frontText: "NAP", backText: "40L" }
+  },
+  {
+    id: "marengo-20-lire-carlo-alberto",
+    name: "Marengo 20 Lire Carlo Alberto",
+    country: "Italia",
+    mintYears: "1831-1849",
+    nominal: "20 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 6.45,
+    fineGold: 5.805,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Carlo Alberto, Re di Sardegna",
+    reverse: "Stemma sabaudo coronato con rami di alloro e valore L.20",
+    history: "Il marengo da 20 Lire di Carlo Alberto appartiene alla tradizione sabauda precedente al Regno d'Italia. Carlo Alberto di Savoia, padre di Vittorio Emanuele II, compare al dritto con legenda reale, mentre il rovescio riporta lo stemma sabaudo coronato, rami di alloro e valore L.20. Come gli altri marenghi europei nello standard latino, e una moneta in oro 900/1000 da circa 6,45 g, con circa 5,80 g di oro fino e diametro di 21 mm.",
+    recognitionHints: ["marengo", "20 lire", "carlo alberto", "albertus", "rex sard", "regno di sardegna", "sardegna", "savoia", "l.20", "l 20", "1835", "stemma sabaudo", "alloro", "italia"],
+    visual: { front: "profile", back: "shield", frontText: "CA", backText: "L20" }
+  },
+  {
+    id: "marengo-20-lire-carlo-felice",
+    name: "Marengo 20 Lire Carlo Felice",
+    country: "Italia",
+    mintYears: "1821-1831",
+    nominal: "20 Lire",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 6.45,
+    fineGold: 5.805,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Carlo Felice, Re di Sardegna",
+    reverse: "Stemma sabaudo coronato con rami di alloro e valore L.20",
+    history: "Il marengo da 20 Lire di Carlo Felice appartiene alle emissioni sabaude del Regno di Sardegna precedenti al Regno d'Italia. Al dritto raffigura Carlo Felice con legenda CAR FELIX D.G. REX SAR. CYP. ET HIER., mentre il rovescio presenta lo stemma sabaudo coronato, rami di alloro e valore L.20. Mantiene lo standard dei marenghi in oro 900/1000: peso di circa 6,45 g, circa 5,80 g di oro fino e diametro di 21 mm.",
+    recognitionHints: ["marengo", "20 lire", "carlo felice", "car felix", "rex sar", "regno di sardegna", "sardegna", "savoia", "l.20", "l 20", "1827", "stemma sabaudo", "alloro", "italia"],
+    visual: { front: "profile", back: "shield", frontText: "CF", backText: "L20" }
+  },
+  {
     id: "marengo-francese-20-franchi",
     name: "Marengo francese 20 Franchi",
     country: "Francia",
@@ -818,6 +961,44 @@ const GOLD_COIN_CATALOG = [
     history: "Coniata dalla zecca francese di Parigi tra il 1899 e il 1914, questa tipologia del 20 Franchi francese unisce Marianne, simbolo della Repubblica, e il gallo gallico, emblema della cultura e della storia francese. Come il Vreneli svizzero, e una moneta 900‰: circa 90% oro e 10% rame, con contenuto d'oro fino di circa 5,81 g.",
     recognitionHints: ["napoleone d'oro", "20 francs", "marianne", "gallo", "coq", "chaplain", "liberte egalite fraternite", "french mint"],
     visual: { front: "profile", back: "rooster", frontText: "RF", backText: "20F" }
+  },
+  {
+    id: "marengo-20-franchi-napoleone-iii-testa-laureata",
+    name: "Marengo 20 Franchi Napoleone III testa laureata",
+    country: "Francia",
+    mintYears: "1861-1870",
+    nominal: "20 Francs",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 6.45,
+    fineGold: 5.805,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Napoleone III testa laureata con legenda NAPOLEON III EMPEREUR",
+    reverse: "Stemma imperiale francese con legenda EMPIRE FRANCAIS, valore 20 FR e anno",
+    history: "Il marengo oro identifica la moneta d'oro da 20 franchi nata dopo la vittoria napoleonica di Marengo del 14 giugno 1800 e poi estesa alle emissioni dell'Unione Monetaria Latina. La zecca di Parigi continuo a produrre 20 franchi con caratteristiche costanti di peso e titolo. Questa variante raffigura Napoleone III con testa laureata, imperatore dei francesi dal 1852 fino alla caduta del Secondo Impero dopo la guerra franco-tedesca. Il rovescio riporta lo stemma imperiale francese, il valore 20 FR e l'anno di coniazione.",
+    recognitionHints: ["marengo", "napoleone iii", "napoleon iii", "testa laureata", "20 franchi", "20 francs", "20 fr", "empereur", "empire francais", "barre", "1865", "secondo impero", "francia"],
+    visual: { front: "profile", back: "shield", frontText: "NIII", backText: "20FR" }
+  },
+  {
+    id: "marengo-20-franchi-napoleone-iii-testa-nuda",
+    name: "Marengo 20 Franchi Napoleone III testa nuda",
+    country: "Francia",
+    mintYears: "1853-1860",
+    nominal: "20 Francs",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰ / 21,6 kt",
+    grossWeight: 6.45,
+    fineGold: 5.805,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Napoleone III testa nuda con legenda NAPOLEON III EMPEREUR",
+    reverse: "Stemma imperiale francese con legenda EMPIRE FRANCAIS, valore 20 FR e anno",
+    history: "Il marengo oro identifica la moneta d'oro da 20 franchi nata dopo la vittoria napoleonica di Marengo del 14 giugno 1800 e poi estesa alle emissioni dell'Unione Monetaria Latina. La zecca di Parigi continuo a produrre 20 franchi con caratteristiche costanti di peso e titolo. Questa variante raffigura Napoleone III a testa nuda, prima della tipologia laureata, con il ritratto imperiale e la legenda NAPOLEON III EMPEREUR. Come gli altri marenghi francesi, mantiene titolo 900‰, peso di circa 6,45 g e diametro di 21 mm.",
+    recognitionHints: ["marengo", "napoleone iii", "napoleon iii", "testa nuda", "senza alloro", "20 franchi", "20 francs", "20 fr", "empereur", "empire francais", "barre", "1857", "secondo impero", "francia"],
+    visual: { front: "profile", back: "shield", frontText: "NIII", backText: "20FR" }
   },
   {
     id: "marengo-svizzero-vreneli",
@@ -1011,6 +1192,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "profile", back: "britannia", frontText: "GB", backText: "BRI" }
   },
   {
+    id: "britannia-100-sterline-fdc",
+    name: "100 Sterline Britannia d'oro (FIOR DI CONIO)",
+    country: "Regno Unito",
+    mintYears: "1987-oggi",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰ dal 2013",
+    grossWeight: 31.104,
+    fineGold: 0.9999,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto del sovrano britannico",
+    reverse: "Britannia con elmo, scudo e tridente",
+    history: "Le monete d'oro Gold Britannia sono monete inglesi emesse dalla Royal Mint (Zecca Reale inglese) in oro dal 1987. La Gold Britannia e' stata la prima moneta in oro da investimento europea del peso di 1 oncia troy; in Gran Bretagna ha corso legale e valore nominale di 100 sterline. La Britannia d'oro e' nota anche per l'esenzione dal capital gain tax nel Regno Unito. Le Gold Britannia sono prodotte anche nei tagli da 1/2, 1/4 e 1/10 di oncia troy e, dal 2013, anche in formati aggiuntivi. Dal 2013 le monete hanno purezza 999,9/1000, mentre fino al 2012 erano a 916,7/1000. Il rovescio raffigura Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d'ulivo; il dritto presenta il ritratto del sovrano britannico.",
+    recognitionHints: ["britannia", "100 pounds", "tridente", "shield", "british"],
+    visual: { front: "/assets/coins/britannia-100-sterline-fdc-fronte.png", back: "/assets/coins/britannia-100-sterline-fdc-retro.png", frontText: "GB", backText: "BRI" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australian Kangaroo",
     country: "Australia",
@@ -1125,6 +1325,82 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "eagle", back: "winged", frontText: "MX", backText: "ONZA" }
   },
   {
+    id: "cina-panda-oro-1-oz-30g",
+    name: "Cina Panda oro 1 oz | 30 grammi",
+    country: "Cina",
+    mintYears: "Anni misti / 1982-oggi",
+    nominal: "500 Yuan",
+    metal: "Oro",
+    purity: 0.999,
+    purityLabel: "24 kt / 999‰",
+    grossWeight: 31.11,
+    fineGold: 31.079,
+    diameter: 32,
+    edge: "Zigrinato",
+    obverse: "Panda gigante con valore 500 yuan e indicazione 1 oz Au .999",
+    reverse: "Tempio del Cielo con scritte in caratteri cinesi",
+    history: "Il Panda d'oro e una serie di monete auree coniate dalla zecca cinese a partire dal 1982. Il disegno del panda cambia di anno in anno, con minime differenze anche nelle dimensioni. La serie e stata prodotta in tagli da 1/20 di oncia fino a 1 oncia; dal 2016 viene coniata in tagli metrici da 1 a 30 grammi. Il Panda oro 1 oz / 30 grammi resta riconoscibile per il panda sul dritto, il Tempio del Cielo sul retro e il valore nominale da 500 yuan.",
+    recognitionHints: ["panda oro", "china panda", "cina panda", "panda cinese", "500 yuan", "500元", "1oz au .999", "1 oz", "30 grammi", "tempio del cielo"],
+    visual: { front: "panda", back: "temple", frontText: "500", backText: "CN" }
+  },
+  {
+    id: "cina-panda-oro-1-2-oz-15g",
+    name: "Cina Panda oro 1/2 oz | 15 grammi",
+    country: "Cina",
+    mintYears: "Anni misti / 1982-oggi",
+    nominal: "200 Yuan",
+    metal: "Oro",
+    purity: 0.999,
+    purityLabel: "24 kt / 999‰",
+    grossWeight: 15.55,
+    fineGold: 15.534,
+    diameter: 27,
+    edge: "Zigrinato",
+    obverse: "Panda gigante con valore 200 yuan",
+    reverse: "Tempio del Cielo con scritte in caratteri cinesi",
+    history: "Il Panda d'oro e una serie di monete auree coniate dalla zecca cinese a partire dal 1982. Il disegno cambia di anno in anno con minime differenze di dimensione e composizione iconografica. La serie e stata prodotta in tagli da 1/20 di oncia fino a 1 oncia; dal 2016 viene coniata in tagli metrici da 1 a 30 grammi. Il taglio 1/2 oz, oggi associato al formato da 15 grammi, mantiene l'oro 999/1000, il panda sul dritto e il Tempio del Cielo sul retro.",
+    recognitionHints: ["panda oro", "china panda", "cina panda", "panda cinese", "200 yuan", "200元", "1/2 oz", "mezza oncia", "15 grammi", "15g", "tempio del cielo"],
+    visual: { front: "panda", back: "temple", frontText: "200", backText: "CN" }
+  },
+  {
+    id: "cina-panda-oro-1-20-oz-1g",
+    name: "Cina Panda oro 1/20 oz | 1 grammo",
+    country: "Cina",
+    mintYears: "Anni misti / 1982-oggi",
+    nominal: "20 Yuan",
+    metal: "Oro",
+    purity: 0.999,
+    purityLabel: "24 kt / 999‰",
+    grossWeight: 1.55,
+    fineGold: 1.548,
+    diameter: 17.95,
+    edge: "Zigrinato",
+    obverse: "Panda gigante con valore 20 yuan",
+    reverse: "Tempio del Cielo con scritte in caratteri cinesi",
+    history: "Il Panda d'oro e una serie di monete auree coniate dalla zecca cinese a partire dal 1982. Il disegno cambia di anno in anno con minime differenze di dimensione. La serie storica varia da 1/20 di oncia a 1 oncia; dal 2016 viene coniata in tagli metrici da 1 a 30 grammi. Questa scheda identifica il formato piccolo 1/20 oz / 1 grammo, in oro 999/1000, con panda sul dritto e Tempio del Cielo sul retro.",
+    recognitionHints: ["panda oro", "china panda", "cina panda", "panda cinese", "20 yuan", "20元", "1/20 oz", "un ventesimo", "1.55 grammi", "1,55 grammi", "1 grammo", "1 g", "tempio del cielo"],
+    visual: { front: "panda", back: "temple", frontText: "20", backText: "CN" }
+  },
+  {
+    id: "cina-panda-oro-1-grammo-fdc",
+    name: "Cina Panda oro 1 grammo (Fior di Conio)",
+    country: "Cina",
+    mintYears: "Fior di Conio (FDC) / 2016-oggi",
+    nominal: "10 Yuan",
+    metal: "Oro",
+    purity: 0.999,
+    purityLabel: "24 kt / 999‰",
+    grossWeight: 1,
+    fineGold: 0.999,
+    diameter: 10,
+    edge: "Zigrinato",
+    obverse: "Panda gigante con valore 10 yuan e indicazione 1g Au .999",
+    reverse: "Tempio del Cielo con anno 2018 e scritte in caratteri cinesi",
+    history: "Il Panda d'oro e una serie di monete auree coniate dalla zecca cinese a partire dal 1982. Il disegno della moneta cambia di anno in anno con minime differenze di dimensione e soggetto. A partire dal 2016 la serie viene emessa in tagli metrici da 1 a 30 grammi. Il taglio da 1 grammo in Fior di Conio mantiene oro 999/1000, valore nominale 10 yuan, panda sul dritto e Tempio del Cielo sul retro.",
+    recognitionHints: ["panda oro", "china panda", "cina panda", "panda cinese", "10 yuan", "10元", "1g au .999", "1 grammo", "1 g", "fior di conio", "fdc", "tempio del cielo", "2018"],
+    visual: { front: "panda", back: "temple", frontText: "10", backText: "CN" }
+  },
+  {
     id: "panda-cinese-30g",
     name: "Panda cinese 30 g",
     country: "Cina",
@@ -1219,6 +1495,67 @@ const GOLD_COIN_CATALOG = [
     recognitionHints: ["20 mark", "deutsches reich", "kaiser", "aigle", "aquila imperiale"],
     visual: { front: "profile", back: "eagle", frontText: "20M", backText: "DR" }
   }
+
+,  {
+    id: "britannia-10-sterline-oro",
+    slug: "britannia-10-sterline-oro",
+    name: "10 Sterline Britannia d'oro",
+    title: "10 Sterline Britannia d'oro",
+    displayName: "10 Sterline Britannia d'oro",
+    country: "Regno Unito",
+    stato: "Regno Unito",
+    nation: "Regno Unito",
+    group: "Regno Unito",
+    category: "Regno Unito",
+    denomination: "10 Sterline",
+    metal: "Oro",
+    mint: "Royal Mint",
+    producer: "Royal Mint",
+    purity: "916,7/1000 - 999,9/1000",
+    titolo: "916,7/1000 - 999,9/1000",
+    weight: "3,11 grammi",
+    peso: "3,11 grammi",
+    weightGrams: 3.11,
+    diameter: "16,5 millimetri",
+    diametro: "16,5 millimetri",
+    diameterMm: 16.5,
+    period: "Anni misti",
+    periodo: "Anni misti",
+    condition: "Anni misti",
+    statoConservazione: "Anni misti",
+    frontLabel: "Fronte - Regina Elisabetta II",
+    backLabel: "Retro - Britannia",
+    obverse: "Ritratto della Regina Elisabetta II con iscrizione regale.",
+    reverse: "Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d'ulivo.",
+    image: "/assets/coins/britannia-10-sterline-fronte.png",
+    frontImage: "/assets/coins/britannia-10-sterline-fronte.png",
+    obverseImage: "/assets/coins/britannia-10-sterline-fronte.png",
+    imageFront: "/assets/coins/britannia-10-sterline-fronte.png",
+    backImage: "/assets/coins/britannia-10-sterline-retro.png",
+    reverseImage: "/assets/coins/britannia-10-sterline-retro.png",
+    imageBack: "/assets/coins/britannia-10-sterline-retro.png",
+    description: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
+    history: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
+    story: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
+    technicalDetails: [
+      { label: "Titolo", value: "916,7/1000 - 999,9/1000" },
+      { label: "Peso", value: "3,11 grammi" },
+      { label: "Diametro", value: "16,5 millimetri" },
+      { label: "Periodo/Stato", value: "Anni misti" }
+    ],
+    details: [
+      { label: "Titolo", value: "916,7/1000 - 999,9/1000" },
+      { label: "Peso", value: "3,11 grammi" },
+      { label: "Diametro", value: "16,5 millimetri" },
+      { label: "Periodo/Stato", value: "Anni misti" }
+    ],
+    specifications: {
+      Titolo: "916,7/1000 - 999,9/1000",
+      Peso: "3,11 grammi",
+      Diametro: "16,5 millimetri",
+      "Periodo/Stato": "Anni misti"
+    }
+  }
 ];
 
 const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
@@ -1269,8 +1606,17 @@ function withBilanciaDoroImages(coin, slug, source) {
 const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "sterlina-oro-sovrana": "sterlina-oro-sovrana",
   "marengo-20-lire-italia": "marengo-20-lire-italia",
+  "marengo-20-lire-vittorio-emanuele-ii": "marengo-20-lire-vittorio-emanuele-ii",
+  "marengo-20-lire-vittorio-emanuele-ii-regno-sardegna": "marengo-20-lire-vittorio-emanuele-ii-regno-sardegna",
+  "marengo-20-lire-vittorio-emanuele-iii-aratrice": "marengo-20-lire-vittorio-emanuele-iii-aratrice",
+  "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
+  "40-lire-oro-napoleone-i": "40-lire-oro-napoleone-i",
+  "marengo-20-lire-carlo-alberto": "marengo-20-lire-carlo-alberto",
+  "marengo-20-lire-carlo-felice": "marengo-20-lire-carlo-felice",
   "marengo-francese-20-franchi": "marengo-francese-20-franchi",
   "napoleone-20-franchi-gallo-marianne": "napoleone-20-franchi-gallo-marianne",
+  "marengo-20-franchi-napoleone-iii-testa-laureata": "marengo-20-franchi-napoleone-iii-testa-laureata",
+  "marengo-20-franchi-napoleone-iii-testa-nuda": "marengo-20-franchi-napoleone-iii-testa-nuda",
   "marengo-svizzero-vreneli": "marengo-svizzero-vreneli",
   "krugerrand-1-oz": "krugerrand-1-oz",
   "american-eagle-1-oz": "american-eagle-1-oz",
@@ -1287,14 +1633,26 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "australia-nugget-kangaroo-25-dollari": "australia-nugget-kangaroo-25-dollari",
   "australia-nugget-kangaroo-15-dollari": "australia-nugget-kangaroo-15-dollari",
   "libertad-1-oz": "libertad-1-oz",
+  "cina-panda-oro-1-oz-30g": "cina-panda-oro-1-oz-30g",
+  "cina-panda-oro-1-2-oz-15g": "cina-panda-oro-1-2-oz-15g",
+  "cina-panda-oro-1-20-oz-1g": "cina-panda-oro-1-20-oz-1g",
+  "cina-panda-oro-1-grammo-fdc": "cina-panda-oro-1-grammo-fdc",
   "panda-cinese-30g": "panda-cinese-30g",
   "centenario-50-pesos": "centenario-50-pesos",
+  "messico-10-pesos-oro": "messico-10-pesos-oro",
   "ducato-austriaco": "ducato-austriaco",
   "20-dollari-double-eagle": "20-dollari-saint-gaudens",
   "20-mark-germania": "20-mark-germania"
 };
 
 const COIN_IMAGE_SOURCE_BY_COIN = {
+  "marengo-20-lire-vittorio-emanuele-ii": "Archivio OroActive",
+  "marengo-20-lire-vittorio-emanuele-ii-regno-sardegna": "Archivio OroActive",
+  "marengo-20-lire-vittorio-emanuele-iii-aratrice": "Archivio OroActive",
+  "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
+  "40-lire-oro-napoleone-i": "Archivio OroActive",
+  "marengo-20-lire-carlo-alberto": "Archivio OroActive",
+  "marengo-20-lire-carlo-felice": "Archivio OroActive",
   "american-buffalo-1-oz": "Archivio OroActive",
   "maple-leaf-1-oz": "Archivio OroActive",
   "canada-maple-leaf-20-dollari": "Archivio OroActive",
@@ -1304,7 +1662,14 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "australia-nugget-kangaroo-25-dollari": "Archivio OroActive",
   "australia-nugget-kangaroo-15-dollari": "Archivio OroActive",
   "libertad-1-oz": "Archivio OroActive",
+  "cina-panda-oro-1-oz-30g": "Archivio OroActive",
+  "cina-panda-oro-1-2-oz-15g": "Archivio OroActive",
+  "cina-panda-oro-1-20-oz-1g": "Archivio OroActive",
+  "cina-panda-oro-1-grammo-fdc": "Archivio OroActive",
   "panda-cinese-30g": "Archivio OroActive",
+  "messico-10-pesos-oro": "Archivio OroActive",
+  "marengo-20-franchi-napoleone-iii-testa-laureata": "Archivio OroActive",
+  "marengo-20-franchi-napoleone-iii-testa-nuda": "Archivio OroActive",
   "napoleone-20-franchi-gallo-marianne": "Archivio OroActive",
   "filarmonica-vienna-2026-1-oz": "Archivio OroActive",
   "somalia-elephant-2023-1-oz": "Archivio OroActive",
@@ -1523,6 +1888,25 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
     recognitionHints: ["20 pesos", "messico", "mexico", "calendario azteco", "aztec calendar"],
     visual: { front: "calendar", back: "eagle", frontText: "20P", backText: "MX" }
   }, "messico-20-pesos"),
+  withBilanciaDoroImages({
+    id: "messico-10-pesos-oro",
+    name: "Messico 10 Pesos oro",
+    country: "Messico",
+    mintYears: "1921-1947",
+    nominal: "10 Pesos",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 8.33,
+    fineGold: 7.5,
+    diameter: 22.5,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Miguel Hidalgo con valore 10 Pesos e anno di coniazione",
+    reverse: "Stemma nazionale messicano con aquila e serpente",
+    history: "Queste monete sono state coniate dal governo messicano tra il 1921 e il 1947. Prima dell'avvento del Krugerrand oro nel 1967, il Pesos messicano era certamente tra le monete in oro da investimento piu diffuse al mondo. Per il Messico i Pesos messicani sono monete d'oro che hanno un immenso valore storico e sentimentale, perche hanno iniziato a circolare oltre 100 anni fa dopo la liberazione del Messico.",
+    recognitionHints: ["10 pesos", "messico", "mexico", "miguel hidalgo", "hidalgo", "estados unidos mexicanos", "aquila e serpente"],
+    visual: { front: "portrait", back: "eagle", frontText: "10P", backText: "MX" }
+  }, "messico-10-pesos-oro"),
   withBilanciaDoroImages({
     id: "austria-1000-scellini",
     name: "Austria 1000 Scellini",
@@ -2141,6 +2525,225 @@ async function refreshApp(options = {}) {
   }
 }
 
+function normalizeAppVersion(version = {}) {
+  return {
+    ok: version.ok !== false,
+    app: version.app || "OroActive",
+    commit: String(version.commit || "unknown"),
+    shortCommit: String(version.shortCommit || version.short_commit || version.commit || "unknown").slice(0, 12),
+    buildNumber: String(version.buildNumber || version.build_number || "local"),
+    buildTime: String(version.buildTime || version.build_time || ""),
+    branch: String(version.branch || "main"),
+    environment: String(version.environment || "")
+  };
+}
+
+function appVersionKey(version = {}) {
+  const data = normalizeAppVersion(version);
+  return [data.commit, data.buildNumber, data.buildTime].join("|");
+}
+
+async function fetchAppVersion(path = "/api/version") {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" }
+  });
+  if (!response.ok) throw new Error("Versione app non disponibile.");
+  return normalizeAppVersion(await response.json());
+}
+
+async function fetchClientVersion() {
+  try {
+    return await fetchAppVersion("/version.json");
+  } catch {
+    return fetchAppVersion("/api/version");
+  }
+}
+
+async function ensureClientVersion() {
+  if (state.clientVersion) return state.clientVersion;
+  const version = await fetchClientVersion();
+  state.clientVersion = version;
+  window.__OROACTIVE_VERSION__ = version;
+  return version;
+}
+
+function isCriticalUnsavedWorkflow() {
+  const activePractice = document.getElementById("practice")?.classList.contains("active-screen");
+  const hasFormData = !isPracticeFormEmpty();
+  return Boolean(
+    state.saving ||
+    state.editingDirty ||
+    state.pendingSync.length ||
+    state.uploadedCaptures.size ||
+    state.captureFiles.size ||
+    state.attachments ||
+    state.signatures.some(Boolean) ||
+    (activePractice && hasFormData)
+  );
+}
+
+function syncDirtyState() {
+  window.__OROACTIVE_DIRTY_STATE__ = isCriticalUnsavedWorkflow();
+  return window.__OROACTIVE_DIRTY_STATE__;
+}
+
+async function clearOldOroactiveCaches() {
+  if (!window.caches?.keys) return [];
+  const keys = await window.caches.keys();
+  const oldKeys = keys.filter((key) => /^oroactive-|^static-|^asset-|^pwa-/i.test(key));
+  await Promise.all(oldKeys.map((key) => window.caches.delete(key).catch(() => false)));
+  return oldKeys;
+}
+
+async function performAppUpdateReload() {
+  if (syncDirtyState()) {
+    alert("Salva la pratica prima di aggiornare l'app.");
+    showToast("Aggiornamento disponibile. Salva la pratica prima di aggiornare.", "warning");
+    return false;
+  }
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+      await registration.update().catch(() => null);
+    }
+  }
+  await clearOldOroactiveCaches();
+  window.location.reload();
+  return true;
+}
+
+function hideAppUpdateBanner() {
+  document.getElementById("oroactiveUpdateBanner")?.remove();
+}
+
+function showAppUpdateBanner(serverVersion = {}) {
+  if (state.appUpdateBannerDismissed) return;
+  let banner = document.getElementById("oroactiveUpdateBanner");
+  if (!banner) {
+    banner = document.createElement("aside");
+    banner.id = "oroactiveUpdateBanner";
+    banner.setAttribute("role", "status");
+    banner.style.cssText = "position:fixed;left:16px;right:16px;bottom:16px;z-index:9999;display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid rgba(255,138,24,.55);border-radius:12px;background:rgba(18,18,18,.96);color:#fff;box-shadow:0 18px 45px rgba(0,0,0,.45);";
+    banner.innerHTML = `
+      <span data-update-copy></span>
+      <span style="display:flex;gap:8px;align-items:center;">
+        <button class="ghost-button" type="button" data-app-update-later>Dopo</button>
+        <button class="primary-button" type="button" data-app-update-now>Aggiorna ora</button>
+      </span>
+    `;
+    banner.querySelector("[data-app-update-later]")?.addEventListener("click", () => {
+      state.appUpdateBannerDismissed = true;
+      hideAppUpdateBanner();
+    });
+    banner.querySelector("[data-app-update-now]")?.addEventListener("click", () => {
+      performAppUpdateReload().catch(() => showToast("Aggiornamento non completato. Riprova tra qualche secondo.", "error"));
+    });
+    document.body.appendChild(banner);
+  }
+  const dirty = syncDirtyState();
+  const copy = dirty
+    ? "Aggiornamento disponibile. Salva la pratica prima di aggiornare."
+    : "Nuova versione OroActive disponibile";
+  banner.querySelector("[data-update-copy]").textContent = copy;
+  state.serverVersion = normalizeAppVersion(serverVersion);
+}
+
+async function appUpdateDebugInfo() {
+  const cacheKeys = window.caches?.keys ? await window.caches.keys().catch(() => []) : [];
+  const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration().catch(() => null) : null;
+  return {
+    serviceWorkerActive: Boolean(navigator.serviceWorker?.controller || registration?.active),
+    serviceWorkerWaiting: Boolean(registration?.waiting),
+    caches: cacheKeys.filter((key) => /^oroactive-|^static-|^asset-|^pwa-/i.test(key)),
+    dirty: syncDirtyState(),
+    lastCheckedAt: state.appUpdateLastCheckedAt || "",
+    userAgent: navigator.userAgent || ""
+  };
+}
+
+function versionDetailRow(label, value) {
+  return `<div class="print-field"><span>${escapeHtml(label)}</span>${escapeHtml(value || "non disponibile")}</div>`;
+}
+
+async function openAppVersionPreview() {
+  if (!isFounder() || !previewModal || !previewBody || !previewTitle) return;
+  const [client, server, debug] = await Promise.all([
+    ensureClientVersion().catch(() => null),
+    fetchAppVersion("/api/version").catch(() => null),
+    appUpdateDebugInfo()
+  ]);
+  if (server) state.serverVersion = server;
+  const updated = Boolean(client && server && appVersionKey(client) === appVersionKey(server));
+  const status = client && server ? (updated ? "App aggiornata" : "Nuova versione disponibile") : "Impossibile verificare";
+  previewTitle.textContent = "Verifica aggiornamento app";
+  previewBody.innerHTML = `
+    <section class="quality-decision-modal">
+      <div class="print-grid">
+        ${versionDetailRow("Versione client", client?.buildNumber)}
+        ${versionDetailRow("Versione server", server?.buildNumber)}
+        ${versionDetailRow("Commit client", client?.shortCommit || client?.commit)}
+        ${versionDetailRow("Commit server", server?.shortCommit || server?.commit)}
+        ${versionDetailRow("Build client", client?.buildTime)}
+        ${versionDetailRow("Build server", server?.buildTime)}
+        ${versionDetailRow("Stato", status)}
+        ${versionDetailRow("Service worker attivo", debug.serviceWorkerActive ? "si" : "no")}
+        ${versionDetailRow("Service worker in attesa", debug.serviceWorkerWaiting ? "si" : "no")}
+        ${versionDetailRow("Cache disponibili", debug.caches.join(", ") || "nessuna")}
+        ${versionDetailRow("Ultima verifica", debug.lastCheckedAt ? formatDateTime(debug.lastCheckedAt) : "non disponibile")}
+        ${versionDetailRow("Pratica non salvata", debug.dirty ? "si" : "no")}
+        ${versionDetailRow("Dispositivo", debug.userAgent)}
+      </div>
+      <div class="modal-actions">
+        <button class="ghost-button" type="button" data-app-version-check>Verifica ora</button>
+        <button class="primary-button" type="button" data-app-update-now>Aggiorna ora</button>
+        <button class="ghost-button" type="button" data-close-preview>Chiudi</button>
+      </div>
+    </section>
+  `;
+  previewModal.hidden = false;
+}
+
+async function checkForAppUpdate(options = {}) {
+  try {
+    const client = await ensureClientVersion();
+    const server = await fetchAppVersion("/api/version");
+    state.serverVersion = server;
+    state.appUpdateLastCheckedAt = new Date().toISOString();
+    if (!server.ok) return false;
+    const changed = appVersionKey(server) !== appVersionKey(client);
+    state.appUpdateAvailable = changed;
+    if (changed) {
+      state.appUpdateBannerDismissed = false;
+      showAppUpdateBanner(server);
+    } else {
+      hideAppUpdateBanner();
+    }
+    if (options.showResult) {
+      showToast(changed ? "Nuova versione OroActive disponibile." : "App aggiornata.", changed ? "warning" : "success");
+      await openAppVersionPreview();
+    }
+    return changed;
+  } catch {
+    if (options.showResult) {
+      showToast("Impossibile verificare l'aggiornamento app.", "error");
+      await openAppVersionPreview();
+    }
+    return false;
+  }
+}
+
+function startAppVersionChecker() {
+  ensureClientVersion().catch(() => null);
+  window.clearInterval(state.appUpdateTimer);
+  state.appUpdateTimer = window.setInterval(() => checkForAppUpdate(), OROACTIVE_UPDATE_INTERVAL_MS);
+  window.addEventListener("focus", () => checkForAppUpdate());
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) checkForAppUpdate();
+  });
+}
+
 function triggerLogoRefresh() {
   if (mainMenuLogoRefresh?.classList) {
     mainMenuLogoRefresh.classList.add("logo-refresh-clicked");
@@ -2491,6 +3094,7 @@ function markPracticeDirty() {
   if (state.editingPracticeNumber && !state.suppressDirtyTracking) {
     state.editingDirty = true;
   }
+  syncDirtyState();
 }
 
 async function syncActsFromServer() {
@@ -2576,6 +3180,7 @@ async function flushPendingSync() {
 async function saveActRecord(act, method = "POST") {
   if (state.saving) throw new Error("Salvataggio già in corso.");
   state.saving = true;
+  syncDirtyState();
   const identifier = act.id || state.editingActId || state.editingPracticeNumber || act.practiceNumber;
   const path = method === "PUT" ? `/atti/${encodeURIComponent(identifier)}` : "/atti";
   document.querySelectorAll("#archivePractice, #saveSuspendedPractice, #nextStep").forEach((button) => {
@@ -2600,6 +3205,7 @@ async function saveActRecord(act, method = "POST") {
   } finally {
     hideLoading();
     state.saving = false;
+    syncDirtyState();
     document.querySelectorAll("#archivePractice, #saveSuspendedPractice, #nextStep").forEach((button) => {
       button.disabled = false;
     });
@@ -3385,7 +3991,8 @@ const MENU_GROUPS = [
     items: [
       { id: "founder-dashboard", label: "Dashboard Founder / KPI rete", description: "Controllo globale.", icon: "DF", order: 10, section: "dashboard", roles: MENU_ROLES.founder, condition: "founder", keywords: "dashboard founder kpi rete statistiche" },
       { id: "daily-report", label: "Founder Daily Report", description: "Report operativo giornaliero.", icon: "FR", order: 20, section: "founderDailyReport", roles: MENU_ROLES.founder, condition: "founder", keywords: "report giornaliero founder" },
-      { id: "store-health", label: "Salute Negozio / Performance negozi", description: "Health score punti vendita.", icon: "SN", order: 30, section: "storeHealth", roles: MENU_ROLES.founder, condition: "founder", keywords: "salute negozio store health performance" }
+      { id: "store-health", label: "Salute Negozio / Performance negozi", description: "Health score punti vendita.", icon: "SN", order: 30, section: "storeHealth", roles: MENU_ROLES.founder, condition: "founder", keywords: "salute negozio store health performance" },
+      { id: "verify-app-update", label: "Verifica aggiornamento app", description: "Versione client e server.", icon: "UP", order: 40, action: "app-update", roles: MENU_ROLES.founder, condition: "founder", keywords: "aggiornamento app pwa versione build service worker cache" }
     ]
   },
   {
@@ -12463,6 +13070,8 @@ function buildActsPdfPacket(title, subtitle, acts) {
 async function requestPdf(path, payload, filename) {
   const headers = { "Content-Type": "application/json" };
   if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
+  state.saving = true;
+  syncDirtyState();
   showLoading("Preparazione PDF...");
   let response;
   try {
@@ -12486,6 +13095,8 @@ async function requestPdf(path, payload, filename) {
     window.setTimeout(() => URL.revokeObjectURL(url), 3000);
   } finally {
     hideLoading();
+    state.saving = false;
+    syncDirtyState();
   }
 }
 
@@ -13539,6 +14150,7 @@ async function resetCurrentPractice(options = {}) {
   updateIbanVisibility();
   updateAttachmentState();
   updateChecklistState();
+  syncDirtyState();
   scheduleQualityCheckValidation();
 }
 
@@ -18550,7 +19162,16 @@ crmList?.addEventListener("click", (event) => {
 previewBody?.addEventListener("click", async (event) => {
   const saveClient = event.target.closest("[data-save-crm-client]");
   const deleteClient = event.target.closest("[data-delete-crm-client]");
+  const checkVersion = event.target.closest("[data-app-version-check]");
+  const updateNow = event.target.closest("[data-app-update-now]");
+  const closePreview = event.target.closest("[data-close-preview]");
   try {
+    if (checkVersion) return await checkForAppUpdate({ showResult: true });
+    if (updateNow) return await performAppUpdateReload();
+    if (closePreview && previewModal) {
+      previewModal.hidden = true;
+      return;
+    }
     if (saveClient) await saveCrmClient(saveClient.dataset.saveCrmClient);
     if (deleteClient) await deleteCrmClient(deleteClient.dataset.deleteCrmClient);
   } catch (error) {
@@ -18812,6 +19433,12 @@ async function openMainMenuItem(button) {
     openAurumChat();
     return;
   }
+  if (button.dataset.menuAction === "app-update") {
+    closeMainMenuDropdowns();
+    closeMainMenuSearchResults();
+    await checkForAppUpdate({ showResult: true });
+    return;
+  }
   if (button.dataset.section) await enterSectionFromMainMenu(button.dataset.section);
 }
 
@@ -18832,6 +19459,11 @@ async function openBrandMenuItem(button) {
     prepareInternalSectionLayout();
     updateAurumMascotVisibility();
     startTutorial({ firstRun: false });
+    return;
+  }
+  if (button.dataset.menuAction === "app-update") {
+    closeBrandMenu();
+    await checkForAppUpdate({ showResult: true });
     return;
   }
   if (!button.dataset.section) return;
@@ -19617,6 +20249,7 @@ async function initializeApp() {
   showStartupSplash();
   try {
     registerServiceWorker();
+    startAppVersionChecker();
     removeLegacySearchMenu();
     upgradeProvinceFields();
     populateAutocompleteLists();

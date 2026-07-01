@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "app": "OroActive",
+  "commit": "unknown",
+  "shortCommit": "unknown",
+  "buildNumber": "local",
+  "buildTime": "2026-07-01T00:00:00.000Z",
+  "branch": "main",
+  "environment": "development"
+}

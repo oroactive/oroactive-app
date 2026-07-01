@@ -1,17 +1,9 @@
-const STATIC_CACHE = "oroactive-static-v20260629-maple-leaf-20-dollari-1";
-const STATIC_ASSETS = [
-  "/index.html",
-  "/styles.css?v=20260629-maple-leaf-20-dollari-1",
-  "/app.js?v=20260629-maple-leaf-20-dollari-1",
-  "/manifest.json",
-  "/manifest.webmanifest",
-  "/oroactive-logo.png",
-  "/icons/apple-touch-icon-180.png",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png"
-];
-const SENSITIVE_PATHS = [
+const BUILD_ID = "20260701-pwa-cache-reset-1";
+const CACHE_NAME = `oroactive-cache-${BUILD_ID}`;
+const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
+const NEVER_CACHE_PREFIXES = [
   "/api/",
+  "/auth/",
   "/uploads/",
   "/documents/",
   "/pdf/",
@@ -21,73 +13,91 @@ const SENSITIVE_PATHS = [
   "/clienti/",
   "/backups/"
 ];
+const NEVER_CACHE_PATHS = [
+  "/",
+  "/app",
+  "/index.html",
+  "/service-worker.js",
+  "/sw.js",
+  "/manifest.json",
+  "/manifest.webmanifest",
+  "/version.json"
+];
+const HASHED_ASSET_PATTERN = /[.-][a-f0-9]{8,}\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i;
 
-function isSensitiveRequest(requestUrl) {
-  const path = requestUrl.pathname.toLowerCase();
-  return SENSITIVE_PATHS.some((prefix) => path.startsWith(prefix))
+function isSameOrigin(url) {
+  return url.origin === self.location.origin;
+}
+
+function shouldNeverCache(url) {
+  const path = url.pathname.toLowerCase();
+  return NEVER_CACHE_PATHS.includes(path)
+    || NEVER_CACHE_PREFIXES.some((prefix) => path.startsWith(prefix))
+    || path.endsWith(".html")
+    || path.includes("service-worker")
+    || path.includes("manifest")
     || path.includes("codice-fiscale")
     || path.includes("documento")
     || path.includes("firma")
     || path.includes("contabile")
-    || path.includes("pdf")
     || path.includes("cliente");
 }
 
-function isStaticAsset(requestUrl) {
-  if (requestUrl.origin !== self.location.origin) return false;
-  return STATIC_ASSETS.some((asset) => {
-    const assetUrl = new URL(asset, self.location.origin);
-    return requestUrl.pathname === assetUrl.pathname;
-  });
+function shouldDeleteCache(key) {
+  return LEGACY_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix)) && key !== CACHE_NAME;
 }
 
-function networkFirst(request) {
-  return fetch(request).then((response) => {
-    if (response.ok) {
-      const clone = response.clone();
-      caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
-    }
-    return response;
-  }).catch(() => caches.match(request));
+async function fetchNoStore(request) {
+  return fetch(request, { cache: "no-store" });
+}
+
+async function cacheFirstHashedAsset(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok) await cache.put(request, response.clone());
+  return response;
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== STATIC_CACHE).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter(shouldDeleteCache).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+    return;
+  }
+  if (event.data?.type === "GET_VERSION") {
+    event.source?.postMessage({ type: "OROACTIVE_SW_VERSION", buildId: BUILD_ID, cacheName: CACHE_NAME });
+  }
+});
+
 self.addEventListener("fetch", (event) => {
-  const requestUrl = new URL(event.request.url);
+  const request = event.request;
+  if (request.method !== "GET") return;
 
-  if (event.request.method !== "GET" || isSensitiveRequest(requestUrl)) {
-    event.respondWith(fetch(event.request, { cache: "no-store" }));
+  const url = new URL(request.url);
+  if (!isSameOrigin(url)) return;
+
+  if (request.mode === "navigate" || shouldNeverCache(url)) {
+    event.respondWith(fetchNoStore(request));
     return;
   }
 
-  if (event.request.mode === "navigate") {
-    event.respondWith(networkFirst(event.request));
+  if (HASHED_ASSET_PATTERN.test(url.pathname)) {
+    event.respondWith(cacheFirstHashedAsset(request));
     return;
   }
 
-  if (isStaticAsset(requestUrl)) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-        const clone = response.clone();
-        if (response.ok) caches.open(STATIC_CACHE).then((cache) => cache.put(event.request, clone));
-        return response;
-      }))
-    );
-    return;
-  }
-
-  event.respondWith(fetch(event.request));
+  event.respondWith(fetchNoStore(request));
 });

@@ -51,6 +51,20 @@ const runtimeStatus = {
   databaseError: "",
   startedAt: new Date().toISOString()
 };
+const buildTime = process.env.BUILD_TIME || process.env.GITHUB_BUILD_TIME || new Date().toISOString();
+const buildCommit = process.env.GITHUB_SHA || process.env.COOLIFY_GIT_COMMIT || process.env.COMMIT_SHA || process.env.SOURCE_COMMIT || "unknown";
+const buildNumber = process.env.GITHUB_RUN_NUMBER || process.env.COOLIFY_DEPLOYMENT_ID || process.env.BUILD_NUMBER || process.env.npm_package_version || "local";
+const buildBranch = process.env.GITHUB_REF_NAME || process.env.COOLIFY_GIT_BRANCH || process.env.BRANCH || "main";
+const buildInfo = {
+  ok: true,
+  app: "OroActive",
+  commit: buildCommit,
+  shortCommit: buildCommit !== "unknown" ? buildCommit.slice(0, 12) : "unknown",
+  buildNumber,
+  buildTime,
+  branch: buildBranch,
+  environment: process.env.NODE_ENV || "development"
+};
 const missingJwtSecretMessage = "JWT_SECRET obbligatorio: configura una chiave lunga e casuale nelle variabili ambiente.";
 const jwtSecret = process.env.JWT_SECRET || (isProduction
   ? crypto.createHash("sha256").update(`oroactive:${process.env.DATABASE_URL || "database"}:${process.env.ADMIN_USERNAME || "Elite"}`).digest("hex")
@@ -643,6 +657,81 @@ app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(express.json({ limit: jsonBodyLimit }));
 const apiRateBuckets = new Map();
+
+function setNoStoreHeaders(response) {
+  response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  response.setHeader("Pragma", "no-cache");
+  response.setHeader("Expires", "0");
+}
+
+function setNoCacheHeaders(response) {
+  response.setHeader("Cache-Control", "no-cache");
+  response.setHeader("Pragma", "no-cache");
+  response.setHeader("Expires", "0");
+}
+
+function isHashedStaticPath(pathname = "") {
+  return /[.-][a-f0-9]{8,}\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i.test(pathname);
+}
+
+function staticCacheHeaders(response, relativePath = "") {
+  const pathname = `/${String(relativePath || "").replace(/^\/+/, "")}`.toLowerCase();
+  if (
+    pathname === "/" ||
+    pathname === "/app" ||
+    pathname.endsWith(".html") ||
+    pathname.includes("service-worker") ||
+    pathname.endsWith("/sw.js") ||
+    pathname.includes("manifest") ||
+    pathname.endsWith("/version.json")
+  ) {
+    setNoStoreHeaders(response);
+    return;
+  }
+  if (isHashedStaticPath(pathname)) {
+    response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return;
+  }
+  if (/\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i.test(pathname)) {
+    setNoCacheHeaders(response);
+  }
+}
+
+app.use((request, response, next) => {
+  const requestPath = (request.path || "").toLowerCase();
+  if (
+    requestPath === "/" ||
+    requestPath === "/app" ||
+    requestPath === "/index.html" ||
+    requestPath.endsWith(".html") ||
+    requestPath.includes("service-worker") ||
+    requestPath.endsWith("/sw.js") ||
+    requestPath.includes("manifest") ||
+    requestPath === "/version.json"
+  ) {
+    setNoStoreHeaders(response);
+    return next();
+  }
+  if (
+    requestPath.startsWith("/api/") ||
+    requestPath.startsWith("/auth/") ||
+    requestPath.startsWith("/uploads/") ||
+    requestPath.startsWith("/documents/") ||
+    requestPath.startsWith("/pdf/") ||
+    requestPath.startsWith("/firme/") ||
+    requestPath.startsWith("/contabili/") ||
+    requestPath.startsWith("/atti/") ||
+    requestPath.startsWith("/clienti/") ||
+    requestPath.startsWith("/backups/")
+  ) {
+    setNoStoreHeaders(response);
+    return next();
+  }
+  if (/\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i.test(requestPath)) {
+    staticCacheHeaders(response, requestPath);
+  }
+  next();
+});
 
 function apiRateLimit(request, response, next) {
   if (!request.path.startsWith("/api")) return next();
@@ -6463,8 +6552,17 @@ const assistantAiSchema = {
 const GOLD_COIN_AI_CATALOG = [
   { id: "sterlina-oro-sovrana", name: "Sterlina d'oro", country: "Regno Unito", purity: "22 kt / 916,7 per mille", obverse: "ritratto sovrano britannico", reverse: "San Giorgio e drago o stemma", hints: ["sovereign", "sovrana", "san giorgio", "drago"] },
   { id: "marengo-20-lire-italia", name: "Marengo italiano 20 Lire", country: "Italia", purity: "900 per mille", obverse: "Re d'Italia", reverse: "stemma sabaudo e 20 Lire", hints: ["20 lire", "vittorio emanuele", "umberto", "regno d'italia"] },
+  { id: "marengo-20-lire-vittorio-emanuele-ii", name: "Marengo 20 Lire Vittorio Emanuele II", country: "Italia", purity: "900 per mille", obverse: "Vittorio Emanuele II Re d'Italia", reverse: "stemma sabaudo coronato con collare dell'Annunziata e L.20", hints: ["marengo", "20 lire", "vittorio emanuele ii", "vittorio emanuele", "regno d'italia", "l.20", "l 20", "1874", "stemma sabaudo", "collare annunziata", "alloro", "italia"] },
+  { id: "marengo-20-lire-vittorio-emanuele-ii-regno-sardegna", name: "Marengo 20 Lire Vittorio Emanuele II Regno di Sardegna", country: "Italia", purity: "900 per mille", obverse: "Vittorio Emanuele II Re di Sardegna", reverse: "stemma sabaudo coronato con rami e L.20", hints: ["marengo", "20 lire", "vittorio emanuele ii", "vittorio emanuele", "regno di sardegna", "rex sard", "sardegna", "savoia", "l.20", "l 20", "1852", "stemma sabaudo", "alloro", "italia"] },
+  { id: "marengo-20-lire-vittorio-emanuele-iii-aratrice", name: "Marengo 20 Lire Vittorio Emanuele III Aratrice", country: "Italia", purity: "900 per mille", obverse: "Vittorio Emanuele III", reverse: "Aratrice con aratro spighe Lire 20 e Regno d'Italia", hints: ["marengo", "20 lire", "vittorio emanuele iii", "aratrice", "regno d'italia", "regno italia", "lire 20", "1912", "aratro", "spighe", "italia"] },
+  { id: "100-lire-vittorio-emanuele-iii-fascione", name: "100 Lire Vittorio Emanuele III Fascione", country: "Italia", purity: "900 per mille", obverse: "Vittorio Emanuele III Re d'Italia", reverse: "Fascio littorio con scure Lire 100 Ottobre 1922 1923", hints: ["100 lire", "vittorio emanuele iii", "fascione", "lire 100", "ottobre 1922", "1923", "fascio", "scure", "regno d'italia", "italia"] },
+  { id: "40-lire-oro-napoleone-i", name: "40 Lire oro Napoleone I", country: "Italia", purity: "900 per mille", obverse: "Napoleone Imperatore e Re 1810 zecca Milano", reverse: "Regno d'Italia stemma e 40 Lire", hints: ["40 lire", "napoleone", "napoleone i", "imperatore e re", "1810", "milano", "regno d'italia", "regno italia", "doppio marengo", "zecca m", "italia"] },
+  { id: "marengo-20-lire-carlo-alberto", name: "Marengo 20 Lire Carlo Alberto", country: "Italia", purity: "900 per mille", obverse: "Carlo Alberto Re di Sardegna", reverse: "stemma sabaudo coronato con rami e L.20", hints: ["marengo", "20 lire", "carlo alberto", "albertus", "rex sard", "regno di sardegna", "sardegna", "savoia", "l.20", "l 20", "1835", "stemma sabaudo", "alloro", "italia"] },
+  { id: "marengo-20-lire-carlo-felice", name: "Marengo 20 Lire Carlo Felice", country: "Italia", purity: "900 per mille", obverse: "Carlo Felice Re di Sardegna", reverse: "stemma sabaudo coronato con rami e L.20", hints: ["marengo", "20 lire", "carlo felice", "car felix", "rex sar", "regno di sardegna", "sardegna", "savoia", "l.20", "l 20", "1827", "stemma sabaudo", "alloro", "italia"] },
   { id: "marengo-francese-20-franchi", name: "Marengo francese 20 Franchi", country: "Francia", purity: "900 per mille", obverse: "Napoleone, Marianne o Gallo", reverse: "20 Francs", hints: ["20 francs", "napoleon", "marianne", "gallo"] },
   { id: "napoleone-20-franchi-gallo-marianne", name: "Napoleone d'oro 20 Franchi Francesi", country: "Francia", purity: "900 per mille", obverse: "Marianne della Repubblica francese di J.C. Chaplain", reverse: "gallo gallico e 20 Francs", hints: ["napoleone d'oro", "20 francs", "marianne", "gallo", "coq", "chaplain", "liberte egalite fraternite"] },
+  { id: "marengo-20-franchi-napoleone-iii-testa-laureata", name: "Marengo 20 Franchi Napoleone III testa laureata", country: "Francia", purity: "900 per mille", obverse: "Napoleone III testa laureata NAPOLEON III EMPEREUR", reverse: "Stemma imperiale EMPIRE FRANCAIS 20 FR", hints: ["marengo", "napoleone iii", "napoleon iii", "testa laureata", "20 franchi", "20 francs", "20 fr", "empereur", "empire francais", "barre", "1865", "francia"] },
+  { id: "marengo-20-franchi-napoleone-iii-testa-nuda", name: "Marengo 20 Franchi Napoleone III testa nuda", country: "Francia", purity: "900 per mille", obverse: "Napoleone III testa nuda NAPOLEON III EMPEREUR", reverse: "Stemma imperiale EMPIRE FRANCAIS 20 FR", hints: ["marengo", "napoleone iii", "napoleon iii", "testa nuda", "senza alloro", "20 franchi", "20 francs", "20 fr", "empereur", "empire francais", "barre", "1857", "francia"] },
   { id: "marengo-svizzero-vreneli", name: "Vreneli 20 Franchi", country: "Svizzera", purity: "900 per mille", obverse: "Helvetia / Vreneli", reverse: "stemma svizzero 20 FR", hints: ["helvetia", "vreneli", "20 fr", "croce"] },
   { id: "krugerrand-1-oz", name: "Krugerrand", country: "Sud Africa", purity: "22 kt / 916,7 per mille", obverse: "Paul Kruger", reverse: "springbok", hints: ["krugerrand", "kruger", "springbok"] },
   { id: "american-eagle-1-oz", name: "American Gold Eagle", country: "Stati Uniti", purity: "22 kt / 916,7 per mille", obverse: "Liberty", reverse: "aquila", hints: ["american eagle", "liberty", "50 dollars"] },
@@ -6481,6 +6579,10 @@ const GOLD_COIN_AI_CATALOG = [
   { id: "australia-nugget-kangaroo-25-dollari", name: "Australia Nugget d'oro (Kangaroo) 25 Dollari", country: "Australia", purity: "999,9 per mille", obverse: "canguro rosso The Australian Nugget 1/4 oz 9999 Gold", reverse: "Regina Elisabetta II Australia 25 Dollars", hints: ["australia nugget", "gold kangaroo", "kangaroo 25 dollars", "25 dollars australia", "1/4 oz", "9999 gold", "red kangaroo", "perth mint", "nugget d'oro"] },
   { id: "australia-nugget-kangaroo-15-dollari", name: "Australia Nugget d'oro (Kangaroo) 15 Dollari", country: "Australia", purity: "999,9 per mille", obverse: "canguro rosso Australian Kangaroo 1/10 oz 9999 Gold", reverse: "Regina Elisabetta II Australia 15 Dollars", hints: ["australia nugget", "gold kangaroo", "kangaroo 15 dollars", "15 dollars australia", "1/10 oz", "1/10oz", "9999 gold", "red kangaroo", "perth mint", "nugget d'oro"] },
   { id: "libertad-1-oz", name: "Libertad", country: "Messico", purity: "999 per mille", obverse: "stemma messicano", reverse: "Vittoria alata", hints: ["libertad", "onza", "mexico"] },
+  { id: "cina-panda-oro-1-oz-30g", name: "Cina Panda oro 1 oz | 30 grammi", country: "Cina", purity: "999 per mille", obverse: "panda gigante 500 yuan 1oz Au .999", reverse: "Tempio del Cielo e scritte cinesi", hints: ["panda oro", "china panda", "cina panda", "panda cinese", "500 yuan", "500元", "1oz au .999", "1 oz", "30 grammi", "tempio del cielo"] },
+  { id: "cina-panda-oro-1-2-oz-15g", name: "Cina Panda oro 1/2 oz | 15 grammi", country: "Cina", purity: "999 per mille", obverse: "panda gigante 200 yuan", reverse: "Tempio del Cielo e scritte cinesi", hints: ["panda oro", "china panda", "cina panda", "panda cinese", "200 yuan", "200元", "1/2 oz", "mezza oncia", "15 grammi", "15g", "tempio del cielo"] },
+  { id: "cina-panda-oro-1-20-oz-1g", name: "Cina Panda oro 1/20 oz | 1 grammo", country: "Cina", purity: "999 per mille", obverse: "panda gigante 20 yuan", reverse: "Tempio del Cielo e scritte cinesi", hints: ["panda oro", "china panda", "cina panda", "panda cinese", "20 yuan", "20元", "1/20 oz", "un ventesimo", "1.55 grammi", "1,55 grammi", "1 grammo", "1 g", "tempio del cielo"] },
+  { id: "cina-panda-oro-1-grammo-fdc", name: "Cina Panda oro 1 grammo (Fior di Conio)", country: "Cina", purity: "999 per mille", obverse: "panda gigante 10 yuan 1g Au .999", reverse: "Tempio del Cielo 2018 e scritte cinesi", hints: ["panda oro", "china panda", "cina panda", "panda cinese", "10 yuan", "10元", "1g au .999", "1 grammo", "1 g", "fior di conio", "fdc", "tempio del cielo", "2018"] },
   { id: "panda-cinese-30g", name: "Panda cinese 30 g", country: "Cina", purity: "999 per mille", obverse: "Tempio del Cielo", reverse: "panda", hints: ["panda", "china", "500 yuan"] },
   { id: "centenario-50-pesos", name: "50 Pesos Centenario", country: "Messico", purity: "900 per mille", obverse: "Vittoria alata", reverse: "aquila messicana", hints: ["50 pesos", "centenario", "37.5"] },
   { id: "ducato-austriaco", name: "Ducato austriaco", country: "Austria", purity: "986 per mille", obverse: "Francesco Giuseppe", reverse: "aquila bicipite", hints: ["ducat", "ducato", "1915", "franz joseph"] },
@@ -6500,6 +6602,7 @@ GOLD_COIN_AI_CATALOG.push(
   { id: "10-dollari-indiano", name: "10 Dollars Indian Head", country: "Stati Uniti", purity: "900 per mille", obverse: "Liberty con copricapo indiano", reverse: "aquila americana", hints: ["10 dollars indian", "indian head", "ten dollars"] },
   { id: "10-dollari-liberty", name: "10 Dollars Liberty Head", country: "Stati Uniti", purity: "900 per mille", obverse: "Liberty Head", reverse: "aquila con scudo", hints: ["10 dollars liberty", "liberty head", "ten dollars"] },
   { id: "messico-20-pesos", name: "Messico 20 Pesos", country: "Messico", purity: "900 per mille", obverse: "calendario azteco", reverse: "aquila e serpente", hints: ["20 pesos", "mexico", "messico", "calendario azteco"] },
+  { id: "messico-10-pesos-oro", name: "Messico 10 Pesos oro", country: "Messico", purity: "900 per mille", obverse: "ritratto di Miguel Hidalgo con valore 10 Pesos", reverse: "aquila e serpente con Estados Unidos Mexicanos", hints: ["10 pesos", "mexico", "messico", "hidalgo", "miguel hidalgo", "estados unidos mexicanos", "aquila e serpente"] },
   { id: "austria-1000-scellini", name: "Austria 1000 Scellini", country: "Austria", purity: "900 per mille", obverse: "motivo commemorativo", reverse: "valore 1000 Schilling", hints: ["1000 scellini", "1000 schilling", "austria", "1976"] },
   { id: "ungheria-20-corone", name: "Ungheria 20 Corone", country: "Ungheria", purity: "900 per mille", obverse: "Francesco Giuseppe", reverse: "stemma ungherese con angeli", hints: ["20 corone", "20 korona", "ungheria", "hungary"] }
 );
@@ -21601,8 +21704,19 @@ app.get("/api/health", (_request, response) => {
     service: "oroactive-gestionale",
     database: runtimeStatus.databaseReady ? "ready" : "initializing_or_unavailable",
     database_error: runtimeStatus.databaseError || null,
-    started_at: runtimeStatus.startedAt
+    started_at: runtimeStatus.startedAt,
+    version: buildInfo
   });
+});
+
+app.get("/api/version", (_request, response) => {
+  setNoStoreHeaders(response);
+  response.json(buildInfo);
+});
+
+app.get("/version.json", (_request, response) => {
+  setNoStoreHeaders(response);
+  response.json(buildInfo);
 });
 
 app.post("/api/auth/login", async (request, response, next) => {
@@ -26113,7 +26227,7 @@ app.get("/service-worker.js", (request, response, next) => {
   next();
 });
 
-app.use(express.static(__dirname, { extensions: ["html"] }));
+app.use(express.static(__dirname, { extensions: ["html"], setHeaders: staticCacheHeaders }));
 app.get("*", (_request, response) => response.sendFile(path.join(__dirname, "index.html")));
 
 function friendlyDatabaseError(error, request) {
