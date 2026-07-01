@@ -2160,7 +2160,7 @@ function isCriticalUnsavedWorkflow() {
   );
 }
 
-function showAppUpdateBanner(message = "Nuova versione disponibile. Ricarica OroActive per completare l'aggiornamento.") {
+function showAppUpdateBanner(message = "Nuova versione disponibile. Premi Aggiorna ora per completare l'aggiornamento.") {
   if (!appUpdateBanner) return;
   if (appUpdateBannerText) appUpdateBannerText.textContent = message;
   appUpdateBanner.hidden = false;
@@ -2188,7 +2188,7 @@ function openAppVersionPreview() {
       <p><strong>Versione caricata:</strong> ${escapeHtml(formatBuildVersion(client))}</p>
       <p><strong>Versione server:</strong> ${escapeHtml(formatBuildVersion(server))}</p>
       <p>${state.updateAvailable ? "Aggiornamento disponibile." : "L'app risulta allineata."}</p>
-      <button class="primary-button" type="button" data-app-update-reload>Ricarica app</button>
+      <button class="primary-button" type="button" data-app-update-reload>Aggiorna ora</button>
     </div>
   `;
   previewBody.querySelector("[data-app-update-reload]")?.addEventListener("click", () => {
@@ -2208,13 +2208,13 @@ async function checkForAppUpdate(options = {}) {
     if (state.updateAvailable) {
       const critical = isCriticalUnsavedWorkflow();
       showAppUpdateBanner(critical
-        ? "Nuova versione pronta. Completa o salva l'operazione, poi ricarica OroActive."
-        : "Nuova versione pronta. Puoi ricaricare OroActive.");
+        ? "Nuova versione pronta. Completa o salva l'operazione, poi premi Aggiorna ora."
+        : "Nuova versione pronta. Aggiornamento automatico in corso.");
       if (autoReload && !critical) {
         window.setTimeout(() => void performAppUpdateReload(), 1200);
       }
       if (manual && isFounder()) openAppVersionPreview();
-      else if (manual) showToast("Aggiornamento pronto. Ricarica l'app quando hai salvato il lavoro.", "warning");
+      else if (manual) showToast("Aggiornamento pronto. Premi Aggiorna ora quando hai salvato il lavoro.", "warning");
       return true;
     }
     hideAppUpdateBanner();
@@ -2230,10 +2230,10 @@ async function checkForAppUpdate(options = {}) {
 }
 
 function startAppVersionChecks() {
-  void checkForAppUpdate({ manual: false });
+  void checkForAppUpdate({ manual: false, autoReload: true });
   if (state.appVersionTimer) return;
   state.appVersionTimer = window.setInterval(() => {
-    void checkForAppUpdate({ manual: false });
+    void checkForAppUpdate({ manual: false, autoReload: true });
   }, APP_VERSION_CHECK_INTERVAL_MS);
 }
 
@@ -19726,11 +19726,11 @@ async function initializeApp() {
     maybeShowInstallHint();
     window.addEventListener("focus", () => {
       if (state.authToken) syncActsFromServer();
-      if (state.authToken) void checkForAppUpdate({ manual: false });
+      if (state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
     });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && state.authToken) syncActsFromServer();
-      if (!document.hidden && state.authToken) void checkForAppUpdate({ manual: false });
+      if (!document.hidden && state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
     });
     await completeStartupSplash(sessionRestored ? "main" : "login");
   } catch (error) {

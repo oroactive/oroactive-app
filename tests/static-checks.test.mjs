@@ -2572,11 +2572,14 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(app, /fetchAppVersion/);
   assert.match(app, /\/version/);
   assert.match(app, /showAppUpdateBanner/);
+  assert.match(app, /autoReload/);
+  assert.match(app, /performAppUpdateReload/);
   assert.match(app, /isCriticalUnsavedWorkflow/);
   assert.match(app, /data-user-check-update/);
   assert.match(index, /id="appVersionPanel"/);
   assert.match(index, /data-user-check-update/);
   assert.match(index, /id="appUpdateBanner"/);
+  assert.match(index, /Aggiorna ora/);
   assert.match(styles, /\.app-update-banner/);
   assert.match(styles, /\.app-version-panel/);
   assert.match(docs, /Deploy OroActive su Coolify/);
