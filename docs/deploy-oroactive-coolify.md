@@ -18,14 +18,20 @@ La Docker image accetta questi build arg:
 - `GIT_COMMIT`
 - `BUILD_TIME`
 - `BUILD_NUMBER`
+- `SOURCE_COMMIT`
+- `SOURCE_BRANCH`
 
 In Coolify vanno valorizzati con i metadati del deploy quando disponibili. Il container li espone poi come:
 
 - `OROACTIVE_GIT_COMMIT`
 - `OROACTIVE_BUILD_TIME`
 - `OROACTIVE_BUILD_NUMBER`
+- `SOURCE_COMMIT`
+- `SOURCE_BRANCH`
 
 Gli endpoint pubblici `/api/health` e `/api/version` mostrano questi metadati senza esporre segreti.
+
+In Coolify, nelle impostazioni avanzate della risorsa, abilita `Include Source Commit in Build` se vuoi che `SOURCE_COMMIT` arrivi sempre alla Docker build. L'app usa comunque fallback automatici: `version.json` creato durante la build, lettura diretta di `.git` quando disponibile e numero build calcolato dal conteggio commit Git se `BUILD_NUMBER` non è impostato.
 
 ## Flusso deploy
 

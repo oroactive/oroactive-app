@@ -70,37 +70,96 @@ async function readOptionalJson(filePath) {
   }
 }
 
+function isUsefulBuildValue(value, options = {}) {
+  const normalized = String(value || "").trim();
+  const blocked = new Set(["", "unknown", "undefined", "null", "HEAD"]);
+  if (options.rejectLocal) blocked.add("local");
+  return !blocked.has(normalized);
+}
+
+function firstUsefulBuildValue(values = [], options = {}) {
+  return values.find((value) => isUsefulBuildValue(value, options)) || "";
+}
+
 function shortCommit(commit = "") {
   const value = String(commit || "").trim();
-  return value && value !== "unknown" ? value.slice(0, 12) : "unknown";
+  return isUsefulBuildValue(value) ? value.slice(0, 12) : "unknown";
+}
+
+async function readGitCommitFromDisk() {
+  const gitDir = path.join(__dirname, ".git");
+  try {
+    const head = String(await fs.readFile(path.join(gitDir, "HEAD"), "utf8")).trim();
+    if (!head.startsWith("ref:")) return head;
+    const ref = head.replace(/^ref:\s*/, "").trim();
+    const refPath = path.join(gitDir, ref);
+    try {
+      return String(await fs.readFile(refPath, "utf8")).trim();
+    } catch {
+      const packedRefs = String(await fs.readFile(path.join(gitDir, "packed-refs"), "utf8"));
+      const line = packedRefs.split(/\r?\n/).find((entry) => entry.endsWith(` ${ref}`));
+      return line ? line.split(" ")[0] : "";
+    }
+  } catch {
+    return "";
+  }
+}
+
+async function readGitValue(args = []) {
+  try {
+    const { stdout } = await execFileAsync("git", args, { cwd: __dirname });
+    return String(stdout || "").trim();
+  } catch {
+    return "";
+  }
 }
 
 async function getBuildMetadata() {
   const now = Date.now();
   if (buildMetadataCache && now - buildMetadataCacheAt < 30000) return buildMetadataCache;
   const fileMetadata = await readOptionalJson(versionFilePath);
-  const commit = process.env.OROACTIVE_GIT_COMMIT
-    || process.env.GIT_COMMIT
-    || process.env.GITHUB_SHA
-    || fileMetadata.commit
-    || "unknown";
-  const buildTime = process.env.OROACTIVE_BUILD_TIME
-    || process.env.BUILD_TIME
-    || fileMetadata.buildTime
-    || fileMetadata.builtAt
-    || "unknown";
-  const buildNumber = process.env.OROACTIVE_BUILD_NUMBER
-    || process.env.BUILD_NUMBER
-    || process.env.GITHUB_RUN_NUMBER
-    || fileMetadata.buildNumber
-    || "local";
+  const gitCommit = await readGitCommitFromDisk();
+  const gitBuildNumber = await readGitValue(["rev-list", "--count", "HEAD"]);
+  const gitBranch = await readGitValue(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const commit = firstUsefulBuildValue([
+    process.env.OROACTIVE_GIT_COMMIT,
+    process.env.GIT_COMMIT,
+    process.env.GITHUB_SHA,
+    process.env.SOURCE_COMMIT,
+    fileMetadata.commit,
+    gitCommit
+  ]) || "unknown";
+  const commitShort = shortCommit(commit);
+  const buildTime = firstUsefulBuildValue([
+    process.env.OROACTIVE_BUILD_TIME,
+    process.env.BUILD_TIME,
+    process.env.GITHUB_RUN_STARTED_AT,
+    fileMetadata.buildTime,
+    fileMetadata.builtAt
+  ]) || runtimeStatus.startedAt;
+  const buildNumber = firstUsefulBuildValue([
+    process.env.OROACTIVE_BUILD_NUMBER,
+    process.env.BUILD_NUMBER,
+    process.env.GITHUB_RUN_NUMBER,
+    process.env.COOLIFY_BUILD_NUMBER,
+    fileMetadata.buildNumber,
+    gitBuildNumber
+  ], { rejectLocal: true }) || (commitShort !== "unknown" ? `git-${commitShort}` : "local");
+  const branch = firstUsefulBuildValue([
+    process.env.OROACTIVE_BRANCH,
+    process.env.SOURCE_BRANCH,
+    process.env.GITHUB_REF_NAME,
+    fileMetadata.branch,
+    gitBranch
+  ]) || "main";
   buildMetadataCache = {
     app: "OroActive",
     service: "oroactive-gestionale",
     commit,
-    shortCommit: shortCommit(commit),
+    shortCommit: commitShort,
     buildTime,
     buildNumber,
+    branch,
     packageVersion: process.env.npm_package_version || fileMetadata.packageVersion || "1.0.0",
     environment: process.env.NODE_ENV || "development"
   };
