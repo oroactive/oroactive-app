@@ -1310,6 +1310,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "organ", back: "music", frontText: "4€", backText: "WIEN" }
   },
   {
+    id: "austria-4-euro-filarmonica-vienna-oro-fdc",
+    name: "Austria 4 euro Filarmonica di Vienna d'oro (FIOR DI CONIO)",
+    country: "Austria",
+    mintYears: "Fior di Conio (FDC)",
+    nominal: "4 Euro",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 1.24,
+    fineGold: 1.24,
+    diameter: 13,
+    edge: "Zigrinato",
+    obverse: "Organo a canne nella Sala d'Oro del Musikverein con legenda REPUBLIK OSTERREICH, 1/25 UNZE GOLD 999.9, anno di emissione e 4 EURO",
+    reverse: "Strumenti della Filarmonica di Vienna: corno, fagotto, quattro violini, arpa e violoncello con legenda WIENER PHILHARMONIKER",
+    history: "La moneta d'oro austriaca da 4 euro della Filarmonica di Vienna, o Wiener Philharmoniker, e la versione da un venticinquesimo d'oncia della celebre bullion austriaca. Appartiene alla serie introdotta nel 1989 e conserva il design storico con l'organo a canne della Sala d'Oro del Musikverein sul dritto e gli strumenti della Filarmonica di Vienna sul rovescio. E coniata in oro puro 999,9/1000, pesa 1,24 grammi e ha diametro di 13 mm. Questa scheda identifica l'esemplare in Fior di Conio (FDC), apprezzato per bellezza, liquidabilita e diffusione internazionale.",
+    recognitionHints: ["filarmonica di vienna", "wiener philharmoniker", "vienna philharmonic", "republik osterreich", "republik österreich", "4 euro", "1/25 unze gold", "un venticinquesimo oncia", "999.9", "organo musikverein", "sala d'oro", "arpa", "violini", "fagotto", "corno", "violoncello", "fior di conio", "fdc"],
+    visual: { front: "organ", back: "music", frontText: "4€", backText: "FDC" }
+  },
+  {
     id: "somalia-elephant-2023-1-oz",
     name: "Somalia Elephant 2023",
     country: "Somalia",
