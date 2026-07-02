@@ -1967,6 +1967,25 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
     visual: { front: "profile", back: "doubleeagle", frontText: "100K", backText: "AT" }
   }, "austria-100-corone"),
   withBilanciaDoroImages({
+    id: "austria-20-corone-oro",
+    name: "Austria 20 Corone d'oro",
+    country: "Austria",
+    mintYears: "1892-1912 / riconio 1915",
+    nominal: "20 Corone",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.77,
+    fineGold: 6.093,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Imperatore Francesco Giuseppe I con legenda FRANC IOS I D G IMP AVSTR REX BOH GAL ILL ETC ET AP REX HVNG",
+    reverse: "Aquila bicipite austro-ungarica con legenda XX CORONAE MDCCCCXV, valore 20 COR e data 1915",
+    history: "Il 20 Corone d'oro austriaco e un riconio ufficiale della moneta usata durante l'Impero Austro-Ungarico ed emessa dalla Zecca Viennese. Sul dritto raffigura l'imperatore Francesco Giuseppe I, mentre il rovescio mostra l'aquila a due teste dell'impero. Fu coniato dal 1892 al 1912 e si distingue in tre tipologie: testa laureata dal 1892 al 1906, commemorativa del 60 anniversario del regno austro-ungarico nel 1908 con scritta Coronae, e testa grande dal 1909 al 1915. Il 20 Corone e il 10 Corone hanno le stesse raffigurazioni e anni, ma peso diverso. E ricercato sia per il contenuto d'oro sia per il valore storico.",
+    recognitionHints: ["20 corone", "20 corona", "20 cor", "xx coronae", "mdccccxv", "austria", "francesco giuseppe", "franz joseph", "franc ios i", "rex boh", "rex hvng", "1915", "aquila bicipite", "impero austro-ungarico", "zecca viennese"],
+    visual: { front: "profile", back: "doubleeagle", frontText: "20K", backText: "AT" }
+  }, "austria-20-corone-oro", "Archivio OroActive"),
+  withBilanciaDoroImages({
     id: "4-ducati-austriaci",
     name: "Austria 4 Ducati d'oro (Francesco Giuseppe)",
     country: "Austria",
