@@ -1986,6 +1986,25 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
     visual: { front: "profile", back: "doubleeagle", frontText: "20K", backText: "AT" }
   }, "austria-20-corone-oro", "Archivio OroActive"),
   withBilanciaDoroImages({
+    id: "austria-10-corone-oro",
+    name: "Austria 10 Corone d'oro",
+    country: "Austria",
+    mintYears: "1892-1912 / riconio",
+    nominal: "10 Corone",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 3.38,
+    fineGold: 3.042,
+    diameter: 19,
+    edge: "Zigrinato",
+    obverse: "Imperatore Francesco Giuseppe I con legenda FRANC IOS I D G IMP AVSTR REX BOH GAL ILL ETC ET AP REX HVNG",
+    reverse: "Aquila bicipite austro-ungarica con legenda X CORONAE MDCCCCXII, valore 10 COR e data 1912",
+    history: "Il 10 Corone d'oro, chiamato anche mezzo marengo, e un riconio ufficiale della moneta usata durante l'Impero Austro-Ungarico ed emessa dalla Zecca Viennese. Sul dritto raffigura l'imperatore Francesco Giuseppe I e sul rovescio l'aquila a due teste dell'impero. Fu coniato dal 1892 al 1912 e presenta le stesse tre tipologie della 20 Corone: testa laureata dal 1892 al 1906, commemorativa del 60 anniversario del regno austro-ungarico nel 1908 con scritta Coronae, e testa grande dal 1909 al 1912. Condivide raffigurazioni e anni della 20 Corone, ma ha peso inferiore. E ricercato sia per il contenuto d'oro sia per il valore storico.",
+    recognitionHints: ["10 corone", "10 corona", "10 cor", "x coronae", "mdccccxii", "austria", "mezzo marengo", "francesco giuseppe", "franz joseph", "franc ios i", "rex boh", "rex hvng", "1912", "aquila bicipite", "impero austro-ungarico", "zecca viennese"],
+    visual: { front: "profile", back: "doubleeagle", frontText: "10K", backText: "AT" }
+  }, "austria-10-corone-oro", "Archivio OroActive"),
+  withBilanciaDoroImages({
     id: "4-ducati-austriaci",
     name: "Austria 4 Ducati d'oro (Francesco Giuseppe)",
     country: "Austria",
