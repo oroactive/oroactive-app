@@ -1196,6 +1196,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "organ", back: "music", frontText: "50€", backText: "WIEN" }
   },
   {
+    id: "austria-50-euro-filarmonica-vienna-oro-fdc",
+    name: "Austria 50 euro Filarmonica di Vienna d'oro (FIOR DI CONIO)",
+    country: "Austria",
+    mintYears: "Fior di Conio (FDC)",
+    nominal: "50 Euro",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 15.55,
+    fineGold: 15.55,
+    diameter: 28,
+    edge: "Zigrinato",
+    obverse: "Organo a canne nella Sala d'Oro del Musikverein con legenda REPUBLIK OSTERREICH, 1/2 UNZE GOLD 999.9, anno di emissione e 50 EURO",
+    reverse: "Strumenti della Filarmonica di Vienna: corno, fagotto, quattro violini, arpa e violoncello con legenda WIENER PHILHARMONIKER",
+    history: "La moneta d'oro austriaca da 50 euro della Filarmonica di Vienna, o Wiener Philharmoniker, e la versione da mezza oncia della celebre bullion austriaca. Appartiene alla serie introdotta nel 1989 e conserva il design storico con l'organo a canne della Sala d'Oro del Musikverein sul dritto e gli strumenti della Filarmonica di Vienna sul rovescio. E coniata in oro puro 999,9/1000, pesa 15,55 grammi e ha diametro di 28 mm. Questa scheda identifica l'esemplare in Fior di Conio (FDC), apprezzato per bellezza, liquidabilita e diffusione internazionale.",
+    recognitionHints: ["filarmonica di vienna", "wiener philharmoniker", "vienna philharmonic", "republik osterreich", "republik österreich", "50 euro", "1/2 unze gold", "mezza oncia", "999.9", "organo musikverein", "sala d'oro", "arpa", "violini", "fagotto", "corno", "violoncello", "fior di conio", "fdc"],
+    visual: { front: "organ", back: "music", frontText: "50€", backText: "FDC" }
+  },
+  {
     id: "austria-25-euro-filarmonica-vienna-oro",
     name: "Austria 25 euro Filarmonica di Vienna d'oro",
     country: "Austria",
