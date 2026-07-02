@@ -1158,6 +1158,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "organ", back: "music", frontText: "100€", backText: "WIEN" }
   },
   {
+    id: "austria-100-euro-filarmonica-vienna-oro-fdc",
+    name: "Austria 100 euro Filarmonica di Vienna d'oro (FIOR DI CONIO)",
+    country: "Austria",
+    mintYears: "Anno corrente",
+    nominal: "100 Euro",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.1,
+    fineGold: 31.1,
+    diameter: 38,
+    edge: "Zigrinato",
+    obverse: "Organo a canne nella Sala d'Oro del Musikverein con legenda REPUBLIK OSTERREICH, 1 UNZE GOLD 999.9, anno di emissione e 100 EURO",
+    reverse: "Strumenti della Filarmonica di Vienna: corno, fagotto, quattro violini, arpa e violoncello con legenda WIENER PHILHARMONIKER",
+    history: "La moneta d'oro austriaca da 100 euro della Filarmonica di Vienna, o Wiener Philharmoniker, e una delle bullion d'oro piu apprezzate al mondo. Emessa per la prima volta nel 1989, ritrae l'organo a canne della Sala d'Oro del Musikverein e gli strumenti della Filarmonica di Vienna. Dal 2002 e stata la prima moneta d'investimento del suo genere con valore nominale in euro, mentre in precedenza era coniata in scellini. E realizzata in oro puro 999,9/1000, mantiene lo stesso design dal 1989 ed e nota per elevata liquidabilita e forte diffusione internazionale. Questa scheda identifica l'esemplare in Fior di Conio con periodo/stato Anno corrente.",
+    recognitionHints: ["filarmonica di vienna", "wiener philharmoniker", "vienna philharmonic", "republik osterreich", "republik österreich", "100 euro", "1 unze gold", "999.9", "organo musikverein", "sala d'oro", "arpa", "violini", "fagotto", "corno", "violoncello", "fior di conio", "fdc", "anno corrente"],
+    visual: { front: "organ", back: "music", frontText: "100€", backText: "FDC" }
+  },
+  {
     id: "austria-50-euro-filarmonica-vienna-oro",
     name: "Austria 50 euro Filarmonica di Vienna d'oro",
     country: "Austria",
