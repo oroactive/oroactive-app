@@ -52,7 +52,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260703-britannia-photos-1"/);
+  assert.match(sw, /const BUILD_ID = "20260703-maple-leaf-canada-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -77,8 +77,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /app\.js\?v=20260703-britannia-photos-1/);
-  assert.match(index, /styles\.css\?v=20260703-britannia-photos-1/);
+  assert.match(index, /app\.js\?v=20260703-maple-leaf-canada-1/);
+  assert.match(index, /styles\.css\?v=20260703-maple-leaf-canada-1/);
   assert.match(version, /"ok": true/);
 });
 
@@ -117,7 +117,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /openMainMenuCleanly\(\{ keepSplash: true \}\)/);
   assert.match(app, /await restoreSession\(\{ keepSplash: true \}\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -479,6 +479,18 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /Canada Foglia d'Acero d'oro 20 Dollari/);
   assert.match(app, /grossWeight: 15\.55/);
   assert.match(app, /diameter: 25/);
+  assert.match(app, /canada-maple-leaf-50-dollari/);
+  assert.match(app, /Canada Foglia d'Acero d'oro 50 Dollari/);
+  assert.match(app, /id: "canada-maple-leaf-50-dollari"[\s\S]*grossWeight: 31\.1,[\s\S]*diameter: 30/);
+  assert.match(app, /canada-maple-leaf-10-dollari/);
+  assert.match(app, /Canada Foglia d'Acero d'oro 10 Dollari/);
+  assert.match(app, /id: "canada-maple-leaf-10-dollari"[\s\S]*grossWeight: 7\.77,[\s\S]*diameter: 20/);
+  assert.match(app, /canada-maple-leaf-5-dollari/);
+  assert.match(app, /Canada Foglia d'Acero d'oro 5 Dollari/);
+  assert.match(app, /id: "canada-maple-leaf-5-dollari"[\s\S]*grossWeight: 3\.11,[\s\S]*diameter: 16/);
+  assert.match(app, /canada-maple-leaf-1-dollaro/);
+  assert.match(app, /Canada Foglia d'Acero d'oro 1 Dollaro/);
+  assert.match(app, /id: "canada-maple-leaf-1-dollaro"[\s\S]*grossWeight: 1\.55,[\s\S]*diameter: 13\.92/);
   assert.match(app, /filarmonica-vienna-2026-1-oz/);
   assert.match(app, /Filarmonica di Vienna 2026/);
   assert.match(app, /austria-100-euro-filarmonica-vienna-oro/);
@@ -617,6 +629,11 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /Marengo 20 Franchi Albert \(Belgio\)/);
   assert.match(app, /ALBERT ROI DES BELGES/);
   assert.match(app, /grossWeight: 6\.45/);
+  assert.match(app, /marengo-20-franchi-leopold-belgio/);
+  assert.match(app, /Marengo 20 Franchi Leopold \(Belgio\)/);
+  assert.match(app, /LEOPOLD II ROI DES BELGES/);
+  assert.match(app, /L'UNION FAIT LA FORCE/);
+  assert.match(app, /id: "marengo-20-franchi-leopold-belgio"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
   assert.match(app, /4-ducati-austriaci/);
   assert.match(app, /Austria 4 Ducati d'oro \(Francesco Giuseppe\)/);
   assert.match(app, /Cecco Beppe/);
@@ -693,6 +710,14 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /arca-noe-armenia-2025-1-oz/);
   assert.match(server, /canada-maple-leaf-20-dollari/);
   assert.match(server, /maple leaf 20 dollars/);
+  assert.match(server, /canada-maple-leaf-50-dollari/);
+  assert.match(server, /maple leaf 50 dollars/);
+  assert.match(server, /canada-maple-leaf-10-dollari/);
+  assert.match(server, /maple leaf 10 dollars/);
+  assert.match(server, /canada-maple-leaf-5-dollari/);
+  assert.match(server, /maple leaf 5 dollars/);
+  assert.match(server, /canada-maple-leaf-1-dollaro/);
+  assert.match(server, /maple leaf 1 dollar/);
   assert.match(server, /Austria 1 Ducato d'oro \(Francesco Giuseppe\)/);
   assert.match(server, /FRANC IOS I D G AUSTRIAE IMPERATOR/);
   assert.match(server, /HUNGAR BOHEM GAL LOD ILL REX A A 1915/);
@@ -746,6 +771,10 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /sterlina-vecchio-conio/);
   assert.match(server, /Marengo 20 Franchi Albert \(Belgio\)/);
   assert.match(server, /albert roi/);
+  assert.match(server, /marengo-20-franchi-leopold-belgio/);
+  assert.match(server, /Marengo 20 Franchi Leopold \(Belgio\)/);
+  assert.match(server, /roi des belges/);
+  assert.match(server, /union fait la force/);
   assert.match(server, /Austria 4 Ducati d'oro \(Francesco Giuseppe\)/);
   assert.match(server, /cecco beppe/);
   assert.match(server, /const goldCoinIdentificationSchema/);
@@ -820,6 +849,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/britannia-100-sterline-fdc-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-belga-20-franchi-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-belga-20-franchi-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-leopold-belgio-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-leopold-belgio-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/ducato-austriaco-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/ducato-austriaco-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/austria-20-corone-oro-front.png", root)),
@@ -836,6 +867,14 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/maple-leaf-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-20-dollari-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-20-dollari-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-50-dollari-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-50-dollari-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-10-dollari-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-10-dollari-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-5-dollari-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-5-dollari-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-1-dollaro-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-1-dollaro-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/kangaroo-nugget-1-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/kangaroo-nugget-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/australia-nugget-kangaroo-100-dollari-front.png", root)),
@@ -2107,7 +2146,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -2166,7 +2205,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -2218,7 +2257,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -2288,9 +2327,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260703-britannia-photos-1/);
-  assert.match(index, /styles\.css\?v=20260703-britannia-photos-1/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(index, /app\.js\?v=20260703-maple-leaf-canada-1/);
+  assert.match(index, /styles\.css\?v=20260703-maple-leaf-canada-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -2336,8 +2375,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260703-britannia-photos-1/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(index, /styles\.css\?v=20260703-maple-leaf-canada-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -2445,7 +2484,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -2549,7 +2588,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -2600,9 +2639,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260703-britannia-photos-1/);
-  assert.match(index, /styles\.css\?v=20260703-britannia-photos-1/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(index, /app\.js\?v=20260703-maple-leaf-canada-1/);
+  assert.match(index, /styles\.css\?v=20260703-maple-leaf-canada-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -2659,9 +2698,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260703-britannia-photos-1/);
-  assert.match(index, /styles\.css\?v=20260703-britannia-photos-1/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(index, /app\.js\?v=20260703-maple-leaf-canada-1/);
+  assert.match(index, /styles\.css\?v=20260703-maple-leaf-canada-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -2739,7 +2778,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -2856,7 +2895,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -2900,7 +2939,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260703-britannia-photos-1/);
+  assert.match(worker, /20260703-maple-leaf-canada-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
