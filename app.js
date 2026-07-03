@@ -1889,6 +1889,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "somalia-elephant-2023-1-oz": "somalia-elephant-2023-1-oz",
   "arca-noe-armenia-2025-1-oz": "arca-noe-armenia-2025-1-oz",
   "britannia-1-oz": "britannia-1-oz",
+  "britannia-100-sterline-fdc": "britannia-100-sterline-fdc",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -1953,6 +1954,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "austria-4-euro-filarmonica-vienna-oro-fdc": "Archivio OroActive",
   "somalia-elephant-2023-1-oz": "Archivio OroActive",
   "arca-noe-armenia-2025-1-oz": "Archivio OroActive",
+  "britannia-100-sterline-fdc": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
