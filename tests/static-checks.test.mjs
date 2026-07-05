@@ -52,7 +52,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260705-messico-libertad-oro-1-2-oz-1"/);
+  assert.match(sw, /const BUILD_ID = "20260705-messico-libertad-oro-1-4-oz-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -77,8 +77,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /app\.js\?v=20260705-messico-libertad-oro-1-2-oz-1/);
-  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(index, /app\.js\?v=20260705-messico-libertad-oro-1-4-oz-1/);
+  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-4-oz-1/);
   assert.match(version, /"ok": true/);
 });
 
@@ -117,7 +117,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /openMainMenuCleanly\(\{ keepSplash: true \}\)/);
   assert.match(app, /await restoreSession\(\{ keepSplash: true \}\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -587,6 +587,10 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /Messico Libertad oro 1\/2 oz/);
   assert.match(app, /id: "messico-libertad-oro-1-2-oz"[\s\S]*grossWeight: 15\.58,[\s\S]*fineGold: 15\.564,[\s\S]*diameter: 29/);
   assert.match(app, /1\/2 Onza Oro Puro Ley \.999/);
+  assert.match(app, /messico-libertad-oro-1-4-oz/);
+  assert.match(app, /Messico Libertad oro 1\/4 oz/);
+  assert.match(app, /id: "messico-libertad-oro-1-4-oz"[\s\S]*grossWeight: 7\.78,[\s\S]*fineGold: 7\.772,[\s\S]*diameter: 23/);
+  assert.match(app, /1\/4 Onza Oro Puro Ley \.999/);
   assert.match(app, /cina-panda-oro-1-oz-30g/);
   assert.match(app, /Cina Panda oro 1 oz \| 30 grammi/);
   assert.match(app, /grossWeight: 31\.11/);
@@ -713,6 +717,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /ley \.999/i);
   assert.match(server, /messico-libertad-oro-1-2-oz/);
   assert.match(server, /Messico Libertad oro 1\/2 oz/);
+  assert.match(server, /messico-libertad-oro-1-4-oz/);
+  assert.match(server, /Messico Libertad oro 1\/4 oz/);
   assert.match(app, /Foto fronte\/retro estratte da/);
   assert.match(app, /function renderCoinEncyclopedia/);
   assert.match(app, /function groupedCoinsByCountry/);
@@ -1009,6 +1015,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/libertad-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-libertad-oro-1-2-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-libertad-oro-1-2-oz-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/messico-libertad-oro-1-4-oz-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/messico-libertad-oro-1-4-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-2-5-pesos-oro-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-2-5-pesos-oro-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-2-pesos-oro-front.png", root)),
@@ -2264,7 +2272,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -2323,7 +2331,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -2375,7 +2383,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -2445,9 +2453,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260705-messico-libertad-oro-1-2-oz-1/);
-  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-2-oz-1/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(index, /app\.js\?v=20260705-messico-libertad-oro-1-4-oz-1/);
+  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-4-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -2493,8 +2501,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-2-oz-1/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-4-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -2602,7 +2610,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -2706,7 +2714,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -2757,9 +2765,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260705-messico-libertad-oro-1-2-oz-1/);
-  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-2-oz-1/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(index, /app\.js\?v=20260705-messico-libertad-oro-1-4-oz-1/);
+  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-4-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -2816,9 +2824,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260705-messico-libertad-oro-1-2-oz-1/);
-  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-2-oz-1/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(index, /app\.js\?v=20260705-messico-libertad-oro-1-4-oz-1/);
+  assert.match(index, /styles\.css\?v=20260705-messico-libertad-oro-1-4-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -2896,7 +2904,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -3013,7 +3021,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -3057,7 +3065,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260705-messico-libertad-oro-1-2-oz-1/);
+  assert.match(worker, /20260705-messico-libertad-oro-1-4-oz-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
