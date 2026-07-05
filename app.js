@@ -2148,6 +2148,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "centenario-50-pesos": "centenario-50-pesos",
   "chile-50-pesos-oro": "chile-50-pesos-oro",
   "messico-10-pesos-oro": "messico-10-pesos-oro",
+  "messico-2-5-pesos-oro": "messico-2-5-pesos-oro",
   "ducato-austriaco": "ducato-austriaco",
   "20-dollari-double-eagle": "20-dollari-saint-gaudens",
   "20-mark-germania": "20-mark-germania"
@@ -2190,6 +2191,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "panda-cinese-30g": "Archivio OroActive",
   "chile-50-pesos-oro": "Archivio OroActive",
   "messico-10-pesos-oro": "Archivio OroActive",
+  "messico-2-5-pesos-oro": "Archivio OroActive",
   "marengo-20-franchi-napoleone-iii-testa-laureata": "Archivio OroActive",
   "100-franchi-napoleone-iii-francia": "Archivio OroActive",
   "5-franchi-napoleone-iii-francia": "Archivio OroActive",
@@ -2519,6 +2521,25 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
     recognitionHints: ["10 pesos", "messico", "mexico", "miguel hidalgo", "hidalgo", "estados unidos mexicanos", "aquila e serpente"],
     visual: { front: "portrait", back: "eagle", frontText: "10P", backText: "MX" }
   }, "messico-10-pesos-oro"),
+  withBilanciaDoroImages({
+    id: "messico-2-5-pesos-oro",
+    name: "Messico 2,5 Pesos oro",
+    country: "Messico",
+    mintYears: "1921-1947",
+    nominal: "2,5 Pesos",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 2.08,
+    fineGold: 1.872,
+    diameter: 15.5,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Miguel Hidalgo con valore Dos y Medio Pesos e anno",
+    reverse: "Stemma nazionale messicano con aquila e serpente e legenda Estados Unidos Mexicanos",
+    history: "Queste monete sono state coniate dal governo messicano tra il 1921 e il 1947. Prima dell'avvento del Krugerrand oro nel 1967, il Pesos messicano era certamente tra le monete in oro da investimento piu diffuse al mondo. Per il Messico i Pesos messicani sono monete d'oro che hanno un immenso valore storico e sentimentale, perche hanno iniziato a circolare oltre 100 anni fa dopo la liberazione del Messico. Il taglio da 2,5 Pesos pesa 2,08 grammi, ha titolo 900/1000 e diametro di 15,5 millimetri.",
+    recognitionHints: ["2,5 pesos", "2.5 pesos", "dos y medio pesos", "messico", "mexico", "miguel hidalgo", "hidalgo", "estados unidos mexicanos", "aquila e serpente", "1945"],
+    visual: { front: "portrait", back: "eagle", frontText: "2.5P", backText: "MX" }
+  }, "messico-2-5-pesos-oro", "Archivio OroActive"),
   withBilanciaDoroImages({
     id: "austria-1000-scellini",
     name: "Austria 1000 Scellini",
