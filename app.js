@@ -3792,6 +3792,10 @@ function apiErrorFallback(path = "", status = 0) {
   return "Operazione non completata. Riprova tra qualche secondo.";
 }
 
+function isLoginRequestPath(path = "") {
+  return path === "/auth/login" || path === "/login";
+}
+
 function sanitizeForSave(value) {
   if (value === undefined) return null;
   if (value === null) return null;
@@ -3818,7 +3822,7 @@ async function apiRequest(path, options = {}) {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        if (response.status === 401 && !path.startsWith("/auth/login")) {
+        if (response.status === 401 && !isLoginRequestPath(path)) {
           showLogin();
         }
         const error = new Error(cleanUserMessage(body.error, apiErrorFallback(path, response.status)));
@@ -5430,6 +5434,7 @@ async function handleLogin(event) {
   }
   if (faceIdLoginButton) faceIdLoginButton.disabled = true;
   showLoading("Accesso in corso...");
+  let authAccepted = false;
   try {
     const body = JSON.stringify({ username, password });
     let data;
@@ -5442,11 +5447,24 @@ async function handleLogin(event) {
         throw error;
       }
     }
+    if (!data?.user || !data?.token) {
+      throw new Error("Accesso non completato: risposta del server non valida.");
+    }
     state.currentUser = data.user;
     await saveStoredAuthToken(data.token);
-    loginForm.reset();
+    authAccepted = true;
     await startAuthenticatedApp();
+    loginForm.reset();
   } catch (error) {
+    if (authAccepted) {
+      reportFrontendFailure("login authenticated startup", error);
+      await clearStoredAuthToken();
+      state.currentUser = null;
+      loginScreen.hidden = false;
+      appShell.hidden = true;
+      mainMenuScreen.hidden = true;
+      updateAurumMascotVisibility();
+    }
     loginMessage.textContent = error.status === 401
       ? "Credenziali non valide"
       : error.isConnectionError
