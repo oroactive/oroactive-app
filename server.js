@@ -932,6 +932,26 @@ function roleSeesAllStores(role) {
   return ["founder", "supervisore"].includes(normalizeRole(role));
 }
 
+function permissionsForRole(role) {
+  const normalized = normalizeRole(role);
+  if (normalized === "founder") {
+    return {
+      accessLevel: "full",
+      menu: "founder",
+      canViewAllStores: true,
+      canManageUsers: true,
+      canUseFounderTools: true
+    };
+  }
+  return {
+    accessLevel: normalized === "commesso" || normalized === "aiuto_commesso" ? "minimum" : "role",
+    menu: normalized,
+    canViewAllStores: roleSeesAllStores(normalized),
+    canManageUsers: ["supervisore", "responsabile"].includes(normalized),
+    canUseFounderTools: false
+  };
+}
+
 function canManageAccess(user) {
   return ["founder", "supervisore", "responsabile"].includes(normalizeRole(user?.ruolo));
 }
@@ -21764,7 +21784,15 @@ async function loginUser(identifier, password, req = null) {
     afterData: safeUser,
     metadata: { login_method: "password" }
   });
-  return { token: signUserToken(safeUser), user: safeUser };
+  const token = signUserToken(safeUser);
+  return {
+    ok: true,
+    token,
+    session: token,
+    user: safeUser,
+    role: safeUser.ruolo,
+    permissions: permissionsForRole(safeUser.ruolo)
+  };
 }
 
 async function registerFaceId(user, credentialId) {
@@ -21819,7 +21847,15 @@ async function loginWithFaceId(identifier, credentialId, req = null) {
     afterData: safeUser,
     metadata: { login_method: "face_id" }
   });
-  return { token: signUserToken(safeUser), user: safeUser };
+  const token = signUserToken(safeUser);
+  return {
+    ok: true,
+    token,
+    session: token,
+    user: safeUser,
+    role: safeUser.ruolo,
+    permissions: permissionsForRole(safeUser.ruolo)
+  };
 }
 
 async function userFromAuthorizationHeader(header = "") {
@@ -21948,7 +21984,13 @@ app.post("/api/auth/logout", async (request, response) => {
 });
 
 app.get("/api/auth/me", authenticate, (request, response) => {
-  response.json({ user: publicUser(request.user) });
+  const user = publicUser(request.user);
+  response.json({
+    ok: true,
+    user,
+    role: user.ruolo,
+    permissions: permissionsForRole(user.ruolo)
+  });
 });
 
 app.use("/api", authenticate);

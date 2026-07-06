@@ -3664,6 +3664,7 @@ function showStartupSplash() {
   state.splashStartedAt = performance.now();
   state.splashReady = false;
   state.splashError = null;
+  splashScreen.hidden = false;
   splashScreen.classList.remove("hidden", "is-exiting", "is-error");
   splashScreen.classList.toggle("is-brief", hasSeenStartupSplashThisSession());
   if (splashError) splashError.hidden = true;
@@ -3679,6 +3680,7 @@ async function hideStartupSplash() {
   splashScreen.classList.add("is-exiting");
   await wait(OROACTIVE_SPLASH_EXIT_MS);
   splashScreen.classList.add("hidden");
+  splashScreen.hidden = true;
   splashScreen.classList.remove("is-exiting", "is-error", "is-brief");
   document.body.classList.remove("splash-active");
   markStartupSplashSeen();
@@ -3693,12 +3695,14 @@ async function completeStartupSplash(targetView) {
     maybeStartFirstRunTutorial();
   }
   await hideStartupSplash();
+  if (targetView === "main") schedulePostLoginMenuGuard("session");
 }
 
 function showStartupSplashError(error) {
-  console.error("OroActive startup error", error);
+  reportFrontendFailure("startup", error);
   state.splashError = error;
   if (!splashScreen) return;
+  splashScreen.hidden = false;
   splashScreen.classList.remove("hidden", "is-exiting");
   splashScreen.classList.add("is-error");
   document.body.classList.add("splash-active");
@@ -3706,8 +3710,14 @@ function showStartupSplashError(error) {
   if (splashError) splashError.hidden = false;
 }
 
-function reportFrontendFailure(area, error) {
-  console.error(`OroActive ${area} error`, error);
+function reportFrontendFailure(area, error, context = {}) {
+  console.error("[OroActive Error]", {
+    fase: area,
+    messaggio: error?.message || String(error || "Errore non specificato"),
+    stack: error?.stack || "",
+    userRole: context.userRole || state.currentUser?.ruolo || "",
+    error
+  });
 }
 
 async function runSafeStartupTask(area, task) {
@@ -3817,6 +3827,7 @@ async function apiRequest(path, options = {}) {
     try {
       const response = await fetch(`${apiBase}${path}`, {
         headers,
+        cache: "no-store",
         ...options,
         signal: options.signal || controller.signal
       });
@@ -4143,8 +4154,11 @@ function showLogin(options = {}) {
   if (notificationCenter) notificationCenter.hidden = true;
   loginScreen.hidden = false;
   if (!keepSplash) {
+    splashScreen.hidden = true;
     splashScreen.classList.add("hidden");
     document.body.classList.remove("splash-active");
+  } else {
+    splashScreen.hidden = false;
   }
   mainMenuScreen.hidden = true;
   document.body.classList.remove("main-menu-active");
@@ -4165,13 +4179,15 @@ function showAuthenticatedShell(options = {}) {
   loginScreen.hidden = true;
   appShell.hidden = true;
   if (keepSplash) {
+    splashScreen.hidden = false;
     splashScreen.classList.remove("hidden");
   } else {
+    splashScreen.hidden = true;
     splashScreen.classList.add("hidden");
     document.body.classList.remove("splash-active");
   }
   mainMenuScreen.hidden = true;
-  document.body.classList.remove("main-menu-active");
+  document.body.classList.remove("main-menu-active", "login-active", "loading-active");
   syncNotificationPlacement();
 }
 
@@ -4195,6 +4211,44 @@ function roleLabel(role) {
     commesso: "Commesso/a",
     aiuto_commesso: "Aiuto Commesso/a"
   }[normalizeRole(role)];
+}
+
+function fallbackPermissionsForRole(role) {
+  const normalized = normalizeRole(role);
+  if (normalized === "founder") {
+    return {
+      accessLevel: "full",
+      menu: "founder",
+      canViewAllStores: true,
+      canManageUsers: true,
+      canUseFounderTools: true
+    };
+  }
+  return {
+    accessLevel: normalized === "commesso" || normalized === "aiuto_commesso" ? "minimum" : "role",
+    menu: normalized,
+    canViewAllStores: ["supervisore"].includes(normalized),
+    canManageUsers: ["responsabile", "supervisore"].includes(normalized),
+    canUseFounderTools: false
+  };
+}
+
+function normalizeAuthenticatedUserPayload(data = {}, phase = "login") {
+  const user = { ...(data.user || {}) };
+  user.ruolo = normalizeRole(user.ruolo || data.role || data.role_code || "commesso");
+  const hasPermissions = Boolean(data.permissions || user.permissions);
+  user.permissions = data.permissions || user.permissions || fallbackPermissionsForRole(user.ruolo);
+  if (!hasPermissions) {
+    console.warn("[OroActive Auth] Permissions fallback", { phase, role: user.ruolo });
+  }
+  if (user.ruolo === "founder") {
+    user.permissions = { ...fallbackPermissionsForRole("founder"), ...(user.permissions || {}) };
+  }
+  return user;
+}
+
+function authLog(message, detail = {}) {
+  console.info(message, detail);
 }
 
 function displayUsername(user = {}) {
@@ -5343,7 +5397,10 @@ async function startAuthenticatedApp(options = {}) {
   runSafeUiTask("role permissions", applyRolePermissions);
   startMainMenuClock();
   maybeShowInstallHint();
-  if (openMainMenu && !keepSplash) showMainMenuFromSplash();
+  if (openMainMenu && !keepSplash) {
+    showMainMenuFromSplash();
+    schedulePostLoginMenuGuard("login");
+  }
   void hydrateAuthenticatedAppInBackground().catch((error) => reportFrontendFailure("authenticated background load", error));
 }
 
@@ -5407,9 +5464,12 @@ async function restoreSession(options = {}) {
   setSplashStatus("Caricamento profilo");
   try {
     const data = await apiRequest("/auth/me", { timeoutMs: SESSION_RESTORE_TIMEOUT_MS, retries: 1 });
-    state.currentUser = data.user;
+    state.currentUser = normalizeAuthenticatedUserPayload(data, "session");
+    authLog("[OroActive Auth] User loaded", { phase: "session", role: state.currentUser.ruolo });
+    authLog("[OroActive Auth] Permissions loaded", { phase: "session", role: state.currentUser.ruolo });
     setSplashStatus("Preparazione area operativa");
     await startAuthenticatedApp({ keepSplash, openMainMenu: !keepSplash });
+    schedulePostLoginMenuGuard("session");
     return true;
   } catch (error) {
     reportFrontendFailure("session profile restore", error);
@@ -5434,6 +5494,7 @@ async function handleLogin(event) {
   }
   if (faceIdLoginButton) faceIdLoginButton.disabled = true;
   showLoading("Accesso in corso...");
+  authLog("[OroActive Auth] Login submit", { username });
   let authAccepted = false;
   try {
     const body = JSON.stringify({ username, password });
@@ -5447,23 +5508,24 @@ async function handleLogin(event) {
         throw error;
       }
     }
-    if (!data?.user || !data?.token) {
+    const token = data?.token || data?.session;
+    if (!data?.user || !token) {
       throw new Error("Accesso non completato: risposta del server non valida.");
     }
-    state.currentUser = data.user;
-    await saveStoredAuthToken(data.token);
+    state.currentUser = normalizeAuthenticatedUserPayload(data, "login");
+    authLog("[OroActive Auth] Login success", { role: state.currentUser.ruolo });
+    authLog("[OroActive Auth] User loaded", { phase: "login", role: state.currentUser.ruolo });
+    authLog("[OroActive Auth] Permissions loaded", { phase: "login", role: state.currentUser.ruolo });
+    await saveStoredAuthToken(token);
     authAccepted = true;
     await startAuthenticatedApp();
+    schedulePostLoginMenuGuard("login");
     loginForm.reset();
   } catch (error) {
     if (authAccepted) {
-      reportFrontendFailure("login authenticated startup", error);
-      await clearStoredAuthToken();
-      state.currentUser = null;
-      loginScreen.hidden = false;
-      appShell.hidden = true;
-      mainMenuScreen.hidden = true;
-      updateAurumMascotVisibility();
+      reportFrontendFailure("login", error);
+      forceShowMainMenuAfterLogin({ renderMenus: false, phase: "login", error });
+      return;
     }
     loginMessage.textContent = error.status === 401
       ? "Credenziali non valide"
@@ -5576,11 +5638,19 @@ async function loginWithFaceId() {
       method: "POST",
       body: JSON.stringify({ username, credentialId })
     });
-    state.currentUser = data.user;
-    await saveStoredAuthToken(data.token);
+    const token = data?.token || data?.session;
+    if (!data?.user || !token) {
+      throw new Error("Accesso Face ID non completato: risposta del server non valida.");
+    }
+    state.currentUser = normalizeAuthenticatedUserPayload(data, "faceid");
+    authLog("[OroActive Auth] Login success", { method: "faceid", role: state.currentUser.ruolo });
+    authLog("[OroActive Auth] User loaded", { phase: "faceid", role: state.currentUser.ruolo });
+    authLog("[OroActive Auth] Permissions loaded", { phase: "faceid", role: state.currentUser.ruolo });
+    await saveStoredAuthToken(token);
     await saveDeviceStorage("oroactive-faceid-username", username);
     await saveDeviceStorage("oroactive-faceid-credential", credentialId);
     await startAuthenticatedApp();
+    schedulePostLoginMenuGuard("faceid");
   } catch (error) {
     loginMessage.textContent = error.status === 401
       ? "Credenziali non valide"
@@ -6072,6 +6142,45 @@ function setMainMenuMode(active) {
   if (mainMenuScreen) mainMenuScreen.hidden = !active;
 }
 
+function renderMainMenuRecoveryError(error, phase = "menu") {
+  const message = "Errore caricamento interfaccia OroActive. Riprova o contatta il Founder.";
+  reportFrontendFailure(phase, error || new Error(message));
+  if (mainMenuWelcome && state.currentUser) {
+    mainMenuWelcome.textContent = `Bentornato, ${displayMenuUserName(state.currentUser)}`;
+  }
+  if (mainMenuQuickActions) {
+    mainMenuQuickActions.innerHTML = `
+      <button class="main-menu-item-button main-menu-quick-button" type="button" data-auth-recovery="retry">
+        <span class="main-menu-item-icon" aria-hidden="true">OK</span>
+        <span class="main-menu-item-copy">
+          <strong>Riprova</strong>
+          <small>Ricarica menu</small>
+        </span>
+      </button>
+      <button class="main-menu-item-button main-menu-quick-button" type="button" data-auth-recovery="login">
+        <span class="main-menu-item-icon" aria-hidden="true">Login</span>
+        <span class="main-menu-item-copy">
+          <strong>Torna al login</strong>
+          <small>Nuovo accesso</small>
+        </span>
+      </button>
+    `;
+  }
+  if (mainMenuActions) {
+    mainMenuActions.innerHTML = `
+      <div class="main-menu-recovery" role="alert">
+        <strong>${escapeHtml(message)}</strong>
+        <p>${escapeHtml(error?.message || "Il menu principale non ha completato il caricamento.")}</p>
+        <div class="main-menu-recovery-actions">
+          <button type="button" data-auth-recovery="retry">Riprova</button>
+          <button type="button" data-auth-recovery="logout">Logout</button>
+          <button type="button" data-auth-recovery="login">Torna al login</button>
+        </div>
+      </div>
+    `;
+  }
+}
+
 function cleanupUiBeforeMainMenu() {
   closeBrandMenu();
   closeMainUserMenu();
@@ -6107,10 +6216,14 @@ function openMainMenuCleanly(options = {}) {
   loginScreen.hidden = true;
   if (!keepSplash) {
     splashScreen.classList.add("hidden");
+    splashScreen.hidden = true;
     document.body.classList.remove("splash-active");
+  } else {
+    splashScreen.hidden = false;
   }
   cleanupUiBeforeMainMenu();
   if (renderMenus) {
+    authLog("[OroActive UI] Rendering main menu", { role: state.currentUser?.ruolo || "" });
     runSafeUiTask("main menu render", renderRoleBasedMenus);
     renderMainMenuFallback();
   }
@@ -6118,6 +6231,57 @@ function openMainMenuCleanly(options = {}) {
   syncNotificationPlacement();
   setAurumSection("menu");
   updateAurumMascotVisibility();
+  authLog("[OroActive UI] Main menu visible", {
+    hidden: Boolean(mainMenuScreen?.hidden),
+    quickActions: mainMenuQuickActions?.querySelectorAll("button").length || 0,
+    actions: mainMenuActions?.querySelectorAll("button").length || 0
+  });
+}
+
+function forceShowMainMenuAfterLogin(options = {}) {
+  const { renderMenus = true, phase = "menu", error = null } = options;
+  console.warn("[OroActive UI] Force main menu after login", {
+    phase,
+    userRole: state.currentUser?.ruolo || "",
+    reason: error?.message || ""
+  });
+  if (loginScreen) loginScreen.hidden = true;
+  if (splashScreen) {
+    splashScreen.hidden = true;
+    splashScreen.classList.add("hidden");
+    splashScreen.classList.remove("is-exiting", "is-error", "is-brief");
+  }
+  if (appShell) appShell.hidden = true;
+  if (mainMenuScreen) {
+    mainMenuScreen.hidden = false;
+    mainMenuScreen.style.display = "block";
+    mainMenuScreen.style.visibility = "visible";
+    mainMenuScreen.style.opacity = "1";
+  }
+  document.body.classList.remove("splash-active", "login-active", "loading-active", "modal-open", "drawer-open", "section-overlay-open");
+  document.body.classList.add("main-menu-active");
+  cleanupUiBeforeMainMenu();
+  if (error) renderMainMenuRecoveryError(error, phase);
+  else if (renderMenus) {
+    runSafeUiTask("main menu render", renderRoleBasedMenus);
+    renderMainMenuFallback();
+  }
+  if (notificationCenter) notificationCenter.hidden = !state.currentUser;
+  syncNotificationPlacement();
+  setAurumSection("menu");
+  updateAurumMascotVisibility();
+}
+
+function schedulePostLoginMenuGuard(phase = "login") {
+  window.setTimeout(() => {
+    if (state.currentUser && mainMenuScreen?.hidden) {
+      console.warn("[OroActive UI] Main menu hidden after authenticated flow, forcing recovery.", {
+        phase,
+        userRole: state.currentUser?.ruolo || ""
+      });
+      forceShowMainMenuAfterLogin({ phase });
+    }
+  }, 800);
 }
 
 function prepareInternalSectionLayout() {
@@ -20335,8 +20499,27 @@ function applyMenuButtonShortcut(button) {
   if (button?.dataset?.courseTabShortcut) state.courseActiveTab = button.dataset.courseTabShortcut;
 }
 
+function handleAuthRecoveryAction(button) {
+  const action = button?.dataset?.authRecovery;
+  if (!action) return false;
+  if (action === "retry") {
+    forceShowMainMenuAfterLogin({ phase: "menu-retry" });
+    return true;
+  }
+  if (action === "logout") {
+    void handleLogout();
+    return true;
+  }
+  if (action === "login") {
+    showLogin();
+    return true;
+  }
+  return false;
+}
+
 async function openMainMenuItem(button) {
   if (!button) return;
+  if (handleAuthRecoveryAction(button)) return;
   if (button.dataset.mainMenuToggle) {
     toggleMainMenuDropdown(button.dataset.mainMenuToggle);
     return;
