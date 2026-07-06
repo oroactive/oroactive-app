@@ -110,12 +110,18 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /const OROACTIVE_SPLASH_SESSION_KEY = "oroactive_splash_seen"/);
   assert.match(app, /const OROACTIVE_SPLASH_MIN_MS = 5000/);
   assert.match(app, /const OROACTIVE_SPLASH_BRIEF_MS = 5000/);
+  assert.match(app, /const SESSION_RESTORE_TIMEOUT_MS = 10000/);
   assert.match(app, /sessionStorage\.getItem\(OROACTIVE_SPLASH_SESSION_KEY\) === "true"/);
   assert.match(app, /sessionStorage\.setItem\(OROACTIVE_SPLASH_SESSION_KEY, "true"\)/);
   assert.match(app, /function showStartupSplash/);
   assert.match(app, /async function completeStartupSplash/);
+  assert.match(app, /async function withSessionRestoreTimeout/);
   assert.match(app, /openMainMenuCleanly\(\{ keepSplash: true \}\)/);
   assert.match(app, /await restoreSession\(\{ keepSplash: true \}\)/);
+  assert.match(app, /withSessionRestoreTimeout\(loadStoredAuthToken\(\), "Lettura sessione"\)/);
+  assert.match(app, /apiRequest\("\/auth\/me", \{ timeoutMs: SESSION_RESTORE_TIMEOUT_MS, retries: 1 \}\)/);
+  assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
+  assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
   assert.match(worker, /20260705-messico-libertad-oro-1-20-oz-1/);
 });

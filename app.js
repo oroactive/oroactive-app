@@ -233,6 +233,7 @@ const OROACTIVE_SPLASH_MIN_MS = 5000;
 const OROACTIVE_SPLASH_BRIEF_MS = 5000;
 const OROACTIVE_SPLASH_READY_MS = 180;
 const OROACTIVE_SPLASH_EXIT_MS = 430;
+const SESSION_RESTORE_TIMEOUT_MS = 10000;
 const OROACTIVE_UPDATE_INTERVAL_MS = 30000;
 const AURUM_SETTINGS_KEY = "oroactive-aurum-settings";
 const AURUM_FLOATING_POSITION_KEY = "aurum_floating_position";
@@ -3719,6 +3720,25 @@ function serverConnectionError() {
   return error;
 }
 
+function sessionRestoreTimeoutError(area) {
+  const error = serverConnectionError();
+  error.message = `${area} non completata. Torno al login per sicurezza.`;
+  error.isSessionRestoreTimeout = true;
+  return error;
+}
+
+async function withSessionRestoreTimeout(promise, area = "Verifica sessione") {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(sessionRestoreTimeoutError(area)), SESSION_RESTORE_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 function cleanUserMessage(message, fallback = "Operazione non completata. Riprova tra qualche secondo.") {
   const raw = typeof message === "string" ? message.trim() : "";
   if (!raw || raw === "undefined" || raw === "null" || raw === "[object Object]") return fallback;
@@ -5345,7 +5365,15 @@ async function hydrateAuthenticatedAppInBackground() {
 
 async function restoreSession(options = {}) {
   const { keepSplash = false } = options;
-  await loadStoredAuthToken();
+  try {
+    await withSessionRestoreTimeout(loadStoredAuthToken(), "Lettura sessione");
+  } catch (error) {
+    reportFrontendFailure("session storage restore", error);
+    await clearStoredAuthToken();
+    setSplashStatus("Preparazione login");
+    showLogin({ keepSplash });
+    return false;
+  }
   if (!state.authToken) {
     setSplashStatus("Preparazione login");
     showLogin({ keepSplash });
@@ -5353,12 +5381,14 @@ async function restoreSession(options = {}) {
   }
   setSplashStatus("Caricamento profilo");
   try {
-    const data = await apiRequest("/auth/me");
+    const data = await apiRequest("/auth/me", { timeoutMs: SESSION_RESTORE_TIMEOUT_MS, retries: 1 });
     state.currentUser = data.user;
     setSplashStatus("Preparazione area operativa");
     await startAuthenticatedApp({ keepSplash, openMainMenu: !keepSplash });
     return true;
-  } catch {
+  } catch (error) {
+    reportFrontendFailure("session profile restore", error);
+    await clearStoredAuthToken();
     setSplashStatus("Preparazione login");
     showLogin({ keepSplash });
     return false;
