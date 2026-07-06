@@ -234,6 +234,7 @@ const OROACTIVE_SPLASH_BRIEF_MS = 5000;
 const OROACTIVE_SPLASH_READY_MS = 180;
 const OROACTIVE_SPLASH_EXIT_MS = 430;
 const SESSION_RESTORE_TIMEOUT_MS = 10000;
+const OROACTIVE_AUTH_DAY_KEY = "oroactive-auth-day";
 const OROACTIVE_UPDATE_INTERVAL_MS = 30000;
 const AURUM_SETTINGS_KEY = "oroactive-aurum-settings";
 const AURUM_FLOATING_POSITION_KEY = "aurum_floating_position";
@@ -3544,20 +3545,38 @@ function triggerLogoRefresh() {
   }, 280);
 }
 
+function currentAuthDay() {
+  return new Date().toLocaleDateString("sv-SE");
+}
+
 async function loadStoredAuthToken() {
-  const token = await loadDeviceStorage("oroactive-auth-token");
+  const [token, authDay] = await Promise.all([
+    loadDeviceStorage("oroactive-auth-token"),
+    loadDeviceStorage(OROACTIVE_AUTH_DAY_KEY)
+  ]);
+  if (!token || authDay !== currentAuthDay()) {
+    state.authToken = "";
+    if (token || authDay) await clearStoredAuthToken();
+    return "";
+  }
   state.authToken = token;
   return token;
 }
 
 async function saveStoredAuthToken(token) {
   state.authToken = token || "";
-  await saveDeviceStorage("oroactive-auth-token", token || "");
+  await Promise.all([
+    saveDeviceStorage("oroactive-auth-token", token || ""),
+    saveDeviceStorage(OROACTIVE_AUTH_DAY_KEY, token ? currentAuthDay() : "")
+  ]);
 }
 
 async function clearStoredAuthToken() {
   state.authToken = "";
-  await saveDeviceStorage("oroactive-auth-token", "");
+  await Promise.all([
+    saveDeviceStorage("oroactive-auth-token", ""),
+    saveDeviceStorage(OROACTIVE_AUTH_DAY_KEY, "")
+  ]);
 }
 
 async function loadDeviceStorage(key) {
@@ -5364,15 +5383,17 @@ async function hydrateAuthenticatedAppInBackground() {
 }
 
 async function restoreSession(options = {}) {
-  const { keepSplash = false } = options;
-  try {
-    await withSessionRestoreTimeout(loadStoredAuthToken(), "Lettura sessione");
-  } catch (error) {
-    reportFrontendFailure("session storage restore", error);
-    await clearStoredAuthToken();
-    setSplashStatus("Preparazione login");
-    showLogin({ keepSplash });
-    return false;
+  const { keepSplash = false, tokenLoaded = false } = options;
+  if (!tokenLoaded) {
+    try {
+      await withSessionRestoreTimeout(loadStoredAuthToken(), "Lettura sessione");
+    } catch (error) {
+      reportFrontendFailure("session storage restore", error);
+      await clearStoredAuthToken();
+      setSplashStatus("Preparazione login");
+      showLogin({ keepSplash });
+      return false;
+    }
   }
   if (!state.authToken) {
     setSplashStatus("Preparazione login");
@@ -21149,8 +21170,20 @@ document.getElementById("closePreview")?.addEventListener("click", () => {
   previewModal.hidden = true;
 });
 
+function registerAppLifecycleListeners() {
+  if (registerAppLifecycleListeners.started) return;
+  window.addEventListener("focus", () => {
+    if (state.authToken) syncActsFromServer();
+    if (state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && state.authToken) syncActsFromServer();
+    if (!document.hidden && state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
+  });
+  registerAppLifecycleListeners.started = true;
+}
+
 async function initializeApp() {
-  showStartupSplash();
   try {
     registerServiceWorker();
     startAppVersionChecker();
@@ -21161,16 +21194,22 @@ async function initializeApp() {
     markAurumAvoidElements();
     startMainMenuClock();
     appShell.hidden = true;
-    const sessionRestored = await restoreSession({ keepSplash: true });
+    registerAppLifecycleListeners();
+    let hasDailySession = false;
+    try {
+      hasDailySession = Boolean(await withSessionRestoreTimeout(loadStoredAuthToken(), "Lettura sessione"));
+    } catch (error) {
+      reportFrontendFailure("daily session check", error);
+      await clearStoredAuthToken();
+    }
+    if (!hasDailySession) {
+      showLogin();
+      maybeShowInstallHint();
+      return;
+    }
+    showStartupSplash();
+    const sessionRestored = await restoreSession({ keepSplash: true, tokenLoaded: true });
     maybeShowInstallHint();
-    window.addEventListener("focus", () => {
-      if (state.authToken) syncActsFromServer();
-      if (state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
-    });
-    document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && state.authToken) syncActsFromServer();
-      if (!document.hidden && state.authToken) void checkForAppUpdate({ manual: false, autoReload: true });
-    });
     await completeStartupSplash(sessionRestored ? "main" : "login");
   } catch (error) {
     showStartupSplashError(error);

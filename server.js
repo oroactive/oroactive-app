@@ -1209,6 +1209,7 @@ function auditDeviceInfo(userAgent = "") {
 }
 
 function auditUserName(user = {}) {
+  if (!user) return "";
   return [user.nome, user.cognome].filter(Boolean).join(" ").trim()
     || user.username
     || user.email
