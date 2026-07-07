@@ -763,6 +763,51 @@ const AURUM_COMPRO_ORO_QUIZ = [
   }
 ];
 
+const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
+
+const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS = new Set([
+  "sterlina-oro-sovrana",
+  "marengo-20-lire-italia",
+  "marengo-francese-20-franchi",
+  "napoleone-20-franchi-gallo-marianne",
+  "marengo-svizzero-vreneli",
+  "krugerrand-1-oz",
+  "american-eagle-1-oz",
+  "arca-noe-armenia-2025-1-oz",
+  "centenario-50-pesos",
+  "ducato-austriaco",
+  "20-dollari-double-eagle",
+  "20-mark-germania",
+  "sterlina-vecchio-conio",
+  "sudafrica-2-rand",
+  "cile-100-pesos",
+  "austria-100-corone",
+  "messico-20-pesos",
+  "austria-1000-scellini",
+  "ungheria-20-corone"
+]);
+
+function bilanciaDoroCoinImages(slug, source = "La Bilancia d'Oro", invertSides = false) {
+  const frontSide = invertSides ? "back" : "front";
+  const backSide = invertSides ? "front" : "back";
+  return {
+    front: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-${frontSide}.png`,
+    back: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-${backSide}.png`,
+    source
+  };
+}
+
+function withBilanciaDoroImages(coin, slug, source) {
+  return {
+    ...coin,
+    bookImages: bilanciaDoroCoinImages(
+      slug,
+      source,
+      INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS.has(coin.id)
+    )
+  };
+}
+
 const GOLD_COIN_CATALOG = [
   {
     id: "sterlina-oro-sovrana",
@@ -2120,51 +2165,6 @@ const GOLD_COIN_CATALOG = [
     }
   }
 ];
-
-const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
-
-const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS = new Set([
-  "sterlina-oro-sovrana",
-  "marengo-20-lire-italia",
-  "marengo-francese-20-franchi",
-  "napoleone-20-franchi-gallo-marianne",
-  "marengo-svizzero-vreneli",
-  "krugerrand-1-oz",
-  "american-eagle-1-oz",
-  "arca-noe-armenia-2025-1-oz",
-  "centenario-50-pesos",
-  "ducato-austriaco",
-  "20-dollari-double-eagle",
-  "20-mark-germania",
-  "sterlina-vecchio-conio",
-  "sudafrica-2-rand",
-  "cile-100-pesos",
-  "austria-100-corone",
-  "messico-20-pesos",
-  "austria-1000-scellini",
-  "ungheria-20-corone"
-]);
-
-function bilanciaDoroCoinImages(slug, source = "La Bilancia d'Oro", invertSides = false) {
-  const frontSide = invertSides ? "back" : "front";
-  const backSide = invertSides ? "front" : "back";
-  return {
-    front: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-${frontSide}.png`,
-    back: `${BILANCIA_DORO_COIN_IMAGE_BASE}/${slug}-${backSide}.png`,
-    source
-  };
-}
-
-function withBilanciaDoroImages(coin, slug, source) {
-  return {
-    ...coin,
-    bookImages: bilanciaDoroCoinImages(
-      slug,
-      source,
-      INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS.has(coin.id)
-    )
-  };
-}
 
 const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "sterlina-oro-sovrana": "sterlina-oro-sovrana",
@@ -5776,6 +5776,30 @@ async function restoreSession(options = {}) {
     showLogin({ keepSplash });
     return false;
   }
+}
+
+function bindLoginForm() {
+  const form = document.getElementById("loginForm");
+  if (!form) {
+    console.error("[OroActive Auth] loginForm not found");
+    return;
+  }
+  if (window.__OROACTIVE_LOGIN_FORM_BOUND__) {
+    console.warn("[OroActive Auth] login form already bound");
+    return;
+  }
+  form.addEventListener("submit", handleLoginSubmit);
+  window.__OROACTIVE_LOGIN_FORM_BOUND__ = true;
+  console.info("[OroActive Auth] login form bound");
+}
+
+async function handleLoginSubmit(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  console.info("[OroActive Auth] Login form submit captured");
+  return handleLogin(event);
 }
 
 async function handleLogin(event) {
@@ -20191,7 +20215,7 @@ navItems.forEach((item) => {
   });
 });
 
-loginForm?.addEventListener("submit", handleLogin);
+bindLoginForm();
 faceIdLoginButton?.addEventListener("click", loginWithFaceId);
 logoutButton?.addEventListener("click", handleLogout);
 registerFaceIdButton?.addEventListener("click", registerFaceId);

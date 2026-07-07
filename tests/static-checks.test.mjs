@@ -27,6 +27,24 @@ test("frontend usa configurazione API condivisa e login con fallback", async () 
   assert.doesNotMatch(app, /console\.log\("API_BASE_URL"/);
 });
 
+test("login form viene intercettato dopo l'avvio frontend", async () => {
+  const app = await file("app.js");
+  const bindStart = app.indexOf("function bindLoginForm");
+  const submitStart = app.indexOf("async function handleLoginSubmit");
+  const loginStart = app.indexOf("async function handleLogin(event)");
+  const bindBlock = app.slice(bindStart, submitStart);
+  const submitBlock = app.slice(submitStart, loginStart);
+
+  assert.ok(bindStart !== -1, "bindLoginForm deve esistere");
+  assert.ok(submitStart !== -1, "handleLoginSubmit deve esistere");
+  assert.match(bindBlock, /form\.addEventListener\("submit", handleLoginSubmit\)/);
+  assert.match(bindBlock, /window\.__OROACTIVE_LOGIN_FORM_BOUND__/);
+  assert.match(submitBlock, /event\.preventDefault\(\)/);
+  assert.match(submitBlock, /event\.stopPropagation\(\)/);
+  assert.match(submitBlock, /return handleLogin\(event\)/);
+  assert.match(app, /bindLoginForm\(\);/);
+});
+
 test("backend login accetta username e utenti migrati con email", async () => {
   const server = await file("server.js");
 
@@ -1079,6 +1097,29 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/panda-cinese-30g-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/panda-cinese-30g-back.png", root))
   ]);
+});
+
+test("immagini Bilancia d'Oro sono inizializzate prima del catalogo monete", async () => {
+  const app = await file("app.js");
+  const baseIndex = app.indexOf("const BILANCIA_DORO_COIN_IMAGE_BASE");
+  const invertedIndex = app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS");
+  const imageFunctionIndex = app.indexOf("function bilanciaDoroCoinImages");
+  const wrapperFunctionIndex = app.indexOf("function withBilanciaDoroImages");
+  const catalogIndex = app.indexOf("const GOLD_COIN_CATALOG = [");
+  const firstRuntimeCallIndex = app.indexOf("withBilanciaDoroImages({");
+
+  assert.ok(baseIndex !== -1, "base path immagini Bilancia d'Oro mancante");
+  assert.ok(invertedIndex !== -1, "set monete invertite mancante");
+  assert.ok(imageFunctionIndex !== -1, "bilanciaDoroCoinImages mancante");
+  assert.ok(wrapperFunctionIndex !== -1, "withBilanciaDoroImages mancante");
+  assert.ok(catalogIndex !== -1, "catalogo monete mancante");
+  assert.ok(firstRuntimeCallIndex !== -1, "prima chiamata runtime a withBilanciaDoroImages mancante");
+  assert.equal(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS", invertedIndex + 1), -1);
+  assert.ok(baseIndex < invertedIndex, "base immagini deve precedere il set invertito");
+  assert.ok(invertedIndex < imageFunctionIndex, "set invertito deve precedere bilanciaDoroCoinImages");
+  assert.ok(imageFunctionIndex < wrapperFunctionIndex, "bilanciaDoroCoinImages deve precedere withBilanciaDoroImages");
+  assert.ok(wrapperFunctionIndex < catalogIndex, "helper immagini deve precedere il catalogo");
+  assert.ok(invertedIndex < firstRuntimeCallIndex, "set invertito deve precedere ogni chiamata runtime");
 });
 
 test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () => {
