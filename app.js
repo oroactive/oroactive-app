@@ -5525,7 +5525,7 @@ function renderMainMenuMinimum() {
   console.info("[OroActive Boot] render minimum menu", { role });
   if (mainMenuWelcome) mainMenuWelcome.textContent = `Bentornato, ${displayMenuUserName(user)}`;
   if (mainMenuHeroRole) mainMenuHeroRole.textContent = roleLabel(role);
-  if (mainMenuHeroStore) mainMenuHeroStore.textContent = roleSeesAllStores(role) ? "Tutti i negozi" : (user.negozio || "Negozio assegnato");
+  if (mainMenuHeroStore) mainMenuHeroStore.textContent = userSeesAllStores(user) ? "Tutti i negozi" : (user.negozio || "Negozio assegnato");
   if (loggedUserName) loggedUserName.textContent = `${displayMenuUserName(user)} - ${roleLabel(role)}`;
   if (sessionUsername) sessionUsername.textContent = displayMenuUserName(user);
   if (mainUserMenuButton) mainUserMenuButton.textContent = displayMenuUserName(user);

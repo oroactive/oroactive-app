@@ -2660,6 +2660,9 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /async function bootAuthenticatedApp\(reason = "login"\)/);
   assert.match(app, /function showMainMenuShell\(\)/);
   assert.match(app, /function renderMainMenuMinimum\(\)/);
+  assert.match(app, /function userSeesAllStores\(user = state\.currentUser\)/);
+  assert.match(app, /mainMenuHeroStore\.textContent = userSeesAllStores\(user\) \? "Tutti i negozi"/);
+  assert.doesNotMatch(app, /roleSeesAllStores\(/);
   assert.match(app, /async function safeStartModule\(name, fn\)/);
   assert.match(app, /function startBootWatchdog\(\)/);
   assert.match(app, /await bootAuthenticatedApp\("login"\)/);
