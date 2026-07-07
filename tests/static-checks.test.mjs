@@ -2663,6 +2663,10 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /function userSeesAllStores\(user = state\.currentUser\)/);
   assert.match(app, /mainMenuHeroStore\.textContent = userSeesAllStores\(user\) \? "Tutti i negozi"/);
   assert.doesNotMatch(app, /roleSeesAllStores\(/);
+  assert.match(app, /inventory: \{ screen: "fusion", fusionView: "stock" \}/);
+  assert.match(app, /quotes: \{ screen: "quotazione" \}/);
+  assert.match(app, /academy: \{ screen: "training" \}/);
+  assert.match(app, /async function enterSectionFromMainMenu\(section\)[\s\S]*const route = resolveSectionRoute\(section\)[\s\S]*setScreen\(route\.screen\)/);
   assert.match(app, /async function safeStartModule\(name, fn\)/);
   assert.match(app, /function startBootWatchdog\(\)/);
   assert.match(app, /await bootAuthenticatedApp\("login"\)/);

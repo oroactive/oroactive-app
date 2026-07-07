@@ -5041,8 +5041,13 @@ function sortedMenuItems(items = []) {
 
 const SECTION_ROUTE_ALIASES = {
   fusion: { screen: "fusion", fusionView: "stock" },
+  inventory: { screen: "fusion", fusionView: "stock" },
+  stock: { screen: "fusion", fusionView: "stock" },
   giacenza: { screen: "fusion", fusionView: "stock" },
-  fusioni: { screen: "fusion", fusionView: "melting" }
+  fusioni: { screen: "fusion", fusionView: "melting" },
+  melting: { screen: "fusion", fusionView: "melting" },
+  quotes: { screen: "quotazione" },
+  academy: { screen: "training" }
 };
 
 function resolveSectionRoute(section = "") {
@@ -6631,7 +6636,7 @@ async function enterSectionFromMainMenu(section) {
     await clearPracticeForFreshStart({ deferPracticeNumber: true });
     return;
   }
-  setScreen(section);
+  setScreen(route.screen);
 }
 
 async function clearPracticeForFreshStart(options = {}) {
