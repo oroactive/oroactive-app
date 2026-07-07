@@ -687,7 +687,7 @@ body.splash-active {
 .main-menu-screen {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 100;
   isolation: isolate;
   display: block;
   overflow-y: auto;
@@ -724,6 +724,11 @@ body.main-menu-active .main-menu-screen {
   opacity: 1 !important;
 }
 
+body.main-menu-active {
+  background: #17130d;
+  min-height: 100vh;
+}
+
 body.main-menu-active .login-screen,
 body.main-menu-active .splash-screen {
   display: none !important;
@@ -749,15 +754,16 @@ body.main-menu-active .splash-screen {
   position: fixed;
   top: max(18px, env(safe-area-inset-top));
   right: 22px;
-  z-index: 80;
+  z-index: 1100;
   max-width: min(390px, calc(100vw - 24px));
+  pointer-events: auto;
 }
 
 .notification-center.is-main-menu-docked {
   position: relative;
   top: auto;
   right: auto;
-  z-index: 38;
+  z-index: 1100;
   width: 44px;
   height: 44px;
 }
@@ -1785,11 +1791,11 @@ body.main-menu-active .splash-screen {
   top: var(--aurum-top, auto);
   right: calc(24px + env(safe-area-inset-right));
   bottom: calc(24px + env(safe-area-inset-bottom));
-  z-index: 8000;
+  z-index: 1200;
   display: grid;
   justify-items: end;
   gap: 12px;
-  pointer-events: none;
+  pointer-events: auto;
   transition: left 0.18s ease, top 0.18s ease, right 0.18s ease, bottom 0.18s ease, opacity 0.18s ease;
   touch-action: none;
 }

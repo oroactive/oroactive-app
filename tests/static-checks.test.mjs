@@ -65,7 +65,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260707-login-protected-1"/);
+  assert.match(sw, /const BUILD_ID = "20260707-resilient-auth-boot-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -90,8 +90,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /app\.js\?v=20260707-login-protected-1/);
-  assert.match(index, /styles\.css\?v=20260707-login-protected-1/);
+  assert.match(index, /app\.js\?v=20260707-resilient-auth-boot-1/);
+  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
   assert.match(version, /"ok": true/);
 });
 
@@ -124,7 +124,8 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /const OROACTIVE_SPLASH_SESSION_KEY = "oroactive_splash_seen"/);
   assert.match(app, /const OROACTIVE_SPLASH_MIN_MS = 5000/);
   assert.match(app, /const OROACTIVE_SPLASH_BRIEF_MS = 5000/);
-  assert.match(app, /const SESSION_RESTORE_TIMEOUT_MS = 10000/);
+  assert.match(app, /const SESSION_RESTORE_TIMEOUT_MS = 8000/);
+  assert.match(app, /const BOOT_SPLASH_MAX_MS = 2000/);
   assert.match(app, /const OROACTIVE_AUTH_DAY_KEY = "oroactive-auth-day"/);
   assert.match(app, /function currentAuthDay/);
   assert.match(app, /authDay !== currentAuthDay\(\)/);
@@ -138,7 +139,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /if \(!hasDailySession\) \{[\s\S]*showLogin\(\);[\s\S]*return;[\s\S]*\}/);
   assert.match(app, /showStartupSplash\(\);[\s\S]*await restoreSession\(\{ keepSplash: true, tokenLoaded: true \}\)/);
   assert.match(app, /withSessionRestoreTimeout\(loadStoredAuthToken\(\), "Lettura sessione"\)/);
-  assert.match(app, /apiRequest\("\/auth\/me", \{ timeoutMs: SESSION_RESTORE_TIMEOUT_MS, retries: 1 \}\)/);
+  assert.match(app, /apiRequest\("\/auth\/me", \{ timeoutMs: keepSplash \? BOOT_SPLASH_MAX_MS : SESSION_RESTORE_TIMEOUT_MS, retries: 1 \}\)/);
   assert.match(app, /cache: "no-store"/);
   assert.match(app, /state\.currentUser = normalizeAuthenticatedUserPayload\(data, "session"\)/);
   assert.match(app, /\[OroActive Auth\] User loaded/);
@@ -147,7 +148,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -2318,7 +2319,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -2377,7 +2378,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -2429,7 +2430,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -2498,7 +2499,10 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(loginBlock, /if \(!data\?\.user \|\| !token\)/);
   assert.match(loginBlock, /state\.authToken = token;\s*authAccepted = true;\s*protectAuthenticatedTransition\(\);/);
   assert.match(loginBlock, /await saveStoredAuthToken\(token\)\.catch\(\(storageError\) => \{[\s\S]*state\.authToken = token;[\s\S]*\}\);/);
-  assert.match(loginBlock, /await startAuthenticatedApp\(\);\s*schedulePostLoginMenuGuard\("login"\);\s*loginForm\.reset\(\);/);
+  assert.match(loginBlock, /console\.info\("\[OroActive Auth\] login submit"\)/);
+  assert.match(loginBlock, /timeoutMs: 8000/);
+  assert.match(loginBlock, /console\.info\("\[OroActive Auth\] login success"/);
+  assert.match(loginBlock, /await bootAuthenticatedApp\("login"\);\s*schedulePostLoginMenuGuard\("login"\);\s*loginForm\.reset\(\);/);
   assert.match(loginBlock, /if \(authAccepted\) \{[\s\S]*reportFrontendFailure\("login", error\)[\s\S]*forceShowMainMenuAfterLogin\(\{ renderMenus: false, phase: "login", error \}\)/);
   assert.doesNotMatch(loginBlock, /login authenticated startup[\s\S]*await clearStoredAuthToken\(\)/);
   assert.match(loginBlock, /Connessione al server non disponibile\. Riprova tra qualche secondo\./);
@@ -2513,9 +2517,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260707-login-protected-1/);
-  assert.match(index, /styles\.css\?v=20260707-login-protected-1/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(index, /app\.js\?v=20260707-resilient-auth-boot-1/);
+  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -2561,8 +2565,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260707-login-protected-1/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -2612,9 +2616,32 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /function runSafeStartupTask/);
   assert.match(app, /function runSafeUiTask/);
   assert.match(app, /function hydrateAuthenticatedAppInBackground/);
-  assert.match(app, /if \(openMainMenu && !keepSplash\) \{[\s\S]*showMainMenuFromSplash\(\);[\s\S]*schedulePostLoginMenuGuard\("login"\);[\s\S]*\}[\s\S]*void hydrateAuthenticatedAppInBackground\(\)\.catch/);
-  assert.match(app, /runSafeStartupTask\("available stores", loadAvailableStores\)/);
-  assert.match(app, /runSafeStartupTask\("notification count", loadNotificationCount\)/);
+  assert.match(app, /async function bootAuthenticatedApp\(reason = "login"\)/);
+  assert.match(app, /function showMainMenuShell\(\)/);
+  assert.match(app, /function renderMainMenuMinimum\(\)/);
+  assert.match(app, /async function safeStartModule\(name, fn\)/);
+  assert.match(app, /function startBootWatchdog\(\)/);
+  assert.match(app, /await bootAuthenticatedApp\("login"\)/);
+  assert.match(app, /await bootAuthenticatedApp\("session-restore"\)/);
+  assert.match(app, /mainMenuScreen\.hidden = false;[\s\S]*mainMenuScreen\.removeAttribute\("hidden"\)/);
+  assert.match(app, /data-safe-boot-menu="minimum"/);
+  assert.match(app, /showBootRecoveryPanel\(error\)/);
+  assert.match(app, /safeStartModule\("notifications", initNotifications\)/);
+  assert.match(app, /safeStartModule\("aurum", initAurum\)/);
+  assert.match(app, /safeStartModule\("academy", initAcademy\)/);
+  assert.match(app, /safeStartModule\("dashboard", initDashboard\)/);
+  assert.match(app, /safeStartModule\("operational-background", initOperationalBackground\)/);
+  assert.match(app, /await loadCriticalUserDataSafely\(\);[\s\S]*renderMainMenu\(\);[\s\S]*startNonCriticalModulesSafely\(\);/);
+  assert.match(app, /showMainMenuShell\(\);[\s\S]*renderMainMenuMinimum\(\);[\s\S]*markBootStage\("main-menu-visible"\);[\s\S]*await loadCriticalUserDataSafely\(\)/);
+  assert.doesNotMatch(app, /await safeStartModule\(/);
+  assert.match(app, /withTimeout\(Promise\.resolve\(\)\.then\(\(\) => applyRolePermissions\(\)\), PERMISSIONS_BOOT_TIMEOUT_MS, "permissions"\)/);
+  assert.match(app, /withTimeout\(loadAvailableStores\(\), STORE_BOOT_TIMEOUT_MS, "stores\/config"\)/);
+  assert.match(app, /const NON_CRITICAL_MODULE_TIMEOUT_MS = 4000/);
+  assert.match(app, /function withTimeout\(promise, ms, label\)/);
+  assert.match(app, /console\.info\("\[OroActive Auth\] session restore start"/);
+  assert.match(app, /BOOT_SPLASH_MAX_MS/);
+  assert.match(app, /cache: "no-store"/);
+  assert.match(app, /"Cache-Control": "no-cache"/);
   assert.match(app, /runSafeUiTask\("main menu render", renderRoleBasedMenus\)/);
   assert.match(app, /renderMainMenuFallback\(\)/);
   assert.match(app, /function getMainMenuConfigForRole/);
@@ -2626,11 +2653,13 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /splashScreen\.hidden = true/);
   assert.match(app, /mainMenuScreen\.hidden = false/);
   assert.match(app, /mainMenuScreen\.style\.display = "block"/);
-  assert.match(app, /document\.body\.classList\.add\("main-menu-active"\)/);
+  assert.match(app, /document\.body\.classList\.add\("main-menu-active", "authenticated"\)/);
   assert.match(app, /function schedulePostLoginMenuGuard/);
   assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]*state\.currentUser && mainMenuScreen\?\.hidden[\s\S]*forceShowMainMenuAfterLogin\(\{ phase \}\)/);
+  assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]*hasUser && \(!mainMenuScreen \|\| mainMenuScreen\.hidden\)[\s\S]*renderMainMenuMinimum\(\)/);
   assert.match(app, /Errore caricamento interfaccia OroActive\. Riprova o contatta il Founder\./);
   assert.match(app, /data-auth-recovery="retry"/);
+  assert.match(app, /data-auth-recovery="menu"/);
   assert.match(app, /function handleAuthRecoveryAction/);
   assert.match(app, /function prepareInternalSectionLayout/);
   assert.match(app, /document\.body\.classList\.toggle\("main-menu-active", active\)/);
@@ -2670,6 +2699,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-hero/);
   assert.match(styles, /\.main-menu-founder-kpis/);
   assert.match(styles, /\.main-menu-screen \{[\s\S]*isolation: isolate[\s\S]*overflow-y: auto[\s\S]*linear-gradient\(180deg, #080808 0%, #050505 100%\)/);
+  assert.match(styles, /body\.main-menu-active \{[\s\S]*background: #17130d[\s\S]*min-height: 100vh/);
   assert.match(styles, /body\.main-menu-active \.main-menu-screen \{[\s\S]*display: block !important[\s\S]*visibility: visible !important[\s\S]*opacity: 1 !important/);
   assert.match(styles, /body\.main-menu-active \.login-screen,[\s\S]*body\.main-menu-active \.splash-screen \{[\s\S]*display: none !important/);
   assert.match(styles, /body\.main-menu-active \.app-shell \{[\s\S]*display: none !important[\s\S]*pointer-events: none !important/);
@@ -2678,14 +2708,14 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-submenu \{[\s\S]*position: relative[\s\S]*scroll-margin-bottom: 150px/);
   assert.match(styles, /\.main-menu-founder-kpis \{[\s\S]*position: relative[\s\S]*z-index: 1/);
   assert.match(styles, /\.main-menu-screen:not\(\[hidden\]\) ~ \.aurum-mascot-root \{[\s\S]*opacity: 1/);
-  assert.match(styles, /\.aurum-mascot-root \{[\s\S]*pointer-events: none/);
-  assert.match(styles, /\.notification-center \{[\s\S]*max-width: min\(390px, calc\(100vw - 24px\)\)/);
+  assert.match(styles, /\.aurum-mascot-root \{[\s\S]*z-index: 1200[\s\S]*pointer-events: auto/);
+  assert.match(styles, /\.notification-center \{[\s\S]*z-index: 1100[\s\S]*max-width: min\(390px, calc\(100vw - 24px\)\)[\s\S]*pointer-events: auto/);
   assert.match(app, /submenu\.scrollIntoView\(\{ block: "nearest", behavior: "smooth" \}\)/);
   assert.match(styles, /@keyframes control-center-orbit/);
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -2789,7 +2819,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -2840,9 +2870,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260707-login-protected-1/);
-  assert.match(index, /styles\.css\?v=20260707-login-protected-1/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(index, /app\.js\?v=20260707-resilient-auth-boot-1/);
+  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -2899,9 +2929,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260707-login-protected-1/);
-  assert.match(index, /styles\.css\?v=20260707-login-protected-1/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(index, /app\.js\?v=20260707-resilient-auth-boot-1/);
+  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -2979,7 +3009,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -3096,7 +3126,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -3140,7 +3170,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260707-login-protected-1/);
+  assert.match(worker, /20260707-resilient-auth-boot-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i

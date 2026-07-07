@@ -1,4 +1,4 @@
-const BUILD_ID = "20260707-login-protected-1";
+const BUILD_ID = "20260707-resilient-auth-boot-1";
 const CACHE_NAME = `oroactive-cache-${BUILD_ID}`;
 const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
 const NEVER_CACHE_PREFIXES = [
