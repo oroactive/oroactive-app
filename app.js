@@ -27,6 +27,7 @@ const state = {
   editingDirty: false,
   suppressDirtyTracking: false,
   loggingIn: false,
+  postLoginRecoveryUntil: 0,
   splashStartedAt: 0,
   splashReady: false,
   splashError: null,
@@ -3743,6 +3744,21 @@ function shouldRetryApi(error, responseStatus) {
   return error?.name === "AbortError" || !navigator.onLine || !responseStatus || responseStatus >= 500 || responseStatus === 429;
 }
 
+function protectAuthenticatedTransition(durationMs = 12000) {
+  state.postLoginRecoveryUntil = Date.now() + durationMs;
+}
+
+function isAuthenticatedTransitionProtected() {
+  return state.loggingIn || (state.currentUser && Date.now() < state.postLoginRecoveryUntil);
+}
+
+function shouldReturnToLoginOnUnauthorized(path = "") {
+  if (isLoginRequestPath(path)) return false;
+  if (path === "/auth/me") return true;
+  if (isAuthenticatedTransitionProtected()) return false;
+  return !state.currentUser;
+}
+
 function serverConnectionError() {
   const error = new Error("Connessione al server non disponibile. Riprova tra qualche secondo.");
   error.isConnectionError = true;
@@ -3833,8 +3849,14 @@ async function apiRequest(path, options = {}) {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        if (response.status === 401 && !isLoginRequestPath(path)) {
+        if (response.status === 401 && shouldReturnToLoginOnUnauthorized(path)) {
           showLogin();
+        } else if (response.status === 401) {
+          console.warn("[OroActive Auth] Unauthorized background request ignored during authenticated transition", {
+            path,
+            userRole: state.currentUser?.ruolo || "",
+            protectedUntil: state.postLoginRecoveryUntil
+          });
         }
         const error = new Error(cleanUserMessage(body.error, apiErrorFallback(path, response.status)));
         error.status = response.status;
@@ -5513,11 +5535,16 @@ async function handleLogin(event) {
       throw new Error("Accesso non completato: risposta del server non valida.");
     }
     state.currentUser = normalizeAuthenticatedUserPayload(data, "login");
+    state.authToken = token;
+    authAccepted = true;
+    protectAuthenticatedTransition();
     authLog("[OroActive Auth] Login success", { role: state.currentUser.ruolo });
     authLog("[OroActive Auth] User loaded", { phase: "login", role: state.currentUser.ruolo });
     authLog("[OroActive Auth] Permissions loaded", { phase: "login", role: state.currentUser.ruolo });
-    await saveStoredAuthToken(token);
-    authAccepted = true;
+    await saveStoredAuthToken(token).catch((storageError) => {
+      reportFrontendFailure("login session storage", storageError);
+      state.authToken = token;
+    });
     await startAuthenticatedApp();
     schedulePostLoginMenuGuard("login");
     loginForm.reset();
@@ -5643,10 +5670,15 @@ async function loginWithFaceId() {
       throw new Error("Accesso Face ID non completato: risposta del server non valida.");
     }
     state.currentUser = normalizeAuthenticatedUserPayload(data, "faceid");
+    state.authToken = token;
+    protectAuthenticatedTransition();
     authLog("[OroActive Auth] Login success", { method: "faceid", role: state.currentUser.ruolo });
     authLog("[OroActive Auth] User loaded", { phase: "faceid", role: state.currentUser.ruolo });
     authLog("[OroActive Auth] Permissions loaded", { phase: "faceid", role: state.currentUser.ruolo });
-    await saveStoredAuthToken(token);
+    await saveStoredAuthToken(token).catch((storageError) => {
+      reportFrontendFailure("faceid session storage", storageError);
+      state.authToken = token;
+    });
     await saveDeviceStorage("oroactive-faceid-username", username);
     await saveDeviceStorage("oroactive-faceid-credential", credentialId);
     await startAuthenticatedApp();
