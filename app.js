@@ -1724,6 +1724,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "falcon", back: "profile", frontText: "FALC", backText: "QEII" }
   },
   {
+    id: "queens-beast-leone-bianco-mortimer-2020",
+    name: "Queen's Beast Leone Bianco di Mortimer 2020",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2020",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.10,
+    fineGold: 31.10,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Elisabetta II con valore nominale 100 Pounds",
+    reverse: "Leone Bianco di Mortimer con scudo araldico e rosa bianca, iscrizione White Lion of Mortimer, 1 oz Fine Gold 999.9 e anno 2020",
+    history: "Il Leone bianco di Mortimer e una delle statue araldiche esposte durante l'incoronazione di Elisabetta II e fa parte della serie Queen's Beast. Il Leone bianco di Mortimer era presente nello stemma reale di Edoardo IV d'Inghilterra, lo stesso sovrano legato anche al Toro nero di Clarence. Edoardo IV eredito questo simbolo araldico dalla nonna, erede dei Mortimer. A differenza del classico Leone d'Inghilterra, il Leone bianco di Mortimer non porta la corona e nella tradizione araldica ha lingua e artigli blu anziche rossi.",
+    recognitionHints: ["queen's beast", "queens beast", "leone bianco di mortimer", "white lion of mortimer", "leone bianco", "mortimer", "2020", "edoardo iv", "toro nero di clarence", "rosa bianca", "100 pounds", "1 oz fine gold", "999.9", "royal mint"],
+    visual: { front: "lion", back: "profile", frontText: "LION", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2367,6 +2386,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "queens-beast-toro-nero-clarence-2018": "queens-beast-toro-nero-clarence-2018",
   "queens-beast-centricora-beaufort-2019": "queens-beast-centricora-beaufort-2019",
   "queens-beast-falco-plantageneti-2019": "queens-beast-falco-plantageneti-2019",
+  "queens-beast-leone-bianco-mortimer-2020": "queens-beast-leone-bianco-mortimer-2020",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2472,6 +2492,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "queens-beast-toro-nero-clarence-2018": "Archivio OroActive",
   "queens-beast-centricora-beaufort-2019": "Archivio OroActive",
   "queens-beast-falco-plantageneti-2019": "Archivio OroActive",
+  "queens-beast-leone-bianco-mortimer-2020": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
