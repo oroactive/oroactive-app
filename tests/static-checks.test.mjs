@@ -745,6 +745,11 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /id: "queens-beast-leone-bianco-mortimer-2020"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2020"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
   assert.match(app, /White Lion of Mortimer/);
   assert.match(app, /Edoardo IV/);
+  assert.match(app, /queens-beast-completer-masterpiece/);
+  assert.match(app, /Queen's Beast Completer Masterpiece/);
+  assert.match(app, /id: "queens-beast-completer-masterpiece"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
+  assert.match(app, /James Woodford/);
+  assert.match(app, /Hampton Court Palace/);
   assert.match(app, /"sterlina-oro-sovrana"[\s\S]*"american-eagle-1-oz"[\s\S]*"arca-noe-armenia-2025-1-oz"/);
   assert.doesNotMatch(app.slice(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS"), app.indexOf("function bilanciaDoroCoinImages")), /"american-buffalo-1-oz"/);
   assert.match(app, /"centenario-50-pesos"[\s\S]*"ducato-austriaco"[\s\S]*"20-dollari-double-eagle"[\s\S]*"20-mark-germania"/);
@@ -1075,6 +1080,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/queens-beast-falco-plantageneti-2019-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-leone-bianco-mortimer-2020-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-leone-bianco-mortimer-2020-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/queens-beast-completer-masterpiece-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/queens-beast-completer-masterpiece-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-belga-20-franchi-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-belga-20-franchi-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-leopold-belgio-front.png", root)),

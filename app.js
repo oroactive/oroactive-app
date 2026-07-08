@@ -1743,6 +1743,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "lion", back: "profile", frontText: "LION", backText: "QEII" }
   },
   {
+    id: "queens-beast-completer-masterpiece",
+    name: "Queen's Beast Completer Masterpiece",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC)",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.10,
+    fineGold: 31.10,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Quinto ritratto di Elisabetta II opera di Jody Clark, con valore nominale 100 Pounds",
+    reverse: "Composizione Completer con le dieci Queen's Beasts riunite intorno al ritratto centrale della Regina",
+    history: "Queen's Beast Completer Masterpiece e il capolavoro conclusivo della serie Queen's Beast emesso dalla Royal Mint. Il rovescio, opera di Jody Clark, riunisce le dieci Bestie della Regina create nel 1953 dall'artista James Woodford per celebrare l'incoronazione di Elisabetta II. Le sculture originali, alte circa 2 metri, sono oggi conservate presso il Canadian Museum of Civilization di Gatineau, in Quebec, e rappresentano creature dell'araldica reale del Regno Unito. Le figure furono ispirate anche alle statue araldiche del ponte sul fossato di Hampton Court Palace: Leone d'Inghilterra, Grifone di Edoardo III, Drago rosso del Galles, Unicorno di Scozia, Toro nero di Clarence, Falco dei Plantageneti, Centicora di Beaufort, Leone bianco di Mortimer, Cavallo bianco di Hanover e Levriero bianco di Richmond.",
+    recognitionHints: ["queen's beast", "queens beast", "completer masterpiece", "completer", "dieci bestie", "jody clark", "james woodford", "elisabetta ii", "hampton court", "canadian museum of civilization", "gatineau", "leone d'inghilterra", "grifone", "drago rosso", "unicorno", "toro nero", "falco dei plantageneti", "centricora", "leone bianco", "cavallo bianco", "levriero bianco", "100 pounds", "1 oz fine gold", "999.9", "royal mint"],
+    visual: { front: "beasts", back: "profile", frontText: "QBC", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2387,6 +2406,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "queens-beast-centricora-beaufort-2019": "queens-beast-centricora-beaufort-2019",
   "queens-beast-falco-plantageneti-2019": "queens-beast-falco-plantageneti-2019",
   "queens-beast-leone-bianco-mortimer-2020": "queens-beast-leone-bianco-mortimer-2020",
+  "queens-beast-completer-masterpiece": "queens-beast-completer-masterpiece",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2493,6 +2513,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "queens-beast-centricora-beaufort-2019": "Archivio OroActive",
   "queens-beast-falco-plantageneti-2019": "Archivio OroActive",
   "queens-beast-leone-bianco-mortimer-2020": "Archivio OroActive",
+  "queens-beast-completer-masterpiece": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
