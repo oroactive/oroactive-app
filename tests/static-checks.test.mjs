@@ -710,6 +710,11 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /id: "tudor-beasts-leone-inghilterra-2022"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2022"[\s\S]*grossWeight: 31\.21,[\s\S]*diameter: 32\.69/);
   assert.match(app, /Hampton Court/);
   assert.match(app, /Jody Clark/);
+  assert.match(app, /queens-beast-grifone-edoardo-iii-2017/);
+  assert.match(app, /Queen's Beast Grifone di Edoardo III 2017/);
+  assert.match(app, /id: "queens-beast-grifone-edoardo-iii-2017"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2017"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
+  assert.match(app, /Griffin of Edward III/);
+  assert.match(app, /Guerra dei cent'anni/);
   assert.match(app, /"sterlina-oro-sovrana"[\s\S]*"american-eagle-1-oz"[\s\S]*"arca-noe-armenia-2025-1-oz"/);
   assert.doesNotMatch(app.slice(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS"), app.indexOf("function bilanciaDoroCoinImages")), /"american-buffalo-1-oz"/);
   assert.match(app, /"centenario-50-pesos"[\s\S]*"ducato-austriaco"[\s\S]*"20-dollari-double-eagle"[\s\S]*"20-mark-germania"/);
@@ -1026,6 +1031,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/queens-beast-leone-inghilterra-2016-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/tudor-beasts-leone-inghilterra-2022-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/tudor-beasts-leone-inghilterra-2022-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/queens-beast-grifone-edoardo-iii-2017-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/queens-beast-grifone-edoardo-iii-2017-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-belga-20-franchi-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-belga-20-franchi-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-leopold-belgio-front.png", root)),

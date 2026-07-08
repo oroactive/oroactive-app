@@ -1610,6 +1610,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "lion", back: "profile", frontText: "TUDOR", backText: "QEII" }
   },
   {
+    id: "queens-beast-grifone-edoardo-iii-2017",
+    name: "Queen's Beast Grifone di Edoardo III 2017",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2017",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.10,
+    fineGold: 31.10,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Elisabetta II con valore nominale 100 Pounds",
+    reverse: "Grifone di Edoardo III con scudo araldico, iscrizione Griffin of Edward III, 1 oz Fine Gold 999.9 e anno 2017",
+    history: "Il Grifone di Edoardo III e la seconda moneta d'oro della serie Queen's Beast. In inglese e nota come The Griffin of Edward III e fu coniata per la prima volta nel 2017; viene chiamata anche Grifone della Regina. Edoardo III fu re d'Inghilterra dal 1312 al 1377 e apparteneva alla dinastia dei Plantageneti. E ricordato per aver dato inizio alla Guerra dei cent'anni contro la Francia, avanzando pretese sul trono francese come nipote diretto di Filippo IV il Bello. Per questa ragione nel suo stemma araldico, oltre al Leone d'Inghilterra, comparvero anche il giglio di Francia e il grifone, simbolo di coraggio, forza, leadership, vigilanza e visione retta.",
+    recognitionHints: ["queen's beast", "queens beast", "grifone di edoardo iii", "griffin of edward iii", "grifone della regina", "edward iii", "2017", "plantageneti", "guerra dei cent'anni", "giglio di francia", "100 pounds", "1 oz fine gold", "999.9", "royal mint"],
+    visual: { front: "griffin", back: "profile", frontText: "GRIF", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2247,6 +2266,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "britannia-100-sterline-fdc": "britannia-100-sterline-fdc",
   "queens-beast-leone-inghilterra-2016": "queens-beast-leone-inghilterra-2016",
   "tudor-beasts-leone-inghilterra-2022": "tudor-beasts-leone-inghilterra-2022",
+  "queens-beast-grifone-edoardo-iii-2017": "queens-beast-grifone-edoardo-iii-2017",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2346,6 +2366,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "britannia-100-sterline-fdc": "Archivio OroActive",
   "queens-beast-leone-inghilterra-2016": "Archivio OroActive",
   "tudor-beasts-leone-inghilterra-2022": "Archivio OroActive",
+  "queens-beast-grifone-edoardo-iii-2017": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
