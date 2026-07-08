@@ -1591,6 +1591,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "lion", back: "profile", frontText: "LION", backText: "QEII" }
   },
   {
+    id: "tudor-beasts-leone-inghilterra-2022",
+    name: "Tudor Beasts Leone d'Inghilterra 2022",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2022",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.21,
+    fineGold: 31.21,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Elisabetta II creato da Jody Clark con valore nominale 100 Pounds",
+    reverse: "Leone d'Inghilterra della collezione Tudor Beasts con scudo araldico, 1 oz Fine Gold 999.9 e anno 2022",
+    history: "La collezione Tudor Beasts omaggia le dieci bestie araldiche che campeggiano da secoli sul ponte del palazzo di Hampton Court. Le statue richiamano figure araldiche collegate a Enrico VIII e alla sua terza moglie Jane Seymour. La serie in oro puro include il Leone d'Inghilterra, il Toro di Clarence, il Drago dei Tudor, il Levriero di Richmond, il Drago Reale, la Centicora di Beaufort, l'Unicorno di Seymour, la Pantera della Regina, il Leone della Regina e la Pantera di Seymour. Il diritto della moneta mostra il piu recente ritratto della Regina Elisabetta II, creato da Jody Clark.",
+    recognitionHints: ["tudor beasts", "leone d'inghilterra", "lion of england", "2022", "hampton court", "enrico viii", "jane seymour", "jody clark", "100 pounds", "1 oz fine gold", "999.9", "royal mint"],
+    visual: { front: "lion", back: "profile", frontText: "TUDOR", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2227,6 +2246,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "britannia-1-oz": "britannia-1-oz",
   "britannia-100-sterline-fdc": "britannia-100-sterline-fdc",
   "queens-beast-leone-inghilterra-2016": "queens-beast-leone-inghilterra-2016",
+  "tudor-beasts-leone-inghilterra-2022": "tudor-beasts-leone-inghilterra-2022",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2325,6 +2345,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "arca-noe-armenia-2025-1-oz": "Archivio OroActive",
   "britannia-100-sterline-fdc": "Archivio OroActive",
   "queens-beast-leone-inghilterra-2016": "Archivio OroActive",
+  "tudor-beasts-leone-inghilterra-2022": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
