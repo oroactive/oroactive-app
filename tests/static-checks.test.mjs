@@ -715,6 +715,11 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /id: "queens-beast-grifone-edoardo-iii-2017"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2017"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
   assert.match(app, /Griffin of Edward III/);
   assert.match(app, /Guerra dei cent'anni/);
+  assert.match(app, /queens-beast-drago-rosso-galles-2017/);
+  assert.match(app, /Queen's Beast Drago Rosso del Galles 2017/);
+  assert.match(app, /id: "queens-beast-drago-rosso-galles-2017"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2017"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
+  assert.match(app, /Red Dragon of Wales/);
+  assert.match(app, /Llywelyn il Grande/);
   assert.match(app, /queens-beast-unicorno-scozia-2018/);
   assert.match(app, /Queen's Beast Unicorno di Scozia 2018/);
   assert.match(app, /id: "queens-beast-unicorno-scozia-2018"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2018"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
@@ -1048,6 +1053,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/tudor-beasts-leone-inghilterra-2022-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-grifone-edoardo-iii-2017-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-grifone-edoardo-iii-2017-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/queens-beast-drago-rosso-galles-2017-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/queens-beast-drago-rosso-galles-2017-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-unicorno-scozia-2018-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-unicorno-scozia-2018-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-toro-nero-clarence-2018-front.png", root)),
