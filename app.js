@@ -1648,6 +1648,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "unicorn", back: "profile", frontText: "UNIC", backText: "QEII" }
   },
   {
+    id: "queens-beast-toro-nero-clarence-2018",
+    name: "Queen's Beast Toro Nero di Clarence 2018",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2018",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.10,
+    fineGold: 31.10,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Elisabetta II con valore nominale 100 Pounds",
+    reverse: "Toro Nero di Clarence con scudo araldico, iscrizione Black Bull of Clarence, 1 oz Fine Gold 999.9 e anno 2018",
+    history: "Il Toro nero di Clarence e la quinta moneta della serie Queen's Beast e fu coniata nel marzo del 2018. Il nome ufficiale inglese e The Black Bull of Clarence, ma viene chiamata anche Toro della Regina. Il toro e un simbolo araldico di coraggio, passione e trasformazione. Apparve per la prima volta sulle monete durante il regno di Elisabetta I Tudor, ma fu scelto circa un secolo prima da Edoardo IV d'Inghilterra, appartenente alla casata degli York e protagonista della Guerra delle Rose contro i Lancaster. Nel 1471 Edoardo IV sconfisse Enrico VI di Lancaster e governo fino alla fine dei suoi giorni. Dopo la sua morte il toro rimase un simbolo araldico inglese anche sotto il regno di Riccardo III, fratello di Edoardo IV.",
+    recognitionHints: ["queen's beast", "queens beast", "toro nero di clarence", "black bull of clarence", "toro della regina", "2018", "edoardo iv", "york", "lancaster", "guerra delle rose", "riccardo iii", "100 pounds", "1 oz fine gold", "999.9", "royal mint"],
+    visual: { front: "bull", back: "profile", frontText: "BULL", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2287,6 +2306,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "tudor-beasts-leone-inghilterra-2022": "tudor-beasts-leone-inghilterra-2022",
   "queens-beast-grifone-edoardo-iii-2017": "queens-beast-grifone-edoardo-iii-2017",
   "queens-beast-unicorno-scozia-2018": "queens-beast-unicorno-scozia-2018",
+  "queens-beast-toro-nero-clarence-2018": "queens-beast-toro-nero-clarence-2018",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2388,6 +2408,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "tudor-beasts-leone-inghilterra-2022": "Archivio OroActive",
   "queens-beast-grifone-edoardo-iii-2017": "Archivio OroActive",
   "queens-beast-unicorno-scozia-2018": "Archivio OroActive",
+  "queens-beast-toro-nero-clarence-2018": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
