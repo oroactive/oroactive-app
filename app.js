@@ -1705,6 +1705,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "yale", back: "profile", frontText: "YALE", backText: "QEII" }
   },
   {
+    id: "queens-beast-falco-plantageneti-2019",
+    name: "Queen's Beast Falco dei Plantageneti 2019",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2019",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.10,
+    fineGold: 31.10,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Elisabetta II con valore nominale 100 Pounds",
+    reverse: "Falco dei Plantageneti con scudo e fetchlock d'oro aperto, iscrizione Falcon of the Plantagenets, 1 oz Fine Gold 999.9 e anno 2019",
+    history: "Il Falco dei Plantageneti, in inglese The Falcon of the Plantagenets, appartiene alla serie Queen's Beast prodotta dalla Royal Mint. Il falco fu un simbolo araldico scelto dal re Edoardo III per incarnare il suo amore per questo animale ed e strettamente associato anche al suo pronipote Edoardo IV. Il falco bianco dell'incoronazione della Regina reggeva uno scudo con un secondo falco bianco all'interno di un fetchlock, o pastoia d'oro aperta. Fetchlock e falco erano emblemi popolari nelle case di York e Lancaster, discendenti dai figli piu giovani di Edoardo III, Giovanni di Gaunt ed Edmondo di Langley. In seguito Enrico VII, unendo York e Lancaster nella nascente casata Tudor grazie al matrimonio con Elisabetta di York, uso spesso il simbolo araldico del falco, tramandato anche come distintivo preferito della regina Elisabetta I.",
+    recognitionHints: ["queen's beast", "queens beast", "falco dei plantageneti", "falcon of the plantagenets", "falco", "plantageneti", "2019", "edoardo iii", "edoardo iv", "fetchlock", "york", "lancaster", "enrico vii", "elisabetta i", "100 pounds", "1 oz fine gold", "999.9", "royal mint"],
+    visual: { front: "falcon", back: "profile", frontText: "FALC", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2347,6 +2366,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "queens-beast-unicorno-scozia-2018": "queens-beast-unicorno-scozia-2018",
   "queens-beast-toro-nero-clarence-2018": "queens-beast-toro-nero-clarence-2018",
   "queens-beast-centricora-beaufort-2019": "queens-beast-centricora-beaufort-2019",
+  "queens-beast-falco-plantageneti-2019": "queens-beast-falco-plantageneti-2019",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2451,6 +2471,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "queens-beast-unicorno-scozia-2018": "Archivio OroActive",
   "queens-beast-toro-nero-clarence-2018": "Archivio OroActive",
   "queens-beast-centricora-beaufort-2019": "Archivio OroActive",
+  "queens-beast-falco-plantageneti-2019": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"

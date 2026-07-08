@@ -735,6 +735,11 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /id: "queens-beast-centricora-beaufort-2019"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2019"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
   assert.match(app, /Yale of Beaufort/);
   assert.match(app, /Lady Margaret Beaufort/);
+  assert.match(app, /queens-beast-falco-plantageneti-2019/);
+  assert.match(app, /Queen's Beast Falco dei Plantageneti 2019/);
+  assert.match(app, /id: "queens-beast-falco-plantageneti-2019"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2019"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
+  assert.match(app, /Falcon of the Plantagenets/);
+  assert.match(app, /fetchlock/);
   assert.match(app, /"sterlina-oro-sovrana"[\s\S]*"american-eagle-1-oz"[\s\S]*"arca-noe-armenia-2025-1-oz"/);
   assert.doesNotMatch(app.slice(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS"), app.indexOf("function bilanciaDoroCoinImages")), /"american-buffalo-1-oz"/);
   assert.match(app, /"centenario-50-pesos"[\s\S]*"ducato-austriaco"[\s\S]*"20-dollari-double-eagle"[\s\S]*"20-mark-germania"/);
@@ -1061,6 +1066,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/queens-beast-toro-nero-clarence-2018-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-centricora-beaufort-2019-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/queens-beast-centricora-beaufort-2019-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/queens-beast-falco-plantageneti-2019-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/queens-beast-falco-plantageneti-2019-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-belga-20-franchi-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-belga-20-franchi-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-leopold-belgio-front.png", root)),
