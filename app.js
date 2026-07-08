@@ -1667,6 +1667,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "bull", back: "profile", frontText: "BULL", backText: "QEII" }
   },
   {
+    id: "queens-beast-centricora-beaufort-2019",
+    name: "Queen's Beast Centicora di Beaufort 2019",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2019",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.10,
+    fineGold: 31.10,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Elisabetta II con valore nominale 100 Pounds",
+    reverse: "Yale of Beaufort o Centicora di Beaufort con scudo araldico, 1 oz Fine Gold 999.9 e anno 2019",
+    history: "Lo Yale di Beaufort, o Centicora di Beaufort, e una figura araldica della serie Queen's Beast. Lo Yale era una bestia mitica descritta come presumibilmente bianca e coperta di macchie d'oro, capace di ruotare indipendentemente ciascuna delle sue corna. Il simbolo araldico discende da Lady Margaret Beaufort, contessa di Richmond e madre del re d'Inghilterra Enrico VII, che continuo a utilizzarlo nella tradizione dinastica Tudor.",
+    recognitionHints: ["queen's beast", "queens beast", "centricora di beaufort", "yale of beaufort", "yale", "beaufort", "lady margaret beaufort", "enrico vii", "2019", "100 pounds", "1 oz fine gold", "999.9", "royal mint"],
+    visual: { front: "yale", back: "profile", frontText: "YALE", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2307,6 +2326,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "queens-beast-grifone-edoardo-iii-2017": "queens-beast-grifone-edoardo-iii-2017",
   "queens-beast-unicorno-scozia-2018": "queens-beast-unicorno-scozia-2018",
   "queens-beast-toro-nero-clarence-2018": "queens-beast-toro-nero-clarence-2018",
+  "queens-beast-centricora-beaufort-2019": "queens-beast-centricora-beaufort-2019",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2409,6 +2429,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "queens-beast-grifone-edoardo-iii-2017": "Archivio OroActive",
   "queens-beast-unicorno-scozia-2018": "Archivio OroActive",
   "queens-beast-toro-nero-clarence-2018": "Archivio OroActive",
+  "queens-beast-centricora-beaufort-2019": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
