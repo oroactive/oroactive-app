@@ -1572,6 +1572,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "/assets/coins/britannia-100-sterline-fdc-fronte.png", back: "/assets/coins/britannia-100-sterline-fdc-retro.png", frontText: "GB", backText: "BRI" }
   },
   {
+    id: "queens-beast-leone-inghilterra-2016",
+    name: "Queen's Beast Leone d'Inghilterra 2016",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2016",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.10,
+    fineGold: 31.10,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Elisabetta II con valore nominale 100 Pounds",
+    reverse: "Leone d'Inghilterra coronato con scudo reale, iscrizione Lion of England, 1 oz Fine Gold 999.9 e anno 2016",
+    history: "La prima moneta d'oro della serie Queen's Beast e il Leone d'Inghilterra, in inglese Lion of England, comunemente chiamato anche Leone della Regina. Prodotta nel 2016 dalla Royal Mint, apre la collezione e conserva un interesse superiore rispetto alle emissioni successive. Il leone era gia presente nell'araldica inglese ai tempi di Guglielmo il Conquistatore, duca di Normandia divenuto re d'Inghilterra nel 1066 dopo la vittoria sui Sassoni. L'icona del leone rimase centrale anche nella tradizione reale inglese, fino a Riccardo I d'Inghilterra, ricordato come Cuor di Leone per forza, coraggio e stemma araldico.",
+    recognitionHints: ["queen's beast", "queens beast", "leone d'inghilterra", "lion of england", "leone della regina", "2016", "100 pounds", "1 oz fine gold", "999.9", "royal mint", "elizabeth ii"],
+    visual: { front: "lion", back: "profile", frontText: "LION", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2207,6 +2226,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "arca-noe-armenia-2025-1-oz": "arca-noe-armenia-2025-1-oz",
   "britannia-1-oz": "britannia-1-oz",
   "britannia-100-sterline-fdc": "britannia-100-sterline-fdc",
+  "queens-beast-leone-inghilterra-2016": "queens-beast-leone-inghilterra-2016",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2304,6 +2324,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "somalia-elephant-2023-1-oz": "Archivio OroActive",
   "arca-noe-armenia-2025-1-oz": "Archivio OroActive",
   "britannia-100-sterline-fdc": "Archivio OroActive",
+  "queens-beast-leone-inghilterra-2016": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
