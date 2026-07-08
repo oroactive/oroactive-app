@@ -5050,6 +5050,35 @@ const SECTION_ROUTE_ALIASES = {
   academy: { screen: "training" }
 };
 
+const OROACTIVE_SCREEN_TARGETS = {
+  practice: "Atto di Vendita",
+  archive: "Elenco Atti",
+  suspendedPractices: "Pratiche sospese",
+  approvals: "Richieste autorizzazione",
+  notifications: "Notifiche",
+  fusion: "Giacenza",
+  dashboard: "Dashboard",
+  storeHealth: "Salute Negozio",
+  founderDailyReport: "Founder Daily Report",
+  quotazione: "Quotazione",
+  stores: "Negozi",
+  backups: "Backup",
+  antifraud: "Antifrode",
+  auditTrail: "Audit Trail",
+  aurumShield: "Aurum Shield",
+  assistant: "Assistente IA",
+  aurumAdmin: "Gestione Aurum",
+  training: "Academy",
+  coinEncyclopedia: "Elenco Monete",
+  gaming: "Gaming",
+  aurumBlocks: "Aurum Blocks",
+  crm: "CRM Clienti",
+  knowledgeNotes: "Knowledge Base",
+  privacyCenter: "Centro Privacy",
+  profile: "Dati utente",
+  users: "Utenti"
+};
+
 function resolveSectionRoute(section = "") {
   const key = String(section || "").trim();
   return SECTION_ROUTE_ALIASES[key] || { screen: key };
@@ -5060,7 +5089,10 @@ function menuButtonMarkup(item = {}, extraClass = "") {
     `type="button"`,
     `data-menu-item="${escapeHtml(item.id)}"`
   ];
-  if (item.section) attributes.push(`data-section="${escapeHtml(item.section)}"`);
+  if (item.section) {
+    attributes.push(`data-section="${escapeHtml(item.section)}"`);
+    attributes.push(`data-menu-target="${escapeHtml(item.section)}"`);
+  }
   if (item.courseTabShortcut) attributes.push(`data-course-tab-shortcut="${escapeHtml(item.courseTabShortcut)}"`);
   if (item.action) attributes.push(`data-menu-action="${escapeHtml(item.action)}"`);
   return `
@@ -5079,7 +5111,10 @@ function mainMenuSearchResultMarkup(item = {}) {
     `type="button"`,
     `data-menu-item="${escapeHtml(item.id)}"`
   ];
-  if (item.section) attributes.push(`data-section="${escapeHtml(item.section)}"`);
+  if (item.section) {
+    attributes.push(`data-section="${escapeHtml(item.section)}"`);
+    attributes.push(`data-menu-target="${escapeHtml(item.section)}"`);
+  }
   if (item.courseTabShortcut) attributes.push(`data-course-tab-shortcut="${escapeHtml(item.courseTabShortcut)}"`);
   if (item.action) attributes.push(`data-menu-action="${escapeHtml(item.action)}"`);
   return `
@@ -5186,7 +5221,7 @@ function renderFounderMenuKpis() {
         <strong>Nessun dato operativo disponibile oggi</strong>
         <small>Apri la Dashboard per controllare KPI e report quando i dati saranno caricati.</small>
       </div>
-      <button class="main-menu-dashboard-link" type="button" data-section="dashboard">Vai alla Dashboard</button>
+      <button class="main-menu-dashboard-link" type="button" data-section="dashboard" data-menu-target="dashboard">Vai alla Dashboard</button>
     `;
     return;
   }
@@ -5194,7 +5229,7 @@ function renderFounderMenuKpis() {
     <div class="main-menu-founder-kpi-list">
       ${visibleKpis.map((kpi) => `<article><span>${escapeHtml(kpi.label)}</span><strong>${escapeHtml(String(kpi.value))}</strong></article>`).join("")}
     </div>
-    <button class="main-menu-dashboard-link" type="button" data-section="dashboard">Vai alla Dashboard</button>
+    <button class="main-menu-dashboard-link" type="button" data-section="dashboard" data-menu-target="dashboard">Vai alla Dashboard</button>
   `;
 }
 
@@ -5225,19 +5260,20 @@ function renderRoleBasedMenus() {
     `).join("");
   }
   renderFounderMenuKpis();
+  if (isFounder()) auditDeadNavigationButtons();
 }
 
 function renderMainMenuFallback() {
   if (mainMenuQuickActions && !mainMenuQuickActions.querySelector("button")) {
     mainMenuQuickActions.innerHTML = `
-      <button class="main-menu-item-button main-menu-quick-button" type="button" data-section="practice">
+      <button class="main-menu-item-button main-menu-quick-button" type="button" data-section="practice" data-menu-target="practice">
         <span class="main-menu-item-icon" aria-hidden="true">+</span>
         <span class="main-menu-item-copy">
           <strong>Nuovo atto</strong>
           <small>Crea subito</small>
         </span>
       </button>
-      <button class="main-menu-item-button main-menu-quick-button" type="button" data-section="archive">
+      <button class="main-menu-item-button main-menu-quick-button" type="button" data-section="archive" data-menu-target="archive">
         <span class="main-menu-item-icon" aria-hidden="true">Lista</span>
         <span class="main-menu-item-copy">
           <strong>Elenco atti</strong>
@@ -5248,14 +5284,14 @@ function renderMainMenuFallback() {
   }
   if (mainMenuActions && !mainMenuActions.querySelector("button")) {
     mainMenuActions.innerHTML = `
-      <button class="main-menu-item-button" type="button" data-section="dashboard">
+      <button class="main-menu-item-button" type="button" data-section="dashboard" data-menu-target="dashboard">
         <span class="main-menu-item-icon" aria-hidden="true">KPI</span>
         <span class="main-menu-item-copy">
           <strong>Dashboard</strong>
           <small>Panoramica operativa</small>
         </span>
       </button>
-      <button class="main-menu-item-button" type="button" data-section="quotazione">
+      <button class="main-menu-item-button" type="button" data-section="quotazione" data-menu-target="quotazione">
         <span class="main-menu-item-icon" aria-hidden="true">EUR</span>
         <span class="main-menu-item-copy">
           <strong>Quotazioni</strong>
@@ -5513,7 +5549,7 @@ function minimumMenuItemsForRole(role) {
 
 function logoutMinimumButtonMarkup(extraClass = "") {
   return `
-    <button class="main-menu-item-button ${escapeHtml(extraClass)}" type="button" data-auth-recovery="logout" aria-label="Logout">
+    <button class="main-menu-item-button ${escapeHtml(extraClass)}" type="button" data-auth-recovery="logout" data-menu-target="logout" aria-label="Logout">
       <span class="main-menu-item-icon" aria-hidden="true">OUT</span>
       <span class="main-menu-item-copy">
         <strong>Logout</strong>
@@ -5551,6 +5587,7 @@ function renderMainMenuMinimum() {
       </section>
     `;
   }
+  if (isFounder()) auditDeadNavigationButtons();
 }
 
 async function loadCriticalUserDataSafely() {
@@ -6058,14 +6095,12 @@ function setScreen(id) {
     showToast("Sezione non disponibile per il tuo ruolo.");
     return;
   }
-  prepareInternalSectionLayout();
   closeMainMenuDropdowns();
   closeMainUserMenu();
   const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
   if (leavingArchive) clearActSearch();
-  screens.forEach((screen) => screen.classList.toggle("active-screen", screen.id === id));
-  syncNotificationPlacement();
-  navItems.forEach((item) => item.classList.toggle("active", item.dataset.section === id));
+  const opened = openAppScreen(id, { requestedSection });
+  if (!opened) return;
   if (practiceTopbar) practiceTopbar.hidden = id !== "practice";
   if (id !== "quotazione" && bullionVaultChart) {
     bullionVaultChart.innerHTML = "";
@@ -6478,8 +6513,150 @@ function safeScrollTopInstant() {
 
 function setMainMenuMode(active) {
   document.body.classList.toggle("main-menu-active", active);
+  document.body.classList.toggle("app-active", !active);
   if (appShell) appShell.hidden = active;
   if (mainMenuScreen) mainMenuScreen.hidden = !active;
+  if (active) {
+    if (appShell) {
+      appShell.style.display = "none";
+      appShell.style.visibility = "hidden";
+      appShell.style.opacity = "0";
+    }
+    if (mainMenuScreen) {
+      mainMenuScreen.removeAttribute("hidden");
+      mainMenuScreen.style.display = "block";
+      mainMenuScreen.style.visibility = "visible";
+      mainMenuScreen.style.opacity = "1";
+    }
+  }
+}
+
+function screenTargetExists(target = "") {
+  const route = resolveSectionRoute(target);
+  return Boolean(route.screen && document.getElementById(route.screen));
+}
+
+function renderNavigationError(screenId) {
+  const label = OROACTIVE_SCREEN_TARGETS[screenId] || screenId || "funzione";
+  showToast?.(`Funzione non disponibile: ${label}`, "error");
+}
+
+function openAppScreen(screenId, options = {}) {
+  console.info("[OroActive Navigation] openAppScreen", { screenId, options });
+
+  const route = resolveSectionRoute(screenId);
+  const targetScreenId = route.screen;
+  const targetScreen = document.getElementById(targetScreenId);
+
+  if (!targetScreen) {
+    console.error("[OroActive Navigation] Screen not found", targetScreenId || screenId);
+    renderNavigationError(targetScreenId || screenId);
+    return false;
+  }
+
+  if (route.fusionView) state.fusionView = route.fusionView;
+
+  if (mainMenuScreen) {
+    mainMenuScreen.hidden = true;
+    mainMenuScreen.style.display = "none";
+    mainMenuScreen.style.visibility = "hidden";
+  }
+
+  if (appShell) {
+    appShell.hidden = false;
+    appShell.removeAttribute("hidden");
+    appShell.style.display = "";
+    appShell.style.visibility = "visible";
+    appShell.style.opacity = "1";
+  }
+
+  if (splashScreen) {
+    splashScreen.classList.add("hidden");
+    splashScreen.hidden = true;
+  }
+
+  document.body.classList.remove("main-menu-active", "login-active", "splash-active", "loading-active", "boot-loading");
+  document.body.classList.add("app-active", "authenticated");
+
+  screens.forEach((screen) => {
+    screen.classList.remove("active-screen");
+    screen.hidden = true;
+    screen.style.display = "none";
+    screen.style.visibility = "hidden";
+    screen.style.opacity = "0";
+  });
+
+  targetScreen.hidden = false;
+  targetScreen.removeAttribute("hidden");
+  targetScreen.style.display = "";
+  targetScreen.style.visibility = "visible";
+  targetScreen.style.opacity = "1";
+  targetScreen.classList.add("active-screen");
+
+  navItems.forEach((item) => item.classList.toggle("active", item.dataset.section === targetScreenId));
+  syncNotificationPlacement();
+
+  console.info("[OroActive Navigation] screen opened", {
+    screenId: targetScreenId,
+    visible: !targetScreen.hidden,
+    display: getComputedStyle(targetScreen).display
+  });
+
+  return true;
+}
+
+function showMainMenuNavigationShell() {
+  screens.forEach((screen) => {
+    screen.classList.remove("active-screen");
+    screen.hidden = true;
+    screen.style.display = "none";
+    screen.style.visibility = "hidden";
+    screen.style.opacity = "0";
+  });
+
+  if (appShell) {
+    appShell.hidden = true;
+    appShell.style.display = "none";
+    appShell.style.visibility = "hidden";
+    appShell.style.opacity = "0";
+  }
+
+  if (mainMenuScreen) {
+    mainMenuScreen.hidden = false;
+    mainMenuScreen.removeAttribute("hidden");
+    mainMenuScreen.style.display = "block";
+    mainMenuScreen.style.visibility = "visible";
+    mainMenuScreen.style.opacity = "1";
+  }
+
+  document.body.classList.remove("app-active");
+  document.body.classList.add("main-menu-active", "authenticated");
+}
+
+function auditDeadNavigationButtons() {
+  const clickableTargets = [
+    ...document.querySelectorAll("[data-menu-target], [data-screen-target]")
+  ];
+  const missing = [];
+
+  clickableTargets.forEach((button) => {
+    const target = button.getAttribute("data-menu-target") || button.getAttribute("data-screen-target");
+    if (!target || target === "logout") return;
+    if (!screenTargetExists(target)) {
+      missing.push({
+        label: button.textContent.trim(),
+        target
+      });
+    }
+  });
+
+  if (missing.length) {
+    console.error("[OroActive Navigation] Dead targets found", missing);
+  } else {
+    console.info("[OroActive Navigation] No dead navigation targets");
+  }
+
+  return missing;
 }
 
 function renderMainMenuRecoveryError(error, phase = "menu") {
@@ -6548,6 +6725,7 @@ function cleanupUiBeforeMainMenu() {
     "sale-deed-active",
     "academy-view-active"
   );
+  showMainMenuNavigationShell();
   safeScrollTopInstant();
 }
 
@@ -6611,9 +6789,23 @@ function schedulePostLoginMenuGuard(phase = "login") {
 
 function prepareInternalSectionLayout() {
   document.body.classList.remove("main-menu-active");
-  splashScreen.classList.add("hidden");
-  if (appShell) appShell.hidden = false;
-  if (mainMenuScreen) mainMenuScreen.hidden = true;
+  document.body.classList.add("app-active", "authenticated");
+  if (splashScreen) {
+    splashScreen.classList.add("hidden");
+    splashScreen.hidden = true;
+  }
+  if (appShell) {
+    appShell.hidden = false;
+    appShell.removeAttribute("hidden");
+    appShell.style.display = "";
+    appShell.style.visibility = "visible";
+    appShell.style.opacity = "1";
+  }
+  if (mainMenuScreen) {
+    mainMenuScreen.hidden = true;
+    mainMenuScreen.style.display = "none";
+    mainMenuScreen.style.visibility = "hidden";
+  }
   closeMainMenuDropdowns();
   closeMainMenuSearchResults();
   closeMainUserMenu();
@@ -6628,7 +6820,6 @@ function showMainMenuFromSplash() {
 async function enterSectionFromMainMenu(section) {
   const route = resolveSectionRoute(section);
   if (route.fusionView) state.fusionView = route.fusionView;
-  prepareInternalSectionLayout();
   setAurumSection(section);
   updateAurumMascotVisibility();
   if (route.screen === "practice") {
@@ -20880,7 +21071,8 @@ async function openMainMenuItem(button) {
     await checkForAppUpdate({ showResult: true });
     return;
   }
-  if (button.dataset.section) await enterSectionFromMainMenu(button.dataset.section);
+  const target = button.dataset.menuTarget || button.dataset.screenTarget || button.dataset.section;
+  if (target) await enterSectionFromMainMenu(target);
 }
 
 async function openBrandMenuItem(button) {
@@ -20907,11 +21099,62 @@ async function openBrandMenuItem(button) {
     await checkForAppUpdate({ showResult: true });
     return;
   }
-  if (!button.dataset.section) return;
-  setScreen(button.dataset.section);
-  if (button.dataset.section === "practice") await resetCurrentPractice({ deferPracticeNumber: true });
+  const target = button.dataset.menuTarget || button.dataset.screenTarget || button.dataset.section;
+  if (!target) return;
+  setScreen(target);
+  if (resolveSectionRoute(target).screen === "practice") await resetCurrentPractice({ deferPracticeNumber: true });
   closeBrandMenu();
 }
+
+function bindGlobalNavigationHandlers() {
+  if (window.__OROACTIVE_GLOBAL_NAV_BOUND__) return;
+
+  document.addEventListener("click", (event) => {
+    if (event.defaultPrevented) return;
+
+    const menuTarget = event.target.closest("[data-menu-target]");
+    if (menuTarget) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const target = menuTarget.getAttribute("data-menu-target");
+      console.info("[OroActive Navigation] data-menu-target click", target);
+
+      if (target === "logout") {
+        handleLogout?.();
+        return;
+      }
+
+      void enterSectionFromMainMenu(target);
+      return;
+    }
+
+    const screenTarget = event.target.closest("[data-screen-target]");
+    if (screenTarget) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const target = screenTarget.getAttribute("data-screen-target");
+      console.info("[OroActive Navigation] data-screen-target click", target);
+
+      setScreen(target);
+      return;
+    }
+
+    const returnButton = event.target.closest("[data-return-menu]");
+    if (returnButton) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      void returnToMainMenu();
+    }
+  });
+
+  window.__OROACTIVE_GLOBAL_NAV_BOUND__ = true;
+  console.info("[OroActive Navigation] global handlers bound");
+}
+
+bindGlobalNavigationHandlers();
 
 brandMenuButton?.addEventListener("click", (event) => {
   event.stopPropagation();
@@ -21046,7 +21289,11 @@ tutorialSkip?.addEventListener("click", () => {
 });
 
 document.querySelectorAll("[data-return-menu]").forEach((button) => {
-  button.addEventListener("click", returnToMainMenu);
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void returnToMainMenu();
+  });
 });
 
 brandDropdown?.addEventListener("click", (event) => {

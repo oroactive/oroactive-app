@@ -10405,6 +10405,42 @@ button.quality-review-badge {
   animation: oa-section-in 0.22s ease-out both;
 }
 
+body.app-active .app-shell {
+  display: grid !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+body.app-active .main-menu-screen {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.main-menu-active .main-menu-screen {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+body.main-menu-active .app-shell {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+.screen.active-screen {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.screen[hidden] {
+  display: none !important;
+}
+
 .form-panel,
 .side-panel > div,
 .dashboard-card,
