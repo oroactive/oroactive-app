@@ -1629,6 +1629,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "griffin", back: "profile", frontText: "GRIF", backText: "QEII" }
   },
   {
+    id: "queens-beast-unicorno-scozia-2018",
+    name: "Queen's Beast Unicorno di Scozia 2018",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2018",
+    nominal: "100 Pounds",
+    metal: "Oro",
+    purity: 0.9999,
+    purityLabel: "24 kt / 999,9‰",
+    grossWeight: 31.10,
+    fineGold: 31.10,
+    diameter: 32.69,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Elisabetta II con valore nominale 100 Pounds",
+    reverse: "Unicorno di Scozia con catena e scudo araldico, iscrizione Unicorn of Scotland, 1 oz Fine Gold 999.9 e anno 2018",
+    history: "L'Unicorno di Scozia e la quarta moneta della serie Queen's Beast e fu coniata nel settembre del 2018. Il nome ufficiale inglese e The Unicorn of Scotland, ma viene chiamata anche Unicorno della Regina. L'unicorno e un simbolo scozzese e venne portato a Londra da Giacomo VI di Scozia quando assunse anche il titolo di re d'Inghilterra, unendo le due corone. Da quel momento il sovrano fu denominato Giacomo I d'Inghilterra e fu il primo a regnare su entrambe le isole britanniche. Il nuovo stemma reale del sovrano era costituito da un unicorno accanto al leone d'Inghilterra, simbolo dell'unione anche araldica dei due troni.",
+    recognitionHints: ["queen's beast", "queens beast", "unicorno di scozia", "unicorn of scotland", "unicorno della regina", "2018", "giacomo vi", "giacomo i", "scozia", "scotland", "100 pounds", "1 oz fine gold", "999.9", "royal mint"],
+    visual: { front: "unicorn", back: "profile", frontText: "UNIC", backText: "QEII" }
+  },
+  {
     id: "kangaroo-nugget-1-oz",
     name: "Australia Nugget d'oro (Kangaroo) 100 Dollari",
     country: "Australia",
@@ -2267,6 +2286,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "queens-beast-leone-inghilterra-2016": "queens-beast-leone-inghilterra-2016",
   "tudor-beasts-leone-inghilterra-2022": "tudor-beasts-leone-inghilterra-2022",
   "queens-beast-grifone-edoardo-iii-2017": "queens-beast-grifone-edoardo-iii-2017",
+  "queens-beast-unicorno-scozia-2018": "queens-beast-unicorno-scozia-2018",
   "100-lire-vittorio-emanuele-iii-fascione": "100-lire-vittorio-emanuele-iii-fascione",
   "kangaroo-nugget-1-oz": "australia-nugget-kangaroo-100-dollari",
   "australia-nugget-kangaroo-100-dollari-fdc": "australia-nugget-kangaroo-100-dollari-fdc",
@@ -2367,6 +2387,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "queens-beast-leone-inghilterra-2016": "Archivio OroActive",
   "tudor-beasts-leone-inghilterra-2022": "Archivio OroActive",
   "queens-beast-grifone-edoardo-iii-2017": "Archivio OroActive",
+  "queens-beast-unicorno-scozia-2018": "Archivio OroActive",
   "100-lire-vittorio-emanuele-iii-fascione": "Archivio OroActive",
   "ducato-austriaco": "Archivio OroActive",
   "4-ducati-austriaci": "Archivio OroActive"
