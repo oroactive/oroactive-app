@@ -1,9 +1,20 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import assert from "node:assert/strict";
+import vm from "node:vm";
 
 const root = new URL("../", import.meta.url);
 const file = (name) => readFile(new URL(name, root), "utf8");
+
+function extractGoldCoinCatalog(app) {
+  const start = app.indexOf("const BILANCIA_DORO_COIN_IMAGE_BASE");
+  const end = app.indexOf("const COIN_RECOGNITION_HINTS", start);
+  assert.notEqual(start, -1, "inizio catalogo immagini monete mancante");
+  assert.notEqual(end, -1, "fine catalogo immagini monete mancante");
+  const context = {};
+  vm.runInNewContext(`${app.slice(start, end)}\nglobalThis.catalog = GOLD_COIN_CATALOG;`, context);
+  return context.catalog;
+}
 
 test("frontend usa configurazione API condivisa e login con fallback", async () => {
   const [index, app, config] = await Promise.all([
@@ -1209,6 +1220,50 @@ test("immagini Bilancia d'Oro sono inizializzate prima del catalogo monete", asy
   assert.ok(imageFunctionIndex < wrapperFunctionIndex, "bilanciaDoroCoinImages deve precedere withBilanciaDoroImages");
   assert.ok(wrapperFunctionIndex < catalogIndex, "helper immagini deve precedere il catalogo");
   assert.ok(invertedIndex < firstRuntimeCallIndex, "set invertito deve precedere ogni chiamata runtime");
+});
+
+test("tutte le monete del catalogo hanno foto fronte retro presenti", async () => {
+  const app = await file("app.js");
+  const catalog = extractGoldCoinCatalog(app);
+  const ids = new Set();
+  const duplicateIds = [];
+  const missingImages = [];
+  const referencedImages = new Set();
+
+  for (const coin of catalog) {
+    if (ids.has(coin.id)) duplicateIds.push(coin.id);
+    ids.add(coin.id);
+    for (const side of ["front", "back"]) {
+      const imagePath = coin.bookImages?.[side];
+      if (!imagePath) {
+        missingImages.push(`${coin.id}:${side}`);
+        continue;
+      }
+      const relativePath = imagePath.replace(/^\//, "");
+      referencedImages.add(relativePath);
+      await access(new URL(relativePath, root));
+    }
+  }
+
+  const assetNames = await readdir(new URL("assets/coins/bilancia-oro/", root));
+  const sideMap = new Map();
+  for (const name of assetNames.filter((item) => /\.(png|jpe?g|webp)$/i.test(item))) {
+    const match = name.match(/^(.*)-(front|back)\.(png|jpe?g|webp)$/i);
+    if (!match) continue;
+    const [, slug, side] = match;
+    if (!sideMap.has(slug)) sideMap.set(slug, new Set());
+    sideMap.get(slug).add(side.toLowerCase());
+  }
+  const unpairedAssets = [...sideMap.entries()]
+    .filter(([, sides]) => !sides.has("front") || !sides.has("back"))
+    .map(([slug]) => slug);
+
+  assert.equal(catalog.length, 99);
+  assert.deepEqual(duplicateIds, []);
+  assert.deepEqual(missingImages, []);
+  assert.deepEqual(unpairedAssets, []);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-back.png"), true);
 });
 
 test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () => {

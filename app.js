@@ -764,9 +764,7 @@ const AURUM_COMPRO_ORO_QUIZ = [
 ];
 
 const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
-const COIN_PHOTO_DISABLED_IDS = new Set([
-  "american-eagle-1-oz"
-]);
+const COIN_PHOTO_DISABLED_IDS = new Set();
 
 const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS = new Set([
   "sterlina-oro-sovrana",
@@ -2413,6 +2411,7 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "40-lire-oro-napoleone-i": "Archivio OroActive",
   "marengo-20-lire-carlo-alberto": "Archivio OroActive",
   "marengo-20-lire-carlo-felice": "Archivio OroActive",
+  "american-eagle-1-oz": "Wikimedia Commons / United States Mint",
   "american-buffalo-1-oz": "Archivio OroActive",
   "maple-leaf-1-oz": "Archivio OroActive",
   "canada-maple-leaf-20-dollari": "Archivio OroActive",
