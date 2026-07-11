@@ -765,8 +765,6 @@ const AURUM_COMPRO_ORO_QUIZ = [
 
 const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
 const COIN_PHOTO_DISABLED_IDS = new Set([
-  "britannia-10-sterline-oro",
-  "britannia-100-sterline-fdc",
   "american-eagle-1-oz"
 ]);
 
@@ -1559,25 +1557,6 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "profile", back: "britannia", frontText: "GB", backText: "BRI" }
   },
   {
-    id: "britannia-100-sterline-fdc",
-    name: "100 Sterline Britannia d'oro (FIOR DI CONIO)",
-    country: "Regno Unito",
-    mintYears: "1987-oggi",
-    nominal: "100 Pounds",
-    metal: "Oro",
-    purity: 0.9999,
-    purityLabel: "24 kt / 999,9‰ dal 2013",
-    grossWeight: 31.104,
-    fineGold: 0.9999,
-    diameter: 32.69,
-    edge: "Zigrinato",
-    obverse: "Ritratto del sovrano britannico",
-    reverse: "Britannia con elmo, scudo e tridente",
-    history: "Le monete d'oro Gold Britannia sono monete inglesi emesse dalla Royal Mint (Zecca Reale inglese) in oro dal 1987. La Gold Britannia e' stata la prima moneta in oro da investimento europea del peso di 1 oncia troy; in Gran Bretagna ha corso legale e valore nominale di 100 sterline. La Britannia d'oro e' nota anche per l'esenzione dal capital gain tax nel Regno Unito. Le Gold Britannia sono prodotte anche nei tagli da 1/2, 1/4 e 1/10 di oncia troy e, dal 2013, anche in formati aggiuntivi. Dal 2013 le monete hanno purezza 999,9/1000, mentre fino al 2012 erano a 916,7/1000. Il rovescio raffigura Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d'ulivo; il dritto presenta il ritratto del sovrano britannico.",
-    recognitionHints: ["britannia", "100 pounds", "tridente", "shield", "british"],
-    visual: { front: "profile", back: "britannia", frontText: "GB", backText: "BRI" }
-  },
-  {
     id: "queens-beast-leone-inghilterra-2016",
     name: "Queen's Beast Leone d'Inghilterra 2016",
     country: "Regno Unito",
@@ -2337,68 +2316,6 @@ const GOLD_COIN_CATALOG = [
     recognitionHints: ["20 mark", "deutsches reich", "kaiser", "aigle", "aquila imperiale"],
     visual: { front: "profile", back: "eagle", frontText: "20M", backText: "DR" }
   }
-
-,  {
-    id: "britannia-10-sterline-oro",
-    slug: "britannia-10-sterline-oro",
-    name: "10 Sterline Britannia d'oro",
-    title: "10 Sterline Britannia d'oro",
-    displayName: "10 Sterline Britannia d'oro",
-    country: "Regno Unito",
-    stato: "Regno Unito",
-    nation: "Regno Unito",
-    group: "Regno Unito",
-    category: "Regno Unito",
-    denomination: "10 Sterline",
-    metal: "Oro",
-    mint: "Royal Mint",
-    producer: "Royal Mint",
-    purity: "916,7/1000 - 999,9/1000",
-    titolo: "916,7/1000 - 999,9/1000",
-    weight: "3,11 grammi",
-    peso: "3,11 grammi",
-    weightGrams: 3.11,
-    diameter: "16,5 millimetri",
-    diametro: "16,5 millimetri",
-    diameterMm: 16.5,
-    period: "Anni misti",
-    periodo: "Anni misti",
-    condition: "Anni misti",
-    statoConservazione: "Anni misti",
-    frontLabel: "Fronte - Regina Elisabetta II",
-    backLabel: "Retro - Britannia",
-    obverse: "Ritratto della Regina Elisabetta II con iscrizione regale.",
-    reverse: "Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d'ulivo.",
-    image: "",
-    frontImage: "",
-    obverseImage: "",
-    imageFront: "",
-    backImage: "",
-    reverseImage: "",
-    imageBack: "",
-    visual: { front: "profile", back: "britannia", frontText: "10£", backText: "BRI" },
-    description: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
-    history: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
-    story: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
-    technicalDetails: [
-      { label: "Titolo", value: "916,7/1000 - 999,9/1000" },
-      { label: "Peso", value: "3,11 grammi" },
-      { label: "Diametro", value: "16,5 millimetri" },
-      { label: "Periodo/Stato", value: "Anni misti" }
-    ],
-    details: [
-      { label: "Titolo", value: "916,7/1000 - 999,9/1000" },
-      { label: "Peso", value: "3,11 grammi" },
-      { label: "Diametro", value: "16,5 millimetri" },
-      { label: "Periodo/Stato", value: "Anni misti" }
-    ],
-    specifications: {
-      Titolo: "916,7/1000 - 999,9/1000",
-      Peso: "3,11 grammi",
-      Diametro: "16,5 millimetri",
-      "Periodo/Stato": "Anni misti"
-    }
-  }
 ];
 
 const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
@@ -2441,7 +2358,6 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "somalia-elephant-2023-1-oz": "somalia-elephant-2023-1-oz",
   "arca-noe-armenia-2025-1-oz": "arca-noe-armenia-2025-1-oz",
   "britannia-1-oz": "britannia-1-oz",
-  "britannia-100-sterline-fdc": "britannia-100-sterline-fdc",
   "queens-beast-leone-inghilterra-2016": "queens-beast-leone-inghilterra-2016",
   "tudor-beasts-leone-inghilterra-2022": "tudor-beasts-leone-inghilterra-2022",
   "tudor-beasts-centricora-beaufort-2023": "tudor-beasts-centricora-beaufort-2023",
@@ -2550,7 +2466,6 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "austria-4-euro-filarmonica-vienna-oro-fdc": "Archivio OroActive",
   "somalia-elephant-2023-1-oz": "Archivio OroActive",
   "arca-noe-armenia-2025-1-oz": "Archivio OroActive",
-  "britannia-100-sterline-fdc": "Archivio OroActive",
   "queens-beast-leone-inghilterra-2016": "Archivio OroActive",
   "tudor-beasts-leone-inghilterra-2022": "Archivio OroActive",
   "tudor-beasts-centricora-beaufort-2023": "Archivio OroActive",

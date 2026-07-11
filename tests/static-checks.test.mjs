@@ -699,7 +699,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /"austria-100-euro-filarmonica-vienna-oro"[\s\S]*"austria-100-euro-filarmonica-vienna-oro-fdc"[\s\S]*"austria-50-euro-filarmonica-vienna-oro"[\s\S]*"austria-50-euro-filarmonica-vienna-oro-fdc"/);
   assert.match(app, /"austria-25-euro-filarmonica-vienna-oro"[\s\S]*"austria-25-euro-filarmonica-vienna-oro-fdc"[\s\S]*"austria-10-euro-filarmonica-vienna-oro"[\s\S]*"austria-10-euro-filarmonica-vienna-oro-fdc"/);
   assert.match(app, /"austria-4-euro-filarmonica-vienna-oro"[\s\S]*"austria-4-euro-filarmonica-vienna-oro-fdc"/);
-  assert.match(app, /"britannia-1-oz"[\s\S]*"britannia-100-sterline-fdc"/);
+  assert.match(app, /"britannia-1-oz"/);
+  assert.doesNotMatch(app, /britannia-100-sterline-fdc|britannia-10-sterline-oro/);
   assert.match(app, /queens-beast-leone-inghilterra-2016/);
   assert.match(app, /Queen's Beast Leone d'Inghilterra 2016/);
   assert.match(app, /id: "queens-beast-leone-inghilterra-2016"[\s\S]*country: "Regno Unito"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2016"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.69/);
