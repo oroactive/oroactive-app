@@ -61,11 +61,19 @@ test("backend login accetta username e utenti migrati con email", async () => {
 });
 
 test("configurazione produzione non contiene password Founder reale", async () => {
-  const envExample = await file(".env.example");
-  const server = await file("server.js");
+  const [envExample, dockerCompose, deployCoolify, server] = await Promise.all([
+    file(".env.example"),
+    file("docker-compose.yml"),
+    file("DEPLOY-COOLIFY.md"),
+    file("server.js")
+  ]);
 
   assert.doesNotMatch(envExample, /Snoopdoggydogg/i);
+  assert.doesNotMatch(dockerCompose, /Snoopdoggydogg|cambia-questa-chiave-jwt-oroactive|oroactive_password/i);
+  assert.doesNotMatch(deployCoolify, /Snoopdoggydogg/i);
   assert.match(envExample, /ADMIN_PASSWORD=INSERISCI_PASSWORD_FOUNDER/);
+  assert.match(dockerCompose, /ADMIN_PASSWORD: \$\{ADMIN_PASSWORD:-INSERISCI_PASSWORD_FOUNDER\}/);
+  assert.match(deployCoolify, /ADMIN_PASSWORD=INSERISCI_PASSWORD_FOUNDER/);
   assert.match(server, /JWT_SECRET obbligatorio/);
   assert.match(server, /ADMIN_PASSWORD obbligatoria/);
 });

@@ -15,7 +15,7 @@ OPENAI_API_KEY=INSERISCI_CHIAVE_OPENAI_SOLO_BACKEND
 OPENAI_MODEL=gpt-4.1-mini
 ADMIN_USERNAME=Elite
 ADMIN_EMAIL=elite@oroactive.it
-ADMIN_PASSWORD=Snoopdoggydogg.8
+ADMIN_PASSWORD=INSERISCI_PASSWORD_FOUNDER
 ADMIN_NOME=Elite
 ADMIN_COGNOME=Founder
 ADMIN_NEGOZIO=Tutti
@@ -89,5 +89,5 @@ Accesso Founder iniziale:
 
 ```text
 Nome utente: Elite
-Password: Snoopdoggydogg.8
+Password: il valore configurato in ADMIN_PASSWORD
 ```

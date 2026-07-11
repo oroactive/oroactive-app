@@ -5,13 +5,13 @@ services:
       - "3000:3000"
     environment:
       PORT: 3000
-      DATABASE_URL: postgresql://oroactive_admin:oroactive_password@postgres:5432/oroactive_db
+      DATABASE_URL: postgresql://oroactive_admin:${POSTGRES_PASSWORD:-INSERISCI_PASSWORD_DATABASE}@postgres:5432/oroactive_db
       NODE_ENV: production
-      JWT_SECRET: cambia-questa-chiave-jwt-oroactive
+      JWT_SECRET: ${JWT_SECRET:-INSERISCI_CHIAVE_LUNGA_CASUALE}
       JWT_EXPIRES_IN: 7d
       ADMIN_USERNAME: Elite
       ADMIN_EMAIL: elite@oroactive.it
-      ADMIN_PASSWORD: Snoopdoggydogg.8
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-INSERISCI_PASSWORD_FOUNDER}
       ADMIN_NOME: Elite
       ADMIN_COGNOME: Founder
       ADMIN_NEGOZIO: Tutti
@@ -25,7 +25,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: oroactive_admin
-      POSTGRES_PASSWORD: oroactive_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-INSERISCI_PASSWORD_DATABASE}
       POSTGRES_DB: oroactive_db
     volumes:
       - oroactive-postgres:/var/lib/postgresql/data
