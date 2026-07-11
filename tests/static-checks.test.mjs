@@ -1027,10 +1027,13 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(styles, /\.coin-photo-frame/);
   assert.match(styles, /\.coin-photo-image/);
   assert.match(app, /<span class="coin-photo-image">/);
+  assert.match(app, /function coinMiniFacesMarkup\(coin = \{\}\) \{[\s\S]*coinFaceMarkup\(coin, "front"\)[\s\S]*coinFaceMarkup\(coin, "back"\)/);
+  assert.doesNotMatch(app.slice(app.indexOf("function coinMiniFacesMarkup"), app.indexOf("function coinSpecListMarkup")), /usePhoto: false/);
   assert.match(styles, /\.coin-country-group/);
   assert.match(styles, /\.coin-country-heading/);
   assert.match(styles, /\.coin-country-grid[\s\S]*grid-template-columns: repeat\(auto-fill, minmax\(260px, 1fr\)\)/);
   assert.match(styles, /\.coin-card[\s\S]*grid-template-rows: auto minmax\(108px, 1fr\) auto/);
+  assert.match(styles, /\.coin-card \.coin-photo-frame[\s\S]*width: calc\(\(100% - 12px\) \/ 2\)/);
   assert.match(styles, /\.coin-card > \.ghost-button[\s\S]*justify-self: stretch/);
   assert.match(styles, /\.coin-card h3[\s\S]*-webkit-line-clamp: 2/);
   assert.match(styles, /@media \(max-width: 680px\)[\s\S]*\.coin-encyclopedia-shell/);

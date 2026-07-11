@@ -2863,6 +2863,7 @@ body.main-menu-active .splash-screen {
 
 .coin-card .coin-mini-media {
   min-height: 132px;
+  width: 100%;
 }
 
 .coin-face {
@@ -2928,6 +2929,12 @@ body.main-menu-active .splash-screen {
   font-weight: 1000;
   line-height: 1.15;
   text-transform: uppercase;
+}
+
+.coin-card .coin-photo-frame {
+  width: calc((100% - 12px) / 2);
+  max-width: 112px;
+  min-width: 0;
 }
 
 .coin-face::before {

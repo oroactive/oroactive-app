@@ -12604,8 +12604,8 @@ function coinFaceMarkup(coin = {}, side = "front", options = {}) {
 function coinMiniFacesMarkup(coin = {}) {
   return `
     <div class="coin-mini-media">
-      ${coinFaceMarkup(coin, "front", { usePhoto: false })}
-      ${coinFaceMarkup(coin, "back", { usePhoto: false })}
+      ${coinFaceMarkup(coin, "front")}
+      ${coinFaceMarkup(coin, "back")}
     </div>
   `;
 }
