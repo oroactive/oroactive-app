@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import bcrypt from "bcrypt";
+import compression from "compression";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
@@ -749,8 +750,13 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
+app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: jsonBodyLimit }));
 const apiRateBuckets = new Map();
+const apiRateBucketTtlMs = 2 * 60_000;
+const apiRateBucketCleanupIntervalMs = 5 * 60_000;
+let apiRateBucketLastCleanup = Date.now();
+const lastSeenTouchIntervalSeconds = Math.max(15, Number(process.env.LAST_SEEN_TOUCH_INTERVAL_SECONDS || 60));
 
 function setNoStoreHeaders(response) {
   response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -831,6 +837,12 @@ function apiRateLimit(request, response, next) {
   if (!request.path.startsWith("/api")) return next();
   const key = `${request.ip || request.socket.remoteAddress || "local"}:${request.headers.authorization || "anon"}`;
   const now = Date.now();
+  if (now - apiRateBucketLastCleanup > apiRateBucketCleanupIntervalMs) {
+    apiRateBucketLastCleanup = now;
+    for (const [bucketKey, bucketValue] of apiRateBuckets) {
+      if (now > bucketValue.resetAt + apiRateBucketTtlMs) apiRateBuckets.delete(bucketKey);
+    }
+  }
   const bucket = apiRateBuckets.get(key) || { count: 0, resetAt: now + 60_000 };
   if (now > bucket.resetAt) {
     bucket.count = 0;
@@ -1534,6 +1546,27 @@ async function findUserById(id) {
   return result.rows[0] || null;
 }
 
+function shouldTouchLastSeen(user, force = false) {
+  if (force) return true;
+  const lastSeen = user?.last_seen ? new Date(user.last_seen).getTime() : 0;
+  return !lastSeen || Date.now() - lastSeen > lastSeenTouchIntervalSeconds * 1000;
+}
+
+async function touchUserLastSeen(user, options = {}) {
+  if (!user?.id || !shouldTouchLastSeen(user, options.force)) return user?.last_seen || null;
+  const result = await pool.query(
+    `UPDATE utenti
+     SET last_seen = NOW()
+     WHERE id = $1::bigint
+       AND ($2::boolean OR last_seen IS NULL OR last_seen < NOW() - ($3::int * INTERVAL '1 second'))
+     RETURNING last_seen`,
+    [user.id, Boolean(options.force), lastSeenTouchIntervalSeconds]
+  );
+  const touchedAt = result.rows[0]?.last_seen || (options.force ? new Date() : user.last_seen);
+  user.last_seen = touchedAt;
+  return touchedAt;
+}
+
 async function authenticate(request, response, next) {
   try {
     const header = request.headers.authorization || "";
@@ -1544,8 +1577,7 @@ async function authenticate(request, response, next) {
     const user = await findUserById(decoded.sub);
     if (!user) return response.status(401).json({ error: "Utente non trovato" });
     if (user.attivo === false) return response.status(403).json({ ok: false, error: "Utente non attivo" });
-    await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
-    user.last_seen = new Date();
+    await touchUserLastSeen(user);
     request.user = user;
     next();
   } catch {
@@ -21763,8 +21795,7 @@ async function loginUser(identifier, password, req = null) {
     error.status = 403;
     throw error;
   }
-  await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
-  user.last_seen = new Date();
+  await touchUserLastSeen(user, { force: true });
   const safeUser = publicUser(user);
   void logUserActivity({
     userId: user.id,
@@ -21826,8 +21857,7 @@ async function loginWithFaceId(identifier, credentialId, req = null) {
     error.status = 403;
     throw error;
   }
-  await pool.query("UPDATE utenti SET last_seen = NOW() WHERE id = $1", [user.id]);
-  user.last_seen = new Date();
+  await touchUserLastSeen(user, { force: true });
   const safeUser = publicUser(user);
   void logUserActivity({
     userId: user.id,

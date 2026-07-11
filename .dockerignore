@@ -1,6 +1,10 @@
 node_modules
 npm-debug.log
 .env
+.git
+.github
+docs
+tests
 *.zip
 backups
 OroActive-WebApp-Backend-Coolify*

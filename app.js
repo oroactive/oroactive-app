@@ -764,6 +764,11 @@ const AURUM_COMPRO_ORO_QUIZ = [
 ];
 
 const BILANCIA_DORO_COIN_IMAGE_BASE = "/assets/coins/bilancia-oro";
+const COIN_PHOTO_DISABLED_IDS = new Set([
+  "britannia-10-sterline-oro",
+  "britannia-100-sterline-fdc",
+  "american-eagle-1-oz"
+]);
 
 const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS = new Set([
   "sterlina-oro-sovrana",
@@ -798,6 +803,7 @@ function bilanciaDoroCoinImages(slug, source = "La Bilancia d'Oro", invertSides 
 }
 
 function withBilanciaDoroImages(coin, slug, source) {
+  if (COIN_PHOTO_DISABLED_IDS.has(coin.id)) return coin;
   return {
     ...coin,
     bookImages: bilanciaDoroCoinImages(
@@ -1569,7 +1575,7 @@ const GOLD_COIN_CATALOG = [
     reverse: "Britannia con elmo, scudo e tridente",
     history: "Le monete d'oro Gold Britannia sono monete inglesi emesse dalla Royal Mint (Zecca Reale inglese) in oro dal 1987. La Gold Britannia e' stata la prima moneta in oro da investimento europea del peso di 1 oncia troy; in Gran Bretagna ha corso legale e valore nominale di 100 sterline. La Britannia d'oro e' nota anche per l'esenzione dal capital gain tax nel Regno Unito. Le Gold Britannia sono prodotte anche nei tagli da 1/2, 1/4 e 1/10 di oncia troy e, dal 2013, anche in formati aggiuntivi. Dal 2013 le monete hanno purezza 999,9/1000, mentre fino al 2012 erano a 916,7/1000. Il rovescio raffigura Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d'ulivo; il dritto presenta il ritratto del sovrano britannico.",
     recognitionHints: ["britannia", "100 pounds", "tridente", "shield", "british"],
-    visual: { front: "/assets/coins/britannia-100-sterline-fdc-fronte.png", back: "/assets/coins/britannia-100-sterline-fdc-retro.png", frontText: "GB", backText: "BRI" }
+    visual: { front: "profile", back: "britannia", frontText: "GB", backText: "BRI" }
   },
   {
     id: "queens-beast-leone-inghilterra-2016",
@@ -2363,13 +2369,14 @@ const GOLD_COIN_CATALOG = [
     backLabel: "Retro - Britannia",
     obverse: "Ritratto della Regina Elisabetta II con iscrizione regale.",
     reverse: "Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d'ulivo.",
-    image: "/assets/coins/britannia-10-sterline-fronte.png",
-    frontImage: "/assets/coins/britannia-10-sterline-fronte.png",
-    obverseImage: "/assets/coins/britannia-10-sterline-fronte.png",
-    imageFront: "/assets/coins/britannia-10-sterline-fronte.png",
-    backImage: "/assets/coins/britannia-10-sterline-retro.png",
-    reverseImage: "/assets/coins/britannia-10-sterline-retro.png",
-    imageBack: "/assets/coins/britannia-10-sterline-retro.png",
+    image: "",
+    frontImage: "",
+    obverseImage: "",
+    imageFront: "",
+    backImage: "",
+    reverseImage: "",
+    imageBack: "",
+    visual: { front: "profile", back: "britannia", frontText: "10£", backText: "BRI" },
     description: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
     history: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
     story: "Le monete d’oro Gold Britannia sono monete inglesi emesse dalla Royal Mint in oro dal 1987. La Britannia d’oro e stata la prima moneta europea da investimento del peso di 1 oncia troy e in Gran Bretagna ha corso legale. Le emissioni sono disponibili in diversi tagli, tra cui 1/2, 1/4 e 1/10 di oncia; dal 2013 sono state introdotte anche versioni da 5 once e da 1/20 di oncia. Dal 2013 la purezza e 999,9/1000, mentre fino al 2012 era 916,7/1000. La moneta e apprezzata per il disegno raffinato e per le tecniche di conio orientate alla sicurezza. Sul fronte compare il ritratto di Elisabetta II, mentre sul retro e raffigurata Lady Britannia con tridente, scudo, elmo corinzio e ramoscello d’ulivo, simbolo di pace e vittoria.",
@@ -2946,7 +2953,7 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
 
 GOLD_COIN_CATALOG.forEach((coin) => {
   const slug = BILANCIA_DORO_IMAGE_SLUGS_BY_COIN[coin.id];
-  if (slug) {
+  if (slug && !COIN_PHOTO_DISABLED_IDS.has(coin.id)) {
     coin.bookImages = bilanciaDoroCoinImages(
       slug,
       COIN_IMAGE_SOURCE_BY_COIN[coin.id],
@@ -12646,20 +12653,17 @@ function coinCatalogFiltered() {
 }
 
 function groupedCoinsByCountry(coins = []) {
-  return coins.reduce((groups, coin) => {
+  const byCountry = new Map();
+  coins.forEach((coin) => {
     const country = coin.country || "Paese non indicato";
-    const existing = groups.find((group) => group.country === country);
-    if (existing) {
-      existing.coins.push(coin);
-    } else {
-      groups.push({ country, coins: [coin] });
-    }
-    return groups;
-  }, []);
+    if (!byCountry.has(country)) byCountry.set(country, { country, coins: [] });
+    byCountry.get(country).coins.push(coin);
+  });
+  return [...byCountry.values()];
 }
 
-function coinFaceMarkup(coin = {}, side = "front") {
-  const imageUrl = coin.bookImages?.[side];
+function coinFaceMarkup(coin = {}, side = "front", options = {}) {
+  const imageUrl = options.usePhoto === false ? "" : coin.bookImages?.[side];
   const visual = coin.visual || {};
   const type = side === "back" ? visual.back : visual.front;
   const text = side === "back" ? visual.backText : visual.frontText;
@@ -12686,8 +12690,8 @@ function coinFaceMarkup(coin = {}, side = "front") {
 function coinMiniFacesMarkup(coin = {}) {
   return `
     <div class="coin-mini-media">
-      ${coinFaceMarkup(coin, "front")}
-      ${coinFaceMarkup(coin, "back")}
+      ${coinFaceMarkup(coin, "front", { usePhoto: false })}
+      ${coinFaceMarkup(coin, "back", { usePhoto: false })}
     </div>
   `;
 }
@@ -12751,7 +12755,11 @@ function renderCoinCountryOptions() {
   if (!coinCountryFilter) return;
   const current = coinCountryFilter.value || state.coinCatalogCountry || "";
   const countries = [...new Set(GOLD_COIN_CATALOG.map((coin) => coin.country))].sort((a, b) => a.localeCompare(b, "it"));
-  coinCountryFilter.innerHTML = `<option value="">Tutti i paesi</option>${countries.map((country) => `<option value="${escapeHtml(country)}">${escapeHtml(country)}</option>`).join("")}`;
+  const optionsMarkup = `<option value="">Tutti i paesi</option>${countries.map((country) => `<option value="${escapeHtml(country)}">${escapeHtml(country)}</option>`).join("")}`;
+  if (state.coinCountryOptionsMarkup !== optionsMarkup) {
+    state.coinCountryOptionsMarkup = optionsMarkup;
+    coinCountryFilter.innerHTML = optionsMarkup;
+  }
   coinCountryFilter.value = countries.includes(current) ? current : "";
 }
 
@@ -12857,6 +12865,14 @@ function renderCoinEncyclopedia() {
   }
   renderCoinDetail(selectedCoin());
   renderCoinIdentificationResults();
+}
+
+function scheduleCoinEncyclopediaRender() {
+  if (state.coinCatalogRenderTimer) window.clearTimeout(state.coinCatalogRenderTimer);
+  state.coinCatalogRenderTimer = window.setTimeout(() => {
+    state.coinCatalogRenderTimer = null;
+    renderCoinEncyclopedia();
+  }, 180);
 }
 
 function resetCoinSearch() {
@@ -20912,7 +20928,7 @@ document.addEventListener("click", (event) => {
 });
 coinSearchInput?.addEventListener("input", () => {
   state.coinCatalogSearch = coinSearchInput.value || "";
-  renderCoinEncyclopedia();
+  scheduleCoinEncyclopediaRender();
 });
 coinCountryFilter?.addEventListener("change", () => {
   state.coinCatalogCountry = coinCountryFilter.value || "";

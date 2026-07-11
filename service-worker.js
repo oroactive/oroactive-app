@@ -24,6 +24,7 @@ const NEVER_CACHE_PATHS = [
   "/version.json"
 ];
 const HASHED_ASSET_PATTERN = /[.-][a-f0-9]{8,}\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i;
+const CACHEABLE_FILE_PATTERN = /\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i;
 
 function isSameOrigin(url) {
   return url.origin === self.location.origin;
@@ -60,6 +61,11 @@ async function cacheFirstHashedAsset(request) {
   return response;
 }
 
+function shouldCacheVersionedAsset(url) {
+  return HASHED_ASSET_PATTERN.test(url.pathname)
+    || (url.searchParams.has("v") && CACHEABLE_FILE_PATTERN.test(url.pathname));
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
 });
@@ -94,7 +100,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (HASHED_ASSET_PATTERN.test(url.pathname)) {
+  if (shouldCacheVersionedAsset(url)) {
     event.respondWith(cacheFirstHashedAsset(request));
     return;
   }

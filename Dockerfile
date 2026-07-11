@@ -11,7 +11,7 @@ WORKDIR /app
 RUN apk add --no-cache postgresql-client git
 
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 COPY . .
 
