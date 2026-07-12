@@ -831,6 +831,25 @@ const GOLD_COIN_CATALOG = [
     visual: { front: "profile", back: "dragon", frontText: "SOV", backText: "G&D" }
   },
   {
+    id: "sterlina-oro-2012-fdc",
+    name: "Sterlina oro 2012 (FIOR DI CONIO)",
+    country: "Regno Unito",
+    mintYears: "Fior di Conio (FDC) / 2012",
+    nominal: "1 Sovereign",
+    metal: "Oro",
+    purity: 0.9167,
+    purityLabel: "22 kt / 916,7‰",
+    grossWeight: 7.98,
+    fineGold: 7.315,
+    diameter: 22.05,
+    edge: "Zigrinato",
+    obverse: "Quarto ritratto della Regina Elisabetta II con diadema, realizzato da Ian Rank-Broadley, con legenda ELIZABETH II DEI GRA REGINA FID DEF",
+    reverse: "Rovescio commemorativo 2012 con San Giorgio e il drago reinterpretati, data 2012 e iniziali PJD",
+    history: "La Sterlina oro Elisabetta II e' coniata dal 1957 e rappresenta la continuita moderna della Sovrana britannica. Dal 1998 al 2015 riporta il quarto ritratto della Regina, opera di Ian Rank-Broadley, riconoscibile per il diadema nuziale e per una resa piu realistica e autorevole del volto. La versione 2012 in Fior di Conio mantiene titolo 916,7‰, peso 7,98 grammi e diametro 22,05 millimetri, ma si distingue per il rovescio commemorativo con San Giorgio e il drago reinterpretati, riconoscibile dalla data 2012 e dalle iniziali PJD.",
+    recognitionHints: ["sterlina oro 2012", "sovereign 2012", "elisabetta ii", "elizabeth ii", "ian rank-broadley", "rank broadley", "irb", "diadema", "san giorgio", "drago", "pjd", "2012", "916.7", "22 kt", "fior di conio", "fdc"],
+    visual: { front: "profile", back: "dragon", frontText: "EII", backText: "2012" }
+  },
+  {
     id: "sterlina-oro-2013-fdc",
     name: "Sterlina oro 2013 (FIOR DI CONIO)",
     country: "Regno Unito",
@@ -2679,6 +2698,7 @@ const GOLD_COIN_CATALOG = [
 
 const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "sterlina-oro-sovrana": "sterlina-oro-sovrana",
+  "sterlina-oro-2012-fdc": "sterlina-oro-2012-fdc",
   "sterlina-oro-2013-fdc": "sterlina-oro-2013-fdc",
   "sterlina-oro-elisabetta-ii-coroncina": "sterlina-oro-elisabetta-ii-coroncina",
   "sterlina-oro-elisabetta-ii-fiocco": "sterlina-oro-elisabetta-ii-fiocco",
@@ -2784,6 +2804,7 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
 };
 
 const COIN_IMAGE_SOURCE_BY_COIN = {
+  "sterlina-oro-2012-fdc": "Archivio OroActive",
   "sterlina-oro-2013-fdc": "Archivio OroActive",
   "sterlina-oro-elisabetta-ii-coroncina": "Archivio OroActive",
   "sterlina-oro-elisabetta-ii-fiocco": "Archivio OroActive",
