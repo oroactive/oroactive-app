@@ -102,7 +102,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260707-resilient-auth-boot-1"/);
+  assert.match(sw, /const BUILD_ID = "20260712-coin-catalog-sovereigns-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -127,8 +127,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /app\.js\?v=20260707-resilient-auth-boot-1/);
-  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
+  assert.match(index, /app\.js\?v=20260712-coin-catalog-sovereigns-1/);
+  assert.match(index, /styles\.css\?v=20260712-coin-catalog-sovereigns-1/);
   assert.match(version, /"ok": true/);
 });
 
@@ -185,7 +185,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -503,8 +503,17 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(index, /id="coinDetailPanel"/);
   assert.match(app, /const GOLD_COIN_CATALOG = \[/);
   assert.match(app, /sterlina-oro-sovrana/);
+  assert.match(app, /id: "sterlina-oro-2011-fdc"[\s\S]*name: "Sterlina oro 2011 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2011"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /id: "sterlina-oro-2012-fdc"[\s\S]*name: "Sterlina oro 2012 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2012"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /iniziali PJD/);
   assert.match(app, /id: "sterlina-oro-2013-fdc"[\s\S]*name: "Sterlina oro 2013 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2013"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /id: "sterlina-oro-2014-fdc"[\s\S]*name: "Sterlina oro 2014 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2014"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /id: "sterlina-oro-2015-fdc"[\s\S]*name: "Sterlina oro 2015 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2015"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /id: "sterlina-oro-2016-fdc"[\s\S]*name: "Sterlina oro 2016 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2016"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /id: "sterlina-oro-2017-200-anni-fdc"[\s\S]*name: "Sterlina oro 2017, emissione celebrativa 200 anni \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2017"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
   assert.match(app, /Ian Rank-Broadley/);
+  assert.match(app, /Jody Clark/);
+  assert.match(app, /marchio celebrativo 200 anni/);
   assert.match(app, /Benedetto Pistrucci/);
   assert.match(app, /id: "sterlina-oro-elisabetta-ii-coroncina"[\s\S]*name: "Sterlina oro Elisabetta II \(Coroncina\)"[\s\S]*mintYears: "1968-1984"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
   assert.match(app, /Arnold Machin/);
@@ -968,9 +977,27 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /1\/25 Unze Gold 999\.9 4 Euro/);
   assert.match(server, /austria-4-euro-filarmonica-vienna-oro-fdc/);
   assert.match(server, /Austria 4 euro Filarmonica di Vienna d'oro \(FIOR DI CONIO\)/);
+  assert.match(server, /sterlina-oro-2011-fdc/);
+  assert.match(server, /Sterlina oro 2011 \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2011/);
+  assert.match(server, /sterlina-oro-2012-fdc/);
+  assert.match(server, /Sterlina oro 2012 \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2012/);
   assert.match(server, /sterlina-oro-2013-fdc/);
   assert.match(server, /Sterlina oro 2013 \(FIOR DI CONIO\)/);
   assert.match(server, /sovereign 2013/);
+  assert.match(server, /sterlina-oro-2014-fdc/);
+  assert.match(server, /Sterlina oro 2014 \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2014/);
+  assert.match(server, /sterlina-oro-2015-fdc/);
+  assert.match(server, /Sterlina oro 2015 \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2015/);
+  assert.match(server, /sterlina-oro-2016-fdc/);
+  assert.match(server, /Sterlina oro 2016 \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2016/);
+  assert.match(server, /sterlina-oro-2017-200-anni-fdc/);
+  assert.match(server, /Sterlina oro 2017, emissione celebrativa 200 anni \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2017/);
   assert.match(server, /sterlina-oro-elisabetta-ii-coroncina/);
   assert.match(server, /Sterlina oro Elisabetta II \(Coroncina\)/);
   assert.match(server, /arnold machin/i);
@@ -1361,14 +1388,26 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
     .filter(([, sides]) => !sides.has("front") || !sides.has("back"))
     .map(([slug]) => slug);
 
-  assert.equal(catalog.length, 118);
+  assert.equal(catalog.length, 124);
   assert.deepEqual(duplicateIds, []);
   assert.deepEqual(missingImages, []);
   assert.deepEqual(unpairedAssets, []);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2011-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2011-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2012-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2012-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2013-fdc-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2013-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2014-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2014-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2015-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2015-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2016-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2016-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2017-200-anni-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2017-200-anni-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-elisabetta-ii-coroncina-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-elisabetta-ii-coroncina-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-elisabetta-ii-fiocco-front.png"), true);
@@ -2647,7 +2686,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -2706,7 +2745,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -2758,7 +2797,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -2845,9 +2884,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260707-resilient-auth-boot-1/);
-  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(index, /app\.js\?v=20260712-coin-catalog-sovereigns-1/);
+  assert.match(index, /styles\.css\?v=20260712-coin-catalog-sovereigns-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -2893,8 +2932,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(index, /styles\.css\?v=20260712-coin-catalog-sovereigns-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3050,7 +3089,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3154,7 +3193,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -3205,9 +3244,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260707-resilient-auth-boot-1/);
-  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(index, /app\.js\?v=20260712-coin-catalog-sovereigns-1/);
+  assert.match(index, /styles\.css\?v=20260712-coin-catalog-sovereigns-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -3264,9 +3303,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260707-resilient-auth-boot-1/);
-  assert.match(index, /styles\.css\?v=20260707-resilient-auth-boot-1/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(index, /app\.js\?v=20260712-coin-catalog-sovereigns-1/);
+  assert.match(index, /styles\.css\?v=20260712-coin-catalog-sovereigns-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -3344,7 +3383,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -3461,7 +3500,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -3505,7 +3544,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260707-resilient-auth-boot-1/);
+  assert.match(worker, /20260712-coin-catalog-sovereigns-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
