@@ -102,7 +102,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260712-half-sovereign-2022-platinum-jubilee-1"/);
+  assert.match(sw, /const BUILD_ID = "20260713-double-sovereign-2026-refresh-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -127,8 +127,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /app\.js\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
-  assert.match(index, /styles\.css\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(index, /app\.js\?v=20260713-double-sovereign-2026-refresh-1/);
+  assert.match(index, /styles\.css\?v=20260713-double-sovereign-2026-refresh-1/);
   assert.match(version, /"ok": true/);
 });
 
@@ -185,7 +185,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -512,6 +512,14 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /id: "sterlina-oro-2016-fdc"[\s\S]*name: "Sterlina oro 2016 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2016"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
   assert.match(app, /id: "sterlina-oro-2017-200-anni-fdc"[\s\S]*name: "Sterlina oro 2017, emissione celebrativa 200 anni \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2017"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
   assert.match(app, /id: "sterlina-oro-2018-fdc"[\s\S]*name: "Sterlina oro 2018 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2018"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /id: "sterlina-oro-2019-fdc"[\s\S]*name: "Sterlina oro 2019 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2019"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /sovereign 2019/i);
+  assert.match(app, /id: "sterlina-oro-2020-fdc"[\s\S]*name: "Sterlina oro 2020 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2020"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /sovereign 2020/i);
+  assert.match(app, /id: "sterlina-oro-2021-fdc"[\s\S]*name: "Sterlina oro 2021 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2021"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /sovereign 2021/i);
+  assert.match(app, /id: "sterlina-oro-2022-platinum-jubilee-fdc"[\s\S]*name: "Sterlina oro 2022 - Platinum Jubilee \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2022"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /platinum jubilee sovereign/i);
   assert.match(app, /Ian Rank-Broadley/);
   assert.match(app, /Jody Clark/);
   assert.match(app, /marchio celebrativo 200 anni/);
@@ -522,9 +530,22 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /id: "sterlina-oro-elisabetta-ii-fiocco"[\s\S]*name: "Sterlina oro Elisabetta II \(Fiocco\)"[\s\S]*mintYears: "1957-1968"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
   assert.match(app, /Mary Gillick/);
   assert.match(app, /fiocchetto/);
+  assert.match(app, /id: "sterlina-oro-vittoria-stemmata"[\s\S]*name: "Sterlina oro Vittoria \(Stemmata\)"[\s\S]*mintYears: "1838-1871"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /Vittoria Testa Giovane con Stemma/);
+  assert.match(app, /BRITANNIARUM REGINA FID DEF/);
+  assert.match(app, /id: "sterlina-oro-vittoria-giovane"[\s\S]*name: "Sterlina oro Vittoria \(Giovane\)"[\s\S]*mintYears: "1871-1887"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /Victoria Young Head/);
+  assert.match(app, /id: "sterlina-oro-vittoria-coronata"[\s\S]*name: "Sterlina oro Vittoria \(Coronata\)"[\s\S]*mintYears: "1887-1893"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
+  assert.match(app, /Victoria Jubilee Head/);
+  assert.match(app, /Testa Coronata/);
   assert.match(app, /id: "sterlina-oro-vittoria-velata"[\s\S]*name: "Sterlina oro Vittoria \(Velata\)"[\s\S]*mintYears: "1893-1901"[\s\S]*grossWeight: 7\.98,[\s\S]*diameter: 22\.05/);
   assert.match(app, /Victoria Old Head/);
   assert.match(app, /Testa Velata/);
+  assert.match(app, /id: "doppia-sterlina-oro-2022-fdc"[\s\S]*name: "Doppia Sterlina oro 2022 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2022"[\s\S]*grossWeight: 15\.98,[\s\S]*diameter: 28\.4/);
+  assert.match(app, /platinum jubilee double sovereign/i);
+  assert.match(app, /id: "doppia-sterlina-oro-2026-fdc"[\s\S]*name: "Doppia Sterlina oro 2026 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2026"[\s\S]*grossWeight: 15\.98,[\s\S]*diameter: 28\.4/);
+  assert.match(app, /Double Sovereign 2026/);
+  assert.match(app, /micro-incisioni/);
   assert.match(app, /id: "mezza-sterlina-oro-anni-misti"[\s\S]*name: "Mezza Sterlina oro \(anni misti\)"[\s\S]*nominal: "1\/2 Sovereign"[\s\S]*grossWeight: 3\.99,[\s\S]*fineGold: 3\.66,[\s\S]*diameter: 19\.2/);
   assert.match(app, /Half Sovereign/);
   assert.match(app, /id: "mezza-sterlina-oro-2019-fdc"[\s\S]*name: "Mezza Sterlina oro 2019 \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2019"[\s\S]*grossWeight: 3\.99,[\s\S]*diameter: 19\.2/);
@@ -535,6 +556,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /half sovereign 2021/i);
   assert.match(app, /id: "mezza-sterlina-oro-2022-platinum-jubilee-fdc"[\s\S]*name: "Mezza Sterlina oro 2022 - Platinum Jubilee \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2022"[\s\S]*grossWeight: 3\.99,[\s\S]*diameter: 19\.2/);
   assert.match(app, /Timothy Noad/);
+  assert.match(app, /id: "quarto-di-sterlina-oro-2022-platinum-jubilee-fdc"[\s\S]*name: "Quarto di Sterlina oro 2022 Platinum Jubilee \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2022"[\s\S]*grossWeight: 1\.83,[\s\S]*diameter: 13\.5/);
+  assert.match(app, /quarter sovereign 2022 platinum jubilee/i);
   assert.match(app, /id: "mezza-sterlina-oro-2022-carlo-iii-memorial-half-sovereign-fdc"[\s\S]*name: "Mezza Sterlina oro 2022 - Carlo III - Memorial Half Sovereign \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2022"[\s\S]*grossWeight: 3\.99,[\s\S]*diameter: 19\.2/);
   assert.match(app, /Martin Jennings/);
   assert.match(app, /id: "mezza-sterlina-oro-2023-re-carlo-iii-coronation-half-sovereign-fdc"[\s\S]*name: "Mezza Sterlina oro 2023 - Re Carlo III - Coronation Half Sovereign \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\) \/ 2023"[\s\S]*grossWeight: 3\.99,[\s\S]*diameter: 19\.2/);
@@ -1020,15 +1043,42 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /sterlina-oro-2018-fdc/);
   assert.match(server, /Sterlina oro 2018 \(FIOR DI CONIO\)/);
   assert.match(server, /sovereign 2018/);
+  assert.match(server, /sterlina-oro-2019-fdc/);
+  assert.match(server, /Sterlina oro 2019 \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2019/);
+  assert.match(server, /sterlina-oro-2020-fdc/);
+  assert.match(server, /Sterlina oro 2020 \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2020/);
+  assert.match(server, /sterlina-oro-2021-fdc/);
+  assert.match(server, /Sterlina oro 2021 \(FIOR DI CONIO\)/);
+  assert.match(server, /sovereign 2021/);
+  assert.match(server, /sterlina-oro-2022-platinum-jubilee-fdc/);
+  assert.match(server, /Sterlina oro 2022 - Platinum Jubilee \(FIOR DI CONIO\)/);
+  assert.match(server, /platinum jubilee sovereign/i);
   assert.match(server, /sterlina-oro-elisabetta-ii-coroncina/);
   assert.match(server, /Sterlina oro Elisabetta II \(Coroncina\)/);
   assert.match(server, /arnold machin/i);
   assert.match(server, /sterlina-oro-elisabetta-ii-fiocco/);
   assert.match(server, /Sterlina oro Elisabetta II \(Fiocco\)/);
   assert.match(server, /mary gillick/i);
+  assert.match(server, /sterlina-oro-vittoria-stemmata/);
+  assert.match(server, /Sterlina oro Vittoria \(Stemmata\)/);
+  assert.match(server, /victoria shield sovereign/i);
+  assert.match(server, /sterlina-oro-vittoria-giovane/);
+  assert.match(server, /Sterlina oro Vittoria \(Giovane\)/);
+  assert.match(server, /victoria young head/i);
+  assert.match(server, /sterlina-oro-vittoria-coronata/);
+  assert.match(server, /Sterlina oro Vittoria \(Coronata\)/);
+  assert.match(server, /victoria jubilee head/i);
   assert.match(server, /sterlina-oro-vittoria-velata/);
   assert.match(server, /Sterlina oro Vittoria \(Velata\)/);
   assert.match(server, /victoria old head/i);
+  assert.match(server, /doppia-sterlina-oro-2022-fdc/);
+  assert.match(server, /Doppia Sterlina oro 2022 \(FIOR DI CONIO\)/);
+  assert.match(server, /platinum jubilee double sovereign/i);
+  assert.match(server, /doppia-sterlina-oro-2026-fdc/);
+  assert.match(server, /Doppia Sterlina oro 2026 \(FIOR DI CONIO\)/);
+  assert.match(server, /double sovereign 2026/i);
   assert.match(server, /mezza-sterlina-oro-anni-misti/);
   assert.match(server, /Mezza Sterlina oro \(anni misti\)/);
   assert.match(server, /half sovereign/i);
@@ -1044,6 +1094,9 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /mezza-sterlina-oro-2022-platinum-jubilee-fdc/);
   assert.match(server, /Mezza Sterlina oro 2022 - Platinum Jubilee \(FIOR DI CONIO\)/);
   assert.match(server, /platinum jubilee/i);
+  assert.match(server, /quarto-di-sterlina-oro-2022-platinum-jubilee-fdc/);
+  assert.match(server, /Quarto di Sterlina oro 2022 Platinum Jubilee \(FIOR DI CONIO\)/);
+  assert.match(server, /quarter sovereign 2022 platinum jubilee/i);
   assert.match(server, /mezza-sterlina-oro-2022-carlo-iii-memorial-half-sovereign-fdc/);
   assert.match(server, /Mezza Sterlina oro 2022 - Carlo III - Memorial Half Sovereign \(FIOR DI CONIO\)/);
   assert.match(server, /memorial half sovereign/i);
@@ -1437,7 +1490,7 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
     .filter(([, sides]) => !sides.has("front") || !sides.has("back"))
     .map(([slug]) => slug);
 
-  assert.equal(catalog.length, 134);
+  assert.equal(catalog.length, 144);
   assert.deepEqual(duplicateIds, []);
   assert.deepEqual(missingImages, []);
   assert.deepEqual(unpairedAssets, []);
@@ -1459,12 +1512,30 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2017-200-anni-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2018-fdc-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2018-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2019-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2019-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2020-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2020-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2021-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2021-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2022-platinum-jubilee-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2022-platinum-jubilee-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-elisabetta-ii-coroncina-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-elisabetta-ii-coroncina-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-elisabetta-ii-fiocco-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-elisabetta-ii-fiocco-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-vittoria-stemmata-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-vittoria-stemmata-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-vittoria-giovane-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-vittoria-giovane-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-vittoria-coronata-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-vittoria-coronata-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-vittoria-velata-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-vittoria-velata-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/doppia-sterlina-oro-2022-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/doppia-sterlina-oro-2022-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/doppia-sterlina-oro-2026-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/doppia-sterlina-oro-2026-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-anni-misti-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-anni-misti-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-2019-fdc-front.png"), true);
@@ -1475,6 +1546,8 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-2021-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-2022-platinum-jubilee-fdc-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-2022-platinum-jubilee-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/quarto-di-sterlina-oro-2022-platinum-jubilee-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/quarto-di-sterlina-oro-2022-platinum-jubilee-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-2022-carlo-iii-memorial-half-sovereign-fdc-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-2022-carlo-iii-memorial-half-sovereign-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/mezza-sterlina-oro-2023-re-carlo-iii-coronation-half-sovereign-fdc-front.png"), true);
@@ -2755,7 +2828,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -2814,7 +2887,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -2866,7 +2939,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -2953,9 +3026,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
-  assert.match(index, /styles\.css\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(index, /app\.js\?v=20260713-double-sovereign-2026-refresh-1/);
+  assert.match(index, /styles\.css\?v=20260713-double-sovereign-2026-refresh-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3001,8 +3074,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(index, /styles\.css\?v=20260713-double-sovereign-2026-refresh-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3158,7 +3231,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3262,7 +3335,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -3313,9 +3386,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
-  assert.match(index, /styles\.css\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(index, /app\.js\?v=20260713-double-sovereign-2026-refresh-1/);
+  assert.match(index, /styles\.css\?v=20260713-double-sovereign-2026-refresh-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -3372,9 +3445,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
-  assert.match(index, /styles\.css\?v=20260712-half-sovereign-2022-platinum-jubilee-1/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(index, /app\.js\?v=20260713-double-sovereign-2026-refresh-1/);
+  assert.match(index, /styles\.css\?v=20260713-double-sovereign-2026-refresh-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -3452,7 +3525,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -3569,7 +3642,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -3613,7 +3686,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260712-half-sovereign-2022-platinum-jubilee-1/);
+  assert.match(worker, /20260713-double-sovereign-2026-refresh-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
