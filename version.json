@@ -3,8 +3,8 @@
   "app": "OroActive",
   "commit": "unknown",
   "shortCommit": "unknown",
-  "buildNumber": "local",
-  "buildTime": "2026-07-01T00:00:00.000Z",
+  "buildNumber": "20260714-coin-catalog-order-1",
+  "buildTime": "2026-07-14T20:10:00.000Z",
   "branch": "main",
   "environment": "development"
 }
