@@ -955,6 +955,27 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /id: "peru-5-soles-oro"[\s\S]*country: "Perù"[\s\S]*grossWeight: 2\.34,[\s\S]*fineGold: 2\.106,[\s\S]*diameter: 15/);
   assert.match(app, /CINCO SOLES ORO/);
   assert.match(app, /REPUBLICA PERUANA/);
+  assert.match(app, /peru-10-soles-oro/);
+  assert.match(app, /Perù 10 Soles oro/);
+  assert.match(app, /id: "peru-10-soles-oro"[\s\S]*country: "Perù"[\s\S]*grossWeight: 4\.68,[\s\S]*fineGold: 4\.212,[\s\S]*diameter: 18/);
+  assert.match(app, /DIEZ SOLES ORO/);
+  assert.match(app, /peru-20-soles-oro/);
+  assert.match(app, /Perù 20 Soles oro/);
+  assert.match(app, /id: "peru-20-soles-oro"[\s\S]*country: "Perù"[\s\S]*grossWeight: 9\.36,[\s\S]*fineGold: 8\.424,[\s\S]*diameter: 23/);
+  assert.match(app, /VEINTE SOLES ORO/);
+  assert.match(app, /NUEVE DECIMOS FINO/);
+  assert.match(app, /peru-50-soles-oro/);
+  assert.match(app, /Perù 50 Soles oro/);
+  assert.match(app, /id: "peru-50-soles-oro"[\s\S]*country: "Perù"[\s\S]*grossWeight: 23\.4,[\s\S]*fineGold: 21\.06,[\s\S]*diameter: 30/);
+  assert.match(app, /CINCUENTA SOLES ORO/);
+  assert.match(app, /peru-50-soles-inca-oro/);
+  assert.match(app, /Perù 50 Soles \\"INCA\\" oro/);
+  assert.match(app, /id: "peru-50-soles-inca-oro"[\s\S]*country: "Perù"[\s\S]*grossWeight: 33\.43,[\s\S]*fineGold: 30\.087,[\s\S]*diameter: 34/);
+  assert.match(app, /GRAMOS 33\.436 FINO/);
+  assert.match(app, /peru-100-soles-oro/);
+  assert.match(app, /Perù 100 Soles oro/);
+  assert.match(app, /id: "peru-100-soles-oro"[\s\S]*country: "Perù"[\s\S]*grossWeight: 46\.8,[\s\S]*fineGold: 42\.12,[\s\S]*diameter: 36/);
+  assert.match(app, /CIEN SOLES ORO/);
   assert.doesNotMatch(app.slice(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS"), app.indexOf("function bilanciaDoroCoinImages")), /"marengo-belga-20-franchi"/);
   assert.match(app, /"austria-100-corone"[\s\S]*"messico-20-pesos"[\s\S]*"messico-10-pesos-oro"[\s\S]*"austria-1000-scellini"[\s\S]*"ungheria-20-corone"/);
   assert.match(app, /Austria 100 Corone d'oro/);
@@ -1491,6 +1512,16 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/10-fiorini-guglielmo-iii-olanda-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/peru-5-soles-oro-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/peru-5-soles-oro-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-10-soles-oro-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-10-soles-oro-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-20-soles-oro-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-20-soles-oro-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-50-soles-oro-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-50-soles-oro-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-50-soles-inca-oro-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-50-soles-inca-oro-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-100-soles-oro-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-100-soles-oro-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-fdc-front.png", root)),
@@ -1635,7 +1666,7 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
     .filter(([, sides]) => !sides.has("front") || !sides.has("back"))
     .map(([slug]) => slug);
 
-  assert.equal(catalog.length, 167);
+  assert.equal(catalog.length, 172);
   assert.deepEqual(duplicateIds, []);
   assert.deepEqual(missingImages, []);
   assert.deepEqual(unpairedAssets, []);
@@ -1677,6 +1708,16 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-fiorini-guglielmo-iii-olanda-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-5-soles-oro-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-5-soles-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-10-soles-oro-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-10-soles-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-20-soles-oro-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-20-soles-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-50-soles-oro-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-50-soles-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-50-soles-inca-oro-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-50-soles-inca-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-100-soles-oro-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-100-soles-oro-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2000-fdc-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2000-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2011-fdc-front.png"), true);
