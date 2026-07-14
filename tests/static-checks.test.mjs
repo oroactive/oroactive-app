@@ -696,6 +696,18 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /100-lire-vittorio-emanuele-iii-fascione/);
   assert.match(app, /100 Lire Vittorio Emanuele III Fascione/);
   assert.match(app, /american-buffalo-1-oz/);
+  assert.match(app, /american-buffalo-1-oz-fdc/);
+  assert.match(app, /America Bisonte 50 dollari d'oro \(FIOR DI CONIO\)/);
+  assert.match(app, /american-liberty-2025-high-relief/);
+  assert.match(app, /American Liberty 2025 \(High Relief\)/);
+  assert.match(app, /american-liberty-2023-high-relief/);
+  assert.match(app, /American Liberty 2023 \(High Relief\)/);
+  assert.match(app, /american-liberty-2021-high-relief/);
+  assert.match(app, /American Liberty 2021 \(High Relief\)/);
+  assert.match(app, /american-liberty-2019-high-relief/);
+  assert.match(app, /America Liberty 2019 \(High Relief\)/);
+  assert.match(app, /american-liberty-2017-225th-anniversary/);
+  assert.match(app, /America Liberty 2017 \(225th anniversary\)/);
   assert.match(app, /kangaroo-nugget-1-oz/);
   assert.match(app, /id: "kangaroo-nugget-1-oz"[\s\S]*name: "Australia Nugget d'oro \(Kangaroo\) 100 Dollari"[\s\S]*mintYears: "Anni misti \/ 1986-oggi"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 30/);
   assert.match(app, /Perth Mint realizzo anche una moneta d'oro da una tonnellata/);
@@ -793,9 +805,32 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /un decimo/);
   assert.match(app, /panda-cinese-30g/);
   assert.match(app, /id: "american-eagle-1-oz"[\s\S]*name: "America Aquila 50 Dollari d'oro"[\s\S]*mintYears: "Anni misti"[\s\S]*grossWeight: 33\.92,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /id: "american-eagle-1-oz-fdc"[\s\S]*name: "America Aquila 50 Dollari d'oro \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 33\.92,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /tutti disponibili in Fior di Conio/);
   assert.match(app, /id: "america-aquila-25-dollari-oro"[\s\S]*name: "America Aquila 25 Dollari d'oro"[\s\S]*mintYears: "Anni misti"[\s\S]*grossWeight: 16\.96,[\s\S]*diameter: 27/);
+  assert.match(app, /id: "america-aquila-25-dollari-oro-fdc"[\s\S]*name: "America Aquila 25 Dollari d'oro \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 16\.96,[\s\S]*diameter: 27/);
   assert.match(app, /id: "america-aquila-10-dollari-oro"[\s\S]*name: "America Aquila 10 Dollari d'oro"[\s\S]*mintYears: "Anni misti"[\s\S]*grossWeight: 8\.48,[\s\S]*diameter: 22/);
+  assert.match(app, /id: "america-aquila-10-dollari-oro-fdc"[\s\S]*name: "America Aquila 10 Dollari d'oro \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 8\.48,[\s\S]*diameter: 22/);
   assert.match(app, /id: "america-aquila-5-dollari-oro"[\s\S]*name: "America Aquila 5 Dollari d'oro"[\s\S]*mintYears: "Anni misti"[\s\S]*grossWeight: 3\.39,[\s\S]*diameter: 16\.5/);
+  assert.match(app, /id: "america-aquila-5-dollari-oro-fdc"[\s\S]*name: "America Aquila 5 Dollari \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 3\.39,[\s\S]*diameter: 16\.5/);
+  assert.match(app, /id: "american-buffalo-1-oz-fdc"[\s\S]*name: "America Bisonte 50 dollari d'oro \(FIOR DI CONIO\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /id: "american-liberty-2025-high-relief"[\s\S]*name: "American Liberty 2025 \(High Relief\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /girasole accompagnato da un'ape/);
+  assert.match(app, /id: "american-liberty-2023-high-relief"[\s\S]*name: "American Liberty 2023 \(High Relief\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /pino Bristlecone/);
+  assert.match(app, /id: "american-liberty-2021-high-relief"[\s\S]*name: "American Liberty 2021 \(High Relief\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /cavallo Mustang americano/);
+  assert.match(app, /id: "american-liberty-2019-high-relief"[\s\S]*name: "America Liberty 2019 \(High Relief\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /13 raggi di luce/);
+  assert.match(app, /id: "american-liberty-2017-225th-anniversary"[\s\S]*name: "America Liberty 2017 \(225th anniversary\)"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 31\.10,[\s\S]*diameter: 32\.7/);
+  assert.match(app, /225 anniversario della Zecca americana/);
+  assert.match(app, /5-dollari-testa-indiano/);
+  assert.match(app, /5 Dollari d'oro Testa Indiano/);
+  assert.match(app, /id: "5-dollari-testa-indiano"[\s\S]*mintYears: "1908-1916, 1929"[\s\S]*grossWeight: 8\.30,[\s\S]*diameter: 21\.6/);
+  assert.match(app, /2-5-dollari-testa-indiano/);
+  assert.match(app, /2,5 Dollari d'oro Testa Indiano/);
+  assert.match(app, /id: "2-5-dollari-testa-indiano"[\s\S]*mintYears: "1908-1916, 1929"[\s\S]*grossWeight: 4\.18,[\s\S]*diameter: 18/);
+  assert.match(app, /disegno in incuso/);
   assert.match(app, /Gold Bullion Coin Act del 1985/);
   assert.match(app, /1 OZ FINE GOLD/);
   assert.match(app, /1\/2 OZ FINE GOLD/);
@@ -893,16 +928,33 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /"sterlina-oro-sovrana"[\s\S]*"american-eagle-1-oz"[\s\S]*"arca-noe-armenia-2025-1-oz"/);
   assert.doesNotMatch(app.slice(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS"), app.indexOf("function bilanciaDoroCoinImages")), /"american-buffalo-1-oz"/);
   assert.match(app, /"centenario-50-pesos"[\s\S]*"ducato-austriaco"[\s\S]*"20-dollari-double-eagle"[\s\S]*"20-mark-germania"/);
+  assert.match(app, /20 Dollari d'oro St\. Gaudens/);
+  assert.match(app, /id: "20-dollari-double-eagle"[\s\S]*mintYears: "1907-1933"[\s\S]*grossWeight: 33\.43,[\s\S]*fineGold: 30\.0933,[\s\S]*diameter: 34/);
+  assert.match(app, /Theodore Roosevelt/);
+  assert.match(app, /TWENTY DOLLARS/);
   assert.match(app, /Austria 1 Ducato d'oro \(Francesco Giuseppe\)/);
   assert.match(app, /id: "ducato-austriaco"[\s\S]*mintYears: "1831-1915 \/ riconio 1915"[\s\S]*grossWeight: 3\.49,[\s\S]*fineGold: 3\.442,[\s\S]*diameter: 20/);
   assert.match(app, /FRANC IOS I D G AUSTRIAE IMPERATOR/);
   assert.match(app, /HUNGAR BOHEM GAL LOD ILL REX A A 1915/);
+  assert.match(app, /10-fiorini-guglielmina-olanda/);
+  assert.match(app, /10 Fiorini Guglielmina \(Olanda\)/);
+  assert.match(app, /id: "10-fiorini-guglielmina-olanda"[\s\S]*country: "Paesi Bassi"[\s\S]*grossWeight: 6\.72,[\s\S]*fineGold: 6\.048,[\s\S]*diameter: 22\.5/);
+  assert.match(app, /KONINGRIJK DER NEDERLANDEN/);
+  assert.match(app, /10-fiorini-guglielmo-iii-olanda/);
+  assert.match(app, /10 Fiorini Guglielmo III \(Olanda\)/);
+  assert.match(app, /id: "10-fiorini-guglielmo-iii-olanda"[\s\S]*mintYears: "1875-1889"[\s\S]*grossWeight: 6\.72,[\s\S]*fineGold: 6\.048,[\s\S]*diameter: 22\.5/);
+  assert.match(app, /KONING WILLEM DE DERDE/);
   assert.match(app, /"marengo-belga-20-franchi"[\s\S]*"sterlina-vecchio-conio"[\s\S]*"sudafrica-2-rand"[\s\S]*"cile-100-pesos"/);
   assert.match(app, /chile-50-pesos-oro/);
   assert.match(app, /Chile 50 Pesos oro/);
   assert.match(app, /id: "chile-50-pesos-oro"[\s\S]*grossWeight: 10\.17,[\s\S]*fineGold: 9\.153,[\s\S]*diameter: 24/);
   assert.match(app, /CINCUENTA PESOS/);
   assert.match(app, /CINCO CONDORES/);
+  assert.match(app, /peru-5-soles-oro/);
+  assert.match(app, /Perù 5 Soles oro/);
+  assert.match(app, /id: "peru-5-soles-oro"[\s\S]*country: "Perù"[\s\S]*grossWeight: 2\.34,[\s\S]*fineGold: 2\.106,[\s\S]*diameter: 15/);
+  assert.match(app, /CINCO SOLES ORO/);
+  assert.match(app, /REPUBLICA PERUANA/);
   assert.doesNotMatch(app.slice(app.indexOf("const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS"), app.indexOf("function bilanciaDoroCoinImages")), /"marengo-belga-20-franchi"/);
   assert.match(app, /"austria-100-corone"[\s\S]*"messico-20-pesos"[\s\S]*"messico-10-pesos-oro"[\s\S]*"austria-1000-scellini"[\s\S]*"ungheria-20-corone"/);
   assert.match(app, /Austria 100 Corone d'oro/);
@@ -1197,6 +1249,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /maple leaf 5 dollars/);
   assert.match(server, /canada-maple-leaf-1-dollaro/);
   assert.match(server, /maple leaf 1 dollar/);
+  assert.match(server, /20 Dollari d'oro St\. Gaudens/);
+  assert.match(server, /saint gaudens/i);
   assert.match(server, /Austria 1 Ducato d'oro \(Francesco Giuseppe\)/);
   assert.match(server, /FRANC IOS I D G AUSTRIAE IMPERATOR/);
   assert.match(server, /HUNGAR BOHEM GAL LOD ILL REX A A 1915/);
@@ -1220,6 +1274,29 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /america-aquila-5-dollari-oro/);
   assert.match(server, /America Aquila 5 Dollari d'oro/);
   assert.match(server, /1\/10 oz fine gold/i);
+  assert.match(server, /american-buffalo-1-oz-fdc/);
+  assert.match(server, /America Bisonte 50 dollari d'oro \(FIOR DI CONIO\)/);
+  assert.match(server, /american-liberty-2025-high-relief/);
+  assert.match(server, /American Liberty 2025 \(High Relief\)/);
+  assert.match(server, /girasole con ape/i);
+  assert.match(server, /american-liberty-2023-high-relief/);
+  assert.match(server, /American Liberty 2023 \(High Relief\)/);
+  assert.match(server, /pino Bristlecone/i);
+  assert.match(server, /american-liberty-2021-high-relief/);
+  assert.match(server, /American Liberty 2021 \(High Relief\)/);
+  assert.match(server, /cavallo Mustang/i);
+  assert.match(server, /american-liberty-2019-high-relief/);
+  assert.match(server, /America Liberty 2019 \(High Relief\)/);
+  assert.match(server, /13 raggi/i);
+  assert.match(server, /american-liberty-2017-225th-anniversary/);
+  assert.match(server, /America Liberty 2017 \(225th anniversary\)/);
+  assert.match(server, /donna afroamericana/i);
+  assert.match(server, /5-dollari-testa-indiano/);
+  assert.match(server, /5 Dollari d'oro Testa Indiano/);
+  assert.match(server, /five dollars indian head/i);
+  assert.match(server, /2-5-dollari-testa-indiano/);
+  assert.match(server, /2,5 Dollari d'oro Testa Indiano/);
+  assert.match(server, /quarter eagle/i);
   assert.match(server, /australia-nugget-kangaroo-100-dollari-fdc/);
   assert.match(server, /kangaroo 100 dollars fdc/);
   assert.match(server, /Carlo III Australia 100 Dollars/);
@@ -1398,8 +1475,36 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/austria-10-corone-oro-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/4-ducati-austriaci-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/4-ducati-austriaci-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/5-dollari-testa-indiano-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/5-dollari-testa-indiano-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/2-5-dollari-testa-indiano-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/2-5-dollari-testa-indiano-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/america-aquila-25-dollari-oro-fdc-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/america-aquila-25-dollari-oro-fdc-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/america-aquila-10-dollari-oro-fdc-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/america-aquila-10-dollari-oro-fdc-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/america-aquila-5-dollari-oro-fdc-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/america-aquila-5-dollari-oro-fdc-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/10-fiorini-guglielmina-olanda-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/10-fiorini-guglielmina-olanda-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/10-fiorini-guglielmo-iii-olanda-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/10-fiorini-guglielmo-iii-olanda-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-5-soles-oro-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/peru-5-soles-oro-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-fdc-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-buffalo-1-oz-fdc-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2025-high-relief-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2025-high-relief-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2023-high-relief-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2023-high-relief-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2021-high-relief-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2021-high-relief-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2019-high-relief-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2019-high-relief-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2017-225th-anniversary-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/american-liberty-2017-225th-anniversary-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/maple-leaf-1-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/maple-leaf-1-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/canada-maple-leaf-20-dollari-front.png", root)),
@@ -1530,18 +1635,48 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
     .filter(([, sides]) => !sides.has("front") || !sides.has("back"))
     .map(([slug]) => slug);
 
-  assert.equal(catalog.length, 152);
+  assert.equal(catalog.length, 167);
   assert.deepEqual(duplicateIds, []);
   assert.deepEqual(missingImages, []);
   assert.deepEqual(unpairedAssets, []);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-buffalo-1-oz-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-buffalo-1-oz-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2025-high-relief-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2025-high-relief-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2023-high-relief-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2023-high-relief-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2021-high-relief-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2021-high-relief-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2019-high-relief-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2019-high-relief-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2017-225th-anniversary-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-liberty-2017-225th-anniversary-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/5-dollari-testa-indiano-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/5-dollari-testa-indiano-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/2-5-dollari-testa-indiano-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/2-5-dollari-testa-indiano-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-25-dollari-oro-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-25-dollari-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-25-dollari-oro-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-25-dollari-oro-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-10-dollari-oro-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-10-dollari-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-10-dollari-oro-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-10-dollari-oro-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-5-dollari-oro-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-5-dollari-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-5-dollari-oro-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/america-aquila-5-dollari-oro-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-fiorini-guglielmina-olanda-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-fiorini-guglielmina-olanda-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-fiorini-guglielmo-iii-olanda-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-fiorini-guglielmo-iii-olanda-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-5-soles-oro-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-5-soles-oro-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2000-fdc-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2000-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sterlina-oro-2011-fdc-front.png"), true);
