@@ -1045,8 +1045,16 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(server, /Messico Libertad oro 1\/20 oz/);
   assert.match(app, /Foto fronte\/retro estratte da/);
   assert.match(app, /function renderCoinEncyclopedia/);
+  assert.match(app, /function coinCatalogCategory/);
+  assert.match(app, /function coinCatalogSortComparator/);
+  assert.match(app, /\.sort\(coinCatalogSortComparator\)/);
   assert.match(app, /function groupedCoinsByCountry/);
+  assert.match(app, /function groupedCoinsByCategory/);
   assert.match(app, /groupedCoinsByCountry\(visibleCoins\)\.map\(coinCountryGroupMarkup\)/);
+  assert.match(app, /coinCatalogCategoryRank\(a\) - coinCatalogCategoryRank\(b\)/);
+  assert.match(app, /coinWeightRangeLabel\(categoryGroup\.coins\)/);
+  assert.match(styles, /\.coin-category-group/);
+  assert.match(styles, /\.coin-category-pill/);
   assert.match(app, /localeCompare\(String\(b\.country \|\| ""\), "it"\)/);
   assert.match(app, /async function identifyCoinFromCamera/);
   assert.match(app, /apiRequest\("\/training\/gold-coins\/identify"/);

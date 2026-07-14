@@ -14056,6 +14056,77 @@ function coinPurityBucket(coin = {}) {
   return "";
 }
 
+const COIN_CATEGORY_ORDER = [
+  "Sovrane e frazioni",
+  "Marenghi e 20 franchi",
+  "Fiorini / Gulden",
+  "Bullion 24 kt",
+  "Krugerrand",
+  "American Eagle",
+  "American Buffalo",
+  "American Liberty",
+  "Dollari storici",
+  "Indian Head",
+  "Maple Leaf",
+  "Libertad",
+  "Pesos e Condores",
+  "Soles peruviani",
+  "Soles INCA",
+  "Corone e Scellini",
+  "Serie storiche",
+  "Altre monete"
+];
+
+const COIN_CATEGORY_RANK = new Map(COIN_CATEGORY_ORDER.map((category, index) => [category, index]));
+
+function coinCatalogCategory(coin = {}) {
+  const text = [
+    coin.id,
+    coin.name,
+    coin.country,
+    coin.nominal,
+    coin.mintYears,
+    ...(coin.recognitionHints || [])
+  ].join(" ").toLowerCase();
+  if (/sterlina|sovereign|sovrana/.test(text)) return "Sovrane e frazioni";
+  if (/marengo|20 franchi|20 lire|vreneli|napoleone|gallo marianne/.test(text)) return "Marenghi e 20 franchi";
+  if (/fiorini|gulden|guglielm|wilhelmina|willem/.test(text)) return "Fiorini / Gulden";
+  if (/soles.*inca|inca oro|50 soles inca/.test(text)) return "Soles INCA";
+  if (/soles|peru/.test(text)) return "Soles peruviani";
+  if (/american eagle|america aquila|aquila americana/.test(text)) return "American Eagle";
+  if (/american buffalo|america bisonte|bisonte/.test(text)) return "American Buffalo";
+  if (/american liberty|america liberty/.test(text)) return "American Liberty";
+  if (/indian head|testa indiano|dollari.*indiano/.test(text)) return "Indian Head";
+  if (/double eagle|st\\. gaudens|saint gaudens|liberty head|20 dollars liberty/.test(text)) return "Dollari storici";
+  if (/maple leaf|foglia d'acero/.test(text)) return "Maple Leaf";
+  if (/libertad/.test(text)) return "Libertad";
+  if (/krugerrand/.test(text)) return "Krugerrand";
+  if (/pesos|condores|centenario/.test(text)) return "Pesos e Condores";
+  if (/corone|corona|scellini|ducato|florin|fl/.test(text)) return "Corone e Scellini";
+  if (Number(coin.purity || 0) >= 0.999) return "Bullion 24 kt";
+  if (/storico|vecchio conio|rand|mark|franchi/.test(text)) return "Serie storiche";
+  return "Altre monete";
+}
+
+function coinCatalogCategoryRank(coin = {}) {
+  const category = coinCatalogCategory(coin);
+  return COIN_CATEGORY_RANK.has(category) ? COIN_CATEGORY_RANK.get(category) : COIN_CATEGORY_ORDER.length;
+}
+
+function coinCatalogSortComparator(a = {}, b = {}) {
+  const countryOrder = String(a.country || "").localeCompare(String(b.country || ""), "it");
+  if (countryOrder) return countryOrder;
+  const categoryOrder = coinCatalogCategoryRank(a) - coinCatalogCategoryRank(b);
+  if (categoryOrder) return categoryOrder;
+  const categoryNameOrder = coinCatalogCategory(a).localeCompare(coinCatalogCategory(b), "it");
+  if (categoryNameOrder) return categoryNameOrder;
+  const weightOrder = Number(a.grossWeight || 0) - Number(b.grossWeight || 0);
+  if (weightOrder) return weightOrder;
+  const nominalOrder = String(a.nominal || "").localeCompare(String(b.nominal || ""), "it", { numeric: true });
+  if (nominalOrder) return nominalOrder;
+  return String(a.name || "").localeCompare(String(b.name || ""), "it", { numeric: true });
+}
+
 function coinCatalogFiltered() {
   const search = String(state.coinCatalogSearch || coinSearchInput?.value || "").trim().toLowerCase();
   const country = String(state.coinCatalogCountry || coinCountryFilter?.value || "").trim();
@@ -14076,11 +14147,7 @@ function coinCatalogFiltered() {
     const matchesCountry = !country || coin.country === country;
     const matchesPurity = !purity || coinPurityBucket(coin) === purity;
     return matchesSearch && matchesCountry && matchesPurity;
-  }).sort((a, b) => {
-    const countryOrder = String(a.country || "").localeCompare(String(b.country || ""), "it");
-    if (countryOrder) return countryOrder;
-    return String(a.name || "").localeCompare(String(b.name || ""), "it");
-  });
+  }).sort(coinCatalogSortComparator);
 }
 
 function groupedCoinsByCountry(coins = []) {
@@ -14091,6 +14158,27 @@ function groupedCoinsByCountry(coins = []) {
     byCountry.get(country).coins.push(coin);
   });
   return [...byCountry.values()];
+}
+
+function groupedCoinsByCategory(coins = []) {
+  const byCategory = new Map();
+  coins.forEach((coin) => {
+    const category = coinCatalogCategory(coin);
+    if (!byCategory.has(category)) byCategory.set(category, { category, coins: [] });
+    byCategory.get(category).coins.push(coin);
+  });
+  return [...byCategory.values()];
+}
+
+function coinWeightRangeLabel(coins = []) {
+  const weights = coins
+    .map((coin) => Number(coin.grossWeight || 0))
+    .filter((weight) => Number.isFinite(weight) && weight > 0);
+  if (!weights.length) return "";
+  const min = Math.min(...weights);
+  const max = Math.max(...weights);
+  if (Math.abs(min - max) < 0.001) return `${formatCoinNumber(min, 3)} g`;
+  return `${formatCoinNumber(min, 3)}-${formatCoinNumber(max, 3)} g`;
 }
 
 function coinFaceMarkup(coin = {}, side = "front", options = {}) {
@@ -14150,11 +14238,15 @@ function coinSpecListMarkup(coin = {}) {
 
 function coinCardMarkup(coin = {}) {
   const active = String(state.coinSelectedId || "") === String(coin.id);
+  const category = coinCatalogCategory(coin);
   return `
     <article class="coin-card ${active ? "active" : ""}">
       ${coinMiniFacesMarkup(coin)}
       <div class="coin-card-copy">
-        <span class="coin-pill">${escapeHtml(coin.country)}</span>
+        <div class="coin-card-badges">
+          <span class="coin-pill">${escapeHtml(coin.country)}</span>
+          <span class="coin-category-pill">${escapeHtml(category)}</span>
+        </div>
         <h3>${escapeHtml(coin.name)}</h3>
         <p>${escapeHtml(coin.purityLabel)} · ${formatCoinNumber(coin.grossWeight, 3)} g · fino ${formatCoinNumber(coin.fineGold, 3)} g</p>
       </div>
@@ -14165,15 +14257,24 @@ function coinCardMarkup(coin = {}) {
 
 function coinCountryGroupMarkup(group = {}) {
   const coins = Array.isArray(group.coins) ? group.coins : [];
+  const categoryGroups = groupedCoinsByCategory(coins);
   return `
     <section class="coin-country-group" aria-label="${escapeHtml(group.country || "Paese")}">
       <header class="coin-country-heading">
         <h3>${escapeHtml(group.country || "Paese")}</h3>
         <span>${coins.length} ${coins.length === 1 ? "moneta" : "monete"}</span>
       </header>
-      <div class="coin-country-grid">
-        ${coins.map(coinCardMarkup).join("")}
-      </div>
+      ${categoryGroups.map((categoryGroup) => `
+        <section class="coin-category-group" aria-label="${escapeHtml(categoryGroup.category)}">
+          <header class="coin-category-heading">
+            <h4>${escapeHtml(categoryGroup.category)}</h4>
+            <span>${escapeHtml(coinWeightRangeLabel(categoryGroup.coins))}</span>
+          </header>
+          <div class="coin-country-grid">
+            ${categoryGroup.coins.map(coinCardMarkup).join("")}
+          </div>
+        </section>
+      `).join("")}
     </section>
   `;
 }
