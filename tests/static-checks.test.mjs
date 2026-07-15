@@ -102,7 +102,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260714-coin-catalog-order-1"/);
+  assert.match(sw, /const BUILD_ID = "20260715-krugerrand-halfoz-fdc-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -127,8 +127,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /app\.js\?v=20260714-coin-catalog-order-1/);
-  assert.match(index, /styles\.css\?v=20260714-coin-catalog-order-1/);
+  assert.match(index, /app\.js\?v=20260715-krugerrand-halfoz-fdc-1/);
+  assert.match(index, /styles\.css\?v=20260715-krugerrand-halfoz-fdc-1/);
   assert.match(version, /"ok": true/);
 });
 
@@ -185,7 +185,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -634,6 +634,49 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /FRANCISCVS IOSEPHVS I D G IMPERATOR ET REX/);
   assert.match(app, /IMPERIVM AVSTRIACVM/);
   assert.match(app, /krugerrand-1-oz/);
+  assert.match(app, /Sudafrica Krugerrand oro 1 oz/);
+  assert.match(app, /id: "krugerrand-1-oz"[\s\S]*grossWeight: 33\.9,[\s\S]*fineGold: 31\.1035,[\s\S]*diameter: 33/);
+  assert.match(app, /SUID-AFRIKA SOUTH AFRICA/);
+  assert.match(server, /Sudafrica Krugerrand oro 1 oz/);
+  assert.match(server, /FYNGOUD 1 OZ FINE GOLD/);
+  assert.match(app, /sudafrica-krugerrand-oro-1-oz-fdc/);
+  assert.match(app, /Sudafrica Krugerrand oro 1 oz \(FIOR DI CONIO\)/);
+  assert.match(app, /id: "sudafrica-krugerrand-oro-1-oz-fdc"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 33\.9,[\s\S]*fineGold: 31\.1035,[\s\S]*diameter: 33/);
+  assert.match(server, /sudafrica-krugerrand-oro-1-oz-fdc/);
+  assert.match(server, /krugerrand un oncia fdc/);
+  assert.match(app, /sudafrica-krugerrand-oro-1-2-oz/);
+  assert.match(app, /Sudafrica Krugerrand oro 1\/2 oz/);
+  assert.match(app, /id: "sudafrica-krugerrand-oro-1-2-oz"[\s\S]*grossWeight: 17,[\s\S]*fineGold: 15\.5517,[\s\S]*diameter: 27/);
+  assert.match(app, /FYNGOUD 1\/2 OZ FINE GOLD/);
+  assert.match(server, /sudafrica-krugerrand-oro-1-2-oz/);
+  assert.match(server, /krugerrand mezza oncia/);
+  assert.match(app, /sudafrica-krugerrand-oro-1-2-oz-fdc/);
+  assert.match(app, /Sudafrica Krugerrand oro 1\/2 oz \(FIOR DI CONIO\)/);
+  assert.match(app, /id: "sudafrica-krugerrand-oro-1-2-oz-fdc"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 17,[\s\S]*fineGold: 15\.5517,[\s\S]*diameter: 27/);
+  assert.match(server, /sudafrica-krugerrand-oro-1-2-oz-fdc/);
+  assert.match(server, /krugerrand mezza oncia fdc/);
+  assert.match(app, /sudafrica-krugerrand-oro-1-4-oz/);
+  assert.match(app, /Sudafrica Krugerrand oro 1\/4 oz/);
+  assert.match(app, /id: "sudafrica-krugerrand-oro-1-4-oz"[\s\S]*grossWeight: 8\.4,[\s\S]*fineGold: 7\.7758,[\s\S]*diameter: 22/);
+  assert.match(app, /FYNGOUD 1\/4 OZ FINE GOLD/);
+  assert.match(server, /sudafrica-krugerrand-oro-1-4-oz/);
+  assert.match(server, /Sudafrica Krugerrand oro 1\/4 oz/);
+  assert.match(app, /sudafrica-krugerrand-oro-1-4-oz-fdc/);
+  assert.match(app, /Sudafrica Krugerrand oro 1\/4 oz \(FIOR DI CONIO\)/);
+  assert.match(app, /id: "sudafrica-krugerrand-oro-1-4-oz-fdc"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 8\.4,[\s\S]*fineGold: 7\.7758,[\s\S]*diameter: 22/);
+  assert.match(server, /sudafrica-krugerrand-oro-1-4-oz-fdc/);
+  assert.match(server, /krugerrand fior di conio/);
+  assert.match(app, /sudafrica-krugerrand-oro-1-10-oz/);
+  assert.match(app, /Sudafrica Krugerrand oro 1\/10 oz/);
+  assert.match(app, /id: "sudafrica-krugerrand-oro-1-10-oz"[\s\S]*grossWeight: 3\.39,[\s\S]*fineGold: 3\.1103,[\s\S]*diameter: 16\.5/);
+  assert.match(app, /FYNGOUD 1\/10 OZ FINE GOLD/);
+  assert.match(server, /sudafrica-krugerrand-oro-1-10-oz/);
+  assert.match(server, /Sudafrica Krugerrand oro 1\/10 oz/);
+  assert.match(app, /sudafrica-krugerrand-oro-1-10-oz-fdc/);
+  assert.match(app, /Sudafrica Krugerrand oro 1\/10 oz \(FIOR DI CONIO\)/);
+  assert.match(app, /id: "sudafrica-krugerrand-oro-1-10-oz-fdc"[\s\S]*mintYears: "Fior di Conio \(FDC\)"[\s\S]*grossWeight: 3\.39,[\s\S]*fineGold: 3\.1103,[\s\S]*diameter: 16\.5/);
+  assert.match(server, /sudafrica-krugerrand-oro-1-10-oz-fdc/);
+  assert.match(server, /krugerrand un decimo fdc/);
   assert.match(app, /maple-leaf-1-oz/);
   assert.match(app, /canada-maple-leaf-20-dollari/);
   assert.match(app, /Canada Foglia d'Acero d'oro 20 Dollari/);
@@ -1017,6 +1060,10 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /grossWeight: 8\.33/);
   assert.match(app, /fineGold: 7\.5/);
   assert.match(app, /diameter: 22\.5/);
+  assert.match(app, /messico-5-pesos-oro/);
+  assert.match(app, /Messico 5 Pesos oro/);
+  assert.match(app, /id: "messico-5-pesos-oro"[\s\S]*grossWeight: 4\.16,[\s\S]*fineGold: 3\.744,[\s\S]*diameter: 19/);
+  assert.match(app, /Cinco Pesos/);
   assert.match(app, /messico-2-5-pesos-oro/);
   assert.match(app, /Messico 2,5 Pesos oro/);
   assert.match(app, /id: "messico-2-5-pesos-oro"[\s\S]*grossWeight: 2\.08,[\s\S]*fineGold: 1\.872,[\s\S]*diameter: 15\.5/);
@@ -1027,6 +1074,9 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /DOS PESOS/);
   assert.match(server, /messico-10-pesos-oro/);
   assert.match(server, /Messico 10 Pesos oro/);
+  assert.match(server, /messico-5-pesos-oro/);
+  assert.match(server, /Messico 5 Pesos oro/);
+  assert.match(server, /cinco pesos/i);
   assert.match(server, /messico-2-5-pesos-oro/);
   assert.match(server, /Messico 2,5 Pesos oro/);
   assert.match(server, /dos y medio pesos/i);
@@ -1598,6 +1648,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/messico-libertad-oro-1-10-oz-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-libertad-oro-1-20-oz-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-libertad-oro-1-20-oz-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/messico-5-pesos-oro-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/messico-5-pesos-oro-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-2-5-pesos-oro-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-2-5-pesos-oro-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/messico-2-pesos-oro-front.png", root)),
@@ -1674,10 +1726,24 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
     .filter(([, sides]) => !sides.has("front") || !sides.has("back"))
     .map(([slug]) => slug);
 
-  assert.equal(catalog.length, 172);
+  assert.equal(catalog.length, 180);
   assert.deepEqual(duplicateIds, []);
   assert.deepEqual(missingImages, []);
   assert.deepEqual(unpairedAssets, []);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-oz-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-oz-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-2-oz-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-2-oz-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-2-oz-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-2-oz-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-10-oz-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-10-oz-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-10-oz-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-10-oz-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-4-oz-fdc-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-4-oz-fdc-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-4-oz-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-4-oz-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/american-eagle-1-oz-fdc-front.png"), true);
@@ -1722,6 +1788,8 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-20-soles-oro-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-50-soles-oro-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-50-soles-oro-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/messico-5-pesos-oro-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/messico-5-pesos-oro-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-50-soles-inca-oro-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-50-soles-inca-oro-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/peru-100-soles-oro-front.png"), true);
@@ -3068,7 +3136,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -3127,7 +3195,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -3179,7 +3247,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -3266,9 +3334,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260714-coin-catalog-order-1/);
-  assert.match(index, /styles\.css\?v=20260714-coin-catalog-order-1/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(index, /app\.js\?v=20260715-krugerrand-halfoz-fdc-1/);
+  assert.match(index, /styles\.css\?v=20260715-krugerrand-halfoz-fdc-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3314,8 +3382,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260714-coin-catalog-order-1/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(index, /styles\.css\?v=20260715-krugerrand-halfoz-fdc-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3471,7 +3539,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3575,7 +3643,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -3626,9 +3694,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260714-coin-catalog-order-1/);
-  assert.match(index, /styles\.css\?v=20260714-coin-catalog-order-1/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(index, /app\.js\?v=20260715-krugerrand-halfoz-fdc-1/);
+  assert.match(index, /styles\.css\?v=20260715-krugerrand-halfoz-fdc-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -3685,9 +3753,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260714-coin-catalog-order-1/);
-  assert.match(index, /styles\.css\?v=20260714-coin-catalog-order-1/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(index, /app\.js\?v=20260715-krugerrand-halfoz-fdc-1/);
+  assert.match(index, /styles\.css\?v=20260715-krugerrand-halfoz-fdc-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -3765,7 +3833,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -3882,7 +3950,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -3926,7 +3994,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260714-coin-catalog-order-1/);
+  assert.match(worker, /20260715-krugerrand-halfoz-fdc-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
