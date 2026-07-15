@@ -5111,13 +5111,17 @@ function isAppleTouchDevice() {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").then((registration) => {
+    navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" }).then((registration) => {
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
       registration.addEventListener("updatefound", () => {
         const worker = registration.installing;
         if (!worker) return;
         worker.addEventListener("statechange", () => {
           if (worker.state === "installed" && navigator.serviceWorker.controller) {
             state.updateAvailable = true;
+            worker.postMessage({ type: "SKIP_WAITING" });
             showAppUpdateBanner("Aggiornamento pronto. Ricarica OroActive quando hai terminato l'operazione in corso.");
           }
         });
