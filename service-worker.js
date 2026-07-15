@@ -1,4 +1,4 @@
-const BUILD_ID = "20260715-force-catalog-refresh-1";
+const BUILD_ID = "20260715-maple-1-fdc-1";
 const CACHE_NAME = `oroactive-cache-${BUILD_ID}`;
 const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
 const NEVER_CACHE_PREFIXES = [
