@@ -1,18 +1,32 @@
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, readdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
 
 const root = new URL("../", import.meta.url);
-const file = (name) => readFile(new URL(name, root), "utf8");
+const fileCache = new Map();
+
+const file = (name) => {
+  if (!fileCache.has(name)) {
+    fileCache.set(name, readFileSync(new URL(name, root), "utf8"));
+  }
+  return fileCache.get(name);
+};
+
+const goldCoinCatalogCache = new Map();
 
 function extractGoldCoinCatalog(app) {
+  const cachedCatalog = goldCoinCatalogCache.get(app);
+  if (cachedCatalog) return cachedCatalog;
+
   const start = app.indexOf("const BILANCIA_DORO_COIN_IMAGE_BASE");
   const end = app.indexOf("const COIN_RECOGNITION_HINTS", start);
   assert.notEqual(start, -1, "inizio catalogo immagini monete mancante");
   assert.notEqual(end, -1, "fine catalogo immagini monete mancante");
   const context = {};
   vm.runInNewContext(`${app.slice(start, end)}\nglobalThis.catalog = GOLD_COIN_CATALOG;`, context);
+  goldCoinCatalogCache.set(app, context.catalog);
   return context.catalog;
 }
 
@@ -102,7 +116,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260715-maple-1-fdc-1"/);
+  assert.match(sw, /const BUILD_ID = "20260716-russia-5-rubli-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -130,8 +144,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /app\.js\?v=20260715-maple-1-fdc-1/);
-  assert.match(index, /styles\.css\?v=20260715-maple-1-fdc-1/);
+  assert.match(index, /app\.js\?v=20260716-russia-5-rubli-1/);
+  assert.match(index, /styles\.css\?v=20260716-russia-5-rubli-1/);
   assert.match(version, /"ok": true/);
 });
 
@@ -188,7 +202,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -497,6 +511,18 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     file("server.js"),
     file("styles.css")
   ]);
+  const coinBlock = (id) => {
+    const start = app.indexOf(`id: "${id}"`);
+    assert.notEqual(start, -1, `scheda ${id} mancante`);
+    const next = app.indexOf("\n  {", start + 1);
+    return app.slice(start, next === -1 ? app.length : next);
+  };
+  const vreneliBlock = coinBlock("marengo-svizzero-vreneli");
+  const helvetiaBlock = coinBlock("marengo-20-franchi-helvetia-svizzera");
+  const russia15RubliBlock = coinBlock("russia-15-rubli-oro-nicola-ii");
+  const russia10RubliBlock = coinBlock("russia-10-rubli-oro-nicola-ii");
+  const russiaChervonetsBlock = coinBlock("russia-10-rubli-oro-chervonets");
+  const russia5RubliBlock = coinBlock("russia-5-rubli-oro-nicola-ii");
 
   assert.match(app, /id: "gold-coin-encyclopedia"[\s\S]*label: "Elenco Monete"[\s\S]*section: "coinEncyclopedia"/);
   assert.match(app, /keywords: "elenco monete monete oro enciclopedia numismatica/);
@@ -631,6 +657,57 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /Marengo 20 Franchi Napoleone III testa nuda/);
   assert.match(app, /testa nuda/);
   assert.match(app, /id: "marengo-20-franchi-napoleone-iii-testa-nuda"[\s\S]*grossWeight: 6\.45,[\s\S]*fineGold: 5\.805,[\s\S]*diameter: 21/);
+  assert.match(app, /marengo-svizzero-vreneli/);
+  assert.match(app, /Marengo 20 Franchi Vreneli \(Svizzera\)/);
+  assert.match(vreneliBlock, /grossWeight: 6\.45/);
+  assert.match(vreneliBlock, /fineGold: 5\.8/);
+  assert.match(vreneliBlock, /diameter: 21/);
+  assert.match(server, /Marengo 20 Franchi Vreneli \(Svizzera\)/);
+  assert.match(server, /vreneli/);
+  assert.match(app, /marengo-20-franchi-helvetia-svizzera/);
+  assert.match(app, /Marengo 20 Franchi Helvetia \(Svizzera\)/);
+  assert.match(helvetiaBlock, /mintYears: "1883-1896"/);
+  assert.match(helvetiaBlock, /grossWeight: 6\.45/);
+  assert.match(helvetiaBlock, /fineGold: 5\.8/);
+  assert.match(helvetiaBlock, /diameter: 21/);
+  assert.match(server, /marengo-20-franchi-helvetia-svizzera/);
+  assert.match(server, /confederatio helvetica/);
+  assert.match(app, /russia-15-rubli-oro-nicola-ii/);
+  assert.match(app, /Russia 15 Rubli d'oro Nicola II/);
+  assert.match(russia15RubliBlock, /country: "Russia"/);
+  assert.match(russia15RubliBlock, /mintYears: "1897"/);
+  assert.match(russia15RubliBlock, /grossWeight: 12\.9/);
+  assert.match(russia15RubliBlock, /fineGold: 11\.612/);
+  assert.match(russia15RubliBlock, /diameter: 24/);
+  assert.match(server, /russia-15-rubli-oro-nicola-ii/);
+  assert.match(server, /aquila imperiale russa/);
+  assert.match(app, /russia-10-rubli-oro-nicola-ii/);
+  assert.match(app, /Russia 10 Rubli d'oro Nicola II/);
+  assert.match(russia10RubliBlock, /country: "Russia"/);
+  assert.match(russia10RubliBlock, /mintYears: "1897-1911"/);
+  assert.match(russia10RubliBlock, /grossWeight: 8\.6/);
+  assert.match(russia10RubliBlock, /fineGold: 7\.74/);
+  assert.match(russia10RubliBlock, /diameter: 22\.6/);
+  assert.match(server, /russia-10-rubli-oro-nicola-ii/);
+  assert.match(server, /valore 10 rubli/);
+  assert.match(app, /russia-10-rubli-oro-chervonets/);
+  assert.match(app, /Russia 10 Rubli d'oro Chervonets/);
+  assert.match(russiaChervonetsBlock, /country: "Russia"/);
+  assert.match(russiaChervonetsBlock, /mintYears: "1975-1982"/);
+  assert.match(russiaChervonetsBlock, /grossWeight: 8\.6/);
+  assert.match(russiaChervonetsBlock, /fineGold: 7\.7446/);
+  assert.match(russiaChervonetsBlock, /diameter: 22\.6/);
+  assert.match(server, /russia-10-rubli-oro-chervonets/);
+  assert.match(server, /falce e martello/);
+  assert.match(app, /russia-5-rubli-oro-nicola-ii/);
+  assert.match(app, /Russia 5 Rubli d'oro Nicola II/);
+  assert.match(russia5RubliBlock, /country: "Russia"/);
+  assert.match(russia5RubliBlock, /mintYears: "1897-1911"/);
+  assert.match(russia5RubliBlock, /grossWeight: 4\.3/);
+  assert.match(russia5RubliBlock, /fineGold: 3\.871/);
+  assert.match(russia5RubliBlock, /diameter: 18/);
+  assert.match(server, /russia-5-rubli-oro-nicola-ii/);
+  assert.match(server, /valore 5 rubli/);
   assert.match(app, /marengo-austriaco-20-franchi/);
   assert.match(app, /Marengo 20 Franchi Francesco Giuseppe I \(Austria\)/);
   assert.match(app, /id: "marengo-austriaco-20-franchi"[\s\S]*mintYears: "1870-1916 \/ riconio 1892"[\s\S]*grossWeight: 6\.45,[\s\S]*diameter: 21/);
@@ -1529,6 +1606,18 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
     access(new URL("assets/coins/bilancia-oro/5-franchi-napoleone-iii-francia-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-napoleone-iii-testa-nuda-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-napoleone-iii-testa-nuda-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-svizzero-vreneli-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-svizzero-vreneli-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-helvetia-svizzera-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/marengo-20-franchi-helvetia-svizzera-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/russia-15-rubli-oro-nicola-ii-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/russia-15-rubli-oro-nicola-ii-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/russia-10-rubli-oro-nicola-ii-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/russia-10-rubli-oro-nicola-ii-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/russia-10-rubli-oro-chervonets-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/russia-10-rubli-oro-chervonets-back.png", root)),
+    access(new URL("assets/coins/bilancia-oro/russia-5-rubli-oro-nicola-ii-front.png", root)),
+    access(new URL("assets/coins/bilancia-oro/russia-5-rubli-oro-nicola-ii-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-austriaco-20-franchi-francesco-giuseppe-i-front.png", root)),
     access(new URL("assets/coins/bilancia-oro/marengo-austriaco-20-franchi-francesco-giuseppe-i-back.png", root)),
     access(new URL("assets/coins/bilancia-oro/filarmonica-vienna-2026-1-oz-front.png", root)),
@@ -1777,10 +1866,22 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
     .filter(([, sides]) => !sides.has("front") || !sides.has("back"))
     .map(([slug]) => slug);
 
-  assert.equal(catalog.length, 186);
+  assert.equal(catalog.length, 191);
   assert.deepEqual(duplicateIds, []);
   assert.deepEqual(missingImages, []);
   assert.deepEqual(unpairedAssets, []);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/marengo-svizzero-vreneli-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/marengo-svizzero-vreneli-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/marengo-20-franchi-helvetia-svizzera-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/marengo-20-franchi-helvetia-svizzera-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-15-rubli-oro-nicola-ii-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-15-rubli-oro-nicola-ii-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-10-rubli-oro-nicola-ii-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-10-rubli-oro-nicola-ii-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-10-rubli-oro-chervonets-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-10-rubli-oro-chervonets-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-5-rubli-oro-nicola-ii-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-5-rubli-oro-nicola-ii-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-oz-fdc-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-oz-fdc-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/sudafrica-krugerrand-oro-1-2-oz-front.png"), true);
@@ -3199,7 +3300,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -3258,7 +3359,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -3310,7 +3411,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -3397,9 +3498,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260715-maple-1-fdc-1/);
-  assert.match(index, /styles\.css\?v=20260715-maple-1-fdc-1/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(index, /app\.js\?v=20260716-russia-5-rubli-1/);
+  assert.match(index, /styles\.css\?v=20260716-russia-5-rubli-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3445,8 +3546,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260715-maple-1-fdc-1/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(index, /styles\.css\?v=20260716-russia-5-rubli-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3602,7 +3703,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3706,7 +3807,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -3757,9 +3858,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260715-maple-1-fdc-1/);
-  assert.match(index, /styles\.css\?v=20260715-maple-1-fdc-1/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(index, /app\.js\?v=20260716-russia-5-rubli-1/);
+  assert.match(index, /styles\.css\?v=20260716-russia-5-rubli-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -3816,9 +3917,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260715-maple-1-fdc-1/);
-  assert.match(index, /styles\.css\?v=20260715-maple-1-fdc-1/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(index, /app\.js\?v=20260716-russia-5-rubli-1/);
+  assert.match(index, /styles\.css\?v=20260716-russia-5-rubli-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -3896,7 +3997,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -4013,7 +4114,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -4057,7 +4158,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260715-maple-1-fdc-1/);
+  assert.match(worker, /20260716-russia-5-rubli-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
