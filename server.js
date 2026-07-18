@@ -26540,6 +26540,41 @@ app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) =
   }
 });
 
+app.get("/reset-cache", async (_request, response) => {
+  const metadata = await getBuildMetadata();
+  const target = `/?v=${encodeURIComponent(metadata.buildNumber || Date.now())}&cache-reset=1`;
+  setNoStoreHeaders(response);
+  response.type("html").send(`<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>OroActive reset cache</title>
+</head>
+<body>
+  <p>Reset aggiornamento OroActive in corso...</p>
+  <script>
+    (async () => {
+      try {
+        if ("serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+        }
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((key) => caches.delete(key)));
+        }
+      } finally {
+        window.location.replace(${JSON.stringify(target)});
+      }
+    })();
+  </script>
+  <p><a href="${target}">Riapri OroActive</a></p>
+</body>
+</html>`);
+});
+
 app.get("/service-worker.js", (request, response, next) => {
   setNoStoreHeaders(response);
   next();
