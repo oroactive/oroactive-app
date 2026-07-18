@@ -4211,6 +4211,9 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(server, /ok: true[\s\S]*app: version\.app[\s\S]*commit: version\.commit[\s\S]*buildNumber: version\.buildNumber/);
   assert.match(server, /app\.get\("\/api\/health"[\s\S]*version/);
   assert.match(server, /setNoStoreHeaders/);
+  assert.match(server, /setClearSiteDataHeaders/);
+  assert.match(server, /Clear-Site-Data", "\\"cache\\", \\"storage\\""/);
+  assert.match(server, /app\.get\("\/reset-cache"[\s\S]*setClearSiteDataHeaders/);
   assert.match(server, /requestPath\.startsWith\("\/api\/"\)/);
   assert.match(server, /public, max-age=31536000, immutable/);
 

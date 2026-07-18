@@ -770,6 +770,11 @@ function setNoCacheHeaders(response) {
   response.setHeader("Expires", "0");
 }
 
+function setClearSiteDataHeaders(response) {
+  setNoStoreHeaders(response);
+  response.setHeader("Clear-Site-Data", "\"cache\", \"storage\"");
+}
+
 function isHashedStaticPath(pathname = "") {
   return /[.-][a-f0-9]{8,}\.(?:js|css|png|jpe?g|webp|svg|woff2?)$/i.test(pathname);
 }
@@ -26543,7 +26548,7 @@ app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) =
 app.get("/reset-cache", async (_request, response) => {
   const metadata = await getBuildMetadata();
   const target = `/?v=${encodeURIComponent(metadata.buildNumber || Date.now())}&cache-reset=1`;
-  setNoStoreHeaders(response);
+  setClearSiteDataHeaders(response);
   response.type("html").send(`<!doctype html>
 <html lang="it">
 <head>
