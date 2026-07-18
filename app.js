@@ -1,3 +1,6 @@
+const OROACTIVE_CLIENT_BUILD_ID = "20260718-auto-refresh-191-1";
+const EXPECTED_GOLD_COIN_CATALOG_COUNT = 191;
+
 const state = {
   step: 0,
   signatures: [false, false, false, false],
@@ -178,6 +181,7 @@ const state = {
   appUpdateBannerDismissed: false,
   appUpdateTimer: null,
   appUpdateLastCheckedAt: null,
+  appUpdateAutoReloading: false,
   tutorial: {
     active: false,
     source: "",
@@ -771,7 +775,6 @@ const INVERTED_BILANCIA_DORO_IMAGE_COIN_IDS = new Set([
   "marengo-20-lire-italia",
   "marengo-francese-20-franchi",
   "napoleone-20-franchi-gallo-marianne",
-  "marengo-svizzero-vreneli",
   "krugerrand-1-oz",
   "american-eagle-1-oz",
   "america-aquila-25-dollari-oro",
@@ -1862,22 +1865,117 @@ const GOLD_COIN_CATALOG = [
   },
   {
     id: "marengo-svizzero-vreneli",
-    name: "Vreneli 20 Franchi",
+    name: "Marengo 20 Franchi Vreneli (Svizzera)",
     country: "Svizzera",
     mintYears: "1897-1949",
-    nominal: "20 Francs",
+    nominal: "20 Franchi",
     metal: "Oro",
     purity: 0.9,
     purityLabel: "900‰",
-    grossWeight: 6.4516,
-    fineGold: 5.806,
+    grossWeight: 6.45,
+    fineGold: 5.8,
     diameter: 21,
     edge: "Inciso o zigrinato, secondo anno",
-    obverse: "Helvetia / Vreneli con montagne alpine",
-    reverse: "Stemma svizzero, quercia e valore 20 FR",
-    history: "Il Vreneli e una delle monete svizzere piu riconoscibili. Il ritratto femminile e lo stemma con croce aiutano il riconoscimento visivo rapido in negozio.",
-    recognitionHints: ["helvetia", "vreneli", "20 fr", "svizzera", "croce svizzera"],
+    obverse: "Vreneli con trecce raccolte, scritta HELVETIA e Alpi sullo sfondo",
+    reverse: "Croce svizzera su scudo elvetico, rami di quercia, valore 20 FR e anno di conio",
+    history: "Il Marengo Svizzero 20 Franchi Vreneli e una delle monete d'oro piu celebri e apprezzate al mondo. Coniato dalla Zecca Federale Svizzera dal 1897 al 1949, mostra al dritto la giovane Vreneli, personificazione della purezza, della liberta e dell'identita nazionale svizzera, disegnata da Fritz Ulysse Landry con lo sguardo rivolto verso le Alpi. Il rovescio presenta la croce svizzera su scudo elvetico con rami di quercia, simbolo di forza e stabilita. Mantiene lo standard dei marenghi europei con titolo 900/1000, peso di 6,45 grammi, diametro di 21 millimetri e circa 5,80 grammi di oro fino.",
+    recognitionHints: ["marengo svizzero", "vreneli", "helvetia", "20 franchi", "20 francs", "20 fr", "svizzera", "croce svizzera", "scudo elvetico", "rami di quercia", "alpi", "fritz ulysse landry", "900", "6.45"],
     visual: { front: "profile", back: "cross", frontText: "HEL", backText: "20F" }
+  },
+  {
+    id: "marengo-20-franchi-helvetia-svizzera",
+    name: "Marengo 20 Franchi Helvetia (Svizzera)",
+    country: "Svizzera",
+    mintYears: "1883-1896",
+    nominal: "20 Franchi",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 6.45,
+    fineGold: 5.8,
+    diameter: 21,
+    edge: "Zigrinato",
+    obverse: "Profilo femminile di Helvetia con scritta CONFEDERATIO HELVETICA",
+    reverse: "Scudo elvetico crociato entro corona d'alloro, valore 20 FR e anno di conio",
+    history: "Il Marengo 20 Franchi Helvetia appartiene alle prime emissioni auree svizzere nello standard dell'Unione Monetaria Latina. Fu coniato fra il 1883 e il 1896 e mantiene le caratteristiche dei marenghi europei: valore 20 nella valuta nazionale, titolo 900/1000, peso di 6,45 grammi e diametro di 21 millimetri. Il dritto presenta il profilo di Helvetia con la legenda CONFEDERATIO HELVETICA, mentre il rovescio mostra lo scudo elvetico crociato entro una corona d'alloro, con valore 20 FR e anno di conio. Le emissioni di questi anni sono piu rare e ricercate come monete da collezione.",
+    recognitionHints: ["marengo svizzero", "helvetia", "confederatio helvetica", "20 franchi", "20 francs", "20 fr", "svizzera", "scudo elvetico", "corona d'alloro", "alloro", "1889", "unione monetaria latina", "900", "6.45"],
+    visual: { front: "profile", back: "shield", frontText: "CONF", backText: "20FR" }
+  },
+  {
+    id: "russia-15-rubli-oro-nicola-ii",
+    name: "Russia 15 Rubli d'oro Nicola II",
+    country: "Russia",
+    mintYears: "1897",
+    nominal: "15 Rubli",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 12.9,
+    fineGold: 11.612,
+    diameter: 24,
+    edge: "Inciso",
+    obverse: "Profilo dello Zar Nicola II con legenda circolare in cirillico",
+    reverse: "Aquila imperiale russa a due teste, valore 15 rubli e anno 1897",
+    history: "I 15 Rubli d'oro con l'effigie dello Zar Nicola II sono un conio molto richiesto fra i collezionisti, legato al fascino della monetazione imperiale russa. La tipologia indicata fu coniata nel 1897 e presenta al dritto il profilo dello Zar Nicola II, mentre al rovescio compare il simbolo dell'Impero russo: l'aquila bicipite con scettro e globo. Con titolo 900/1000, peso di 12,90 grammi, diametro di 24 millimetri e circa 11,612 grammi di oro puro, e una moneta storica apprezzata sia per contenuto aureo sia per valore numismatico.",
+    recognitionHints: ["russia", "15 rubli", "15 roubles", "15 rubles", "nicola ii", "nikolai ii", "zar nicola ii", "zar", "impero russo", "aquila bicipite", "aquila a due teste", "cyrillic", "cirillico", "1897", "900", "12.90"],
+    visual: { front: "profile", back: "eagle", frontText: "NII", backText: "15R" }
+  },
+  {
+    id: "russia-10-rubli-oro-nicola-ii",
+    name: "Russia 10 Rubli d'oro Nicola II",
+    country: "Russia",
+    mintYears: "1897-1911",
+    nominal: "10 Rubli",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 8.6,
+    fineGold: 7.74,
+    diameter: 22.6,
+    edge: "Inciso",
+    obverse: "Profilo dello Zar Nicola II con legenda circolare in cirillico",
+    reverse: "Aquila imperiale russa a due teste, valore 10 rubli e anno di conio",
+    history: "I 10 Rubli d'oro Zar Nicola II appartengono alla monetazione aurea russa del periodo Romanov, dedicata all'ultimo sovrano dell'Impero russo. Coniati dal 1897 al 1911, presentano al dritto il profilo dello Zar Nicola II con legenda in cirillico, mentre al rovescio compare l'aquila bicipite imperiale, con stemmi, scettro, globo e il valore 10 rubli. Con titolo 900/1000, peso di 8,60 grammi, diametro di 22,6 millimetri e circa 7,74 grammi di oro fino, sono monete storiche molto ricercate dai collezionisti.",
+    recognitionHints: ["russia", "10 rubli", "10 roubles", "10 rubles", "nicola ii", "nikolai ii", "zar nicola ii", "zar", "romanov", "impero russo", "aquila bicipite", "aquila bicefala", "aquila a due teste", "cyrillic", "cirillico", "1899", "900", "8.60"],
+    visual: { front: "profile", back: "eagle", frontText: "NII", backText: "10R" }
+  },
+  {
+    id: "russia-10-rubli-oro-chervonets",
+    name: "Russia 10 Rubli d'oro Chervonets",
+    country: "Russia",
+    mintYears: "1975-1982",
+    nominal: "10 Rubli",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 8.6,
+    fineGold: 7.7446,
+    diameter: 22.6,
+    edge: "Inciso",
+    obverse: "Contadino seminatore con cesto di semi, aratro, sole nascente e stabilimento industriale",
+    reverse: "Falce e martello davanti al sole nascente, corona di spighe e sigla RSFSR",
+    history: "I 10 Rubli d'oro Chervonets sono una delle emissioni auree piu riconoscibili dell'Unione Sovietica. La coniazione riprese nel 1975 e prosegui fino al 1982, con titolo 900/1000, peso lordo di 8,60 grammi, diametro di 22,6 millimetri e contenuto in oro fino pari a circa 7,7446 grammi. Il nome Chervonets richiama la moneta rossa, dovuta alla lega con rame che dona una tonalita calda e maggiore resistenza. Il dritto mostra il contadino seminatore con aratro, sole nascente e industria sullo sfondo; il rovescio presenta falce e martello entro spighe di grano, sigla RSFSR e motto sovietico in cirillico.",
+    recognitionHints: ["russia", "10 rubli", "10 roubles", "10 rubles", "chervonets", "chervonetz", "unione sovietica", "sovietica", "urss", "ussr", "rsfsr", "pcocp", "falce e martello", "martello", "seminatore", "contadino", "aratro", "spighe", "1977", "900", "8.60"],
+    visual: { front: "sower", back: "hammer-sickle", frontText: "10R", backText: "RSFSR" }
+  },
+  {
+    id: "russia-5-rubli-oro-nicola-ii",
+    name: "Russia 5 Rubli d'oro Nicola II",
+    country: "Russia",
+    mintYears: "1897-1911",
+    nominal: "5 Rubli",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 4.3,
+    fineGold: 3.871,
+    diameter: 18,
+    edge: "Inciso",
+    obverse: "Profilo dello Zar Nicola II con legenda circolare in cirillico",
+    reverse: "Aquila imperiale russa a due teste, valore 5 rubli e anno di conio",
+    history: "I 5 Rubli d'oro Zar Nicola II appartengono alla serie aurea russa dedicata all'ultimo sovrano della dinastia Romanov. Coniati dal 1897 al 1911, appena prima della rivoluzione bolscevica, presentano al dritto il profilo dello Zar Nicola II e al rovescio l'aquila bicefala dell'Impero russo, con cavaliere e scudo sul petto. Con titolo 900/1000, peso lordo di 4,30 grammi, diametro di 18 millimetri e circa 3,871 grammi di oro puro, sono ricercati dai collezionisti come parte del set zarista da 15, 10 e 5 Rubli.",
+    recognitionHints: ["russia", "5 rubli", "5 roubles", "5 rubles", "nicola ii", "nikolai ii", "zar nicola ii", "zar", "romanov", "impero russo", "aquila bicipite", "aquila bicefala", "aquila a due teste", "cyrillic", "cirillico", "1898", "1897", "900", "4.30"],
+    visual: { front: "profile", back: "eagle", frontText: "NII", backText: "5R" }
   },
   {
     id: "krugerrand-1-oz",
@@ -3801,6 +3899,11 @@ const BILANCIA_DORO_IMAGE_SLUGS_BY_COIN = {
   "5-franchi-napoleone-iii-francia": "5-franchi-napoleone-iii-francia",
   "marengo-20-franchi-napoleone-iii-testa-nuda": "marengo-20-franchi-napoleone-iii-testa-nuda",
   "marengo-svizzero-vreneli": "marengo-svizzero-vreneli",
+  "marengo-20-franchi-helvetia-svizzera": "marengo-20-franchi-helvetia-svizzera",
+  "russia-15-rubli-oro-nicola-ii": "russia-15-rubli-oro-nicola-ii",
+  "russia-10-rubli-oro-nicola-ii": "russia-10-rubli-oro-nicola-ii",
+  "russia-10-rubli-oro-chervonets": "russia-10-rubli-oro-chervonets",
+  "russia-5-rubli-oro-nicola-ii": "russia-5-rubli-oro-nicola-ii",
   "krugerrand-1-oz": "krugerrand-1-oz",
   "sudafrica-krugerrand-oro-1-oz-fdc": "sudafrica-krugerrand-oro-1-oz-fdc",
   "sudafrica-krugerrand-oro-1-2-oz": "sudafrica-krugerrand-oro-1-2-oz",
@@ -4015,6 +4118,12 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
   "5-franchi-napoleone-iii-francia": "Archivio OroActive",
   "marengo-20-franchi-napoleone-iii-testa-nuda": "Archivio OroActive",
   "napoleone-20-franchi-gallo-marianne": "Archivio OroActive",
+  "marengo-svizzero-vreneli": "Archivio OroActive",
+  "marengo-20-franchi-helvetia-svizzera": "Archivio OroActive",
+  "russia-15-rubli-oro-nicola-ii": "Archivio OroActive",
+  "russia-10-rubli-oro-nicola-ii": "Archivio OroActive",
+  "russia-10-rubli-oro-chervonets": "Archivio OroActive",
+  "russia-5-rubli-oro-nicola-ii": "Archivio OroActive",
   "filarmonica-vienna-2026-1-oz": "Archivio OroActive",
   "austria-100-euro-filarmonica-vienna-oro": "Archivio OroActive",
   "austria-100-euro-filarmonica-vienna-oro-fdc": "Archivio OroActive",
@@ -5292,13 +5401,25 @@ function normalizeAppVersion(version = {}) {
     buildNumber: String(version.buildNumber || version.build_number || "local"),
     buildTime: String(version.buildTime || version.build_time || ""),
     branch: String(version.branch || "main"),
-    environment: String(version.environment || "")
+    environment: String(version.environment || ""),
+    assetBuildId: String(version.assetBuildId || version.asset_build_id || version.buildId || version.build_id || "")
   };
 }
 
 function appVersionKey(version = {}) {
   const data = normalizeAppVersion(version);
-  return [data.commit, data.buildNumber, data.buildTime].join("|");
+  if (data.assetBuildId) return `asset:${data.assetBuildId}`;
+  return [data.commit, data.buildNumber, data.buildTime, data.assetBuildId].join("|");
+}
+
+async function fetchLatestClientBuildId() {
+  const response = await fetch(`/app.js?v=${Date.now()}`, {
+    cache: "no-store",
+    headers: { Accept: "application/javascript,text/javascript,*/*", "Cache-Control": "no-cache" }
+  });
+  if (!response.ok) throw new Error("Build client non disponibile.");
+  const source = await response.text();
+  return source.match(/const OROACTIVE_CLIENT_BUILD_ID = "([^"]+)"/)?.[1] || "";
 }
 
 async function fetchAppVersion(path = "/api/version") {
@@ -5311,10 +5432,21 @@ async function fetchAppVersion(path = "/api/version") {
 }
 
 async function fetchClientVersion() {
+  const clientAssetVersion = {
+    app: "OroActive",
+    commit: OROACTIVE_CLIENT_BUILD_ID,
+    shortCommit: OROACTIVE_CLIENT_BUILD_ID,
+    buildNumber: OROACTIVE_CLIENT_BUILD_ID,
+    buildTime: "",
+    branch: "client",
+    environment: "browser",
+    assetBuildId: OROACTIVE_CLIENT_BUILD_ID
+  };
   try {
-    return await fetchAppVersion("/version.json");
+    const version = await fetchAppVersion("/version.json");
+    return normalizeAppVersion({ ...version, ...clientAssetVersion });
   } catch {
-    return fetchAppVersion("/api/version");
+    return normalizeAppVersion(clientAssetVersion);
   }
 }
 
@@ -5352,6 +5484,26 @@ async function clearOldOroactiveCaches() {
   const oldKeys = keys.filter((key) => /^oroactive-|^static-|^asset-|^pwa-/i.test(key));
   await Promise.all(oldKeys.map((key) => window.caches.delete(key).catch(() => false)));
   return oldKeys;
+}
+
+function isGoldCoinCatalogCurrent() {
+  return Array.isArray(GOLD_COIN_CATALOG) && GOLD_COIN_CATALOG.length >= EXPECTED_GOLD_COIN_CATALOG_COUNT;
+}
+
+async function refreshStaleClientBuild(reason = "Aggiornamento app richiesto.") {
+  if (state.appUpdateAutoReloading) return false;
+  state.appUpdateAutoReloading = true;
+  showToast(reason, "warning");
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+      await registration.update().catch(() => null);
+    }
+  }
+  await clearOldOroactiveCaches();
+  window.setTimeout(() => window.location.reload(), 600);
+  return true;
 }
 
 async function performAppUpdateReload() {
@@ -5416,6 +5568,9 @@ async function appUpdateDebugInfo() {
     serviceWorkerActive: Boolean(navigator.serviceWorker?.controller || registration?.active),
     serviceWorkerWaiting: Boolean(registration?.waiting),
     caches: cacheKeys.filter((key) => /^oroactive-|^static-|^asset-|^pwa-/i.test(key)),
+    catalogCoinCount: Array.isArray(GOLD_COIN_CATALOG) ? GOLD_COIN_CATALOG.length : 0,
+    expectedCatalogCoinCount: EXPECTED_GOLD_COIN_CATALOG_COUNT,
+    clientBuildId: OROACTIVE_CLIENT_BUILD_ID,
     dirty: syncDirtyState(),
     lastCheckedAt: state.appUpdateLastCheckedAt || "",
     userAgent: navigator.userAgent || ""
@@ -5428,11 +5583,13 @@ function versionDetailRow(label, value) {
 
 async function openAppVersionPreview() {
   if (!isFounder() || !previewModal || !previewBody || !previewTitle) return;
-  const [client, server, debug] = await Promise.all([
+  const [client, server, latestClientBuildId, debug] = await Promise.all([
     ensureClientVersion().catch(() => null),
     fetchAppVersion("/api/version").catch(() => null),
+    fetchLatestClientBuildId().catch(() => ""),
     appUpdateDebugInfo()
   ]);
+  if (server && latestClientBuildId) server.assetBuildId = latestClientBuildId;
   if (server) state.serverVersion = server;
   const updated = Boolean(client && server && appVersionKey(client) === appVersionKey(server));
   const status = client && server ? (updated ? "App aggiornata" : "Nuova versione disponibile") : "Impossibile verificare";
@@ -5446,6 +5603,8 @@ async function openAppVersionPreview() {
         ${versionDetailRow("Commit server", server?.shortCommit || server?.commit)}
         ${versionDetailRow("Build client", client?.buildTime)}
         ${versionDetailRow("Build server", server?.buildTime)}
+        ${versionDetailRow("Build app caricata", debug.clientBuildId)}
+        ${versionDetailRow("Catalogo monete", `${debug.catalogCoinCount}/${debug.expectedCatalogCoinCount}`)}
         ${versionDetailRow("Stato", status)}
         ${versionDetailRow("Service worker attivo", debug.serviceWorkerActive ? "si" : "no")}
         ${versionDetailRow("Service worker in attesa", debug.serviceWorkerWaiting ? "si" : "no")}
@@ -5468,17 +5627,26 @@ async function checkForAppUpdate(options = {}) {
   try {
     const showResult = Boolean(options.showResult || options.manual);
     const client = await ensureClientVersion();
-    const server = await fetchAppVersion("/api/version");
+    const [server, latestClientBuildId] = await Promise.all([
+      fetchAppVersion("/api/version"),
+      fetchLatestClientBuildId().catch(() => "")
+    ]);
+    if (latestClientBuildId) server.assetBuildId = latestClientBuildId;
     state.serverVersion = server;
     state.appUpdateLastCheckedAt = new Date().toISOString();
     if (!server.ok) return false;
-    const changed = appVersionKey(server) !== appVersionKey(client);
+    const clientBuildStale = Boolean(latestClientBuildId && latestClientBuildId !== OROACTIVE_CLIENT_BUILD_ID);
+    const catalogStale = !isGoldCoinCatalogCurrent();
+    const changed = clientBuildStale || catalogStale || Boolean(latestClientBuildId && appVersionKey(server) !== appVersionKey(client));
     state.appUpdateAvailable = changed;
     if (changed) {
       state.appUpdateBannerDismissed = false;
-      showAppUpdateBanner(server);
+      const reason = catalogStale
+        ? `Catalogo monete non aggiornato (${GOLD_COIN_CATALOG.length}/${EXPECTED_GOLD_COIN_CATALOG_COUNT}). Ricarico OroActive.`
+        : "Nuova versione OroActive disponibile";
+      showAppUpdateBanner(reason);
       if (options.autoReload && !syncDirtyState() && !document.hidden) {
-        window.setTimeout(() => void performAppUpdateReload(), 1200);
+        window.setTimeout(() => void refreshStaleClientBuild(reason), 900);
       }
     } else {
       hideAppUpdateBanner();
@@ -5500,10 +5668,11 @@ async function checkForAppUpdate(options = {}) {
 function startAppVersionChecker() {
   ensureClientVersion().catch(() => null);
   window.clearInterval(state.appUpdateTimer);
-  state.appUpdateTimer = window.setInterval(() => checkForAppUpdate(), OROACTIVE_UPDATE_INTERVAL_MS);
-  window.addEventListener("focus", () => checkForAppUpdate());
+  void checkForAppUpdate({ autoReload: true });
+  state.appUpdateTimer = window.setInterval(() => checkForAppUpdate({ autoReload: true }), OROACTIVE_UPDATE_INTERVAL_MS);
+  window.addEventListener("focus", () => checkForAppUpdate({ autoReload: true }));
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) checkForAppUpdate();
+    if (!document.hidden) checkForAppUpdate({ autoReload: true });
   });
 }
 
