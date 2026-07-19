@@ -79,3 +79,44 @@ jobs:
             --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
             --header "Content-Type: application/json" \
             --data "{\"commit\":\"${GIT_COMMIT}\",\"branch\":\"${GITHUB_REF_NAME}\",\"buildNumber\":\"${BUILD_NUMBER}\"}"
+
+      - name: Verify production version
+        run: |
+          version_url="${OROACTIVE_HEALTH_URL:-https://app.oroactive.it/version.json}"
+          case "${version_url}" in
+            */api/version|*/api/health|*/version.json) ;;
+            *) version_url="${version_url%/}/version.json" ;;
+          esac
+
+          version_payload="$(mktemp)"
+          echo "Waiting for ${version_url} to expose commit ${GIT_COMMIT}."
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error --max-time 10 --connect-timeout 5 "${version_url}" -o "${version_payload}"; then
+              if node - "${GIT_COMMIT}" "${version_payload}" <<'NODE'
+          const fs = require("node:fs");
+          const expectedCommit = process.argv[2];
+          const payloadPath = process.argv[3];
+          const payload = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
+          const publishedCommit = payload?.commit || payload?.version?.commit || "";
+
+          if (publishedCommit === expectedCommit) {
+            process.exit(0);
+          }
+
+          console.log(`Published commit ${publishedCommit || "missing"} does not match ${expectedCommit}.`);
+          process.exit(1);
+          NODE
+              then
+                echo "Production is serving the expected commit."
+                exit 0
+              fi
+            fi
+
+            echo "Production not updated yet, attempt ${attempt}/60."
+            sleep 10
+          done
+
+          echo "::error::Coolify accepted the deploy webhook, but production did not expose commit ${GIT_COMMIT}. Check that COOLIFY_WEBHOOK targets the app.oroactive.it production resource and that Coolify pulls branch ${GITHUB_REF_NAME}."
+          echo "Last production version payload:"
+          cat "${version_payload}" || true
+          exit 1

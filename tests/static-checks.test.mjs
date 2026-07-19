@@ -4184,8 +4184,12 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /curl --fail[\s\S]*COOLIFY_WEBHOOK/);
-  assert.doesNotMatch(workflow, /Verify deployed health|health\.json|Health check|seq 1 36|Waiting for deployed app health|version\?\.commit|jq -e|python3|grep -q/);
-  assert.doesNotMatch(workflow, /deployment\/|coolify\.|https:\/\/app\.oroactive\.it/);
+  assert.match(workflow, /Verify production version/);
+  assert.match(workflow, /OROACTIVE_HEALTH_URL:-https:\/\/app\.oroactive\.it\/version\.json/);
+  assert.match(workflow, /seq 1 60/);
+  assert.match(workflow, /publishedCommit = payload\?\.commit \|\| payload\?\.version\?\.commit \|\| ""/);
+  assert.match(workflow, /COOLIFY_WEBHOOK targets the app\.oroactive\.it production resource/);
+  assert.doesNotMatch(workflow, /deployment\/|coolify\./);
 
   assert.match(dockerfile, /ARG GIT_COMMIT/);
   assert.match(dockerfile, /ARG SOURCE_COMMIT/);
@@ -4253,8 +4257,11 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(styles, /\.app-version-panel/);
   assert.doesNotMatch(styles, /\.app-footer-build/);
   assert.match(docs, /Deploy OroActive su Coolify/);
+  assert.match(docs, /OROACTIVE_HEALTH_URL/);
+  assert.match(docs, /https:\/\/app\.oroactive\.it\/version\.json/);
   assert.match(docs, /Include Source Commit in Build/);
-  assert.match(docs, /Healthcheck configurato in Coolify/);
-  assert.doesNotMatch(docs, /OROACTIVE_HEALTH_URL|commit esposto da \/api\/health.*unknown|Attende che \/api\/health/);
+  assert.match(docs, /dominio pubblico esponga[\s\S]*lo stesso commit appena inviato/);
+  assert.match(docs, /Coolify accetta il webhook ma il dominio continua a mostrare un commit vecchio/);
+  assert.doesNotMatch(docs, /commit esposto da \/api\/health.*unknown/);
   assert.doesNotMatch(docs, /Bearer\s+[A-Za-z0-9]/);
 });

@@ -8,6 +8,7 @@ Impostare in GitHub, nella repository, questi Secrets:
 
 - `COOLIFY_WEBHOOK`: webhook di deploy fornito da Coolify.
 - `COOLIFY_TOKEN`: token usato dal webhook Coolify.
+- `OROACTIVE_HEALTH_URL`: URL pubblico da verificare dopo il deploy, normalmente `https://app.oroactive.it/version.json`.
 - `OROACTIVE_EXPECTED_BRANCH`: ramo autorizzato al deploy, normalmente `main`.
 
 ## Build metadata in Coolify
@@ -39,9 +40,10 @@ In Coolify, nelle impostazioni avanzate della risorsa, abilita `Include Source C
 3. Controlla la sintassi di `app.js` e `server.js`.
 4. Esegue i test.
 5. Chiama il webhook Coolify usando solo i Secrets.
-6. Termina con successo quando Coolify accetta il deploy webhook.
+6. Attende che il dominio pubblico esponga in `/version.json`, `/api/version` o `/api/health` lo stesso commit appena inviato.
+7. Termina con successo solo quando la produzione sta servendo il commit corretto.
 
-Lo stato runtime dell'app resta demandato esclusivamente all'Healthcheck configurato in Coolify. GitHub Actions non interroga `/api/health`, cosi evita falsi negativi quando Coolify ha gia accettato e gestisce correttamente il deploy.
+Se Coolify accetta il webhook ma il dominio continua a mostrare un commit vecchio, GitHub Actions fallisce. In quel caso controllare che `COOLIFY_WEBHOOK` punti alla risorsa Coolify collegata a `app.oroactive.it`, che il ramo sia `main` e che Coolify stia ricostruendo l'immagine dal commit ricevuto.
 
 ## PWA e iPad
 
