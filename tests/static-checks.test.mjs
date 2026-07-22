@@ -2902,7 +2902,7 @@ test("strumenti contiene collegamento verificabile al sito OroActive", async () 
   assert.match(index, /id="brandDropdown"/);
   assert.match(app, /label: "Sito web OroActive"[\s\S]*action: "website"/);
   assert.match(app, /data-menu-action="\$\{escapeHtml\(item\.action\)\}"/);
-  assert.match(app, /const OROACTIVE_WEBSITE_URL = "http:\/\/wcfme33owxz0wfkr0ysnzthy\.188\.213\.161\.151\.sslip\.io\/"/);
+  assert.match(app, /const OROACTIVE_WEBSITE_URL = "https:\/\/www\.oroactive\.it"/);
   assert.match(app, /function openOroActiveWebsite/);
   assert.match(app, /window\.open\(OROACTIVE_WEBSITE_URL, "_blank", "noopener,noreferrer"\)/);
 });

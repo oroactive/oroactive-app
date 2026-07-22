@@ -197,7 +197,7 @@ const EXPECTED_GOLD_COIN_CATALOG_COUNT = 191;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
-const OROACTIVE_WEBSITE_URL = "http://wcfme33owxz0wfkr0ysnzthy.188.213.161.151.sslip.io/";
+const OROACTIVE_WEBSITE_URL = "https://www.oroactive.it";
 const PRIVACY_POLICY_FALLBACK = {
   version: "v1.0",
   updated_at: "2026-05-29",
