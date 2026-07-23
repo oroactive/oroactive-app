@@ -3,8 +3,10 @@
   "app": "OroActive",
   "commit": "unknown",
   "shortCommit": "unknown",
-  "buildNumber": "20260718-force-refresh-191-monete-2",
-  "buildTime": "2026-07-18T15:30:09.000Z",
+  "buildNumber": "20260723-production-recovery-191-1",
+  "buildTime": "2026-07-23T00:00:00.000Z",
   "branch": "main",
-  "environment": "development"
+  "environment": "development",
+  "assetBuildId": "20260723-production-recovery-191-1",
+  "catalogCount": 191
 }

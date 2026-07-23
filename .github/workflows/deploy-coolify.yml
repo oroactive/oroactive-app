@@ -53,21 +53,7 @@ jobs:
         run: npm test
 
       - name: Write build metadata
-        run: |
-          node - <<'NODE'
-          const fs = require("node:fs");
-          const metadata = {
-            app: "OroActive",
-            service: "oroactive-gestionale",
-            commit: process.env.GIT_COMMIT,
-            shortCommit: process.env.GIT_COMMIT.slice(0, 12),
-            buildTime: process.env.BUILD_TIME || new Date().toISOString(),
-            buildNumber: process.env.BUILD_NUMBER,
-            packageVersion: require("./package.json").version,
-            environment: "production"
-          };
-          fs.writeFileSync("version.json", `${JSON.stringify(metadata, null, 2)}\n`);
-          NODE
+        run: node scripts/write-version-metadata.mjs
 
       - name: Trigger Coolify deploy
         run: |
@@ -89,25 +75,52 @@ jobs:
           esac
 
           version_payload="$(mktemp)"
-          echo "Waiting for ${version_url} to expose commit ${GIT_COMMIT}."
+          expected_asset_build_id="$(node -p 'JSON.parse(require("node:fs").readFileSync("version.json", "utf8")).assetBuildId')"
+          expected_catalog_count="$(node -p 'JSON.parse(require("node:fs").readFileSync("version.json", "utf8")).catalogCount')"
+          echo "Waiting for ${version_url} to expose commit ${GIT_COMMIT}, build ${expected_asset_build_id} and ${expected_catalog_count} coins."
           for attempt in $(seq 1 60); do
-            if curl --fail --silent --show-error --max-time 10 --connect-timeout 5 "${version_url}" -o "${version_payload}"; then
-              if node - "${GIT_COMMIT}" "${version_payload}" <<'NODE'
+            separator="?"
+            case "${version_url}" in *\?*) separator="&" ;; esac
+            request_url="${version_url}${separator}deploy-check=${GITHUB_RUN_ID}-${attempt}"
+            if curl --fail --silent --show-error --max-time 10 --connect-timeout 5 \
+              --header "Cache-Control: no-cache" \
+              --header "Pragma: no-cache" \
+              "${request_url}" -o "${version_payload}"; then
+              if node - "${GIT_COMMIT}" "${expected_asset_build_id}" "${expected_catalog_count}" "${version_payload}" <<'NODE'
           const fs = require("node:fs");
           const expectedCommit = process.argv[2];
-          const payloadPath = process.argv[3];
+          const expectedAssetBuildId = process.argv[3];
+          const expectedCatalogCount = Number(process.argv[4]);
+          const payloadPath = process.argv[5];
           const payload = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
           const publishedCommit = payload?.commit || payload?.version?.commit || "";
+          const publishedAssetBuildId = payload?.assetBuildId || payload?.version?.assetBuildId || "";
+          const publishedCatalogCount = Number(payload?.catalogCount || payload?.version?.catalogCount || 0);
 
-          if (publishedCommit === expectedCommit) {
+          if (
+            publishedCommit === expectedCommit
+            && publishedAssetBuildId === expectedAssetBuildId
+            && publishedCatalogCount === expectedCatalogCount
+          ) {
             process.exit(0);
           }
 
-          console.log(`Published commit ${publishedCommit || "missing"} does not match ${expectedCommit}.`);
+          console.log(JSON.stringify({
+            expected: {
+              commit: expectedCommit,
+              assetBuildId: expectedAssetBuildId,
+              catalogCount: expectedCatalogCount
+            },
+            published: {
+              commit: publishedCommit || "missing",
+              assetBuildId: publishedAssetBuildId || "missing",
+              catalogCount: publishedCatalogCount || "missing"
+            }
+          }, null, 2));
           process.exit(1);
           NODE
               then
-                echo "Production is serving the expected commit."
+                echo "Production is serving the expected commit, frontend build and complete coin catalog."
                 exit 0
               fi
             fi

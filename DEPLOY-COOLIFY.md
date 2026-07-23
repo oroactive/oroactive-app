@@ -36,10 +36,20 @@ DATABASE_SSL=true
 ## Servizi Coolify
 
 1. Crea un database PostgreSQL in Coolify.
-2. Crea una nuova app dal repository o caricando questi file.
+2. Crea una nuova app dal repository `oroactive/oroactive-app`.
 3. Seleziona deploy con Dockerfile oppure Nixpacks.
 4. Collega la variabile `DATABASE_URL` del database PostgreSQL.
 5. Avvia il deploy.
+
+La risorsa di produzione deve usare il ramo `main`, il dominio `https://app.oroactive.it` e il deploy automatico. Il Secret GitHub `COOLIFY_WEBHOOK` deve contenere il webhook generato dalla stessa risorsa Coolify che serve questo dominio. Non usare il webhook della risorsa `oroactive-site`, dedicata al sito `oroactive.it`.
+
+Dopo ogni deploy, `https://app.oroactive.it/version.json` deve riportare:
+
+- lo stesso `commit` presente su GitHub `main`;
+- l'`assetBuildId` della release appena costruita;
+- il `catalogCount` atteso.
+
+Il workflow GitHub considera il deploy riuscito solo quando tutti e tre i valori coincidono. Se Coolify accetta il webhook ma il dominio espone ancora un commit vecchio, la risorsa o il webhook non sono collegati alla produzione corretta.
 
 Alla prima partenza il server crea automaticamente la tabella `atti_vendita`.
 La tabella usa i campi principali richiesti: `id`, `cliente_nome`, `cliente_cognome`, `codice_fiscale`, `telefono`, `peso_oro`, `quotazione`, `totale`, `data_atto`. Le informazioni complete del gestionale vengono salvate anche nel campo `payload`.

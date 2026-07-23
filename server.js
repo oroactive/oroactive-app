@@ -87,6 +87,11 @@ function shortCommit(commit = "") {
   return isUsefulBuildValue(value) ? value.slice(0, 12) : "unknown";
 }
 
+function validCatalogCount(value) {
+  const count = Number(value);
+  return Number.isInteger(count) && count > 0 ? count : 0;
+}
+
 async function readGitCommitFromDisk() {
   const gitDir = path.join(__dirname, ".git");
   try {
@@ -153,6 +158,16 @@ async function getBuildMetadata() {
     fileMetadata.branch,
     gitBranch
   ]) || "main";
+  const assetBuildId = firstUsefulBuildValue([
+    process.env.OROACTIVE_ASSET_BUILD_ID,
+    fileMetadata.assetBuildId
+  ]);
+  const catalogCount = validCatalogCount(
+    firstUsefulBuildValue([
+      process.env.OROACTIVE_CATALOG_COUNT,
+      fileMetadata.catalogCount
+    ])
+  );
   buildMetadataCache = {
     app: "OroActive",
     service: "oroactive-gestionale",
@@ -162,7 +177,9 @@ async function getBuildMetadata() {
     buildNumber,
     branch,
     packageVersion: process.env.npm_package_version || fileMetadata.packageVersion || "1.0.0",
-    environment: process.env.NODE_ENV || "development"
+    environment: process.env.NODE_ENV || "development",
+    assetBuildId,
+    catalogCount
   };
   buildMetadataCacheAt = now;
   return buildMetadataCache;
@@ -22018,7 +22035,9 @@ app.get("/api/version", async (_request, response) => {
     buildTime: version.buildTime,
     branch: version.branch,
     environment: version.environment,
-    packageVersion: version.packageVersion
+    packageVersion: version.packageVersion,
+    assetBuildId: version.assetBuildId,
+    catalogCount: version.catalogCount
   });
 });
 
@@ -22034,7 +22053,9 @@ app.get("/version.json", async (_request, response) => {
     buildTime: version.buildTime,
     branch: version.branch,
     environment: version.environment,
-    packageVersion: version.packageVersion
+    packageVersion: version.packageVersion,
+    assetBuildId: version.assetBuildId,
+    catalogCount: version.catalogCount
   });
 });
 

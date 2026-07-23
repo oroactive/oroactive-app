@@ -192,7 +192,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260718-force-refresh-191-monete-2";
+const OROACTIVE_CLIENT_BUILD_ID = "20260723-production-recovery-191-1";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 191;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -5396,7 +5396,8 @@ function normalizeAppVersion(version = {}) {
     buildTime: String(version.buildTime || version.build_time || ""),
     branch: String(version.branch || "main"),
     environment: String(version.environment || ""),
-    assetBuildId: String(version.assetBuildId || "").trim()
+    assetBuildId: String(version.assetBuildId || "").trim(),
+    catalogCount: Number(version.catalogCount || version.catalog_count || 0)
   };
 }
 
@@ -5438,7 +5439,8 @@ async function fetchClientVersion() {
     buildTime: "",
     branch: "client",
     environment: "browser",
-    assetBuildId: OROACTIVE_CLIENT_BUILD_ID
+    assetBuildId: OROACTIVE_CLIENT_BUILD_ID,
+    catalogCount: GOLD_COIN_CATALOG.length
   };
   try {
     const version = await fetchAppVersion("/version.json");
@@ -5602,6 +5604,7 @@ async function openAppVersionPreview() {
         ${versionDetailRow("Build app caricata", debug.clientBuildId)}
         ${versionDetailRow("Build app disponibile", latestClientBuildId || server?.assetBuildId)}
         ${versionDetailRow("Catalogo monete", `${debug.catalogCoinCount}/${debug.expectedCatalogCoinCount}`)}
+        ${versionDetailRow("Catalogo server", server?.catalogCount ? `${server.catalogCount} monete` : "non dichiarato")}
         ${versionDetailRow("Commit client", client?.shortCommit || client?.commit)}
         ${versionDetailRow("Commit server", server?.shortCommit || server?.commit)}
         ${versionDetailRow("Build client", client?.buildTime)}
@@ -5638,7 +5641,11 @@ async function checkForAppUpdate(options = {}) {
     if (!server.ok) return false;
     const clientBuildStale = Boolean(latestClientBuildId && latestClientBuildId !== OROACTIVE_CLIENT_BUILD_ID);
     const catalogStale = !isGoldCoinCatalogCurrent();
-    const changed = clientBuildStale || catalogStale || Boolean(latestClientBuildId && appVersionKey(server) !== appVersionKey(client));
+    const serverCatalogStale = Boolean(server.catalogCount && server.catalogCount < EXPECTED_GOLD_COIN_CATALOG_COUNT);
+    const changed = clientBuildStale
+      || catalogStale
+      || serverCatalogStale
+      || Boolean(latestClientBuildId && appVersionKey(server) !== appVersionKey(client));
     state.appUpdateAvailable = changed;
     if (changed) {
       const reason = catalogStale ? "Catalogo monete non aggiornato" : "Nuova versione OroActive disponibile";
