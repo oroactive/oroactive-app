@@ -199,7 +199,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260725-laboratorio-gemmologico-196-3";
+const OROACTIVE_CLIENT_BUILD_ID = "20260725-laboratorio-gemmologico-formazione-196-4";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 196;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -5063,6 +5063,11 @@ const storeForm = document.getElementById("storeForm");
 const storesList = document.getElementById("storesList");
 const antifraudList = document.getElementById("antifraudList");
 const trainingList = document.getElementById("trainingList");
+const trainingHero = document.getElementById("trainingHero");
+const trainingEyebrow = document.getElementById("trainingEyebrow");
+const trainingTitle = document.getElementById("trainingTitle");
+const trainingDescription = document.getElementById("trainingDescription");
+const academyCourseTabs = document.getElementById("academyCourseTabs");
 const courseSummary = document.getElementById("courseSummary");
 const courseCurrentLocation = document.getElementById("courseCurrentLocation");
 const courseSearch = document.getElementById("courseSearch");
@@ -7158,6 +7163,7 @@ const MENU_GROUPS = [
     roles: MENU_ROLES.all,
     items: [
       { id: "academy", label: "OroActive Academy", description: "Ingresso unico a catalogo, certificazioni, badge e training.", icon: "OA", order: 10, section: "training", courseTabShortcut: "catalog", roles: MENU_ROLES.all, keywords: "academy formazione catalogo academy corsi certificazioni attestati badge training operatore gestione academy" },
+      { id: "gemological-lab", label: "Laboratorio gemmologico", description: "Identificazione pietre, strumenti, protocolli e quiz professionali.", icon: "LG", order: 20, section: "training", courseTabShortcut: "gems", roles: MENU_ROLES.all, keywords: "laboratorio gemmologico gemmologia pietre diamante sintetico moissanite zirconia strumenti protocolli quiz" },
       { id: "gold-coin-encyclopedia", label: "Elenco Monete", description: "Enciclopedia monete d'oro con schede, storia e ricerca fotografica AI.", icon: "EM", order: 60, section: "coinEncyclopedia", roles: MENU_ROLES.all, keywords: "elenco monete monete oro enciclopedia numismatica sterlina marengo krugerrand sovereign riconoscimento fotocamera" },
       { id: "gaming-oroactive", label: "Gaming OroActive", description: "Aurum Blocks arcade formativo.", icon: "GO", order: 70, section: "gaming", roles: MENU_ROLES.all, keywords: "gaming oroactive giochi arcade formazione punteggi carature" },
       { id: "knowledge", label: "Nuova conoscenza", description: "Contenuti utili per l'AI.", icon: "AI", order: 80, section: "knowledgeNotes", roles: ["founder", "responsabile"], condition: "knowledge", keywords: "conoscenza ai approvata aurum" },
@@ -13772,6 +13778,14 @@ function resetTrainingCourseFormValues() {
 
 function renderCourseSummary() {
   if (!courseSummary) return;
+  if (state.courseActiveTab === "gems") {
+    const attempts = state.academyGemAttempts || [];
+    const average = attempts.length
+      ? Math.round(attempts.reduce((total, item) => total + Number(item.score || 0), 0) / attempts.length)
+      : 0;
+    courseSummary.innerHTML = `<span>Laboratorio</span><strong>${state.academyGemMaterials.length} pietre</strong><small>${state.academyGemTools.length} strumenti · media quiz ${average}/100</small>`;
+    return;
+  }
   courseSummary.innerHTML = `<span>Livello ${escapeHtml(operatorAcademyLevel())}</span><strong>Test finali</strong><small>Badge e certificazioni</small>`;
 }
 
@@ -13793,7 +13807,26 @@ const ACADEMY_TAB_LABELS = {
 
 function updateAcademyLocation() {
   if (!courseCurrentLocation) return;
-  courseCurrentLocation.textContent = `OroActive Academy / ${ACADEMY_TAB_LABELS[state.courseActiveTab] || ACADEMY_TAB_LABELS.catalog}`;
+  courseCurrentLocation.textContent = state.courseActiveTab === "gems"
+    ? "Formazione / Laboratorio gemmologico"
+    : `OroActive Academy / ${ACADEMY_TAB_LABELS[state.courseActiveTab] || ACADEMY_TAB_LABELS.catalog}`;
+}
+
+function renderTrainingSectionChrome() {
+  const isGemologicalLab = state.courseActiveTab === "gems";
+  trainingHero?.classList.toggle("gem-lab-standalone-hero", isGemologicalLab);
+  if (trainingEyebrow) {
+    trainingEyebrow.textContent = isGemologicalLab ? "Formazione specialistica" : "Università aziendale interna";
+  }
+  if (trainingTitle) {
+    trainingTitle.textContent = isGemologicalLab ? "Laboratorio gemmologico" : "OroActive Academy";
+  }
+  if (trainingDescription) {
+    trainingDescription.textContent = isGemologicalLab
+      ? "Sezione professionale autonoma per identificare pietre, applicare protocolli al banco e verificare le competenze."
+      : "Corsi disponibili, materiali, certificazioni, badge e livelli operatore.";
+  }
+  if (academyCourseTabs) academyCourseTabs.hidden = isGemologicalLab;
 }
 
 function trainingDifficultyLabel(difficulty = "") {
@@ -14480,6 +14513,7 @@ function renderTraining() {
   if (!ACADEMY_TAB_LABELS[state.courseActiveTab]) {
     state.courseActiveTab = "catalog";
   }
+  renderTrainingSectionChrome();
   renderCourseSummary();
   updateAcademyLocation();
   if (state.courseActiveTab !== "management") {

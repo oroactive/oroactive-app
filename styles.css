@@ -2454,6 +2454,10 @@ body.main-menu-active .splash-screen {
   margin: 12px 0 16px;
 }
 
+.course-tabs[hidden] {
+  display: none;
+}
+
 .course-tabs button,
 .course-card button,
 .course-toolbar select,

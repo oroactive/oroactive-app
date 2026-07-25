@@ -10,7 +10,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="OroActive">
   <meta name="format-detection" content="telephone=no">
-  <meta name="oroactive-build-id" content="20260725-laboratorio-gemmologico-196-3">
+  <meta name="oroactive-build-id" content="20260725-laboratorio-gemmologico-formazione-196-4">
   <title>OroActive Gestionale</title>
   <script>
     (() => {
@@ -57,12 +57,12 @@
       void verifyBootBuild();
     })();
   </script>
-  <link rel="manifest" href="manifest.json?v=20260725-laboratorio-gemmologico-196-3">
+  <link rel="manifest" href="manifest.json?v=20260725-laboratorio-gemmologico-formazione-196-4">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260725-laboratorio-gemmologico-196-3">
-  <script src="frontend-config.js?v=20260725-laboratorio-gemmologico-196-3"></script>
+  <link rel="stylesheet" href="styles.css?v=20260725-laboratorio-gemmologico-formazione-196-4">
+  <script src="frontend-config.js?v=20260725-laboratorio-gemmologico-formazione-196-4"></script>
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -1366,21 +1366,20 @@
 
       <section id="training" class="screen">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
-        <div class="course-hero">
+        <div class="course-hero" id="trainingHero">
           <div>
-            <p class="eyebrow">Università aziendale interna</p>
-            <h2>OroActive Academy</h2>
-            <p class="muted">Corsi disponibili, materiali, certificazioni, badge e livelli operatore.</p>
+            <p class="eyebrow" id="trainingEyebrow">Università aziendale interna</p>
+            <h2 id="trainingTitle">OroActive Academy</h2>
+            <p class="muted" id="trainingDescription">Corsi disponibili, materiali, certificazioni, badge e livelli operatore.</p>
           </div>
           <div class="course-summary" id="courseSummary">
             <span>Academy</span>
             <strong>Test finali</strong>
           </div>
         </div>
-        <div class="course-tabs" role="tablist" aria-label="Sezioni OroActive Academy">
+        <div class="course-tabs" id="academyCourseTabs" role="tablist" aria-label="Sezioni OroActive Academy">
           <button type="button" data-course-tab="path">Il mio percorso</button>
           <button class="active" type="button" data-course-tab="catalog">Catalogo Academy</button>
-          <button type="button" data-course-tab="gems">Laboratorio gemmologico</button>
           <button type="button" data-course-tab="competencies">Matrice competenze</button>
           <button type="button" data-course-tab="certifications">Certificazioni</button>
           <button type="button" data-course-tab="badges">Badge</button>
@@ -1965,6 +1964,6 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260725-laboratorio-gemmologico-196-3"></script>
+  <script src="app.js?v=20260725-laboratorio-gemmologico-formazione-196-4"></script>
 </body>
 </html>
