@@ -116,7 +116,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260725-guglielmo-i-10-mark-193-1"/);
+  assert.match(sw, /const BUILD_ID = "20260725-germania-10-mark-196-1"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -144,7 +144,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /meta name="oroactive-build-id" content="20260725-guglielmo-i-10-mark-193-1"/);
+  assert.match(index, /meta name="oroactive-build-id" content="20260725-germania-10-mark-196-1"/);
   assert.match(index, /async function verifyBootBuild/);
   assert.match(index, /async function resetStalePwa/);
   assert.match(index, /\/version\.json\?boot=\$\{Date\.now\(\)\}/);
@@ -152,11 +152,11 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(index, /registration\.unregister/);
   assert.match(index, /window\.caches\.delete/);
   assert.match(index, /serverBuildId !== htmlBuildId/);
-  assert.match(index, /app\.js\?v=20260725-guglielmo-i-10-mark-193-1/);
-  assert.match(index, /styles\.css\?v=20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(index, /app\.js\?v=20260725-germania-10-mark-196-1/);
+  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
   assert.match(version, /"ok": true/);
-  assert.match(version, /"assetBuildId": "20260725-guglielmo-i-10-mark-193-1"/);
-  assert.match(version, /"catalogCount": 193/);
+  assert.match(version, /"assetBuildId": "20260725-germania-10-mark-196-1"/);
+  assert.match(version, /"catalogCount": 196/);
 });
 
 test("splash screen iniziale premium animata e senza ghost screen", async () => {
@@ -212,7 +212,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -691,6 +691,15 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /WILHELM DEUTSCHER KAISER KONIG V\. PREUSSEN/);
   assert.match(server, /10-marchi-guglielmo-i-prussia/);
   assert.match(server, /10 Marchi d'oro Imperatore Guglielmo I di Prussia/);
+  assert.match(app, /id: "10-marchi-guglielmo-ii-prussia"[\s\S]*country: "Germania"[\s\S]*mintYears: "1889-1913"[\s\S]*grossWeight: 3\.58,[\s\S]*fineGold: 3\.222,[\s\S]*diameter: 19\.5,[\s\S]*thickness: 0\.9/);
+  assert.match(app, /WILHELM II DEUTSCHER KAISER KONIG V\. PREUSSEN/);
+  assert.match(server, /10-marchi-guglielmo-ii-prussia/);
+  assert.match(app, /id: "10-marchi-federico-i-baden"[\s\S]*country: "Germania"[\s\S]*mintYears: "1872-1901"[\s\S]*grossWeight: 3\.58,[\s\S]*fineGold: 3\.222,[\s\S]*diameter: 19\.5,[\s\S]*thickness: 0\.9/);
+  assert.match(app, /FRIEDRICH GROSSHERZOG VON BADEN/);
+  assert.match(server, /10-marchi-federico-i-baden/);
+  assert.match(app, /id: "10-marchi-carlo-wurttemberg"[\s\S]*country: "Germania"[\s\S]*mintYears: "1864-1891"[\s\S]*grossWeight: 3\.58,[\s\S]*fineGold: 3\.222,[\s\S]*diameter: 19\.5,[\s\S]*thickness: 0\.9/);
+  assert.match(app, /KARL KONIG VON WUERTTEMBERG/);
+  assert.match(server, /10-marchi-carlo-wurttemberg/);
   assert.match(app, /russia-15-rubli-oro-nicola-ii/);
   assert.match(app, /Russia 15 Rubli d'oro Nicola II/);
   assert.match(russia15RubliBlock, /country: "Russia"/);
@@ -1885,7 +1894,7 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
     .filter(([, sides]) => !sides.has("front") || !sides.has("back"))
     .map(([slug]) => slug);
 
-  assert.equal(catalog.length, 193);
+  assert.equal(catalog.length, 196);
   assert.deepEqual(duplicateIds, []);
   assert.deepEqual(missingImages, []);
   assert.deepEqual(unpairedAssets, []);
@@ -1897,6 +1906,12 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-amburgo-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-guglielmo-i-prussia-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-guglielmo-i-prussia-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-guglielmo-ii-prussia-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-guglielmo-ii-prussia-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-federico-i-baden-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-federico-i-baden-back.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-carlo-wurttemberg-front.png"), true);
+  assert.equal(referencedImages.has("assets/coins/bilancia-oro/10-marchi-carlo-wurttemberg-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-15-rubli-oro-nicola-ii-front.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-15-rubli-oro-nicola-ii-back.png"), true);
   assert.equal(referencedImages.has("assets/coins/bilancia-oro/russia-10-rubli-oro-nicola-ii-front.png"), true);
@@ -3323,7 +3338,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -3382,7 +3397,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -3434,7 +3449,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -3521,9 +3536,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260725-guglielmo-i-10-mark-193-1/);
-  assert.match(index, /styles\.css\?v=20260725-guglielmo-i-10-mark-193-1/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(index, /app\.js\?v=20260725-germania-10-mark-196-1/);
+  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3569,8 +3584,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260725-guglielmo-i-10-mark-193-1/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3726,7 +3741,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3830,7 +3845,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -3881,9 +3896,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260725-guglielmo-i-10-mark-193-1/);
-  assert.match(index, /styles\.css\?v=20260725-guglielmo-i-10-mark-193-1/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(index, /app\.js\?v=20260725-germania-10-mark-196-1/);
+  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -3940,9 +3955,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260725-guglielmo-i-10-mark-193-1/);
-  assert.match(index, /styles\.css\?v=20260725-guglielmo-i-10-mark-193-1/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(index, /app\.js\?v=20260725-germania-10-mark-196-1/);
+  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -4020,7 +4035,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -4137,7 +4152,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -4181,7 +4196,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260725-guglielmo-i-10-mark-193-1/);
+  assert.match(worker, /20260725-germania-10-mark-196-1/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i

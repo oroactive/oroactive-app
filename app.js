@@ -192,8 +192,8 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260725-guglielmo-i-10-mark-193-1";
-const EXPECTED_GOLD_COIN_CATALOG_COUNT = 193;
+const OROACTIVE_CLIENT_BUILD_ID = "20260725-germania-10-mark-196-1";
+const EXPECTED_GOLD_COIN_CATALOG_COUNT = 196;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
@@ -4180,6 +4180,66 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
     recognitionHints: ["10 marchi guglielmo i", "10 mark wilhelm i", "10 mark prussia", "10 marchi prussia", "guglielmo i", "wilhelm i", "deutscher kaiser", "konig von preussen", "konig v preussen", "prussia", "deutsches reich", "aquila imperiale", "10 mark", "marchio a", "zecca di berlino", "1873", "1888", "900"],
     visual: { front: "profile", back: "eagle", frontText: "W I", backText: "10M" }
   }, "10-marchi-guglielmo-i-prussia", "Archivio OroActive"),
+  withBilanciaDoroImages({
+    id: "10-marchi-guglielmo-ii-prussia",
+    name: "10 Marchi d'oro Imperatore Guglielmo II di Prussia (1889-1913)",
+    country: "Germania",
+    mintYears: "1889-1913",
+    nominal: "10 Mark",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 3.58,
+    fineGold: 3.222,
+    diameter: 19.5,
+    thickness: 0.9,
+    edge: "Zigrinato",
+    obverse: "Ritratto a testa nuda dell'Imperatore Guglielmo II rivolto a destra, con legenda WILHELM II DEUTSCHER KAISER KONIG V. PREUSSEN e marchio di zecca A",
+    reverse: "Aquila imperiale tedesca coronata con scudo, legenda DEUTSCHES REICH, anno di emissione e valore 10 MARK",
+    history: "I 10 Marchi d'oro dell'Imperatore Guglielmo II di Prussia furono emessi durante l'Impero Tedesco e circolarono come moneta legale. Il Regno di Prussia era lo stato piu esteso e influente dell'Impero, nato dopo la riforma monetaria che sostitui il Tallero con il Marco. Il dritto mostra Guglielmo II rivolto a destra con la legenda WILHELM II DEUTSCHER KAISER KONIG V. PREUSSEN; il rovescio presenta l'aquila imperiale, DEUTSCHES REICH, l'anno e il valore 10 MARK. La lega composta da oro 900/1000 e rame 100/1000 rende la moneta resistente all'abrasione e le conferisce una tonalita calda. Le emissioni di Guglielmo II sono tra le tipologie auree piu riconoscibili dell'Impero Tedesco.",
+    recognitionHints: ["10 marchi guglielmo ii", "10 mark wilhelm ii", "10 mark prussia", "10 marchi prussia", "guglielmo ii", "wilhelm ii", "deutscher kaiser", "konig von preussen", "konig v preussen", "prussia", "deutsches reich", "aquila imperiale", "10 mark", "marchio a", "zecca di berlino", "1889", "1913", "900"],
+    visual: { front: "profile", back: "eagle", frontText: "W II", backText: "10M" }
+  }, "10-marchi-guglielmo-ii-prussia", "Archivio OroActive"),
+  withBilanciaDoroImages({
+    id: "10-marchi-federico-i-baden",
+    name: "10 Marchi Gran Duca Federico I di Baden (1872-1901)",
+    country: "Germania",
+    mintYears: "1872-1901",
+    nominal: "10 Mark",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 3.58,
+    fineGold: 3.222,
+    diameter: 19.5,
+    thickness: 0.9,
+    edge: "Zigrinato",
+    obverse: "Ritratto del Granduca Federico I di Baden rivolto a sinistra, con legenda FRIEDRICH GROSSHERZOG VON BADEN e marchio di zecca G",
+    reverse: "Aquila imperiale tedesca coronata con scudo, legenda DEUTSCHES REICH, anno di emissione e valore 10 MARK",
+    history: "Federico I di Baden sostenne una politica liberale e la monarchia costituzionale, promuovendo riforme nell'istruzione e nel diritto civile. Favorevole all'unione tra Germania e Prussia, dopo la guerra del 1866 avvicino Baden alla Prussia e nel 1870-1871 prese parte al quartier generale di Versailles. I 10 Marchi d'oro recano sul dritto il suo ritratto con la legenda FRIEDRICH GROSSHERZOG VON BADEN e il marchio G della Zecca di Karlsruhe. Sul rovescio compare l'aquila imperiale con DEUTSCHES REICH, anno e valore 10 MARK. La moneta segue lo standard dell'Impero Tedesco con titolo 900/1000, peso di 3,58 grammi e diametro di 19,5 millimetri.",
+    recognitionHints: ["10 marchi federico i baden", "10 mark friedrich i baden", "10 mark baden", "federico i", "friedrich i", "grossherzog von baden", "granduca di baden", "baden", "deutsches reich", "aquila imperiale", "10 mark", "marchio g", "zecca di karlsruhe", "1872", "1901", "900"],
+    visual: { front: "profile", back: "eagle", frontText: "F I", backText: "10M" }
+  }, "10-marchi-federico-i-baden", "Archivio OroActive"),
+  withBilanciaDoroImages({
+    id: "10-marchi-carlo-wurttemberg",
+    name: "10 Marchi Re Carlo di Wurttemberg (1864-1891)",
+    country: "Germania",
+    mintYears: "1864-1891",
+    nominal: "10 Mark",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 3.58,
+    fineGold: 3.222,
+    diameter: 19.5,
+    thickness: 0.9,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Re Carlo di Wurttemberg rivolto a destra, con legenda KARL KONIG VON WUERTTEMBERG e marchio di zecca F",
+    reverse: "Aquila imperiale tedesca coronata con scudo del Wurttemberg, legenda DEUTSCHES REICH, anno e valore 10 MARK",
+    history: "Come regno dell'Impero Tedesco, il Wurttemberg conio monete recanti l'effigie di Re Carlo. Il sovrano sostenne una politica liberale, concedendo liberta di stampa e associazione e ampliando il diritto di voto per la Camera del Popolo. Il Wurttemberg aderi alla Confederazione della Germania del Nord, dalla quale emerse in seguito l'Impero Tedesco. Sul dritto dei 10 Marchi compare il ritratto di Carlo con la legenda KARL KONIG VON WUERTTEMBERG e il marchio F della Zecca di Stoccarda. Il rovescio mostra l'aquila imperiale, DEUTSCHES REICH, l'anno e il valore 10 MARK. La moneta e in oro 900/1000, pesa 3,58 grammi e misura 19,5 millimetri.",
+    recognitionHints: ["10 marchi carlo wurttemberg", "10 mark karl wurttemberg", "10 mark wuerttemberg", "re carlo", "karl konig", "konig von wurttemberg", "konig von wuerttemberg", "wurttemberg", "wuerttemberg", "deutsches reich", "aquila imperiale", "10 mark", "marchio f", "zecca di stoccarda", "stuttgart", "1864", "1891", "900"],
+    visual: { front: "profile", back: "eagle", frontText: "KARL", backText: "10M" }
+  }, "10-marchi-carlo-wurttemberg", "Archivio OroActive"),
   withBilanciaDoroImages({
     id: "10-marchi-amburgo",
     name: "10 Marchi Citta Libera Anseatica di Amburgo",
