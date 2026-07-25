@@ -192,8 +192,8 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260725-hamburg-10-mark-192-1";
-const EXPECTED_GOLD_COIN_CATALOG_COUNT = 192;
+const OROACTIVE_CLIENT_BUILD_ID = "20260725-guglielmo-i-10-mark-193-1";
+const EXPECTED_GOLD_COIN_CATALOG_COUNT = 193;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
@@ -4160,6 +4160,26 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
 };
 
 const BILANCIA_DORO_COIN_ADDITIONS = [
+  withBilanciaDoroImages({
+    id: "10-marchi-guglielmo-i-prussia",
+    name: "10 Marchi d'oro Imperatore Guglielmo I di Prussia (1873-1888)",
+    country: "Germania",
+    mintYears: "1873-1888",
+    nominal: "10 Mark",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 3.58,
+    fineGold: 3.222,
+    diameter: 19.5,
+    thickness: 0.9,
+    edge: "Zigrinato",
+    obverse: "Ritratto a testa nuda dell'Imperatore Guglielmo I rivolto a destra, con legenda WILHELM DEUTSCHER KAISER KONIG V. PREUSSEN e marchio di zecca A",
+    reverse: "Aquila imperiale tedesca coronata con scudo, legenda DEUTSCHES REICH, anno di emissione e valore 10 MARK",
+    history: "I 10 Marchi d'oro dell'Imperatore Guglielmo I di Prussia furono coniati dal 1873 al 1888 durante l'Impero Tedesco. Dopo la vittoria nella guerra franco-prussiana, Guglielmo I fu proclamato primo imperatore tedesco il 18 gennaio 1871 a Versailles. La riforma monetaria introdusse il Marco al posto del Tallero, mentre i diversi stati dell'Impero conservarono il diritto di emettere monete con i propri sovrani o stemmi. Sul dritto compare il ritratto dell'Imperatore rivolto a destra con la legenda WILHELM DEUTSCHER KAISER KONIG V. PREUSSEN; sul rovescio l'aquila imperiale con scudo e le iscrizioni DEUTSCHES REICH, anno e 10 MARK. La lega di oro 900/1000 e rame 100/1000 rende la moneta resistente e le conferisce una caratteristica tonalita calda. Il 1888, anno della morte di Guglielmo I, e ricordato come l'anno dei tre imperatori: gli succedettero Federico III e poi Guglielmo II.",
+    recognitionHints: ["10 marchi guglielmo i", "10 mark wilhelm i", "10 mark prussia", "10 marchi prussia", "guglielmo i", "wilhelm i", "deutscher kaiser", "konig von preussen", "konig v preussen", "prussia", "deutsches reich", "aquila imperiale", "10 mark", "marchio a", "zecca di berlino", "1873", "1888", "900"],
+    visual: { front: "profile", back: "eagle", frontText: "W I", backText: "10M" }
+  }, "10-marchi-guglielmo-i-prussia", "Archivio OroActive"),
   withBilanciaDoroImages({
     id: "10-marchi-amburgo",
     name: "10 Marchi Citta Libera Anseatica di Amburgo",

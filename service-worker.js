@@ -1,4 +1,4 @@
-const BUILD_ID = "20260725-hamburg-10-mark-192-1";
+const BUILD_ID = "20260725-guglielmo-i-10-mark-193-1";
 const CACHE_NAME = `oroactive-cache-${BUILD_ID}`;
 const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
 const NEVER_CACHE_PREFIXES = [
