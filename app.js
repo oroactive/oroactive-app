@@ -192,8 +192,8 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260723-production-recovery-191-1";
-const EXPECTED_GOLD_COIN_CATALOG_COUNT = 191;
+const OROACTIVE_CLIENT_BUILD_ID = "20260725-hamburg-10-mark-192-1";
+const EXPECTED_GOLD_COIN_CATALOG_COUNT = 192;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
@@ -4160,6 +4160,26 @@ const COIN_IMAGE_SOURCE_BY_COIN = {
 };
 
 const BILANCIA_DORO_COIN_ADDITIONS = [
+  withBilanciaDoroImages({
+    id: "10-marchi-amburgo",
+    name: "10 Marchi Citta Libera Anseatica di Amburgo",
+    country: "Germania",
+    mintYears: "1873-1913",
+    nominal: "10 Mark",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 3.58,
+    fineGold: 3.222,
+    diameter: 19.5,
+    thickness: 0.9,
+    edge: "Zigrinato",
+    obverse: "Stemma della Citta Libera Anseatica di Amburgo sostenuto da due leoni, con castello, elmo, lance, piume, legenda FREIE UND HANSESTADT HAMBURG e marchio di zecca J",
+    reverse: "Aquila imperiale tedesca coronata con legenda DEUTSCHES REICH, anno di emissione e valore 10 MARK",
+    history: "Le monete d'oro da 10 Marchi della Citta Libera Anseatica di Amburgo furono coniate dal 1873 al 1913 durante l'Impero Tedesco. Amburgo, fondata nel IX secolo, entro nella Lega Anseatica nel 1241 e fu dichiarata citta libera nel 1510; anche dopo la nascita dell'Impero Tedesco conservo la propria identita monetaria. Il taglio da 10 Marchi era la denominazione aurea piu piccola e accessibile. Sul dritto compare lo stemma cittadino con il castello sostenuto da due leoni, sormontato da elmo, lance e piume, insieme alla legenda FREIE UND HANSESTADT HAMBURG e al marchio J della Zecca di Amburgo. Sul rovescio e raffigurata l'aquila imperiale tedesca coronata con DEUTSCHES REICH, anno di emissione e valore 10 MARK. La tiratura inferiore rispetto ad altre emissioni dell'Impero e il titolo 900/1000 ne sostengono l'interesse storico e numismatico.",
+    recognitionHints: ["10 marchi amburgo", "10 mark hamburg", "10 mark amburgo", "freie und hansestadt hamburg", "citta libera anseatica", "città libera anseatica", "hamburg", "amburgo", "deutsches reich", "impero tedesco", "aquila imperiale", "stemma amburgo", "zecca di amburgo", "marchio j", "zecca j", "1873", "1913", "900"],
+    visual: { front: "shield", back: "eagle", frontText: "HH", backText: "10M" }
+  }, "10-marchi-amburgo", "Archivio OroActive"),
   withBilanciaDoroImages({
     id: "marengo-belga-20-franchi",
     name: "Marengo 20 Franchi Albert (Belgio)",
