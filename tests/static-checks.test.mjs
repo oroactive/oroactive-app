@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
+import {
+  ACADEMY_GEM_MATERIALS,
+  ACADEMY_GEM_TOOLS,
+  academyGemSeedValidation
+} from "../services/academy/gemologicalLab.js";
 
 const root = new URL("../", import.meta.url);
 const fileCache = new Map();
@@ -15,6 +20,72 @@ const file = (name) => {
 };
 
 const goldCoinCatalogCache = new Map();
+
+test("laboratorio gemmologico pubblica solo schede complete e approvate", async () => {
+  assert.equal(ACADEMY_GEM_TOOLS.length, 11);
+  assert.ok(ACADEMY_GEM_MATERIALS.length >= 4);
+  assert.ok(academyGemSeedValidation().every(({ valid }) => valid));
+
+  for (const material of ACADEMY_GEM_MATERIALS.filter(({ published }) => published)) {
+    assert.equal(material.founder_review_status, "approved", `${material.slug}: revisione Founder mancante`);
+    assert.ok(material.identification_difficulty >= 1 && material.identification_difficulty <= 5, `${material.slug}: difficolta non valida`);
+    assert.ok(material.gallery.length >= 1, `${material.slug}: immagine mancante`);
+    assert.ok(material.recommended_tools.length >= 1, `${material.slug}: strumenti mancanti`);
+    assert.ok(material.operator_protocol.steps.length >= 1, `${material.slug}: protocollo mancante`);
+    assert.ok(material.comparison_table.rows.length >= 1, `${material.slug}: confronto differenziale mancante`);
+    assert.deepEqual(
+      material.comparison_table.columns,
+      ["Materiale", "Aspetto", "Durezza", "Peso specifico", "Indice di rifrazione", "Birifrangenza", "Fluorescenza", "Inclusioni o segnali", "Strumento decisivo"],
+      `${material.slug}: campi del confronto differenziale incompleti`
+    );
+    assert.ok(material.common_mistakes.length >= 1, `${material.slug}: errori comuni mancanti`);
+
+    for (const media of material.gallery) {
+      assert.ok(media.source && media.license && media.author, `${material.slug}: diritti immagine incompleti`);
+      assert.ok(media.resolution && media.what_to_observe, `${material.slug}: metadati didattici incompleti`);
+      await access(new URL(media.url.replace(/^\//, ""), root));
+    }
+
+    const questionTypes = new Set(material.quiz.questions.map(({ type }) => type));
+    assert.deepEqual(
+      [...questionTypes].sort(),
+      ["material", "procedure", "tool"],
+      `${material.slug}: il quiz deve verificare materiale, strumento e procedura`
+    );
+  }
+});
+
+test("laboratorio gemmologico espone API, apprendimento e quiz persistente", async () => {
+  const [server, app, index, schema, migration] = await Promise.all([
+    file("server.js"),
+    file("app.js"),
+    file("index.html"),
+    file("schema.sql"),
+    file("migrations/20260725_academy_gemological_lab.sql")
+  ]);
+
+  assert.match(server, /seedAcademyGemologicalLab\(\)/);
+  assert.match(server, /app\.get\("\/api\/academy\/gems\/materials"/);
+  assert.match(server, /app\.get\("\/api\/academy\/gems\/materials\/:id"/);
+  assert.match(server, /app\.get\("\/api\/academy\/gems\/tools"/);
+  assert.match(server, /app\.post\("\/api\/academy\/gems\/quiz-attempts"/);
+  assert.match(server, /app\.get\("\/api\/academy\/gems\/my-quiz-attempts"/);
+  assert.match(server, /app\.post\("\/api\/academy\/gems\/materials\/:id\/review", requireFounder/);
+  assert.match(server, /questions\.map\(\(\{ correct_answer: _correctAnswer, \.\.\.question \}\) => question\)/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS academy_gem_tools/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS academy_gem_materials/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS academy_gem_quiz_attempts/);
+  assert.match(migration, /founder_review_status/);
+  assert.match(migration, /identification_difficulty/);
+  assert.match(app, /Laboratorio gemmologico/);
+  assert.match(app, /Impara questa pietra/);
+  assert.match(app, /Riconosci la pietra/);
+  assert.match(app, /data-submit-gem-quiz/);
+  assert.match(app, /\/academy\/gems\/quiz-attempts/);
+  assert.match(app, /duration_seconds/);
+  assert.match(app, /result\.errors/);
+  assert.match(index, /data-course-tab="gems"/);
+});
 
 function extractGoldCoinCatalog(app) {
   const cachedCatalog = goldCoinCatalogCache.get(app);
@@ -116,7 +187,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260725-germania-10-mark-196-1"/);
+  assert.match(sw, /const BUILD_ID = "20260725-laboratorio-gemmologico-196-3"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -144,7 +215,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /meta name="oroactive-build-id" content="20260725-germania-10-mark-196-1"/);
+  assert.match(index, /meta name="oroactive-build-id" content="20260725-laboratorio-gemmologico-196-3"/);
   assert.match(index, /async function verifyBootBuild/);
   assert.match(index, /async function resetStalePwa/);
   assert.match(index, /\/version\.json\?boot=\$\{Date\.now\(\)\}/);
@@ -152,10 +223,10 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(index, /registration\.unregister/);
   assert.match(index, /window\.caches\.delete/);
   assert.match(index, /serverBuildId !== htmlBuildId/);
-  assert.match(index, /app\.js\?v=20260725-germania-10-mark-196-1/);
-  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
+  assert.match(index, /app\.js\?v=20260725-laboratorio-gemmologico-196-3/);
+  assert.match(index, /styles\.css\?v=20260725-laboratorio-gemmologico-196-3/);
   assert.match(version, /"ok": true/);
-  assert.match(version, /"assetBuildId": "20260725-germania-10-mark-196-1"/);
+  assert.match(version, /"assetBuildId": "20260725-laboratorio-gemmologico-196-3"/);
   assert.match(version, /"catalogCount": 196/);
 });
 
@@ -212,7 +283,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -3338,7 +3409,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -3397,7 +3468,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -3449,7 +3520,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -3536,9 +3607,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260725-germania-10-mark-196-1/);
-  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(index, /app\.js\?v=20260725-laboratorio-gemmologico-196-3/);
+  assert.match(index, /styles\.css\?v=20260725-laboratorio-gemmologico-196-3/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3584,8 +3655,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(index, /styles\.css\?v=20260725-laboratorio-gemmologico-196-3/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3741,7 +3812,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3845,7 +3916,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -3896,9 +3967,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260725-germania-10-mark-196-1/);
-  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(index, /app\.js\?v=20260725-laboratorio-gemmologico-196-3/);
+  assert.match(index, /styles\.css\?v=20260725-laboratorio-gemmologico-196-3/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -3955,9 +4026,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260725-germania-10-mark-196-1/);
-  assert.match(index, /styles\.css\?v=20260725-germania-10-mark-196-1/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(index, /app\.js\?v=20260725-laboratorio-gemmologico-196-3/);
+  assert.match(index, /styles\.css\?v=20260725-laboratorio-gemmologico-196-3/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -4035,7 +4106,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -4152,7 +4223,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -4196,7 +4267,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260725-germania-10-mark-196-1/);
+  assert.match(worker, /20260725-laboratorio-gemmologico-196-3/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i

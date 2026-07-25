@@ -35,6 +35,11 @@ import {
   findBilanciaDOroSource,
   slugifyGoldMaster
 } from "./services/academy/goldMasterCourseGenerator.js";
+import {
+  ACADEMY_GEM_MATERIALS,
+  ACADEMY_GEM_TOOLS,
+  academyGemSeedValidation
+} from "./services/academy/gemologicalLab.js";
 
 dotenv.config();
 
@@ -9025,6 +9030,7 @@ async function initDatabase() {
   await seedAurumBundledKnowledgeDocuments();
   await bootstrapStores();
   await bootstrapAdminUser();
+  await seedAcademyGemologicalLab();
   await bootstrapPrivacyPolicy();
   await seedDefaultCompetitorSources();
   await seedDefaultCompetitorExtractionRules();
@@ -15612,6 +15618,203 @@ async function gamingOverview(user = {}) {
       { id: "aurum_blocks", title: "Aurum Blocks", section: "aurumBlocks", best_score: Number(aurumBlocksBest?.score || 0) }
     ],
     aurum_blocks: { best_score: Number(aurumBlocksBest?.score || 0) }
+  };
+}
+
+const ACADEMY_GEM_MATERIAL_COLUMNS = [
+  "slug",
+  "commercial_name",
+  "mineralogical_name",
+  "family",
+  "gem_group",
+  "chemical_formula",
+  "crystal_system",
+  "origin",
+  "classification",
+  "theory",
+  "mohs_hardness",
+  "density",
+  "specific_gravity",
+  "tenacity",
+  "cleavage",
+  "fracture",
+  "luster",
+  "transparency",
+  "color",
+  "pleochroism",
+  "refractive_index",
+  "birefringence",
+  "dispersion",
+  "double_refraction",
+  "fluorescence",
+  "spectral_features",
+  "optical_properties",
+  "inclusions",
+  "gallery",
+  "identification_difficulty",
+  "operator_protocol",
+  "recommended_tools",
+  "common_mistakes",
+  "comparison_table",
+  "quiz",
+  "published",
+  "founder_review_status",
+  "founder_reviewed_at",
+  "founder_reviewed_by",
+  "review_note"
+];
+
+const ACADEMY_GEM_JSON_COLUMNS = new Set([
+  "optical_properties",
+  "inclusions",
+  "gallery",
+  "operator_protocol",
+  "recommended_tools",
+  "common_mistakes",
+  "comparison_table",
+  "quiz"
+]);
+
+function academyGemMaterialValue(material = {}, column = "", founderId = null) {
+  if (column === "founder_reviewed_at") {
+    return material.founder_review_status === "approved" ? new Date().toISOString() : null;
+  }
+  if (column === "founder_reviewed_by") return founderId;
+  const value = material[column] ?? null;
+  return ACADEMY_GEM_JSON_COLUMNS.has(column) ? JSON.stringify(value) : value;
+}
+
+async function seedAcademyGemologicalLab() {
+  const invalidMaterials = academyGemSeedValidation().filter((entry) => !entry.valid);
+  if (invalidMaterials.length) {
+    throw new Error(`Materiali gemmologici incompleti: ${invalidMaterials.map((entry) => entry.slug).join(", ")}`);
+  }
+  for (const tool of ACADEMY_GEM_TOOLS) {
+    await pool.query(
+      `INSERT INTO academy_gem_tools (name, description, usage, limitations, available)
+       VALUES ($1::text, $2::text, $3::text, $4::text, TRUE)
+       ON CONFLICT (name)
+       DO UPDATE SET description = EXCLUDED.description,
+                     usage = EXCLUDED.usage,
+                     limitations = EXCLUDED.limitations,
+                     available = TRUE,
+                     updated_at = NOW()`,
+      [tool.name, tool.description, tool.usage, tool.limitations]
+    );
+  }
+  const founderId = (await pool.query(
+    "SELECT id FROM utenti WHERE LOWER(ruolo) = 'founder' ORDER BY id ASC LIMIT 1"
+  )).rows[0]?.id || null;
+  const placeholders = ACADEMY_GEM_MATERIAL_COLUMNS.map((_, index) => `$${index + 1}`).join(", ");
+  const updateColumns = ACADEMY_GEM_MATERIAL_COLUMNS
+    .slice(1)
+    .filter((column) => !["founder_reviewed_at", "founder_reviewed_by"].includes(column))
+    .map((column) => `${column} = EXCLUDED.${column}`)
+    .join(", ");
+  for (const material of ACADEMY_GEM_MATERIALS) {
+    const values = ACADEMY_GEM_MATERIAL_COLUMNS.map((column) => academyGemMaterialValue(material, column, founderId));
+    await pool.query(
+      `INSERT INTO academy_gem_materials (${ACADEMY_GEM_MATERIAL_COLUMNS.join(", ")})
+       VALUES (${placeholders})
+       ON CONFLICT (slug)
+       DO UPDATE SET ${updateColumns},
+                     founder_reviewed_at = COALESCE(academy_gem_materials.founder_reviewed_at, EXCLUDED.founder_reviewed_at),
+                     founder_reviewed_by = COALESCE(academy_gem_materials.founder_reviewed_by, EXCLUDED.founder_reviewed_by),
+                     updated_at = NOW()`,
+      values
+    );
+  }
+}
+
+function sanitizeAcademyGemMaterial(material = {}) {
+  const questions = Array.isArray(material.quiz?.questions) ? material.quiz.questions : [];
+  return {
+    ...material,
+    quiz: {
+      questions: questions.map(({ correct_answer: _correctAnswer, ...question }) => question)
+    }
+  };
+}
+
+async function listAcademyGemMaterials({ includeDrafts = false } = {}) {
+  const result = await pool.query(
+    `SELECT *
+     FROM academy_gem_materials
+     WHERE ($1::boolean = TRUE OR (published = TRUE AND founder_review_status = 'approved'))
+     ORDER BY identification_difficulty ASC, commercial_name ASC`,
+    [includeDrafts]
+  );
+  return result.rows.map(sanitizeAcademyGemMaterial);
+}
+
+async function findAcademyGemMaterial(identifier = "", { includeDrafts = false, sanitize = true } = {}) {
+  const normalized = String(identifier || "").trim();
+  if (!normalized) return null;
+  const result = await pool.query(
+    `SELECT *
+     FROM academy_gem_materials
+     WHERE (slug = $1::text OR id::text = $1::text)
+       AND ($2::boolean = TRUE OR (published = TRUE AND founder_review_status = 'approved'))
+     LIMIT 1`,
+    [normalized, includeDrafts]
+  );
+  const material = result.rows[0] || null;
+  return material && sanitize ? sanitizeAcademyGemMaterial(material) : material;
+}
+
+async function submitAcademyGemQuizAttempt(user = {}, input = {}) {
+  const material = await findAcademyGemMaterial(input.material_id || input.material_slug, { sanitize: false });
+  if (!material) throw new Error("Materiale gemmologico non disponibile.");
+  const questions = Array.isArray(material.quiz?.questions) ? material.quiz.questions : [];
+  if (!questions.length) throw new Error("Quiz gemmologico non configurato.");
+  const answers = input.answers && typeof input.answers === "object" && !Array.isArray(input.answers)
+    ? input.answers
+    : {};
+  const errors = [];
+  let correct = 0;
+  questions.forEach((question) => {
+    const answer = String(answers[question.id] || "").trim();
+    if (normalizeQuizAnswerValue(answer) === normalizeQuizAnswerValue(question.correct_answer)) {
+      correct += 1;
+      return;
+    }
+    errors.push({
+      question_id: question.id,
+      type: question.type,
+      prompt: question.prompt,
+      answer,
+      correct_answer: question.correct_answer
+    });
+  });
+  const score = Math.round((correct / questions.length) * 100);
+  const levelReached = score >= 90 ? 5 : score >= 75 ? 4 : score >= 60 ? 3 : score >= 40 ? 2 : 1;
+  const durationSeconds = Math.min(86400, Math.max(0, Number(input.duration_seconds || 0)));
+  const result = await pool.query(
+    `INSERT INTO academy_gem_quiz_attempts
+      (user_id, material_id, mode, score, duration_seconds, errors, level_reached, answers, started_at, completed_at)
+     VALUES
+      ($1::bigint, $2::bigint, $3::text, $4::integer, $5::integer, $6::jsonb, $7::integer, $8::jsonb,
+       NOW() - ($5::integer * INTERVAL '1 second'), NOW())
+     RETURNING *`,
+    [
+      user.id,
+      material.id,
+      input.mode === "study" ? "study" : "recognition",
+      score,
+      durationSeconds,
+      JSON.stringify(errors),
+      levelReached,
+      JSON.stringify(answers)
+    ]
+  );
+  return {
+    attempt: result.rows[0],
+    material: sanitizeAcademyGemMaterial(material),
+    score,
+    correct_answers: correct,
+    total_questions: questions.length,
+    errors,
+    level_reached: levelReached
   };
 }
 
@@ -23090,6 +23293,94 @@ app.get("/api/corsi", async (request, response, next) => {
     response.json(await listCourses(request.user));
   } catch (error) {
     next(error);
+  }
+});
+
+app.get("/api/academy/gems/materials", async (request, response, next) => {
+  try {
+    response.set("Cache-Control", "no-store");
+    const includeDrafts = normalizeRole(request.user.ruolo) === "founder" && request.query.include_drafts === "1";
+    response.json({ ok: true, materials: await listAcademyGemMaterials({ includeDrafts }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/gems/materials/:id", async (request, response, next) => {
+  try {
+    response.set("Cache-Control", "no-store");
+    const includeDrafts = normalizeRole(request.user.ruolo) === "founder";
+    const material = await findAcademyGemMaterial(request.params.id, { includeDrafts });
+    if (!material) return response.status(404).json({ error: "Materiale gemmologico non trovato." });
+    return response.json({ ok: true, material });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.get("/api/academy/gems/tools", async (_request, response, next) => {
+  try {
+    response.set("Cache-Control", "no-store");
+    const tools = (await pool.query(
+      `SELECT *
+       FROM academy_gem_tools
+       WHERE available = TRUE
+       ORDER BY name ASC`
+    )).rows;
+    response.json({ ok: true, tools });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/gems/quiz-attempts", async (request, response, next) => {
+  try {
+    const result = await submitAcademyGemQuizAttempt(request.user, request.body || {});
+    response.status(201).json({ ok: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/academy/gems/my-quiz-attempts", async (request, response, next) => {
+  try {
+    const attempts = (await pool.query(
+      `SELECT a.*, m.slug AS material_slug, m.commercial_name
+       FROM academy_gem_quiz_attempts a
+       JOIN academy_gem_materials m ON m.id = a.material_id
+       WHERE a.user_id = $1::bigint
+       ORDER BY a.completed_at DESC
+       LIMIT 100`,
+      [request.user.id]
+    )).rows;
+    response.json({ ok: true, attempts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/academy/gems/materials/:id/review", requireFounder, async (request, response, next) => {
+  try {
+    const status = String(request.body?.status || "").trim().toLowerCase();
+    if (!["approved", "rejected", "pending"].includes(status)) {
+      return response.status(400).json({ error: "Stato revisione non valido." });
+    }
+    const result = await pool.query(
+      `UPDATE academy_gem_materials
+       SET founder_review_status = $2::text,
+           founder_reviewed_at = CASE WHEN $2::text = 'pending' THEN NULL ELSE NOW() END,
+           founder_reviewed_by = CASE WHEN $2::text = 'pending' THEN NULL ELSE $3::bigint END,
+           review_note = $4::text,
+           published = CASE WHEN $2::text = 'approved' THEN TRUE WHEN $2::text = 'rejected' THEN FALSE ELSE published END,
+           updated_at = NOW()
+       WHERE id::text = $1::text OR slug = $1::text
+       RETURNING *`,
+      [request.params.id, status, request.user.id, String(request.body?.note || "").trim()]
+    );
+    if (!result.rowCount) return response.status(404).json({ error: "Materiale gemmologico non trovato." });
+    return response.json({ ok: true, material: sanitizeAcademyGemMaterial(result.rows[0]) });
+  } catch (error) {
+    return next(error);
   }
 });
 

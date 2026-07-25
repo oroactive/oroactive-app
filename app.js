@@ -99,6 +99,13 @@ const state = {
   academySimulationScenarios: [],
   academyExamHistory: [],
   academyFounderDashboard: null,
+  academyGemMaterials: [],
+  academyGemTools: [],
+  academyGemAttempts: [],
+  academyGemActiveMaterial: null,
+  academyGemQuizMaterial: null,
+  academyGemQuizStartedAt: 0,
+  academyGemQuizResult: null,
   courseActiveTab: "catalog",
   coinCatalogSearch: "",
   coinCatalogCountry: "",
@@ -192,7 +199,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260725-germania-10-mark-196-1";
+const OROACTIVE_CLIENT_BUILD_ID = "20260725-laboratorio-gemmologico-196-3";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 196;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -13771,6 +13778,7 @@ function renderCourseSummary() {
 const ACADEMY_TAB_LABELS = {
   path: "Il mio percorso",
   catalog: "Catalogo Academy",
+  gems: "Laboratorio gemmologico",
   competencies: "Matrice competenze",
   certifications: "Certificazioni",
   badges: "Badge",
@@ -14184,6 +14192,289 @@ function renderFounderQualificationDashboard() {
   `;
 }
 
+function gemDifficultyLabel(level = 1) {
+  return {
+    1: "Facile",
+    2: "Base",
+    3: "Intermedio",
+    4: "Avanzato",
+    5: "Esperto"
+  }[Number(level)] || "Base";
+}
+
+function gemValueList(values = []) {
+  const items = Array.isArray(values) ? values : [];
+  return items.length
+    ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : "<p>Nessun dato registrato.</p>";
+}
+
+function academyGemMaterialBySlug(slug = "") {
+  return (state.academyGemMaterials || []).find((item) => String(item.slug) === String(slug)) || null;
+}
+
+function renderGemQuiz(material = {}) {
+  if (state.academyGemQuizMaterial !== material.slug) return "";
+  const questions = Array.isArray(material.quiz?.questions) ? material.quiz.questions : [];
+  const result = state.academyGemQuizResult?.material?.slug === material.slug
+    ? state.academyGemQuizResult
+    : null;
+  return `
+    <section class="gem-lab-section gem-quiz-panel" aria-labelledby="gemQuizTitle">
+      <div class="gem-section-heading">
+        <div>
+          <span class="course-pill">Prova pratica con foto</span>
+          <h4 id="gemQuizTitle">Riconosci la pietra</h4>
+        </div>
+        <button type="button" data-close-gem-quiz>Chiudi quiz</button>
+      </div>
+      <div class="gem-quiz-intro">
+        <img src="${escapeHtml(material.gallery?.[0]?.url || "")}" alt="Campione gemmologico da riconoscere">
+        <div>
+          <strong>Dati parziali del campione</strong>
+          <p>Lucentezza ${escapeHtml(material.luster || "-")} · trasparenza ${escapeHtml(material.transparency || "-")} · difficoltà ${escapeHtml(String(material.identification_difficulty || 1))}/5.</p>
+          <small>Scegli materiale, strumento e procedura. Le risposte vengono corrette dal server.</small>
+        </div>
+      </div>
+      ${questions.length ? `
+        <form class="gem-quiz-form" data-gem-quiz-form="${escapeHtml(material.slug)}">
+          ${questions.map((question, index) => `
+            <fieldset>
+              <legend><span>${index + 1}</span>${escapeHtml(question.prompt || "Domanda")}</legend>
+              ${(question.options || []).map((option) => `
+                <label>
+                  <input type="radio" name="gem-answer-${escapeHtml(question.id)}" value="${escapeHtml(option)}">
+                  <span>${escapeHtml(option)}</span>
+                </label>
+              `).join("")}
+            </fieldset>
+          `).join("")}
+          <button class="primary-button" type="button" data-submit-gem-quiz="${escapeHtml(material.slug)}">Consegna prova</button>
+        </form>
+      ` : '<div class="empty-state">Quiz non ancora disponibile.</div>'}
+      ${result ? `
+        <div class="gem-quiz-result ${Number(result.score || 0) >= 60 ? "passed" : "failed"}" role="status">
+          <div>
+            <span>Risultato</span>
+            <strong>${escapeHtml(String(result.score || 0))}/100</strong>
+          </div>
+          <p>${escapeHtml(String(result.correct_answers || 0))} risposte corrette su ${escapeHtml(String(result.total_questions || 0))}. Livello raggiunto: ${escapeHtml(gemDifficultyLabel(result.level_reached))}.</p>
+          ${result.errors?.length ? `
+            <details>
+              <summary>Rivedi gli errori (${result.errors.length})</summary>
+              ${result.errors.map((error) => `
+                <p><strong>${escapeHtml(error.prompt || "Domanda")}</strong><br>Risposta data: ${escapeHtml(error.answer || "nessuna")}<br>Risposta corretta: ${escapeHtml(error.correct_answer || "-")}</p>
+              `).join("")}
+            </details>
+          ` : "<p>Prova completata senza errori.</p>"}
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
+function renderGemMaterialDetail(material = {}) {
+  const gallery = Array.isArray(material.gallery) ? material.gallery : [];
+  const opticalProperties = Array.isArray(material.optical_properties) ? material.optical_properties : [];
+  const tools = [...(material.recommended_tools || [])].sort((a, b) => Number(a.priority || 99) - Number(b.priority || 99));
+  const comparisonColumns = material.comparison_table?.columns || [];
+  const comparisonRows = material.comparison_table?.rows || [];
+  const quizAttempts = (state.academyGemAttempts || []).filter((attempt) => String(attempt.material_slug) === String(material.slug));
+  const identityFields = [
+    ["Nome commerciale", material.commercial_name],
+    ["Nome mineralogico", material.mineralogical_name],
+    ["Famiglia", material.family],
+    ["Gruppo", material.gem_group],
+    ["Formula chimica", material.chemical_formula],
+    ["Sistema cristallino", material.crystal_system],
+    ["Origine", material.origin],
+    ["Classificazione", material.classification]
+  ];
+  const physicalFields = [
+    ["Durezza Mohs", material.mohs_hardness],
+    ["Densità", material.density],
+    ["Peso specifico", material.specific_gravity],
+    ["Tenacità", material.tenacity],
+    ["Sfaldatura", material.cleavage],
+    ["Frattura", material.fracture],
+    ["Lucentezza", material.luster],
+    ["Trasparenza", material.transparency],
+    ["Colore", material.color],
+    ["Pleocroismo", material.pleochroism]
+  ];
+  return `
+    <section class="gem-lab-detail">
+      <div class="gem-detail-actions">
+        <button type="button" data-back-gem-lab>← Biblioteca gemme</button>
+        <button class="primary-button" type="button" data-start-gem-quiz="${escapeHtml(material.slug)}">Riconosci la pietra</button>
+      </div>
+      <header class="gem-detail-hero">
+        <div>
+          <span class="course-pill">${escapeHtml(material.classification || "Materiale")}</span>
+          <h3>${escapeHtml(material.commercial_name || "Pietra")}</h3>
+          <p>${escapeHtml(material.theory || "")}</p>
+          <div class="gem-detail-meta">
+            <span>Difficoltà ${escapeHtml(String(material.identification_difficulty || 1))}/5 · ${escapeHtml(gemDifficultyLabel(material.identification_difficulty))}</span>
+            <span>${material.founder_review_status === "approved" ? "Revisionata dal Founder" : "Revisione in corso"}</span>
+            <span>${quizAttempts.length} prove completate</span>
+          </div>
+        </div>
+        ${gallery[0] ? `<img src="${escapeHtml(gallery[0].url)}" alt="${escapeHtml(gallery[0].title || material.commercial_name)}">` : ""}
+      </header>
+
+      <section class="gem-lab-section">
+        <div class="gem-section-heading"><div><span>A</span><h4>Identità della pietra</h4></div></div>
+        <dl class="gem-data-grid">
+          ${identityFields.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "-")}</dd></div>`).join("")}
+        </dl>
+      </section>
+
+      <section class="gem-lab-section">
+        <div class="gem-section-heading"><div><span>B</span><h4>Galleria fotografica HD</h4></div></div>
+        <div class="gem-media-grid">
+          ${gallery.map((media) => `
+            <figure>
+              <img src="${escapeHtml(media.url)}" alt="${escapeHtml(media.title || material.commercial_name)}" loading="lazy">
+              <figcaption>
+                <strong>${escapeHtml(media.title || "Immagine didattica")}</strong>
+                <p>${escapeHtml(media.what_to_observe || media.description || "")}</p>
+                <small>${escapeHtml(media.source || "OroActive")} · ${escapeHtml(media.license || "Uso interno")} · ${escapeHtml(media.resolution || "")}</small>
+              </figcaption>
+            </figure>
+          `).join("") || '<div class="empty-state">Nessuna immagine disponibile.</div>'}
+        </div>
+      </section>
+
+      <section class="gem-lab-section">
+        <div class="gem-section-heading"><div><span>C</span><h4>Caratteristiche fisiche</h4></div></div>
+        <dl class="gem-data-grid">
+          ${physicalFields.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "-")}</dd></div>`).join("")}
+        </dl>
+      </section>
+
+      <section class="gem-lab-section">
+        <div class="gem-section-heading"><div><span>D</span><h4>Caratteristiche ottiche</h4></div></div>
+        <div class="gem-optical-grid">
+          ${opticalProperties.map((property) => `
+            <article>
+              <h5>${escapeHtml(property.name || "Proprietà")}</h5>
+              <strong>${escapeHtml(property.value || "-")}</strong>
+              <p>${escapeHtml(property.explanation || "")}</p>
+              <small>Al banco: ${escapeHtml(property.bench || "-")}</small>
+            </article>
+          `).join("")}
+          <article><h5>Doppia rifrazione</h5><strong>${escapeHtml(material.double_refraction || "-")}</strong><p>${escapeHtml(material.birefringence || "")}</p></article>
+          <article><h5>Fluorescenza</h5><strong>${escapeHtml(material.fluorescence || "-")}</strong><p>${escapeHtml(material.spectral_features || "")}</p></article>
+        </div>
+      </section>
+
+      <section class="gem-lab-section">
+        <div class="gem-section-heading"><div><span>E</span><h4>Cosa vedere con lente 10x</h4></div></div>
+        <div class="gem-inclusion-grid">
+          <article><h5>Inclusioni tipiche</h5>${gemValueList(material.inclusions?.typical)}</article>
+          <article><h5>Inclusioni rare</h5>${gemValueList(material.inclusions?.rare)}</article>
+          <article><h5>Segni di trattamento</h5>${gemValueList(material.inclusions?.treatment_signs)}</article>
+          <article><h5>Segni di sintesi</h5>${gemValueList(material.inclusions?.synthesis_signs)}</article>
+          <article><h5>Segni di imitazione</h5>${gemValueList(material.inclusions?.imitation_signs)}</article>
+        </div>
+      </section>
+
+      <section class="gem-lab-section">
+        <div class="gem-section-heading"><div><span>F</span><h4>Strumenti consigliati</h4></div></div>
+        <div class="gem-tools-list">
+          ${tools.map((tool) => `
+            <article>
+              <span class="gem-tool-priority">${escapeHtml(String(tool.priority || "-"))}</span>
+              <div>
+                <h5>${escapeHtml(tool.name || "Strumento")}</h5>
+                <p><strong>Utilità:</strong> ${escapeHtml(tool.utility || "-")}</p>
+                <p><strong>Cosa cercare:</strong> ${escapeHtml(tool.look_for || "-")}</p>
+                <p><strong>Risultato atteso:</strong> ${escapeHtml(tool.expected_result || "-")}</p>
+                <small>Limite: ${escapeHtml(tool.limitations || "-")}</small>
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+
+      <section class="gem-lab-section gem-protocol">
+        <div class="gem-section-heading"><div><span>G</span><h4>${escapeHtml(material.operator_protocol?.title || "Protocollo OroActive")}</h4></div></div>
+        <ol>
+          ${(material.operator_protocol?.steps || []).map((step) => `<li><span>STEP</span><p>${escapeHtml(step)}</p></li>`).join("")}
+        </ol>
+      </section>
+
+      <section class="gem-lab-section">
+        <div class="gem-section-heading"><div><span>H</span><h4>Pietre simili da distinguere</h4></div></div>
+        <div class="gem-comparison-scroll">
+          <table class="gem-comparison-table">
+            <thead><tr>${comparisonColumns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr></thead>
+            <tbody>
+              ${comparisonRows.map((row) => `<tr>${row.map((value) => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="gem-lab-section">
+        <div class="gem-section-heading"><div><span>I</span><h4>Errori da evitare</h4></div></div>
+        <div class="gem-mistakes">${gemValueList(material.common_mistakes)}</div>
+      </section>
+
+      ${renderGemQuiz(material)}
+    </section>
+  `;
+}
+
+function renderGemologicalLab() {
+  const materials = state.academyGemMaterials || [];
+  const activeMaterial = academyGemMaterialBySlug(state.academyGemActiveMaterial);
+  if (activeMaterial) {
+    trainingList.innerHTML = renderGemMaterialDetail(activeMaterial);
+    return;
+  }
+  const attempts = state.academyGemAttempts || [];
+  const average = attempts.length
+    ? Math.round(attempts.reduce((total, item) => total + Number(item.score || 0), 0) / attempts.length)
+    : 0;
+  trainingList.innerHTML = `
+    <section class="gem-lab-shell">
+      <header class="gem-lab-header">
+        <div>
+          <span class="course-pill">Laboratorio professionale</span>
+          <h3>Laboratorio Gemmologico OroActive</h3>
+          <p>Banca dati operativa per osservazione, identificazione differenziale e protocollo di valutazione al banco.</p>
+        </div>
+        <div class="gem-lab-metrics">
+          <div><strong>${materials.length}</strong><span>materiali</span></div>
+          <div><strong>${(state.academyGemTools || []).length}</strong><span>strumenti</span></div>
+          <div><strong>${average}</strong><span>media quiz</span></div>
+        </div>
+      </header>
+      <div class="gem-material-grid">
+        ${materials.map((material) => `
+          <article class="gem-material-card">
+            <img src="${escapeHtml(material.gallery?.[0]?.url || "")}" alt="${escapeHtml(material.commercial_name || "Pietra")}" loading="lazy">
+            <div>
+              <span class="course-pill">${escapeHtml(material.classification || "Materiale")}</span>
+              <h4>${escapeHtml(material.commercial_name || "Pietra")}</h4>
+              <p>${escapeHtml(material.mineralogical_name || "")} · ${escapeHtml(material.chemical_formula || "-")}</p>
+              <div class="gem-difficulty" aria-label="Difficoltà ${escapeHtml(String(material.identification_difficulty || 1))} su 5">
+                ${Array.from({ length: 5 }, (_, index) => `<span class="${index < Number(material.identification_difficulty || 1) ? "active" : ""}"></span>`).join("")}
+                <small>${escapeHtml(gemDifficultyLabel(material.identification_difficulty))}</small>
+              </div>
+              <div class="gem-card-actions">
+                <button type="button" data-open-gem-material="${escapeHtml(material.slug)}">Impara questa pietra</button>
+                <button class="primary-button" type="button" data-start-gem-quiz="${escapeHtml(material.slug)}">Riconosci la pietra</button>
+              </div>
+            </div>
+          </article>
+        `).join("") || '<div class="empty-state">Materiali gemmologici non disponibili.</div>'}
+      </div>
+    </section>
+  `;
+}
+
 function renderTraining() {
   if (!trainingList) return;
   if (!ACADEMY_TAB_LABELS[state.courseActiveTab]) {
@@ -14203,6 +14494,11 @@ function renderTraining() {
 
   if (state.courseActiveTab === "path") {
     renderMyLearningPath();
+    return;
+  }
+
+  if (state.courseActiveTab === "gems") {
+    renderGemologicalLab();
     return;
   }
 
@@ -14559,7 +14855,10 @@ async function loadTraining() {
     capabilitiesResult,
     simulationsResult,
     examHistoryResult,
-    founderDashboardResult
+    founderDashboardResult,
+    gemMaterialsResult,
+    gemToolsResult,
+    gemAttemptsResult
   ] = await Promise.allSettled([
     apiRequest("/corsi"),
     apiRequest("/training/scenarios", { retries: 1 }),
@@ -14572,7 +14871,10 @@ async function loadTraining() {
     apiRequest("/academy/my-operational-capabilities", { retries: 1 }),
     apiRequest("/academy/simulations", { retries: 1 }),
     apiRequest("/academy/exam-attempts/history", { retries: 1 }),
-    apiRequest("/academy/founder/qualification-dashboard", { retries: 1 })
+    apiRequest("/academy/founder/qualification-dashboard", { retries: 1 }),
+    apiRequest("/academy/gems/materials", { retries: 1 }),
+    apiRequest("/academy/gems/tools", { retries: 1 }),
+    apiRequest("/academy/gems/my-quiz-attempts", { retries: 1 })
   ]);
   const courseDataLoaded = rawCourseDataResult.status === "fulfilled";
   const rawCourseData = courseDataLoaded ? rawCourseDataResult.value : currentTrainingDataSnapshot();
@@ -14596,6 +14898,15 @@ async function loadTraining() {
       founderDashboardData: founderDashboardResult.status === "fulfilled" ? founderDashboardResult.value : {}
     }
   );
+  state.academyGemMaterials = gemMaterialsResult.status === "fulfilled"
+    ? gemMaterialsResult.value.materials || []
+    : state.academyGemMaterials || [];
+  state.academyGemTools = gemToolsResult.status === "fulfilled"
+    ? gemToolsResult.value.tools || []
+    : state.academyGemTools || [];
+  state.academyGemAttempts = gemAttemptsResult.status === "fulfilled"
+    ? gemAttemptsResult.value.attempts || []
+    : state.academyGemAttempts || [];
   renderTraining();
 }
 
@@ -22931,6 +23242,11 @@ document.querySelectorAll("[data-course-tab]").forEach((button) => {
   button.addEventListener("click", () => {
     state.courseActiveTab = button.dataset.courseTab || "catalog";
     if (state.courseActiveTab !== "management") resetTrainingCourseFormValues();
+    if (state.courseActiveTab !== "gems") {
+      state.academyGemActiveMaterial = null;
+      state.academyGemQuizMaterial = null;
+      state.academyGemQuizResult = null;
+    }
     renderTraining();
   });
 });
@@ -22949,7 +23265,76 @@ trainingList?.addEventListener("click", async (event) => {
   const prerequisiteButton = event.target.closest("[data-open-prerequisite-course]");
   const requestPractical = event.target.closest("[data-request-practical-assessment]");
   const startSimulation = event.target.closest("[data-start-academy-simulation]");
+  const openGemMaterial = event.target.closest("[data-open-gem-material]");
+  const backGemLab = event.target.closest("[data-back-gem-lab]");
+  const startGemQuiz = event.target.closest("[data-start-gem-quiz]");
+  const closeGemQuiz = event.target.closest("[data-close-gem-quiz]");
+  const submitGemQuiz = event.target.closest("[data-submit-gem-quiz]");
   try {
+    if (openGemMaterial) {
+      state.academyGemActiveMaterial = openGemMaterial.dataset.openGemMaterial;
+      state.academyGemQuizMaterial = null;
+      state.academyGemQuizResult = null;
+      renderTraining();
+      trainingList.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (backGemLab) {
+      state.academyGemActiveMaterial = null;
+      state.academyGemQuizMaterial = null;
+      state.academyGemQuizResult = null;
+      renderTraining();
+      return;
+    }
+    if (startGemQuiz) {
+      const slug = startGemQuiz.dataset.startGemQuiz;
+      state.academyGemActiveMaterial = slug;
+      state.academyGemQuizMaterial = slug;
+      state.academyGemQuizStartedAt = Date.now();
+      state.academyGemQuizResult = null;
+      renderTraining();
+      document.querySelector(".gem-quiz-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (closeGemQuiz) {
+      state.academyGemQuizMaterial = null;
+      state.academyGemQuizResult = null;
+      renderTraining();
+      return;
+    }
+    if (submitGemQuiz) {
+      const slug = submitGemQuiz.dataset.submitGemQuiz;
+      const material = academyGemMaterialBySlug(slug);
+      const form = trainingList.querySelector(`[data-gem-quiz-form="${slug}"]`);
+      const questions = material?.quiz?.questions || [];
+      if (!material || !form || !questions.length) throw new Error("Quiz gemmologico non disponibile.");
+      const answers = {};
+      questions.forEach((question) => {
+        answers[question.id] = form.elements.namedItem(`gem-answer-${question.id}`)?.value || "";
+      });
+      if (Object.values(answers).some((value) => !value)) {
+        throw new Error("Rispondi a tutte le domande prima di consegnare.");
+      }
+      return await withButtonBusy(submitGemQuiz, "Correggo...", async () => {
+        const result = await apiRequest("/academy/gems/quiz-attempts", {
+          method: "POST",
+          body: JSON.stringify({
+            material_slug: slug,
+            mode: "recognition",
+            duration_seconds: Math.max(1, Math.round((Date.now() - Number(state.academyGemQuizStartedAt || Date.now())) / 1000)),
+            answers
+          })
+        });
+        state.academyGemQuizResult = result;
+        state.academyGemAttempts = [
+          { ...(result.attempt || {}), material_slug: slug, commercial_name: material.commercial_name },
+          ...(state.academyGemAttempts || [])
+        ];
+        renderTraining();
+        document.querySelector(".gem-quiz-result")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        showToast(`Prova gemmologica completata: ${Number(result.score || 0)}/100.`);
+      });
+    }
     if (startOperator) return await withButtonBusy(startOperator, "Avvio...", () => startOperatorTraining(startOperator.dataset.startOperatorTraining));
     if (saveOperator) return await withButtonBusy(saveOperator, "Salvo...", () => saveOperatorTrainingProgress(saveOperator.dataset.saveOperatorTraining));
     if (completeOperator) return await withButtonBusy(completeOperator, "Valuto...", () => completeOperatorTraining(completeOperator.dataset.completeOperatorTraining));
