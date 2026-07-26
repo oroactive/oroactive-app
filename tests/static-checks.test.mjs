@@ -4298,7 +4298,10 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(workflow, /OROACTIVE_EXPECTED_BRANCH/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm test/);
-  assert.match(workflow, /curl --fail[\s\S]*COOLIFY_WEBHOOK/);
+  assert.match(workflow, /force_rebuild_webhook/);
+  assert.match(workflow, /searchParams\.set\("force", "true"\)/);
+  assert.match(workflow, /curl --fail[\s\S]*force_rebuild_webhook/);
+  assert.match(workflow, /Coolify force rebuild request accepted/);
   assert.match(workflow, /Verify production version/);
   assert.match(workflow, /OROACTIVE_HEALTH_URL:-https:\/\/app\.oroactive\.it\/version\.json/);
   assert.match(workflow, /seq 1 60/);

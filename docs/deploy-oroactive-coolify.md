@@ -42,7 +42,7 @@ In Coolify, nelle impostazioni avanzate della risorsa, abilita `Include Source C
 2. GitHub Actions installa le dipendenze.
 3. Controlla la sintassi di `app.js` e `server.js`.
 4. Esegue i test.
-5. Chiama il webhook Coolify usando solo i Secrets.
+5. Chiama il webhook Coolify usando solo i Secrets e impone `force=true`, così ogni commit ricostruisce l'immagine senza riusare la cache di una release precedente.
 6. Attende che il dominio pubblico esponga in `/version.json`, `/api/version` o `/api/health` lo stesso commit appena inviato.
 7. Verifica anche che `assetBuildId` coincida con il frontend creato e che `catalogCount` coincida con il catalogo atteso.
 8. Termina con successo solo quando la produzione sta servendo commit, frontend e catalogo corretti.

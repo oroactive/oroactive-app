@@ -61,10 +61,18 @@ jobs:
             echo "COOLIFY_WEBHOOK and COOLIFY_TOKEN secrets are required."
             exit 1
           fi
-          curl --fail --silent --show-error --request POST "${COOLIFY_WEBHOOK}" \
+
+          force_rebuild_webhook="$(node -e '
+            const webhook = new URL(process.argv[1]);
+            webhook.searchParams.set("force", "true");
+            process.stdout.write(webhook.href);
+          ' "${COOLIFY_WEBHOOK}")"
+
+          curl --fail --silent --show-error --request POST "${force_rebuild_webhook}" \
             --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
             --header "Content-Type: application/json" \
             --data "{\"commit\":\"${GIT_COMMIT}\",\"branch\":\"${GITHUB_REF_NAME}\",\"buildNumber\":\"${BUILD_NUMBER}\"}"
+          echo "Coolify force rebuild request accepted."
 
       - name: Verify production version
         run: |
