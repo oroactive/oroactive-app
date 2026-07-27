@@ -218,8 +218,8 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260727-gemological-encyclopedia-196-2";
-const EXPECTED_GOLD_COIN_CATALOG_COUNT = 196;
+const OROACTIVE_CLIENT_BUILD_ID = "20260727-gold-catalog-197-1";
+const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
@@ -4226,6 +4226,26 @@ const BILANCIA_DORO_COIN_ADDITIONS = [
     recognitionHints: ["10 marchi guglielmo ii", "10 mark wilhelm ii", "10 mark prussia", "10 marchi prussia", "guglielmo ii", "wilhelm ii", "deutscher kaiser", "konig von preussen", "konig v preussen", "prussia", "deutsches reich", "aquila imperiale", "10 mark", "marchio a", "zecca di berlino", "1889", "1913", "900"],
     visual: { front: "profile", back: "eagle", frontText: "W II", backText: "10M" }
   }, "10-marchi-guglielmo-ii-prussia", "Archivio OroActive"),
+  withBilanciaDoroImages({
+    id: "10-marchi-ludovico-ii-baviera",
+    name: "10 Marchi Re Ludovico II di Baviera (1874-1886)",
+    country: "Germania",
+    mintYears: "1874-1886",
+    nominal: "10 Mark",
+    metal: "Oro",
+    purity: 0.9,
+    purityLabel: "900‰",
+    grossWeight: 3.58,
+    fineGold: 3.222,
+    diameter: 19.5,
+    thickness: 0.9,
+    edge: "Zigrinato",
+    obverse: "Ritratto di Re Ludovico II di Baviera rivolto a destra, con legenda LUDWIG II KOENIG V. BAYERN e marchio di zecca D",
+    reverse: "Aquila imperiale tedesca coronata con scudo bavarese, legenda DEUTSCHES REICH, anno di emissione e valore 10 MARK",
+    history: "Ludovico II di Baviera e uno dei sovrani tedeschi piu noti a livello internazionale, soprattutto per il castello di Neuschwanstein, da lui concepito e oggi simbolo dell'architettura romantica bavarese. Nonostante la fama legata ai suoi progetti artistici, Ludovico II segui con attenzione gli affari di governo, annotando documenti e formulando raccomandazioni fino agli ultimi anni del regno. Durante la guerra austro-prussiana la Baviera combatte al fianco dell'Austria; nella successiva guerra franco-prussiana Ludovico sostenne invece la Prussia e accetto l'ingresso della Baviera nel nuovo Impero Tedesco. I 10 Marchi recano sul dritto il suo ritratto con la legenda LUDWIG II KOENIG V. BAYERN e il marchio D della Zecca di Monaco. Sul rovescio compare l'aquila imperiale con DEUTSCHES REICH, anno e valore 10 MARK. La moneta e in oro 900/1000, pesa 3,58 grammi e misura 19,5 millimetri.",
+    recognitionHints: ["10 marchi ludovico ii", "10 mark ludwig ii", "10 mark baviera", "10 mark bayern", "ludovico ii", "ludwig ii", "konig von bayern", "koenig v bayern", "baviera", "bayern", "deutsches reich", "aquila imperiale", "10 mark", "marchio d", "zecca di monaco", "munich mint", "neuschwanstein", "1874", "1886", "900"],
+    visual: { front: "profile", back: "eagle", frontText: "L II", backText: "10M" }
+  }, "10-marchi-ludovico-ii-baviera", "Archivio OroActive"),
   withBilanciaDoroImages({
     id: "10-marchi-federico-i-baden",
     name: "10 Marchi Gran Duca Federico I di Baden (1872-1901)",

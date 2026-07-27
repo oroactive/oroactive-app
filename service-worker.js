@@ -1,4 +1,4 @@
-const BUILD_ID = "20260727-gemological-encyclopedia-196-2";
+const BUILD_ID = "20260727-gold-catalog-197-1";
 const CACHE_NAME = `oroactive-cache-${BUILD_ID}`;
 const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
 const NEVER_CACHE_PREFIXES = [
