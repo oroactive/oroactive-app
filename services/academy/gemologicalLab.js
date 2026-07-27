@@ -1,3 +1,10 @@
+import {
+  GEM_CATALOG_SEED,
+  GEM_CATALOG_SEED_VALIDATION,
+  GEM_TOOL_SEED,
+  evaluateGemPublicationReadiness
+} from "./gemologicalCatalog.js";
+
 const generatedMediaNotice = "Immagine didattica generata internamente: non sostituisce l'osservazione del campione reale o un referto gemmologico.";
 
 function academyGemMedia(slug, title, whatToObserve) {
@@ -16,7 +23,7 @@ function academyGemMedia(slug, title, whatToObserve) {
   }];
 }
 
-export const ACADEMY_GEM_TOOLS = [
+const LEGACY_ACADEMY_GEM_TOOLS = [
   {
     name: "Lente 10x",
     description: "Lente acromatica e aplanatica per il primo esame di superficie e inclusioni.",
@@ -105,7 +112,7 @@ const diamondComparison = {
   ]
 };
 
-export const ACADEMY_GEM_MATERIALS = [
+const LEGACY_ACADEMY_GEM_MATERIALS = [
   {
     slug: "diamante-naturale",
     commercial_name: "Diamante naturale",
@@ -409,23 +416,85 @@ export const ACADEMY_GEM_MATERIALS = [
   }
 ].map((material) => ({
   ...material,
-  published: true,
-  founder_review_status: "approved",
-  review_note: "Contenuto base OroActive approvato per la pubblicazione interna."
+  published: false,
+  active: true,
+  review_status: "draft",
+  media_status: "needs_media",
+  founder_review_status: "pending",
+  review_note: "Contenuto didattico precedente da validare con fonti, media HD autorizzati e revisione Founder."
 }));
+
+const LEGACY_GEM_BY_SLUG = new Map(LEGACY_ACADEMY_GEM_MATERIALS.map((material) => [
+  material.slug === "diamante-sintetico" ? "diamante-sintetico-hpht" : material.slug,
+  material
+]));
+
+export const ACADEMY_GEM_TOOLS = GEM_TOOL_SEED.map((tool) => {
+  const legacy = LEGACY_ACADEMY_GEM_TOOLS.find((item) => item.name === tool.name);
+  return legacy ? { ...tool, ...legacy } : tool;
+});
+
+export const ACADEMY_GEM_MATERIALS = GEM_CATALOG_SEED.map((seed) => {
+  const legacy = LEGACY_GEM_BY_SLUG.get(seed.slug);
+  if (!legacy) return seed;
+  const material = {
+    ...seed,
+    ...legacy,
+    slug: seed.slug,
+    name: seed.name,
+    commercial_name: seed.commercial_name,
+    mineral_name: seed.mineral_name,
+    mineralogical_name: seed.mineralogical_name,
+    aliases: seed.aliases,
+    category: seed.category,
+    classification: seed.classification,
+    summary: legacy.theory || null,
+    description: legacy.theory || null,
+    origins: legacy.origin ? [legacy.origin] : [],
+    typical_colors: legacy.color ? [legacy.color] : [],
+    mohs_min: null,
+    mohs_max: null,
+    density_min: null,
+    density_max: null,
+    refractive_index_min: null,
+    refractive_index_max: null,
+    optical_character: legacy.double_refraction || null,
+    fluorescence_long_wave: legacy.fluorescence || null,
+    common_treatments: legacy.inclusions?.treatment_signs || [],
+    common_simulants: legacy.inclusions?.imitation_signs || [],
+    cleaning_precautions: null,
+    sources: [],
+    published: false,
+    active: true,
+    review_status: "draft",
+    media_status: "needs_media",
+    founder_review_status: "pending"
+  };
+  if (seed.slug === "diamante-sintetico-hpht") {
+    material.commercial_name = seed.commercial_name;
+    material.name = seed.name;
+    material.origin = "Produzione in laboratorio con metodo HPHT";
+    material.origins = ["Produzione in laboratorio con metodo HPHT"];
+  }
+  return material;
+});
 
 export function academyGemSeedValidation(materials = ACADEMY_GEM_MATERIALS) {
   return materials.map((material) => ({
     slug: material.slug,
     valid: Boolean(
-      material.published
-      && material.gallery?.length
-      && material.recommended_tools?.length
-      && material.operator_protocol?.steps?.length
-      && material.comparison_table?.rows?.length
+      material.slug
+      && (material.name || material.commercial_name)
       && Number(material.identification_difficulty) >= 1
       && Number(material.identification_difficulty) <= 5
-      && material.founder_review_status === "approved"
-    )
+      && (!material.published || evaluateGemPublicationReadiness(material).ready)
+    ),
+    publication: evaluateGemPublicationReadiness(material)
   }));
 }
+
+export const academyGemCatalogValidation = Object.freeze({
+  ...GEM_CATALOG_SEED_VALIDATION,
+  valid: GEM_CATALOG_SEED_VALIDATION.count === GEM_CATALOG_SEED_VALIDATION.expectedCount
+    && GEM_CATALOG_SEED_VALIDATION.uniqueSlugs === GEM_CATALOG_SEED_VALIDATION.expectedCount
+});
