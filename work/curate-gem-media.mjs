@@ -5,14 +5,11 @@ const root = process.cwd();
 const manifestPath = path.join(root, "assets", "academy", "gems", "library-manifest.json");
 const platesPath = path.join(root, "assets", "academy", "gems", "plates");
 const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
-const plateSlugs = new Set([
-  "diamante-naturale",
-  "diamante-trattato",
-  "vetro-pasta-vitrea",
-  "rodolite",
-  "crisoberillo-occhio-di-gatto",
-  "perla-coltivata"
-]);
+const plateSlugs = new Set(
+  (await fs.readdir(platesPath))
+    .filter((name) => name.endsWith("-four-view.jpg"))
+    .map((name) => name.replace(/-four-view\.jpg$/, ""))
+);
 
 for (const material of manifest.materials) {
   material.media = plateSlugs.has(material.slug)

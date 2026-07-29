@@ -1,4 +1,4 @@
-const BUILD_ID = "20260729-gem-lab-61-1";
+const BUILD_ID = "20260729-gem-media-audit-1";
 const CACHE_NAME = `oroactive-cache-${BUILD_ID}`;
 const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
 const NEVER_CACHE_PREFIXES = [

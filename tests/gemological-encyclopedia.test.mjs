@@ -123,6 +123,16 @@ test("ogni materiale dispone di almeno quattro viste HD autorizzate", () => {
   }
 });
 
+test("la galleria non contiene omonimi geografici, animali o oggetti estranei", () => {
+  const manifest = JSON.parse(file("assets/academy/gems/library-manifest.json"));
+  const forbidden = /\b(bay|beach|sea|falls|waterfall|tower|ship|panoramio|chameleon|damselfly|bird|butterfly|crescent|xolmis|pyrope pyrope|duicon|tights|temple|display base|collision|mist|tobacco box|mantel clock|workshop|epergne|base jumping)\b/i;
+  for (const material of manifest.materials) {
+    for (const media of material.media) {
+      assert.doesNotMatch(media.title, forbidden, `${material.slug}: media estraneo ${media.title}`);
+    }
+  }
+});
+
 test("catalogo include materiali naturali", () => {
   assert.ok(GEM_CATALOG_SEED.some(({ classification }) => classification === "Naturale"));
 });
@@ -295,7 +305,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260729-gem-lab-61-1";
+  const expected = "20260729-gem-media-audit-1";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);
