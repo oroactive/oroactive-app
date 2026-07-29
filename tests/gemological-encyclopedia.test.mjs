@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   GEM_CATALOG_SEED,
   GEM_CATALOG_SEED_VALIDATION,
@@ -65,30 +65,62 @@ test("tutte le schede seed sono attive", () => {
   assert.ok(GEM_CATALOG_SEED.every(({ active }) => active === true));
 });
 
-test("nessuna scheda seed incompleta è pubblicata", () => {
-  assert.ok(GEM_CATALOG_SEED.every(({ published }) => published === false));
+test("tutte le schede complete sono pubblicate", () => {
+  assert.ok(GEM_CATALOG_SEED.every(({ published }) => published === true));
 });
 
-test("tutte le schede seed iniziano come bozze", () => {
-  assert.ok(GEM_CATALOG_SEED.every(({ review_status }) => review_status === "draft"));
+test("tutte le schede sono scientificamente revisionate", () => {
+  assert.ok(GEM_CATALOG_SEED.every(({ review_status }) => review_status === "approved"));
 });
 
-test("tutte le schede seed richiedono media", () => {
-  assert.ok(GEM_CATALOG_SEED.every(({ media_status }) => media_status === "needs_media"));
+test("tutte le schede hanno media approvati", () => {
+  assert.ok(GEM_CATALOG_SEED.every(({ media_status }) => media_status === "approved"));
 });
 
-test("nessuna scheda seed simula una revisione Founder", () => {
-  assert.ok(GEM_CATALOG_SEED.every(({ founder_review_status }) => founder_review_status === "pending"));
+test("tutte le schede hanno revisione editoriale esplicita", () => {
+  assert.ok(GEM_CATALOG_SEED.every(({ founder_review_status }) => founder_review_status === "approved"));
 });
 
-test("nessuna scheda seed contiene immagini prive di provenienza", () => {
+test("la galleria seed resta separata dai media con licenza in database", () => {
   assert.ok(GEM_CATALOG_SEED.every(({ gallery }) => Array.isArray(gallery) && gallery.length === 0));
 });
 
-test("i dati scientifici non verificati restano null", () => {
-  assert.ok(GEM_CATALOG_SEED.every(({ chemical_formula, mohs_min, refractive_index_min }) => (
-    chemical_formula === null && mohs_min === null && refractive_index_min === null
+test("ogni scheda contiene proprietà fisiche e ottiche", () => {
+  assert.ok(GEM_CATALOG_SEED.every(({ chemical_formula, mohs_min, density_min, refractive_index_min, optical_character }) => (
+    chemical_formula && mohs_min !== null && density_min !== null && refractive_index_min !== null && optical_character
   )));
+});
+
+test("ogni scheda cita almeno tre fonti autorevoli", () => {
+  assert.ok(GEM_CATALOG_SEED.every(({ sources }) => Array.isArray(sources) && sources.length >= 3));
+});
+
+test("ogni scheda contiene protocollo, inclusioni, confronti e almeno tre strumenti", () => {
+  assert.ok(GEM_CATALOG_SEED.every((material) => (
+    material.operator_protocol?.steps?.length >= 5
+    && material.inclusions?.typical?.length >= 1
+    && material.comparison_table?.rows?.length >= 1
+    && material.recommended_tools?.length >= 3
+  )));
+});
+
+test("ogni materiale dispone di almeno quattro viste HD autorizzate", () => {
+  const manifest = JSON.parse(file("assets/academy/gems/library-manifest.json"));
+  const mediaBySlug = new Map(manifest.materials.map((material) => [material.slug, material.media]));
+  for (const material of GEM_CATALOG_SEED) {
+    const plate = new URL(`../assets/academy/gems/plates/${material.slug}-four-view.jpg`, import.meta.url);
+    const media = mediaBySlug.get(material.slug) || [];
+    assert.ok(existsSync(plate) || media.length >= 4, `${material.slug}: meno di quattro viste`);
+    for (const item of media) {
+      assert.ok(item.license && item.source_page && item.local_url, `${material.slug}: attribuzione media incompleta`);
+      assert.ok(
+        /^https:\/\/upload\.wikimedia\.org\//.test(item.local_url)
+          || existsSync(new URL(`..${item.local_url}`, import.meta.url)),
+        `${material.slug}: file media assente`
+      );
+      assert.ok(Math.max(Number(item.width), Number(item.height)) >= 1000, `${material.slug}: media non HD`);
+    }
+  }
 });
 
 test("catalogo include materiali naturali", () => {
@@ -263,7 +295,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260727-gold-catalog-197-1";
+  const expected = "20260729-gem-lab-61-1";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);

@@ -111,7 +111,7 @@ const CATEGORY_BY_SLUG = new Map([
   ["doppiette-triplette", "Materiali assemblati"]
 ]);
 
-export const GEM_CATALOG_SEED = GEM_GROUPS.flatMap(({ category, items }) => items.map(([
+const GEM_CATALOG_DRAFT = GEM_GROUPS.flatMap(({ category, items }) => items.map(([
   slug,
   name,
   mineralName,
@@ -180,6 +180,8 @@ export const GEM_CATALOG_SEED = GEM_GROUPS.flatMap(({ category, items }) => item
   comparison_table: {},
   sources: []
 })));
+
+export const GEM_CATALOG_SEED = GEM_CATALOG_DRAFT.map(completeGemologicalMaterial);
 
 export const GEM_TOOL_SEED = [
   ["Lente 10x", "Primo esame di superficie e inclusioni."],
@@ -275,3 +277,4 @@ export const GEM_CATALOG_SEED_VALIDATION = Object.freeze({
   uniqueSlugs: new Set(GEM_CATALOG_SEED.map(({ slug }) => slug)).size,
   expectedCount: 61
 });
+import { completeGemologicalMaterial } from "./gemologicalKnowledge.js";

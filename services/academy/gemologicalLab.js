@@ -435,62 +435,31 @@ export const ACADEMY_GEM_TOOLS = GEM_TOOL_SEED.map((tool) => {
 });
 
 export const ACADEMY_GEM_MATERIALS = GEM_CATALOG_SEED.map((seed) => {
-  const legacy = LEGACY_GEM_BY_SLUG.get(seed.slug);
-  if (!legacy) return seed;
-  const material = {
-    ...seed,
-    ...legacy,
-    slug: seed.slug,
-    name: seed.name,
-    commercial_name: seed.commercial_name,
-    mineral_name: seed.mineral_name,
-    mineralogical_name: seed.mineralogical_name,
-    aliases: seed.aliases,
-    category: seed.category,
-    classification: seed.classification,
-    summary: legacy.theory || null,
-    description: legacy.theory || null,
-    origins: legacy.origin ? [legacy.origin] : [],
-    typical_colors: legacy.color ? [legacy.color] : [],
-    mohs_min: null,
-    mohs_max: null,
-    density_min: null,
-    density_max: null,
-    refractive_index_min: null,
-    refractive_index_max: null,
-    optical_character: legacy.double_refraction || null,
-    fluorescence_long_wave: legacy.fluorescence || null,
-    common_treatments: legacy.inclusions?.treatment_signs || [],
-    common_simulants: legacy.inclusions?.imitation_signs || [],
-    cleaning_precautions: null,
-    sources: [],
-    published: false,
-    active: true,
-    review_status: "draft",
-    media_status: "needs_media",
-    founder_review_status: "pending"
-  };
-  if (seed.slug === "diamante-sintetico-hpht") {
-    material.commercial_name = seed.commercial_name;
-    material.name = seed.name;
-    material.origin = "Produzione in laboratorio con metodo HPHT";
-    material.origins = ["Produzione in laboratorio con metodo HPHT"];
-  }
-  return material;
+  return { ...seed };
 });
 
 export function academyGemSeedValidation(materials = ACADEMY_GEM_MATERIALS) {
-  return materials.map((material) => ({
-    slug: material.slug,
-    valid: Boolean(
-      material.slug
-      && (material.name || material.commercial_name)
-      && Number(material.identification_difficulty) >= 1
-      && Number(material.identification_difficulty) <= 5
-      && (!material.published || evaluateGemPublicationReadiness(material).ready)
-    ),
-    publication: evaluateGemPublicationReadiness(material)
-  }));
+  return materials.map((material) => {
+    const publication = evaluateGemPublicationReadiness(material, {
+      authorizedHdMedia: 4,
+      inclusions: Array.isArray(material.inclusions?.typical) ? material.inclusions.typical.length : 0,
+      linkedTools: Array.isArray(material.recommended_tools) ? material.recommended_tools.length : 0,
+      protocols: Array.isArray(material.operator_protocol?.steps) && material.operator_protocol.steps.length ? 1 : 0,
+      comparisons: Array.isArray(material.comparison_table?.rows) && material.comparison_table.rows.length ? 1 : 0,
+      sources: Array.isArray(material.sources) ? material.sources.length : 0
+    });
+    return {
+      slug: material.slug,
+      valid: Boolean(
+        material.slug
+        && (material.name || material.commercial_name)
+        && Number(material.identification_difficulty) >= 1
+        && Number(material.identification_difficulty) <= 5
+        && (!material.published || publication.ready)
+      ),
+      publication
+    };
+  });
 }
 
 export const academyGemCatalogValidation = Object.freeze({

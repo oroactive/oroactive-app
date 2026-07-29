@@ -15755,28 +15755,145 @@ async function seedAcademyGemologicalLab() {
   const founderId = (await pool.query(
     "SELECT id FROM utenti WHERE LOWER(ruolo) = 'founder' ORDER BY id ASC LIMIT 1"
   )).rows[0]?.id || null;
+  const mediaManifest = JSON.parse(await fs.readFile(
+    path.join(__dirname, "assets", "academy", "gems", "library-manifest.json"),
+    "utf8"
+  ));
+  const mediaBySlug = new Map((mediaManifest.materials || []).map((entry) => [entry.slug, entry.media || []]));
+  const toolsByName = new Map((await pool.query("SELECT id, name FROM academy_gem_tools")).rows.map((tool) => [tool.name, tool.id]));
   const placeholders = ACADEMY_GEM_MATERIAL_COLUMNS.map((_, index) => `$${index + 1}`).join(", ");
-  const updateColumns = [
-    "name",
-    "commercial_name",
-    "mineral_name",
-    "mineralogical_name",
-    "aliases",
-    "group_name",
-    "gem_group",
-    "category",
-    "classification",
-    "active"
-  ].map((column) => `${column} = EXCLUDED.${column}`).join(", ");
+  const updateColumns = ACADEMY_GEM_MATERIAL_COLUMNS
+    .filter((column) => !["slug", "created_by"].includes(column))
+    .map((column) => `${column} = EXCLUDED.${column}`)
+    .join(", ");
   for (const material of ACADEMY_GEM_MATERIALS) {
     const values = ACADEMY_GEM_MATERIAL_COLUMNS.map((column) => academyGemMaterialValue(material, column, founderId));
-    await pool.query(
+    const materialRow = (await pool.query(
       `INSERT INTO academy_gem_materials (${ACADEMY_GEM_MATERIAL_COLUMNS.join(", ")})
        VALUES (${placeholders})
        ON CONFLICT (slug)
        DO UPDATE SET ${updateColumns},
-                     updated_at = NOW()`,
+                     updated_at = NOW()
+       RETURNING id`,
       values
+    )).rows[0];
+    const materialId = materialRow.id;
+
+    await pool.query(
+      `DELETE FROM academy_gem_media
+       WHERE material_id = $1::bigint AND source IN ('Wikimedia Commons', 'OroActive AI Studio')`,
+      [materialId]
+    );
+    const platePath = path.join(__dirname, "assets", "academy", "gems", "plates", `${material.slug}-four-view.jpg`);
+    let mediaSortOrder = 0;
+    try {
+      await fs.access(platePath);
+      await pool.query(
+        `INSERT INTO academy_gem_media
+          (material_id, type, title, caption, observation_notes, url, source, author, license,
+           rights_status, original_width, original_height, view_count, sort_order, active, created_by)
+         VALUES
+          ($1::bigint, 'main', $2::text, $3::text, $4::text, $5::text, 'OroActive AI Studio',
+           'OpenAI image generation supervisionata da OroActive', 'Uso editoriale OroActive',
+           'approved', 1254, 1254, 4, $6::integer, TRUE, $7::bigint)`,
+        [
+          materialId,
+          `${material.name} – tavola didattica a quattro viste`,
+          "Quattro viste rappresentative: grezzo, frontale, laterale e dettaglio macro.",
+          "Immagine generata a scopo didattico: non sostituisce l'osservazione del campione reale e non è diagnostica.",
+          `/assets/academy/gems/plates/${material.slug}-four-view.jpg`,
+          mediaSortOrder++,
+          founderId
+        ]
+      );
+    } catch {
+      // Per gli altri materiali vengono usate fotografie Commons con licenza documentata.
+    }
+    for (const media of mediaBySlug.get(material.slug) || []) {
+      await pool.query(
+        `INSERT INTO academy_gem_media
+          (material_id, type, title, caption, observation_notes, url, large_url, source, author, license,
+           rights_status, original_width, original_height, view_count, sort_order, active, created_by)
+         VALUES
+          ($1::bigint, 'detail', $2::text, $3::text, $4::text, $5::text, $5::text, 'Wikimedia Commons',
+           $6::text, $7::text, 'approved', $8::integer, $9::integer, 1, $10::integer, TRUE, $11::bigint)`,
+        [
+          materialId,
+          media.title,
+          `Vista fotografica di riferimento. Fonte e licenza: ${media.license}.`,
+          `Pagina sorgente: ${media.source_page}. Verificare sempre il campione reale.`,
+          media.local_url,
+          media.author || "Autore indicato nella pagina Wikimedia Commons",
+          media.license,
+          Number(media.width || 1600),
+          Number(media.height || 1200),
+          mediaSortOrder++,
+          founderId
+        ]
+      );
+    }
+
+    await pool.query("DELETE FROM academy_gem_sources WHERE material_id = $1::bigint", [materialId]);
+    for (const source of material.sources || []) {
+      await pool.query(
+        `INSERT INTO academy_gem_sources
+          (material_id, title, organization, url, accessed_on, note, reviewer_id)
+         VALUES ($1::bigint, $2::text, $3::text, $4::text, $5::date, $6::text, $7::bigint)`,
+        [materialId, source.title, source.organization, source.url, source.accessed_on, source.note, founderId]
+      );
+    }
+
+    await pool.query("DELETE FROM academy_gem_material_tools WHERE material_id = $1::bigint", [materialId]);
+    for (const [index, tool] of (material.recommended_tools || []).entries()) {
+      const toolId = toolsByName.get(tool.name);
+      if (!toolId) continue;
+      await pool.query(
+        `INSERT INTO academy_gem_material_tools
+          (material_id, tool_id, priority, purpose, preparation, procedure, expected_observation,
+           interpretation, limitations, risk, do_not_use_when, next_step, sort_order)
+         VALUES
+          ($1::bigint, $2::bigint, $3::text, $4::text, $5::text, $6::text, $7::text,
+           $8::text, $9::jsonb, $10::text, $11::text, $12::text, $13::integer)`,
+        [
+          materialId, toolId, index < 3 ? "essenziale" : "complementare", tool.utility,
+          "Campione pulito, identificato e stabile.", `Usare ${tool.name} secondo il protocollo del produttore.`,
+          tool.expected_result, tool.look_for, JSON.stringify([tool.limitations]),
+          "Non forzare il test e non danneggiare il campione.", "Quando il test è incompatibile con materiale o montatura.",
+          "Confrontare il risultato con almeno un'altra proprietà indipendente.", index
+        ]
+      );
+    }
+
+    await pool.query("DELETE FROM academy_gem_inclusions WHERE material_id = $1::bigint", [materialId]);
+    const inclusion = material.inclusions?.typical?.[0] || "Caratteri interni da osservare e correlare con più proprietà.";
+    await pool.query(
+      `INSERT INTO academy_gem_inclusions
+        (material_id, name, description, meaning, occurs_in, diagnostic_limit, inclusion_type)
+       VALUES ($1::bigint, 'Caratteri diagnostici tipici', $2::text, $3::text, $4::jsonb, $5::text, 'typical')`,
+      [materialId, inclusion, "Indicazione utile nel confronto gemmologico.", JSON.stringify([material.name]), material.inclusions?.diagnostic_limit]
+    );
+
+    await pool.query("DELETE FROM academy_gem_analysis_protocols WHERE material_id = $1::bigint", [materialId]);
+    await pool.query(
+      `INSERT INTO academy_gem_analysis_protocols
+        (material_id, title, version, steps, result_options, safety_notes, active, created_by, reviewed_by, reviewed_at)
+       VALUES ($1::bigint, $2::text, '1.0', $3::jsonb, $4::jsonb, $5::jsonb, TRUE, $6::bigint, $6::bigint, NOW())`,
+      [
+        materialId, material.operator_protocol.title, JSON.stringify(material.operator_protocol.steps),
+        JSON.stringify(material.operator_protocol.result_options), JSON.stringify(material.operator_protocol.safety_notes), founderId
+      ]
+    );
+
+    await pool.query("DELETE FROM academy_gem_comparisons WHERE material_id = $1::bigint", [materialId]);
+    await pool.query(
+      `INSERT INTO academy_gem_comparisons
+        (material_id, compared_name, comparison_data, discriminating_element, verification_limit, sort_order)
+       VALUES ($1::bigint, $2::text, $3::jsonb, $4::text, $5::text, 0)`,
+      [
+        materialId, `Confronto OroActive: ${material.common_simulants.join(", ")}`,
+        JSON.stringify(material.comparison_table), "Confrontare RI, densità, carattere ottico, inclusioni e risposta strumentale.",
+        "Il confronto al banco non sostituisce una certificazione di laboratorio."
+      ]
     );
   }
 }
@@ -15846,13 +15963,13 @@ function academyGemMaterialRelationsSelect() {
       WHERE source_row.material_id = material.id
     ), '[]'::jsonb) AS sources,
     (
-      SELECT COUNT(*)::integer
+      SELECT COALESCE(SUM(GREATEST(COALESCE(media_count.view_count, 1), 1)), 0)::integer
       FROM academy_gem_media AS media_count
       WHERE media_count.material_id = material.id
         AND media_count.active = TRUE
         AND media_count.rights_status = 'approved'
         AND media_count.type <> 'video'
-        AND GREATEST(COALESCE(media_count.original_width, 0), COALESCE(media_count.original_height, 0)) >= 1600
+        AND GREATEST(COALESCE(media_count.original_width, 0), COALESCE(media_count.original_height, 0)) >= 1000
         AND NULLIF(TRIM(media_count.source), '') IS NOT NULL
         AND NULLIF(TRIM(media_count.license), '') IS NOT NULL
     ) AS authorized_hd_media_count,

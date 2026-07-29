@@ -80,6 +80,15 @@ CREATE TABLE IF NOT EXISTS academy_gem_media (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE academy_gem_media
+  ADD COLUMN IF NOT EXISTS view_count INTEGER NOT NULL DEFAULT 1;
+
+ALTER TABLE academy_gem_media
+  DROP CONSTRAINT IF EXISTS academy_gem_media_view_count_check;
+
+ALTER TABLE academy_gem_media
+  ADD CONSTRAINT academy_gem_media_view_count_check CHECK (view_count BETWEEN 1 AND 12);
+
 CREATE TABLE IF NOT EXISTS academy_gem_material_tools (
   id BIGSERIAL PRIMARY KEY,
   material_id BIGINT NOT NULL REFERENCES academy_gem_materials(id) ON DELETE CASCADE,
@@ -184,7 +193,7 @@ SET published = FALSE,
     review_status = CASE WHEN review_status = 'approved' THEN 'draft' ELSE review_status END,
     media_status = CASE
       WHEN (
-        SELECT COUNT(*)
+        SELECT COALESCE(SUM(GREATEST(media.view_count, 1)), 0)
         FROM academy_gem_media AS media
         WHERE media.material_id = material.id
           AND media.active = TRUE
@@ -193,7 +202,7 @@ SET published = FALSE,
           AND GREATEST(
             COALESCE(media.original_width, 0),
             COALESCE(media.original_height, 0)
-          ) >= 1600
+          ) >= 1000
       ) < 4 THEN 'needs_media'
       ELSE media_status
     END,
@@ -206,7 +215,7 @@ WHERE published = TRUE
     OR jsonb_array_length(material.common_treatments) = 0
     OR jsonb_array_length(material.common_simulants) = 0
     OR (
-      SELECT COUNT(*)
+        SELECT COALESCE(SUM(GREATEST(media.view_count, 1)), 0)
       FROM academy_gem_media AS media
       WHERE media.material_id = material.id
         AND media.active = TRUE
@@ -215,7 +224,7 @@ WHERE published = TRUE
         AND GREATEST(
           COALESCE(media.original_width, 0),
           COALESCE(media.original_height, 0)
-        ) >= 1600
+        ) >= 1000
     ) < 4
     OR (SELECT COUNT(*) FROM academy_gem_inclusions WHERE material_id = material.id) < 1
     OR (SELECT COUNT(*) FROM academy_gem_material_tools WHERE material_id = material.id) < 3
