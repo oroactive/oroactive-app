@@ -12594,6 +12594,13 @@ input.document-expired {
   background: #111214;
   border: 1px solid rgba(238, 154, 48, 0.34);
   border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: rgba(240, 178, 75, 0.18);
+}
+
+.gem-lab-card:focus-visible {
+  outline: 3px solid #f0b24b;
+  outline-offset: 3px;
 }
 
 .gem-lab-card-media {
@@ -13057,6 +13064,7 @@ input.document-expired {
   padding: max(52px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
   color: #ffffff;
   background: rgba(4, 5, 6, 0.96);
+  overscroll-behavior: contain;
 }
 
 .gem-lab-zoom img {
@@ -13077,14 +13085,40 @@ input.document-expired {
   top: max(14px, env(safe-area-inset-top));
   right: 16px;
   display: grid;
-  width: 42px;
-  height: 42px;
+  z-index: 1202;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   place-items: center;
   color: #ffffff;
   background: #252628;
   border: 1px solid #6b6c6f;
   border-radius: 50%;
   font-size: 28px;
+  touch-action: manipulation;
+}
+
+@media (min-width: 821px) and (max-width: 1100px) {
+  .gem-lab-detail-hero {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+
+  .gem-lab-detail-hero > .ghost-button {
+    grid-column: 1 / -1;
+    width: max-content;
+    max-width: 100%;
+  }
+
+  .gem-lab-detail-media {
+    width: 100%;
+    max-width: 280px;
+  }
+
+  .gem-lab-tabs button,
+  .gem-lab-hero-actions button {
+    min-height: 48px;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -13135,6 +13169,32 @@ input.document-expired {
 
   .gem-lab-founder-grid {
     grid-template-columns: 1fr;
+  }
+
+  .gem-lab-tabs {
+    padding: 8px;
+    scroll-padding-inline: 8px;
+  }
+
+  .gem-lab-tabs button {
+    min-height: 48px;
+  }
+
+  .gem-lab-zoom {
+    padding:
+      max(76px, calc(env(safe-area-inset-top) + 64px))
+      12px
+      max(18px, env(safe-area-inset-bottom));
+  }
+
+  .gem-lab-zoom img {
+    max-width: 100%;
+    max-height: 68vh;
+  }
+
+  .gem-lab-zoom-close {
+    top: max(10px, calc(env(safe-area-inset-top) + 8px));
+    right: max(10px, calc(env(safe-area-inset-right) + 8px));
   }
 }
 

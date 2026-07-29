@@ -218,7 +218,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-media-audit-1";
+const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-ipad-detail-1";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -15093,7 +15093,7 @@ function gemLabApprovedMedia(material = {}) {
     && media.rights_status === "approved"
     && String(media.source || "").trim()
     && String(media.license || "").trim()
-    && Math.max(Number(media.original_width || 0), Number(media.original_height || 0)) >= 1600
+    && Math.max(Number(media.original_width || 0), Number(media.original_height || 0)) >= 1000
     && String(media.url || "").trim()
   ));
 }
@@ -15226,7 +15226,13 @@ function renderGemLabCard(material = {}) {
   const media = gemLabApprovedMedia(material).find((item) => item.type !== "video");
   const draft = !material.published || material.founder_review_status !== "approved";
   return `
-    <article class="gem-lab-card">
+    <article
+      class="gem-lab-card"
+      data-gem-open="${escapeHtml(String(material.id || material.slug))}"
+      role="link"
+      tabindex="0"
+      aria-label="Apri la scheda completa di ${escapeHtml(material.name || material.commercial_name || "questo materiale")}"
+    >
       <div class="gem-lab-card-media">
         ${media
           ? `<img ${gemLabMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}" loading="lazy">`
@@ -15807,7 +15813,7 @@ function renderGemLabZoom(material = {}) {
   const media = gemLabApprovedMedia(material)[index];
   if (!media) return "";
   return `
-    <div class="gem-lab-zoom" role="dialog" aria-modal="true" aria-label="Visualizzazione immagine ingrandita">
+    <div class="gem-lab-zoom" role="dialog" aria-modal="true" aria-label="Visualizzazione immagine ingrandita" data-gem-zoom-backdrop>
       <button class="gem-lab-zoom-close" type="button" data-gem-zoom-close aria-label="Chiudi immagine">×</button>
       <img ${gemLabMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}">
       <div>
@@ -16005,14 +16011,19 @@ gemLabShell?.addEventListener("click", async (event) => {
       renderGemLab();
       return;
     }
-    const zoomButton = event.target.closest("[data-gem-zoom]");
-    if (zoomButton) {
-      state.gemLabZoomMedia = zoomButton.dataset.gemZoom;
+    if (event.target.closest("[data-gem-zoom-close]")) {
+      state.gemLabZoomMedia = null;
       renderGemLab();
       return;
     }
-    if (event.target.closest("[data-gem-zoom-close]")) {
+    if (event.target.matches("[data-gem-zoom-backdrop]")) {
       state.gemLabZoomMedia = null;
+      renderGemLab();
+      return;
+    }
+    const zoomButton = event.target.closest("[data-gem-zoom]");
+    if (zoomButton) {
+      state.gemLabZoomMedia = zoomButton.dataset.gemZoom;
       renderGemLab();
       return;
     }
@@ -16031,6 +16042,19 @@ gemLabShell?.addEventListener("click", async (event) => {
   } catch (error) {
     showToast(cleanUserMessage(error?.message, "Operazione gemmologica non completata."), "error");
   }
+});
+
+gemLabShell?.addEventListener("keydown", (event) => {
+  const card = event.target.closest(".gem-lab-card[data-gem-open]");
+  if (!card || !["Enter", " "].includes(event.key)) return;
+  event.preventDefault();
+  card.click();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || state.gemLabZoomMedia === null) return;
+  state.gemLabZoomMedia = null;
+  renderGemLab();
 });
 
 gemLabShell?.addEventListener("submit", async (event) => {
