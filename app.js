@@ -218,7 +218,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-viewer-fix-2";
+const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-viewer-null-fix-3";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -15809,7 +15809,13 @@ function renderGemLabDetail(material = {}) {
 }
 
 function renderGemLabZoom(material = {}) {
+  if (
+    state.gemLabZoomMedia === null
+    || state.gemLabZoomMedia === undefined
+    || state.gemLabZoomMedia === ""
+  ) return "";
   const index = Number(state.gemLabZoomMedia);
+  if (!Number.isInteger(index) || index < 0) return "";
   const media = gemLabApprovedMedia(material)[index];
   if (!media) return "";
   return `

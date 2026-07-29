@@ -296,6 +296,42 @@ test("il visualizzatore immagini si chiude da tasto, sfondo ed Escape", () => {
   assert.match(app, /document\.addEventListener\("click"[\s\S]*true\);/);
 });
 
+test("nessuna immagine si apre automaticamente quando la scheda usa lo stato null", () => {
+  const app = file("app.js");
+  const start = app.indexOf("function renderGemLabZoom");
+  const end = app.indexOf("function renderGemLab()", start);
+  assert.ok(start >= 0 && end > start);
+  const source = app.slice(start, end);
+  const createRenderer = new Function(
+    "state",
+    "gemLabApprovedMedia",
+    "gemLabMediaAttributes",
+    "escapeHtml",
+    `${source}; return renderGemLabZoom;`
+  );
+  const media = [{
+    title: "Rodolite",
+    rights_status: "approved",
+    source: "OroActive",
+    license: "OroActive",
+    url: "/rodolite.jpg",
+    original_width: 1600
+  }];
+  const renderWith = (gemLabZoomMedia) => createRenderer(
+    { gemLabZoomMedia },
+    () => media,
+    () => 'src="/rodolite.jpg"',
+    String
+  )({ name: "Rodolite" });
+
+  assert.equal(renderWith(null), "");
+  assert.equal(renderWith(undefined), "");
+  assert.equal(renderWith(""), "");
+  assert.equal(renderWith(-1), "");
+  assert.equal(renderWith("0.5"), "");
+  assert.match(renderWith("0"), /class="gem-lab-zoom"/);
+});
+
 test("layout iPad protegge pulsanti, scheda e chiusura immagine", () => {
   const styles = file("styles.css");
   assert.match(styles, /@media \(min-width: 821px\) and \(max-width: 1100px\)/);
@@ -331,7 +367,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260729-gem-viewer-fix-2";
+  const expected = "20260729-gem-viewer-null-fix-3";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);
