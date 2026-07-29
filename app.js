@@ -218,7 +218,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260729-hpht-media-fix-4";
+const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-card-preview-fix-5";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -15098,6 +15098,29 @@ function gemLabApprovedMedia(material = {}) {
   ));
 }
 
+function gemLabCardMedia(material = {}) {
+  const approvedMedia = gemLabApprovedMedia(material).filter((media) => media.type !== "video");
+  const singlePhoto = approvedMedia.find((media) => Number(media.view_count || 1) === 1);
+  if (singlePhoto) return singlePhoto;
+
+  const slug = String(material.slug || "").trim();
+  const plateUrl = slug ? `/assets/academy/gems/plates/${slug}-four-view.jpg` : "";
+  const hasDedicatedPlate = approvedMedia.some((media) => (
+    Number(media.view_count || 0) > 1
+    && String(media.url || "") === plateUrl
+  ));
+  if (!slug || !hasDedicatedPlate) return null;
+
+  const isFancySapphire = slug === "zaffiri-fancy";
+  return {
+    type: "preview",
+    title: `${material.name || material.commercial_name || "Materiale gemmologico"} – vista intera`,
+    url: `/assets/academy/gems/previews/${encodeURIComponent(slug)}-preview.jpg`,
+    original_width: isFancySapphire ? 384 : 627,
+    original_height: isFancySapphire ? 341 : 627
+  };
+}
+
 function gemLabPlaceholder(material = {}, label = "Media autorizzato non disponibile") {
   const initials = String(material.name || material.commercial_name || "OA")
     .split(/\s+/)
@@ -15223,7 +15246,7 @@ async function loadGemologicalEncyclopedia({ preserveView = false } = {}) {
 }
 
 function renderGemLabCard(material = {}) {
-  const media = gemLabApprovedMedia(material).find((item) => item.type !== "video");
+  const media = gemLabCardMedia(material);
   const draft = !material.published || material.founder_review_status !== "approved";
   return `
     <article
@@ -15235,8 +15258,8 @@ function renderGemLabCard(material = {}) {
     >
       <div class="gem-lab-card-media">
         ${media
-          ? `<img ${gemLabMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}" loading="lazy">`
-          : gemLabPlaceholder(material)}
+          ? `<img class="gem-lab-card-preview" ${gemLabMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}" loading="lazy" decoding="async">`
+          : gemLabPlaceholder(material, "Anteprima singola in preparazione")}
       </div>
       <div class="gem-lab-card-body">
         <div class="gem-lab-badges">

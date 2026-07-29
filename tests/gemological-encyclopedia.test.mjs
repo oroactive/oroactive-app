@@ -147,6 +147,81 @@ test("diamante sintetico HPHT usa solo la tavola gemmologica dedicata", () => {
   );
 });
 
+test("ogni materiale ha una fotografia singola o una preview dedicata per la card", () => {
+  const manifest = JSON.parse(file("assets/academy/gems/library-manifest.json"));
+  const mediaBySlug = new Map(manifest.materials.map((material) => [material.slug, material.media || []]));
+  let dedicatedPreviewCount = 0;
+
+  for (const material of GEM_CATALOG_SEED) {
+    const singlePhotos = mediaBySlug.get(material.slug) || [];
+    const preview = new URL(`../assets/academy/gems/previews/${material.slug}-preview.jpg`, import.meta.url);
+    const hasDedicatedPreview = existsSync(preview);
+    if (hasDedicatedPreview) dedicatedPreviewCount += 1;
+    assert.ok(
+      singlePhotos.length > 0 || hasDedicatedPreview,
+      `${material.slug}: anteprima singola assente`
+    );
+  }
+
+  assert.equal(dedicatedPreviewCount, 36);
+});
+
+test("la card preferisce una foto singola e non usa mai la tavola multivista", () => {
+  const app = file("app.js");
+  const start = app.indexOf("function gemLabCardMedia");
+  const end = app.indexOf("function gemLabPlaceholder", start);
+  assert.ok(start >= 0 && end > start);
+  const source = app.slice(start, end);
+  const selectCardMedia = new Function(
+    "gemLabApprovedMedia",
+    `${source}; return gemLabCardMedia;`
+  )((material) => material.media || []);
+  const plate = {
+    type: "main",
+    view_count: 4,
+    url: "/assets/academy/gems/plates/rodolite-four-view.jpg"
+  };
+  const single = {
+    type: "detail",
+    view_count: 1,
+    url: "https://upload.wikimedia.org/rodolite.jpg"
+  };
+
+  assert.equal(selectCardMedia({ slug: "rodolite", media: [plate, single] }), single);
+  assert.deepEqual(
+    selectCardMedia({ slug: "rodolite", name: "Rodolite", media: [plate] }),
+    {
+      type: "preview",
+      title: "Rodolite – vista intera",
+      url: "/assets/academy/gems/previews/rodolite-preview.jpg",
+      original_width: 627,
+      original_height: 627
+    }
+  );
+  assert.equal(selectCardMedia({
+    slug: "materiale-nuovo",
+    media: [{ type: "main", view_count: 4, url: "/media/tavola-non-validata.jpg" }]
+  }), null);
+});
+
+test("anteprima card contiene una sola immagine completa e la galleria resta separata", () => {
+  const app = file("app.js");
+  const styles = file("styles.css");
+  const cardStart = app.indexOf("function renderGemLabCard");
+  const cardEnd = app.indexOf("function renderGemLabCatalog", cardStart);
+  const card = app.slice(cardStart, cardEnd);
+  const galleryStart = app.indexOf("function renderGemLabTabContent");
+  const galleryEnd = app.indexOf("function renderGemLabAnalysis", galleryStart);
+  const gallery = app.slice(galleryStart, galleryEnd);
+
+  assert.match(card, /const media = gemLabCardMedia\(material\)/);
+  assert.match(card, /class="gem-lab-card-preview"/);
+  assert.equal((card.match(/<img /g) || []).length, 1);
+  assert.doesNotMatch(card, /data-gem-zoom=/);
+  assert.match(styles, /\.gem-lab-card-media > img \{[\s\S]*object-fit: contain;[\s\S]*object-position: center;/);
+  assert.match(gallery, /gemLabMediaFigure/);
+});
+
 test("catalogo include materiali naturali", () => {
   assert.ok(GEM_CATALOG_SEED.some(({ classification }) => classification === "Naturale"));
 });
@@ -381,7 +456,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260729-hpht-media-fix-4";
+  const expected = "20260729-gem-card-preview-fix-5";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);
