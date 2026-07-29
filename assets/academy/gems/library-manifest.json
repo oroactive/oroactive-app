@@ -19,74 +19,9 @@
         "HPHT diamond"
       ],
       "expected": 4,
-      "collected": 4,
-      "media": [
-        {
-          "title": "Synthetic diamond HPHT Créer le cristal.jpg",
-          "source_page": "https://commons.wikimedia.org/wiki/File:Synthetic_diamond_HPHT_Cr%C3%A9er_le_cristal.jpg",
-          "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Synthetic_diamond_HPHT_Cr%C3%A9er_le_cristal.jpg/1920px-Synthetic_diamond_HPHT_Cr%C3%A9er_le_cristal.jpg",
-          "original_url": "https://upload.wikimedia.org/wikipedia/commons/0/0d/Synthetic_diamond_HPHT_Cr%C3%A9er_le_cristal.jpg",
-          "width": 1600,
-          "height": 1600,
-          "original_width": 2724,
-          "original_height": 2724,
-          "author": "Marie-Lan Taÿ Pamart",
-          "license": "CC BY 4.0",
-          "license_url": "https://creativecommons.org/licenses/by/4.0",
-          "credit": "Own work",
-          "score": 227.24,
-          "local_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Synthetic_diamond_HPHT_Cr%C3%A9er_le_cristal.jpg/1920px-Synthetic_diamond_HPHT_Cr%C3%A9er_le_cristal.jpg"
-        },
-        {
-          "title": "B-doped diamond HPHT synthesis.jpg",
-          "source_page": "https://commons.wikimedia.org/wiki/File:B-doped_diamond_HPHT_synthesis.jpg",
-          "download_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/B-doped_diamond_HPHT_synthesis.jpg",
-          "original_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/B-doped_diamond_HPHT_synthesis.jpg",
-          "width": 1405,
-          "height": 964,
-          "original_width": 1405,
-          "original_height": 964,
-          "author": "E.A. Ekimov et al.",
-          "license": "CC BY 4.0",
-          "license_url": "https://creativecommons.org/licenses/by/4.0",
-          "credit": "https://www.tandfonline.com/doi/full/10.1088/1468-6996/9/4/044210",
-          "score": 214.05,
-          "local_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/B-doped_diamond_HPHT_synthesis.jpg"
-        },
-        {
-          "title": "Diamonds7.jpg",
-          "source_page": "https://commons.wikimedia.org/wiki/File:Diamonds7.jpg",
-          "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Diamonds7.jpg/1920px-Diamonds7.jpg",
-          "original_url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Diamonds7.jpg",
-          "width": 1600,
-          "height": 1036,
-          "original_width": 5447,
-          "original_height": 3527,
-          "author": "Bilovitskiy",
-          "license": "CC BY 4.0",
-          "license_url": "https://creativecommons.org/licenses/by/4.0",
-          "credit": "Own work",
-          "score": 154.47,
-          "local_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Diamonds7.jpg/1920px-Diamonds7.jpg"
-        },
-        {
-          "title": "Carbon diamond.jpg",
-          "source_page": "https://commons.wikimedia.org/wiki/File:Carbon_diamond.jpg",
-          "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Carbon_diamond.jpg/1920px-Carbon_diamond.jpg",
-          "original_url": "https://upload.wikimedia.org/wikipedia/commons/d/db/Carbon_diamond.jpg",
-          "width": 1600,
-          "height": 684,
-          "original_width": 3968,
-          "original_height": 1696,
-          "author": "2x910",
-          "license": "CC BY-SA 4.0",
-          "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-          "credit": "Own work",
-          "score": 139.68,
-          "local_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Carbon_diamond.jpg/1920px-Carbon_diamond.jpg"
-        }
-      ],
-      "presentation": "Fotografie Wikimedia Commons selezionate con attribuzione e licenza documentata."
+      "collected": 0,
+      "media": [],
+      "presentation": "Tavola originale OroActive a quattro viste; rappresentazione didattica non diagnostica."
     },
     {
       "slug": "diamante-sintetico-cvd",

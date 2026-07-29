@@ -133,6 +133,20 @@ test("la galleria non contiene omonimi geografici, animali o oggetti estranei", 
   }
 });
 
+test("diamante sintetico HPHT usa solo la tavola gemmologica dedicata", () => {
+  const manifest = JSON.parse(file("assets/academy/gems/library-manifest.json"));
+  const material = manifest.materials.find(({ slug }) => slug === "diamante-sintetico-hpht");
+  const plate = new URL("../assets/academy/gems/plates/diamante-sintetico-hpht-four-view.jpg", import.meta.url);
+  assert.ok(material);
+  assert.ok(existsSync(plate));
+  assert.equal(material.media.length, 0);
+  assert.match(material.presentation, /Tavola originale OroActive a quattro viste/);
+  assert.doesNotMatch(
+    JSON.stringify(material),
+    /Créer le cristal|B-doped diamond HPHT synthesis|Diamonds7|Carbon diamond|pressure cell|graphite bar/i
+  );
+});
+
 test("catalogo include materiali naturali", () => {
   assert.ok(GEM_CATALOG_SEED.some(({ classification }) => classification === "Naturale"));
 });
@@ -367,7 +381,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260729-gem-viewer-null-fix-3";
+  const expected = "20260729-hpht-media-fix-4";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);
