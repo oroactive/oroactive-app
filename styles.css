@@ -12774,9 +12774,12 @@ input.document-expired {
 }
 
 .gem-lab-detail-media img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 
 .gem-lab-tabs {
@@ -13096,6 +13099,7 @@ input.document-expired {
   border: 1px solid #6b6c6f;
   border-radius: 50%;
   font-size: 28px;
+  pointer-events: auto !important;
   touch-action: manipulation;
 }
 

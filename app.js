@@ -218,7 +218,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-ipad-detail-1";
+const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-viewer-fix-2";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -15782,7 +15782,7 @@ function renderGemLabDetail(material = {}) {
         <button class="ghost-button" type="button" data-gem-back>Indietro al catalogo</button>
         <div class="gem-lab-detail-media">
           ${cover
-            ? `<button type="button" data-gem-zoom="${coverIndex}"><img ${gemLabMediaAttributes(cover)} alt="${escapeHtml(cover.title || material.name)}"></button>`
+            ? `<img ${gemLabMediaAttributes(cover)} alt="${escapeHtml(cover.title || material.name)}">`
             : gemLabPlaceholder(material)}
         </div>
         <div>
@@ -15970,6 +15970,7 @@ gemLabShell?.addEventListener("click", async (event) => {
       const identifier = openButton.dataset.gemOpen;
       state.gemLabView = "detail";
       state.gemLabDetailTab = "overview";
+      state.gemLabZoomMedia = null;
       state.gemLabSelectedMaterial = state.gemLabMaterials.find((item) => (
         String(item.id) === String(identifier) || item.slug === identifier
       )) || { id: identifier };
@@ -16051,10 +16052,26 @@ gemLabShell?.addEventListener("keydown", (event) => {
   card.click();
 });
 
-document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape" || state.gemLabZoomMedia === null) return;
+function closeGemLabZoom() {
+  if (state.gemLabZoomMedia === null) return;
   state.gemLabZoomMedia = null;
   renderGemLab();
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target) return;
+  const closeButton = target.closest("[data-gem-zoom-close]");
+  const backdrop = target.matches("[data-gem-zoom-backdrop]");
+  if (!closeButton && !backdrop) return;
+  event.preventDefault();
+  event.stopPropagation();
+  closeGemLabZoom();
+}, true);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || state.gemLabZoomMedia === null) return;
+  closeGemLabZoom();
 });
 
 gemLabShell?.addEventListener("submit", async (event) => {

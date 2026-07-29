@@ -281,8 +281,10 @@ test("media responsive usa srcset, sizes e caricamento lazy", () => {
 test("le card aprono la scheda completa e non il visualizzatore immagini", () => {
   const app = file("app.js");
   assert.match(app, /class="gem-lab-card"[\s\S]*data-gem-open=/);
-  assert.match(app, /state\.gemLabView = "detail"[\s\S]*state\.gemLabDetailTab = "overview"/);
+  assert.match(app, /state\.gemLabView = "detail"[\s\S]*state\.gemLabDetailTab = "overview"[\s\S]*state\.gemLabZoomMedia = null/);
   assert.doesNotMatch(app, /class="gem-lab-card"[^>]*data-gem-zoom=/);
+  const detail = app.slice(app.indexOf("function renderGemLabDetail"), app.indexOf("function renderGemLabZoom"));
+  assert.doesNotMatch(detail, /data-gem-zoom=/);
 });
 
 test("il visualizzatore immagini si chiude da tasto, sfondo ed Escape", () => {
@@ -290,7 +292,8 @@ test("il visualizzatore immagini si chiude da tasto, sfondo ed Escape", () => {
   assert.match(app, /data-gem-zoom-close/);
   assert.match(app, /data-gem-zoom-backdrop/);
   assert.match(app, /event\.key !== "Escape"/);
-  assert.match(app, /state\.gemLabZoomMedia = null/);
+  assert.match(app, /function closeGemLabZoom\(\)/);
+  assert.match(app, /document\.addEventListener\("click"[\s\S]*true\);/);
 });
 
 test("layout iPad protegge pulsanti, scheda e chiusura immagine", () => {
@@ -328,7 +331,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260729-gem-ipad-detail-1";
+  const expected = "20260729-gem-viewer-fix-2";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);
