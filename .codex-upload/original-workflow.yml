@@ -6,9 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 concurrency:
   group: oroactive-coolify-${{ github.ref_name }}
   cancel-in-progress: false
@@ -29,8 +26,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Validate branch
         run: |
@@ -45,9 +40,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-
-      - name: Materialize verified source tree
-        run: node .codex-upload/apply.mjs
 
       - name: Install dependencies
         run: npm ci
