@@ -183,6 +183,7 @@ const state = {
   aurumSending: false,
   aurumAskedMoodToday: false,
   aurumLastUserMessage: "",
+  aurumRequestedFieldKey: "",
   aurumConsentCandidate: null,
   aurumMemories: [],
   aurumAllMemories: [],
@@ -218,7 +219,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260730-aurum-sector-knowledge-8";
+const OROACTIVE_CLIENT_BUILD_ID = "20260730-aurum-gems-sale-guide-9";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -636,6 +637,86 @@ const AURUM_HELP_TARGETS = [
   { key: "badge", selector: "#courseSummary" },
   { key: "certificazione", selector: "#courseSummary" }
 ];
+const AURUM_SALE_DEED_FIELD_HELP = Object.freeze([
+  { id: "record_id", label: "Identificativo record", aliases: ["id atto", "id pratica"] },
+  { id: "practice_number", label: "Numero atto", aliases: ["numero pratica", "progressivo"], selector: "#practiceNumber" },
+  { id: "store", label: "Negozio", aliases: ["sede", "punto vendita"], selector: "#storeCode" },
+  { id: "act_date", label: "Data operazione", aliases: ["data atto", "data compilazione"], selector: "#practiceDate" },
+  { id: "act_time", label: "Ora operazione", aliases: ["ora atto", "ora compilazione"], selector: "#practiceTime" },
+  { id: "operator_identity", label: "Operatore", aliases: ["commesso", "utente operatore"] },
+  { id: "workflow_status", label: "Stato atto", aliases: ["bozza", "sospesa", "completata", "archiviata"] },
+  { id: "approval", label: "Approvazione responsabile", aliases: ["autorizzazione", "override responsabile"] },
+  { id: "suspension", label: "Sospensione pratica", aliases: ["pratica sospesa", "motivo sospensione"], selector: "#saveSuspendedPractice" },
+  { id: "legal_integrity", label: "Integrità e copia archiviata", aliases: ["hash", "anti tamper", "audit trail"] },
+  { id: "customer_name", label: "Nome cliente", aliases: ["nome", "nome venditore"], selector: "[name='nome']" },
+  { id: "customer_surname", label: "Cognome cliente", aliases: ["cognome", "cognome venditore"], selector: "[name='cognome']" },
+  { id: "birth_date", label: "Data di nascita", aliases: ["nascita", "data nascita"], selector: "[name='nascita']" },
+  { id: "birth_place", label: "Luogo di nascita", aliases: ["comune nascita", "stato nascita"], selector: "[name='luogo']" },
+  { id: "birth_province", label: "Provincia di nascita", aliases: ["provincia nascita"], selector: "[name='provinciaNascita']" },
+  { id: "fiscal_code", label: "Codice fiscale", aliases: ["cf", "tessera sanitaria"], selector: "[name='cf']" },
+  { id: "phone", label: "Telefono", aliases: ["cellulare", "numero telefono"], selector: "[name='telefono']" },
+  { id: "email", label: "Email", aliases: ["mail cliente", "posta elettronica"], selector: "[name='email']" },
+  { id: "citizenship", label: "Cittadinanza", aliases: ["nazionalità", "nazionalita"], selector: "[name='cittadinanza']" },
+  { id: "sex", label: "Sesso", aliases: ["genere anagrafico"], selector: "[name='sesso']" },
+  { id: "residence_address", label: "Indirizzo di residenza", aliases: ["residenza", "indirizzo"], selector: "[name='indirizzo']" },
+  { id: "residence_province", label: "Provincia di residenza", aliases: ["provincia residenza"], selector: "[name='provinciaResidenza']" },
+  { id: "document_type", label: "Tipo documento", aliases: ["carta identità", "patente", "passaporto"], selector: "#documentType" },
+  { id: "document_number", label: "Numero documento", aliases: ["estremi documento"], selector: "[name='numeroDocumento']" },
+  { id: "document_issue_date", label: "Data rilascio documento", aliases: ["data rilascio"], selector: "[name='dataRilascioDocumento']" },
+  { id: "document_expiry", label: "Scadenza documento", aliases: ["data scadenza"], selector: "[name='scadenzaDocumento']" },
+  { id: "profession", label: "Professione", aliases: ["professione lavorativa", "attività cliente"], selector: "[name='professione']" },
+  { id: "privacy_acknowledgement", label: "Presa visione privacy", aliases: ["cliente informato", "informativa privacy"], selector: "#customerPrivacyAcknowledged" },
+  { id: "item_description", label: "Descrizione oggetto", aliases: ["oggetto ceduto", "preziosi"], selector: ".ceded-item-row label:nth-of-type(1) input" },
+  { id: "item_metal", label: "Metallo oggetto", aliases: ["metallo", "oro", "argento", "platino"], selector: ".ceded-item-row label:nth-of-type(2) select" },
+  { id: "item_title", label: "Titolo o caratura", aliases: ["titolo", "caratura", "millesimi"], selector: ".ceded-item-row label:nth-of-type(3) select" },
+  { id: "material_lot", label: "Lotto metallo e titolo", aliases: ["lotto materiale", "raggruppamento titolo"] },
+  { id: "lot_weight", label: "Peso lotto", aliases: ["peso", "grammi", "peso oggetti"], selector: "#totalWeightFields input[data-metal-weight]" },
+  { id: "total_weight", label: "Peso totale", aliases: ["totale grammi", "peso complessivo"] },
+  { id: "material_amount_split", label: "Ripartizione importo per metallo", aliases: ["ripartizione importo"], selector: "#materialAmountFields" },
+  { id: "print_weight_customer", label: "Peso sulla copia cliente", aliases: ["stampa peso cliente"], selector: "#printWeightCustomer" },
+  { id: "valuation_quote", label: "Quotazione e valutazione applicata", aliases: ["quotazione metallo", "valutazione oggetto", "fonte quotazione"] },
+  { id: "subsequent_destination", label: "Destinazione successiva dell'oggetto", aliases: ["destinazione oggetto", "fonderia", "cessione successiva"] },
+  { id: "payment_method", label: "Metodo di pagamento", aliases: ["pagamento", "bonifico", "contanti", "assegno"], selector: "#paymentMethod" },
+  { id: "total_amount", label: "Totale corrisposto", aliases: ["importo", "totale vendita"], selector: "#saleTotal" },
+  { id: "iban", label: "IBAN", aliases: ["conto destinazione", "coordinate bancarie"], selector: "#paymentIban" },
+  { id: "account_holder", label: "Intestatario del conto", aliases: ["titolare iban", "beneficiario bonifico"] },
+  { id: "payment_proof", label: "Prova del pagamento", aliases: ["contabile", "ricevuta bonifico", "foto assegno"], selector: "#paymentCaptureSection" },
+  { id: "identity_attachments", label: "Allegati documento e tessera fiscale", aliases: ["documento fronte retro", "tessera sanitaria fronte retro"], selector: "[data-capture-group='identity'], [data-capture-group='fiscal']" },
+  { id: "precious_photos", label: "Fotografie degli oggetti", aliases: ["foto preziosi", "due prospettive"], selector: "#preciousCaptureGrid" },
+  { id: "operator_notes", label: "Note operatore", aliases: ["note vendita", "annotazioni interne"], selector: ".textarea-label textarea" },
+  { id: "signatures", label: "Firme atto", aliases: ["firma", "firma_cliente", "firma vendita", "firma dichiarazioni", "firma privacy", "firma operatore"], selector: ".signature-grid" },
+  { id: "quality_and_risk", label: "Controllo qualità e rischio", aliases: ["controllo qualità", "aurum shield", "risk score"], selector: "#aurumShieldCard, #guidedQualityPanel, #qualityReviewPanel" }
+]);
+
+AURUM_SALE_DEED_FIELD_HELP.forEach(({ id, label, aliases = [], selector = "" }) => {
+  AURUM_FIELD_HELP[id] = {
+    labels: [label, ...aliases],
+    text: `Aurum dispone della guida professionale completa per ${label}: scopo, modalità di compilazione, obbligatorietà, controlli, privacy ed errori da evitare.`
+  };
+  if (selector) AURUM_HELP_TARGETS.push({ key: id, selector });
+});
+
+const AURUM_SALE_DEED_FIELD_IDS = new Set(AURUM_SALE_DEED_FIELD_HELP.map(({ id }) => id));
+const AURUM_LEGACY_SALE_FIELD_MAP = Object.freeze({
+  codice_fiscale: "fiscal_code",
+  documento: "document_type",
+  scadenza_documento: "document_expiry",
+  cittadinanza: "citizenship",
+  residenza: "residence_address",
+  provincia: "residence_province",
+  oggetti_preziosi: "item_description",
+  metallo: "item_metal",
+  titolo_caratura: "item_title",
+  peso: "lot_weight",
+  metodo_pagamento: "payment_method",
+  iban: "iban",
+  contabile: "payment_proof",
+  firma_cliente: "signatures",
+  controllo_qualita: "quality_and_risk",
+  stato_atto: "workflow_status"
+});
+
+OROACTIVE_APP_GUIDE.nuovo_atto_vendita.fields = AURUM_SALE_DEED_FIELD_HELP.map(({ label }) => label);
 const AURUM_TUTORIAL_TO_GUIDE = {
   tutorial_compila_atto: "nuovo_atto_vendita",
   tutorial_stampa_copia_cliente: "nuovo_atto_vendita",
@@ -654,13 +735,13 @@ const AURUM_LIVE_TUTORIALS = {
     intro: "Ti guido passo passo nella compilazione dell'atto di vendita.",
     steps: [
       { title: "Apri Nuovo Atto", text: "La pratica si compila dalla sezione Atto di Vendita. Controlla negozio, numero provvisorio, data e ora.", screen: "practice", practiceStep: 0, selector: ".practice-meta" },
-      { title: "Dati cliente", text: "Compila nome, cognome e codice fiscale. Se il cliente esiste già, l'app può recuperare i dati CRM.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="codice_fiscale"]' },
-      { title: "Documento", text: "Inserisci tipo, numero, rilascio e scadenza documento. Se è scaduto, chiedi un documento valido.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="documento"]' },
-      { title: "Residenza", text: "Completa indirizzo e provincia di residenza in modo leggibile e coerente.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="residenza"]' },
-      { title: "Oggetti preziosi", text: "Aggiungi descrizione, metallo e titolo/caratura per ogni oggetto ceduto.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="oggetti_preziosi"]' },
-      { title: "Pagamento", text: "Scegli metodo pagamento, inserisci totale e IBAN/contabile quando richiesti.", screen: "practice", practiceStep: 1, selector: '[data-aurum-help="metodo_pagamento"]' },
+      { title: "Dati cliente", text: "Compila nome, cognome e codice fiscale. Se il cliente esiste già, l'app può recuperare i dati CRM.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="fiscal_code"]' },
+      { title: "Documento", text: "Inserisci tipo, numero, rilascio e scadenza documento. Se è scaduto, chiedi un documento valido.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="document_type"]' },
+      { title: "Residenza", text: "Completa indirizzo e provincia di residenza in modo leggibile e coerente.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="residence_address"]' },
+      { title: "Oggetti preziosi", text: "Aggiungi descrizione, metallo e titolo/caratura per ogni oggetto ceduto.", screen: "practice", practiceStep: 0, selector: '[data-aurum-help="item_description"]' },
+      { title: "Pagamento", text: "Scegli metodo pagamento, inserisci totale e IBAN/contabile quando richiesti.", screen: "practice", practiceStep: 1, selector: '[data-aurum-help="payment_method"]' },
       { title: "Documenti e foto", text: "Carica documento, tessera sanitaria, foto preziosi e contabile se prevista.", screen: "practice", practiceStep: 3, selector: ".capture-grid" },
-      { title: "Firme", text: "Fai firmare cliente e operatore nelle aree previste prima di completare.", screen: "practice", practiceStep: 2, selector: '[data-aurum-help="firma_cliente"]' },
+      { title: "Firme", text: "Fai firmare cliente e operatore nelle aree previste prima di completare.", screen: "practice", practiceStep: 2, selector: '[data-aurum-help="signatures"]' },
       { title: "Controllo e chiusura", text: "Nel riepilogo controlla checklist, stampa copie e poi completa o archivia.", screen: "practice", practiceStep: 4, selector: ".print-box" }
     ]
   },
@@ -9763,11 +9844,18 @@ function formatAurumGuideResponse(guideKey, tutorialId = "") {
 function aurumFieldByQuestion(question = "") {
   const normalized = aurumNormalize(question);
   const activeKey = document.activeElement?.closest?.("[data-aurum-help]")?.dataset?.aurumHelp || "";
-  if (/questo campo|campo selezionato|campo attuale/.test(normalized) && activeKey) return activeKey;
+  if (/questo campo|campo selezionato|campo attuale/.test(normalized) && activeKey) {
+    return AURUM_LEGACY_SALE_FIELD_MAP[activeKey] || activeKey;
+  }
   if (!isAurumFieldHelpQuestion(question)) return "";
-  return Object.entries(AURUM_FIELD_HELP).find(([, help]) => (
+  const saleField = AURUM_SALE_DEED_FIELD_HELP.find(({ label, aliases = [] }) => (
+    [label, ...aliases].some((candidate) => normalized.includes(aurumNormalize(candidate)))
+  ));
+  if (saleField) return saleField.id;
+  const legacyKey = Object.entries(AURUM_FIELD_HELP).find(([, help]) => (
     help.labels.some((label) => normalized.includes(aurumNormalize(label)))
   ))?.[0] || "";
+  return AURUM_LEGACY_SALE_FIELD_MAP[legacyKey] || legacyKey;
 }
 
 function explainAurumField(fieldKey = "") {
@@ -9853,16 +9941,19 @@ function startAurumTutorial(tutorialId = "") {
 
 function handleAurumTutorRequest(question = "") {
   const fieldKey = aurumFieldByQuestion(question);
-  if (fieldKey) {
-    const answer = explainAurumField(fieldKey);
-    state.aurumMessages.push({ role: "assistant", content: answer });
+  if (fieldKey && AURUM_SALE_DEED_FIELD_IDS.has(fieldKey)) {
+    state.aurumRequestedFieldKey = fieldKey;
     const target = document.querySelector(`[data-aurum-help="${cssEscape(fieldKey)}"]`);
     if (target) applyTutorialHighlight(`[data-aurum-help="${cssEscape(fieldKey)}"]`);
+    return false;
+  }
+  if (fieldKey) {
+    state.aurumMessages.push({ role: "assistant", content: explainAurumField(fieldKey) });
     renderAurumMessages();
     return true;
   }
   if (/(questo campo|a cosa serve.*campo|spiegami.*campo)/.test(aurumNormalize(question))) {
-    state.aurumMessages.push({ role: "assistant", content: "Seleziona o tocca un campo visibile e poi chiedimi di spiegarlo. Posso spiegare codice fiscale, documento, residenza, metallo, titolo, peso, pagamento, contabile, firme, giacenza, fusioni, badge e certificazioni." });
+    state.aurumMessages.push({ role: "assistant", content: "Seleziona o tocca un campo visibile e poi chiedimi di spiegarlo. Per ogni campo dell’atto posso descrivere scopo, compilazione, obbligatorietà, controlli, privacy, errori comuni e stato effettivo nell’app." });
     renderAurumMessages();
     return true;
   }
@@ -10902,6 +10993,7 @@ function aurumContextPayload(question) {
     context: {
       currentSection: isPriceExplanation ? "quotazione" : aurumSectionKey(),
       currentSubSection: isPriceExplanation ? "analisi_predittiva_metalli" : currentAurumSubSection(),
+      requestedFieldId: state.aurumRequestedFieldKey || "",
       userRole: state.currentUser?.ruolo || "",
       role: state.currentUser?.ruolo || "",
       storeName: state.currentUser?.negozio || "",
@@ -10946,6 +11038,7 @@ async function askAurum(event) {
     showToast("Scrivi una domanda per Aurum.");
     return;
   }
+  state.aurumRequestedFieldKey = "";
   state.aurumLastUserMessage = question;
   state.aurumMessages.push({ role: "user", content: question });
   if (aurumQuestion) aurumQuestion.value = "";
@@ -10995,10 +11088,13 @@ async function askAurum(event) {
       role: "assistant",
       content: normativeQuestion
         ? buildAurumNormativeAnswer(question)
-        : error.message || "Aurum non riesce a contattare l'Assistente IA in questo momento."
+        : state.aurumRequestedFieldKey
+          ? `${explainAurumField(state.aurumRequestedFieldKey)}\n\nLa guida professionale completa non è raggiungibile in questo momento: riprova appena la connessione è disponibile.`
+          : error.message || "Aurum non riesce a contattare l'Assistente IA in questo momento."
     });
   } finally {
     state.aurumSending = false;
+    state.aurumRequestedFieldKey = "";
     if (aurumAskButton) aurumAskButton.disabled = false;
     renderAurumMessages();
   }
@@ -11019,6 +11115,9 @@ function renderKnowledgeStatus() {
       <span>${status.fallback_full_text ? "Full-text PostgreSQL: attivo" : `Embeddings: ${status.embeddings ? "presenti" : "non presenti"}`}</span>
       <span>${status.sector_knowledge_loaded ? `Base settoriale Aurum ${escapeHtml(status.sector_knowledge_version || "")}: ${Number(status.sector_topics || 0)} argomenti verificati` : "Base settoriale Aurum non caricata"}</span>
       <span>${status.sector_knowledge_verified_at ? `Fonti verificate: ${escapeHtml(status.sector_knowledge_verified_at)}` : ""}</span>
+      <span>${status.gemological_knowledge_loaded ? `Laboratorio Gemmologico: ${Number(status.gemological_materials || 0)} pietre e ${Number(status.gemological_tools || 0)} strumenti` : "Conoscenza gemmologica non caricata"}</span>
+      <span>${status.sale_deed_knowledge_loaded ? `Guida Atto di Vendita: ${Number(status.sale_deed_fields || 0)} campi (${Number(status.sale_deed_fields_implemented || 0)} implementati, ${Number(status.sale_deed_known_gaps || 0)} gap noti)` : "Guida Atto di Vendita non caricata"}</span>
+      <span>${status.sale_deed_knowledge_verified_at ? `Guida atto verificata: ${escapeHtml(status.sale_deed_knowledge_verified_at)}` : ""}</span>
       <span>${status.knowledge_base_loaded ? "Knowledge base disponibile" : "Knowledge base non disponibile"}</span>
       <span>${escapeHtml(status.pgvector_message || "")}</span>
     </article>
@@ -23495,6 +23594,7 @@ function updateCededItems() {
   renderWeightFields();
   renderMaterialAmountFields();
   renderPreciousCaptureCards();
+  ensureAurumHelpAttributes();
   updateAttachmentState();
 }
 

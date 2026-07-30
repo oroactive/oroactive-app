@@ -49,6 +49,23 @@ import {
   sectorKnowledgeSources
 } from "./services/aurum/sectorKnowledge.js";
 import {
+  AURUM_GEM_KNOWLEDGE_STATS,
+  buildGemologicalKnowledgeAnswer,
+  formatGemologicalKnowledgeContext,
+  gemologicalKnowledgeSources,
+  hasGemologicalKnowledgeIntent,
+  searchGemologicalKnowledge
+} from "./services/aurum/gemologicalKnowledge.js";
+import {
+  AURUM_SALE_DEED_STATS,
+  buildSaleDeedKnowledgeAnswer,
+  findSaleDeedFieldById,
+  formatSaleDeedKnowledgeContext,
+  saleDeedKnowledgeSources,
+  selectSaleDeedKnowledgeMatches,
+  searchSaleDeedKnowledge
+} from "./services/aurum/saleDeedKnowledge.js";
+import {
   containsAssistantPersonalData,
   redactAssistantPersonalData,
   sanitizeAssistantContextObject,
@@ -8346,6 +8363,7 @@ const trustedAssistantSourceDomains = [
   "oiml.org",
   "gia.edu",
   "cibjo.org",
+  "gem-a.com",
   "lbma.org.uk",
   "camcom.it",
   "poliziadistato.it",
@@ -8424,6 +8442,16 @@ function normalizeAssistantIntentText(value = "") {
     .trim();
 }
 
+function hasSaleDeedIntent(question = "", matches = [], options = {}) {
+  if (!matches.length) return false;
+  if (String(options.requestedFieldId || "").trim()) return true;
+  const normalized = normalizeAssistantIntentText(question);
+  const topScore = Number(matches[0]?.score || 0);
+  const inSaleSection = ["practice", "nuovo_atto_vendita"].includes(normalizeAssistantIntentText(options.section));
+  const fieldIntent = /(atto|pratica|campo|voce|modulo|compil|inser|scriv|selezion|documento|firma|allegat|fotografi|pagamento|bonifico|contabile|privacy|cliente|oggetto ceduto|caratura|peso lotto|quotazione|valutazione|destinazione|iban|codice fiscale|residenza|nascita|cittadinanza|professione|scadenza|numero atto|totale corrisposto|metallo oggetto|titolo o caratura|note operatore|controllo qualita)/.test(normalized);
+  return topScore >= 24 && (inSaleSection || fieldIntent);
+}
+
 function isComproOroNormativeQuestion(question = "") {
   const normalized = normalizeAssistantIntentText(question);
   if (!normalized) return false;
@@ -8460,7 +8488,36 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const hasRestrictedPersonalData = containsAssistantPersonalData(domanda)
     || containsAssistantPersonalData(JSON.stringify(rawAurumContext.priceExplanationContext || {}))
     || containsAssistantPersonalData(JSON.stringify(rawAurumContext.normativeContext || {}));
-  const sectorMatches = searchSectorKnowledge(domanda, { limit: 5 });
+  const requestedFieldCandidate = /^[a-z0-9_]{1,80}$/i.test(String(aurumContext.requestedFieldId || ""))
+    ? String(aurumContext.requestedFieldId)
+    : "";
+  const requestedSaleField = findSaleDeedFieldById(requestedFieldCandidate);
+  const requestedFieldId = requestedSaleField?.id || "";
+  const gemKnowledge = searchGemologicalKnowledge(domanda, { maxMaterials: 6, maxTools: 8 });
+  const gemIntent = hasGemologicalKnowledgeIntent(gemKnowledge);
+  const saleMatchesCandidate = requestedSaleField
+    ? [{ field: requestedSaleField, score: 10_000, matchedTerms: [requestedSaleField.id] }]
+    : selectSaleDeedKnowledgeMatches(searchSaleDeedKnowledge(domanda, { limit: 5 }));
+  const saleIntent = hasSaleDeedIntent(domanda, saleMatchesCandidate, {
+    requestedFieldId,
+    section: options.section || aurumContext.currentSection
+  });
+  const hasSaleDeedContext = saleIntent && (Boolean(requestedFieldId) || !gemIntent);
+  const hasGemologicalContext = gemIntent && !hasSaleDeedContext;
+  const gemAnswer = buildGemologicalKnowledgeAnswer(domanda, gemKnowledge);
+  const gemSources = hasGemologicalContext ? gemologicalKnowledgeSources(gemKnowledge, 10) : [];
+  const gemContext = hasGemologicalContext
+    ? formatGemologicalKnowledgeContext(gemKnowledge, { maxChars: 12_000, maxMaterials: gemKnowledge.comparison ? 2 : 1, maxTools: 5 })
+    : "";
+  const saleMatches = hasSaleDeedContext ? saleMatchesCandidate : [];
+  const saleAnswer = buildSaleDeedKnowledgeAnswer(domanda, saleMatches);
+  const saleSources = hasSaleDeedContext ? saleDeedKnowledgeSources(saleMatches) : [];
+  const saleContext = hasSaleDeedContext
+    ? formatSaleDeedKnowledgeContext(saleMatches, { limit: 3 })
+    : "";
+  const sectorMatches = hasGemologicalContext || hasSaleDeedContext
+    ? []
+    : searchSectorKnowledge(domanda, { limit: 5 });
   const sectorAnswer = buildSectorKnowledgeAnswer(domanda, sectorMatches);
   const sectorSources = sectorKnowledgeSources(sectorMatches.slice(0, 3), 10);
   const sectorContext = formatSectorKnowledgeContext(sectorMatches);
@@ -8472,7 +8529,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const wantsCurrentWebVerification = isNormativeQuestion
     || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(domanda);
   const shouldUseWeb = !hasRestrictedPersonalData
-    && (options.allowWeb === true || wantsCurrentWebVerification || (!hasSectorContext && chunks.length < 3));
+    && (options.allowWeb === true || wantsCurrentWebVerification || (!hasSectorContext && !hasGemologicalContext && !hasSaleDeedContext && chunks.length < 3));
   const web = shouldUseWeb ? await webSearchFallback(domanda) : { available: false, results: [] };
   const redactedQuestion = redactAssistantPersonalData(domanda);
   const priceExplanationContext = aurumContext.priceExplanationContext && typeof aurumContext.priceExplanationContext === "object"
@@ -8521,6 +8578,8 @@ async function askOroActiveAssistant(question = "", options = {}) {
     `[Web ${index + 1}: ${sanitizeAssistantUntrustedContext(item.title || "Fonte web", 240)}]\n${sanitizeAssistantUntrustedContext(item.snippet || "", 1600)}\n${item.url || ""}`
   )).join("\n\n---\n\n");
   const responseSources = [...new Map([
+    ...gemSources,
+    ...saleSources,
     ...sectorSources,
     ...(web.results || []).map((item) => ({
       title: item.title || "Fonte web ufficiale",
@@ -8536,7 +8595,41 @@ async function askOroActiveAssistant(question = "", options = {}) {
     categoria: topic.category,
     score
   }));
-  const defaultSource = hasSectorContext
+  const gemResults = hasGemologicalContext
+    ? {
+        materiali: gemKnowledge.materials.map((match) => ({
+          id: match.id,
+          slug: match.slug,
+          titolo: match.name,
+          score: match.score,
+          confidenza: match.confidence
+        })),
+        strumenti: gemKnowledge.tools.map((match) => ({
+          id: match.id,
+          titolo: match.name,
+          score: match.score,
+          fonte_match: match.source
+        })),
+        ambiguo: gemKnowledge.ambiguous,
+        confronto: gemKnowledge.comparison
+      }
+    : null;
+  const saleResults = saleMatches.map(({ field, score }) => ({
+    id: field.id,
+    titolo: field.label,
+    categoria: field.category,
+    implementato: field.implemented,
+    score
+  }));
+  const defaultSource = hasSaleDeedContext
+    ? web.results?.length
+      ? "Guida professionale Atto di Vendita OroActive + ricerca web ufficiale"
+      : "Guida professionale Atto di Vendita OroActive"
+    : hasGemologicalContext
+      ? web.results?.length
+        ? "Laboratorio Gemmologico OroActive + ricerca web ufficiale"
+        : "Laboratorio Gemmologico OroActive"
+      : hasSectorContext
     ? web.results?.length
       ? "Base settoriale Aurum verificata + ricerca web ufficiale"
       : hasApprovedKnowledge || hasAcademyContext
@@ -8556,6 +8649,36 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const privacyNotice = hasRestrictedPersonalData
       ? "\n\nNota privacy: ho escluso i dati personali rilevati e non li ho inviati a servizi esterni. Per una risposta più specifica, riformula usando dati anonimi."
       : "";
+    if (hasSaleDeedContext) {
+      return {
+        risposta: `${saleAnswer.risposta}${privacyNotice}`,
+        fonte: "Guida professionale Atto di Vendita OroActive",
+        dal_libro: false,
+        citazioni: saleAnswer.sources.filter((source) => source.url).map((source) => `${source.title} — ${source.url}`),
+        fonti: saleAnswer.sources.filter((source) => source.url),
+        guida_atto: saleResults,
+        conoscenza_gemmologica: null,
+        conoscenza_settoriale: [],
+        risultati: [],
+        error: hasRestrictedPersonalData ? "Invio esterno bloccato per tutela dei dati personali" : "OpenAI non configurato",
+        privacy_filtered: hasRestrictedPersonalData
+      };
+    }
+    if (hasGemologicalContext) {
+      return {
+        risposta: `${gemAnswer.risposta}${privacyNotice}`,
+        fonte: gemAnswer.fonte,
+        dal_libro: false,
+        citazioni: gemAnswer.fonti.map((source) => `${source.title} — ${source.url}`),
+        fonti: gemAnswer.fonti,
+        guida_atto: [],
+        conoscenza_gemmologica: gemResults,
+        conoscenza_settoriale: [],
+        risultati: [],
+        error: hasRestrictedPersonalData ? "Invio esterno bloccato per tutela dei dati personali" : "OpenAI non configurato",
+        privacy_filtered: hasRestrictedPersonalData
+      };
+    }
     if (hasSectorContext) {
       return {
         risposta: `${sectorAnswer.risposta}${privacyNotice}`,
@@ -8563,6 +8686,8 @@ async function askOroActiveAssistant(question = "", options = {}) {
         dal_libro: false,
         citazioni: sectorAnswer.sources.map((source) => `${source.title} — ${source.url}`),
         fonti: sectorAnswer.sources,
+        guida_atto: [],
+        conoscenza_gemmologica: null,
         conoscenza_settoriale: sectorResults,
         risultati: chunks.map((chunk) => ({
           titolo: chunk.titolo,
@@ -8582,6 +8707,8 @@ async function askOroActiveAssistant(question = "", options = {}) {
       dal_libro: false,
       citazioni: [],
       fonti: responseSources,
+      guida_atto: saleResults,
+      conoscenza_gemmologica: gemResults,
       conoscenza_settoriale: sectorResults,
       risultati: chunks.map((chunk) => ({
         titolo: chunk.titolo,
@@ -8611,6 +8738,8 @@ Non inventare fonti web aggiornate: usa soltanto i risultati web forniti nel con
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
 Per prove tecniche usa esiti proporzionati come compatibile, non compatibile, inconcludente o da riferire al laboratorio; non concludere autenticita, titolo esatto o origine da un solo screening.
+Quando è presente il contesto gemmologico, non mescolare proprietà di schede diverse: tratta una sola pietra primaria, salvo confronto esplicitamente richiesto, e distingui sempre naturale, sintetica, trattata, simulante, imitazione o assemblata.
+Quando è presente la guida dell'atto, distingui obbligo legale, procedura OroActive e campo mancante; spiega scopo, compilazione, condizioni, controlli, privacy ed errori senza chiedere o ripetere valori reali del cliente.
 Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : mode === "price_explanation" ? "Spiegazione prezzo Quotazione. Rispondi con questa struttura: titolo, punto di partenza, calcolo purezza, valore teorico, costi e rientro compro oro, massimo pagabile, prezzo consigliato, fluttuazione prevista, confronto competitor se disponibile, avviso finale. Usa solo i dati nel contesto prezzo; se un dato manca, dichiaralo." : mode === "normativa_operativa" ? "Normativa operativa. Rispondi con il riferimento normativo, anno, decreto, implicazioni operative e avviso di verifica professionale. Se il contesto e parziale, usa i riferimenti normativi caricati e dichiarane il limite." : "Assistente operativo."}
 
 CONTESTO APP AURUM:
@@ -8624,6 +8753,12 @@ ${safeNormativeText || "Nessun contesto normativo specifico."}
 
 BASE SETTORIALE AURUM VERIFICATA:
 ${sectorContext || "Nessun argomento settoriale sufficientemente pertinente."}
+
+LABORATORIO GEMMOLOGICO OROACTIVE:
+${gemContext || "Nessuna pietra o strumentazione identificata con sufficiente sicurezza."}
+
+GUIDA PROFESSIONALE ATTO DI VENDITA:
+${saleContext || "Nessun campo dell'atto identificato con sufficiente sicurezza."}
 
 CONTESTO DOCUMENTI, PROCEDURE E ACADEMY:
 ${context || "Nessun passaggio documentale trovato per questa domanda."}
@@ -8646,12 +8781,16 @@ ${redactedQuestion}`,
     const parsed = parseOpenAiJson(result);
     return {
       risposta: parsed.risposta || "",
-      fonte: hasSectorContext ? defaultSource : (parsed.fonte || defaultSource),
+      fonte: hasSectorContext || hasGemologicalContext || hasSaleDeedContext
+        ? defaultSource
+        : (parsed.fonte || defaultSource),
       dal_libro: Boolean(parsed.dal_libro && hasBookContext),
       citazioni: responseSources.length
         ? responseSources.map((source) => `${source.title} — ${source.url}`)
         : Array.isArray(parsed.citazioni) ? parsed.citazioni : [],
       fonti: responseSources,
+      guida_atto: saleResults,
+      conoscenza_gemmologica: gemResults,
       conoscenza_settoriale: sectorResults,
       risultati: chunks.map((chunk) => ({
         titolo: chunk.titolo,
@@ -8662,6 +8801,34 @@ ${redactedQuestion}`,
       web: { available: Boolean(web.available), provider: web.provider || "", results: web.results || [] }
     };
   } catch (error) {
+    if (hasSaleDeedContext) {
+      return {
+        risposta: saleAnswer.risposta,
+        fonte: "Guida professionale Atto di Vendita OroActive",
+        dal_libro: false,
+        citazioni: saleAnswer.sources.filter((source) => source.url).map((source) => `${source.title} — ${source.url}`),
+        fonti: saleAnswer.sources.filter((source) => source.url),
+        guida_atto: saleResults,
+        conoscenza_gemmologica: null,
+        conoscenza_settoriale: [],
+        risultati: [],
+        error: error.message || "OpenAI non disponibile"
+      };
+    }
+    if (hasGemologicalContext) {
+      return {
+        risposta: gemAnswer.risposta,
+        fonte: gemAnswer.fonte,
+        dal_libro: false,
+        citazioni: gemAnswer.fonti.map((source) => `${source.title} — ${source.url}`),
+        fonti: gemAnswer.fonti,
+        guida_atto: [],
+        conoscenza_gemmologica: gemResults,
+        conoscenza_settoriale: [],
+        risultati: [],
+        error: error.message || "OpenAI non disponibile"
+      };
+    }
     if (hasSectorContext) {
       return {
         risposta: sectorAnswer.risposta,
@@ -8669,6 +8836,8 @@ ${redactedQuestion}`,
         dal_libro: false,
         citazioni: sectorAnswer.sources.map((source) => `${source.title} — ${source.url}`),
         fonti: sectorAnswer.sources,
+        guida_atto: [],
+        conoscenza_gemmologica: null,
         conoscenza_settoriale: sectorResults,
         risultati: chunks.map((chunk) => ({
           titolo: chunk.titolo,
@@ -8687,6 +8856,8 @@ ${redactedQuestion}`,
       dal_libro: false,
       citazioni: [],
       fonti: responseSources,
+      guida_atto: saleResults,
+      conoscenza_gemmologica: gemResults,
       conoscenza_settoriale: sectorResults,
       risultati: chunks.map((chunk) => ({
         titolo: chunk.titolo,
@@ -8729,6 +8900,14 @@ async function aiAssistantStatus() {
     sector_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
     sector_topics: AURUM_SECTOR_KNOWLEDGE.topics.length,
     sector_categories: [...new Set(AURUM_SECTOR_KNOWLEDGE.topics.map((topic) => topic.category))].sort((left, right) => left.localeCompare(right, "it")),
+    gemological_knowledge_loaded: AURUM_GEM_KNOWLEDGE_STATS.materialCount === 61 && AURUM_GEM_KNOWLEDGE_STATS.toolCount === 21,
+    gemological_materials: AURUM_GEM_KNOWLEDGE_STATS.materialCount,
+    gemological_tools: AURUM_GEM_KNOWLEDGE_STATS.toolCount,
+    sale_deed_knowledge_loaded: AURUM_SALE_DEED_STATS.totalFields > 0,
+    sale_deed_fields: AURUM_SALE_DEED_STATS.totalFields,
+    sale_deed_fields_implemented: AURUM_SALE_DEED_STATS.implementedFields,
+    sale_deed_known_gaps: AURUM_SALE_DEED_STATS.knownGaps,
+    sale_deed_knowledge_verified_at: AURUM_SALE_DEED_STATS.verifiedAt,
     pgvector_message: aiRuntime.pgvectorMessage,
     vector_column: aiRuntime.vectorColumn,
     fallback: aiRuntime.pgvector ? "pgvector" : "full-text"

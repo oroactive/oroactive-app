@@ -8,7 +8,7 @@ const birthDatePattern = /\b(?:nato|nata|data\s+di\s+nascita)\b.{0,60}\d{1,2}[\/
 const documentPattern = /\b(?:passaporto|patente|carta\s+d['’]?identit[aà]|documento)(?:\s+(?:n|numero))?\s*[:#-]?\s*(?=[A-Z0-9-]{5,24}\b)(?=[A-Z0-9-]*\d)[A-Z0-9-]{5,24}\b/i;
 const labelledNamePattern = /\b(?:cliente|sig(?:nor[ae])?|nome|cognome)\s*[:=-]\s*[\p{L}'’ -]{2,80}/iu;
 const spokenNamePattern = /\b(?:il\s+)?cliente\s+(?:e|è|si\s+chiama)\s+[\p{Lu}][\p{Ll}'’-]+(?:\s+[\p{Lu}][\p{Ll}'’-]+){1,2}\b/u;
-const sensitiveContextKeyPattern = /^(?:availableMemories|userName|cliente|customer|nome|cognome|indirizzo|residenza|domicilio|documento|documentNumber|passaporto|patente|email|telefono|phone|iban|codiceFiscale|codice_fiscale|partitaIva|partita_iva|dataNascita|data_nascita)$/i;
+const sensitiveContextKeyPattern = /^(?:availableMemories|userName|cliente|customer|nome|cognome|indirizzo|residenza|domicilio|documento|documentNumber|passaporto|patente|email|telefono|phone|iban|codiceFiscale|codice_fiscale|fiscalCode|taxCode|partitaIva|partita_iva|dataNascita|data_nascita|birthDate|dateOfBirth|signatureImage|signatureImages|signatureData|capture|captures|captureAttachments|attachments|identityAttachments|paymentProof)$/i;
 const sensitiveJsonValuePattern = /("(?:cliente|customer|nome|cognome|indirizzo|residenza|domicilio|documento|documentNumber|passaporto|patente|email|telefono|phone|iban|codiceFiscale|codice_fiscale|partitaIva|partita_iva|dataNascita|data_nascita)"\s*:\s*)"[^"]*"/gi;
 
 export function redactAssistantPersonalData(value = "", maxLength = 4000) {

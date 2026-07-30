@@ -3,10 +3,13 @@
   "app": "OroActive",
   "commit": "unknown",
   "shortCommit": "unknown",
-  "buildNumber": "20260730-aurum-sector-knowledge-8",
-  "buildTime": "2026-07-30T08:10:33.000Z",
+  "buildNumber": "20260730-aurum-gems-sale-guide-9",
+  "buildTime": "2026-07-30T11:49:10.000Z",
   "branch": "main",
   "environment": "development",
-  "assetBuildId": "20260730-aurum-sector-knowledge-8",
-  "catalogCount": 197
+  "assetBuildId": "20260730-aurum-gems-sale-guide-9",
+  "catalogCount": 197,
+  "aurumGemMaterials": 61,
+  "aurumGemTools": 21,
+  "aurumSaleDeedFields": 48
 }
