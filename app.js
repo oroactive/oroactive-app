@@ -218,7 +218,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-card-preview-fix-5";
+const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-cutout-preview-fix-6";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -15015,6 +15015,70 @@ const GEM_LAB_COLORS = [
 
 const GEM_LAB_DIFFICULTIES = ["Base", "Intermedia", "Avanzata", "Esperto"];
 
+const GEM_LAB_CUTOUT_SLUGS = new Set([
+  "acquamarina",
+  "agata",
+  "alessandrite",
+  "ambra",
+  "ametista",
+  "calcedonio",
+  "citrino",
+  "corallo",
+  "crisoberillo-occhio-di-gatto",
+  "demantoide",
+  "diamante-naturale",
+  "diamante-sintetico-cvd",
+  "diamante-sintetico-hpht",
+  "diamante-trattato",
+  "doppiette-triplette",
+  "eliodoro",
+  "giadeite",
+  "goshenite",
+  "granato-almandino",
+  "granato-piropo",
+  "indicolite",
+  "labradorite",
+  "lapislazzuli",
+  "malachite",
+  "moissanite",
+  "morganite",
+  "nefrite",
+  "onice",
+  "opale-di-fuoco",
+  "opale-prezioso",
+  "opale-sintetico",
+  "peridoto",
+  "perla-coltivata",
+  "perla-imitazione",
+  "perla-naturale",
+  "pietra-di-luna",
+  "prasiolite",
+  "quarzo-fume",
+  "quarzo-ialino",
+  "quarzo-rosa",
+  "rodolite",
+  "rubellite",
+  "rubino-naturale",
+  "rubino-sintetico",
+  "smeraldo-sintetico",
+  "smeraldo",
+  "spinello-naturale",
+  "spinello-sintetico",
+  "tanzanite",
+  "topazio-imperiale",
+  "topazio",
+  "tormalina-paraiba",
+  "tormalina",
+  "tsavorite",
+  "turchese",
+  "vetro-pasta-vitrea",
+  "zaffiri-fancy",
+  "zaffiro-blu-naturale",
+  "zaffiro-sintetico",
+  "zircone-naturale",
+  "zirconia-cubica"
+]);
+
 const GEM_LAB_TABS = [
   ["overview", "Panoramica"],
   ["gallery", "Galleria HD"],
@@ -15099,11 +15163,21 @@ function gemLabApprovedMedia(material = {}) {
 }
 
 function gemLabCardMedia(material = {}) {
+  const slug = String(material.slug || "").trim();
+  if (GEM_LAB_CUTOUT_SLUGS.has(slug)) {
+    return {
+      type: "preview",
+      title: `${material.name || material.commercial_name || "Materiale gemmologico"} – pietra scontornata`,
+      url: `/assets/academy/gems/cutouts/${encodeURIComponent(slug)}-preview.png`,
+      original_width: 1024,
+      original_height: 1024
+    };
+  }
+
   const approvedMedia = gemLabApprovedMedia(material).filter((media) => media.type !== "video");
   const singlePhoto = approvedMedia.find((media) => Number(media.view_count || 1) === 1);
   if (singlePhoto) return singlePhoto;
 
-  const slug = String(material.slug || "").trim();
   const plateUrl = slug ? `/assets/academy/gems/plates/${slug}-four-view.jpg` : "";
   const hasDedicatedPlate = approvedMedia.some((media) => (
     Number(media.view_count || 0) > 1
@@ -15797,8 +15871,9 @@ function renderGemLabFounderManage(material = {}) {
 
 function renderGemLabDetail(material = {}) {
   const media = gemLabApprovedMedia(material);
-  const coverIndex = media.findIndex((item) => item.type !== "video");
-  const cover = coverIndex >= 0 ? media[coverIndex] : null;
+  const cover = gemLabCardMedia(material)
+    || media.find((item) => item.type !== "video")
+    || null;
   return `
     <article class="gem-lab-detail-panel">
       <header class="gem-lab-detail-hero">

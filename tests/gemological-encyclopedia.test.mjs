@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import {
   GEM_CATALOG_SEED,
   GEM_CATALOG_SEED_VALIDATION,
@@ -10,6 +11,81 @@ import {
 
 const root = new URL("../", import.meta.url);
 const file = (path) => readFileSync(new URL(path, root), "utf8");
+
+function pngAlphaStats(png) {
+  const idat = [];
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+
+  while (offset + 12 <= png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (type === "IHDR") {
+      width = png.readUInt32BE(dataStart);
+      height = png.readUInt32BE(dataStart + 4);
+      bitDepth = png[dataStart + 8];
+      colorType = png[dataStart + 9];
+    }
+    if (type === "IDAT") idat.push(png.subarray(dataStart, dataEnd));
+    offset = dataEnd + 4;
+    if (type === "IEND") break;
+  }
+
+  assert.equal(bitDepth, 8);
+  assert.equal(colorType, 6);
+  const bytesPerPixel = 4;
+  const stride = width * bytesPerPixel;
+  const inflated = inflateSync(Buffer.concat(idat));
+  let cursor = 0;
+  let previous = Buffer.alloc(stride);
+  let current = Buffer.alloc(stride);
+  let transparent = 0;
+  let opaque = 0;
+  let partial = 0;
+
+  const paeth = (left, up, upperLeft) => {
+    const estimate = left + up - upperLeft;
+    const leftDistance = Math.abs(estimate - left);
+    const upDistance = Math.abs(estimate - up);
+    const upperLeftDistance = Math.abs(estimate - upperLeft);
+    if (leftDistance <= upDistance && leftDistance <= upperLeftDistance) return left;
+    if (upDistance <= upperLeftDistance) return up;
+    return upperLeft;
+  };
+
+  for (let row = 0; row < height; row += 1) {
+    const filter = inflated[cursor];
+    cursor += 1;
+    for (let column = 0; column < stride; column += 1) {
+      const left = column >= bytesPerPixel ? current[column - bytesPerPixel] : 0;
+      const up = previous[column];
+      const upperLeft = column >= bytesPerPixel ? previous[column - bytesPerPixel] : 0;
+      let predictor = 0;
+      if (filter === 1) predictor = left;
+      else if (filter === 2) predictor = up;
+      else if (filter === 3) predictor = Math.floor((left + up) / 2);
+      else if (filter === 4) predictor = paeth(left, up, upperLeft);
+      else assert.equal(filter, 0, `Filtro PNG non supportato: ${filter}`);
+      current[column] = (inflated[cursor] + predictor) & 0xff;
+      cursor += 1;
+      if (column % bytesPerPixel === 3) {
+        const alpha = current[column];
+        if (alpha === 0) transparent += 1;
+        else if (alpha === 255) opaque += 1;
+        else partial += 1;
+      }
+    }
+    [previous, current] = [current, previous];
+    current.fill(0);
+  }
+
+  return { width, height, transparent, opaque, partial, total: width * height };
+}
 
 const completeMaterial = () => ({
   name: "Campione revisionato",
@@ -147,34 +223,45 @@ test("diamante sintetico HPHT usa solo la tavola gemmologica dedicata", () => {
   );
 });
 
-test("ogni materiale ha una fotografia singola o una preview dedicata per la card", () => {
-  const manifest = JSON.parse(file("assets/academy/gems/library-manifest.json"));
-  const mediaBySlug = new Map(manifest.materials.map((material) => [material.slug, material.media || []]));
-  let dedicatedPreviewCount = 0;
+test("ogni materiale ha una preview PNG realmente scontornata ad alta risoluzione", () => {
+  const app = file("app.js");
+  const cutoutStart = app.indexOf("const GEM_LAB_CUTOUT_SLUGS");
+  const cutoutEnd = app.indexOf("const GEM_LAB_TABS", cutoutStart);
+  assert.ok(cutoutStart >= 0 && cutoutEnd > cutoutStart);
+  const cutoutSlugs = new Function(
+    `${app.slice(cutoutStart, cutoutEnd)}; return GEM_LAB_CUTOUT_SLUGS;`
+  )();
+  assert.equal(cutoutSlugs.size, 61);
 
   for (const material of GEM_CATALOG_SEED) {
-    const singlePhotos = mediaBySlug.get(material.slug) || [];
-    const preview = new URL(`../assets/academy/gems/previews/${material.slug}-preview.jpg`, import.meta.url);
-    const hasDedicatedPreview = existsSync(preview);
-    if (hasDedicatedPreview) dedicatedPreviewCount += 1;
-    assert.ok(
-      singlePhotos.length > 0 || hasDedicatedPreview,
-      `${material.slug}: anteprima singola assente`
-    );
+    assert.ok(cutoutSlugs.has(material.slug), `${material.slug}: non selezionato dalla card`);
+    const preview = new URL(`../assets/academy/gems/cutouts/${material.slug}-preview.png`, import.meta.url);
+    assert.ok(existsSync(preview), `${material.slug}: scontorno assente`);
+    const png = readFileSync(preview);
+    assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${material.slug}: PNG non valido`);
+    const alpha = pngAlphaStats(png);
+    assert.equal(alpha.width, 1024, `${material.slug}: larghezza non valida`);
+    assert.equal(alpha.height, 1024, `${material.slug}: altezza non valida`);
+    assert.ok(alpha.transparent / alpha.total >= 0.15, `${material.slug}: fondo non trasparente`);
+    assert.ok(alpha.opaque / alpha.total >= 0.02, `${material.slug}: soggetto assente`);
+    assert.ok(alpha.partial >= 50, `${material.slug}: bordo alpha anomalo`);
+    assert.ok((alpha.opaque + alpha.partial) / alpha.total < 0.69, `${material.slug}: rettangolo di sfondo residuo`);
+    assert.ok(png.length > 10_000, `${material.slug}: file immagine vuoto o anomalo`);
   }
-
-  assert.equal(dedicatedPreviewCount, 36);
 });
 
-test("la card preferisce una foto singola e non usa mai la tavola multivista", () => {
+test("la card usa sempre lo scontorno per il catalogo e non la tavola multivista", () => {
   const app = file("app.js");
+  const cutoutStart = app.indexOf("const GEM_LAB_CUTOUT_SLUGS");
+  const cutoutEnd = app.indexOf("const GEM_LAB_TABS", cutoutStart);
   const start = app.indexOf("function gemLabCardMedia");
   const end = app.indexOf("function gemLabPlaceholder", start);
-  assert.ok(start >= 0 && end > start);
+  assert.ok(cutoutStart >= 0 && cutoutEnd > cutoutStart && start >= 0 && end > start);
+  const cutoutSource = app.slice(cutoutStart, cutoutEnd);
   const source = app.slice(start, end);
   const selectCardMedia = new Function(
     "gemLabApprovedMedia",
-    `${source}; return gemLabCardMedia;`
+    `${cutoutSource}\n${source}; return gemLabCardMedia;`
   )((material) => material.media || []);
   const plate = {
     type: "main",
@@ -187,17 +274,17 @@ test("la card preferisce una foto singola e non usa mai la tavola multivista", (
     url: "https://upload.wikimedia.org/rodolite.jpg"
   };
 
-  assert.equal(selectCardMedia({ slug: "rodolite", media: [plate, single] }), single);
   assert.deepEqual(
-    selectCardMedia({ slug: "rodolite", name: "Rodolite", media: [plate] }),
+    selectCardMedia({ slug: "rodolite", name: "Rodolite", media: [plate, single] }),
     {
       type: "preview",
-      title: "Rodolite – vista intera",
-      url: "/assets/academy/gems/previews/rodolite-preview.jpg",
-      original_width: 627,
-      original_height: 627
+      title: "Rodolite – pietra scontornata",
+      url: "/assets/academy/gems/cutouts/rodolite-preview.png",
+      original_width: 1024,
+      original_height: 1024
     }
   );
+  assert.equal(selectCardMedia({ slug: "materiale-nuovo", media: [single] }), single);
   assert.equal(selectCardMedia({
     slug: "materiale-nuovo",
     media: [{ type: "main", view_count: 4, url: "/media/tavola-non-validata.jpg" }]
@@ -213,12 +300,17 @@ test("anteprima card contiene una sola immagine completa e la galleria resta sep
   const galleryStart = app.indexOf("function renderGemLabTabContent");
   const galleryEnd = app.indexOf("function renderGemLabAnalysis", galleryStart);
   const gallery = app.slice(galleryStart, galleryEnd);
+  const detailStart = app.indexOf("function renderGemLabDetail");
+  const detailEnd = app.indexOf("function renderGemLabZoom", detailStart);
+  const detail = app.slice(detailStart, detailEnd);
 
   assert.match(card, /const media = gemLabCardMedia\(material\)/);
   assert.match(card, /class="gem-lab-card-preview"/);
   assert.equal((card.match(/<img /g) || []).length, 1);
   assert.doesNotMatch(card, /data-gem-zoom=/);
   assert.match(styles, /\.gem-lab-card-media > img \{[\s\S]*object-fit: contain;[\s\S]*object-position: center;/);
+  assert.match(styles, /\.gem-lab-card-media > img \{[\s\S]*background: transparent;/);
+  assert.match(detail, /const cover = gemLabCardMedia\(material\)/);
   assert.match(gallery, /gemLabMediaFigure/);
 });
 
@@ -456,7 +548,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260729-gem-card-preview-fix-5";
+  const expected = "20260729-gem-cutout-preview-fix-6";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);

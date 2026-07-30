@@ -1,4 +1,4 @@
-const BUILD_ID = "20260729-gem-card-preview-fix-5";
+const BUILD_ID = "20260729-gem-cutout-preview-fix-6";
 const CACHE_NAME = `oroactive-cache-${BUILD_ID}`;
 const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
 const NEVER_CACHE_PREFIXES = [
