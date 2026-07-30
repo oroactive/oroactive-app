@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { appendFileSync, copyFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import path from "node:path";
 
-const expectedTree = "ddad9422a57aa0c7f916003692b90da37169c63e";
+const expectedTree = "48a27aabbf76ea26ae7df7831be42efc36cbf6a8";
 const uploadRoot = ".codex-upload";
 const chunksDir = path.join(uploadRoot, "chunks");
 const chunkFiles = readdirSync(chunksDir).sort();
@@ -12,7 +12,6 @@ const compressedPatch = Buffer.concat(chunkFiles.map((name) => readFileSync(path
 const patchPath = path.join("/tmp", "oroactive-release.patch");
 writeFileSync(patchPath, gunzipSync(compressedPatch));
 execFileSync("git", ["apply", "--index", patchPath], { stdio: "inherit" });
-copyFileSync(path.join(uploadRoot, "original-workflow.yml"), ".github/workflows/deploy-coolify.yml");
 rmSync(uploadRoot, { recursive: true, force: true });
 execFileSync("git", ["add", "-A"], { stdio: "inherit" });
 const actualTree = execFileSync("git", ["write-tree"], { encoding: "utf8" }).trim();
