@@ -129,6 +129,52 @@ test("catalogo gemmologico usa 61 slug univoci", () => {
   assert.equal(GEM_CATALOG_SEED_VALIDATION.uniqueSlugs, 61);
 });
 
+test("catalogo gemmologico mostra sempre le schede in ordine alfabetico italiano", () => {
+  const app = file("app.js");
+  const searchStart = app.indexOf("function gemLabSearchText");
+  const optionsStart = app.indexOf("function gemLabSelectOptions", searchStart);
+  assert.ok(searchStart >= 0 && optionsStart > searchStart);
+  const visibleMaterials = new Function(
+    "state",
+    `${app.slice(searchStart, optionsStart)}; return gemLabVisibleMaterials();`
+  );
+  const materials = [
+    { id: 4, slug: "zaffiro", name: "Zaffiro" },
+    { id: 3, slug: "ambra", name: "ambra" },
+    { id: 2, slug: "diamante-10", name: "Diamante 10" },
+    { id: 1, slug: "diamante-2", name: "Diamante 2" },
+    { id: 5, slug: "agata", commercial_name: "Agata" }
+  ];
+  const state = {
+    gemLabMaterials: materials,
+    gemLabSearch: "",
+    gemLabCategory: "",
+    gemLabClassification: "",
+    gemLabDifficulty: "",
+    gemLabColor: ""
+  };
+
+  assert.deepEqual(
+    visibleMaterials(state).map((material) => material.name || material.commercial_name),
+    ["Agata", "ambra", "Diamante 2", "Diamante 10", "Zaffiro"]
+  );
+  assert.deepEqual(materials.map(({ slug }) => slug), [
+    "zaffiro",
+    "ambra",
+    "diamante-10",
+    "diamante-2",
+    "agata"
+  ]);
+
+  const orderedCatalogNames = visibleMaterials({
+    ...state,
+    gemLabMaterials: GEM_CATALOG_SEED
+  }).map((material) => material.name || material.commercial_name);
+  assert.equal(orderedCatalogNames.length, 61);
+  assert.equal(orderedCatalogNames[0], "Acquamarina");
+  assert.equal(orderedCatalogNames.at(-1), "Zirconia cubica - CZ");
+});
+
 test("catalogo contiene i 21 strumenti richiesti", () => {
   assert.equal(GEM_TOOL_SEED.length, 21);
 });
@@ -548,7 +594,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260729-gem-cutout-preview-fix-6";
+  const expected = "20260730-gem-alphabetical-order-7";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);

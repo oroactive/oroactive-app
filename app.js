@@ -218,7 +218,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260729-gem-cutout-preview-fix-6";
+const OROACTIVE_CLIENT_BUILD_ID = "20260730-gem-alphabetical-order-7";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -15280,6 +15280,15 @@ function gemLabVisibleMaterials() {
     if (state.gemLabDifficulty && material.difficulty_level !== state.gemLabDifficulty) return false;
     if (state.gemLabColor && !JSON.stringify(material.typical_colors || []).toLowerCase().includes(state.gemLabColor.toLowerCase())) return false;
     return true;
+  }).sort((first, second) => {
+    const firstName = String(first.name || first.commercial_name || "Materiale senza nome").trim();
+    const secondName = String(second.name || second.commercial_name || "Materiale senza nome").trim();
+    return firstName.localeCompare(secondName, "it", { numeric: true, sensitivity: "base" })
+      || String(first.slug || first.id || "").localeCompare(
+        String(second.slug || second.id || ""),
+        "it",
+        { numeric: true, sensitivity: "base" }
+      );
   });
 }
 
