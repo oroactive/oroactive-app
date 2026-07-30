@@ -46,7 +46,8 @@ test("il backend mantiene separate guida atto, laboratorio e conoscenza settoria
   assert.match(serverSource, /hasGemologicalKnowledgeIntent\(gemKnowledge\)/);
   assert.match(serverSource, /findSaleDeedFieldById\(requestedFieldCandidate\)/);
   assert.match(serverSource, /requestedSaleField[\s\S]{0,200}?score:\s*10_000/);
-  assert.match(serverSource, /hasGemologicalContext\s*\|\|\s*hasSaleDeedContext\s*\?\s*\[\]/);
+  assert.match(serverSource, /resolveAurumKnowledgeRoute\(\{/);
+  assert.match(serverSource, /hasGemologicalContext\s*\|\|\s*hasSaleDeedContext\s*\|\|\s*hasCoachingContext\s*\?\s*\[\]/);
   assert.match(serverSource, /LABORATORIO GEMMOLOGICO OROACTIVE:/);
   assert.match(serverSource, /GUIDA PROFESSIONALE ATTO DI VENDITA:/);
   assert.match(serverSource, /non mescolare proprietà di schede diverse/i);

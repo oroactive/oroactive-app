@@ -149,6 +149,9 @@ test("Aurum blocca e oscura dati personali prima dei servizi esterni", () => {
   assert.doesNotMatch(redacted, /Mario Rossi|via Roma 12|YA1234567|example\.it|333 1234567/);
 
   assert.equal(containsAssistantPersonalData("Il cliente è Mario Rossi"), true);
+  assert.equal(containsAssistantPersonalData("Vorrei che mi chiamassi Lia"), true);
+  assert.equal(containsAssistantPersonalData("Il mio compleanno è il 29/07"), true);
+  assert.equal(redactAssistantPersonalData("Chiamami Lia. Il mio compleanno è il 29 luglio"), "[nome preferito omesso]. [compleanno omesso]");
   const jsonContext = { cliente: "Mario Rossi", documento: "YA1234567", current_price_per_gram: 91.25 };
   assert.equal(containsAssistantPersonalData(JSON.stringify(jsonContext)), true);
   assert.deepEqual(sanitizeAssistantContextObject(jsonContext), { current_price_per_gram: 91.25 });

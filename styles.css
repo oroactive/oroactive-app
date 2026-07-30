@@ -1992,8 +1992,9 @@ body.main-menu-active .splash-screen {
   font-size: 18px;
   font-weight: 900;
   line-height: 1;
-  min-width: 30px;
-  min-height: 30px;
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 
 .aurum-chat-panel {
@@ -2065,6 +2066,14 @@ body.main-menu-active .splash-screen {
   margin: 2px 0 0;
   color: #fff4d5;
   font-size: 18px;
+}
+
+.aurum-coaching-disclaimer {
+  max-width: 320px;
+  margin: 5px 0 0;
+  color: rgba(255, 248, 237, 0.72);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .aurum-chat-log {
@@ -2216,6 +2225,132 @@ body.main-menu-active .splash-screen {
   display: none;
 }
 
+.aurum-memory-center {
+  flex: 0 1 auto;
+  max-height: min(220px, 30dvh);
+  margin: 10px 12px 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 181, 72, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.aurum-memory-center > summary {
+  min-height: 44px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 11px;
+  color: #ffd696;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  touch-action: manipulation;
+}
+
+.aurum-memory-center > summary::marker {
+  color: #ff9f2f;
+}
+
+.aurum-memory-center > summary span {
+  min-width: 28px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255, 122, 0, 0.22);
+  text-align: center;
+}
+
+.aurum-memory-center-body {
+  max-height: calc(min(220px, 30dvh) - 44px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 10px 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.aurum-memory-center-body > p {
+  margin: 0 0 9px;
+  color: rgba(255, 248, 237, 0.74);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.aurum-my-memories-list {
+  display: grid;
+  gap: 8px;
+}
+
+.aurum-personal-memory {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.aurum-memory-toolbar,
+.aurum-memory-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.aurum-memory-toolbar {
+  margin-top: 9px;
+}
+
+.aurum-memory-toolbar button,
+.aurum-memory-row-actions button,
+.aurum-inline-actions button {
+  min-height: 44px;
+  flex: 1 1 132px;
+  touch-action: manipulation;
+}
+
+.aurum-memory-share-consent {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  margin: 8px 0 10px;
+  color: rgba(255, 248, 237, 0.84);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.aurum-memory-share-consent input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: #ff7a00;
+}
+
+.aurum-memory-existing-share {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  color: rgba(255, 248, 237, 0.78);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  touch-action: manipulation;
+}
+
+.aurum-memory-existing-share input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: #ff7a00;
+}
+
+.aurum-list-row .aurum-memory-existing-share span {
+  max-height: none;
+  overflow: visible;
+}
+
 .aurum-inline-actions,
 .aurum-support-actions {
   display: flex;
@@ -2313,6 +2448,20 @@ body.main-menu-active .splash-screen {
 .aurum-memory-group h4 {
   margin: 0;
   color: #ffd696;
+}
+
+.aurum-memory-summary-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.aurum-memory-summary-types span {
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 181, 72, 0.22);
+  border-radius: 999px;
+  color: rgba(255, 248, 237, 0.82);
+  font-size: 11px;
 }
 
 .user-messages-panel {
@@ -11731,9 +11880,18 @@ input.document-expired {
 
   .aurum-consent-panel,
   .aurum-support-actions,
+  .aurum-memory-center,
   .aurum-chat-form {
     margin-right: 10px;
     margin-left: 10px;
+  }
+
+  .aurum-memory-center {
+    max-height: min(190px, 27dvh);
+  }
+
+  .aurum-memory-center-body {
+    max-height: calc(min(190px, 27dvh) - 44px);
   }
 
   .aurum-chat-form textarea {

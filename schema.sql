@@ -1643,6 +1643,16 @@ CREATE TABLE IF NOT EXISTS aurum_user_memories (
   user_id BIGINT NOT NULL,
   memory_text TEXT NOT NULL,
   memory_type TEXT DEFAULT 'work_preference',
+  memory_key TEXT,
+  memory_label TEXT,
+  memory_value_encrypted TEXT,
+  sensitivity TEXT DEFAULT 'personal',
+  consent_version TEXT DEFAULT 'legacy',
+  consent_at TIMESTAMPTZ NULL,
+  source TEXT DEFAULT 'legacy',
+  use_in_chat BOOLEAN DEFAULT FALSE,
+  share_with_ai BOOLEAN DEFAULT FALSE,
+  expires_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   deleted_at TIMESTAMPTZ NULL
@@ -1651,6 +1661,16 @@ CREATE TABLE IF NOT EXISTS aurum_user_memories (
 ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS user_id BIGINT;
 ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS memory_text TEXT;
 ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS memory_type TEXT DEFAULT 'work_preference';
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS memory_key TEXT;
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS memory_label TEXT;
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS memory_value_encrypted TEXT;
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS sensitivity TEXT DEFAULT 'personal';
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS consent_version TEXT DEFAULT 'legacy';
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS consent_at TIMESTAMPTZ;
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'legacy';
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS use_in_chat BOOLEAN DEFAULT FALSE;
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS share_with_ai BOOLEAN DEFAULT FALSE;
+ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE aurum_user_memories ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
@@ -1663,6 +1683,14 @@ CREATE INDEX IF NOT EXISTS aurum_user_memories_type_idx
 
 CREATE INDEX IF NOT EXISTS aurum_user_memories_founder_review_idx
   ON aurum_user_memories (user_id, memory_type, updated_at DESC)
+  WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS aurum_user_memories_active_key_unique
+  ON aurum_user_memories (user_id, memory_key)
+  WHERE deleted_at IS NULL AND memory_key IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS aurum_user_memories_chat_idx
+  ON aurum_user_memories (user_id, use_in_chat, updated_at DESC)
   WHERE deleted_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS customer_trust_packs (

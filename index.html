@@ -10,7 +10,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="OroActive">
   <meta name="format-detection" content="telephone=no">
-  <meta name="oroactive-build-id" content="20260730-aurum-gems-sale-guide-9">
+  <meta name="oroactive-build-id" content="20260730-aurum-coaching-memory-10">
   <title>OroActive Gestionale</title>
   <script>
     (() => {
@@ -57,12 +57,12 @@
       void verifyBootBuild();
     })();
   </script>
-  <link rel="manifest" href="manifest.json?v=20260730-aurum-gems-sale-guide-9">
+  <link rel="manifest" href="manifest.json?v=20260730-aurum-coaching-memory-10">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260730-aurum-gems-sale-guide-9">
-  <script src="frontend-config.js?v=20260730-aurum-gems-sale-guide-9"></script>
+  <link rel="stylesheet" href="styles.css?v=20260730-aurum-coaching-memory-10">
+  <script src="frontend-config.js?v=20260730-aurum-coaching-memory-10"></script>
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -1341,7 +1341,7 @@
           <div>
             <p class="eyebrow">Aurum</p>
             <h2>Gestione Aurum</h2>
-            <p class="muted">Sezione riservata al Founder per controllare mascotte, memorie interne divise per utente, messaggi riservati e richieste di supporto.</p>
+            <p class="muted">Sezione riservata al Founder per controllare mascotte, statistiche aggregate sull’uso della memoria, messaggi riservati e richieste di supporto. Il contenuto delle memorie personali resta visibile solo al relativo utente.</p>
           </div>
           <div class="aurum-settings-grid">
             <label class="inline-check"><input id="aurumEnabledToggle" type="checkbox"> Attiva mascotte</label>
@@ -1358,7 +1358,8 @@
             <div class="aurum-admin-list" id="aurumSupportRequestsList" aria-live="polite"></div>
           </div>
           <div>
-            <h3>Memorie Aurum per utente</h3>
+            <h3>Statistiche memorie Aurum</h3>
+            <p class="muted">Sono mostrati soltanto conteggi e categorie per utente, mai il contenuto delle memorie personali.</p>
             <div class="aurum-admin-list aurum-memory-groups" id="aurumMemoriesList" aria-live="polite"></div>
           </div>
         </section>
@@ -1897,12 +1898,28 @@
         <div>
           <p class="eyebrow">Mascotte AI ufficiale</p>
           <h2 id="aurumChatTitle">Aurum — Assistente OroActive</h2>
+          <p class="aurum-coaching-disclaimer">Supporto AI di coaching, non umano e non terapeutico. Non sostituisce professionisti qualificati.</p>
         </div>
         <button type="button" id="aurumChatClose" aria-label="Chiudi chat Aurum">×</button>
       </div>
       <div class="aurum-chat-log" id="aurumChatMessages" aria-live="polite"></div>
+      <details class="aurum-memory-center">
+        <summary>La mia memoria Aurum <span id="aurumMyMemoriesCount">0</span></summary>
+        <div class="aurum-memory-center-body">
+          <p>Le memorie sono private per impostazione predefinita e vengono salvate solo dopo il tuo consenso. Solo quelle che autorizzi separatamente possono essere usate con il servizio AI. Puoi modificarle, esportarle o eliminarle in qualsiasi momento.</p>
+          <div class="aurum-my-memories-list" id="aurumMyMemoriesList" aria-live="polite"></div>
+          <div class="aurum-memory-toolbar">
+            <button class="ghost-button" type="button" id="aurumExportMemories">Esporta le mie memorie</button>
+            <button class="danger-button" type="button" id="aurumDeleteAllMemories">Elimina tutte</button>
+          </div>
+        </div>
+      </details>
       <div class="aurum-consent-panel" id="aurumConsentPanel" hidden>
-        <p>Vuoi che lo ricordi per aiutarti meglio in futuro?</p>
+        <p id="aurumConsentText">Vuoi che Aurum ricordi questa informazione per aiutarti meglio in futuro?</p>
+        <label class="aurum-memory-share-consent">
+          <input id="aurumShareMemoryWithAi" type="checkbox">
+          <span>Consenti anche l’invio di questa memoria al servizio AI quando serve per risponderti. È facoltativo e separato dal salvataggio privato.</span>
+        </label>
         <div class="aurum-inline-actions">
           <button class="small-button" type="button" id="aurumRememberYes">Sì, ricordalo</button>
           <button class="ghost-button" type="button" id="aurumRememberNo">No, non salvarlo</button>
@@ -1969,6 +1986,7 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="app.js?v=20260730-aurum-gems-sale-guide-9"></script>
+  <script src="shared/aurum-policy.js?v=20260730-aurum-coaching-memory-10"></script>
+  <script src="app.js?v=20260730-aurum-coaching-memory-10"></script>
 </body>
 </html>

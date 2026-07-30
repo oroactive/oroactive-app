@@ -169,7 +169,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260730-aurum-gems-sale-guide-9"/);
+  assert.match(sw, /const BUILD_ID = "20260730-aurum-coaching-memory-10"/);
   assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
@@ -197,7 +197,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /meta name="oroactive-build-id" content="20260730-aurum-gems-sale-guide-9"/);
+  assert.match(index, /meta name="oroactive-build-id" content="20260730-aurum-coaching-memory-10"/);
   assert.match(index, /async function verifyBootBuild/);
   assert.match(index, /async function resetStalePwa/);
   assert.match(index, /\/version\.json\?boot=\$\{Date\.now\(\)\}/);
@@ -205,10 +205,11 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(index, /registration\.unregister/);
   assert.match(index, /window\.caches\.delete/);
   assert.match(index, /serverBuildId !== htmlBuildId/);
-  assert.match(index, /app\.js\?v=20260730-aurum-gems-sale-guide-9/);
-  assert.match(index, /styles\.css\?v=20260730-aurum-gems-sale-guide-9/);
+  assert.match(index, /app\.js\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(index, /shared\/aurum-policy\.js\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(index, /styles\.css\?v=20260730-aurum-coaching-memory-10/);
   assert.match(version, /"ok": true/);
-  assert.match(version, /"assetBuildId": "20260730-aurum-gems-sale-guide-9"/);
+  assert.match(version, /"assetBuildId": "20260730-aurum-coaching-memory-10"/);
   assert.match(version, /"catalogCount": 197/);
 });
 
@@ -265,7 +266,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -3040,8 +3041,11 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(index, /id="aurumMessageRecipient"/);
   assert.match(index, /id="aurumConsentPanel"/);
   assert.match(index, /id="aurumMemoriesList"/);
-  assert.match(index, /Memorie Aurum per utente/);
-  assert.doesNotMatch(index, /id="aurumUserMemoryToggle"|id="aurumUserMemories"/);
+  assert.match(index, /Statistiche memorie Aurum/);
+  assert.match(index, /id="aurumMyMemoriesList"/);
+  assert.match(index, /id="aurumExportMemories"/);
+  assert.match(index, /id="aurumDeleteAllMemories"/);
+  assert.match(index, /id="aurumShareMemoryWithAi"/);
   assert.doesNotMatch(index, /id="aurumTutorToolbar"|id="aurumPriceToolbar"/);
   assert.doesNotMatch(index, /data-aurum-price-followup|data-aurum-tutorial|data-aurum-field-help|data-aurum-quiz/);
   assert.doesNotMatch(styles, /\.aurum-tutor-toolbar|\.aurum-price-toolbar|\.aurum-quick-actions/);
@@ -3082,7 +3086,9 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(app, /function renderAurumMessageRecipients/);
   assert.match(app, /function aurumMessageDirectionLabel/);
   assert.match(app, /function saveAurumMemory/);
-  assert.match(app, /function recordAurumInteractionMemory/);
+  assert.doesNotMatch(app, /function recordAurumInteractionMemory/);
+  assert.doesNotMatch(app, /automatic:\s*true/);
+  assert.match(app, /explicit_consent:\s*true/);
   assert.match(app, /function loadAurumAllMemories/);
   assert.match(app, /function resetAurumVisibleChat/);
   const resetAurumChatStart = app.indexOf("function resetAurumVisibleChat");
@@ -3123,7 +3129,7 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(server, /containsAssistantPersonalData/);
   assert.match(server, /sanitizeAssistantContextObject/);
   assert.match(server, /sanitizeAssistantUntrustedContext/);
-  assert.match(server, /Il contenuto non viene trasmesso al modello esterno/);
+  assert.match(server, /Nessuna memoria personale autorizzata alla condivisione con il modello IA/);
   assert.match(server, /Invio esterno bloccato per tutela dei dati personali/);
   assert.match(server, /"camcom\.it"/);
   assert.match(server, /"poliziadistato\.it"/);
@@ -3156,7 +3162,8 @@ test("mascotte Aurum interattiva usa gufo dorato, flag e AI esistente", async ()
   assert.match(server, /founder_observer/);
   assert.match(server, /can_reply: isRecipient/);
   assert.match(server, /sanitizeAurumMemoryText/);
-  assert.match(server, /Memoria non salvata: contiene dati personali o sensibili/);
+  assert.match(server, /È necessario il consenso esplicito per salvare una memoria Aurum/);
+  assert.match(server, /encryptAurumMemoryValue/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_support_requests/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS aurum_user_memories/);
   assert.match(schema, /aurum_user_memories_type_idx/);
@@ -3421,7 +3428,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -3480,7 +3487,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -3532,7 +3539,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -3619,9 +3626,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260730-aurum-gems-sale-guide-9/);
-  assert.match(index, /styles\.css\?v=20260730-aurum-gems-sale-guide-9/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(index, /app\.js\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(index, /styles\.css\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3667,8 +3674,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260730-aurum-gems-sale-guide-9/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(index, /styles\.css\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3824,7 +3831,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3928,7 +3935,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -3979,9 +3986,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260730-aurum-gems-sale-guide-9/);
-  assert.match(index, /styles\.css\?v=20260730-aurum-gems-sale-guide-9/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(index, /app\.js\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(index, /styles\.css\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -4003,7 +4010,7 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(migration, /privacy_policy_versions/);
   assert.match(migration, /privacy_policy_acceptances/);
 
-  assert.match(server, /const privacyPolicyVersion = "v1\.0"/);
+  assert.match(server, /const privacyPolicyVersion = "v1\.1"/);
   assert.match(server, /async function bootstrapPrivacyPolicy/);
   assert.match(server, /function writePrivacyPolicyPdf/);
   assert.match(server, /app\.get\("\/api\/privacy-policy\/current"/);
@@ -4038,9 +4045,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260730-aurum-gems-sale-guide-9/);
-  assert.match(index, /styles\.css\?v=20260730-aurum-gems-sale-guide-9/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(index, /app\.js\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(index, /styles\.css\?v=20260730-aurum-coaching-memory-10/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -4118,7 +4125,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -4235,7 +4242,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -4279,7 +4286,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260730-aurum-gems-sale-guide-9/);
+  assert.match(worker, /20260730-aurum-coaching-memory-10/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i

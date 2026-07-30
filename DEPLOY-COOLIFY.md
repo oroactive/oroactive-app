@@ -10,6 +10,8 @@ PORT=3000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
 JWT_SECRET=UNA_CHIAVE_LUNGA_CASUALE
 JWT_EXPIRES_IN=7d
+AURUM_MEMORY_ENCRYPTION_KEY=UNA_CHIAVE_AURUM_LUNGA_CASUALE_STABILE_MINIMO_32_BYTE
+AURUM_MEMORY_ENCRYPTION_KEY_PREVIOUS=
 BULLIONVAULT_MARKET_URL=https://www.bullionvault.com/view_market_xml.do
 OPENAI_API_KEY=INSERISCI_CHIAVE_OPENAI_SOLO_BACKEND
 OPENAI_MODEL=gpt-4.1-mini
@@ -20,6 +22,10 @@ ADMIN_NOME=Elite
 ADMIN_COGNOME=Founder
 ADMIN_NEGOZIO=Tutti
 ```
+
+`AURUM_MEMORY_ENCRYPTION_KEY` cifra le memorie personali di Aurum. Genera una chiave casuale di almeno 32 byte, configurala come secret esclusivamente nel backend di Coolify e conservala in un gestore di segreti sicuro. La chiave deve rimanere stabile tra riavvii e deploy. Se deve essere ruotata, inserisci temporaneamente il valore precedente in `AURUM_MEMORY_ENCRYPTION_KEY_PREVIOUS` finché le memorie esistenti non sono state aggiornate; non inserire mai queste chiavi nel repository, nei log o nel frontend.
+
+Per generare un valore adatto, esegui localmente `openssl rand -base64 48` e copia il risultato direttamente nel secret Coolify.
 
 Per la configurazione OroActive richiesta:
 

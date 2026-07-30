@@ -8,6 +8,8 @@ const birthDatePattern = /\b(?:nato|nata|data\s+di\s+nascita)\b.{0,60}\d{1,2}[\/
 const documentPattern = /\b(?:passaporto|patente|carta\s+d['’]?identit[aà]|documento)(?:\s+(?:n|numero))?\s*[:#-]?\s*(?=[A-Z0-9-]{5,24}\b)(?=[A-Z0-9-]*\d)[A-Z0-9-]{5,24}\b/i;
 const labelledNamePattern = /\b(?:cliente|sig(?:nor[ae])?|nome|cognome)\s*[:=-]\s*[\p{L}'’ -]{2,80}/iu;
 const spokenNamePattern = /\b(?:il\s+)?cliente\s+(?:e|è|si\s+chiama)\s+[\p{Lu}][\p{Ll}'’-]+(?:\s+[\p{Lu}][\p{Ll}'’-]+){1,2}\b/u;
+const preferredNamePattern = /\b(?:mi\s+chiamo|chiamami|puoi\s+chiamarmi|vorrei\s+che\s+mi\s+chiamassi)\s+[\p{L}][\p{L}'’-]{1,40}(?:\s+[\p{L}][\p{L}'’-]{1,40}){0,2}(?=[,.;!?]|\s+(?:e|ma|perch[eé]|quando|oggi|sono|preferisco)\b|$)/iu;
+const birthdayPattern = /\b(?:il\s+mio\s+)?compleanno\s+(?:[eè]\s+(?:il\s+)?|cade\s+il\s+)?(?:\d{1,2}[\/.-]\d{1,2}(?:[\/.-](?:19|20)?\d{2})?|\d{1,2}\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre))\b/iu;
 const sensitiveContextKeyPattern = /^(?:availableMemories|userName|cliente|customer|nome|cognome|indirizzo|residenza|domicilio|documento|documentNumber|passaporto|patente|email|telefono|phone|iban|codiceFiscale|codice_fiscale|fiscalCode|taxCode|partitaIva|partita_iva|dataNascita|data_nascita|birthDate|dateOfBirth|signatureImage|signatureImages|signatureData|capture|captures|captureAttachments|attachments|identityAttachments|paymentProof)$/i;
 const sensitiveJsonValuePattern = /("(?:cliente|customer|nome|cognome|indirizzo|residenza|domicilio|documento|documentNumber|passaporto|patente|email|telefono|phone|iban|codiceFiscale|codice_fiscale|partitaIva|partita_iva|dataNascita|data_nascita)"\s*:\s*)"[^"]*"/gi;
 
@@ -16,6 +18,8 @@ export function redactAssistantPersonalData(value = "", maxLength = 4000) {
   return String(value || "")
     .replace(sensitiveJsonValuePattern, '$1"[dato personale omesso]"')
     .replace(new RegExp(spokenNamePattern.source, "gu"), "[nome omesso]")
+    .replace(new RegExp(preferredNamePattern.source, "giu"), "[nome preferito omesso]")
+    .replace(new RegExp(birthdayPattern.source, "giu"), "[compleanno omesso]")
     .replace(/(^|[.;]\s*)([\p{Lu}][\p{L}'’-]+(?:\s+[\p{Lu}][\p{L}'’-]+){1,2})(?=\s*,\s*(?:via|viale|piazza|corso|largo|vicolo)\b)/gu, "$1[nome omesso]")
     .replace(new RegExp(labelledNamePattern.source, "giu"), "[nome omesso]")
     .replace(new RegExp(addressPattern.source, "giu"), "[indirizzo omesso]")
@@ -44,6 +48,8 @@ export function containsAssistantPersonalData(value = "") {
     documentPattern,
     labelledNamePattern,
     spokenNamePattern,
+    preferredNamePattern,
+    birthdayPattern,
     new RegExp(sensitiveJsonValuePattern.source, "i")
   ].some((pattern) => pattern.test(text));
 }

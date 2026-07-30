@@ -1,0 +1,309 @@
+{
+  "knowledgeVersion": "2026.07.30",
+  "verifiedAt": "30 luglio 2026",
+  "professionalStandard": "ICF Core Competencies 2025",
+  "method": "Sintesi originale e strutturata dei nove corsi A.Co.I. forniti dal Founder, integrata con standard professionali e fonti istituzionali correnti. I PDF originali non sono pubblicati né riprodotti.",
+  "sources": [
+    {
+      "id": "icf-core-2025",
+      "title": "2025 ICF Core Competencies",
+      "url": "https://coachingfederation.org/credentialing/coaching-competencies/icf-core-competencies/",
+      "authority": "International Coaching Federation",
+      "verifiedAt": "30 luglio 2026"
+    },
+    {
+      "id": "icf-ethics-2025",
+      "title": "ICF Code of Ethics - in vigore dal 1 aprile 2025",
+      "url": "https://coachingfederation.org/credentialing/coaching-ethics/icf-code-of-ethics/",
+      "authority": "International Coaching Federation",
+      "verifiedAt": "30 luglio 2026"
+    },
+    {
+      "id": "icf-ai-coaching",
+      "title": "ICF Artificial Intelligence Coaching Framework and Standards",
+      "url": "https://coachingfederation.org/resource/icf-artificial-intelligence-ai-coaching-framework-and-standards/",
+      "authority": "International Coaching Federation",
+      "verifiedAt": "30 luglio 2026"
+    },
+    {
+      "id": "icf-referral",
+      "title": "Referring a Client to Therapy: A Set of Guidelines",
+      "url": "https://coachingfederation.org/resource/client-referral/",
+      "authority": "International Coaching Federation",
+      "verifiedAt": "30 luglio 2026"
+    },
+    {
+      "id": "global-ethics-v4",
+      "title": "Global Code of Ethics for Coaches, Mentors and Supervisors - Versione 4",
+      "url": "https://globalcodeofethics.org/",
+      "authority": "EMCC Global e organismi cofirmatari",
+      "verifiedAt": "30 luglio 2026"
+    },
+    {
+      "id": "gdpr",
+      "title": "Regolamento (UE) 2016/679 - GDPR",
+      "url": "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:32016R0679",
+      "authority": "Unione europea - EUR-Lex",
+      "verifiedAt": "30 luglio 2026"
+    },
+    {
+      "id": "inail-stress",
+      "title": "Rischio stress lavoro-correlato",
+      "url": "https://www.inail.it/portale/ricerca-e-tecnologia/it/ambiti-di-ricerca/area-salute-sul-lavoro/rischi-psicosociali-e-tutela-dei-lavoratori-vulnerabili/rischio-stress-lavoro-correlato.html",
+      "authority": "INAIL",
+      "verifiedAt": "30 luglio 2026"
+    },
+    {
+      "id": "eu-osha-psychosocial",
+      "title": "Psychosocial risks and mental health at work",
+      "url": "https://osha.europa.eu/en/themes/psychosocial-risks-and-mental-health",
+      "authority": "Agenzia europea per la sicurezza e la salute sul lavoro",
+      "verifiedAt": "30 luglio 2026"
+    }
+  ],
+  "topics": [
+    {
+      "id": "coaching_self_sabotage",
+      "title": "Autosabotaggio, perfezionismo e senso di inadeguatezza",
+      "course": {
+        "title": "Quanto valgo? 5 step per smettere di autosabotarti",
+        "authors": ["Laura Peli", "Luca Cupani"],
+        "filename": "5 Step per smettere di autosabotarti.pdf",
+        "pages": 35,
+        "sha256": "41ef0e90f7736ac697346e69b0847872430fe70333a86ac23d2c2852547f168f"
+      },
+      "summary": "Aiuta a distinguere fatti, interpretazioni e comportamenti che mantengono il blocco, quindi a costruire autocompassione, prove di competenza, alleanze e micro-azioni scelte dall'utente.",
+      "aliases": ["non valgo", "non sono abbastanza", "mi sento un impostore", "non merito", "procrastino", "mi autosaboto", "perfezionismo", "paura di fallire", "paura del successo", "giudice interiore", "non sono pronto", "chiedere aiuto"],
+      "concepts": ["esperienza dell'impostore", "pensieri automatici", "perfezionismo", "evitamento", "modello ABCDE", "autocompassione", "banca delle prove", "micro-azioni", "rete di supporto"],
+      "questions": [
+        "Quale fatto concreto ha attivato questo dubbio?",
+        "Quale interpretazione stai aggiungendo al fatto?",
+        "Quali prove sostengono questa convinzione e quali la ridimensionano?",
+        "Come parleresti a una persona competente che stimi nella stessa situazione?",
+        "Quale risultato o feedback positivo stai trascurando?",
+        "Che cosa cambierebbe se l'errore fosse informazione e non identità?",
+        "Qual è il passo più piccolo che puoi completare entro sette giorni?",
+        "Chi può offrirti confronto o responsabilizzazione senza giudicarti?"
+      ],
+      "exercises": ["diario fatto-pensiero-emozione-azione", "traccia ABCDE", "lettera autocompassionevole", "banca delle prove di competenza", "obiettivo SMART scomposto", "mappa degli alleati"],
+      "cautions": ["Usare espressioni descrittive e non formulare diagnosi.", "I profili dell'impostore sono mappe, non tipi psicologici certi.", "La ristrutturazione cognitiva non sostituisce psicoterapia.", "Sofferenza intensa o compromissione richiedono un professionista qualificato."],
+      "sourceRefs": ["icf-core-2025", "icf-ethics-2025", "icf-referral"]
+    },
+    {
+      "id": "coaching_leadership",
+      "title": "Leadership, visione, fiducia e gestione della complessità",
+      "course": {
+        "title": "Coaching & Leadership: creare visione e azione",
+        "authors": ["Katia Burdet"],
+        "filename": "Coaching e Leadership, creare visione e azione.pdf",
+        "pages": 104,
+        "sha256": "719b9ab13a81a5360db82f3e59259961372a473fbfc64b4cbcac456d62177203"
+      },
+      "summary": "Sostiene leader e responsabili nel collegare visione, fiducia, stile situazionale, priorità, delega, feedback e conflitto, mantenendo responsabilità e autonomia delle persone.",
+      "aliases": ["leader o manager", "stile di leadership", "vision", "fiducia nel team", "delegare", "feedback", "gestire pressione", "inner driver", "conflitto nel team", "stakeholder", "influenzare senza autorità", "inclusione", "appartenenza"],
+      "concepts": ["leadership relazionale", "visione", "management", "stili situazionali", "fiducia", "delega progressiva", "feedback evolutivo", "conflitto", "self-leadership", "inclusione"],
+      "questions": [
+        "Dove vuoi portare il gruppo e perché questa direzione conta?",
+        "Qui serve soprattutto struttura manageriale o orientamento di leadership?",
+        "Qual è il livello attuale di competenza e autonomia delle persone coinvolte?",
+        "Quale stile stai usando automaticamente e quale richiede il contesto?",
+        "Come valuti integrità, intenzione, competenza e risultati nella fiducia attuale?",
+        "La tensione nasce dalla relazione o da ruoli e priorità poco chiari?",
+        "Quale criterio condiviso aiuterebbe le parti a decidere?",
+        "Quale responsabilità puoi trasferire con confini e verifiche proporzionati?"
+      ],
+      "exercises": ["matrice contesto-autonomia-stile", "audit delle dimensioni della fiducia", "matrice di Eisenhower", "mappa degli inner driver", "feedback comportamento-impatto-sviluppo", "delega con obiettivo-criteri-confini"],
+      "cautions": ["Nessuno stile è sempre corretto.", "Aurum non decide assunzioni, licenziamenti o valutazioni del personale.", "Evitare stereotipi culturali e letture automatiche.", "Distinguere coaching da consulenza organizzativa, HR o legale."],
+      "sourceRefs": ["icf-core-2025", "icf-ethics-2025", "global-ethics-v4"]
+    },
+    {
+      "id": "coaching_relational_skills",
+      "title": "Empatia, ascolto, assertività e resilienza",
+      "course": {
+        "title": "Empatia, assertività e resilienza: come stabilire una relazione efficace nel Coaching",
+        "authors": ["Serena De Luca"],
+        "filename": "Empatia, assertività e resilienza, come stabilire una relazione efficace nel Coaching .pdf",
+        "pages": 122,
+        "sha256": "c9316a04c11098a9eaf9c07e4bb6ee21e23dfc47c64411f9e91167ba3e18cff0"
+      },
+      "summary": "Allena ascolto e comprensione senza fusione, comunicazione rispettosa di sé e dell'altro, confini e capacità di mobilitare risorse personali e sociali davanti alle difficoltà.",
+      "aliases": ["empatia", "ascolto attivo", "non mi sento ascoltato", "dire di no", "assertività", "passivo aggressivo", "confini", "comunicazione nonviolenta", "resilienza", "autoefficacia", "locus of control", "supporto sociale"],
+      "concepts": ["empatia cognitiva", "empatia emotiva", "empatia compassionevole", "ascolto attivo", "stili comunicativi", "assertività", "autoefficacia", "resilienza", "supporto sociale"],
+      "questions": [
+        "Che cosa hai compreso del punto di vista altrui senza doverlo condividere?",
+        "Che cosa stai osservando e che cosa invece stai interpretando?",
+        "Quale emozione, bisogno o confine vuoi comunicare?",
+        "Come puoi esprimerlo rispettando te e l'altra persona?",
+        "Quale parte della situazione puoi influenzare e quale devi accettare?",
+        "Quali risorse ti hanno già aiutato in passato?",
+        "Quale supporto sarebbe utile chiedere adesso?",
+        "Quale alternativa emerge cambiando prospettiva?"
+      ],
+      "exercises": ["autovalutazione riflessiva dell'ascolto", "riformulazione con verifica", "sequenza osservazione-vissuto-bisogno-richiesta", "role-play degli stili comunicativi", "radar della resilienza", "mappa rischi-protezioni-rete"],
+      "cautions": ["Non inferire emozioni o intenzioni solo da postura e tono.", "La regola 7-38-55 non è una legge universale.", "I neuroni specchio non spiegano da soli l'empatia.", "I test del corso sono riflessivi e non diagnostici."],
+      "sourceRefs": ["icf-core-2025", "icf-ethics-2025", "icf-referral"]
+    },
+    {
+      "id": "coaching_flow",
+      "title": "Flow, motivazione intrinseca e concentrazione sostenibile",
+      "course": {
+        "title": "Flow State: riconoscere e facilitare le esperienze ottimali",
+        "authors": ["Michael Gabaldi"],
+        "filename": "Flow state - riconoscere e facilitare le esperienze ottimali.pdf",
+        "pages": 44,
+        "sha256": "46e3b69c8b77f06db5564ec81025734d2ba62296ff50e0e5fb5c21962a0b5314"
+      },
+      "summary": "Aiuta a riconoscere le condizioni che favoriscono un coinvolgimento profondo: equilibrio fra sfida e abilità, obiettivi chiari, feedback rapido, motivazione intrinseca e protezione dell'attenzione.",
+      "aliases": ["flow", "essere nella zona", "perdo la cognizione del tempo", "sono immerso", "motivazione intrinseca", "sfida e abilità", "noia", "ansia da prestazione", "feedback immediato", "clutch", "concentrazione totale"],
+      "concepts": ["flow", "attività autotelica", "sfida-abilità", "obiettivi di processo", "feedback immediato", "motivazione intrinseca", "concentrazione", "clutch state"],
+      "questions": [
+        "Quando ti sei sentito completamente immerso in un'attività?",
+        "Che cosa rendeva quella sfida proporzionata alle tue capacità?",
+        "Quanto valuti oggi sfida e abilità da uno a dieci?",
+        "Quale obiettivo di processo renderebbe chiaro il prossimo passo?",
+        "Quale feedback rapido e non giudicante ti orienterebbe?",
+        "Quali distrazioni o decisioni inutili puoi rimuovere?",
+        "Che cosa faresti anche senza ricompensa esterna?",
+        "Questa attività esprime qualcosa di importante per te?"
+      ],
+      "exercises": ["ricostruzione di un episodio di flow", "mappa delle dimensioni del flow", "griglia sfida-abilità", "obiettivo di processo", "progetto del feedback immediato", "audit delle distrazioni"],
+      "cautions": ["Il flow non può essere garantito o indotto.", "L'ipofrontalità transitoria è un'ipotesi da presentare con prudenza.", "Non usare il flow per legittimare iperlavoro.", "Il flow non è una terapia per ansia, depressione o difficoltà attentive."],
+      "sourceRefs": ["icf-core-2025", "icf-ethics-2025"]
+    },
+    {
+      "id": "coaching_creativity",
+      "title": "Pensiero creativo, alternative e sperimentazione",
+      "course": {
+        "title": "Fuori dagli schemi: allenare il pensiero creativo",
+        "authors": ["Gioni Cadamuro"],
+        "filename": "Fuori dagli schemi, allenare il pensiero creativo.pdf",
+        "pages": 151,
+        "sha256": "8cde8f8d8c7f43dbd7b1c78d9f3c6932bf655b2b7a10c3f3f0bb922b3efa0453"
+      },
+      "summary": "Separa la generazione delle possibilità dalla loro valutazione e usa curiosità, prospettive, analogie e piccoli esperimenti per superare rigidità, paura del giudizio e perfezionismo.",
+      "aliases": ["blocco creativo", "non ho idee", "brainstorming", "pensiero laterale", "scamper", "sei cappelli", "reverse thinking", "curiosità", "perfezionismo creativo", "innovazione", "uscire dagli schemi", "idee alternative"],
+      "concepts": ["pensiero divergente", "pensiero convergente", "fluidità", "flessibilità", "originalità", "incubazione", "SCAMPER", "sei cappelli", "reverse thinking", "sicurezza psicologica"],
+      "questions": [
+        "Quale assunzione stai trattando come se fosse un fatto?",
+        "Come vedrebbe il problema una persona di un altro settore?",
+        "Quali dieci possibilità puoi generare prima di valutarle?",
+        "Che cosa faresti se il giudizio altrui non fosse un ostacolo?",
+        "Come potresti ottenere intenzionalmente il risultato opposto?",
+        "Quale elemento di un altro contesto puoi adattare?",
+        "Quale versione provvisoria puoi testare con rischio contenuto?",
+        "Quali criteri userai nella fase convergente?"
+      ],
+      "exercises": ["dieci idee prima del giudizio", "associazioni libere", "SCAMPER", "mappa mentale e analogia forzata", "sei cappelli", "reverse thinking"],
+      "cautions": ["L'intuizione va verificata con dati e vincoli.", "Le descrizioni neuroscientifiche sono semplificazioni.", "Le attività creative non sostituiscono interventi clinici.", "I contenuti IA richiedono verifica umana e tutela della riservatezza."],
+      "sourceRefs": ["icf-core-2025", "icf-ai-coaching", "icf-ethics-2025"]
+    },
+    {
+      "id": "coaching_learning",
+      "title": "Apprendimento esperienziale e cambiamento sostenibile",
+      "course": {
+        "title": "Il mistero dell'apprendimento: il fine ultimo del Coaching",
+        "authors": ["Serena De Luca"],
+        "filename": "Il metodo dell'apprendimento.pdf",
+        "pages": 92,
+        "sha256": "9912b8b8695a49c751d82b7b87e96b7e2ffb3b33130e8211bbffc6ef895a26aa"
+      },
+      "summary": "Trasforma esperienza e insight in apprendimento osservabile attraverso riflessione, ipotesi, sperimentazione, feedback, metacognizione e micro-azioni ripetibili.",
+      "aliases": ["come imparare", "metacognizione", "kolb", "mezirow", "70 20 10", "andragogia", "insight", "memoria di lavoro", "bias", "non riesco a concentrarmi", "consolidare un'abitudine", "micro azioni", "embodied learning", "feedback"],
+      "concepts": ["sapere-saper fare-saper essere", "apprendimento esperienziale", "ciclo di Kolb", "Mezirow", "andragogia", "metacognizione", "carico cognitivo", "feedback", "micro-azioni"],
+      "questions": [
+        "Che cosa è accaduto concretamente?",
+        "Che cosa hai notato nel tuo modo di pensare, sentire o agire?",
+        "Quale significato o regola personale ne stai ricavando?",
+        "Quale convinzione di fondo viene messa in discussione?",
+        "Come testerai il nuovo apprendimento nella pratica?",
+        "Quale segnale corporeo noti senza interpretarlo come certezza?",
+        "Come saprai che non è solo un insight momentaneo?",
+        "Quale micro-azione ripetibile può consolidarlo?"
+      ],
+      "exercises": ["mappa delle forme di apprendimento", "ciclo esperienza-riflessione-concetto-esperimento", "analisi di una cornice di significato", "piano 70-20-10 adattato", "journaling metacognitivo", "micro-azione-feedback-revisione"],
+      "cautions": ["Il 70-20-10 è una cornice euristica.", "Non diagnosticare deficit cognitivi da stanchezza o distrazione.", "I segnali corporei sono dati da esplorare e non verità nascoste.", "Aurum non sostituisce valutazioni neuropsicologiche, psicologiche o mediche."],
+      "sourceRefs": ["icf-core-2025", "icf-ethics-2025", "icf-referral"]
+    },
+    {
+      "id": "coaching_ethics",
+      "title": "Etica, presenza, contratto e qualità della relazione",
+      "course": {
+        "title": "Il cuore etico del Coaching: integrità, presenza e qualità della relazione",
+        "authors": ["Cristina Fiore"],
+        "filename": "Integrità, presenza e qualità della relazione.pdf",
+        "pages": 51,
+        "sha256": "d773fa25f4e80078a594d8ffbf4cbe003a4a8fe1da33e0d582c88f6a2734a966"
+      },
+      "summary": "Mantiene chiarezza di mandato, confini, riservatezza, integrità, autonomia e vigilanza sulle asimmetrie di potere, con possibilità di rinegoziare, chiedere supervisione o indirizzare altrove.",
+      "aliases": ["etica coaching", "confini", "riservatezza", "privacy", "contratto di coaching", "committente", "conflitto di interessi", "terapia o coaching", "integrità", "supervisione", "rinunciare a un cliente", "dipendenza dal coach"],
+      "concepts": ["integrità", "presenza", "contratto", "riservatezza", "potere", "autonomia", "conflitto di interessi", "supervisione", "rinuncia responsabile"],
+      "questions": [
+        "Qual è il mandato e a chi appartiene realmente l'obiettivo?",
+        "L'utente conosce scopo, limiti, uso dei dati e possibilità di interrompere?",
+        "Sto aprendo il pensiero o guidando verso una mia conclusione?",
+        "Questa relazione aumenta autonomia o crea dipendenza?",
+        "Quali informazioni possono essere condivise e con chi?",
+        "Esiste un conflitto di interesse o un'aspettativa implicita?",
+        "La richiesta rientra nel coaching e nelle competenze disponibili?",
+        "Serve rinegoziare, chiedere supervisione o indirizzare altrove?"
+      ],
+      "exercises": ["triade identità-valori-integrità", "check di integrità", "verifica di chiarezza e riservatezza", "contratto e revisione del mandato", "debrief etico", "registro temi per supervisione"],
+      "cautions": ["Aurum deve dichiarare di essere un sistema IA.", "Consenso e memoria devono essere granulari.", "Non promettere risultati o segretezza assoluta.", "Non usare confidenze per profilazione, persuasione o valutazione occulta."],
+      "sourceRefs": ["icf-core-2025", "icf-ethics-2025", "icf-ai-coaching", "global-ethics-v4", "gdpr"]
+    },
+    {
+      "id": "coaching_emotional_leadership",
+      "title": "Leadership emotiva, clima e autonomia del team",
+      "course": {
+        "title": "Leadership emotiva: Coaching e sviluppo di un Team di successo",
+        "authors": ["Davide Caforio"],
+        "filename": "Leadership emotiva - coaching e sviluppo di un team di successo .pdf",
+        "pages": 83,
+        "sha256": "2e2d34888a07b670faae3c86a68184f080d90d45ffb861df783eaf8046fdb750"
+      },
+      "summary": "Aiuta il leader a riconoscere il proprio stato, osservarne l'impatto, scegliere lo stile, sostenere sicurezza psicologica, delega e apprendimento senza usare il coaching come controllo nascosto.",
+      "aliases": ["leadership emotiva", "leader risonante", "clima del team", "contagio emotivo", "autoregolazione", "leader coach", "team autonomo", "fiducia", "sicurezza psicologica", "conflitto", "motivare il team", "delega"],
+      "concepts": ["autoconsapevolezza", "autoregolazione", "empatia", "clima", "stili di leadership", "sicurezza psicologica", "delega", "conflitto", "abitudini"],
+      "questions": [
+        "Quale emozione influenza maggiormente le tue decisioni?",
+        "Che impatto osservabile ha il tuo stato sul team?",
+        "Quale stile stai usando e quale richiede la situazione?",
+        "Quali convinzioni guidano automaticamente il tuo modo di dirigere?",
+        "Che cosa accadrebbe se il team avesse più autonomia?",
+        "Quale responsabilità puoi delegare con confini chiari?",
+        "Che cosa indica che le persone possono dissentire o ammettere un errore?",
+        "Quale comportamento vuoi allenare e quale feedback userai?"
+      ],
+      "exercises": ["diario emozione-decisione-impatto", "pausa riconoscere-nominare-regolare-scegliere", "inventario stile-contesto", "check del clima con feedback volontario", "scala progressiva di delega", "piano pratica-feedback-revisione"],
+      "cautions": ["Non presumere che cosa provano gli altri.", "Neurogenesi e tempi fissi delle abitudini non sono regole universali.", "Il leader-coach deve gestire l'asimmetria di potere.", "Il coaching non deve diventare valutazione nascosta o pressione gerarchica."],
+      "sourceRefs": ["icf-core-2025", "icf-ethics-2025", "global-ethics-v4"]
+    },
+    {
+      "id": "coaching_work_life_balance",
+      "title": "Work-life balance, priorità e stress lavoro-correlato",
+      "course": {
+        "title": "Work-life balance e stress da lavoro correlato",
+        "authors": ["Sole Lancia"],
+        "filename": "Work-life balance e stress da lavoro correlato.pdf",
+        "pages": 39,
+        "sha256": "a434bcd9b79e3b94aef32bf06c86e74e66586e9ff7a51c81b448187c5379ceeb"
+      },
+      "summary": "Esplora carico, confini, priorità, autonomia e risorse con piccoli esperimenti sostenibili, senza individualizzare problemi organizzativi né sostituire gli obblighi di tutela del lavoro.",
+      "aliases": ["work life balance", "stress da lavoro", "burnout", "lavoro troppo", "non riesco a staccare", "sempre reperibile", "gestire il tempo", "eisenhower", "pomodoro", "time blocking", "delega", "confini", "sonno", "sovraccarico"],
+      "concepts": ["richieste e risorse", "segnali di sovraccarico", "confini", "priorità", "delega", "disconnessione", "benessere multidimensionale", "piccoli esperimenti"],
+      "questions": [
+        "Come valuti oggi il tuo equilibrio complessivo da uno a dieci?",
+        "Quali segnali ti indicano che il carico non è sostenibile?",
+        "Che cosa è davvero importante e che cosa è soltanto urgente?",
+        "Quale confine lavorativo avrebbe l'impatto maggiore?",
+        "Quale attività può essere eliminata, ridotta o delegata?",
+        "Che cosa rende difficile dire di no o disconnetterti?",
+        "Quale piccolo esperimento realistico vuoi provare questa settimana?",
+        "Come misurerai il cambiamento senza creare altra pressione?"
+      ],
+      "exercises": ["ruota delle aree di benessere", "diario del tempo", "matrice di Eisenhower", "obiettivo SMART", "time blocking con pause", "mappa eliminare-ridurre-delegare"],
+      "cautions": ["Non diagnosticare burnout, ansia o depressione.", "Sintomi persistenti o forte compromissione richiedono assistenza qualificata.", "Le tecniche sono opzioni, non prescrizioni mediche.", "Il coaching non sostituisce gli obblighi del datore di lavoro sulla sicurezza."],
+      "sourceRefs": ["icf-core-2025", "icf-referral", "inail-stress", "eu-osha-psychosocial"]
+    }
+  ]
+}

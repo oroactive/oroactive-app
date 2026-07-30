@@ -219,15 +219,15 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260730-aurum-gems-sale-guide-9";
+const OROACTIVE_CLIENT_BUILD_ID = "20260730-aurum-coaching-memory-10";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
 const OROACTIVE_WEBSITE_URL = "https://www.oroactive.it";
 const PRIVACY_POLICY_FALLBACK = {
-  version: "v1.0",
-  updated_at: "2026-05-29",
+  version: "v1.1",
+  updated_at: "2026-07-30",
   title: "Privacy Policy e Informativa sul trattamento dei dati personali — OroActive",
   subtitle: "Informativa ai sensi del Regolamento UE 2016/679 (GDPR) e della normativa applicabile in materia di protezione dei dati personali.",
   note: "Questa informativa descrive come OroActive tratta i dati personali all'interno dell'app gestionale e nei processi collegati agli atti di vendita, alla gestione clienti, alla formazione, alla sicurezza operativa e alle funzionalità AI.",
@@ -245,14 +245,14 @@ const PRIVACY_POLICY_FALLBACK = {
       { title: "Dati degli utenti dell'app", items: ["nome e cognome", "username/email", "ruolo operativo", "negozio assegnato", "telefono se inserito", "stato online/offline", "attività svolte nell'app", "log accessi", "autorizzazioni, notifiche e audit trail", "risultati formazione Academy", "badge e certificazioni interne"] },
       { title: "Dati dei clienti negli atti di vendita", items: ["nome e cognome", "codice fiscale", "data e luogo di nascita", "indirizzo di residenza", "telefono/email se richiesti", "dati documento di identità", "immagini documento/tessera sanitaria se acquisite", "firme", "dati relativi agli oggetti preziosi ceduti", "foto preziosi", "dati pagamento", "IBAN o contabili se necessari", "numero pratica / atto di vendita", "storico operazioni collegate al cliente"] },
       { title: "Dati tecnici e di sicurezza", items: ["indirizzo IP", "browser/dispositivo", "data e ora accesso", "log di sistema", "audit log", "attività utente", "errori applicativi", "notifiche operative", "stato sessione"] },
-      { title: "Dati relativi ad AI e Aurum", items: ["domande inviate all'assistente", "risposte generate", "contesto operativo non sensibile", "memorie salvate solo se l'utente ha dato consenso", "preferenze operative condivise volontariamente dall'utente"] }
+      { title: "Dati relativi ad AI e Aurum", items: ["domande inviate volontariamente all'assistente e cronologia recente necessaria alla risposta", "risposte generate", "contesto operativo minimizzato e filtrato", "memorie strutturate salvate solo dopo consenso esplicito per la singola informazione", "nome preferito e compleanno, limitato a giorno e mese, soltanto se confermati", "obiettivi, abitudini, preferenze, punti di forza, riflessioni e impegni soltanto se confermati", "consenso separato e facoltativo per usare una memoria con il fornitore IA esterno"] }
     ], closing: "OroActive non deve utilizzare l'AI per trattare dati sensibili non necessari o documenti personali senza specifica necessità operativa e senza adeguate misure di protezione." },
     { id: "finalita", tab: "Dati trattati", title: "3. Perché trattiamo i dati", items: ["gestione degli utenti dell'app", "autenticazione e controllo accessi", "gestione ruoli e permessi", "compilazione e conservazione degli atti di vendita", "identificazione del cliente", "adempimenti normativi e amministrativi", "gestione pagamenti", "generazione PDF e copie cliente/azienda", "gestione CRM clienti", "controllo qualità pratica", "sicurezza operativa", "prevenzione errori, frodi e anomalie", "gestione giacenza e fusioni", "gestione backup", "audit trail e tracciamento attività", "notifiche interne", "formazione interna OroActive Academy", "supporto operativo tramite Aurum/AI", "generazione Customer Trust Pack", "statistiche interne autorizzate per Founder/Responsabili"] },
     { id: "basi-giuridiche", tab: "Finalità e basi giuridiche", title: "4. Base giuridica del trattamento", paragraphs: ["Il trattamento può fondarsi su esecuzione di misure contrattuali o precontrattuali, adempimento di obblighi legali, legittimo interesse del Titolare alla sicurezza, organizzazione, controllo qualità, tutela aziendale e prevenzione di abusi, consenso dell'interessato quando richiesto, e necessità di accertare, esercitare o difendere un diritto in sede competente."], closing: "Le basi giuridiche devono essere verificate e confermate dal consulente privacy in base al modello operativo definitivo." },
     { id: "modalita", tab: "Conservazione dati", title: "5. Come vengono trattati i dati", paragraphs: ["I dati sono trattati con strumenti informatici e telematici, mediante accesso autenticato all'app OroActive. L'accesso è regolato da ruoli e permessi, in modo che ogni utente possa vedere solo le informazioni necessarie alla propria funzione.", "L'app può registrare attività operative, modifiche, salvataggi, eliminazioni, stampe, accessi, autorizzazioni e altre azioni rilevanti per garantire sicurezza, tracciabilità e controllo interno."] },
-    { id: "conservazione", tab: "Conservazione dati", title: "6. Per quanto tempo conserviamo i dati", paragraphs: ["I dati sono conservati per il tempo necessario alle finalità per cui sono stati raccolti, agli obblighi normativi applicabili, alla tutela dei diritti del Titolare e alla corretta gestione delle pratiche aziendali."], items: ["atti di vendita e documenti collegati: secondo obblighi normativi e policy aziendale", "dati utenti: per tutta la durata del rapporto operativo e successivamente per esigenze di sicurezza/audit", "audit log: per esigenze di tracciabilità e sicurezza", "backup: secondo policy interna di conservazione e verifica", "dati Academy: per mantenere storico formativo e certificazioni interne", "memorie Aurum: fino a cancellazione da parte dell'utente o disattivazione memoria"], closing: "Le tempistiche definitive devono essere confermate dal consulente privacy." },
+    { id: "conservazione", tab: "Conservazione dati", title: "6. Per quanto tempo conserviamo i dati", paragraphs: ["I dati sono conservati per il tempo necessario alle finalità per cui sono stati raccolti, agli obblighi normativi applicabili, alla tutela dei diritti del Titolare e alla corretta gestione delle pratiche aziendali."], items: ["atti di vendita e documenti collegati: secondo obblighi normativi e policy aziendale", "dati utenti: per tutta la durata del rapporto operativo e successivamente per esigenze di sicurezza/audit", "audit log: per esigenze di tracciabilità e sicurezza; il testo delle conversazioni Aurum non viene inserito nell'audit", "backup: secondo policy interna di conservazione e verifica", "dati Academy: per mantenere storico formativo e certificazioni interne", "memorie Aurum: fino a cancellazione da parte dell'utente o revoca; le precedenti memorie automatiche restano disattivate e non vengono usate in chat"], closing: "Le tempistiche definitive devono essere confermate dal consulente privacy." },
     { id: "comunicazione", tab: "Sicurezza", title: "7. A chi possono essere comunicati i dati", items: ["personale autorizzato OroActive", "Founder, responsabili e supervisori secondo permessi", "fornitori tecnici dell'app", "hosting provider", "fornitori backup/storage", "consulenti fiscali/legali/amministrativi", "autorità competenti quando previsto dalla legge", "servizi di pagamento o strumenti collegati se necessari", "fornitori AI solo nei limiti tecnici e con minimizzazione dei dati"], closing: "Non vengono comunicati dati personali a soggetti non autorizzati." },
-    { id: "ai-aurum", tab: "AI, Aurum e automazioni", title: "8. Funzionalità AI e Aurum", paragraphs: ["OroActive può includere funzionalità di assistenza AI tramite Aurum, assistente operativo interno. Aurum può aiutare l'utente a comprendere sezioni, compilare correttamente le pratiche, consultare procedure e ricevere suggerimenti operativi."], items: ["Aurum non sostituisce il giudizio umano", "Aurum non deve trattare dati cliente non necessari", "dati sensibili, documenti, firme, IBAN e codici fiscali devono essere minimizzati", "le memorie personali dell'utente vengono salvate solo se l'utente conferma esplicitamente", "l'utente può visualizzare e cancellare le memorie Aurum", "eventuali domande e risposte possono essere registrate per sicurezza, miglioramento e tracciabilità nel rispetto delle policy interne"] },
+    { id: "ai-aurum", tab: "AI, Aurum e automazioni", title: "8. Funzionalità AI e Aurum", paragraphs: ["OroActive può includere funzionalità di assistenza AI tramite Aurum, assistente operativo interno. Aurum può aiutare l'utente a comprendere sezioni, compilare correttamente le pratiche, consultare procedure e ricevere suggerimenti operativi o di coaching.", "Aurum è un sistema IA e non un coach umano certificato, uno psicologo, uno psicoterapeuta o un medico. Il coaching digitale sostiene riflessione e autonomia, ma non formula diagnosi, non prescrive trattamenti e non sostituisce professionisti qualificati."], items: ["Aurum non sostituisce il giudizio umano", "Aurum non deve trattare dati cliente non necessari", "categorie particolari di dati, salute, documenti, firme, IBAN, codici fiscali e credenziali non sono ammessi nella memoria personale", "ogni memoria viene salvata cifrata soltanto se l'utente conferma esplicitamente quella specifica informazione", "l'uso della memoria nella chat e la condivisione con un fornitore IA esterno sono scelte separate; la condivisione esterna è disattivata per impostazione predefinita", "l'utente può visualizzare, modificare, esportare, eliminare singolarmente o cancellare tutte le proprie memorie", "il Founder può consultare soltanto conteggi e categorie tecniche, non il contenuto delle memorie", "la cronologia recente viene minimizzata e filtrata per assicurare continuità; se sono rilevati dati personali non viene inviata al fornitore IA esterno", "richieste di crisi o di diagnosi e terapia non vengono memorizzate né inviate al fornitore IA esterno"] },
     { id: "sicurezza", tab: "Sicurezza", title: "9. Misure di sicurezza", paragraphs: ["OroActive adotta misure tecniche e organizzative per proteggere i dati personali."], items: ["accesso con credenziali", "ruoli e permessi", "tracciamento attività tramite Audit Trail", "backup", "controllo qualità", "autorizzazioni superiori per pratiche rischiose", "protezione file e documenti", "limitazione accessi in base al ruolo", "registrazione eventi critici", "controlli su operazioni anomale"], closing: "La sicurezza viene migliorata progressivamente in base all'evoluzione dell'app e delle esigenze operative." },
     { id: "diritti", tab: "Diritti privacy", title: "10. Diritti privacy", paragraphs: ["L'interessato può esercitare, nei limiti previsti dalla normativa, i diritti di accesso, rettifica, cancellazione, limitazione del trattamento, opposizione, portabilità ove applicabile, revoca del consenso ove il trattamento sia basato sul consenso e reclamo all'Autorità Garante per la protezione dei dati personali.", "Per esercitare i diritti: Email [INSERIRE EMAIL PRIVACY] - PEC [INSERIRE PEC]."] },
     { id: "cookie-pwa", tab: "Cookie / PWA / log tecnici", title: "11. Cookie, PWA e dati tecnici", paragraphs: ["L'app OroActive può utilizzare strumenti tecnici necessari al funzionamento, come cookie tecnici, localStorage, sessionStorage, service worker/PWA e log tecnici."], items: ["mantenere la sessione", "migliorare la navigazione", "salvare preferenze utente", "abilitare funzionalità PWA", "gestire aggiornamenti applicativi", "garantire sicurezza e continuità operativa"], closing: "Se in futuro verranno utilizzati strumenti di analytics, marketing o profilazione, dovrà essere predisposta informativa e consenso specifico ove richiesto." },
@@ -5123,8 +5123,14 @@ const aurumChatForm = document.getElementById("aurumChatForm");
 const aurumQuestion = document.getElementById("aurumQuestion");
 const aurumAskButton = document.getElementById("aurumAskButton");
 const aurumConsentPanel = document.getElementById("aurumConsentPanel");
+const aurumConsentText = document.getElementById("aurumConsentText");
+const aurumShareMemoryWithAi = document.getElementById("aurumShareMemoryWithAi");
 const aurumRememberYes = document.getElementById("aurumRememberYes");
 const aurumRememberNo = document.getElementById("aurumRememberNo");
+const aurumMyMemoriesCount = document.getElementById("aurumMyMemoriesCount");
+const aurumMyMemoriesList = document.getElementById("aurumMyMemoriesList");
+const aurumExportMemories = document.getElementById("aurumExportMemories");
+const aurumDeleteAllMemories = document.getElementById("aurumDeleteAllMemories");
 const aurumSupportActions = document.getElementById("aurumSupportActions");
 const aurumMessageRecipient = document.getElementById("aurumMessageRecipient");
 const aurumSendDirectMessage = document.getElementById("aurumSendDirectMessage");
@@ -6585,6 +6591,7 @@ async function withButtonBusy(button, busyText, task) {
 function showLogin(options = {}) {
   const { keepSplash = false } = options;
   clearStoredAuthToken();
+  resetAurumSessionState();
   state.currentUser = null;
   if (mainUserMenuButton) mainUserMenuButton.textContent = "Elite";
   if (loggedUserName) loggedUserName.textContent = "";
@@ -8216,6 +8223,7 @@ async function restoreSession(options = {}) {
   setSplashStatus("Caricamento profilo");
   try {
     const data = await apiRequest("/auth/me", { timeoutMs: keepSplash ? BOOT_SPLASH_MAX_MS : SESSION_RESTORE_TIMEOUT_MS, retries: 1 });
+    resetAurumSessionState();
     state.currentUser = normalizeAuthenticatedUserPayload(data, "session");
     console.info("[OroActive Auth] session restore success", { role: state.currentUser.ruolo });
     authLog("[OroActive Auth] User loaded", { phase: "session", role: state.currentUser.ruolo });
@@ -8290,6 +8298,7 @@ async function handleLogin(event) {
     if (!data?.user || !token) {
       throw new Error("Accesso non completato: risposta del server non valida.");
     }
+    resetAurumSessionState();
     state.currentUser = normalizeAuthenticatedUserPayload(data, "login");
     state.authToken = token;
     authAccepted = true;
@@ -8427,6 +8436,7 @@ async function loginWithFaceId() {
     if (!data?.user || !token) {
       throw new Error("Accesso Face ID non completato: risposta del server non valida.");
     }
+    resetAurumSessionState();
     state.currentUser = normalizeAuthenticatedUserPayload(data, "faceid");
     state.authToken = token;
     protectAuthenticatedTransition();
@@ -10398,7 +10408,26 @@ function updateAurumMascotVisibility() {
 
 function aurumUserLabel(user = state.currentUser) {
   if (!user) return "operatore";
+  const preferredName = (state.aurumMemories || []).find((memory) => (
+    memory.source === "explicit"
+    && memory.memory_type === "preferred_name"
+    && !memory.unavailable
+    && (memory.memory_value || memory.memory_text)
+  ));
+  if (preferredName) return preferredName.memory_value || preferredName.memory_text;
   return user.nome || displayUsername(user) || user.email || "operatore";
+}
+
+function isAurumBirthdayToday() {
+  const birthday = (state.aurumMemories || []).find((memory) => (
+    memory.source === "explicit"
+    && memory.memory_type === "birthday"
+    && !memory.unavailable
+  ));
+  const match = String(birthday?.memory_value || birthday?.memory_text || "").match(/^(\d{2})\/(\d{2})$/);
+  if (!match) return false;
+  const today = new Date();
+  return Number(match[1]) === today.getDate() && Number(match[2]) === today.getMonth() + 1;
 }
 
 function aurumGreetingKey(user = state.currentUser) {
@@ -10412,12 +10441,17 @@ function maybeShowAurumDailyGreeting() {
   if (localStorage.getItem(key)) return;
   localStorage.setItem(key, "shown");
   state.aurumAskedMoodToday = true;
+  const birthdayGreeting = isAurumBirthdayToday()
+    ? `Buon compleanno ${aurumUserLabel()}! Ti auguro una giornata speciale. Come stai oggi?`
+    : `Ciao ${aurumUserLabel()}, bentornato in OroActive. Come stai oggi?`;
   state.aurumMessages.push({
     role: "assistant",
-    content: `Ciao ${aurumUserLabel()}, bentornato in OroActive. Come stai oggi?`
+    content: birthdayGreeting
   });
   renderAurumMessages();
-  showAurumTip(`Ciao ${aurumUserLabel()}, se vuoi sono qui per aiutarti nelle attivita di oggi.`);
+  showAurumTip(isAurumBirthdayToday()
+    ? `Buon compleanno ${aurumUserLabel()}!`
+    : `Ciao ${aurumUserLabel()}, se vuoi sono qui per aiutarti nelle attivita di oggi.`);
 }
 
 function sectionTipPool(section = state.aurumCurrentSection) {
@@ -10524,6 +10558,55 @@ function openAurumPanel(options = {}) {
   openAurumChat();
 }
 
+function resetAurumSessionState() {
+  window.clearTimeout(state.aurumTipTimer);
+  window.clearTimeout(state.aurumTipHideTimer);
+  window.clearTimeout(state.aurumMovementTimer);
+  window.clearTimeout(state.aurumLookTimer);
+  if (state.aurumBlocksLoop) window.cancelAnimationFrame(state.aurumBlocksLoop);
+  state.aurumSettings = null;
+  state.aurumCurrentSection = "menu";
+  state.aurumTipTimer = null;
+  state.aurumTipHideTimer = null;
+  state.aurumMovementTimer = null;
+  state.aurumLookTimer = null;
+  state.aurumMessages = [];
+  state.aurumMode = "";
+  state.aurumPriceContext = null;
+  state.aurumLastPriceContext = null;
+  state.aurumSending = false;
+  state.aurumAskedMoodToday = false;
+  state.aurumLastUserMessage = "";
+  state.aurumRequestedFieldKey = "";
+  state.aurumConsentCandidate = null;
+  state.aurumMemories = [];
+  state.aurumAllMemories = [];
+  state.aurumSupportRequests = [];
+  state.aurumActiveQuiz = null;
+  state.aurumQuizIndex = 0;
+  state.aurumBlocksConfig = null;
+  state.aurumBlocksQuestions = [];
+  state.aurumBlocksSession = null;
+  state.aurumBlocksGame = null;
+  state.aurumBlocksLoop = null;
+  state.aurumBlocksScores = [];
+  state.aurumBlocksBestScore = 0;
+  state.aurumBlocksBestScoreRow = null;
+  state.aurumBlocksLeaderboard = [];
+  state.aurumBlocksBadges = [];
+  state.aurumBlocksQuestionOpen = false;
+  state.aurumBlocksTouchStart = null;
+  if (aurumChatPanel) aurumChatPanel.hidden = true;
+  aurumMascotRoot?.classList.remove("aurum-panel-open");
+  if (aurumSupportActions) aurumSupportActions.hidden = true;
+  if (aurumQuestion) aurumQuestion.value = "";
+  if (aurumAskButton) aurumAskButton.disabled = false;
+  if (aurumMessageRecipient) aurumMessageRecipient.innerHTML = "";
+  showAurumMemoryConsent(null);
+  renderAurumMessages();
+  renderAurumSupportRequests();
+}
+
 function resetAurumVisibleChat() {
   state.aurumMessages = [];
   state.aurumLastUserMessage = "";
@@ -10577,40 +10660,38 @@ function scheduleAurumTips() {
   }, 120000);
 }
 
+function requiresAurumBackendSafety(text = "") {
+  const policy = globalThis.OroActiveAurumPolicy;
+  if (!policy?.classifySafety) return true;
+  return ["crisis", "mental_health_boundary"].includes(policy.classifySafety(text).level);
+}
+
 function classifyAurumMood(text = "") {
-  const value = String(text || "").toLowerCase();
-  if (/(responsabile|founder|fondatore|parlare con|supporto)/i.test(value)) return "support";
-  if (/(stress|stressato|male|stanco|ansia|preoccup|problema|cliente difficile|arrabbi|agitato|non bene)/i.test(value)) return "negative";
-  if (/(bene|benissimo|tutto bene|ok|alla grande|positivo|sereno|carico)/i.test(value)) return "positive";
-  if (/(cosi|così|normale|abbastanza|neutro|uguale)/i.test(value)) return "neutral";
+  const value = String(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+  if (/^(?:vorrei parlare con (?:il |un )?(?:responsabile|founder|fondatore)|posso parlare con (?:il |un )?(?:responsabile|founder|fondatore))[.!]?$/i.test(value)) return "support";
+  if (/^(?:bene|benissimo|tutto bene|sto bene|alla grande|positivo|sereno|carico|ok)[.!]?$/i.test(value)) return "positive";
+  if (/^(?:cosi cosi|così così|normale|abbastanza bene|neutro|come al solito)[.!]?$/i.test(value)) return "neutral";
   return "";
 }
 
 function handleAurumMoodReply(question = "") {
+  if (!state.aurumAskedMoodToday) return false;
+  state.aurumAskedMoodToday = false;
+  if (requiresAurumBackendSafety(question)) return false;
   const mood = classifyAurumMood(question);
-  if (!state.aurumAskedMoodToday && !mood) return false;
+  if (!mood) return false;
   if (mood === "positive") {
     state.aurumMessages.push({ role: "assistant", content: "Perfetto, allora ti accompagno nelle attivita di oggi." });
-    state.aurumAskedMoodToday = false;
-    return true;
-  }
-  if (mood === "negative") {
-    state.aurumMessages.push({ role: "assistant", content: "Mi dispiace. Vuoi che ti aiuti a organizzare meglio le attivita di oggi oppure vuoi inviare un messaggio riservato a un utente specifico?" });
-    if (aurumSupportActions) aurumSupportActions.hidden = false;
-    renderAurumMessageRecipients();
-    state.aurumAskedMoodToday = false;
     return true;
   }
   if (mood === "support") {
     state.aurumMessages.push({ role: "assistant", content: "Posso inviare un messaggio interno riservato. Seleziona il destinatario tra gli utenti disponibili." });
     if (aurumSupportActions) aurumSupportActions.hidden = false;
     renderAurumMessageRecipients();
-    state.aurumAskedMoodToday = false;
     return true;
   }
-  if (mood === "neutral" || state.aurumAskedMoodToday) {
+  if (mood === "neutral") {
     state.aurumMessages.push({ role: "assistant", content: "Va bene. Se vuoi, posso aiutarti a ordinare le priorita operative della giornata." });
-    state.aurumAskedMoodToday = false;
     return true;
   }
   return false;
@@ -10619,35 +10700,129 @@ function handleAurumMoodReply(question = "") {
 function detectAurumMemoryCandidate(question = "") {
   if (!loadAurumSettings().memory) return null;
   const text = String(question || "").trim();
-  if (text.length < 12 || text.length > 300) return null;
-  if (classifyAurumMood(text) === "negative") return null;
-  if (!/(ricorda|ricordami|preferisco|di solito|per me e meglio|mi aiuta|quando lavoro)/i.test(text)) return null;
+  if (text.length < 4 || text.length > 600) return null;
+  if (containsAurumForbiddenMemoryData(text)) {
+    return null;
+  }
+
+  const preferredName = text.match(/\b(?:chiamami|puoi chiamarmi|vorrei che mi chiamassi|mi chiamo)\s+([\p{L}][\p{L}'’ -]{0,58}?)(?=[,.;!?]|\s+(?:e|ma|perch[eé]|quando|oggi|sono|preferisco)\b|$)/iu);
+  if (preferredName?.[1]) {
+    return {
+      memory_type: "preferred_name",
+      memory_value: preferredName[1].trim()
+    };
+  }
+
+  const birthday = text.match(/\b(?:il\s+mio\s+)?compleanno\s+(?:[eè]\s+(?:il\s+)?|cade\s+il\s+)?(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](?:19|20)?\d{2})?\b/iu);
+  if (birthday?.[1]) {
+    return {
+      memory_type: "birthday",
+      memory_value: `${birthday[1]}/${birthday[2]}`
+    };
+  }
+  const birthdayWithMonthName = text.match(/\b(?:il\s+mio\s+)?compleanno\s+(?:[eè]\s+(?:il\s+)?|cade\s+il\s+)?(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/iu);
+  if (birthdayWithMonthName?.[1]) {
+    const monthNames = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+    return {
+      memory_type: "birthday",
+      memory_value: `${birthdayWithMonthName[1]}/${monthNames.indexOf(birthdayWithMonthName[2].toLowerCase()) + 1}`
+    };
+  }
+
+  const structuredRules = [
+    { memory_type: "goal", pattern: /\b(?:il mio obiettivo [eè]|voglio raggiungere|vorrei riuscire a)\s+(.+)/iu },
+    { memory_type: "habit", pattern: /\b(?:la mia abitudine [eè]|di solito|abitualmente)\s+(.+)/iu },
+    { memory_type: "strength", pattern: /\b(?:il mio punto di forza [eè]|sono particolarmente bravo a)\s+(.+)/iu },
+    { memory_type: "reflection", pattern: /\b(?:ho capito che|mi sono res[oa] conto che|la mia riflessione [eè])\s+(.+)/iu },
+    { memory_type: "commitment", pattern: /\b(?:mi impegno a|il mio impegno [eè]|da oggi voglio)\s+(.+)/iu },
+    { memory_type: "boundary", pattern: /\b(?:non voglio che|per me [eè] importante non|il mio limite [eè])\s+(.+)/iu },
+    { memory_type: "training_preference", pattern: /\b(?:imparo meglio quando|per imparare preferisco|nella formazione preferisco)\s+(.+)/iu },
+    { memory_type: "communication_preference", pattern: /\b(?:preferisco che tu mi risponda|preferisco risposte|rispondimi sempre|parlami sempre|usa con me un tono)\s+(.+)/iu },
+    { memory_type: "work_preference", pattern: /\b(?:quando lavoro preferisco|al lavoro preferisco|lavoro meglio quando|preferisco lavorare)\s+(.+)/iu },
+    { memory_type: "request", pattern: /\b(?:ricorda(?:ti)? che|ricordami che|vorrei che ricordassi che|voglio che (?:tu )?ricordi che)\s+(.+)/iu }
+  ];
+  const matchedRule = structuredRules
+    .map((rule) => ({ ...rule, match: text.match(rule.pattern) }))
+    .find((rule) => rule.match?.[1]);
+  if (!matchedRule) return null;
+  const value = String(matchedRule.match[1] || "").trim().replace(/[.!?]+$/, "");
+  if (value.length < 2 || value.length > 500) return null;
   return {
-    memory_text: text,
-    memory_type: /(corso|academy|formazione)/i.test(text) ? "training_preference" : "work_preference"
+    memory_type: matchedRule.memory_type,
+    memory_value: value
   };
+}
+
+function containsAurumForbiddenMemoryData(text = "") {
+  const policy = globalThis.OroActiveAurumPolicy;
+  if (!policy?.containsForbiddenMemoryData) return true;
+  return policy.containsForbiddenMemoryData(text);
 }
 
 function showAurumMemoryConsent(candidate) {
   state.aurumConsentCandidate = candidate;
   if (aurumConsentPanel) aurumConsentPanel.hidden = !candidate;
+  if (aurumShareMemoryWithAi) aurumShareMemoryWithAi.checked = false;
+  if (aurumConsentText) {
+    aurumConsentText.textContent = candidate
+      ? `Vuoi salvare come “${aurumMemoryTypeLabel(candidate.memory_type)}” questa informazione: “${candidate.memory_value}”?`
+      : "Vuoi che Aurum ricordi questa informazione per aiutarti meglio in futuro?";
+  }
 }
 
 function aurumMemoryTypeLabel(type = "") {
   return {
+    preferred_name: "Nome preferito",
+    birthday: "Compleanno",
+    communication_preference: "Preferenza comunicazione",
     work_preference: "Preferenza lavoro",
     training_preference: "Preferenza formazione",
-    operational_note: "Nota operativa",
-    communication_preference: "Preferenza comunicazione",
-    user_question: "Domanda utente",
-    user_feedback: "Feedback utente",
-    quiz_answer: "Risposta quiz",
-    support_message: "Messaggio supporto"
+    goal: "Obiettivo",
+    habit: "Abitudine",
+    strength: "Punto di forza",
+    reflection: "Riflessione",
+    commitment: "Impegno",
+    boundary: "Confine personale",
+    request: "Richiesta da ricordare"
   }[String(type || "").trim()] || "Memoria Aurum";
 }
 
 function renderAurumMemoryLists() {
+  renderMyAurumMemories();
   renderFounderAurumMemories();
+}
+
+function renderMyAurumMemories() {
+  if (!aurumMyMemoriesList) return;
+  const memories = state.aurumMemories || [];
+  if (aurumMyMemoriesCount) aurumMyMemoriesCount.textContent = String(memories.length);
+  if (aurumExportMemories) aurumExportMemories.disabled = !memories.length;
+  if (aurumDeleteAllMemories) aurumDeleteAllMemories.disabled = !memories.length;
+  if (!memories.length) {
+    aurumMyMemoriesList.innerHTML = '<div class="empty-state">Non hai memorie Aurum salvate.</div>';
+    return;
+  }
+  aurumMyMemoriesList.innerHTML = memories.map((memory) => {
+    const isLegacy = memory.source !== "explicit";
+    const isReadOnly = isLegacy || memory.unavailable === true;
+    return `
+      <article class="aurum-list-row aurum-personal-memory">
+        <strong>${escapeHtml(memory.memory_label || aurumMemoryTypeLabel(memory.memory_type))}</strong>
+        <span>${memory.unavailable ? "Contenuto non decifrabile: puoi eliminare questa memoria." : escapeHtml(memory.memory_value || memory.memory_text || "")}</span>
+        <small>${memory.unavailable ? "Memoria non disponibile" : isLegacy ? "Memoria precedente inattiva" : memory.share_with_ai ? "Condivisione AI autorizzata" : "Solo memoria privata"} · ${escapeHtml(formatDateTime(memory.updated_at || memory.created_at))}</small>
+        ${isReadOnly ? "" : `
+          <label class="aurum-memory-existing-share">
+            <input type="checkbox" data-share-aurum-memory="${escapeHtml(String(memory.id || ""))}" ${memory.share_with_ai ? "checked" : ""}>
+            <span>Usa anche nel contesto inviato al servizio AI</span>
+          </label>
+        `}
+        <div class="aurum-memory-row-actions">
+          ${isReadOnly ? "" : `<button class="ghost-button" type="button" data-edit-aurum-memory="${escapeHtml(String(memory.id || ""))}">Modifica</button>`}
+          <button class="danger-button" type="button" data-delete-aurum-memory="${escapeHtml(String(memory.id || ""))}">Elimina</button>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function renderFounderAurumMemories() {
@@ -10656,33 +10831,22 @@ function renderFounderAurumMemories() {
     aurumMemoriesList.innerHTML = "";
     return;
   }
-  const memories = state.aurumAllMemories || [];
-  if (!memories.length) {
+  const summaries = state.aurumAllMemories || [];
+  if (!summaries.length) {
     aurumMemoriesList.innerHTML = '<div class="empty-state">Nessuna memoria Aurum registrata.</div>';
     return;
   }
-  const groups = new Map();
-  memories.forEach((memory) => {
-    const key = String(memory.user_id || "sconosciuto");
-    if (!groups.has(key)) {
-      groups.set(key, {
-        label: memory.user_name || "Utente OroActive",
-        store: memory.store || "",
-        rows: []
-      });
-    }
-    groups.get(key).rows.push(memory);
-  });
-  aurumMemoriesList.innerHTML = [...groups.values()].map((group) => `
+  aurumMemoriesList.innerHTML = summaries.map((summary) => `
     <section class="aurum-memory-group">
-      <h4>${escapeHtml(group.label)}</h4>
-      ${group.store ? `<small>${escapeHtml(group.store)}</small>` : ""}
-      ${group.rows.map((memory) => `
-        <article class="aurum-list-row">
-          <span>${escapeHtml(memory.memory_text || "")}</span>
-          <small>${escapeHtml(aurumMemoryTypeLabel(memory.memory_type))} · ${escapeHtml(formatDateTime(memory.updated_at || memory.created_at))}</small>
-        </article>
-      `).join("")}
+      <h4>${escapeHtml(summary.user_name || "Utente OroActive")}</h4>
+      ${summary.store ? `<small>${escapeHtml(summary.store)}</small>` : ""}
+      <strong>${Number(summary.memory_count || 0)} memorie personali</strong>
+      <div class="aurum-memory-summary-types">
+        ${(summary.types || []).map((type) => `
+          <span>${escapeHtml(type.label || aurumMemoryTypeLabel(type.memory_type))}: ${Number(type.count || 0)}</span>
+        `).join("")}
+      </div>
+      <small>Ultimo aggiornamento: ${escapeHtml(formatDateTime(summary.updated_at))}</small>
     </section>
   `).join("");
 }
@@ -10768,32 +10932,6 @@ function renderAurumManagementPanel() {
   renderAurumSupportRequests();
 }
 
-function shouldRecordAurumMemory() {
-  return ENABLE_AURUM_MASCOT && Boolean(state.currentUser) && Boolean(loadAurumSettings().memory);
-}
-
-function recordAurumInteractionMemory(memoryType, text, context = "") {
-  if (!shouldRecordAurumMemory()) return;
-  const content = [text, context].filter(Boolean).join(" | ").trim();
-  if (content.length < 3) return;
-  apiRequest("/aurum/memories", {
-    method: "POST",
-    body: JSON.stringify({
-      memory_text: content.slice(0, 1000),
-      memory_type: memoryType,
-      automatic: true
-    })
-  }).then((data) => {
-    if (data.memory) {
-      state.aurumMemories = [data.memory, ...state.aurumMemories].filter(Boolean).slice(0, 100);
-      renderAurumMemoryLists();
-    }
-    if (isFounder()) loadAurumAllMemories();
-  }).catch(() => {
-    // La memoria non deve mai bloccare chat, quiz o operatività.
-  });
-}
-
 async function loadAurumMemories() {
   if (!ENABLE_AURUM_MASCOT || !state.currentUser) return;
   try {
@@ -10809,7 +10947,7 @@ async function loadAurumAllMemories() {
   if (!ENABLE_AURUM_MASCOT || !isFounder()) return;
   try {
     const data = await apiRequest("/aurum/memories/all");
-    state.aurumAllMemories = data.memories || [];
+    state.aurumAllMemories = data.summaries || [];
   } catch {
     state.aurumAllMemories = [];
   }
@@ -10818,15 +10956,30 @@ async function loadAurumAllMemories() {
 
 async function saveAurumMemory() {
   const candidate = state.aurumConsentCandidate;
+  const shareWithAi = Boolean(aurumShareMemoryWithAi?.checked);
   showAurumMemoryConsent(null);
   if (!candidate) return;
   try {
     const data = await apiRequest("/aurum/memories", {
       method: "POST",
-      body: JSON.stringify(candidate)
+      body: JSON.stringify({
+        ...candidate,
+        explicit_consent: true,
+        use_in_chat: true,
+        share_with_ai: shareWithAi
+      })
     });
-    state.aurumMemories = [data.memory, ...state.aurumMemories].filter(Boolean);
-    state.aurumMessages.push({ role: "assistant", content: "Memoria salvata. La usero solo per supporto operativo interno." });
+    state.aurumMemories = [
+      data.memory,
+      ...state.aurumMemories.filter((memory) => String(memory.id) !== String(data.memory?.id))
+    ].filter(Boolean);
+    state.aurumMessages.push({
+      role: "assistant",
+      content: shareWithAi
+        ? "Memoria salvata. Hai autorizzato anche il suo uso nel contesto inviato al servizio AI."
+        : "Memoria salvata in modo privato. Non verrà inviata al servizio AI."
+    });
+    if (isFounder()) await loadAurumAllMemories();
   } catch (error) {
     state.aurumMessages.push({ role: "assistant", content: error.message || "Non sono riuscito a salvare la memoria." });
   } finally {
@@ -10836,13 +10989,107 @@ async function saveAurumMemory() {
 
 async function deleteAurumMemory(id) {
   if (!id) return;
+  if (!window.confirm("Vuoi eliminare questa memoria personale?")) return;
   try {
     await apiRequest(`/aurum/memories/${encodeURIComponent(id)}`, { method: "DELETE" });
     state.aurumMemories = state.aurumMemories.filter((memory) => String(memory.id) !== String(id));
     renderAurumMemoryLists();
-    showToast("Memoria Aurum eliminata.");
+    if (isFounder()) await loadAurumAllMemories();
+    showToast("Memoria Aurum eliminata.", "success");
   } catch (error) {
     showToast(error.message || "Memoria Aurum non eliminata.");
+  }
+}
+
+async function editAurumMemory(id) {
+  const current = state.aurumMemories.find((memory) => String(memory.id) === String(id));
+  if (!current) return;
+  const value = window.prompt(
+    `Modifica: ${current.memory_label || aurumMemoryTypeLabel(current.memory_type)}`,
+    current.memory_value || current.memory_text || ""
+  );
+  if (value === null) return;
+  const memoryValue = value.trim();
+  if (!memoryValue) {
+    showToast("La memoria non può essere vuota.", "error");
+    return;
+  }
+  try {
+    const data = await apiRequest(`/aurum/memories/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        memory_value: memoryValue,
+        explicit_consent: true,
+        use_in_chat: current.use_in_chat !== false,
+        share_with_ai: current.share_with_ai === true
+      })
+    });
+    state.aurumMemories = state.aurumMemories.map((memory) => (
+      String(memory.id) === String(id) ? data.memory : memory
+    ));
+    renderAurumMemoryLists();
+    showToast("Memoria Aurum aggiornata.", "success");
+  } catch (error) {
+    showToast(error.message || "Memoria Aurum non aggiornata.", "error");
+  }
+}
+
+async function updateAurumMemoryAiSharing(id, shareWithAi) {
+  const current = state.aurumMemories.find((memory) => String(memory.id) === String(id));
+  if (!current) return;
+  try {
+    const data = await apiRequest(`/aurum/memories/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        memory_value: current.memory_value || current.memory_text || "",
+        explicit_consent: true,
+        use_in_chat: current.use_in_chat !== false,
+        share_with_ai: shareWithAi === true
+      })
+    });
+    state.aurumMemories = state.aurumMemories.map((memory) => (
+      String(memory.id) === String(id) ? data.memory : memory
+    ));
+    renderAurumMemoryLists();
+    showToast(
+      shareWithAi ? "Condivisione della memoria con il servizio AI autorizzata." : "Condivisione della memoria con il servizio AI disattivata.",
+      "success"
+    );
+  } catch (error) {
+    renderAurumMemoryLists();
+    showToast(error.message || "Preferenza di condivisione non aggiornata.", "error");
+  }
+}
+
+async function exportAurumMemories() {
+  try {
+    const data = await apiRequest("/aurum/memories/export");
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const download = document.createElement("a");
+    download.href = url;
+    download.download = `aurum-memorie-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(download);
+    download.click();
+    download.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    showToast("Esportazione memorie completata.", "success");
+  } catch (error) {
+    showToast(error.message || "Esportazione memorie non riuscita.", "error");
+  }
+}
+
+async function deleteAllAurumMemories() {
+  if (!state.aurumMemories.length) return;
+  if (!window.confirm("Vuoi eliminare definitivamente tutte le tue memorie Aurum?")) return;
+  try {
+    await apiRequest("/aurum/memories", { method: "DELETE" });
+    state.aurumMemories = [];
+    renderAurumMemoryLists();
+    if (isFounder()) await loadAurumAllMemories();
+    showToast("Tutte le memorie Aurum sono state eliminate.", "success");
+  } catch (error) {
+    showToast(error.message || "Le memorie Aurum non sono state eliminate.", "error");
   }
 }
 
@@ -10922,7 +11169,6 @@ async function sendAurumDirectMessage(recipientId, message, options = {}) {
       })
     });
     state.aurumSupportRequests = [data.request, ...state.aurumSupportRequests].filter(Boolean);
-    recordAurumInteractionMemory("support_message", text, `Destinatario: ${data.request?.recipient_name || recipientId}`);
     if (aurumSupportActions) aurumSupportActions.hidden = true;
     if (options.fromAurum) {
       state.aurumMessages.push({ role: "assistant", content: "Messaggio riservato inviato al destinatario selezionato." });
@@ -10964,7 +11210,6 @@ function evaluateAurumQuizAnswer(answer = "") {
   const matches = (quiz.accepted || []).filter((term) => normalized.includes(normalizeAurumQuizText(term))).length;
   const correct = matches >= Math.min(2, Math.max(1, Math.ceil((quiz.accepted || []).length / 3)));
   state.aurumActiveQuiz = null;
-  recordAurumInteractionMemory("quiz_answer", `Domanda quiz: ${quiz.question}`, `Risposta utente: ${answer}`);
   state.aurumMessages.push({
     role: "assistant",
     content: correct
@@ -10998,7 +11243,6 @@ function aurumContextPayload(question) {
       role: state.currentUser?.ruolo || "",
       storeName: state.currentUser?.negozio || "",
       store: state.currentUser?.negozio || "",
-      userName: aurumUserLabel(),
       visibleFields: visibleAurumFields(),
       availableActions: visibleAurumActions(),
       appGuide: {
@@ -11025,7 +11269,13 @@ function aurumContextPayload(question) {
         verificatoIl: "30 luglio 2026",
         rispostaLocale: buildAurumNormativeAnswer(question)
       } : null,
-      availableMemories: (state.aurumMemories || []).map((memory) => memory.memory_text).filter(Boolean).slice(0, 8)
+      conversationHistory: state.aurumMessages
+        .filter((message) => message?.role === "user" || message?.role === "assistant")
+        .slice(-8)
+        .map((message) => ({
+          role: message.role,
+          content: String(message.content || "").slice(0, 1200)
+        }))
     }
   };
 }
@@ -11044,25 +11294,30 @@ async function askAurum(event) {
   if (aurumQuestion) aurumQuestion.value = "";
   renderAurumMessages();
 
-  if (state.aurumActiveQuiz) {
+  const requiresBackendSafety = requiresAurumBackendSafety(question);
+  if (requiresBackendSafety) {
+    state.aurumActiveQuiz = null;
+    state.aurumAskedMoodToday = false;
+  }
+
+  if (!requiresBackendSafety && state.aurumActiveQuiz) {
     evaluateAurumQuizAnswer(question);
     return;
   }
 
-  recordAurumInteractionMemory("user_question", question, `Sezione: ${aurumSectionKey()}`);
   const normativeQuestion = isAurumNormativeQuestion(question);
 
-  if (/(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
+  if (!requiresBackendSafety && /(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
     startAurumCuriosityQuiz();
     return;
   }
 
-  if (handleAurumMoodReply(question)) {
+  if (!requiresBackendSafety && handleAurumMoodReply(question)) {
     renderAurumMessages();
     return;
   }
 
-  if (!normativeQuestion && handleAurumTutorRequest(question)) {
+  if (!requiresBackendSafety && !normativeQuestion && handleAurumTutorRequest(question)) {
     return;
   }
 
@@ -11082,7 +11337,12 @@ async function askAurum(event) {
       source: data.fonte || "",
       fonti: Array.isArray(data.fonti) ? data.fonti : []
     });
-    showAurumMemoryConsent(detectAurumMemoryCandidate(question));
+    const safetyLevel = String(data.safety?.level || data.safety_level || "").toLowerCase();
+    showAurumMemoryConsent(
+      ["crisis", "crisis_follow_up", "mental_health_boundary"].includes(safetyLevel)
+        ? null
+        : detectAurumMemoryCandidate(question)
+    );
   } catch (error) {
     state.aurumMessages.push({
       role: "assistant",
@@ -11118,6 +11378,8 @@ function renderKnowledgeStatus() {
       <span>${status.gemological_knowledge_loaded ? `Laboratorio Gemmologico: ${Number(status.gemological_materials || 0)} pietre e ${Number(status.gemological_tools || 0)} strumenti` : "Conoscenza gemmologica non caricata"}</span>
       <span>${status.sale_deed_knowledge_loaded ? `Guida Atto di Vendita: ${Number(status.sale_deed_fields || 0)} campi (${Number(status.sale_deed_fields_implemented || 0)} implementati, ${Number(status.sale_deed_known_gaps || 0)} gap noti)` : "Guida Atto di Vendita non caricata"}</span>
       <span>${status.sale_deed_knowledge_verified_at ? `Guida atto verificata: ${escapeHtml(status.sale_deed_knowledge_verified_at)}` : ""}</span>
+      <span>${status.coaching_knowledge_loaded ? `Coaching professionale Aurum: ${Number(status.coaching_courses || 0)} corsi, ${Number(status.coaching_topics || 0)} temi, ${Number(status.coaching_exercises || 0)} esercizi` : "Conoscenza coaching non caricata"}</span>
+      <span>${status.coaching_professional_standard ? `Standard coaching: ${escapeHtml(status.coaching_professional_standard)}` : ""}</span>
       <span>${status.knowledge_base_loaded ? "Knowledge base disponibile" : "Knowledge base non disponibile"}</span>
       <span>${escapeHtml(status.pgvector_message || "")}</span>
     </article>
@@ -11428,7 +11690,6 @@ async function sendAssistantFeedback(messageIndex, type) {
         comment
       })
     });
-    recordAurumInteractionMemory("user_feedback", comment || `Feedback ${type}`, `Domanda: ${message.question || ""}`);
     showToast("Feedback salvato. Grazie.");
   } catch (error) {
     showToast(error.message || "Feedback non salvato.");
@@ -24642,6 +24903,8 @@ aurumRememberNo?.addEventListener("click", () => {
   state.aurumMessages.push({ role: "assistant", content: "Va bene, non salvo questa informazione." });
   renderAurumMessages();
 });
+aurumExportMemories?.addEventListener("click", exportAurumMemories);
+aurumDeleteAllMemories?.addEventListener("click", deleteAllAurumMemories);
 aurumSendDirectMessage?.addEventListener("click", () => {
   sendAurumDirectMessage(aurumMessageRecipient?.value || "", state.aurumLastUserMessage || "Messaggio riservato da Aurum", { fromAurum: true });
 });
@@ -24677,11 +24940,15 @@ aurumResetLocalMemory?.addEventListener("click", () => {
     .forEach((key) => localStorage.removeItem(key));
   showToast("Saluto giornaliero Aurum resettato per il test.");
 });
-[aurumMemoriesList].forEach((container) => {
-  container?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-delete-aurum-memory]");
-    if (button) deleteAurumMemory(button.dataset.deleteAurumMemory);
-  });
+aurumMyMemoriesList?.addEventListener("click", (event) => {
+  const editButton = event.target.closest("[data-edit-aurum-memory]");
+  const deleteButton = event.target.closest("[data-delete-aurum-memory]");
+  if (editButton) editAurumMemory(editButton.dataset.editAurumMemory);
+  if (deleteButton) deleteAurumMemory(deleteButton.dataset.deleteAurumMemory);
+});
+aurumMyMemoriesList?.addEventListener("change", (event) => {
+  const checkbox = event.target.closest("[data-share-aurum-memory]");
+  if (checkbox) updateAurumMemoryAiSharing(checkbox.dataset.shareAurumMemory, checkbox.checked);
 });
 knowledgeForm?.addEventListener("submit", uploadKnowledgeBook);
 reindexKnowledge?.addEventListener("click", reindexKnowledgeBase);
