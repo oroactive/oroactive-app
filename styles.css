@@ -2102,6 +2102,65 @@ body.main-menu-active .splash-screen {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.aurum-message-sources {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 183, 79, 0.28);
+  white-space: normal;
+}
+
+.aurum-message-sources > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #ffc46d;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.aurum-message-sources ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aurum-message-sources li {
+  min-width: 0;
+}
+
+.aurum-message-sources a {
+  display: block;
+  max-width: 100%;
+  color: #ffd79b;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.aurum-message-sources small {
+  display: block;
+  margin-top: 1px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.assistant-message.ai .aurum-message-sources {
+  border-top-color: #ead9c8;
+}
+
+.assistant-message.ai .aurum-message-sources > strong,
+.assistant-message.ai .aurum-message-sources a {
+  color: #8a3c00;
+}
+
+.assistant-message.ai .aurum-message-sources small {
+  color: #6b5a4b;
+}
+
 .aurum-chat-form {
   flex: 0 0 auto;
   display: grid;

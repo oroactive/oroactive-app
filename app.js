@@ -218,7 +218,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260730-gem-alphabetical-order-7";
+const OROACTIVE_CLIENT_BUILD_ID = "20260730-aurum-sector-knowledge-8";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -9524,6 +9524,42 @@ async function deleteUser(id) {
   }
 }
 
+function safeAurumSourceUrl(value = "") {
+  try {
+    const parsed = new URL(String(value || ""));
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function aurumSourcesMarkup(message = {}) {
+  const seen = new Set();
+  const sources = (Array.isArray(message.fonti) ? message.fonti : [])
+    .map((source) => ({
+      title: String(source?.title || source?.titolo || "Fonte verificata").trim(),
+      url: safeAurumSourceUrl(source?.url),
+      authority: String(source?.authority || source?.ente || "").trim(),
+      verifiedAt: String(source?.verifiedAt || source?.verificatoIl || "").trim()
+    }))
+    .filter((source) => source.url && !seen.has(source.url) && seen.add(source.url))
+    .slice(0, 8);
+  if (!sources.length) return "";
+  return `
+    <div class="aurum-message-sources">
+      <strong>Fonti e riferimenti</strong>
+      <ul>
+        ${sources.map((source) => `
+          <li>
+            <a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title)}</a>
+            ${source.authority ? `<small>${escapeHtml(source.authority)}${source.verifiedAt ? ` · verifica ${escapeHtml(source.verifiedAt)}` : ""}</small>` : ""}
+          </li>
+        `).join("")}
+      </ul>
+    </div>
+  `;
+}
+
 function renderAssistantMessages() {
   if (!assistantChat) return;
   if (!state.assistantMessages.length) {
@@ -9533,6 +9569,7 @@ function renderAssistantMessages() {
   assistantChat.innerHTML = state.assistantMessages.map((message, index) => `
     <article class="assistant-message ${message.role === "user" ? "user" : "ai"}">
       ${escapeHtml(message.content)}
+      ${message.role === "assistant" ? aurumSourcesMarkup(message) : ""}
       ${message.role === "assistant" ? `
         <div class="assistant-feedback" data-assistant-feedback-index="${index}">
           <button type="button" data-ai-feedback="utile">Risposta utile</button>
@@ -9571,6 +9608,7 @@ async function askAssistant(event) {
       role: "assistant",
       content: data.risposta || "Risposta non disponibile.",
       source: data.fonte || "Integrazione generale",
+      fonti: Array.isArray(data.fonti) ? data.fonti : [],
       question
     });
   } catch (error) {
@@ -9620,29 +9658,28 @@ function isAurumNormativeAnswerAdequate(answer = "") {
 
 function buildAurumNormativeAnswer(question = "") {
   const normalized = aurumNormalize(question);
-  const asksLatest = /(ultima|ultimo|recente|nuova|aggiornat|2024)/.test(normalized);
-  const asksYear = /(anno|quando|emessa|emanata|fatta)/.test(normalized);
-  const opening = asksYear && !asksLatest
-    ? "La normativa organica di riferimento per i compro oro e stata emanata nel 2017: Decreto Legislativo 25 maggio 2017, n. 92."
-    : asksLatest
-      ? "Nel materiale normativo caricato in OroActive il riferimento piu recente e il Decreto Legislativo 10 dicembre 2024, n. 211; il quadro base per i compro oro resta il Decreto Legislativo 25 maggio 2017, n. 92."
-      : "Per i compro oro il riferimento operativo principale caricato in Aurum e il Decreto Legislativo 25 maggio 2017, n. 92, con aggiornamenti normativi successivi presenti nei materiali OroActive.";
+  const asksOpo = /(opo|operatore professionale|legge 7|dichiarazione oro|211|10.?000|2.?500)/.test(normalized);
+  const opening = asksOpo
+    ? "Il D.Lgs. 10 dicembre 2024, n. 211, in vigore dal 17 gennaio 2025, aggiorna soprattutto la disciplina degli operatori professionali in oro (OPO), il registro OAM e le dichiarazioni ORO. Non sostituisce la legge base dei compro oro."
+    : "La disciplina organica dell’attività di compro oro resta il D.Lgs. 25 maggio 2017, n. 92, da consultare nel testo vigente.";
 
   return [
-    "Risposta normativa OroActive",
+    "Normativa compro oro — sintesi offline verificata il 30 luglio 2026",
     "",
     opening,
     "",
-    "In pratica, per l'operatore significa lavorare sempre con questi controlli minimi:",
-    "1. identificare correttamente il cliente e verificare il documento;",
-    "2. registrare l'operazione con descrizione chiara degli oggetti, metallo, titolo/caratura, peso e prezzo;",
-    "3. conservare documenti, foto, firme e tracciabilita secondo procedura OroActive;",
-    "4. rispettare limiti, mezzi di pagamento e controlli antiriciclaggio previsti dalle policy interne;",
-    "5. sospendere o far autorizzare la pratica quando emergono anomalie, documenti scaduti, operazioni frazionate o rischio Aurum Shield.",
+    "Controlli minimi previsti dal D.Lgs. 92/2017:",
+    "1. identificazione di ogni cliente prima dell’operazione;",
+    "2. pagamento non in contanti, tracciabile e riconducibile al disponente per importi pari o superiori a 500 euro, anche frazionati;",
+    "3. scheda progressiva con descrizione, quotazione, valutazione, data, ora, importo, pagamento e destinazione;",
+    "4. due fotografie digitali dell’oggetto da prospettive differenti e ricevuta al cliente;",
+    "5. conservazione di dati, schede e ricevute per dieci anni, con integrità e storicità;",
+    "6. valutazione delle operazioni sospette e, quando dovuto, segnalazione alla UIF.",
     "",
-    "Se la domanda riguarda l'ultima norma caricata: il documento piu recente nei materiali Aurum e il D.Lgs. 211/2024. Se invece chiedi la legge base dei compro oro, la risposta e il 2017, D.Lgs. 92/2017.",
+    "Fonte ufficiale: https://www.normattiva.it/eli/id/2017/06/20/17G00109/CONSOLIDATED",
+    "Aggiornamento OPO: https://www.gazzettaufficiale.it/eli/id/2025/01/02/24G00222/sg",
     "",
-    "Nota: questa e una spiegazione operativa interna, non consulenza legale. Per decisioni formali usa sempre il testo ufficiale e le procedure approvate dal Founder."
+    "Sintesi operativa generale: per il caso concreto verifica il testo vigente e il professionista o l’autorità competente."
   ].join("\n");
 }
 
@@ -10352,11 +10389,12 @@ function renderAurumMessages() {
   if (!state.aurumMessages.length) {
     aurumChatMessages.innerHTML = isPriceExplanation
       ? '<div class="empty-state">Aurum è pronto per spiegare prezzi, carature, titoli, costi, margini e scenari.</div>'
-      : '<div class="empty-state">Aurum è pronto per rispondere usando l’Assistente IA OroActive.</div>';
+      : '<div class="empty-state">Aurum conosce normativa compro oro, OAM/UIF, oro, argento, PGM, diamanti, gemme, strumenti, prove, sicurezza e valutazione. Le risposte settoriali mostrano le fonti verificate.</div>';
   } else {
     aurumChatMessages.innerHTML = state.aurumMessages.map((message) => `
       <article class="aurum-message ${message.role === "user" ? "user" : "assistant"}">
         ${escapeHtml(message.content || "")}
+        ${message.role === "assistant" ? aurumSourcesMarkup(message) : ""}
       </article>
     `).join("");
     aurumChatMessages.scrollTop = aurumChatMessages.scrollHeight;
@@ -10850,10 +10888,13 @@ function aurumContextPayload(question) {
   const guide = currentAurumGuide();
   const tutorialId = inferAurumTutorialId(question);
   const normativeQuestion = isAurumNormativeQuestion(question);
+  const wantsCurrentWebVerification = normativeQuestion
+    || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(String(question || ""));
   const isPriceExplanation = state.aurumMode === "price_explanation";
   return {
     domanda: question,
     message: question,
+    allowWeb: wantsCurrentWebVerification,
     mode: isPriceExplanation ? "price_explanation" : normativeQuestion ? "normativa_operativa" : tutorialId ? "tutorial_operativo" : "chat",
     interface: "aurum_operational_tutor",
     section: isPriceExplanation ? "quotazione" : aurumSectionKey(),
@@ -10883,11 +10924,13 @@ function aurumContextPayload(question) {
       priceExplanationContext: isPriceExplanation ? state.aurumPriceContext : null,
       normativeContext: normativeQuestion ? {
         documenti: [
-          "Decreto Legislativo 25 maggio 2017, n. 92",
-          "Decreto Legislativo 10 dicembre 2024, n. 211",
-          "Normativa e legislazione 2017",
-          "Normativa e legislazione 2023"
+          "D.Lgs. 25 maggio 2017, n. 92 — disciplina base OCO",
+          "D.M. 14 maggio 2018 — Registro OAM",
+          "D.Lgs. 21 novembre 2007, n. 231 — antiriciclaggio",
+          "D.Lgs. 10 dicembre 2024, n. 211 — aggiornamento OPO e dichiarazioni ORO",
+          "Istruzioni UIF efficaci dal 1 luglio 2026"
         ],
+        verificatoIl: "30 luglio 2026",
         rispostaLocale: buildAurumNormativeAnswer(question)
       } : null,
       availableMemories: (state.aurumMemories || []).map((memory) => memory.memory_text).filter(Boolean).slice(0, 8)
@@ -10943,7 +10986,8 @@ async function askAurum(event) {
       content: normativeQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
         ? buildAurumNormativeAnswer(question)
         : data.risposta || "Risposta non disponibile.",
-      source: data.fonte || ""
+      source: data.fonte || "",
+      fonti: Array.isArray(data.fonti) ? data.fonti : []
     });
     showAurumMemoryConsent(detectAurumMemoryCandidate(question));
   } catch (error) {
@@ -10973,7 +11017,9 @@ function renderKnowledgeStatus() {
       <span>OpenAI: ${status.openai ? "attivo" : "non configurato"}</span>
       <span>Ricerca: ${status.pgvector ? "pgvector attivo" : "fallback full-text attivo"}</span>
       <span>${status.fallback_full_text ? "Full-text PostgreSQL: attivo" : `Embeddings: ${status.embeddings ? "presenti" : "non presenti"}`}</span>
-      <span>${status.knowledge_base_loaded ? "Libro indicizzato correttamente" : "Libro non ancora indicizzato"}</span>
+      <span>${status.sector_knowledge_loaded ? `Base settoriale Aurum ${escapeHtml(status.sector_knowledge_version || "")}: ${Number(status.sector_topics || 0)} argomenti verificati` : "Base settoriale Aurum non caricata"}</span>
+      <span>${status.sector_knowledge_verified_at ? `Fonti verificate: ${escapeHtml(status.sector_knowledge_verified_at)}` : ""}</span>
+      <span>${status.knowledge_base_loaded ? "Knowledge base disponibile" : "Knowledge base non disponibile"}</span>
       <span>${escapeHtml(status.pgvector_message || "")}</span>
     </article>
   ` : "";

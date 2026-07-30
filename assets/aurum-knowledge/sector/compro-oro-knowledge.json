@@ -1,0 +1,1394 @@
+{
+  "schemaVersion": 1,
+  "knowledgeVersion": "2026.07.30",
+  "verifiedAt": "30 luglio 2026",
+  "jurisdiction": "Italia e standard tecnici internazionali di settore",
+  "scope": [
+    "attività compro oro",
+    "oro, argento, platino e palladio",
+    "diamanti naturali, prodotti in laboratorio e simulanti",
+    "strumenti e prove di banco",
+    "metrologia legale",
+    "antiriciclaggio, privacy, sicurezza e fiscalità di base"
+  ],
+  "topics": [
+    {
+      "id": "quadro-normativo-compro-oro",
+      "title": "Quadro normativo dell’attività di compro oro",
+      "category": "Normativa e compliance",
+      "keywords": ["D.Lgs. 92/2017", "legge compro oro", "oggetti preziosi usati", "tracciabilità", "normativa vigente"],
+      "summary": "Il D.Lgs. 25 maggio 2017 n. 92 è la disciplina organica dell’attività di compro oro: regola accesso all’attività, identificazione, pagamenti, tracciabilità, conservazione e segnalazioni sospette.",
+      "facts": [
+        "Il decreto è entrato in vigore il 5 luglio 2017 e mira alla piena tracciabilità della compravendita e permuta di oggetti preziosi usati.",
+        "L’attività comprende compravendita all’ingrosso o al dettaglio e permuta di oggetti preziosi usati.",
+        "Il D.Lgs. 211/2024 non sostituisce il D.Lgs. 92/2017: dal 17 gennaio 2025 ha soprattutto trasferito all’OAM il registro degli operatori professionali in oro e coordinato tale registro con quello compro oro."
+      ],
+      "checklist": [
+        "Individuare la norma applicabile alla domanda e l’articolo pertinente.",
+        "Controllare sempre la versione consolidata e la data di vigenza prima di una decisione formale.",
+        "Distinguere obbligo legale, procedura interna OroActive e buona pratica tecnica."
+      ],
+      "warnings": [
+        "Non presentare automaticamente il D.Lgs. 211/2024 come la nuova legge generale dei compro oro.",
+        "Una sintesi operativa non sostituisce testo vigente, Questura, OAM, UIF o consulente."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 25 maggio 2017 n. 92, testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/2017/06/20/17G00109/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "D.Lgs. 10 dicembre 2024 n. 211",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2025/01/02/24G00222/sg",
+          "authority": "Gazzetta Ufficiale",
+          "status": "vigente dal 17 gennaio 2025",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "licenza-oam-requisiti",
+      "title": "Licenza di pubblica sicurezza e iscrizione OAM",
+      "category": "Normativa e compliance",
+      "keywords": ["OAM", "registro operatori compro oro", "licenza Questura", "articolo 127 TULPS", "sede operativa", "preposto"],
+      "summary": "L’esercizio lecito richiede la licenza in materia di oggetti preziosi e l’iscrizione nel Registro OAM degli operatori compro oro; sedi, preposti e dati dichiarati devono restare aggiornati.",
+      "facts": [
+        "Il registro pubblico informatizzato degli operatori compro oro è tenuto dall’OAM.",
+        "L’iscrizione è subordinata al possesso e alla perdurante validità della licenza prevista dall’art. 127 TULPS.",
+        "Le variazioni dei dati comunicati all’OAM sono considerate tempestive se inviate entro dieci giorni."
+      ],
+      "checklist": [
+        "Verificare licenza, codice OAM, sede operativa e preposto prima dell’avvio.",
+        "Comunicare variazioni di sede, preposto, licenza, PEC o conto dedicato entro il termine applicabile.",
+        "Conservare ricevute delle comunicazioni e controllare contributi/rinnovi OAM."
+      ],
+      "warnings": [
+        "L’attività senza iscrizione OAM integra esercizio abusivo e comporta sanzioni penali.",
+        "Requisiti e modulistica vanno verificati nell’area OAM e con la Questura competente."
+      ],
+      "sources": [
+        {
+          "title": "Iscrizione al Registro operatori compro oro",
+          "url": "https://www.organismo-am.it/iscrizione-al-registro",
+          "authority": "OAM",
+          "status": "procedura corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Decreto MEF 14 maggio 2018",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2018/07/02/18A04512/sg",
+          "authority": "Gazzetta Ufficiale",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "operatori-professionali-oro-dichiarazioni",
+      "title": "Operatori professionali in oro e dichiarazioni ORO",
+      "category": "Normativa e compliance",
+      "keywords": ["OPO", "operatore professionale in oro", "Legge 7/2000", "D.Lgs. 211/2024", "dichiarazione ORO", "10000 euro", "2500 euro", "UIF", "OAM"],
+      "summary": "Il D.Lgs. 211/2024, in vigore dal 17 gennaio 2025, ha aggiornato la Legge 7/2000, trasferito all’OAM il registro OPO e modificato le dichiarazioni delle operazioni professionali in oro; OCO e OPO restano qualifiche distinte.",
+      "facts": [
+        "La soglia ordinaria della dichiarazione ORO alla UIF è 10.000 euro.",
+        "Sono rilevanti anche operazioni dello stesso tipo, nello stesso mese e con la stessa controparte, singolarmente pari o superiori a 2.500 euro e complessivamente pari o superiori a 10.000 euro.",
+        "La dichiarazione va effettuata senza indugio e comunque entro la fine del mese successivo; dal 1 ottobre 2025 si usa il codice OAM.",
+        "SOS antiriciclaggio e dichiarazione ORO sono adempimenti distinti e possono ricorrere separatamente o insieme."
+      ],
+      "checklist": [
+        "Distinguere prima attività OCO su oggetti preziosi usati e attività professionale in oro ai sensi della Legge 7/2000.",
+        "Verificare natura, purezza, destinazione del materiale, soggetti e aggregazioni mensili.",
+        "Se l’OCO svolge anche attività OPO, verificare la separata iscrizione e gli adempimenti UIF."
+      ],
+      "warnings": [
+        "Non trasformare automaticamente ogni acquisto di gioielleria usata in una dichiarazione ORO.",
+        "Materiale usato destinato alla fusione può richiedere verifica OPO, ma Aurum non deve decidere senza i fatti completi."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 10 dicembre 2024 n. 211",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2025/01/02/24G00222/sg",
+          "authority": "Gazzetta Ufficiale",
+          "status": "vigente dal 17 gennaio 2025",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "UIF: comunicato sul D.Lgs. 211/2024",
+          "url": "https://uif.bancaditalia.it/pubblicazioni/comunicati/documenti/Comunicato-oro-d-lgs-211-2024.pdf",
+          "authority": "UIF - Banca d’Italia",
+          "status": "indicazioni ufficiali",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Vademecum OPO",
+          "url": "https://www.organismo-am.it/vademecum-opo/vademecum",
+          "authority": "OAM",
+          "status": "procedura corrente",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "identificazione-cliente-pagamenti",
+      "title": "Identificazione del cliente e limite di 500 euro",
+      "category": "Normativa e compliance",
+      "keywords": ["cliente", "documento", "identificazione", "500 euro", "contante", "pagamento tracciabile", "operazione frazionata", "sette giorni"],
+      "summary": "Ogni cliente va identificato prima dell’operazione. Per importi pari o superiori a 500 euro, anche se frazionati, il pagamento deve essere non in contanti, tracciabile e univocamente riconducibile al disponente.",
+      "facts": [
+        "L’identificazione è obbligatoria prima dell’esecuzione di ogni operazione.",
+        "La soglia speciale del settore è 500 euro, inclusa l’operazione unitaria suddivisa in più operazioni.",
+        "Il decreto definisce un periodo di sette giorni per la nozione di operazione frazionata, senza escludere il frazionamento quando altri elementi lo dimostrano."
+      ],
+      "checklist": [
+        "Acquisire e verificare documento e dati identificativi prima della valutazione conclusiva.",
+        "Sommare operazioni economicamente collegate e controllare la finestra dei sette giorni.",
+        "Per almeno 500 euro usare solo un mezzo tracciabile riconducibile al disponente e registrarne gli estremi."
+      ],
+      "warnings": [
+        "Non applicare al compro oro il limite generale al contante al posto della soglia speciale di 500 euro.",
+        "Spezzare artificiosamente un’operazione non elimina l’obbligo di tracciabilità."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017, articoli 1 e 4",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2017/06/20/17G00109/sg",
+          "authority": "Gazzetta Ufficiale",
+          "status": "testo ufficiale",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Conto corrente dedicato e pagamenti",
+          "url": "https://www.organismo-am.it/conto-corrente-dedicato",
+          "authority": "OAM",
+          "status": "indicazioni correnti",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "scheda-operazione-fotografie-ricevuta",
+      "title": "Scheda dell’operazione, fotografie e ricevuta",
+      "category": "Normativa e compliance",
+      "keywords": ["scheda operazione", "due fotografie", "ricevuta", "quotazione", "data ora", "destinazione oggetto"],
+      "summary": "Per ogni operazione occorre una scheda progressiva completa, due fotografie digitali da prospettive diverse e una ricevuta riepilogativa al cliente.",
+      "facts": [
+        "La scheda riporta dati cliente, descrizione e qualità dell’oggetto, quotazione indipendente, valutazione, data, ora, importo e mezzo di pagamento.",
+        "Sono obbligatorie due fotografie digitali dell’oggetto acquisite da prospettive diverse.",
+        "La scheda va integrata con la destinazione successiva dell’oggetto e i dati del cessionario, operatore professionale, fonderia o impresa di recupero."
+      ],
+      "checklist": [
+        "Numerare progressivamente la pratica e associare un ID univoco a oggetti e foto.",
+        "Fotografare interamente l’oggetto da due angoli, con immagini nitide e riconducibili alla pratica.",
+        "Registrare fonte e timestamp della quotazione, valutazione, pagamento e destinazione.",
+        "Rilasciare al cliente la ricevuta riepilogativa al termine."
+      ],
+      "warnings": [
+        "Foto generiche, duplicate o non riconducibili all’oggetto non soddisfano la finalità di tracciabilità.",
+        "La destinazione non può essere ricostruita solo a posteriori senza collegamento certo alla scheda."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017, articolo 5",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2017/06/20/17G00109/sg",
+          "authority": "Gazzetta Ufficiale",
+          "status": "testo ufficiale",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Controlli compro oro e obbligo delle fotografie",
+          "url": "https://questure.poliziadistato.it/it/Viterbo/articolo/2743680f640b58e3f011672669",
+          "authority": "Polizia di Stato",
+          "status": "indicazione istituzionale",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "conto-dedicato",
+      "title": "Conto corrente dedicato alle operazioni",
+      "category": "Normativa e compliance",
+      "keywords": ["conto corrente dedicato", "IBAN", "tracciabilità", "sede operativa", "bancario", "postale"],
+      "summary": "Le transazioni finanziarie compro oro devono transitare su un conto bancario o postale dedicato in via esclusiva a tali operazioni e comunicato all’OAM.",
+      "facts": [
+        "L’IBAN del conto dedicato deve essere comunicato all’OAM e aggiornato in caso di variazione.",
+        "Con più sedi è possibile associare un conto dedicato a ciascuna sede; non è ammesso indicare più conti per la stessa sede.",
+        "Il requisito riguarda la separazione e la ricostruibilità delle transazioni del settore."
+      ],
+      "checklist": [
+        "Verificare che il pagamento sia coerente con il conto dedicato della sede.",
+        "Conservare evidenza dell’intestatario e della riconducibilità del pagamento.",
+        "Comunicare tempestivamente all’OAM ogni variazione dell’IBAN."
+      ],
+      "warnings": [
+        "Un conto usato promiscuamente compromette la finalità di tracciabilità.",
+        "Un IBAN non coerente con soggetto, sede o pratica richiede verifica e sospensione operativa."
+      ],
+      "sources": [
+        {
+          "title": "Conto corrente dedicato alle operazioni compro oro",
+          "url": "https://www.organismo-am.it/conto-corrente-dedicato",
+          "authority": "OAM",
+          "status": "indicazioni correnti",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "conservazione-dieci-anni-fermo-dieci-giorni",
+      "title": "Conservazione per dieci anni e fermo degli oggetti",
+      "category": "Normativa e compliance",
+      "keywords": ["conservazione", "10 anni", "dieci anni", "10 giorni", "dieci giorni", "alienazione", "alterazione", "articolo 128 TULPS"],
+      "summary": "Dati, schede e ricevute vanno conservati dieci anni con integrità e storicità; gli oggetti preziosi usati non possono essere alterati o alienati prima del decorso del fermo di dieci giorni previsto dall’art. 128 TULPS.",
+      "facts": [
+        "La conservazione obbligatoria di dati, schede e ricevute dura dieci anni.",
+        "Il sistema deve garantire accessibilità alle autorità, integrità, non alterabilità, completezza e collegamento storico.",
+        "Il fermo di dieci giorni permette il controllo della circolazione degli oggetti preziosi usati prima di fusione, alterazione o cessione."
+      ],
+      "checklist": [
+        "Bloccare automaticamente alienazione, smontaggio, alterazione e fusione fino alla scadenza del fermo.",
+        "Mantenere foto, documenti, pagamenti, destinazione e audit trail collegati alla pratica.",
+        "Applicare backup, controllo accessi e registrazione delle modifiche per l’intero periodo."
+      ],
+      "warnings": [
+        "Dieci giorni di fermo e dieci anni di conservazione sono due obblighi distinti.",
+        "Eventuali eccezioni e disposizioni locali vanno verificate con la Questura competente."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017, articolo 6",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2017/06/20/17G00109/sg",
+          "authority": "Gazzetta Ufficiale",
+          "status": "testo ufficiale",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Compro oro: obblighi e decorso dei dieci giorni",
+          "url": "https://questure.poliziadistato.it/Roma/articolo/9445b91111c43040315121866",
+          "authority": "Polizia di Stato",
+          "status": "indicazione istituzionale",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "sos-uif-antiriciclaggio",
+      "title": "Segnalazioni di operazioni sospette e indicatori UIF",
+      "category": "Normativa e compliance",
+      "keywords": ["SOS", "UIF", "operazione sospetta", "antiriciclaggio", "indicatori anomalia", "D.Lgs. 231/2007", "frazionamento"],
+      "summary": "Gli operatori compro oro devono valutare e segnalare senza ritardo alla UIF le operazioni per le quali sanno, sospettano o hanno motivi ragionevoli di sospettare riciclaggio, finanziamento del terrorismo o provenienza criminosa dei fondi.",
+      "facts": [
+        "La valutazione considera elementi oggettivi e soggettivi, natura, entità, collegamento e frazionamento delle operazioni.",
+        "Gli indicatori UIF sono ausili non esaustivi né tassativi: un indicatore non prova da solo il sospetto e la sua assenza non esclude il rischio.",
+        "La segnalazione va effettuata senza ritardo e, ove possibile, prima di eseguire l’operazione.",
+        "Dal 1 luglio 2026 sono efficaci le nuove Istruzioni UIF emanate il 18 dicembre 2025, che sostituiscono quelle del 4 maggio 2011."
+      ],
+      "checklist": [
+        "Raccogliere evidenze senza informare il cliente della possibile segnalazione.",
+        "Valutare comportamento, coerenza economica, frequenza, sedi, documenti, pagamenti e collegamenti.",
+        "Escalare al responsabile e usare i canali UIF previsti senza sostituire la valutazione umana con un punteggio automatico."
+      ],
+      "warnings": [
+        "Una red flag non è una condanna; serve una valutazione complessiva documentata.",
+        "Aurum può supportare l’analisi ma non decide autonomamente l’invio di una SOS."
+      ],
+      "sources": [
+        {
+          "title": "Segnalazioni di operazioni sospette",
+          "url": "https://uif.bancaditalia.it/adempimenti-operatori/segnalazioni-sos/",
+          "authority": "UIF - Banca d’Italia",
+          "status": "istruzioni correnti",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Indicatori, schemi e profili di anomalia",
+          "url": "https://uif.bancaditalia.it/normativa/norm-indicatori-anomalia/",
+          "authority": "UIF - Banca d’Italia",
+          "status": "raccolta corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "D.Lgs. 231/2007, testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/2007/12/14/007X0246/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Istruzioni UIF per rilevazione e segnalazione delle operazioni sospette",
+          "url": "https://uif.bancaditalia.it/normativa/norm-antiric/documenti/2025/Istruzioni-UIF-per-la-rilevazione-e-la-segnalazione-delle-operazioni-sospette.pdf",
+          "authority": "UIF - Banca d’Italia",
+          "status": "efficaci dal 1 luglio 2026",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "privacy-sicurezza-dati",
+      "title": "Privacy e sicurezza dei dati delle pratiche",
+      "category": "Normativa e compliance",
+      "keywords": ["GDPR", "privacy", "documento identità", "foto cliente", "minimizzazione", "cifratura", "accessi", "backup"],
+      "summary": "I dati identificativi e le immagini delle pratiche vanno trattati per finalità determinate, limitati al necessario e protetti con misure tecniche e organizzative adeguate al rischio.",
+      "facts": [
+        "La conservazione decennale prevista dal D.Lgs. 92/2017 costituisce un obbligo specifico, ma non elimina i principi GDPR.",
+        "Il principio di minimizzazione impone dati adeguati, pertinenti e limitati a quanto necessario.",
+        "Le misure devono proteggere riservatezza, integrità, disponibilità e capacità di ripristino.",
+        "Le due fotografie obbligatorie sono immagini dell’oggetto; non autorizzano ritratti del cliente o copie indiscriminate di dati non necessari."
+      ],
+      "checklist": [
+        "Limitare accessi per ruolo e registrare consultazioni e modifiche.",
+        "Cifrare trasmissione e archivi sensibili, effettuare backup verificati e gestire le credenziali.",
+        "Non inviare a servizi AI dati cliente non necessari; redigere codici fiscali, IBAN, email, telefoni e documenti."
+      ],
+      "warnings": [
+        "Non pubblicare o riutilizzare foto e documenti cliente per finalità incompatibili.",
+        "La cancellazione su richiesta può essere limitata dagli obblighi legali di conservazione: va valutata caso per caso."
+      ],
+      "sources": [
+        {
+          "title": "Guida all’applicazione del GDPR",
+          "url": "https://www.garanteprivacy.it/it/regolamentoue/guida-all-applicazione-del-regolamento-europeo-in-materia-di-protezione-dei-dati-personali",
+          "authority": "Garante per la protezione dei dati personali",
+          "status": "guida corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Misure di sicurezza",
+          "url": "https://www.garanteprivacy.it/it/temi/cybersecurity/misure-di-sicurezza",
+          "authority": "Garante per la protezione dei dati personali",
+          "status": "guida corrente",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "titoli-marchi-metalli-preziosi",
+      "title": "Titoli legali e marchi dei metalli preziosi",
+      "category": "Metalli preziosi",
+      "keywords": ["punzone", "marchio identificazione", "millesimi", "750", "585", "375", "925", "800", "950", "platino", "palladio"],
+      "summary": "La disciplina italiana considera preziosi platino, palladio, oro e argento. Titolo e marchio identificano finezza dichiarata e soggetto responsabile dell’immissione sul mercato.",
+      "facts": [
+        "Titoli legali: oro 750, 585 e 375‰; argento 925 e 800‰; platino 950, 900 e 850‰; palladio 950 e 500‰.",
+        "Il titolo è il rapporto in peso tra metallo prezioso fino e peso complessivo della lega, espresso in millesimi.",
+        "Il marchio identificativo italiano include stella, numero dell’assegnatario e sigla della provincia."
+      ],
+      "checklist": [
+        "Osservare a 10× titolo, marchio, nitidezza, usura e posizione.",
+        "Verificare se il punzone è coerente con costruzione, colore e risultati strumentali.",
+        "Registrare il punzone come evidenza, mai come prova unica di autenticità."
+      ],
+      "warnings": [
+        "Un punzone può essere contraffatto, incompleto o riferito a una sola parte.",
+        "Oggetti usati, importati, antichi o esclusi possono richiedere regole specifiche."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 251/1999, disciplina titoli e marchi",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=099G0329&atto.dataPubblicazioneGazzetta=1999-08-03",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Registro e titoli legali dei metalli preziosi",
+          "url": "https://www.vi.camcom.it/it/servizi/metrologia/registro-assegnatari-marchio-identificazione-metalli-preziosi.html",
+          "authority": "Camera di Commercio di Vicenza",
+          "status": "indicazioni istituzionali",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "carati-millesimi-grammi-fini",
+      "title": "Carati, millesimi e calcolo dei grammi fini",
+      "category": "Metalli preziosi",
+      "keywords": ["carati", "millesimi", "18k", "14k", "9k", "22k", "24k", "grammi fini", "finezza", "titolo"],
+      "summary": "Per l’oro, i carati esprimono parti d’oro su 24; il titolo in millesimi esprime parti in peso su 1.000. Il valore metallurgico parte dai grammi fini, non dal solo peso lordo.",
+      "facts": [
+        "Conversione teorica: millesimi = carati ÷ 24 × 1.000.",
+        "Corrispondenze operative: 22 K circa 916,7‰; 18 K 750‰; 14 K teorico 583,3‰ ma titolo legale italiano 585‰; 9 K 375‰.",
+        "Grammi fini = peso netto del metallo × titolo ÷ 1.000."
+      ],
+      "checklist": [
+        "Separare o stimare pietre, molle, riempimenti, sporco e parti non preziose.",
+        "Usare il titolo verificato o dichiarare esplicitamente che si tratta di una stima.",
+        "Mostrare peso lordo, tara/esclusioni, peso netto, titolo e grammi fini."
+      ],
+      "warnings": [
+        "24 K teorico equivale a 1.000‰; i prodotti commerciali fini sono comunemente 999 o 999,9‰.",
+        "Non applicare una caratura uniforme a oggetti con saldature, rivestimenti o parti eterogenee."
+      ],
+      "sources": [
+        {
+          "title": "CIBJO Precious Metals Blue Book",
+          "url": "https://cibjo.org/wp-content/uploads/2022/09/CIBJO-Precious-Metals-Blue-Book-20-04-01-.pdf",
+          "authority": "CIBJO",
+          "status": "standard di settore",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA: definizioni del contenuto fino",
+          "url": "https://www.lbma.org.uk/publications/the-code/annex-3-wholesale-precious-metals-spot-forward-and-deposits-in-precious-metals-basic-market-definitions",
+          "authority": "LBMA",
+          "status": "standard di mercato",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "leghe-oro-argento-pgm",
+      "title": "Leghe di oro, argento, platino e palladio",
+      "category": "Metalli preziosi",
+      "keywords": ["oro giallo", "oro bianco", "oro rosa", "argento", "platino", "palladio", "rodio", "nichel", "lega", "densità"],
+      "summary": "Colore, densità e risposta ai test dipendono dalla lega, dai trattamenti superficiali e dalla costruzione; non si può identificare con certezza un titolo dal solo colore.",
+      "facts": [
+        "L’oro bianco può contenere nichel o palladio ed essere rivestito di rodio; l’oro rosa contiene tipicamente più rame.",
+        "Densità indicative dei metalli puri: oro circa 19,3, argento 10,5, platino 21,45 e palladio 12,0 g/cm³.",
+        "Molle, viti, perni, fili d’acciaio e magneti di chiusure possono essere parti funzionali non preziose."
+      ],
+      "checklist": [
+        "Esaminare giunti, saldature, bordi consumati, chiusure e zone riparate.",
+        "Eseguire misure su più punti e confrontare metodi indipendenti.",
+        "Descrivere separatamente corpo, rivestimento, saldature e componenti."
+      ],
+      "warnings": [
+        "Una risposta magnetica locale non dimostra che l’intero gioiello sia falso.",
+        "Le densità dei metalli puri non sono valori automatici delle leghe commerciali."
+      ],
+      "sources": [
+        {
+          "title": "CIBJO Precious Metals Blue Book",
+          "url": "https://cibjo.org/wp-content/uploads/2022/09/CIBJO-Precious-Metals-Blue-Book-20-04-01-.pdf",
+          "authority": "CIBJO",
+          "status": "standard di settore",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Gold - proprietà dell’elemento",
+          "url": "https://periodic-table.rsc.org/element/79/gold",
+          "authority": "Royal Society of Chemistry",
+          "status": "riferimento scientifico",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "bilance-metrologia-legale",
+      "title": "Bilance e metrologia legale",
+      "category": "Strumenti e attrezzature",
+      "keywords": ["bilancia", "metrologia legale", "verificazione periodica", "NAWID", "Min", "divisione e", "divisione d", "peso"],
+      "summary": "La massa che determina il corrispettivo commerciale va misurata con uno strumento per pesare idoneo all’uso legale, correttamente installato, sigillato e sottoposto ai controlli previsti.",
+      "facts": [
+        "Non si deve pesare sotto la portata minima Min dichiarata.",
+        "La divisione visualizzata d e l’intervallo di verifica e non sono necessariamente uguali; più decimali non significano automaticamente maggiore accuratezza legale.",
+        "Il carato metrico equivale a 0,2 grammi.",
+        "Per gli strumenti per pesare a funzionamento non automatico la periodicità ordinaria della verificazione è tre anni; dopo riparazione con rimozione dei sigilli la richiesta va presentata entro dieci giorni lavorativi."
+      ],
+      "checklist": [
+        "Posizionare su piano stabile e livellato, lontano da vibrazioni e correnti d’aria.",
+        "Controllare zero/tara, marcature, sigilli e validità della verificazione.",
+        "Eseguire e registrare controlli interni con masse adeguate senza sostituire la verificazione obbligatoria."
+      ],
+      "warnings": [
+        "Una bilancia da laboratorio non legalizzata non va usata per determinare il prezzo verso il cliente.",
+        "Periodicità e adempimenti vanno confermati con Camera di Commercio e organismo abilitato."
+      ],
+      "sources": [
+        {
+          "title": "Metrologia legale - strumenti di misura",
+          "url": "https://www.mimit.gov.it/it/mercato-e-consumatori/normativa-tecnica/metrologia/strumenti-di-misura",
+          "authority": "MIMIT",
+          "status": "quadro corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Direttiva 2014/31/UE sugli strumenti per pesare non automatici",
+          "url": "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:32014L0031",
+          "authority": "EUR-Lex",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA Weighing Guidelines",
+          "url": "https://cdn.lbma.org.uk/downloads/GDL-Assets/Weighing-Guidelines.pdf",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Verificazione periodica degli strumenti metrici",
+          "url": "https://cn.camcom.it/regolazione-del-mercato/servizio-metrico/verificazione-periodica",
+          "authority": "Camera di Commercio di Cuneo",
+          "status": "indicazioni istituzionali",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "prezzo-quotazione-spread",
+      "title": "Quotazione, valore teorico e prezzo di acquisto",
+      "category": "Valutazione economica",
+      "keywords": ["quotazione oro", "spot", "prezzo grammo", "oncia troy", "31,1034768", "spread", "margine", "valore teorico"],
+      "summary": "Il valore teorico del metallo si ricava da benchmark, valuta, unità, peso netto e titolo; l’offerta commerciale deve poi distinguere costi, rischio, spread e margine.",
+      "facts": [
+        "Una oncia troy equivale a 31,1034768 grammi.",
+        "Prezzo teorico per grammo fino = benchmark per oncia nella valuta scelta ÷ 31,1034768.",
+        "Valore teorico = grammi fini × prezzo per grammo fino; non coincide automaticamente con il prezzo pagabile."
+      ],
+      "checklist": [
+        "Registrare fonte indipendente, valuta e timestamp del benchmark.",
+        "Calcolare e mostrare titolo, grammi fini e valore teorico.",
+        "Separare costi di analisi, smontaggio, raffinazione, copertura prezzo, rischio, spread e margine."
+      ],
+      "warnings": [
+        "Non memorizzare una quotazione statica come prezzo corrente.",
+        "Non promettere un rendimento o presentare una previsione come certezza."
+      ],
+      "sources": [
+        {
+          "title": "LBMA: The Price",
+          "url": "https://www.lbma.org.uk/publications/the-otc-guide/the-price",
+          "authority": "LBMA",
+          "status": "standard di mercato",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA: definizioni del mercato fisico",
+          "url": "https://www.lbma.org.uk/publications/the-code/annex-3-wholesale-precious-metals-spot-forward-and-deposits-in-precious-metals-basic-market-definitions",
+          "authority": "LBMA",
+          "status": "standard di mercato",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "calo-fusione-campionamento",
+      "title": "Calo di fusione, campionamento e resa",
+      "category": "Valutazione economica",
+      "keywords": ["calo fusione", "resa", "campionamento", "omogeneizzazione", "raffinazione", "pietre", "riempimenti"],
+      "summary": "Non esiste una percentuale universale di calo valida per ogni lotto: resa e differenze dipendono da materiali non preziosi, contaminanti, campionamento, processo e misure effettive.",
+      "facts": [
+        "Pietre, molle, riempimenti, sporco, saldature e componenti non preziosi devono essere separati o stimati in modo trasparente.",
+        "Il titolo esatto di un lotto eterogeneo richiede omogeneizzazione e campione rappresentativo.",
+        "La perdita effettiva di lavorazione va misurata e documentata, non presunta con una regola fissa."
+      ],
+      "checklist": [
+        "Inventariare materiali esclusi e pesi prima della lavorazione.",
+        "Sigillare e tracciare lotto, campione e controcampione.",
+        "Confrontare peso iniziale, fino stimato, fino recuperato e residui con metodo documentato."
+      ],
+      "warnings": [
+        "Una lettura superficiale non rappresenta necessariamente un oggetto o lotto eterogeneo.",
+        "La fusione è distruttiva e richiede consenso e struttura autorizzata."
+      ],
+      "sources": [
+        {
+          "title": "LBMA: Sampling and Assaying",
+          "url": "https://www.lbma.org.uk/publications/spotlight-on-north-american-gold-silver-refining/chapter-4-sampling-and-assaying",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA Good Delivery Rules 2026",
+          "url": "https://cdn.lbma.org.uk/downloads/Publications/2026/Good-Delivery/Good-Delivery-List-Rules-2026-FINAL.pdf",
+          "authority": "LBMA",
+          "status": "edizione 2026",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "flusso-accettazione-tecnica",
+      "title": "Flusso tecnico di accettazione di un prezioso",
+      "category": "Procedure operative",
+      "keywords": ["accettazione", "workflow", "catena custodia", "test multipli", "consenso", "screening", "pratica"],
+      "summary": "Una valutazione difendibile collega identità, oggetto, immagini, peso, osservazioni, prove, risultato, prezzo e destinazione senza mescolare lotti o saltare i limiti dei test.",
+      "facts": [
+        "Ogni evidenza deve essere riconducibile a un ID univoco di pratica e oggetto.",
+        "Il risultato corretto di uno screening è compatibile, non compatibile, inconcludente o da riferire al laboratorio.",
+        "Metodo, punto analizzato, strumento, operatore, data, calibrazione e risultato grezzo devono essere registrati."
+      ],
+      "checklist": [
+        "Identificare, fotografare e sigillare l’oggetto mantenendo separati i lotti.",
+        "Annotare punzoni, stato, pietre, parti cave, saldature, rivestimenti e danni preesistenti.",
+        "Pesare davanti al cliente e distinguere lordo, tara, esclusioni e netto stimato.",
+        "Partire da ispezione non distruttiva, poi scegliere prove indipendenti in base al rischio.",
+        "Ottenere consenso prima di limatura, acido, smontaggio, fusione o altra prova distruttiva.",
+        "Escalare discordanza o alto valore a laboratorio qualificato."
+      ],
+      "warnings": [
+        "Mai dichiarare autenticità, origine o titolo esatto da un unico test di screening.",
+        "Non chiamare certificato un rapporto interno di banco."
+      ],
+      "sources": [
+        {
+          "title": "LBMA Physical Market Guidelines",
+          "url": "https://www.lbma.org.uk/good-delivery/physical-market-guidelines",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "ISO 23345:2021 - ED-XRF",
+          "url": "https://www.iso.org/standard/75272.html",
+          "authority": "ISO",
+          "status": "standard corrente",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "ispezione-punzoni-magnetismo",
+      "title": "Ispezione, lente 10×, punzoni e magnete",
+      "category": "Strumenti e attrezzature",
+      "keywords": ["lente", "10x", "punzone", "magnete", "ferromagnetico", "usura", "saldature", "chiusura"],
+      "summary": "Ispezione e magnete sono controlli rapidi per individuare incoerenze e scegliere dove testare, ma non provano da soli autenticità o titolo.",
+      "facts": [
+        "Usura diversa, colore sotto abrasione, giunti, tappi, saldature e punzoni su parti sostituibili sono segnali da approfondire.",
+        "L’assenza di attrazione magnetica non prova che il metallo sia prezioso.",
+        "Una risposta locale può dipendere da molla, vite, perno o magnete funzionale."
+      ],
+      "checklist": [
+        "Pulire solo quanto necessario senza alterare l’oggetto.",
+        "Osservare sistematicamente tutte le parti e registrare le zone sospette.",
+        "Confermare con almeno un metodo indipendente adatto alla costruzione."
+      ],
+      "warnings": [
+        "Non usare magneti potenti vicino a orologi, dispositivi o pietre/assemblaggi sensibili senza valutazione.",
+        "Un punzone coerente è solo un’indicazione, non una certificazione."
+      ],
+      "sources": [
+        {
+          "title": "CIBJO Precious Metals Blue Book",
+          "url": "https://cibjo.org/wp-content/uploads/2022/09/CIBJO-Precious-Metals-Blue-Book-20-04-01-.pdf",
+          "authority": "CIBJO",
+          "status": "standard di settore",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "densita-idrostatica",
+      "title": "Densità e pesata idrostatica",
+      "category": "Strumenti e attrezzature",
+      "keywords": ["densità", "idrostatica", "peso acqua", "volume", "Archimede", "tungsteno", "oggetto cavo"],
+      "summary": "La densità confronta massa e volume ed è utile come controllo di compatibilità su oggetti adatti, ma perde affidabilità su geometrie o materiali complessi.",
+      "facts": [
+        "Il metodo idrostatico richiede una misura accurata in aria e immersa, temperatura controllata e assenza di bolle.",
+        "Oggetti cavi, porosi, con pietre, resine, saldature o leghe miste possono dare risultati fuorvianti.",
+        "Oro e tungsteno hanno densità vicine: la densità da sola non esclude un inserto ad alta densità."
+      ],
+      "checklist": [
+        "Verificare che l’oggetto sia adatto all’immersione e non trattenga bolle.",
+        "Registrare temperatura, liquido, pesi e incertezza.",
+        "Confrontare il risultato con costruzione, dimensioni e altre prove."
+      ],
+      "warnings": [
+        "Non immergere oggetti o gemme sensibili senza una valutazione preventiva.",
+        "Non convertire automaticamente una densità in caratura esatta."
+      ],
+      "sources": [
+        {
+          "title": "GIA: confronto dei metodi per il contenuto d’oro",
+          "url": "https://www.gia.edu/gems-gemology/winter-1992-gold-content-mercer",
+          "authority": "GIA",
+          "status": "riferimento tecnico",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA Physical Market Guidelines",
+          "url": "https://www.lbma.org.uk/good-delivery/physical-market-guidelines",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "pietra-paragone-acidi",
+      "title": "Pietra di paragone e test con acidi",
+      "category": "Strumenti e attrezzature",
+      "keywords": ["pietra di paragone", "acido nitrico", "acidi", "strisciata", "aghi campione", "limatura", "corrosivo"],
+      "summary": "Il test su pietra di paragone è uno screening comparativo della strisciata o della superficie; dipende da esperienza, lega, rivestimenti e preparazione e non certifica il titolo.",
+      "facts": [
+        "Placcature e trattamenti superficiali possono mascherare il materiale sottostante.",
+        "Il confronto con aghi campione migliora la coerenza, ma resta operatore-dipendente.",
+        "Acidi e miscele di saggio sono corrosivi e possono produrre vapori pericolosi."
+      ],
+      "checklist": [
+        "Ottenere consenso prima di qualsiasi abrasione o limatura.",
+        "Usare prodotto identificato, SDS aggiornata, ventilazione valutata e DPI compatibili.",
+        "Registrare zona, reagente, lotto/scadenza, osservazione e confronto.",
+        "Confermare risultati economici rilevanti con un metodo indipendente."
+      ],
+      "warnings": [
+        "Aurum non deve fornire ricette per preparare acidi, acqua regia o procedure di raffinazione in negozio.",
+        "Non usare il test su pietre o finiture sensibili e non versare residui nello scarico."
+      ],
+      "sources": [
+        {
+          "title": "GIA: confronto dei metodi per il contenuto d’oro",
+          "url": "https://www.gia.edu/gems-gemology/winter-1992-gold-content-mercer",
+          "authority": "GIA",
+          "status": "riferimento tecnico",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "REACH - requisiti della scheda dati di sicurezza",
+          "url": "https://eur-lex.europa.eu/eli/reg/2006/1907",
+          "authority": "EUR-Lex",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "D.Lgs. 81/2008, sicurezza sul lavoro",
+          "url": "https://www.normattiva.it/eli/id/2008/04/30/008G0104/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "xrf-fluorescenza-raggi-x",
+      "title": "Analisi ED-XRF dei metalli preziosi",
+      "category": "Strumenti e attrezzature",
+      "keywords": ["XRF", "ED-XRF", "fluorescenza raggi X", "composizione superficiale", "placcatura", "omogeneo", "non distruttivo"],
+      "summary": "L’ED-XRF misura rapidamente la composizione elementare della zona superficiale ed è non distruttiva, ma non dimostra da sola la composizione dell’intero oggetto.",
+      "facts": [
+        "ISO 23345:2021 riguarda oggetti omogenei e non rivestiti.",
+        "Nell’oro la profondità analizzata può essere inferiore a 10 micrometri; placcature e arricchimento superficiale possono ingannare.",
+        "Geometria, curvatura, finitura, calibrazione e matrice influenzano il risultato."
+      ],
+      "checklist": [
+        "Verificare calibrazione e materiale di riferimento adatto alla matrice.",
+        "Misurare più punti, incluse aree di usura o sezioni rappresentative quando autorizzato.",
+        "Registrare spettro/lettura, punto, tempo, impostazioni, strumento e incertezza.",
+        "Confermare discordanza o alto valore con metodo volumetrico o laboratorio."
+      ],
+      "warnings": [
+        "Una lettura XRF superficiale non certifica un oggetto placcato, cavo o eterogeneo.",
+        "Lo strumento usa radiazioni ionizzanti e richiede protezioni e adempimenti specifici."
+      ],
+      "sources": [
+        {
+          "title": "ISO 23345:2021 - ED-XRF per metalli preziosi",
+          "url": "https://www.iso.org/standard/75272.html",
+          "authority": "ISO",
+          "status": "standard corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA Physical Market Guidelines",
+          "url": "https://www.lbma.org.uk/good-delivery/physical-market-guidelines",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "correnti-indotte-ultrasuoni",
+      "title": "Conducibilità, correnti indotte e ultrasuoni",
+      "category": "Strumenti e attrezzature",
+      "keywords": ["eddy current", "correnti indotte", "conducibilità", "ultrasuoni", "velocità acustica", "lingotto", "inserto"],
+      "summary": "Conducibilità e ultrasuoni aggiungono informazioni sotto la superficie, soprattutto sui lingotti, ma rispondono a domande diverse e non misurano da soli il titolo.",
+      "facts": [
+        "Le correnti indotte valutano compatibilità elettrica entro area e profondità dipendenti da sonda, frequenza e matrice.",
+        "Gli ultrasuoni possono evidenziare vuoti, discontinuità o velocità incompatibili e verificare l’eco di fondo.",
+        "Porosità, accoppiamento, forma e superficie possono generare segnali ambigui o falsi allarmi."
+      ],
+      "checklist": [
+        "Usare sonde e impostazioni validate per lega, forma e spessore.",
+        "Confrontare con campione noto e registrare posizione e segnale grezzo.",
+        "Integrare massa, dimensioni, XRF multipunto e prova interna."
+      ],
+      "warnings": [
+        "L’ultrasuono non misura la purezza.",
+        "Un risultato anomalo richiede approfondimento, non un verdetto automatico di falso."
+      ],
+      "sources": [
+        {
+          "title": "LBMA Physical Market Guidelines",
+          "url": "https://www.lbma.org.uk/good-delivery/physical-market-guidelines",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Ultrasonic probe and display",
+          "url": "https://www.lbma.org.uk/wonders-of-gold/items/ultrasonic-probe-and-display",
+          "authority": "LBMA",
+          "status": "riferimento tecnico",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "saggio-fuoco-analisi-laboratorio",
+      "title": "Saggio al fuoco e analisi di laboratorio",
+      "category": "Strumenti e attrezzature",
+      "keywords": ["saggio al fuoco", "cupellazione", "ICP-OES", "ICP-MS", "laboratorio", "campione rappresentativo", "distruttivo"],
+      "summary": "Per l’oro, il saggio al fuoco su campione rappresentativo resta un riferimento quantitativo di alta accuratezza; tecniche strumentali validate completano l’analisi di oro, argento e PGM.",
+      "facts": [
+        "Il saggio al fuoco separa l’oro dalle impurità e determina gravimetricamente il contenuto su campione.",
+        "ICP-OES, ICP-MS, metodi gravimetrici e potenziometrici richiedono preparazione, metodo validato e controllo qualità.",
+        "L’accuratezza dell’analisi non corregge un campionamento non rappresentativo."
+      ],
+      "checklist": [
+        "Omogeneizzare il lotto quando appropriato e prelevare campione/controcampione tracciati.",
+        "Affidare analisi distruttive a laboratorio competente con metodo dichiarato.",
+        "Conservare risultati, incertezza, catena di custodia e residui."
+      ],
+      "warnings": [
+        "Non eseguire cupellazione o raffinazione improvvisata in negozio.",
+        "Il risultato vale per il campione analizzato e per il lotto solo se il campionamento è rappresentativo."
+      ],
+      "sources": [
+        {
+          "title": "ISO 11426:2021 - determinazione dell’oro con cupellazione",
+          "url": "https://www.iso.org/standard/75771.html",
+          "authority": "ISO",
+          "status": "standard corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA: Measuring Gold Fineness",
+          "url": "https://cdn.lbma.org.uk/downloads/Alchemist/PDFs/Alch110Complete_FINAL.pdf",
+          "authority": "LBMA",
+          "status": "riferimento tecnico",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "attrezzatura-minima-compro-oro",
+      "title": "Attrezzatura e materiali per un compro oro",
+      "category": "Strumenti e attrezzature",
+      "keywords": ["attrezzatura", "materiale compro oro", "lente", "microscopio", "calibro", "fotocamera", "sigilli", "masse campione", "SDS"],
+      "summary": "La dotazione va organizzata per livelli: tracciabilità e misure legali sempre, screening proporzionato al rischio, analisi avanzata solo con competenze e sicurezza adeguate.",
+      "facts": [
+        "Dotazione di base: bilancia idonea all’uso legale, masse di controllo, lente 10×, illuminazione neutra, calibro, fotocamera, etichette e sigilli antimanomissione.",
+        "Livello intermedio: microscopio stereoscopico, kit densità, pietra/aghì campione, XRF schermato e strumenti combinati di screening.",
+        "Livello avanzato: ultrasuoni, FTIR, Raman, fotoluminescenza, UV-Vis, imaging UV profondo e analisi chimiche di laboratorio."
+      ],
+      "checklist": [
+        "Tenere inventario, manuali, manutenzioni, calibrazioni, materiali di riferimento e formazione.",
+        "Separare strumenti per metalli, pietre e diamanti secondo campo validato.",
+        "Conservare SDS, DPI, kit versamenti, lavaocchi e procedure di emergenza per gli agenti chimici."
+      ],
+      "warnings": [
+        "Acquistare uno strumento non crea automaticamente competenza diagnostica.",
+        "Prima dell’acquisto verificare campo di misura, limiti, assistenza, calibrazione, normativa e costi totali."
+      ],
+      "sources": [
+        {
+          "title": "LBMA Physical Market Guidelines",
+          "url": "https://www.lbma.org.uk/good-delivery/physical-market-guidelines",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "GIA Instruments",
+          "url": "https://www.gia.edu/instruments",
+          "authority": "GIA",
+          "status": "strumentazione gemmologica",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "lingotti-contraffazioni",
+      "title": "Controllo dei lingotti e segnali di contraffazione",
+      "category": "Antifrode",
+      "keywords": ["lingotto falso", "tungsteno", "massa dimensioni", "seriale", "packaging", "ultrasuoni", "XRF", "conducibilità"],
+      "summary": "Il controllo di un lingotto richiede coerenza tra identità, massa, dimensioni e più tecniche; confezione, seriale e XRF superficiale non bastano.",
+      "facts": [
+        "Massa e dimensioni incompatibili, cuciture, tappi, abrasioni o superficie diversa sono segnali da approfondire.",
+        "XRF legge soprattutto la superficie; un inserto interno può richiedere ultrasuoni, correnti indotte o campionamento.",
+        "L’assenza dell’eco di fondo o una velocità acustica anomala è un’indicazione, non la misura del titolo."
+      ],
+      "checklist": [
+        "Verificare peso, dimensioni, marchi, seriale, confezione e provenienza.",
+        "Applicare XRF multipunto e almeno una tecnica con sensibilità sotto-superficiale.",
+        "Per alto valore o discordanza sospendere e inviare a laboratorio/raffineria qualificata."
+      ],
+      "warnings": [
+        "Non rompere un blister o alterare un lingotto senza consenso e valutazione del danno commerciale.",
+        "Nessun singolo dispositivo copre ogni contraffazione."
+      ],
+      "sources": [
+        {
+          "title": "LBMA Physical Market Guidelines",
+          "url": "https://www.lbma.org.uk/good-delivery/physical-market-guidelines",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA Good Delivery Rules 2026",
+          "url": "https://cdn.lbma.org.uk/downloads/Publications/2026/Good-Delivery/Good-Delivery-List-Rules-2026-FINAL.pdf",
+          "authority": "LBMA",
+          "status": "edizione 2026",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "diamante-naturale-lab-grown-simulanti",
+      "title": "Diamante naturale, laboratory-grown e simulanti",
+      "category": "Diamanti e gemme",
+      "keywords": ["diamante naturale", "diamante sintetico", "laboratory-grown", "HPHT", "CVD", "moissanite", "zirconia cubica", "simulante"],
+      "summary": "Un diamante prodotto in laboratorio è diamante con struttura e proprietà fondamentali analoghe al naturale, cresciuto HPHT o CVD; moissanite e zirconia cubica sono invece simulanti.",
+      "facts": [
+        "HPHT e CVD sono i due principali processi di crescita e possono essere seguiti da trattamenti post-crescita.",
+        "Osservazione e strumenti gemmologici tradizionali non separano sempre naturale e laboratory-grown.",
+        "I termini laboratory-grown, laboratory-created o synthetic devono rendere inequivocabile l’origine non naturale."
+      ],
+      "checklist": [
+        "Separare prima diamante da simulante, poi valutare l’origine naturale o di laboratorio.",
+        "Controllare incisione e rapporto senza considerarli prove sufficienti.",
+        "Usare screening validato e inviare ogni risultato refer a test avanzato."
+      ],
+      "warnings": [
+        "Non chiamare la moissanite diamante sintetico.",
+        "Aspetto fotografico, colore o inclusione singola non provano l’origine."
+      ],
+      "sources": [
+        {
+          "title": "GIA: identificazione dei laboratory-grown diamonds",
+          "url": "https://www.gia.edu/gia-faq/gia-faq-analysis-grading-identify-laboratory-grown-diamonds",
+          "authority": "GIA",
+          "status": "guida corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "CIBJO Diamond Blue Book 2024",
+          "url": "https://cibjo.org/wp-content/uploads/2024/11/CIBJO-Diamond-Blue-Book-2024-1.pdf",
+          "authority": "CIBJO",
+          "status": "edizione 2024",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "screening-diamanti-pass-refer",
+      "title": "Screening dei diamanti: pass, refer e limiti",
+      "category": "Diamanti e gemme",
+      "keywords": ["diamond tester", "tester termico", "pass", "refer", "screening", "melee", "fotoluminescenza", "FTIR", "Raman"],
+      "summary": "Lo screening rapido deve essere interpretato nel campo validato dello strumento: pass indica compatibilità con naturale; refer richiede approfondimento e non significa automaticamente sintetico.",
+      "facts": [
+        "Un tester termico tradizionale può confondere moissanite e diamante.",
+        "Non esiste un singolo strumento rapido ed economico che identifichi definitivamente ogni laboratory-grown diamond.",
+        "Conclusioni avanzate possono richiedere microscopia, FTIR, Raman, fotoluminescenza, UV-Vis e imaging UV profondo."
+      ],
+      "checklist": [
+        "Controllare dimensione, colore, forma e montatura ammessi dal dispositivo.",
+        "Testare l’intero lotto melee secondo capacità e procedura dello strumento.",
+        "Registrare esito grezzo e inviare i refer a laboratorio qualificato."
+      ],
+      "warnings": [
+        "Non trasformare refer in una diagnosi di sintetico.",
+        "Alcuni strumenti possono non riferire certi simulanti o materiali fuori campo."
+      ],
+      "sources": [
+        {
+          "title": "GIA 2024: aggiornamento e limiti dello screening",
+          "url": "https://www.gia.edu/gems-gemology/summer-2024-gia-update-on-laboratory-grown-diamonds",
+          "authority": "GIA",
+          "status": "ricerca tecnica",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "GIA Diamond Research",
+          "url": "https://www.gia.edu/articles/diamond-research",
+          "authority": "GIA",
+          "status": "ricerca corrente",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "quattro-c-diamanti-valutazione",
+      "title": "Le 4C e la valutazione economica del diamante",
+      "category": "Diamanti e gemme",
+      "keywords": ["4C", "carat", "color", "clarity", "cut", "peso carati", "colore", "purezza", "taglio", "perizia valore"],
+      "summary": "Peso, colore, purezza e taglio descrivono la qualità del diamante, ma identità, origine, trattamenti, mercato e condizioni commerciali restano separati dalla classificazione.",
+      "facts": [
+        "Il peso è espresso in carati metrici: 1 ct = 0,2 g.",
+        "Colore e purezza richiedono condizioni standardizzate; il taglio considera proporzioni e finitura.",
+        "Un rapporto gemmologico descrive il campione e non è automaticamente una perizia di valore."
+      ],
+      "checklist": [
+        "Verificare prima identità, origine e trattamenti.",
+        "Usare peso misurato e ambiente standard; su montato dichiarare i limiti.",
+        "Separare qualità gemmologica, prezzo comparabile, liquidità e margine."
+      ],
+      "warnings": [
+        "La montatura può impedire peso esatto e alterare percezione di colore e purezza.",
+        "Non ricavare un valore certo dalle sole 4C o da un listino non contestualizzato."
+      ],
+      "sources": [
+        {
+          "title": "GIA: come vengono classificati i diamanti",
+          "url": "https://www.gia.edu/gem-lab-how-gia-grades-diamond",
+          "authority": "GIA",
+          "status": "metodo corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "GIA: il rapporto non è una valutazione economica",
+          "url": "https://4cs.gia.edu/en-us/blog/what-is-a-gia-diamond/",
+          "authority": "GIA",
+          "status": "guida corrente",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "trattamenti-diamante-report-check",
+      "title": "Trattamenti del diamante e verifica del rapporto",
+      "category": "Diamanti e gemme",
+      "keywords": ["laser drilling", "fracture filling", "coating", "irradiazione", "annealing", "HPHT trattamento", "Report Check", "incisione contraffatta"],
+      "summary": "Trattamenti e origine incidono su descrizione e valore; numero di rapporto e incisione vanno verificati confrontando tutte le caratteristiche, perché possono essere contraffatti.",
+      "facts": [
+        "Trattamenti noti includono laser drilling, riempimento di fratture, coating, HPHT sul colore, irradiazione e annealing.",
+        "GIA considera stabili alcuni trattamenti come HPHT, irradiazione/annealing e laser drilling; coating e fracture filling possono essere non permanenti.",
+        "Esistono diamanti CVD con incisioni contraffatte: numero, peso, misure, forma e diagramma devono coincidere."
+      ],
+      "checklist": [
+        "Verificare il rapporto sul servizio ufficiale dell’ente emittente.",
+        "Confrontare peso, dimensioni, forma, iscrizione e caratteristiche osservabili.",
+        "Dichiarare trattamento e origine in modo evidente e rinviare discordanza al laboratorio."
+      ],
+      "warnings": [
+        "Un PDF o QR apparentemente valido non prova che il rapporto appartenga alla pietra.",
+        "Calore, ultrasuoni e sostanze chimiche possono danneggiare pietre trattate o riempite."
+      ],
+      "sources": [
+        {
+          "title": "GIA: Diamond Treatments",
+          "url": "https://4cs.gia.edu/en-us/diamond-treatments/",
+          "authority": "GIA",
+          "status": "guida corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "GIA: CVD con iscrizione contraffatta",
+          "url": "https://www.gia.edu/gems-gemology/summer-2021-labnotes-cvd-laboratory-grown-diamond-with-counterfeit-gia-inscription",
+          "authority": "GIA",
+          "status": "caso di laboratorio",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "diamanti-lab-grown-standard-2025",
+      "title": "Classificazione GIA dei laboratory-grown dal 2025",
+      "category": "Diamanti e gemme",
+      "keywords": ["Premium", "Standard", "GIA 2025", "laboratory-grown quality assessment", "diamante laboratorio"],
+      "summary": "Dal 1º ottobre 2025 GIA usa per i laboratory-grown incolori o quasi incolori idonei una valutazione complessiva Premium o Standard, anziché replicare la nomenclatura creata per i naturali.",
+      "facts": [
+        "Il servizio riguarda diamanti laboratory-grown sciolti, incolori o quasi incolori, nei requisiti indicati da GIA.",
+        "La cintura viene iscritta con Laboratory-Grown e il numero della valutazione.",
+        "Per i colorati sono disponibili servizi distinti con valutazione del tipo di crescita e dei trattamenti."
+      ],
+      "checklist": [
+        "Identificare data e tipo del rapporto prima di interpretare la scala.",
+        "Usare il servizio Report Check ufficiale.",
+        "Non convertire automaticamente Premium/Standard nelle scale dei naturali."
+      ],
+      "warnings": [
+        "Servizi, soglie e nomenclatura possono cambiare: verificare sempre la pagina corrente GIA.",
+        "La valutazione di qualità non è una stima economica."
+      ],
+      "sources": [
+        {
+          "title": "GIA Laboratory-Grown Diamond Services",
+          "url": "https://www.gia.edu/gia-website/laboratory-grown-diamond",
+          "authority": "GIA",
+          "status": "servizio corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "GIA: lancio dei servizi aggiornati dal 1 ottobre 2025",
+          "url": "https://www.gia.edu/gia-news-press/updated-laboratory-grown-diamond-services-to-launch-october-1",
+          "authority": "GIA",
+          "status": "comunicato ufficiale",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "gemme-identificazione-prudente",
+      "title": "Identificazione prudente delle gemme",
+      "category": "Diamanti e gemme",
+      "keywords": ["gemme", "pietre preziose", "indice rifrazione", "birifrangenza", "spettro", "microscopio", "trattamenti", "origine"],
+      "summary": "Una gemma si identifica combinando proprietà indipendenti e osservazioni; specie, varietà, origine naturale/sintetica, trattamenti e provenienza geografica sono conclusioni differenti.",
+      "facts": [
+        "Colore e fotografia non identificano una gemma.",
+        "Indice di rifrazione, densità, pleocroismo, spettro, inclusioni e risposta UV hanno campi e limiti specifici.",
+        "L’origine geografica e molti trattamenti richiedono tecniche avanzate e dati comparativi di laboratorio."
+      ],
+      "checklist": [
+        "Separare osservazione, misura, inferenza e conclusione.",
+        "Usare almeno due proprietà indipendenti e controllare che il campione rientri nel campo dello strumento.",
+        "Riferire al laboratorio pietre montate, costose, trattate, sintetiche sospette o risultati discordanti."
+      ],
+      "warnings": [
+        "Non eseguire test distruttivi o immersione senza conoscere sensibilità della gemma.",
+        "Non attribuire provenienza geografica da colore, foto o singola inclusione."
+      ],
+      "sources": [
+        {
+          "title": "CIBJO Gemstone Blue Book",
+          "url": "https://cibjo.org/industry-standards-resources/",
+          "authority": "CIBJO",
+          "status": "raccolta standard corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "GIA Gem Encyclopedia",
+          "url": "https://www.gia.edu/gem-encyclopedia",
+          "authority": "GIA",
+          "status": "riferimento gemmologico",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "sicurezza-xrf-radiazioni",
+      "title": "Sicurezza XRF e radiazioni ionizzanti",
+      "category": "Sicurezza",
+      "keywords": ["XRF sicurezza", "radiazioni ionizzanti", "D.Lgs. 101/2020", "interblocco", "schermatura", "esperto radioprotezione"],
+      "summary": "Gli analizzatori XRF generano raggi X: configurazione, uso e adempimenti devono rispettare la radioprotezione applicabile e le istruzioni del fabbricante.",
+      "facts": [
+        "Il riferimento italiano è il D.Lgs. 101/2020, aggiornato dal D.Lgs. 203/2022.",
+        "Interblocchi e schermature non devono mai essere esclusi.",
+        "Obblighi, classificazione e necessità dell’esperto di radioprotezione dipendono da apparecchio, uso e configurazione."
+      ],
+      "checklist": [
+        "Preferire XRF da banco schermato per il punto vendita.",
+        "Verificare marcature, valutazione preventiva, formazione, controlli e registri.",
+        "Impedire accesso non autorizzato e seguire manuale e procedure di emergenza."
+      ],
+      "warnings": [
+        "Non puntare mai un XRF palmare verso persone o parti del corpo.",
+        "Aurum non sostituisce l’esperto di radioprotezione."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 101/2020, protezione dalle radiazioni ionizzanti",
+          "url": "https://www.normattiva.it/eli/id/2020/08/12/20G00121/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Radiazioni ionizzanti",
+          "url": "https://www.inail.it/portale/prevenzione-e-sicurezza/it/come-fare-per/conoscere-il-rischio/agenti-fisici/radiazioni-ionizzanti.html",
+          "authority": "INAIL",
+          "status": "guida istituzionale",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "sicurezza-chimica-lavoro",
+      "title": "Sicurezza chimica, DPI e schede SDS",
+      "category": "Sicurezza",
+      "keywords": ["SDS", "DPI", "acidi", "agenti chimici", "D.Lgs. 81/2008", "lavaocchi", "ventilazione", "smaltimento"],
+      "summary": "L’uso di reagenti richiede valutazione del rischio chimico, SDS aggiornata, formazione, controllo dell’esposizione, DPI compatibili, gestione di versamenti e smaltimento.",
+      "facts": [
+        "La SDS serve a identificare pericoli e misure per stoccaggio, manipolazione, emergenza e smaltimento.",
+        "Il D.Lgs. 81/2008 disciplina attrezzature, DPI e protezione da agenti chimici nei luoghi di lavoro.",
+        "Guanti generici non sono universalmente compatibili: materiale e tempo di permeazione vanno verificati sulla SDS."
+      ],
+      "checklist": [
+        "Inventariare prodotti, etichette, scadenze e SDS in italiano.",
+        "Valutare ventilazione, protezione occhi/viso e mani, vaschetta, lavaocchi e kit versamenti.",
+        "Conservare reagenti incompatibili separati e affidare rifiuti a canale autorizzato."
+      ],
+      "warnings": [
+        "Non preparare miscele o neutralizzare versamenti senza procedura competente.",
+        "Non conservare reagenti in contenitori alimentari o privi di etichetta."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 81/2008, testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/2008/04/30/008G0104/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "REACH - schede dati di sicurezza",
+          "url": "https://eur-lex.europa.eu/eli/reg/2006/1907",
+          "authority": "EUR-Lex",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "catena-custodia-antimanomissione",
+      "title": "Catena di custodia e separazione dei lotti",
+      "category": "Procedure operative",
+      "keywords": ["catena di custodia", "sigillo", "lotto", "campione", "controcampione", "tracciabilità", "audit trail"],
+      "summary": "Dal banco alla fonderia ogni oggetto, lotto e campione deve restare identificabile, separato e protetto da sostituzioni o alterazioni non registrate.",
+      "facts": [
+        "ID, foto, peso, sigillo, operatore, luogo, data e passaggi di consegna devono essere collegati.",
+        "Campione e controcampione devono essere rappresentativi e riconducibili al lotto.",
+        "Ogni apertura, trasferimento, smontaggio, fusione o restituzione deve lasciare traccia."
+      ],
+      "checklist": [
+        "Usare contenitori e sigilli numerati antimanomissione.",
+        "Registrare ogni consegna con mittente, ricevente, data, ora e condizione del sigillo.",
+        "Riconciliare quantità e pesi a ogni passaggio."
+      ],
+      "warnings": [
+        "Non riutilizzare lo stesso ID o mescolare oggetti di pratiche diverse.",
+        "Una catena interrotta riduce l’affidabilità anche di un’analisi accurata."
+      ],
+      "sources": [
+        {
+          "title": "LBMA Good Delivery Rules 2026",
+          "url": "https://cdn.lbma.org.uk/downloads/Publications/2026/Good-Delivery/Good-Delivery-List-Rules-2026-FINAL.pdf",
+          "authority": "LBMA",
+          "status": "edizione 2026",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "D.Lgs. 92/2017, tracciabilità e conservazione",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2017/06/20/17G00109/sg",
+          "authority": "Gazzetta Ufficiale",
+          "status": "testo ufficiale",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "oro-investimento-iva",
+      "title": "Oro da investimento e regime IVA",
+      "category": "Fiscalità",
+      "keywords": ["oro da investimento", "IVA", "lingotti 995", "monete 900", "articolo 10", "DPR 633/1972", "lista monete 2026"],
+      "summary": "L’oro da investimento ha una definizione e un regime IVA specifici; non ogni oggetto, moneta o rottame d’oro rientra automaticamente nel regime.",
+      "facts": [
+        "La direttiva IVA definisce oro da investimento i lingotti o placchette di peso accettato dal mercato con purezza almeno 995‰.",
+        "Le monete devono avere purezza almeno 900‰, essere coniate dopo il 1800, avere o aver avuto corso legale e rispettare il criterio di prezzo.",
+        "L’Unione pubblica ogni anno una lista di monete che soddisfano i criteri; la lista 2026 è valida dal 1 gennaio al 31 dicembre 2026.",
+        "L’assenza dalla lista annuale non esclude automaticamente una moneta che dimostri direttamente tutti i requisiti normativi."
+      ],
+      "checklist": [
+        "Classificare separatamente gioiello usato, rottame, oro industriale e oro da investimento.",
+        "Verificare purezza, forma, moneta e lista annuale applicabile.",
+        "Demandare fatturazione, esenzione, opzione o inversione contabile al consulente fiscale sul caso concreto."
+      ],
+      "warnings": [
+        "Aurum non deve assegnare autonomamente un trattamento IVA a una transazione reale.",
+        "La qualifica commerciale di bullion non basta per l’esenzione."
+      ],
+      "sources": [
+        {
+          "title": "Direttiva 2006/112/CE, regime oro da investimento",
+          "url": "https://eur-lex.europa.eu/eli/dir/2006/112/oj/ita",
+          "authority": "EUR-Lex",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "D.P.R. 633/1972, articolo 10 n. 11",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.presidente.repubblica:1972-10-26;633~art10!vig=",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "Lista UE delle monete d’oro da investimento valida per il 2026",
+          "url": "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:52025XC05923",
+          "authority": "EUR-Lex",
+          "status": "valida per il 2026",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "esiti-screening-linguaggio",
+      "title": "Linguaggio corretto degli esiti tecnici",
+      "category": "Procedure operative",
+      "keywords": ["autentico", "falso", "compatibile", "non compatibile", "inconcludente", "refer", "certificato", "screening"],
+      "summary": "Aurum deve distinguere dato misurato, stima, inferenza e conclusione e usare un linguaggio proporzionato alla forza delle evidenze.",
+      "facts": [
+        "Compatibile significa che le misure rientrano nei criteri del test, non che ogni possibile frode è esclusa.",
+        "Non compatibile segnala una discordanza da investigare, non prova automaticamente dolo o falsità.",
+        "Inconcludente o refer richiede test aggiuntivi o laboratorio."
+      ],
+      "checklist": [
+        "Elencare metodo, campo validato, dato grezzo e limite.",
+        "Motivare l’esito con più evidenze indipendenti.",
+        "Indicare il passo successivo e il soggetto qualificato."
+      ],
+      "warnings": [
+        "Non usare certificato per un controllo di banco non accreditato.",
+        "Non dichiarare naturale, sintetico, autentico o titolo esatto da una sola prova."
+      ],
+      "sources": [
+        {
+          "title": "GIA 2024: limiti degli strumenti di screening",
+          "url": "https://www.gia.edu/gems-gemology/summer-2024-gia-update-on-laboratory-grown-diamonds",
+          "authority": "GIA",
+          "status": "ricerca tecnica",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA Physical Market Guidelines",
+          "url": "https://www.lbma.org.uk/good-delivery/physical-market-guidelines",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "red-flags-antifrode",
+      "title": "Red flag tecniche e operative antifrode",
+      "category": "Antifrode",
+      "keywords": ["red flag", "contraffazione", "documento", "IBAN", "punzone", "discordanza", "frazionamento", "melee", "alto rischio"],
+      "summary": "Le anomalie devono attivare approfondimenti proporzionati senza produrre automaticamente una diagnosi tecnica o una segnalazione antiriciclaggio.",
+      "facts": [
+        "Red flag tecniche: massa/dimensioni incoerenti, punzoni anomali, letture XRF variabili, rivestimenti, giunti, vuoti o discordanza tra test.",
+        "Red flag gemmologiche: rapporto, incisione, peso, misure o inclusioni non coincidenti; lotto melee non interamente testato; refer presentato come sintetico.",
+        "Red flag operative: operazioni collegate, documenti o IBAN incoerenti, frequenza o sedi insolite, pressione a eludere foto, tracciabilità o consenso."
+      ],
+      "checklist": [
+        "Bloccare la conclusione e preservare evidenze e catena di custodia.",
+        "Eseguire controlli indipendenti e documentare il ragionamento.",
+        "Escalare separatamente a responsabile compliance, laboratorio o autorità competente secondo la natura del rischio."
+      ],
+      "warnings": [
+        "Non accusare il cliente sulla base di un indicatore.",
+        "Non comunicare al cliente l’eventuale valutazione o invio di una SOS."
+      ],
+      "sources": [
+        {
+          "title": "UIF: indicatori e schemi di anomalia",
+          "url": "https://uif.bancaditalia.it/normativa/norm-indicatori-anomalia/",
+          "authority": "UIF - Banca d’Italia",
+          "status": "raccolta corrente",
+          "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "LBMA Physical Market Guidelines",
+          "url": "https://www.lbma.org.uk/good-delivery/physical-market-guidelines",
+          "authority": "LBMA",
+          "status": "guida tecnica",
+          "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    }
+  ]
+}
