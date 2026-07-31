@@ -1237,6 +1237,7 @@ function auditActionLabel(action = "") {
     unauthorized_user_create_attempt: "Tentativo creazione utente non autorizzato",
     deactivate_user: "Disattivazione utente",
     delete_user: "Eliminazione utente",
+    store_deleted: "Eliminazione negozio",
     view_user_activity: "Visualizzazione attività utente",
     create_crm_client: "Creazione cliente CRM",
     update_crm_client: "Modifica cliente CRM",
@@ -10368,6 +10369,7 @@ async function bootstrapStores() {
     FROM negozi n
     WHERE u.negozio_id IS NULL
       AND u.negozio = n.nome
+      AND n.deleted_at IS NULL
   `);
   await pool.query(`
     UPDATE atti_vendita a
@@ -10378,6 +10380,7 @@ async function bootstrapStores() {
     FROM negozi n
     WHERE a.negozio_id IS NULL
       AND (a.store = n.nome OR a.store_code = n.codice)
+      AND n.deleted_at IS NULL
   `);
 }
 
@@ -10443,7 +10446,7 @@ async function storeByCodeOrName(value = "") {
   const text = String(value || "").trim();
   if (!text || text === "Tutti") return null;
   const result = await pool.query(
-    "SELECT * FROM negozi WHERE codice = $1 OR nome = $1 ORDER BY id LIMIT 1",
+    "SELECT * FROM negozi WHERE deleted_at IS NULL AND (codice = $1 OR nome = $1) ORDER BY id LIMIT 1",
     [text]
   );
   return result.rows[0] || null;
@@ -10451,7 +10454,7 @@ async function storeByCodeOrName(value = "") {
 
 async function storeForUser(user = {}) {
   if (user.negozio_id) {
-    const result = await pool.query("SELECT * FROM negozi WHERE id = $1 LIMIT 1", [user.negozio_id]);
+    const result = await pool.query("SELECT * FROM negozi WHERE id = $1 AND deleted_at IS NULL LIMIT 1", [user.negozio_id]);
     if (result.rows[0]) return result.rows[0];
   }
   return storeByCodeOrName(user.negozio);
@@ -10467,7 +10470,7 @@ function canViewControlSections(user = {}) {
 
 async function listStores(user = {}) {
   if (roleSeesAllStores(user.ruolo)) {
-    const result = await pool.query("SELECT * FROM negozi ORDER BY nome");
+    const result = await pool.query("SELECT * FROM negozi WHERE deleted_at IS NULL ORDER BY nome");
     return result.rows;
   }
   const store = await storeForUser(user);
@@ -10498,7 +10501,9 @@ async function createStore(input = {}, user = {}) {
          telefono = EXCLUDED.telefono,
          email = EXCLUDED.email,
          responsabile_id = EXCLUDED.responsabile_id,
-         attivo = EXCLUDED.attivo
+         attivo = EXCLUDED.attivo,
+         deleted_at = NULL,
+         deleted_by = NULL
      RETURNING *`,
     [
       nome,
@@ -10533,6 +10538,7 @@ async function updateStore(id, input = {}, user = {}) {
          responsabile_id = COALESCE($9, responsabile_id),
          attivo = COALESCE($10, attivo)
      WHERE id = $1
+       AND deleted_at IS NULL
      RETURNING *`,
     [
       id,
@@ -10548,6 +10554,127 @@ async function updateStore(id, input = {}, user = {}) {
     ]
   );
   return result.rows[0] || null;
+}
+
+async function deleteStore(id, user = {}) {
+  if (!canManageStores(user)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  const storeId = Number(id);
+  if (!Number.isInteger(storeId) || storeId <= 0) {
+    const error = new Error("Identificativo negozio non valido.");
+    error.status = 400;
+    throw error;
+  }
+
+  const db = await pool.connect();
+  try {
+    await db.query("BEGIN");
+    await db.query("LOCK TABLE negozi IN SHARE ROW EXCLUSIVE MODE");
+    await db.query("LOCK TABLE utenti, atti_vendita, approval_requests, fusion_lots IN SHARE MODE");
+    const storeResult = await db.query(
+      "SELECT * FROM negozi WHERE id = $1::bigint AND deleted_at IS NULL FOR UPDATE",
+      [storeId]
+    );
+    const store = storeResult.rows[0] || null;
+    if (!store) {
+      await db.query("COMMIT");
+      return null;
+    }
+
+    const remainingResult = await db.query(
+      "SELECT COUNT(*)::int AS count FROM negozi WHERE deleted_at IS NULL",
+      []
+    );
+    if (Number(remainingResult.rows[0]?.count || 0) <= 1) {
+      const error = new Error("Non puoi eliminare l'ultimo negozio disponibile.");
+      error.status = 409;
+      throw error;
+    }
+
+    const [usersResult, practicesResult, approvalsResult, fusionLotsResult] = await Promise.all([
+      db.query(
+        `SELECT COUNT(*)::int AS count
+         FROM utenti
+         WHERE COALESCE(attivo, TRUE) = TRUE
+           AND (negozio_id = $1::bigint OR (negozio_id IS NULL AND negozio = $2::text))`,
+        [storeId, store.nome]
+      ),
+      db.query(
+        `SELECT COUNT(*)::int AS count
+         FROM atti_vendita a
+         WHERE (
+             a.negozio_id = $1::bigint
+             OR (a.negozio_id IS NULL AND (a.store = $2::text OR a.store_code = $3::text))
+           )
+           AND a.deleted_at IS NULL
+           AND NOT (${realCompletedStatusSql("a")})`,
+        [storeId, store.nome, store.codice]
+      ),
+      db.query(
+        `SELECT COUNT(*)::int AS count
+         FROM approval_requests ar
+         WHERE COALESCE(ar.status, 'pending') ILIKE 'pending'
+           AND (
+             ar.store_id = $1::bigint
+             OR ar.sale_deed_id IN (
+               SELECT a.id FROM atti_vendita a
+               WHERE a.negozio_id = $1::bigint
+                  OR (a.negozio_id IS NULL AND (a.store = $2::text OR a.store_code = $3::text))
+             )
+           )`,
+        [storeId, store.nome, store.codice]
+      ),
+      db.query(
+        `SELECT COUNT(*)::int AS count
+         FROM fusion_lots f
+         WHERE (
+             f.negozio_id = $1::bigint
+             OR (f.negozio_id IS NULL AND f.negozio = $2::text)
+           )
+           AND NOT (
+             COALESCE(f.stato, '') ILIKE 'conclus%'
+             OR COALESCE(f.stato, '') ILIKE 'completed'
+           )`,
+        [storeId, store.nome]
+      )
+    ]);
+
+    const activeUsers = Number(usersResult.rows[0]?.count || 0);
+    const openPractices = Number(practicesResult.rows[0]?.count || 0);
+    const pendingApprovals = Number(approvalsResult.rows[0]?.count || 0);
+    const openFusionLots = Number(fusionLotsResult.rows[0]?.count || 0);
+    const conflicts = [];
+    if (activeUsers) conflicts.push(`${activeUsers} utenti attivi assegnati`);
+    if (openPractices) conflicts.push(`${openPractices} pratiche operative ancora aperte`);
+    if (pendingApprovals) conflicts.push(`${pendingApprovals} richieste di approvazione pendenti`);
+    if (openFusionLots) conflicts.push(`${openFusionLots} lotti di fusione ancora aperti`);
+    if (conflicts.length) {
+      const error = new Error(`Non puoi eliminare “${store.nome}”: risultano ${conflicts.join(", ")}. Riassegna gli utenti e completa o trasferisci le pratiche, poi riprova.`);
+      error.status = 409;
+      throw error;
+    }
+
+    const deletedResult = await db.query(
+      `UPDATE negozi
+       SET attivo = FALSE,
+           deleted_at = NOW(),
+           deleted_by = $2::bigint
+       WHERE id = $1::bigint
+         AND deleted_at IS NULL
+       RETURNING *`,
+      [storeId, user.id || null]
+    );
+    await db.query("COMMIT");
+    return deletedResult.rows[0] ? { ...deletedResult.rows[0], previous_attivo: store.attivo } : null;
+  } catch (error) {
+    await db.query("ROLLBACK");
+    throw error;
+  } finally {
+    db.release();
+  }
 }
 
 async function visibleStoreWhere(user = {}, values = [], alias = "a") {
@@ -23989,6 +24116,27 @@ app.put("/api/negozi/:id", requireFounder, async (request, response, next) => {
   }
 });
 
+app.delete("/api/negozi/:id", requireFounder, async (request, response, next) => {
+  try {
+    const store = await deleteStore(request.params.id, request.user);
+    if (!store) return response.status(404).json({ error: "Negozio non trovato" });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "store_deleted",
+      entityType: "store",
+      entityId: store.id,
+      entityLabel: store.nome || store.codice || "",
+      beforeData: { attivo: store.previous_attivo, deleted_at: null },
+      afterData: { attivo: false, deleted_at: store.deleted_at },
+      metadata: { store_id: store.id, store_name: store.nome, store_code: store.codice, soft_delete: true, critical: true }
+    });
+    response.json({ ok: true, message: "Negozio eliminato correttamente. Lo storico resta conservato.", store });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/antifrode", async (request, response, next) => {
   try {
     response.json({ alerts: await listAntifraudAlerts(request.user) });
@@ -28543,6 +28691,9 @@ function friendlyDatabaseError(error, request) {
     if (/\/api\/(utenti|users)/.test(url)) return "Campo utente obbligatorio mancante.";
     return "Campo obbligatorio mancante nel salvataggio.";
   }
+  if (error.code === "23503" && /oroactive_active_store_required/i.test(constraint)) {
+    return "Il negozio selezionato non è più disponibile. Aggiorna la pagina e scegli un negozio attivo.";
+  }
   if (error.code === "42703") return "Schema database non aggiornato: manca una colonna richiesta.";
   if (error.code === "42P01") return "Schema database non aggiornato: manca una tabella richiesta.";
   if (error.code === "42804" || error.code === "42P18") return "Tipo dato non valido nel salvataggio: controlla importi, date e identificativi.";
@@ -28602,13 +28753,15 @@ app.use((error, request, response, _next) => {
   console.error(error);
   const message = publicErrorMessage(error, request);
   const payload = { ok: false, error: message };
+  const activeStoreConflict = error.code === "23503"
+    && /oroactive_active_store_required/i.test(String(error.constraint || ""));
   if (error.approval_required) {
     payload.approval_required = true;
     payload.reasons = error.reasons || [];
     payload.quality_check = error.quality_check || null;
     payload.aurum_shield = error.aurum_shield || null;
   }
-  response.status(error.status || 500).json(payload);
+  response.status(error.status || (activeStoreConflict ? 409 : 500)).json(payload);
 });
 
 app.listen(port, () => {

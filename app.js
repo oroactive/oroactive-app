@@ -189,6 +189,7 @@ const state = {
   aurumAllMemories: [],
   aurumSupportRequests: [],
   aurumActiveQuiz: null,
+  aurumPendingTutorialId: "",
   aurumQuizIndex: 0,
   aurumFloatingPosition: null,
   aurumDragState: null,
@@ -219,7 +220,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260730-aurum-coaching-memory-10";
+const OROACTIVE_CLIENT_BUILD_ID = "20260730-store-delete-aurum-users-11";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -9885,10 +9886,10 @@ function inferAurumTutorialId(question = "") {
   if (/(crm|cliente crm|storico cliente|modifico un cliente)/.test(normalized)) return "tutorial_crm";
   if (/(academy|corso|corsi|badge|certificazione|formazione)/.test(normalized)) return "tutorial_academy";
   if (/(backup|restore|scarica backup|verifica backup)/.test(normalized)) return "tutorial_backup";
-  if (/(utenti|utente|ruoli|permessi|online|offline|attivita utente)/.test(normalized)) return "tutorial_utenti";
+  if (isAurumExplicitUsersTutorialRequest(question)) return "tutorial_utenti";
   if (/(atto di vendita|compil.*atto|nuovo atto|archiviare|completa pratica|cosa devo controllare)/.test(normalized)) return "tutorial_compila_atto";
   if (/(guidami|passo passo|tutorial operativo|cosa devo fare ora|spiegami questa sezione|come funziona questa sezione)/.test(normalized)) {
-    return {
+    const tutorialId = {
       nuovo_atto_vendita: "tutorial_compila_atto",
       elenco_atti: "tutorial_elenco_atti",
       giacenza: "tutorial_giacenza",
@@ -9898,7 +9899,67 @@ function inferAurumTutorialId(question = "") {
       backup: "tutorial_backup",
       utenti: "tutorial_utenti"
     }[aurumSectionKey()] || "";
+    if (tutorialId !== "tutorial_utenti") return tutorialId;
+    return isAurumExplicitTutorialRequest(question) ? tutorialId : "";
   }
+  return "";
+}
+
+function isAurumUsersTopic(question = "") {
+  const normalized = aurumNormalize(question);
+  if (/\bpermessi?\b/.test(normalized) && /\b(?:browser|sito|dispositivo|ipad|tablet|telefono|fotocamera|microfono|notifiche)\b/.test(normalized)) {
+    return false;
+  }
+  return /\b(?:sezione utenti?|gestione utenti?|utenti?|ruoli?|permessi?|stato online|stato offline|attivita utente)\b/.test(normalized);
+}
+
+function isAurumExplicitTutorialRequest(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  const negated = (
+    /\b(?:non|no|senza|evita(?:re)? di)\b.{0,64}\b(?:avvia|avviare|avviarlo|inizia|iniziare|apri|aprire|guidami|guidarmi|voglio|vorrei|tutorial|guida)\b/.test(normalized)
+    || /\b(?:tutorial|guida)\b.{0,32}\b(?:non voglio|non avviare|non iniziare)\b/.test(normalized)
+  );
+  if (negated) return false;
+  const informationalIntent = /\b(?:informazioni|info|cos e|che cos e|cosa significa|che significa|a cosa serve|come funziona|come si avvia|parlami del)\b/.test(normalized);
+  const guideIntent = /\b(?:tutorial|guida|passo passo)\b/.test(normalized);
+  const requestAction = /\b(?:avvia|avviare|avviami|avvialo|apri|aprire|inizia|iniziare|fai partire|fammi|mostrami|guidami|guidarmi)\b/.test(normalized);
+  const wantsGuidance = /\b(?:voglio|vorrei|desidero)\b.{0,48}\b(?:tutorial|guida|passo passo|essere guidat)\b/.test(normalized);
+  const politeStart = /\bpuoi\b.{0,32}\b(?:avviare|iniziare|aprire|farmi|guidarmi|mostrarmi)\b/.test(normalized);
+  const stepByStepRequest = (
+    /\b(?:spiegami|mostrami|illustrami|guidami|guidarmi)\b.{0,64}\bpasso passo\b/.test(normalized)
+    || /\bpasso passo\b.{0,64}\b(?:spiegami|mostrami|illustrami|guidami|guidarmi)\b/.test(normalized)
+  );
+  const bareRequest = /^(?:tutorial|guida)(?: guidata)?(?: della| sulla)?(?: sezione| gestione)?(?: utenti)?$/.test(normalized);
+  if (informationalIntent && !stepByStepRequest) return false;
+  return (guideIntent && (requestAction || wantsGuidance || politeStart)) || stepByStepRequest || bareRequest;
+}
+
+function isAurumExplicitUsersTutorialRequest(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!isAurumUsersTopic(normalized)) return false;
+  return isAurumExplicitTutorialRequest(normalized);
+}
+
+function isAurumUsersConfusionRequest(question = "", sectionKey = "") {
+  const normalized = aurumNormalize(question);
+  const deicticUsersContext = sectionKey === "utenti"
+    && /\b(?:questa sezione|questa pagina|questa schermata|sezione corrente|qui)\b/.test(normalized);
+  const usersContext = isAurumUsersTopic(normalized) || deicticUsersContext;
+  if (!usersContext) return false;
+  return /(?:non (?:ho )?(?:capisco|comprendo|capito|compreso)|non mi (?:e|sono) chiar|non riesco|non so come|sono confus|mi sono pers|ho dubbi|come funziona (?:la |questa )?(?:sezione|gestione)(?: utenti)?|spiegami (?:la|questa) sezione)/.test(normalized);
+}
+
+function classifyAurumTutorialConfirmation(question = "") {
+  const normalized = aurumNormalize(question)
+    .replace(/[.!?,;:]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (/^(?:no|no grazie|no non ora|no preferisco di no|no lascia stare|non ora|annulla|lascia stare|preferisco di no|non avviarlo|si ma non(?: ora)?|si pero non(?: ora)?)(?: grazie)?$/.test(normalized)) return "decline";
+  if (/^(?:procedi|avvia|avvialo|inizia|fallo|vai)(?: pure| grazie| per favore)?$/.test(normalized)) return "accept";
+  const affirmative = /^(?:si|s|certo|certamente|ok|okay|va bene|d accordo)(?:$| )/.test(normalized);
+  const contradictory = /\b(?:non|annulla|lascia stare|preferisco di no)\b/.test(normalized);
+  if (affirmative && !contradictory) return "accept";
   return "";
 }
 
@@ -9937,6 +9998,7 @@ function startAurumTutorial(tutorialId = "") {
     return true;
   }
   ensureAurumHelpAttributes();
+  state.aurumPendingTutorialId = "";
   state.tutorial.active = true;
   state.tutorial.source = "aurum";
   state.tutorial.id = tutorialId;
@@ -9950,6 +10012,26 @@ function startAurumTutorial(tutorialId = "") {
 }
 
 function handleAurumTutorRequest(question = "") {
+  if (state.aurumPendingTutorialId) {
+    const pendingTutorialId = state.aurumPendingTutorialId;
+    const confirmation = classifyAurumTutorialConfirmation(question);
+    state.aurumPendingTutorialId = "";
+    if (confirmation === "accept") {
+      const guideKey = AURUM_TUTORIAL_TO_GUIDE[pendingTutorialId] || aurumSectionKey();
+      state.aurumMessages.push({ role: "assistant", content: formatAurumGuideResponse(guideKey, pendingTutorialId) });
+      renderAurumMessages();
+      startAurumTutorial(pendingTutorialId);
+      return true;
+    }
+    if (confirmation === "decline") {
+      state.aurumMessages.push({
+        role: "assistant",
+        content: "Va bene, non avvio il tutorial. Scrivimi il dubbio specifico sulla sezione Utenti e ti rispondo senza interrompere la conversazione."
+      });
+      renderAurumMessages();
+      return true;
+    }
+  }
   const fieldKey = aurumFieldByQuestion(question);
   if (fieldKey && AURUM_SALE_DEED_FIELD_IDS.has(fieldKey)) {
     state.aurumRequestedFieldKey = fieldKey;
@@ -9964,6 +10046,16 @@ function handleAurumTutorRequest(question = "") {
   }
   if (/(questo campo|a cosa serve.*campo|spiegami.*campo)/.test(aurumNormalize(question))) {
     state.aurumMessages.push({ role: "assistant", content: "Seleziona o tocca un campo visibile e poi chiedimi di spiegarlo. Per ogni campo dell’atto posso descrivere scopo, compilazione, obbligatorietà, controlli, privacy, errori comuni e stato effettivo nell’app." });
+    renderAurumMessages();
+    return true;
+  }
+  if (!isAurumExplicitUsersTutorialRequest(question) && isAurumUsersConfusionRequest(question, aurumSectionKey())) {
+    state.aurumPendingTutorialId = "tutorial_utenti";
+    state.aurumActiveQuiz = null;
+    state.aurumMessages.push({
+      role: "assistant",
+      content: "Posso aiutarti con una risposta mirata oppure avviare la guida completa. Vuoi che avvii il tutorial guidato della sezione Utenti?"
+    });
     renderAurumMessages();
     return true;
   }
@@ -10583,6 +10675,7 @@ function resetAurumSessionState() {
   state.aurumAllMemories = [];
   state.aurumSupportRequests = [];
   state.aurumActiveQuiz = null;
+  state.aurumPendingTutorialId = "";
   state.aurumQuizIndex = 0;
   state.aurumBlocksConfig = null;
   state.aurumBlocksQuestions = [];
@@ -10613,6 +10706,7 @@ function resetAurumVisibleChat() {
   state.aurumMode = "";
   state.aurumPriceContext = null;
   state.aurumActiveQuiz = null;
+  state.aurumPendingTutorialId = "";
   state.aurumSending = false;
   showAurumMemoryConsent(null);
   if (aurumSupportActions) aurumSupportActions.hidden = true;
@@ -11297,7 +11391,17 @@ async function askAurum(event) {
   const requiresBackendSafety = requiresAurumBackendSafety(question);
   if (requiresBackendSafety) {
     state.aurumActiveQuiz = null;
+    state.aurumPendingTutorialId = "";
     state.aurumAskedMoodToday = false;
+  }
+
+  if (!requiresBackendSafety && state.aurumPendingTutorialId) {
+    const confirmation = classifyAurumTutorialConfirmation(question);
+    if (confirmation) {
+      handleAurumTutorRequest(question);
+      return;
+    }
+    state.aurumPendingTutorialId = "";
   }
 
   if (!requiresBackendSafety && state.aurumActiveQuiz) {
@@ -12352,6 +12456,7 @@ function auditActionLabel(action = "") {
     change_user_role: "Cambio ruolo utente",
     change_user_store: "Cambio negozio utente",
     user_deleted: "Eliminazione utente",
+    store_deleted: "Eliminazione negozio",
     user_deactivated: "Disattivazione utente",
     unauthorized_user_delete_attempt: "Tentativo eliminazione utente non autorizzato",
     unauthorized_user_create_attempt: "Tentativo creazione utente non autorizzato",
@@ -14011,7 +14116,11 @@ function renderStores() {
         <span>${escapeHtml(store.citta || "")}</span>
         <span>${escapeHtml(store.provincia || "")}</span>
         <em class="${store.attivo ? "status-completed" : "status-draft"}">${store.attivo ? "Attivo" : "Non attivo"}</em>
-        <span class="row-actions"><button type="button" data-edit-store="${store.id}">Modifica</button><button class="warning-button" type="button" data-toggle-store="${store.id}">${store.attivo ? "Disattiva" : "Attiva"}</button></span>
+        <span class="row-actions">
+          <button type="button" data-edit-store="${escapeHtml(String(store.id))}">Modifica</button>
+          <button class="warning-button" type="button" data-toggle-store="${escapeHtml(String(store.id))}">${store.attivo ? "Disattiva" : "Attiva"}</button>
+          <button class="danger-button" type="button" data-delete-store="${escapeHtml(String(store.id))}" aria-label="Elimina negozio ${escapeHtml(store.nome || store.codice || "")}">Elimina</button>
+        </span>
       </div>
     `).join("")}
   `;
@@ -14043,7 +14152,9 @@ function populateStoreSelectors() {
   const userStore = document.getElementById("userStore");
   if (userStore) {
     userStore.innerHTML = '<option>Tutti</option>' + stores.map((store) => `<option>${escapeHtml(store.nome)}</option>`).join("");
-    if (currentValues.userStore) userStore.value = currentValues.userStore;
+    if (currentValues.userStore && [...userStore.options].some((option) => option.value === currentValues.userStore)) {
+      userStore.value = currentValues.userStore;
+    }
   }
   ["archiveStoreFilter", "fusionStoreFilter"].forEach((id) => {
     const select = document.getElementById(id);
@@ -14051,12 +14162,14 @@ function populateStoreSelectors() {
     const includeAll = id === "archiveStoreFilter" || id === "fusionStoreFilter";
     select.innerHTML = `${includeAll ? "<option>Tutti</option>" : ""}${stores.map((store) => `<option>${escapeHtml(store.nome)}</option>`).join("")}`;
     const previous = id === "archiveStoreFilter" ? currentValues.archive : currentValues.fusion;
-    if (previous) select.value = previous;
+    if (previous && [...select.options].some((option) => option.value === previous)) select.value = previous;
   });
   const storeCodeSelect = document.getElementById("storeCode");
   if (storeCodeSelect) {
     storeCodeSelect.innerHTML = stores.map((store) => `<option value="${escapeHtml(store.codice)}">${escapeHtml(store.nome)}</option>`).join("");
-    if (currentValues.storeCode) storeCodeSelect.value = currentValues.storeCode;
+    if (currentValues.storeCode && [...storeCodeSelect.options].some((option) => option.value === currentValues.storeCode)) {
+      storeCodeSelect.value = currentValues.storeCode;
+    }
   }
   configureUserFormPermissions();
 }
@@ -14120,6 +14233,34 @@ async function toggleStore(id) {
   if (!store) return;
   await apiRequest(`/negozi/${id}`, { method: "PUT", body: JSON.stringify({ attivo: !store.attivo }) });
   await loadStores();
+}
+
+async function deleteStore(id, button = null) {
+  if (!isFounder()) {
+    showToast("Solo il Founder può eliminare un negozio.", "error");
+    return;
+  }
+  const store = state.stores.find((item) => String(item.id) === String(id));
+  if (!store) return;
+  const confirmed = window.confirm(
+    `Vuoi eliminare il negozio “${store.nome || store.codice || ""}”?\n\nIl negozio scomparirà dalle liste, mentre lo storico già registrato resterà conservato. Se ci sono utenti attivi o pratiche operative aperte, l'eliminazione verrà bloccata.`
+  );
+  if (!confirmed) return;
+  const task = async () => {
+    const result = await apiRequest(`/negozi/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (String(document.getElementById("storeId")?.value || "") === String(id)) resetStoreForm();
+    await loadStores();
+    showToast(result?.message || "Negozio eliminato correttamente.", "success");
+  };
+  if (button) {
+    await withButtonBusy(button, "Elimino...", task);
+    return;
+  }
+  try {
+    await task();
+  } catch (error) {
+    showToast(error.message || "Impossibile eliminare il negozio.", "error");
+  }
 }
 
 function renderAntifraud() {
@@ -24959,8 +25100,10 @@ document.getElementById("resetStoreForm")?.addEventListener("click", resetStoreF
 storesList?.addEventListener("click", (event) => {
   const edit = event.target.closest("[data-edit-store]");
   const toggle = event.target.closest("[data-toggle-store]");
+  const remove = event.target.closest("[data-delete-store]");
   if (edit) editStore(edit.dataset.editStore);
   if (toggle) toggleStore(toggle.dataset.toggleStore);
+  if (remove) deleteStore(remove.dataset.deleteStore, remove);
 });
 document.getElementById("scanAntifraud")?.addEventListener("click", scanAntifraud);
 antifraudList?.addEventListener("change", async (event) => {

@@ -9011,6 +9011,10 @@ input.document-expired {
   grid-template-columns: 1fr 1.05fr 0.75fr 0.75fr 0.9fr 1.05fr 0.9fr;
 }
 
+.stores-table .table-row {
+  grid-template-columns: 0.7fr 1.15fr 0.9fr 0.65fr 0.75fr minmax(240px, 1.35fr);
+}
+
 #auditTrailList .table-row {
   grid-template-columns: 0.95fr 1.05fr 0.9fr 0.95fr 1.2fr 0.7fr;
 }
@@ -11563,6 +11567,7 @@ input.document-expired {
   .acts-table .table-row,
   .fusion-table .table-row,
   .users-table .table-row,
+  .stores-table .table-row,
   #auditTrailList .table-row,
   .approvals-table .table-row,
   .notifications-table .table-row,
