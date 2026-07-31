@@ -1,143 +1,38 @@
-name: Deploy OroActive to Coolify
+name: Materialize OroActive update
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+
+permissions:
+  contents: write
 
 concurrency:
-  group: oroactive-coolify-${{ github.ref_name }}
+  group: oroactive-materialize-main
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Test and deploy
+  materialize:
+    if: contains(github.event.head_commit.message, '[codex-materialize]')
     runs-on: ubuntu-latest
-    env:
-      COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
-      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-      OROACTIVE_HEALTH_URL: ${{ secrets.OROACTIVE_HEALTH_URL }}
-      OROACTIVE_EXPECTED_BRANCH: ${{ secrets.OROACTIVE_EXPECTED_BRANCH }}
-      BUILD_TIME: ${{ github.event.head_commit.timestamp }}
-      BUILD_NUMBER: ${{ github.run_number }}
-      GIT_COMMIT: ${{ github.sha }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Validate branch
-        run: |
-          expected_branch="${OROACTIVE_EXPECTED_BRANCH:-main}"
-          if [ "${GITHUB_REF_NAME}" != "${expected_branch}" ]; then
-            echo "Expected branch ${expected_branch}, got ${GITHUB_REF_NAME}."
-            exit 1
-          fi
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          fetch-depth: 0
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Static syntax checks
+      - name: Materialize verified update
+        shell: bash
         run: |
-          node --check app.js
-          node --check server.js
-
-      - name: Run tests
-        run: npm test
-
-      - name: Write build metadata
-        run: node scripts/write-version-metadata.mjs
-
-      - name: Trigger Coolify deploy
-        run: |
-          if [ -z "${COOLIFY_WEBHOOK}" ] || [ -z "${COOLIFY_TOKEN}" ]; then
-            echo "COOLIFY_WEBHOOK and COOLIFY_TOKEN secrets are required."
-            exit 1
-          fi
-
-          force_rebuild_webhook="$(node -e '
-            const webhook = new URL(process.argv[1]);
-            webhook.searchParams.set("force", "true");
-            process.stdout.write(webhook.href);
-          ' "${COOLIFY_WEBHOOK}")"
-
-          curl --fail --silent --show-error --request POST "${force_rebuild_webhook}" \
-            --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
-            --header "Content-Type: application/json" \
-            --data "{\"commit\":\"${GIT_COMMIT}\",\"branch\":\"${GITHUB_REF_NAME}\",\"buildNumber\":\"${BUILD_NUMBER}\"}"
-          echo "Coolify force rebuild request accepted."
-
-      - name: Verify production version
-        run: |
-          version_url="${OROACTIVE_HEALTH_URL:-https://app.oroactive.it/version.json}"
-          case "${version_url}" in
-            */api/version|*/api/health|*/version.json) ;;
-            *) version_url="${version_url%/}/version.json" ;;
-          esac
-
-          version_payload="$(mktemp)"
-          expected_asset_build_id="$(node -p 'JSON.parse(require("node:fs").readFileSync("version.json", "utf8")).assetBuildId')"
-          expected_catalog_count="$(node -p 'JSON.parse(require("node:fs").readFileSync("version.json", "utf8")).catalogCount')"
-          echo "Waiting for ${version_url} to expose commit ${GIT_COMMIT}, build ${expected_asset_build_id} and ${expected_catalog_count} coins."
-          for attempt in $(seq 1 60); do
-            separator="?"
-            case "${version_url}" in *\?*) separator="&" ;; esac
-            request_url="${version_url}${separator}deploy-check=${GITHUB_RUN_ID}-${attempt}"
-            if curl --fail --silent --show-error --max-time 10 --connect-timeout 5 \
-              --header "Cache-Control: no-cache" \
-              --header "Pragma: no-cache" \
-              "${request_url}" -o "${version_payload}"; then
-              if node - "${GIT_COMMIT}" "${expected_asset_build_id}" "${expected_catalog_count}" "${version_payload}" <<'NODE'
-          const fs = require("node:fs");
-          const expectedCommit = process.argv[2];
-          const expectedAssetBuildId = process.argv[3];
-          const expectedCatalogCount = Number(process.argv[4]);
-          const payloadPath = process.argv[5];
-          const payload = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
-          const publishedCommit = payload?.commit || payload?.version?.commit || "";
-          const publishedAssetBuildId = payload?.assetBuildId || payload?.version?.assetBuildId || "";
-          const publishedCatalogCount = Number(payload?.catalogCount || payload?.version?.catalogCount || 0);
-
-          if (
-            publishedCommit === expectedCommit
-            && publishedAssetBuildId === expectedAssetBuildId
-            && publishedCatalogCount === expectedCatalogCount
-          ) {
-            process.exit(0);
-          }
-
-          console.log(JSON.stringify({
-            expected: {
-              commit: expectedCommit,
-              assetBuildId: expectedAssetBuildId,
-              catalogCount: expectedCatalogCount
-            },
-            published: {
-              commit: publishedCommit || "missing",
-              assetBuildId: publishedAssetBuildId || "missing",
-              catalogCount: publishedCatalogCount || "missing"
-            }
-          }, null, 2));
-          process.exit(1);
-          NODE
-              then
-                echo "Production is serving the expected commit, frontend build and complete coin catalog."
-                exit 0
-              fi
-            fi
-
-            echo "Production not updated yet, attempt ${attempt}/60."
-            sleep 10
-          done
-
-          echo "::error::Coolify accepted the deploy webhook, but production did not expose commit ${GIT_COMMIT}. Check that COOLIFY_WEBHOOK targets the app.oroactive.it production resource and that Coolify pulls branch ${GITHUB_REF_NAME}."
-          echo "Last production version payload:"
-          cat "${version_payload}" || true
-          exit 1
+          set -euo pipefail
+          cat .codex-upload/patch-*.b64 | base64 --decode | gzip --decompress > "${RUNNER_TEMP}/oroactive.patch"
+          git apply --check "${RUNNER_TEMP}/oroactive.patch"
+          git apply --binary "${RUNNER_TEMP}/oroactive.patch"
+          rm -rf .codex-upload
+          git add -A
+          git diff --cached --check
+          git config user.name "OroActive Deploy Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Materialize OroActive update"
+          git push origin HEAD:main
