@@ -8,6 +8,15 @@
   window.OroActiveConfig = {
     apiBaseUrl,
     apiBase: `${apiBaseUrl}/api`,
-    debug: window.location.search.includes("debug=1")
+    debug: window.location.search.includes("debug=1"),
+    aurumKnowledge: Object.freeze({
+      retrievalTimeoutMs: 8000,
+      modelTimeoutMs: 60000,
+      maxCandidateChunks: 12,
+      maxRerankedChunks: 8,
+      maxPrimarySources: 4,
+      maxProcedures: 2,
+      cacheDynamicResponses: false
+    })
   };
 })();

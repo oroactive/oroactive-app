@@ -72,7 +72,10 @@ test("lo stato AI pubblica copertura e gap verificabili", () => {
 
 test("le domande contabili usano la base specialistica e non il fallback legale generico", () => {
   assert.match(appSource, /function isAurumFiscalAccountingQuestion/);
-  assert.match(appSource, /normativeQuestion && !accountingQuestion && !professionalGoldQuestion && !isAurumNormativeAnswerAdequate/);
+  assert.match(appSource, /const professionalResponse = normalizeAurumProfessionalResponse\(data\)/);
+  assert.match(appSource, /content:\s*professionalResponse\.content/);
+  assert.match(appSource, /Non posso verificare in questo momento le fonti approvate e vigenti/);
+  assert.doesNotMatch(appSource, /normativeQuestion\s*&&[\s\S]{0,160}?buildAurumNormativeAnswer\(question\)/);
   assert.match(serverSource, /function isComproOroAccountingQuestion/);
   assert.match(serverSource, /Modalita contabile-fiscale/);
   assert.match(serverSource, /Non assegnare una scrittura o un regime definitivo/);
@@ -83,7 +86,8 @@ test("le domande contabili usano la base specialistica e non il fallback legale 
 test("le domande OPO, Banca d’Italia, lingotti e privati usano il percorso specialistico", () => {
   assert.match(appSource, /function isAurumProfessionalGoldQuestion/);
   assert.match(appSource, /const professionalGoldQuestion = isAurumProfessionalGoldQuestion\(question\)/);
-  assert.match(appSource, /!professionalGoldQuestion && !isAurumNormativeAnswerAdequate/);
+  assert.match(appSource, /const normativeQuestion = isAurumNormativeQuestion\(question\) \|\| accountingQuestion \|\| professionalGoldQuestion/);
+  assert.doesNotMatch(appSource, /!professionalGoldQuestion\s*&&\s*!isAurumNormativeAnswerAdequate/);
   assert.match(serverSource, /function isProfessionalGoldQuestion/);
   assert.match(serverSource, /Modalita OPO-lingotti/);
   assert.match(serverSource, /non presentare Banca d.Italia come gestore attuale del Registro OPO/i);

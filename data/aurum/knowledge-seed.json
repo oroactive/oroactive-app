@@ -1,0 +1,327 @@
+{
+  "version": "2026.08.01-knowledge-os-1",
+  "reviewedAt": "2026-08-01",
+  "reviewStatus": "pending",
+  "facts": [
+    {
+      "factKey": "gold-18kt-fineness-750",
+      "sourceKey": "oroactive-sector-knowledge",
+      "domain": "alloys",
+      "subject": "Oro 18 kt",
+      "predicate": "fineness",
+      "objectValue": { "value": "750", "unit": "millesimi" },
+      "authorityLevel": 80,
+      "confidence": 1
+    },
+    {
+      "factKey": "xrf-surface-screening",
+      "sourceKey": "oroactive-sector-knowledge",
+      "domain": "assaying",
+      "subject": "XRF",
+      "predicate": "screening_scope",
+      "objectValue": { "value": "composizione della zona superficiale analizzata" },
+      "authorityLevel": 80,
+      "confidence": 0.98
+    },
+    {
+      "factKey": "xrf-coated-not-conclusive",
+      "sourceKey": "oroactive-sector-knowledge",
+      "domain": "assaying",
+      "subject": "XRF",
+      "predicate": "not_conclusive_for",
+      "objectValue": { "value": "oggetto rivestito o non omogeneo" },
+      "authorityLevel": 80,
+      "confidence": 0.98
+    },
+    {
+      "factKey": "thermal-tester-screening",
+      "sourceKey": "oroactive-laboratorio-gemmologico",
+      "domain": "diamonds",
+      "subject": "Tester termico",
+      "predicate": "screening_for",
+      "objectValue": { "value": "compatibilità preliminare con diamante" },
+      "authorityLevel": 80,
+      "confidence": 0.95
+    },
+    {
+      "factKey": "thermal-tester-not-conclusive-moissanite",
+      "sourceKey": "oroactive-laboratorio-gemmologico",
+      "domain": "diamonds",
+      "subject": "Tester termico",
+      "predicate": "not_conclusive_for",
+      "objectValue": { "value": "diamante rispetto a moissanite" },
+      "authorityLevel": 80,
+      "confidence": 0.98
+    },
+    {
+      "factKey": "gem-photo-not-authentication",
+      "sourceKey": "oroactive-laboratorio-gemmologico",
+      "domain": "gemology",
+      "subject": "Fotografia di una gemma",
+      "predicate": "cannot_establish",
+      "objectValue": { "value": ["autenticità", "origine naturale", "trattamenti", "valore"] },
+      "authorityLevel": 80,
+      "confidence": 1
+    },
+    {
+      "factKey": "coin-melt-needs-numismatic-check",
+      "sourceKey": "oroactive-elenco-monete",
+      "domain": "numismatics",
+      "subject": "Moneta d'oro",
+      "predicate": "requires_before_melting",
+      "objectValue": { "value": "verifica di rarità, variante, conservazione e premio numismatico" },
+      "authorityLevel": 80,
+      "confidence": 0.95
+    },
+    {
+      "factKey": "live-price-temporal",
+      "sourceKey": "oroactive-sector-knowledge",
+      "domain": "market_prices",
+      "subject": "Quotazione live",
+      "predicate": "validity",
+      "objectValue": { "value": "temporanea", "requires": ["fonte", "timestamp", "valuta", "unità"] },
+      "authorityLevel": 80,
+      "confidence": 1
+    },
+    {
+      "factKey": "private-memory-specific-consent",
+      "sourceKey": "oroactive-procedure-operative",
+      "domain": "privacy",
+      "subject": "Memoria privata Aurum",
+      "predicate": "requires",
+      "objectValue": { "value": "consenso specifico per salvataggio e consenso separato per condivisione con AI" },
+      "authorityLevel": 85,
+      "confidence": 1
+    },
+    {
+      "factKey": "founder-memory-aggregate-only",
+      "sourceKey": "oroactive-procedure-operative",
+      "domain": "privacy",
+      "subject": "Founder",
+      "predicate": "may_view_memory",
+      "objectValue": { "value": "soltanto statistiche aggregate, mai contenuto privato" },
+      "authorityLevel": 85,
+      "confidence": 1
+    },
+    {
+      "factKey": "feedback-no-auto-publish",
+      "sourceKey": "oroactive-procedure-operative",
+      "domain": "ai_governance",
+      "subject": "Feedback utente",
+      "predicate": "cannot_directly_publish",
+      "objectValue": { "value": "conoscenza Aurum" },
+      "authorityLevel": 85,
+      "confidence": 1
+    },
+    {
+      "factKey": "high-risk-source-gate",
+      "sourceKey": "oroactive-procedure-operative",
+      "domain": "ai_governance",
+      "subject": "Risposta high risk",
+      "predicate": "requires",
+      "objectValue": { "value": ["fonte primaria vigente", "citazione", "data di validità", "disclaimer", "escalation quando necessaria"] },
+      "authorityLevel": 85,
+      "confidence": 1
+    },
+    {
+      "factKey": "policy-does-not-override-law",
+      "sourceKey": "oroactive-procedure-operative",
+      "domain": "ai_governance",
+      "subject": "Policy OroActive",
+      "predicate": "cannot_override",
+      "objectValue": { "value": "norma vigente" },
+      "authorityLevel": 85,
+      "confidence": 1
+    },
+    {
+      "factKey": "aml-assistant-no-sos-decision",
+      "sourceKey": "oroactive-procedure-operative",
+      "domain": "aml_ctf",
+      "subject": "Aurum",
+      "predicate": "must_not",
+      "objectValue": { "value": "decidere o inviare una SOS" },
+      "authorityLevel": 85,
+      "confidence": 1
+    },
+    {
+      "factKey": "case-library-anonymization-gate",
+      "sourceKey": "oroactive-procedure-operative",
+      "domain": "oroactive_cases",
+      "subject": "Caso reale",
+      "predicate": "requires_before_publication",
+      "objectValue": { "value": ["anonimizzazione", "revisione", "approvazione Founder"] },
+      "authorityLevel": 85,
+      "confidence": 1
+    }
+  ],
+  "relations": [
+    { "sourceKey": "oroactive-sector-knowledge", "sourceEntity": "Oro 18 kt", "relationType": "fineness", "targetEntity": "750 millesimi", "domain": "alloys" },
+    { "sourceKey": "oroactive-laboratorio-gemmologico", "sourceEntity": "Moissanite", "relationType": "can_be_confused_with", "targetEntity": "Diamante", "domain": "diamonds" },
+    { "sourceKey": "oroactive-laboratorio-gemmologico", "sourceEntity": "Tester termico", "relationType": "screening_for", "targetEntity": "Diamante", "domain": "diamonds" },
+    { "sourceKey": "oroactive-laboratorio-gemmologico", "sourceEntity": "Tester termico", "relationType": "not_conclusive_for", "targetEntity": "Diamante vs Moissanite", "domain": "diamonds" },
+    { "sourceKey": "oroactive-sector-knowledge", "sourceEntity": "XRF", "relationType": "not_conclusive_for", "targetEntity": "Oggetto rivestito", "domain": "assaying" },
+    { "sourceKey": "oroactive-procedure-operative", "sourceEntity": "Operazione sospetta", "relationType": "requires_escalation_to", "targetEntity": "Responsabile AML", "domain": "aml_ctf" },
+    { "sourceKey": "oroactive-procedure-operative", "sourceEntity": "Pratica critica", "relationType": "requires", "targetEntity": "Autorizzazione superiore", "domain": "store_operations" },
+    { "sourceKey": "oroactive-laboratorio-gemmologico", "sourceEntity": "Rubino", "relationType": "common_treatment", "targetEntity": "Riscaldamento", "domain": "gemology" },
+    { "sourceKey": "oroactive-sector-knowledge", "sourceEntity": "Oggetto cavo", "relationType": "may_contain", "targetEntity": "Materiale non prezioso", "domain": "jewellery_manufacturing" },
+    { "sourceKey": "oroactive-procedure-operative", "sourceEntity": "Lotto fonderia", "relationType": "requires", "targetEntity": "Riconciliazione pesi", "domain": "foundry" }
+  ],
+  "procedures": [
+    {
+      "procedureKey": "source-change-review",
+      "title": "Revisione di una fonte aggiornata",
+      "domain": "ai_governance",
+      "jurisdiction": "IT",
+      "purpose": "Impedire che una variazione esterna diventi conoscenza pubblicata senza controllo.",
+      "riskLevel": "high",
+      "requiredRole": "founder",
+      "requiredTools": [],
+      "preconditions": ["nuova versione con hash diverso", "fonte registrata"],
+      "stopConditions": ["dominio non autorizzato", "licenza non compatibile", "fonte non identificabile"],
+      "escalationRules": ["conflitto high risk", "variazione normativa sostanziale"],
+      "sourceKeys": ["oroactive-procedure-operative"],
+      "steps": [
+        { "title": "Controlla provenienza", "instruction": "Verifica organizzazione, URL ufficiale, licenza e autorità.", "whyItMatters": "Una fonte non identificata non può sostenere una risposta professionale.", "blocking": true },
+        { "title": "Esamina la differenza", "instruction": "Confronta la nuova versione con quella corrente e individua fatti, eccezioni e date cambiate.", "whyItMatters": "Evita aggiornamenti parziali o fuori contesto.", "blocking": true },
+        { "title": "Risolvi i conflitti", "instruction": "Applica la gerarchia delle fonti e invia i conflitti high risk alla coda Founder.", "whyItMatters": "Le norme prevalgono sulle policy interne.", "blocking": true },
+        { "title": "Approva e testa", "instruction": "Approva esplicitamente la versione e riesegui gli eval pertinenti prima di renderla corrente.", "whyItMatters": "La pubblicazione richiede evidenza di regressione.", "blocking": true }
+      ]
+    },
+    {
+      "procedureKey": "assay-screening-safe",
+      "title": "Screening non distruttivo al banco",
+      "domain": "assaying",
+      "jurisdiction": "IT",
+      "purpose": "Organizzare osservazioni e screening senza trasformarli in certificazione.",
+      "riskLevel": "high",
+      "requiredRole": "commesso",
+      "requiredTools": ["buildAssayProtocol"],
+      "preconditions": ["consenso alle verifiche", "strumenti idonei e calibrati"],
+      "stopConditions": ["oggetto danneggiabile", "esito incoerente", "rivestimento o non omogeneità sospetta"],
+      "escalationRules": ["test inconcludenti", "valore rilevante", "richiesta di certificazione"],
+      "sourceKeys": ["oroactive-sector-knowledge"],
+      "steps": [
+        { "title": "Documenta il campione", "instruction": "Registra peso, descrizione, punzoni, parti non preziose e stato senza dati eccedenti.", "whyItMatters": "Consente tracciabilità e confronto dei risultati.", "blocking": true },
+        { "title": "Osserva e misura", "instruction": "Esegui osservazioni e misure non distruttive previste dal protocollo e registra unità e tolleranze.", "whyItMatters": "Lo screening deve essere ripetibile.", "blocking": false },
+        { "title": "Confronta metodi indipendenti", "instruction": "Non concludere da un singolo metodo; confronta risultati, limiti e possibili rivestimenti.", "whyItMatters": "Riduce falsi positivi e falsi negativi.", "blocking": true },
+        { "title": "Classifica l'esito", "instruction": "Usa compatibile, non compatibile, inconcludente o da riferire al laboratorio.", "whyItMatters": "Evita certificazioni improprie.", "blocking": true }
+      ]
+    },
+    {
+      "procedureKey": "xrf-coated-object-escalation",
+      "title": "Oggetto rivestito o non omogeneo analizzato con XRF",
+      "domain": "assaying",
+      "jurisdiction": "IT",
+      "purpose": "Gestire il limite superficiale dell'XRF.",
+      "riskLevel": "high",
+      "requiredRole": "responsabile",
+      "requiredTools": ["buildAssayProtocol"],
+      "preconditions": ["screening XRF disponibile"],
+      "stopConditions": ["dati insufficienti", "consenso assente per verifiche ulteriori"],
+      "escalationRules": ["rivestimento sospetto", "risultati discordanti"],
+      "sourceKeys": ["oroactive-sector-knowledge"],
+      "steps": [
+        { "title": "Segnala il limite", "instruction": "Tratta il risultato XRF come misura della zona superficiale analizzata.", "whyItMatters": "Il nucleo può avere composizione diversa.", "blocking": true },
+        { "title": "Confronta più zone", "instruction": "Documenta la variabilità senza dedurre automaticamente il titolo dell'intero oggetto.", "whyItMatters": "La non omogeneità altera l'interpretazione.", "blocking": false },
+        { "title": "Escalation", "instruction": "Sospendi la conclusione e riferisci a metodo/laboratorio appropriato quando il rischio resta.", "whyItMatters": "Protegge da una valutazione assertiva non supportata.", "blocking": true }
+      ]
+    },
+    {
+      "procedureKey": "gemological-referral",
+      "title": "Referral gemmologico",
+      "domain": "gemology",
+      "jurisdiction": "IT",
+      "purpose": "Riconoscere quando lo screening di banco non è sufficiente.",
+      "riskLevel": "high",
+      "requiredRole": "responsabile",
+      "requiredTools": ["compareGemCandidates"],
+      "preconditions": ["osservazioni documentate"],
+      "stopConditions": ["richiesta di autenticità certa da fotografia", "trattamento o origine non verificabile"],
+      "escalationRules": ["valore rilevante", "sintetico o trattamento sospetto", "esiti incoerenti"],
+      "sourceKeys": ["oroactive-laboratorio-gemmologico"],
+      "steps": [
+        { "title": "Raccogli dati non invasivi", "instruction": "Registra proprietà osservate, strumenti e limiti.", "whyItMatters": "Il laboratorio deve poter ricostruire lo screening.", "blocking": false },
+        { "title": "Dichiara l'incertezza", "instruction": "Non affermare autenticità, origine o assenza di trattamento.", "whyItMatters": "Lo screening non equivale a certificazione.", "blocking": true },
+        { "title": "Invia al professionista", "instruction": "Indica gemmologo o laboratorio qualificato e la domanda diagnostica da risolvere.", "whyItMatters": "Rende l'escalation utile e verificabile.", "blocking": true }
+      ]
+    },
+    {
+      "procedureKey": "aml-indicator-escalation",
+      "title": "Escalation indicatori antiriciclaggio",
+      "domain": "aml_ctf",
+      "jurisdiction": "IT",
+      "purpose": "Raccogliere indicatori senza formulare accuse o decidere una SOS.",
+      "riskLevel": "critical",
+      "requiredRole": "responsabile",
+      "requiredTools": ["scoreAmlIndicators"],
+      "preconditions": ["indicatori oggettivi documentati"],
+      "stopConditions": ["rischio di informare il cliente di una valutazione riservata"],
+      "escalationRules": ["indicatori multipli", "documenti incoerenti", "tentativo di elusione"],
+      "sourceKeys": ["oroactive-procedure-operative"],
+      "steps": [
+        { "title": "Registra fatti", "instruction": "Annota solo elementi oggettivi e dati mancanti, senza etichettare il cliente.", "whyItMatters": "Separa evidenza da giudizio.", "blocking": true },
+        { "title": "Sospendi automatismi", "instruction": "Aurum non decide né invia una SOS e non comunica sospetti al cliente.", "whyItMatters": "La decisione appartiene al responsabile competente.", "blocking": true },
+        { "title": "Escalation riservata", "instruction": "Trasmetti gli elementi al responsabile AML secondo la procedura interna.", "whyItMatters": "Garantisce valutazione umana e riservatezza.", "blocking": true }
+      ]
+    },
+    {
+      "procedureKey": "foundry-lot-reconciliation",
+      "title": "Riconciliazione lotto fonderia",
+      "domain": "foundry",
+      "jurisdiction": "IT",
+      "purpose": "Confrontare pesi e resa senza nascondere differenze.",
+      "riskLevel": "high",
+      "requiredRole": "responsabile",
+      "requiredTools": ["reconcileLotWeights", "calculateFoundryYield"],
+      "preconditions": ["pesi con unità e timestamp", "documenti di invio e ritorno"],
+      "stopConditions": ["unità non comparabili", "peso iniziale mancante"],
+      "escalationRules": ["differenza oltre tolleranza documentata", "lotto non tracciabile"],
+      "sourceKeys": ["oroactive-procedure-operative"],
+      "steps": [
+        { "title": "Allinea le unità", "instruction": "Converte tutti i pesi nella stessa unità e conserva i valori originali.", "whyItMatters": "Evita differenze dovute alla conversione.", "blocking": true },
+        { "title": "Calcola la riconciliazione", "instruction": "Confronta ingresso, scarti, campioni, uscita e resa con formula esplicita.", "whyItMatters": "La differenza deve essere spiegabile.", "blocking": true },
+        { "title": "Gestisci lo scostamento", "instruction": "Segnala lo scostamento e richiedi verifica quando supera la tolleranza approvata.", "whyItMatters": "Evita rettifiche silenziose.", "blocking": true }
+      ]
+    },
+    {
+      "procedureKey": "customer-complaint",
+      "title": "Gestione reclamo cliente",
+      "domain": "complaints",
+      "jurisdiction": "IT",
+      "purpose": "Gestire un reclamo con tracciabilità e linguaggio chiaro.",
+      "riskLevel": "medium",
+      "requiredRole": "commesso",
+      "requiredTools": [],
+      "preconditions": ["ascolto del reclamo"],
+      "stopConditions": ["minaccia o aggressione", "richiesta legale formale"],
+      "escalationRules": ["contestazione economica rilevante", "errore documentale", "sicurezza"],
+      "sourceKeys": ["oroactive-procedure-operative"],
+      "steps": [
+        { "title": "Ascolta e riformula", "instruction": "Raccogli il problema senza interrompere e conferma ciò che va verificato.", "whyItMatters": "Riduce incomprensioni.", "blocking": false },
+        { "title": "Separa fatti e valutazioni", "instruction": "Controlla pratica, misure e comunicazioni senza promettere un esito.", "whyItMatters": "Mantiene trasparenza.", "blocking": true },
+        { "title": "Escalation e riscontro", "instruction": "Assegna il referente e comunica tempi e canale del riscontro.", "whyItMatters": "Il reclamo deve avere un responsabile.", "blocking": true }
+      ]
+    },
+    {
+      "procedureKey": "knowledge-conflict-resolution",
+      "title": "Risoluzione conflitto di conoscenza",
+      "domain": "ai_governance",
+      "jurisdiction": "IT",
+      "purpose": "Rendere visibili e risolvere conflitti senza sovrascriverli silenziosamente.",
+      "riskLevel": "high",
+      "requiredRole": "founder",
+      "requiredTools": [],
+      "preconditions": ["almeno due affermazioni incompatibili"],
+      "stopConditions": ["fonte non identificata", "validità non determinabile"],
+      "escalationRules": ["conflitto legale, AML, fiscale o di sicurezza"],
+      "sourceKeys": ["oroactive-procedure-operative"],
+      "steps": [
+        { "title": "Confronta le versioni", "instruction": "Mostra fonte A, fonte B, date, giurisdizione e differenza.", "whyItMatters": "Il conflitto deve essere verificabile.", "blocking": true },
+        { "title": "Applica la gerarchia", "instruction": "Valuta autorità, vigenza, pertinenza e ambito senza far prevalere una policy sulla legge.", "whyItMatters": "Riduce decisioni arbitrarie.", "blocking": true },
+        { "title": "Registra la decisione", "instruction": "Documenta impatto, fonte prevalente, motivazione operativa e test da rieseguire.", "whyItMatters": "La risoluzione deve restare auditabile.", "blocking": true }
+      ]
+    }
+  ],
+  "cases": [],
+  "caseLibraryStatus": "Nessun caso reale pubblicato: attendere anonimizzazione, revisione e approvazione esplicita del Founder."
+}

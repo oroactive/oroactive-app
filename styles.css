@@ -2139,7 +2139,8 @@ body.main-menu-active .splash-screen {
   min-width: 0;
 }
 
-.aurum-message-sources a {
+.aurum-message-sources a,
+.aurum-message-sources .aurum-source-title {
   display: block;
   max-width: 100%;
   color: #ffd79b;
@@ -2162,12 +2163,121 @@ body.main-menu-active .splash-screen {
 }
 
 .assistant-message.ai .aurum-message-sources > strong,
-.assistant-message.ai .aurum-message-sources a {
+.assistant-message.ai .aurum-message-sources a,
+.assistant-message.ai .aurum-message-sources .aurum-source-title {
   color: #8a3c00;
 }
 
 .assistant-message.ai .aurum-message-sources small {
   color: #6b5a4b;
+}
+
+.aurum-message-answer {
+  white-space: pre-wrap;
+}
+
+.aurum-response-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+  white-space: normal;
+}
+
+.aurum-response-badges span {
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 183, 79, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 181, 72, 0.1);
+  color: #ffd79b;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.assistant-message.ai .aurum-response-badges span {
+  border-color: #e7c7aa;
+  background: #fff5ea;
+  color: #713100;
+}
+
+.aurum-response-section {
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid rgba(255, 183, 79, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  white-space: normal;
+}
+
+.aurum-response-section > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #ffc46d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.aurum-response-section ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.aurum-response-risks {
+  border-color: rgba(255, 136, 113, 0.48);
+}
+
+.aurum-response-escalation {
+  border-color: rgba(255, 181, 72, 0.54);
+}
+
+.assistant-message.ai .aurum-response-section {
+  border-color: #ead9c8;
+  background: #fff9f4;
+}
+
+.assistant-message.ai .aurum-response-section > strong {
+  color: #8a3c00;
+}
+
+.aurum-operational-details {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 183, 79, 0.28);
+  border-radius: 8px;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.aurum-operational-details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  color: #ffd79b;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.aurum-operational-details summary::marker {
+  color: #ff9b33;
+}
+
+.aurum-operational-details-body {
+  padding: 0 10px 10px;
+}
+
+.aurum-operational-details-body .aurum-message-sources {
+  margin-top: 0;
+}
+
+.assistant-message.ai .aurum-operational-details {
+  border-color: #ead9c8;
+}
+
+.assistant-message.ai .aurum-operational-details summary {
+  color: #713100;
 }
 
 .aurum-chat-form {
@@ -2375,6 +2485,262 @@ body.main-menu-active .splash-screen {
 .aurum-admin-list {
   display: grid;
   gap: 8px;
+}
+
+.aurum-knowledge-header,
+.aurum-knowledge-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.aurum-knowledge-header {
+  margin-bottom: 14px;
+  padding: 20px;
+  border: 1px solid rgba(255, 181, 72, 0.35);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 106, 0, 0.14), rgba(0, 0, 0, 0.78)), #17100b;
+  color: #fff8ed;
+}
+
+.aurum-knowledge-header h2,
+.aurum-knowledge-panel-heading h3 {
+  margin: 2px 0 4px;
+}
+
+.aurum-knowledge-header .muted {
+  color: rgba(255, 248, 237, 0.76);
+}
+
+.aurum-knowledge-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 4px 2px 10px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.aurum-knowledge-tabs button {
+  flex: 0 0 auto;
+  min-height: 46px;
+  padding: 9px 13px;
+  border: 1px solid rgba(255, 106, 0, 0.28);
+  border-radius: 12px;
+  background: #fff;
+  color: #2a190d;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.aurum-knowledge-tabs button.active,
+.aurum-knowledge-tabs button[aria-selected="true"] {
+  border-color: #ff8a00;
+  background: #ff6a00;
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(255, 106, 0, 0.24);
+}
+
+.aurum-knowledge-tabs button:focus-visible {
+  outline: 3px solid rgba(255, 181, 72, 0.52);
+  outline-offset: 2px;
+}
+
+.aurum-knowledge-workspace {
+  min-height: 320px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.aurum-knowledge-panel-heading {
+  margin-bottom: 16px;
+}
+
+.aurum-knowledge-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.aurum-knowledge-list,
+.aurum-knowledge-coverage {
+  display: grid;
+  gap: 12px;
+}
+
+.aurum-knowledge-coverage {
+  margin-top: 20px;
+}
+
+.aurum-knowledge-row {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #ead9c8;
+  border-radius: 12px;
+  background: #fffaf6;
+}
+
+.aurum-knowledge-row > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.aurum-knowledge-status {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 106, 0, 0.24);
+  border-radius: 999px;
+  background: #fff2e7;
+  color: #783400;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.aurum-knowledge-row dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.aurum-knowledge-row dl > div {
+  min-width: 0;
+  padding: 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.aurum-knowledge-row dt {
+  color: #795d47;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.aurum-knowledge-row dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  color: #2a190d;
+  line-height: 1.4;
+}
+
+.aurum-knowledge-source-link {
+  color: #8a3c00;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.aurum-knowledge-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.aurum-knowledge-row-actions button {
+  min-height: 44px;
+}
+
+.aurum-knowledge-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 180px;
+  padding: 22px;
+  border: 1px dashed #e4c4aa;
+  border-radius: 12px;
+  color: #6b513c;
+  text-align: center;
+}
+
+.aurum-knowledge-state.error {
+  flex-direction: column;
+  border-color: #e5a29a;
+  background: #fff3f1;
+  color: #8c251a;
+}
+
+.aurum-knowledge-state.empty {
+  min-height: 120px;
+}
+
+.aurum-knowledge-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(255, 106, 0, 0.2);
+  border-top-color: #ff6a00;
+  border-radius: 50%;
+  animation: aurum-knowledge-spin 0.8s linear infinite;
+}
+
+.aurum-knowledge-test-form {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid #ead9c8;
+  border-radius: 12px;
+  background: #fff9f4;
+}
+
+.aurum-knowledge-test-form textarea {
+  width: 100%;
+}
+
+@keyframes aurum-knowledge-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurum-knowledge-spinner { animation: none; }
+}
+
+@media (max-width: 720px) {
+  .aurum-knowledge-header,
+  .aurum-knowledge-panel-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .aurum-knowledge-header > button,
+  .aurum-knowledge-panel-heading > button {
+    width: 100%;
+  }
+
+  .aurum-knowledge-workspace {
+    min-height: 260px;
+    padding: 14px;
+  }
+
+  .aurum-knowledge-kpi-grid,
+  .aurum-knowledge-row dl {
+    grid-template-columns: 1fr;
+  }
+
+  .aurum-knowledge-row > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .aurum-knowledge-status {
+    align-self: flex-start;
+  }
+
+  .aurum-knowledge-row-actions button {
+    flex: 1 1 180px;
+  }
 }
 
 .aurum-avoid,

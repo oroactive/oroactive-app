@@ -9,10 +9,13 @@ import {
 } from "../services/aurum/sectorKnowledge.js";
 import {
   containsAssistantPersonalData,
+  containsAurumCaseRestrictedData,
+  isAurumCaseFieldNameAllowed,
   redactAssistantPersonalData,
   sanitizeAssistantContextObject,
   sanitizeAssistantUntrustedContext
 } from "../services/aurum/privacy.js";
+import { ACADEMY_GEM_MATERIALS, ACADEMY_GEM_TOOLS } from "../services/academy/gemologicalLab.js";
 
 test("la base settoriale Aurum è ampia, versionata e interamente fontata", () => {
   assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.01-opo-bullion");
@@ -252,11 +255,50 @@ test("Aurum blocca e oscura dati personali prima dei servizi esterni", () => {
   assert.equal(containsAssistantPersonalData("Il cliente è Mario Rossi"), true);
   assert.equal(containsAssistantPersonalData("Vorrei che mi chiamassi Lia"), true);
   assert.equal(containsAssistantPersonalData("Il mio compleanno è il 29/07"), true);
+  assert.equal(containsAssistantPersonalData("3331234567"), true);
+  assert.equal(containsAssistantPersonalData("0234567890"), true);
+  assert.equal(containsAssistantPersonalData("333/123/4567"), true);
+  assert.equal(containsAssistantPersonalData("02/12345678"), true);
   assert.equal(redactAssistantPersonalData("Chiamami Lia. Il mio compleanno è il 29 luglio"), "[nome preferito omesso]. [compleanno omesso]");
   const jsonContext = { cliente: "Mario Rossi", documento: "YA1234567", current_price_per_gram: 91.25 };
   assert.equal(containsAssistantPersonalData(JSON.stringify(jsonContext)), true);
   assert.deepEqual(sanitizeAssistantContextObject(jsonContext), { current_price_per_gram: 91.25 });
   assert.equal(redactAssistantPersonalData("1 oz troy = 31.1034768 g"), "1 oz troy = 31.1034768 g");
+  for (const restricted of [
+    "xavier dupont è presente nel registro",
+    "passaporto YA1234567 associato al caso",
+    "documento AB1234567 archiviato",
+    "targa AB123CD verificata",
+    "nato il 12/03/1980 nel comune di Roma",
+    "3331234567",
+    "0234567890",
+    "333/123/4567",
+    "02/12345678",
+    "score 12345678901"
+  ]) assert.equal(containsAurumCaseRestrictedData(restricted), true, restricted);
+  for (const controlled of [
+    "Diamante Naturale",
+    "Esito Positivo",
+    "campione pseudonimizzato",
+    "peso netto 12.5 g titolo oro 750",
+    "indice rifrazione osservazioni strumentazione formula"
+  ]) assert.equal(containsAurumCaseRestrictedData(controlled), false, controlled);
+  for (const material of ACADEMY_GEM_MATERIALS) {
+    assert.equal(containsAurumCaseRestrictedData(material.name), false, `materiale non coperto: ${material.name}`);
+    assert.equal(containsAurumCaseRestrictedData(material.chemical_formula, { allowChemicalFormula: true }), false, `formula non coperta: ${material.name}`);
+    assert.equal(containsAurumCaseRestrictedData(material.density), false, `densità non coperta: ${material.name}`);
+  }
+  for (const tool of ACADEMY_GEM_TOOLS) {
+    assert.equal(containsAurumCaseRestrictedData(tool.name), false, `strumento non coperto: ${tool.name}`);
+  }
+  assert.equal(isAurumCaseFieldNameAllowed("densita"), true);
+  assert.equal(isAurumCaseFieldNameAllowed("densità"), true);
+  assert.equal(containsAurumCaseRestrictedData("3,52 g/cm3"), false);
+  assert.equal(containsAurumCaseRestrictedData("Be3Al2Si6O18"), true, "una formula non è ammessa fuori dal campo dedicato");
+  assert.equal(containsAurumCaseRestrictedData("Be3Al2Si6O18", { allowChemicalFormula: true }), false);
+  assert.equal(containsAurumCaseRestrictedData("Ca2Al3Si3O12", { allowChemicalFormula: true }), false);
+  assert.equal(containsAurumCaseRestrictedData("Ca123Se", { allowChemicalFormula: true }), true);
+  assert.equal(containsAurumCaseRestrictedData("AB1234567"), true);
 });
 
 test("Aurum elimina istruzioni malevole dai documenti recuperati", () => {

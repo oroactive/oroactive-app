@@ -1,7 +1,7 @@
 {
   "name": "OroActive Gestionale",
   "short_name": "OroActive",
-  "description": "Software gestionale OroActive per atti di vendita.",
+  "description": "Gestionale OroActive con Aurum Knowledge OS e strumenti professionali per il compro oro.",
   "start_url": "/index.html",
   "scope": "/",
   "id": "/oroactive-gestionale",

@@ -1,4 +1,4 @@
-const BUILD_ID = "20260801-aurum-opo-bullion-13";
+const BUILD_ID = "20260801-aurum-knowledge-os-14";
 const CACHE_NAME = `oroactive-cache-${BUILD_ID}`;
 const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
 const NEVER_CACHE_PREFIXES = [

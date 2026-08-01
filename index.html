@@ -10,7 +10,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="OroActive">
   <meta name="format-detection" content="telephone=no">
-  <meta name="oroactive-build-id" content="20260801-aurum-opo-bullion-13">
+  <meta name="oroactive-build-id" content="20260801-aurum-knowledge-os-14">
   <title>OroActive Gestionale</title>
   <script>
     (() => {
@@ -57,12 +57,12 @@
       void verifyBootBuild();
     })();
   </script>
-  <link rel="manifest" href="manifest.json?v=20260801-aurum-opo-bullion-13">
+  <link rel="manifest" href="manifest.json?v=20260801-aurum-knowledge-os-14">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260801-aurum-opo-bullion-13">
-  <script src="frontend-config.js?v=20260801-aurum-opo-bullion-13"></script>
+  <link rel="stylesheet" href="styles.css?v=20260801-aurum-knowledge-os-14">
+  <script src="frontend-config.js?v=20260801-aurum-knowledge-os-14"></script>
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -1337,7 +1337,35 @@
 
       <section id="aurumAdmin" class="screen founder-only">
         <button class="return-menu-button" type="button" data-return-menu>Torna al menu principale</button>
-        <section class="knowledge-card aurum-management-panel" id="aurumManagementPanel" hidden>
+        <header class="aurum-knowledge-header">
+          <div>
+            <p class="eyebrow">Founder · Governo della conoscenza</p>
+            <h2>Aurum Knowledge OS</h2>
+            <p class="muted">Fonti versionate, conoscenza verificata, procedure e controlli di qualità dell’assistente OroActive.</p>
+          </div>
+          <button class="ghost-button" type="button" id="aurumKnowledgeRefresh">Aggiorna dati</button>
+        </header>
+        <div class="aurum-knowledge-tabs" id="aurumKnowledgeTabs" role="tablist" aria-label="Gestione Aurum Knowledge OS">
+          <button class="active" type="button" role="tab" aria-selected="true" data-aurum-knowledge-tab="overview">Panoramica</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="domains">Domini di conoscenza</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="sources">Fonti</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="versions">Versioni</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="documents">Documenti</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="facts">Fatti</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="graph">Knowledge Graph</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="procedures">Procedure</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="cases">Casi reali</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="review">Review Queue</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="conflicts">Conflitti</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="stale">Fonti obsolete</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="sync">Sincronizzazioni</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="coverage">Copertura</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="tests">Test Aurum</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="feedback">Feedback</button>
+          <button type="button" role="tab" aria-selected="false" data-aurum-knowledge-tab="settings">Impostazioni</button>
+        </div>
+        <section class="aurum-knowledge-workspace" id="aurumKnowledgeWorkspace" role="tabpanel" aria-live="polite"></section>
+        <section class="knowledge-card aurum-management-panel" id="aurumManagementPanel" role="tabpanel" hidden>
           <div>
             <p class="eyebrow">Aurum</p>
             <h2>Gestione Aurum</h2>
@@ -1986,7 +2014,7 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="shared/aurum-policy.js?v=20260801-aurum-opo-bullion-13"></script>
-  <script src="app.js?v=20260801-aurum-opo-bullion-13"></script>
+  <script src="shared/aurum-policy.js?v=20260801-aurum-knowledge-os-14"></script>
+  <script src="app.js?v=20260801-aurum-knowledge-os-14"></script>
 </body>
 </html>
