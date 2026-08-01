@@ -120,41 +120,10 @@
     return classifySafety(value).blockMemory || matchesAny(forbiddenMemoryPatterns, value);
   }
 
-  const knowledgeSourceAuthority = Object.freeze({
-    law: 100,
-    authority: 95,
-    technicalStandard: 90,
-    oroactivePolicy: 85,
-    proprietaryKnowledge: 80,
-    approvedCase: 70,
-    secondary: 40
-  });
-
-  const knowledgeLimits = Object.freeze({
-    candidateChunks: 12,
-    rerankedChunks: 8,
-    primarySources: 4,
-    procedures: 2,
-    noSourceAnswer: "Non dispongo di una fonte sufficiente e aggiornata per affermarlo.",
-    neverAutoPublishFeedback: true,
-    neverExposePrivateReasoning: true,
-    neverExposePrivateMemoriesToFounder: true
-  });
-
-  const professionalRiskDomains = Object.freeze([
-    "legal_compro_oro", "oam_registry", "aml_ctf", "privacy", "ai_governance",
-    "assaying", "hallmarks", "gemology", "diamonds", "market_prices",
-    "buyback_pricing", "foundry", "refining", "tax_accounting", "physical_security"
-  ]);
-
   globalThis.OroActiveAurumPolicy = Object.freeze({
     classifySafety,
     containsForbiddenMemoryData,
     safetyCases,
-    forbiddenMemoryCases,
-    knowledgeSourceAuthority,
-    knowledgeLimits,
-    professionalRiskDomains,
-    confidenceLevels: Object.freeze(["ALTO", "MEDIO", "BASSO", "INSUFFICIENTE"])
+    forbiddenMemoryCases
   });
 })();

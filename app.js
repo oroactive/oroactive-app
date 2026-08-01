@@ -188,10 +188,6 @@ const state = {
   aurumMemories: [],
   aurumAllMemories: [],
   aurumSupportRequests: [],
-  aurumKnowledgeTab: "overview",
-  aurumKnowledgeData: {},
-  aurumKnowledgeErrors: {},
-  aurumKnowledgeLoading: {},
   aurumActiveQuiz: null,
   aurumPendingTutorialId: "",
   aurumQuizIndex: 0,
@@ -224,28 +220,8 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260801-aurum-knowledge-os-14";
+const OROACTIVE_CLIENT_BUILD_ID = "20260801-aurum-opo-bullion-13";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
-
-const AURUM_KNOWLEDGE_TABS = Object.freeze([
-  { id: "overview", label: "Panoramica", endpoint: "/aurum/knowledge/overview" },
-  { id: "domains", label: "Domini di conoscenza", endpoint: "/aurum/knowledge/domains" },
-  { id: "sources", label: "Fonti", endpoint: "/aurum/knowledge/sources" },
-  { id: "versions", label: "Versioni", endpoint: "/aurum/knowledge/versions" },
-  { id: "documents", label: "Documenti", endpoint: "/aurum/knowledge/documents" },
-  { id: "facts", label: "Fatti", endpoint: "/aurum/knowledge/facts" },
-  { id: "graph", label: "Knowledge Graph", endpoint: "/aurum/knowledge/graph" },
-  { id: "procedures", label: "Procedure", endpoint: "/aurum/knowledge/procedures" },
-  { id: "cases", label: "Casi reali", endpoint: "/aurum/knowledge/cases" },
-  { id: "review", label: "Review Queue", endpoint: "/aurum/knowledge/review-queue" },
-  { id: "conflicts", label: "Conflitti", endpoint: "/aurum/knowledge/conflicts" },
-  { id: "stale", label: "Fonti obsolete", endpoint: "/aurum/knowledge/stale" },
-  { id: "sync", label: "Sincronizzazioni", endpoint: "/aurum/knowledge/sync-runs" },
-  { id: "coverage", label: "Copertura", endpoint: "/aurum/knowledge/coverage" },
-  { id: "tests", label: "Test Aurum", endpoint: "/aurum/knowledge/evaluations" },
-  { id: "feedback", label: "Feedback", endpoint: "/aurum/knowledge/feedback" },
-  { id: "settings", label: "Impostazioni", endpoint: "" }
-]);
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
@@ -5169,9 +5145,6 @@ const aurumRefreshAdminData = document.getElementById("aurumRefreshAdminData");
 const aurumResetLocalMemory = document.getElementById("aurumResetLocalMemory");
 const aurumSupportRequestsList = document.getElementById("aurumSupportRequestsList");
 const aurumMemoriesList = document.getElementById("aurumMemoriesList");
-const aurumKnowledgeTabs = document.getElementById("aurumKnowledgeTabs");
-const aurumKnowledgeWorkspace = document.getElementById("aurumKnowledgeWorkspace");
-const aurumKnowledgeRefresh = document.getElementById("aurumKnowledgeRefresh");
 const userMessagesPanel = document.getElementById("userMessagesPanel");
 const userMessagesList = document.getElementById("userMessagesList");
 const userMessageForm = document.getElementById("userMessageForm");
@@ -8639,7 +8612,8 @@ async function handleScreenDataLoad(id) {
     if (isFounder()) await loadKnowledgeStatus();
   }
   if (id === "aurumAdmin") {
-    await loadAurumKnowledgeTab(state.aurumKnowledgeTab || "overview");
+    renderAurumManagementPanel();
+    await refreshAurumAdminData();
   }
   if (id === "knowledgeNotes") {
     resetKnowledgeNoteFormValues();
@@ -9651,158 +9625,30 @@ function safeAurumSourceUrl(value = "") {
   }
 }
 
-function normalizeAurumList(value) {
-  if (value === null || value === undefined || value === "") return [];
-  return (Array.isArray(value) ? value : [value]).filter((item) => item !== null && item !== undefined && item !== "");
-}
-
-function normalizeAurumSource(source = {}) {
-  if (typeof source === "string") return { title: source, url: "", organization: "" };
-  return {
-    organization: String(source.organization || source.authority || source.ente || source.organizzazione || "").trim(),
-    title: String(source.title || source.titolo || source.citation_label || "Fonte verificata").trim(),
-    version: String(source.version || source.version_label || source.versione || "").trim(),
-    section: String(source.articleSection || source.article_section || source.article || source.article_number || source.section || source.sezione || source.section_path || "").trim(),
-    validity: String(source.validity || source.valid_as_of || source.effective_from || source.vigenteAl || source.validita || "").trim(),
-    consultedAt: String(source.consultedAt || source.consulted_at || source.retrieved_at || source.verifiedAt || source.verificatoIl || "").trim(),
-    url: safeAurumSourceUrl(source.url || source.official_url || source.link || "")
-  };
-}
-
-function aurumStructuredText(item) {
-  if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") return String(item);
-  if (!item || typeof item !== "object") return "";
-  return String(item.label || item.title || item.name || item.message || item.description || item.result || item.value || JSON.stringify(item));
-}
-
-function normalizeAurumProfessionalResponse(data = {}) {
-  const professionalPayload = data.professional && typeof data.professional === "object" ? data.professional : {};
-  const response = { ...data, ...professionalPayload };
-  const operational = response.operationalReasoning || response.operational_reasoning || response.ragionamentoOperativo || {};
-  const sources = normalizeAurumList(response.sources?.length ? response.sources : response.fonti).map(normalizeAurumSource);
-  const normalized = {
-    content: String(response.answer || response.risposta || "Risposta non disponibile."),
-    source: String(response.source || response.fonte || ""),
-    fonti: sources,
-    classification: normalizeAurumList(response.classification || response.classificazioni),
-    domain: normalizeAurumList(response.domain || response.domains || response.dominio),
-    jurisdiction: String(response.jurisdiction || response.giurisdizione || ""),
-    validAsOf: String(response.validAsOf || response.valid_as_of || response.validoAl || ""),
-    confidence: String(response.confidence || response.affidabilita || response.confidenza || ""),
-    assumptions: normalizeAurumList(response.assumptions || response.assunzioni),
-    missingInformation: normalizeAurumList(response.missingInformation || response.missing_information || response.informazioniMancanti),
-    toolResults: normalizeAurumList(response.toolResults || response.tool_results || response.risultatiTool),
-    recommendedSteps: normalizeAurumList(response.recommendedSteps || response.recommended_steps || response.passiConsigliati),
-    risks: normalizeAurumList(response.risks || response.rischi),
-    escalation: response.escalation || null,
-    facts: normalizeAurumList(response.facts || response.fatti || operational.facts || operational.fatti),
-    rules: normalizeAurumList(response.rules || response.regole || operational.rules || operational.regole),
-    calculations: normalizeAurumList(response.calculations || response.calcoli || operational.calculations || operational.calcoli),
-    steps: normalizeAurumList(response.steps || response.passaggi || operational.steps || operational.passaggi)
-  };
-  normalized.professional = Boolean(
-    Object.keys(professionalPayload).length
-    || normalized.classification.length
-    || normalized.domain.length
-    || normalized.validAsOf
-    || normalized.confidence
-    || normalized.toolResults.length
-    || normalized.recommendedSteps.length
-    || normalized.risks.length
-    || normalized.escalation
-  );
-  return normalized;
-}
-
 function aurumSourcesMarkup(message = {}) {
   const seen = new Set();
   const sources = (Array.isArray(message.fonti) ? message.fonti : [])
-    .map(normalizeAurumSource)
-    .filter((source) => {
-      const fingerprint = [source.organization, source.title, source.version, source.section, source.url].join("|");
-      if ((!source.title && !source.organization && !source.url) || seen.has(fingerprint)) return false;
-      seen.add(fingerprint);
-      return true;
-    })
-    .slice(0, 4);
+    .map((source) => ({
+      title: String(source?.title || source?.titolo || "Fonte verificata").trim(),
+      url: safeAurumSourceUrl(source?.url),
+      authority: String(source?.authority || source?.ente || "").trim(),
+      verifiedAt: String(source?.verifiedAt || source?.verificatoIl || "").trim()
+    }))
+    .filter((source) => source.url && !seen.has(source.url) && seen.add(source.url))
+    .slice(0, 8);
   if (!sources.length) return "";
   return `
     <div class="aurum-message-sources">
-      <strong>Fonti utilizzate</strong>
+      <strong>Fonti e riferimenti</strong>
       <ul>
-        ${sources.map((source, index) => `
+        ${sources.map((source) => `
           <li>
-            ${source.url
-              ? `<a class="aurum-source-title" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${index + 1}. ${escapeHtml([source.organization, source.title].filter(Boolean).join(" — ") || source.title)}</a>`
-              : `<span class="aurum-source-title">${index + 1}. ${escapeHtml([source.organization, source.title].filter(Boolean).join(" — ") || source.title)}</span>`}
-            ${source.version ? `<small>Versione: ${escapeHtml(source.version)}</small>` : ""}
-            ${source.section ? `<small>Articolo/sezione: ${escapeHtml(source.section)}</small>` : ""}
-            ${source.validity ? `<small>Validità: ${escapeHtml(source.validity)}</small>` : ""}
-            ${source.consultedAt ? `<small>Consultata/verificata: ${escapeHtml(source.consultedAt)}</small>` : ""}
+            <a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title)}</a>
+            ${source.authority ? `<small>${escapeHtml(source.authority)}${source.verifiedAt ? ` · verifica ${escapeHtml(source.verifiedAt)}` : ""}</small>` : ""}
           </li>
         `).join("")}
       </ul>
     </div>
-  `;
-}
-
-function aurumStructuredListMarkup(title, items = [], className = "") {
-  const visible = normalizeAurumList(items).map(aurumStructuredText).filter(Boolean);
-  if (!visible.length) return "";
-  return `
-    <section class="aurum-response-section ${escapeHtml(className)}">
-      <strong>${escapeHtml(title)}</strong>
-      <ul>${visible.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-    </section>`;
-}
-
-function aurumProfessionalBadgesMarkup(message = {}) {
-  const badges = [
-    ...normalizeAurumList(message.classification),
-    ...normalizeAurumList(message.domain),
-    message.jurisdiction,
-    message.confidence ? `Affidabilità ${message.confidence}` : ""
-  ].map(aurumStructuredText).filter(Boolean);
-  if (!badges.length && !message.validAsOf) return "";
-  return `
-    <div class="aurum-response-badges">
-      ${badges.map((badge) => `<span>${escapeHtml(badge)}</span>`).join("")}
-      ${message.validAsOf ? `<span>Valida al ${escapeHtml(message.validAsOf)}</span>` : ""}
-    </div>`;
-}
-
-function aurumOperationalDetailsMarkup(message = {}) {
-  const sources = aurumSourcesMarkup(message);
-  const body = [
-    sources,
-    aurumStructuredListMarkup("Fatti utilizzati", message.facts),
-    aurumStructuredListMarkup("Regole applicate", message.rules),
-    aurumStructuredListMarkup("Calcoli", message.calculations),
-    aurumStructuredListMarkup("Passaggi procedurali", message.steps),
-    aurumStructuredListMarkup("Dati mancanti", message.missingInformation)
-  ].filter(Boolean).join("");
-  if (!body && !message.professional) return "";
-  return `
-    <details class="aurum-operational-details">
-      <summary>Mostra fonti e ragionamento operativo</summary>
-      <div class="aurum-operational-details-body">${body || '<p class="muted">Nessun dettaglio operativo disponibile.</p>'}</div>
-    </details>`;
-}
-
-function aurumProfessionalMessageMarkup(message = {}) {
-  const escalation = message.escalation
-    ? aurumStructuredListMarkup("Escalation", [message.escalation], "aurum-response-escalation")
-    : "";
-  return `
-    <div class="aurum-message-answer">${escapeHtml(message.content || "")}</div>
-    ${aurumProfessionalBadgesMarkup(message)}
-    ${aurumStructuredListMarkup("Assunzioni", message.assumptions)}
-    ${aurumStructuredListMarkup("Informazioni mancanti", message.missingInformation)}
-    ${aurumStructuredListMarkup("Risultati strumenti", message.toolResults, "aurum-response-tools")}
-    ${aurumStructuredListMarkup("Passi consigliati", message.recommendedSteps)}
-    ${aurumStructuredListMarkup("Rischi", message.risks, "aurum-response-risks")}
-    ${escalation}
-    ${aurumOperationalDetailsMarkup(message)}
   `;
 }
 
@@ -9814,7 +9660,8 @@ function renderAssistantMessages() {
   }
   assistantChat.innerHTML = state.assistantMessages.map((message, index) => `
     <article class="assistant-message ${message.role === "user" ? "user" : "ai"}">
-      ${message.role === "assistant" ? aurumProfessionalMessageMarkup(message) : escapeHtml(message.content)}
+      ${escapeHtml(message.content)}
+      ${message.role === "assistant" ? aurumSourcesMarkup(message) : ""}
       ${message.role === "assistant" ? `
         <div class="assistant-feedback" data-assistant-feedback-index="${index}">
           <button type="button" data-ai-feedback="utile">Risposta utile</button>
@@ -9851,7 +9698,9 @@ async function askAssistant(event) {
     });
     state.assistantMessages.push({
       role: "assistant",
-      ...normalizeAurumProfessionalResponse(data),
+      content: data.risposta || "Risposta non disponibile.",
+      source: data.fonte || "Integrazione generale",
+      fonti: Array.isArray(data.fonti) ? data.fonti : [],
       question
     });
   } catch (error) {
@@ -10801,7 +10650,8 @@ function renderAurumMessages() {
   } else {
     aurumChatMessages.innerHTML = state.aurumMessages.map((message) => `
       <article class="aurum-message ${message.role === "user" ? "user" : "assistant"}">
-        ${message.role === "assistant" ? aurumProfessionalMessageMarkup(message) : escapeHtml(message.content || "")}
+        ${escapeHtml(message.content || "")}
+        ${message.role === "assistant" ? aurumSourcesMarkup(message) : ""}
       </article>
     `).join("");
     aurumChatMessages.scrollTop = aurumChatMessages.scrollHeight;
@@ -10864,10 +10714,6 @@ function resetAurumSessionState() {
   state.aurumMemories = [];
   state.aurumAllMemories = [];
   state.aurumSupportRequests = [];
-  state.aurumKnowledgeTab = "overview";
-  state.aurumKnowledgeData = {};
-  state.aurumKnowledgeErrors = {};
-  state.aurumKnowledgeLoading = {};
   state.aurumActiveQuiz = null;
   state.aurumPendingTutorialId = "";
   state.aurumQuizIndex = 0;
@@ -11206,7 +11052,7 @@ function renderUserMessages(markup = "") {
 
 function renderAurumManagementPanel() {
   const settings = loadAurumSettings();
-  const canViewPanel = isFounder() && state.aurumKnowledgeTab === "settings";
+  const canViewPanel = isFounder();
   if (aurumManagementPanel) aurumManagementPanel.hidden = !canViewPanel;
   if (aurumEnabledToggle) aurumEnabledToggle.checked = Boolean(settings.enabled);
   if (aurumMovementToggle) aurumMovementToggle.checked = Boolean(settings.movement);
@@ -11218,296 +11064,6 @@ function renderAurumManagementPanel() {
   if (aurumResetLocalMemory) aurumResetLocalMemory.hidden = !isFounder();
   renderAurumMemoryLists();
   renderAurumSupportRequests();
-}
-
-function aurumKnowledgeTabDefinition(tabId = state.aurumKnowledgeTab) {
-  return AURUM_KNOWLEDGE_TABS.find((tab) => tab.id === tabId) || AURUM_KNOWLEDGE_TABS[0];
-}
-
-function aurumKnowledgeRecordArray(data = {}, tabId = state.aurumKnowledgeTab) {
-  const payload = data?.data && typeof data.data === "object" ? data.data : data;
-  if (Array.isArray(payload)) return payload;
-  const aliases = {
-    domains: ["domains", "items"],
-    sources: ["sources", "items"],
-    versions: ["versions", "items"],
-    documents: ["documents", "items"],
-    facts: ["facts", "items"],
-    graph: ["relations", "graph", "items"],
-    procedures: ["procedures", "items"],
-    cases: ["cases", "items"],
-    review: ["reviewQueue", "review_queue", "items"],
-    conflicts: ["conflicts", "items"],
-    stale: ["stale", "sources", "items"],
-    sync: ["syncRuns", "sync_runs", "runs", "items"],
-    coverage: ["coverage", "domains", "items"],
-    tests: ["evaluations", "tests", "items"],
-    feedback: ["feedback", "items"]
-  };
-  for (const key of aliases[tabId] || ["items"]) {
-    if (Array.isArray(payload?.[key])) return payload[key];
-  }
-  return [];
-}
-
-function aurumKnowledgeValue(value) {
-  if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "boolean") return value ? "Sì" : "No";
-  if (Array.isArray(value)) {
-    return value.map((item) => typeof item === "object" ? JSON.stringify(item) : String(item)).join(", ");
-  }
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
-
-function aurumKnowledgeLabel(key = "") {
-  return String(key || "")
-    .replace(/_/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/^./, (letter) => letter.toUpperCase());
-}
-
-function aurumKnowledgeRecordTitle(record = {}, tabId = state.aurumKnowledgeTab) {
-  return record.title || record.name || record.label || record.source_key || record.procedure_key
-    || record.case_key || record.fact_key || record.organization || `${aurumKnowledgeTabDefinition(tabId).label} #${record.id || "—"}`;
-}
-
-function aurumKnowledgeRecordFields(record = {}) {
-  const hiddenKeys = new Set(["id", "title", "name", "label", "content", "raw_content", "embedding", "embedding_json"]);
-  return Object.entries(record)
-    .filter(([key, value]) => !hiddenKeys.has(key) && value !== null && value !== undefined && value !== "")
-    .slice(0, 9);
-}
-
-function aurumKnowledgeActionButtons(tabId, record = {}) {
-  const id = escapeHtml(String(record.id || record.source_id || record.entity_id || ""));
-  if (!id) return "";
-  const button = (action, label, className = "ghost-button") => (
-    `<button class="${className}" type="button" data-aurum-knowledge-action="${action}" data-aurum-entity-id="${id}">${label}</button>`
-  );
-  const actions = [];
-  if (tabId === "sources") {
-    actions.push(button("sync-source", "Sincronizza fonte"));
-    if (record.active !== false) actions.push(button("deactivate-source", "Disattiva fonte", "danger-button"));
-  }
-  if (tabId === "versions" && !["approved", "approvata"].includes(String(record.review_status || record.status || "").toLowerCase())) {
-    actions.push(button("approve-version", "Approva versione", "primary-button"));
-  }
-  if (tabId === "documents") {
-    actions.push(button("regenerate-embeddings", "Rigenera embeddings"));
-    actions.push(button("extract-facts", "Riesegui estrazione fatti"));
-  }
-  if (tabId === "review" && ["pending", "in_review"].includes(String(record.status || "pending").toLowerCase())) {
-    actions.push(button("resolve-review", "Risolvi revisione", "primary-button"));
-  }
-  if (tabId === "conflicts" && String(record.status || "open").toLowerCase() !== "resolved") {
-    actions.push(button("resolve-conflict", "Risolvi conflitto", "primary-button"));
-  }
-  if (tabId === "procedures" && record.published !== true && !["approved", "approvata"].includes(String(record.review_status || record.status || "").toLowerCase())) {
-    actions.push(button("publish-procedure", "Pubblica procedura", "primary-button"));
-  }
-  return actions.length ? `<div class="aurum-knowledge-row-actions">${actions.join("")}</div>` : "";
-}
-
-function aurumKnowledgeRecordMarkup(record = {}, tabId = state.aurumKnowledgeTab) {
-  const url = safeAurumSourceUrl(record.official_url || record.url || "");
-  return `
-    <article class="aurum-knowledge-row">
-      <header>
-        <strong>${escapeHtml(aurumKnowledgeRecordTitle(record, tabId))}</strong>
-        ${record.status || record.review_status ? `<span class="aurum-knowledge-status">${escapeHtml(record.status || record.review_status)}</span>` : ""}
-      </header>
-      <dl>
-        ${aurumKnowledgeRecordFields(record).map(([key, value]) => `
-          <div><dt>${escapeHtml(aurumKnowledgeLabel(key))}</dt><dd>${escapeHtml(aurumKnowledgeValue(value).slice(0, 520))}</dd></div>
-        `).join("")}
-      </dl>
-      ${url ? `<a class="aurum-knowledge-source-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Apri fonte ufficiale</a>` : ""}
-      ${aurumKnowledgeActionButtons(tabId, record)}
-    </article>
-  `;
-}
-
-function aurumKnowledgeMetricEntries(data = {}) {
-  const payload = data?.data && typeof data.data === "object" ? data.data : data;
-  const counts = payload.counts && typeof payload.counts === "object" ? payload.counts : {};
-  const overview = payload.overview && typeof payload.overview === "object" ? payload.overview : {};
-  const source = { ...overview, ...counts, ...payload };
-  const definitions = [
-    ["Fonti attive", ["active_sources", "activeSources", "sources_active"]],
-    ["Fonti ufficiali", ["official_sources", "officialSources"]],
-    ["Documenti", ["documents", "document_count"]],
-    ["Chunk", ["chunks", "chunk_count"]],
-    ["Fatti", ["facts", "fact_count"]],
-    ["Relazioni", ["relations", "relation_count"]],
-    ["Procedure", ["procedures", "procedure_count"]],
-    ["Casi", ["cases", "case_count"]],
-    ["Fonti scadute", ["stale_sources", "staleSources"]],
-    ["Conflitti", ["conflicts", "conflict_count"]],
-    ["Review pending", ["review_pending", "reviewPending"]],
-    ["Domande senza risposta", ["unanswered_questions", "unansweredQuestions"]],
-    ["Affidabilità media", ["average_reliability", "averageReliability", "average_confidence", "averageConfidence"]]
-  ];
-  return definitions.map(([label, keys]) => {
-    const key = keys.find((candidate) => source[candidate] !== undefined);
-    return { label, value: key ? source[key] : 0 };
-  });
-}
-
-function aurumKnowledgeToolbar(tabId) {
-  if (["overview", "sources", "stale"].includes(tabId)) {
-    return `<button class="primary-button" type="button" data-aurum-knowledge-action="check-updates">Verifica aggiornamenti</button>`;
-  }
-  return "";
-}
-
-function aurumKnowledgeTestForm() {
-  return `
-    <form class="aurum-knowledge-test-form" id="aurumKnowledgeTestForm">
-      <label>Testa una domanda
-        <textarea name="question" rows="3" required placeholder="Inserisci una domanda di valutazione per Aurum"></textarea>
-      </label>
-      <button class="primary-button" type="submit">Testa domanda</button>
-    </form>
-    <div id="aurumKnowledgeTestResult" aria-live="polite"></div>
-  `;
-}
-
-function renderAurumKnowledgeTabs() {
-  if (!aurumKnowledgeTabs) return;
-  aurumKnowledgeTabs.querySelectorAll("[data-aurum-knowledge-tab]").forEach((button) => {
-    const active = button.dataset.aurumKnowledgeTab === state.aurumKnowledgeTab;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-selected", String(active));
-    button.tabIndex = active ? 0 : -1;
-  });
-}
-
-function renderAurumKnowledgeTab() {
-  if (!aurumKnowledgeWorkspace || !isFounder()) return;
-  const tab = aurumKnowledgeTabDefinition();
-  renderAurumKnowledgeTabs();
-  renderAurumManagementPanel();
-  aurumKnowledgeWorkspace.hidden = tab.id === "settings";
-  if (tab.id === "settings") return;
-  if (state.aurumKnowledgeLoading[tab.id]) {
-    aurumKnowledgeWorkspace.innerHTML = `<div class="aurum-knowledge-state" role="status"><span class="aurum-knowledge-spinner" aria-hidden="true"></span>Caricamento ${escapeHtml(tab.label)}…</div>`;
-    return;
-  }
-  const error = state.aurumKnowledgeErrors[tab.id];
-  if (error) {
-    aurumKnowledgeWorkspace.innerHTML = `
-      <div class="aurum-knowledge-state error" role="alert">
-        <strong>${escapeHtml(error)}</strong>
-        <button class="ghost-button" type="button" data-aurum-knowledge-action="retry-tab">Riprova</button>
-      </div>`;
-    return;
-  }
-  const data = state.aurumKnowledgeData[tab.id] || {};
-  const payload = data?.data && typeof data.data === "object" ? data.data : data;
-  if (tab.id === "overview") {
-    aurumKnowledgeWorkspace.innerHTML = `
-      <div class="aurum-knowledge-panel-heading">
-        <div><p class="eyebrow">Controllo Founder</p><h3>Panoramica Knowledge OS</h3></div>
-        ${aurumKnowledgeToolbar(tab.id)}
-      </div>
-      <div class="aurum-knowledge-kpi-grid">
-        ${aurumKnowledgeMetricEntries(data).map(({ label, value }) => metricCard(label, value)).join("")}
-      </div>
-      ${Array.isArray(payload.coverageByDomain) && payload.coverageByDomain.length ? `<section class="aurum-knowledge-coverage"><h3>Copertura per dominio</h3>${payload.coverageByDomain.map((record) => aurumKnowledgeRecordMarkup(record, "coverage")).join("")}</section>` : ""}
-    `;
-    return;
-  }
-  const records = aurumKnowledgeRecordArray(data, tab.id);
-  aurumKnowledgeWorkspace.innerHTML = `
-    <div class="aurum-knowledge-panel-heading">
-      <div><p class="eyebrow">Aurum Knowledge OS</p><h3>${escapeHtml(tab.label)}</h3></div>
-      ${aurumKnowledgeToolbar(tab.id)}
-    </div>
-    ${tab.id === "tests" ? aurumKnowledgeTestForm() : ""}
-    <div class="aurum-knowledge-list">
-      ${records.length
-        ? records.map((record) => aurumKnowledgeRecordMarkup(record, tab.id)).join("")
-        : `<div class="aurum-knowledge-state empty">Nessun elemento disponibile in ${escapeHtml(tab.label)}.</div>`}
-    </div>
-  `;
-}
-
-async function loadAurumKnowledgeTab(tabId = state.aurumKnowledgeTab, options = {}) {
-  if (!isFounder()) return;
-  const tab = aurumKnowledgeTabDefinition(tabId);
-  state.aurumKnowledgeTab = tab.id;
-  if (tab.id === "settings") {
-    renderAurumKnowledgeTab();
-    await refreshAurumAdminData();
-    return;
-  }
-  if (!options.force && state.aurumKnowledgeData[tab.id]) {
-    renderAurumKnowledgeTab();
-    return;
-  }
-  state.aurumKnowledgeLoading[tab.id] = true;
-  delete state.aurumKnowledgeErrors[tab.id];
-  renderAurumKnowledgeTab();
-  try {
-    state.aurumKnowledgeData[tab.id] = await apiRequest(tab.endpoint, { retries: 1 });
-  } catch (error) {
-    state.aurumKnowledgeErrors[tab.id] = error.message || `${tab.label} non disponibile.`;
-  } finally {
-    delete state.aurumKnowledgeLoading[tab.id];
-    renderAurumKnowledgeTab();
-  }
-}
-
-async function performAurumKnowledgeAction(action, entityId = "") {
-  if (!isFounder()) return;
-  if (action === "retry-tab") return loadAurumKnowledgeTab(state.aurumKnowledgeTab, { force: true });
-  const id = encodeURIComponent(entityId);
-  const resolution = ["resolve-review", "resolve-conflict"].includes(action)
-    ? window.prompt("Inserisci una nota di risoluzione")
-    : "";
-  if (["resolve-review", "resolve-conflict"].includes(action) && resolution === null) return;
-  const requests = {
-    "check-updates": ["/aurum/knowledge/sources/check-updates", { method: "POST", body: JSON.stringify({}) }],
-    "sync-source": [`/aurum/knowledge/sources/${id}/sync`, { method: "POST", body: JSON.stringify({}) }],
-    "deactivate-source": [`/aurum/knowledge/sources/${id}`, { method: "PUT", body: JSON.stringify({ active: false }) }],
-    "approve-version": [`/aurum/knowledge/versions/${id}/approve`, { method: "POST", body: JSON.stringify({}) }],
-    "regenerate-embeddings": [`/aurum/knowledge/documents/${id}/reindex`, { method: "POST", body: JSON.stringify({}) }],
-    "extract-facts": [`/aurum/knowledge/documents/${id}/extract-facts`, { method: "POST", body: JSON.stringify({}) }],
-    "resolve-review": [`/aurum/knowledge/review-queue/${id}/resolve`, { method: "POST", body: JSON.stringify({ status: "resolved", resolution }) }],
-    "resolve-conflict": [`/aurum/knowledge/conflicts/${id}/resolve`, { method: "POST", body: JSON.stringify({ status: "resolved", resolution }) }],
-    "publish-procedure": [`/aurum/knowledge/procedures/${id}/publish`, { method: "POST", body: JSON.stringify({}) }]
-  };
-  const request = requests[action];
-  if (!request) return;
-  try {
-    showLoading("Aggiornamento Knowledge OS…");
-    await apiRequest(request[0], { ...request[1], timeoutMs: 120000 });
-    delete state.aurumKnowledgeData.overview;
-    await loadAurumKnowledgeTab(state.aurumKnowledgeTab, { force: true });
-    showToast("Operazione Knowledge OS completata.", "success");
-  } catch (error) {
-    showToast(error.message || "Operazione Knowledge OS non completata.", "error");
-  } finally {
-    hideLoading();
-  }
-}
-
-async function runAurumKnowledgeEvaluation(form) {
-  const question = String(new FormData(form).get("question") || "").trim();
-  if (!question) return;
-  const output = document.getElementById("aurumKnowledgeTestResult");
-  if (output) output.innerHTML = '<div class="aurum-knowledge-state" role="status">Valutazione in corso…</div>';
-  try {
-    const result = await apiRequest("/aurum/knowledge/evaluate", {
-      method: "POST",
-      body: JSON.stringify({ question }),
-      timeoutMs: 120000
-    });
-    if (output) output.innerHTML = aurumKnowledgeRecordMarkup(result, "tests");
-  } catch (error) {
-    if (output) output.innerHTML = `<div class="aurum-knowledge-state error" role="alert">${escapeHtml(error.message || "Test Aurum non completato.")}</div>`;
-  }
 }
 
 async function loadAurumMemories() {
@@ -11924,11 +11480,13 @@ async function askAurum(event) {
       body: JSON.stringify(aurumContextPayload(question)),
       timeoutMs: 60000
     });
-    const professionalResponse = normalizeAurumProfessionalResponse(data);
     state.aurumMessages.push({
       role: "assistant",
-      ...professionalResponse,
-      content: professionalResponse.content
+      content: normativeQuestion && !accountingQuestion && !professionalGoldQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
+        ? buildAurumNormativeAnswer(question)
+        : data.risposta || "Risposta non disponibile.",
+      source: data.fonte || "",
+      fonti: Array.isArray(data.fonti) ? data.fonti : []
     });
     const safetyLevel = String(data.safety?.level || data.safety_level || "").toLowerCase();
     showAurumMemoryConsent(
@@ -11939,8 +11497,12 @@ async function askAurum(event) {
   } catch (error) {
     state.aurumMessages.push({
       role: "assistant",
-      content: normativeQuestion
-        ? "Non posso verificare in questo momento le fonti approvate e vigenti necessarie per una risposta professionale. Riprova appena la connessione è disponibile oppure sottoponi il caso al responsabile competente."
+      content: accountingQuestion
+        ? "La base specialistica contabile e fiscale di Aurum non è raggiungibile in questo momento. Per evitare di assegnare un regime IVA, una scrittura o una scadenza errati senza fonti e dati completi, riprova appena la connessione è disponibile."
+        : professionalGoldQuestion
+          ? buildAurumNormativeAnswer(question)
+        : normativeQuestion
+          ? buildAurumNormativeAnswer(question)
         : state.aurumRequestedFieldKey
           ? `${explainAurumField(state.aurumRequestedFieldKey)}\n\nLa guida professionale completa non è raggiungibile in questo momento: riprova appena la connessione è disponibile.`
           : error.message || "Aurum non riesce a contattare l'Assistente IA in questo momento."
@@ -12250,7 +11812,7 @@ function renderAiFeedback() {
       <p><b>Domanda:</b> ${escapeHtml(String(item.question || "").slice(0, 180))}</p>
       <p><b>Commento:</b> ${escapeHtml(item.comment || "Nessun commento")}</p>
       <div class="row-actions">
-        <button class="primary-button" type="button" data-feedback-to-knowledge="${escapeHtml(String(item.id))}">Invia alla Review Queue</button>
+        <button class="primary-button" type="button" data-feedback-to-knowledge="${escapeHtml(String(item.id))}">Trasforma in conoscenza approvata</button>
         <button class="danger-button" type="button" data-delete-ai-feedback="${escapeHtml(String(item.id))}">Elimina feedback</button>
       </div>
     </article>
@@ -12300,7 +11862,7 @@ async function feedbackToKnowledge(id) {
       body: JSON.stringify({})
     });
     await Promise.all([loadKnowledgeNotes(), loadAiFeedback()]);
-    showToast("Feedback anonimizzato inviato alla Review Queue.");
+    showToast("Feedback trasformato in conoscenza approvata.");
   } catch (error) {
     showToast(error.message || "Feedback non trasformato.");
   }
@@ -23107,12 +22669,10 @@ async function explainPriceWithAurum(context = {}, options = {}) {
       }),
       timeoutMs: 60000
     });
-    const professionalResponse = normalizeAurumProfessionalResponse(data);
-    const answer = String(professionalResponse.content || "").trim();
+    const answer = String(data.risposta || "").trim();
     const fallbackNeeded = Boolean(data.error) || !answer || /Non ho trovato una risposta sufficiente|Questa informazione non è presente/i.test(answer);
     state.aurumMessages[loadingIndex] = {
       role: "assistant",
-      ...professionalResponse,
       content: fallbackNeeded
         ? `Aurum AI non disponibile. Ti mostro una spiegazione tecnica locale.\n\n${generateLocalPriceExplanation(context, options)}`
         : answer,
@@ -25557,33 +25117,6 @@ userMessageForm?.addEventListener("submit", async (event) => {
   }));
 });
 aurumRefreshAdminData?.addEventListener("click", refreshAurumAdminData);
-aurumKnowledgeRefresh?.addEventListener("click", () => loadAurumKnowledgeTab(state.aurumKnowledgeTab, { force: true }));
-aurumKnowledgeTabs?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-aurum-knowledge-tab]");
-  if (button) void loadAurumKnowledgeTab(button.dataset.aurumKnowledgeTab);
-});
-aurumKnowledgeTabs?.addEventListener("keydown", (event) => {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-  const tabs = [...aurumKnowledgeTabs.querySelectorAll("[data-aurum-knowledge-tab]")];
-  const current = Math.max(0, tabs.indexOf(document.activeElement));
-  const next = event.key === 'Home'
-    ? 0
-    : event.key === 'End'
-      ? tabs.length - 1
-      : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-  event.preventDefault();
-  tabs[next]?.focus();
-  void loadAurumKnowledgeTab(tabs[next]?.dataset.aurumKnowledgeTab);
-});
-aurumKnowledgeWorkspace?.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-aurum-knowledge-action]");
-  if (button) void performAurumKnowledgeAction(button.dataset.aurumKnowledgeAction, button.dataset.aurumEntityId || "");
-});
-aurumKnowledgeWorkspace?.addEventListener("submit", (event) => {
-  if (!event.target.matches("#aurumKnowledgeTestForm")) return;
-  event.preventDefault();
-  void runAurumKnowledgeEvaluation(event.target);
-});
 [
   aurumSupportRequestsList,
   userMessagesList

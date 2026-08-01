@@ -82,27 +82,6 @@ import {
   buildAurumCrisisFollowUpResponse
 } from "./services/aurum/conversationSafety.js";
 import { resolveAurumKnowledgeRoute } from "./services/aurum/routing.js";
-import { routeAurumQuestion } from "./services/aurum/aurumQuestionRouter.js";
-import { buildAurumProfessionalResponse } from "./services/aurum/aurumProfessionalResponse.js";
-import { createAurumKnowledgeManagement } from "./services/aurum/aurumKnowledgeManagement.js";
-import {
-  buildIsolatedKnowledgeContext,
-  chunkStructuredDocument,
-  createEmbeddingService,
-  createRetrievalService,
-  createSqlKnowledgeRepository,
-  createSourceFetcher,
-  createSourceVersion,
-  extractStructuredFacts,
-  loadSourceRegistry,
-  parseDocument,
-  sourceNextCheckAt
-} from "./services/aurum/knowledge/index.js";
-import {
-  AurumToolAccessError,
-  executeAurumTool,
-  listAurumToolsForRole
-} from "./services/aurum/tools/index.js";
 import {
   AURUM_MEMORY_CONSENT_VERSION,
   aurumMemoryTypeLabel,
@@ -136,18 +115,6 @@ const runtimeStatus = {
   startedAt: new Date().toISOString()
 };
 const versionFilePath = path.join(__dirname, "version.json");
-const aurumSourceRegistryFilePath = path.join(__dirname, "config", "aurum-source-registry.json");
-const aurumTaxonomyFilePath = path.join(__dirname, "data", "aurum", "taxonomy.json");
-const aurumKnowledgeSeedFilePath = path.join(__dirname, "data", "aurum", "knowledge-seed.json");
-const aurumEvaluationFilePath = path.join(__dirname, "evals", "aurum", "knowledge-evaluation.json");
-const aurumSourceRegistry = loadSourceRegistry(aurumSourceRegistryFilePath);
-const aurumSourceFetcher = createSourceFetcher({
-  registry: aurumSourceRegistry,
-  timeoutMs: 15000,
-  maxBytes: 5 * 1024 * 1024,
-  maxRedirects: 3
-});
-let aurumKnowledgeManagement = null;
 let buildMetadataCache = null;
 let buildMetadataCacheAt = 0;
 const missingJwtSecretMessage = "JWT_SECRET obbligatorio: configura una chiave lunga e casuale nelle variabili ambiente.";
@@ -172,394 +139,6 @@ async function readOptionalJson(filePath) {
     return JSON.parse(await fs.readFile(filePath, "utf8"));
   } catch {
     return {};
-  }
-}
-
-function aurumSourceRegistryRows(registry = {}) {
-  if (Array.isArray(registry)) return registry;
-  if (Array.isArray(registry.sources)) return registry.sources;
-  return [];
-}
-
-function aurumEvaluationRows(evaluation = {}) {
-  if (Array.isArray(evaluation)) return evaluation;
-  if (Array.isArray(evaluation.cases)) return evaluation.cases;
-  if (Array.isArray(evaluation.evaluations)) return evaluation.evaluations;
-  return [];
-}
-
-async function seedAurumKnowledgeOs() {
-  const [registry, seed, evaluation] = await Promise.all([
-    readOptionalJson(aurumSourceRegistryFilePath),
-    readOptionalJson(aurumKnowledgeSeedFilePath),
-    readOptionalJson(aurumEvaluationFilePath)
-  ]);
-  const sources = aurumSourceRegistryRows(registry);
-  if (!sources.length) throw new Error("Registro fonti Aurum Knowledge OS assente o vuoto.");
-
-  const db = await pool.connect();
-  try {
-    await db.query("BEGIN");
-    const sourceIds = new Map();
-    for (const source of sources) {
-      const sourceKey = String(source.source_key || source.sourceKey || "").trim();
-      if (!sourceKey) throw new Error("Fonte Aurum priva di source_key.");
-      const configuredSource = {
-        source_key: sourceKey,
-        organization: String(source.organization || "OroActive").trim(),
-        title: String(source.title || sourceKey).trim(),
-        official_url: source.official_url || source.officialUrl || null,
-        domain: String(source.domain || "oroactive_policy").trim(),
-        jurisdiction: String(source.jurisdiction || "IT").trim(),
-        authority_level: Math.max(0, Math.min(100, Number(source.authority_level ?? source.authorityLevel ?? 0))),
-        source_type: String(source.source_type || source.sourceType || "internal").trim(),
-        document_identifier: source.document_identifier || source.documentIdentifier || null,
-        language: String(source.language || "it").trim(),
-        license: source.license || null,
-        ingestion_mode: String(source.ingestion_mode || source.ingestionMode || "metadata_only").trim(),
-        content_policy: String(source.content_policy || source.contentPolicy || "metadata_abstract_only_until_rights_reviewed").trim(),
-        allow_full_text: source.allow_full_text === true || source.allowFullText === true,
-        update_frequency: String(source.update_frequency || source.updateFrequency || "manual").trim(),
-        requires_manual_review: source.requires_manual_review ?? source.requiresManualReview ?? true,
-        active: source.active !== false,
-        last_checked_at: source.last_checked_at || source.lastCheckedAt || null,
-        next_check_at: source.next_check_at || source.nextCheckAt || null
-      };
-      const result = await db.query(
-        `INSERT INTO ai_source_registry (
-           source_key, organization, title, official_url, domain, jurisdiction,
-           authority_level, source_type, document_identifier, language, license,
-           ingestion_mode, content_policy, allow_full_text, update_frequency, requires_manual_review, active,
-           last_checked_at, next_check_at, updated_at
-         )
-         VALUES (
-           $1::text, $2::text, $3::text, $4::text, $5::text, $6::text,
-           $7::int, $8::text, $9::text, $10::text, $11::text,
-           $12::text, $13::text, $14::boolean, $15::text, $16::boolean, $17::boolean,
-           $18::timestamptz, $19::timestamptz, NOW()
-         )
-         ON CONFLICT (source_key) DO NOTHING
-         RETURNING *`,
-        [
-          configuredSource.source_key,
-          configuredSource.organization,
-          configuredSource.title,
-          configuredSource.official_url,
-          configuredSource.domain,
-          configuredSource.jurisdiction,
-          configuredSource.authority_level,
-          configuredSource.source_type,
-          configuredSource.document_identifier,
-          configuredSource.language,
-          configuredSource.license,
-          configuredSource.ingestion_mode,
-          configuredSource.content_policy,
-          configuredSource.allow_full_text,
-          configuredSource.update_frequency,
-          configuredSource.requires_manual_review,
-          configuredSource.active,
-          configuredSource.last_checked_at,
-          configuredSource.next_check_at
-        ]
-      );
-      const storedSource = result.rows[0] || (await db.query(
-        "SELECT * FROM ai_source_registry WHERE source_key = $1::text",
-        [sourceKey]
-      )).rows[0];
-      if (!storedSource) throw new Error(`Fonte Aurum non registrabile: ${sourceKey}`);
-      sourceIds.set(sourceKey, storedSource.id);
-      if (!result.rows[0]) {
-        const governedFields = [
-          "organization", "title", "official_url", "domain", "jurisdiction", "authority_level",
-          "source_type", "document_identifier", "language", "license", "ingestion_mode",
-          "content_policy", "allow_full_text", "update_frequency", "requires_manual_review", "active"
-        ];
-        const changedFields = governedFields.filter((field) => String(storedSource[field] ?? "") !== String(configuredSource[field] ?? ""));
-        if (changedFields.length) {
-          await db.query(
-            `WITH refreshed AS (
-               UPDATE ai_review_queue
-               SET reason = $2::text, priority = $3::text, proposed_change = $4::jsonb
-               WHERE entity_type = 'source_registry_update'
-                 AND entity_id = $1::bigint
-                 AND status IN ('pending', 'in_review')
-               RETURNING id
-             )
-             INSERT INTO ai_review_queue (entity_type, entity_id, reason, priority, proposed_change, status)
-             SELECT 'source_registry_update', $1::bigint, $2::text, $3::text, $4::jsonb, 'pending'
-             WHERE NOT EXISTS (SELECT 1 FROM refreshed)`,
-            [
-              storedSource.id,
-              `Il registro configurato propone modifiche a ${sourceKey}; applicazione Founder obbligatoria.`,
-              configuredSource.authority_level >= 95 ? "high" : "normal",
-              jsonForPostgres({
-                changed_fields: changedFields,
-                configured: Object.fromEntries(changedFields.map((field) => [field, configuredSource[field]])),
-                current: Object.fromEntries(changedFields.map((field) => [field, storedSource[field]]))
-              })
-            ]
-          );
-        }
-      }
-    }
-
-    const seedVersion = String(seed.version || "2026.08.01-knowledge-os-1");
-    const internalSourceVersions = new Map();
-    const referencedInternalKeys = new Set([
-      ...(seed.facts || []).map((fact) => fact.sourceKey),
-      ...(seed.relations || []).map((relation) => relation.sourceKey),
-      ...(seed.procedures || []).flatMap((procedure) => procedure.sourceKeys || [])
-    ].filter(Boolean));
-    for (const sourceKey of referencedInternalKeys) {
-      const sourceId = sourceIds.get(sourceKey);
-      if (!sourceId) throw new Error(`Fonte interna Aurum non registrata: ${sourceKey}`);
-      const controlledSourceContent = {
-        seedVersion,
-        facts: (seed.facts || []).filter((fact) => fact.sourceKey === sourceKey),
-        relations: (seed.relations || []).filter((relation) => relation.sourceKey === sourceKey),
-        procedures: (seed.procedures || []).filter((procedure) => (procedure.sourceKeys || []).includes(sourceKey))
-      };
-      const contentHash = crypto.createHash("sha256")
-        .update(JSON.stringify(controlledSourceContent))
-        .digest("hex");
-      const versionResult = await db.query(
-        `INSERT INTO ai_source_versions (
-           source_id, version_label, effective_from, content_hash, metadata,
-           change_summary, is_current, review_status
-         )
-         VALUES ($1::bigint, $2::text, $3::date, $4::text, $5::jsonb, $6::text, FALSE, 'pending')
-         ON CONFLICT (source_id, content_hash) DO UPDATE SET
-           version_label = EXCLUDED.version_label,
-           metadata = EXCLUDED.metadata,
-           change_summary = EXCLUDED.change_summary
-         RETURNING id, review_status, is_current`,
-        [
-          sourceId,
-          seedVersion,
-          seed.reviewedAt || "2026-08-01",
-          contentHash,
-          jsonForPostgres({ seed: true, controlledInternalKnowledge: true }),
-          "Seed interno Knowledge OS da revisionare"
-        ]
-      );
-      const internalVersion = versionResult.rows[0];
-      internalSourceVersions.set(sourceKey, internalVersion.id);
-      if (internalVersion.review_status !== "approved") {
-        await db.query(
-          `INSERT INTO ai_review_queue (entity_type, entity_id, reason, priority, proposed_change, status)
-           SELECT 'source_version', $1::bigint, $2::text, 'high', $3::jsonb, 'pending'
-           WHERE NOT EXISTS (
-             SELECT 1 FROM ai_review_queue
-             WHERE entity_type = 'source_version' AND entity_id = $1::bigint AND status IN ('pending', 'in_review')
-           )`,
-          [
-            internalVersion.id,
-            `Nuova versione controllata ${sourceKey}: approvazione Founder obbligatoria prima dell'uso.`,
-            jsonForPostgres({ source_key: sourceKey, seed_version: seedVersion, content_hash: contentHash })
-          ]
-        );
-      }
-    }
-
-    for (const fact of seed.facts || []) {
-      const sourceVersionId = internalSourceVersions.get(fact.sourceKey);
-      if (!sourceVersionId) continue;
-      await db.query(
-        `INSERT INTO ai_knowledge_facts (
-           fact_key, domain, subject, predicate, object_value, jurisdiction,
-           source_version_id, authority_level, valid_from, valid_to, confidence,
-           review_status, updated_at
-         )
-         VALUES ($1::text, $2::text, $3::text, $4::text, $5::jsonb, $6::text,
-                 $7::bigint, $8::int, $9::date, $10::date, $11::numeric,
-                 'pending', NOW())
-         ON CONFLICT (fact_key, source_version_id) WHERE fact_key IS NOT NULL DO UPDATE SET
-           domain = EXCLUDED.domain,
-           subject = EXCLUDED.subject,
-           predicate = EXCLUDED.predicate,
-           object_value = EXCLUDED.object_value,
-           jurisdiction = EXCLUDED.jurisdiction,
-           authority_level = EXCLUDED.authority_level,
-           valid_from = EXCLUDED.valid_from,
-           valid_to = EXCLUDED.valid_to,
-           confidence = EXCLUDED.confidence,
-           updated_at = NOW()`,
-        [
-          fact.factKey,
-          fact.domain,
-          fact.subject,
-          fact.predicate,
-          jsonForPostgres(fact.objectValue),
-          fact.jurisdiction || "IT",
-          sourceVersionId,
-          Number(fact.authorityLevel || 80),
-          fact.validFrom || seed.reviewedAt || "2026-08-01",
-          fact.validTo || null,
-          Number(fact.confidence ?? 1)
-        ]
-      );
-    }
-
-    for (const relation of seed.relations || []) {
-      const sourceVersionId = internalSourceVersions.get(relation.sourceKey) || null;
-      await db.query(
-        `WITH updated AS (
-           UPDATE ai_knowledge_relations
-           SET properties = $5::jsonb,
-               updated_at = NOW()
-           WHERE source_entity = $1::text
-             AND relation_type = $2::text
-             AND target_entity = $3::text
-             AND COALESCE(domain, '') = COALESCE($4::text, '')
-             AND source_version_id IS NOT DISTINCT FROM $6::bigint
-           RETURNING id
-         )
-         INSERT INTO ai_knowledge_relations (
-           source_entity, relation_type, target_entity, domain, properties,
-           source_version_id, review_status
-         )
-         SELECT $1::text, $2::text, $3::text, $4::text, $5::jsonb, $6::bigint, 'pending'
-         WHERE NOT EXISTS (SELECT 1 FROM updated)`,
-        [
-          relation.sourceEntity,
-          relation.relationType,
-          relation.targetEntity,
-          relation.domain || null,
-          jsonForPostgres(relation.properties || {}),
-          sourceVersionId
-        ]
-      );
-    }
-
-    for (const procedure of seed.procedures || []) {
-      const sourceVersions = (procedure.sourceKeys || [])
-        .map((sourceKey) => internalSourceVersions.get(sourceKey))
-        .filter(Boolean);
-      const procedureResult = await db.query(
-        `INSERT INTO ai_procedures (
-           procedure_key, title, domain, jurisdiction, purpose, risk_level,
-           required_role, required_tools, preconditions, stop_conditions,
-           escalation_rules, source_versions, version, active, review_status,
-           updated_at
-         )
-         VALUES ($1::text, $2::text, $3::text, $4::text, $5::text, $6::text,
-                 $7::text, $8::jsonb, $9::jsonb, $10::jsonb,
-                 $11::jsonb, $12::jsonb, 1, TRUE, 'pending', NOW())
-         ON CONFLICT (procedure_key) DO UPDATE SET
-           title = EXCLUDED.title,
-           domain = EXCLUDED.domain,
-           jurisdiction = EXCLUDED.jurisdiction,
-           purpose = EXCLUDED.purpose,
-           risk_level = EXCLUDED.risk_level,
-           required_role = EXCLUDED.required_role,
-           required_tools = EXCLUDED.required_tools,
-           preconditions = EXCLUDED.preconditions,
-           stop_conditions = EXCLUDED.stop_conditions,
-           escalation_rules = EXCLUDED.escalation_rules,
-           source_versions = EXCLUDED.source_versions,
-           version = CASE
-             WHEN ai_procedures.source_versions = EXCLUDED.source_versions THEN ai_procedures.version
-             ELSE ai_procedures.version + 1
-           END,
-           active = TRUE,
-           review_status = CASE
-             WHEN ai_procedures.source_versions = EXCLUDED.source_versions THEN ai_procedures.review_status
-             ELSE 'pending'
-           END,
-           reviewed_by = CASE
-             WHEN ai_procedures.source_versions = EXCLUDED.source_versions THEN ai_procedures.reviewed_by
-             ELSE NULL
-           END,
-           reviewed_at = CASE
-             WHEN ai_procedures.source_versions = EXCLUDED.source_versions THEN ai_procedures.reviewed_at
-             ELSE NULL
-           END,
-           updated_at = NOW()
-         RETURNING id`,
-        [
-          procedure.procedureKey,
-          procedure.title,
-          procedure.domain,
-          procedure.jurisdiction || "IT",
-          procedure.purpose || "",
-          procedure.riskLevel || "medium",
-          procedure.requiredRole || "commesso",
-          jsonForPostgres(procedure.requiredTools || []),
-          jsonForPostgres(procedure.preconditions || []),
-          jsonForPostgres(procedure.stopConditions || []),
-          jsonForPostgres(procedure.escalationRules || []),
-          jsonForPostgres(sourceVersions)
-        ]
-      );
-      const procedureId = procedureResult.rows[0].id;
-      for (let index = 0; index < (procedure.steps || []).length; index += 1) {
-        const step = procedure.steps[index];
-        await db.query(
-          `INSERT INTO ai_procedure_steps (
-             procedure_id, step_order, title, instruction, why_it_matters,
-             input_schema, expected_result, warning, blocking
-           )
-           VALUES ($1::bigint, $2::int, $3::text, $4::text, $5::text,
-                   $6::jsonb, $7::jsonb, $8::text, $9::boolean)
-           ON CONFLICT (procedure_id, step_order) DO UPDATE SET
-             title = EXCLUDED.title,
-             instruction = EXCLUDED.instruction,
-             why_it_matters = EXCLUDED.why_it_matters,
-             input_schema = EXCLUDED.input_schema,
-             expected_result = EXCLUDED.expected_result,
-             warning = EXCLUDED.warning,
-             blocking = EXCLUDED.blocking`,
-          [
-            procedureId,
-            index + 1,
-            step.title,
-            step.instruction,
-            step.whyItMatters || null,
-            jsonForPostgres(step.inputSchema || {}),
-            jsonForPostgres(step.expectedResult || {}),
-            step.warning || null,
-            step.blocking === true
-          ]
-        );
-      }
-    }
-
-    for (const evaluationCase of aurumEvaluationRows(evaluation)) {
-      await db.query(
-        `INSERT INTO ai_evaluation_cases (
-           case_key, domain, question, expected_source_keys, required_concepts,
-           forbidden_claims, expected_tool, risk_level, active
-         )
-         VALUES ($1::text, $2::text, $3::text, $4::jsonb, $5::jsonb,
-                 $6::jsonb, $7::text, $8::text, TRUE)
-         ON CONFLICT (case_key) DO UPDATE SET
-           domain = EXCLUDED.domain,
-           question = EXCLUDED.question,
-           expected_source_keys = EXCLUDED.expected_source_keys,
-           required_concepts = EXCLUDED.required_concepts,
-           forbidden_claims = EXCLUDED.forbidden_claims,
-           expected_tool = EXCLUDED.expected_tool,
-           risk_level = EXCLUDED.risk_level,
-           active = TRUE`,
-        [
-          evaluationCase.id || evaluationCase.case_key || evaluationCase.caseKey,
-          evaluationCase.domain,
-          evaluationCase.question,
-          jsonForPostgres(evaluationCase.expectedSources || evaluationCase.expected_source_keys || []),
-          jsonForPostgres(evaluationCase.requiredConcepts || evaluationCase.required_concepts || []),
-          jsonForPostgres(evaluationCase.forbiddenClaims || evaluationCase.forbidden_claims || []),
-          evaluationCase.expectedTool || evaluationCase.expected_tool || null,
-          evaluationCase.riskLevel || evaluationCase.risk_level || "medium"
-        ]
-      );
-    }
-
-    await db.query("COMMIT");
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  } finally {
-    db.release();
   }
 }
 
@@ -680,10 +259,6 @@ const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
-const aurumKnowledgeRetrievalTimeoutMs = Math.min(Math.max(Number(process.env.AURUM_KNOWLEDGE_RETRIEVAL_TIMEOUT_MS || 8000), 1000), 30000);
-const aurumKnowledgeSchedulerEnabled = String(process.env.AURUM_KNOWLEDGE_SCHEDULER_ENABLED || "true").toLowerCase() !== "false";
-const aurumKnowledgeSchedulerIntervalMinutes = Math.min(Math.max(Number(process.env.AURUM_KNOWLEDGE_SCHEDULER_INTERVAL_MINUTES || 60), 15), 1440);
-let aurumKnowledgeSchedulerTimer = null;
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
 const metalPriceProviderPrimary = String(process.env.METAL_PRICE_PROVIDER_PRIMARY || process.env.GOLD_PRICE_PROVIDER || "bullionvault").toLowerCase();
 const metalPriceProviderFallback = String(process.env.METAL_PRICE_PROVIDER_FALLBACK || "manual").toLowerCase();
@@ -1033,19 +608,6 @@ const pool = new Pool({
 });
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
-const aurumSqlKnowledgeRepository = createSqlKnowledgeRepository({
-  query: (sql, parameters) => pool.query(sql, parameters)
-});
-const aurumKnowledgeEmbeddingService = openai
-  ? createEmbeddingService({ embedMany: (texts) => createTextEmbeddings(texts) })
-  : null;
-const aurumKnowledgeRetrieval = createRetrievalService({
-  repository: aurumSqlKnowledgeRepository,
-  embeddingService: aurumKnowledgeEmbeddingService
-});
-const aurumKnowledgeFullTextRetrieval = createRetrievalService({
-  repository: aurumSqlKnowledgeRepository
-});
 const aiCompetitorQuoteExtractor = createAiCompetitorQuoteExtractor({
   openai,
   model: competitorAiExtractionModel,
@@ -7000,10 +6562,6 @@ function sanitizeForPostgres(value) {
   return value;
 }
 
-function jsonForPostgres(value) {
-  return JSON.stringify(sanitizeForPostgres(value));
-}
-
 function redactedActPayloadForLog(act = {}) {
   const payload = act.payload || {};
   return {
@@ -8307,34 +7865,19 @@ async function listAiFeedback() {
 }
 
 async function createAiFeedback(input = {}, user) {
-  const redactedQuestion = redactAssistantPersonalData(String(input.question || "").slice(0, 6000));
-  const redactedAnswer = redactAssistantPersonalData(String(input.answer || "").slice(0, 12000));
-  const redactedComment = redactAssistantPersonalData(String(input.comment || "").slice(0, 4000));
   const result = await pool.query(
     `INSERT INTO ai_feedback (user_id, question, answer, feedback_type, comment, status)
      VALUES ($1, $2, $3, $4, $5, 'da_valutare')
      RETURNING *`,
     [
       user.id,
-      redactedQuestion,
-      redactedAnswer,
+      String(input.question || "").slice(0, 6000),
+      String(input.answer || "").slice(0, 12000),
       String(input.feedback_type || input.type || "utile").slice(0, 80),
-      redactedComment
+      String(input.comment || "").slice(0, 4000)
     ]
   );
-  const feedback = result.rows[0];
-  if (/negativ|non[_\s-]?utile|errat|inesatt|da[_\s-]?migliorare/i.test(String(feedback?.feedback_type || ""))) {
-    await pool.query(
-      `INSERT INTO ai_review_queue (entity_type, entity_id, reason, priority, proposed_change, status)
-       VALUES ('ai_feedback', $1::bigint, $2::text, 'normal', $3::jsonb, 'pending')`,
-      [
-        feedback.id,
-        "Feedback negativo da anonimizzare e revisionare; non pubblicare automaticamente",
-        jsonForPostgres({ feedback_type: feedback.feedback_type, anonymization_required: true })
-      ]
-    );
-  }
-  return feedback;
+  return result.rows[0];
 }
 
 async function feedbackToKnowledge(id, input = {}, user) {
@@ -8350,36 +7893,18 @@ async function feedbackToKnowledge(id, input = {}, user) {
   );
   const feedback = feedbackResult.rows[0];
   if (!feedback) return null;
-  const content = redactAssistantPersonalData(String(
-    input.content || `Domanda operatore:\n${feedback.question}\n\nRisposta AI:\n${feedback.answer}\n\nFeedback:\n${feedback.comment || feedback.feedback_type}`
-  ).trim());
+  const content = String(input.content || `Domanda operatore:\n${feedback.question}\n\nRisposta AI:\n${feedback.answer}\n\nFeedback:\n${feedback.comment || feedback.feedback_type}`).trim();
   try {
     const note = await createKnowledgeNote({
       title: input.title || `Miglioramento AI #${feedback.id}`,
       category: input.category || "Formazione operatori",
       source: input.source || "Feedback Assistente IA OroActive",
       content,
-      status: "in revisione"
+      status: "approvata"
     }, user);
     await pool.query(
-      `INSERT INTO ai_review_queue (entity_type, entity_id, reason, priority, proposed_change, status, assigned_to)
-       VALUES ('knowledge_note', $1::bigint, $2::text, 'normal', $3::jsonb, 'pending', $4::bigint)`,
-      [
-        note.id,
-        "Feedback anonimizzato da verificare prima della pubblicazione",
-        jsonForPostgres({
-          title: note.title,
-          category: note.category,
-          source: note.source,
-          anonymized: true,
-          originating_feedback_id: feedback.id
-        }),
-        user.id
-      ]
-    );
-    await pool.query(
       `UPDATE ai_feedback
-       SET status = 'in_revisione',
+       SET status = 'approvato',
            knowledge_note_id = $2::bigint,
            reviewed_by = $3::bigint,
            reviewed_at = NOW()
@@ -8982,7 +8507,7 @@ async function createAurumSupportRequest(input = {}, user = {}) {
   }, user);
 }
 
-async function searchAiChunksBySource(question = "", sourceType = "book", limit = 6, options = {}) {
+async function searchAiChunksBySource(question = "", sourceType = "book", limit = 6) {
   const text = String(question || "").trim();
   if (!text) return [];
   if (!aiRuntime.pgvector) {
@@ -8990,21 +8515,13 @@ async function searchAiChunksBySource(question = "", sourceType = "book", limit 
   }
   const sourceCondition = sourceType === "note"
     ? "d.metadata->>'sourceType' = 'note'"
-    : "(d.metadata->>'sourceType' IN ('book', 'aurum_knowledge_source') OR d.metadata->>'sourceType' IS NULL)";
-  const governanceCondition = options.governedOnly
-    ? sourceType === "note"
-      ? "AND d.metadata->>'status' = 'approvata'"
-      : `AND d.source_version_id IS NOT NULL
-         AND d.review_status = 'approved' AND d.is_current = TRUE
-         AND c.source_version_id = d.source_version_id AND c.review_status = 'approved'`
-    : "";
+    : "(d.metadata->>'sourceType' = 'book' OR d.metadata->>'sourceType' IS NULL)";
   const fullTextResult = await pool.query(
     `SELECT c.id, c.title, c.content, c.chunk_index, d.titolo, d.autore, d.metadata,
             ts_rank_cd(c.content_tsv, plainto_tsquery('italian', $1)) AS score
      FROM ai_document_chunks c
      JOIN ai_documents d ON d.id = c.document_id
      WHERE (${sourceCondition})
-       ${governanceCondition}
        AND (c.content_tsv @@ plainto_tsquery('italian', $1) OR c.content ILIKE $2)
      ORDER BY score DESC, c.created_at DESC
      LIMIT $3`,
@@ -9024,7 +8541,6 @@ async function searchAiChunksBySource(question = "", sourceType = "book", limit 
      FROM ai_document_chunks c
      JOIN ai_documents d ON d.id = c.document_id
      WHERE (${sourceCondition})
-       ${governanceCondition}
        AND EXISTS (
          SELECT 1 FROM unnest($1::text[]) term
          WHERE LOWER(c.content) LIKE '%' || term || '%'
@@ -9036,12 +8552,11 @@ async function searchAiChunksBySource(question = "", sourceType = "book", limit 
   return fallback.rows;
 }
 
-async function searchAiChunks(question = "", options = {}) {
-  const governedOnly = options.governedOnly === true;
+async function searchAiChunks(question = "") {
   const [bookChunks, noteChunks, academyChunks] = await Promise.all([
-    searchAiChunksBySource(question, "book", 6, { governedOnly }),
-    searchAiChunksBySource(question, "note", 6, { governedOnly }),
-    governedOnly ? [] : searchAcademyKnowledgeChunks(question, 4)
+    searchAiChunksBySource(question, "book", 6),
+    searchAiChunksBySource(question, "note", 6),
+    searchAcademyKnowledgeChunks(question, 4)
   ]);
   return [...bookChunks.slice(0, 5), ...noteChunks.slice(0, 4), ...academyChunks.slice(0, 3)].slice(0, 10);
 }
@@ -9243,718 +8758,6 @@ function buildComproOroNormativeAnswer(question = "") {
   return buildSectorKnowledgeAnswer(question, matches).risposta;
 }
 
-async function withAurumKnowledgeTimeout(promise, timeoutMs = aurumKnowledgeRetrievalTimeoutMs) {
-  let timer;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          const error = new Error("Timeout nel recupero Aurum Knowledge OS.");
-          error.code = "AURUM_KNOWLEDGE_TIMEOUT";
-          reject(error);
-        }, timeoutMs);
-      })
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function prepareAurumKnowledgeQuestion(question = "", user = {}) {
-  const role = normalizeRole(user?.ruolo);
-  const route = routeAurumQuestion(question, { role });
-  if (!route.access_allowed) {
-    return { route, retrieved: [], context: "", retrievalError: "" };
-  }
-  const safeQuestion = redactAssistantPersonalData(question, 1200);
-  if (!safeQuestion) {
-    return { route, retrieved: [], context: "", retrievalError: "Domanda non interrogabile dopo la minimizzazione privacy." };
-  }
-  try {
-    const retrieval = route.pii_detected ? aurumKnowledgeFullTextRetrieval : aurumKnowledgeRetrieval;
-    const retrieved = await withAurumKnowledgeTimeout(retrieval.retrieve(safeQuestion, {
-      domains: route.domains,
-      jurisdiction: route.jurisdiction,
-      role,
-      minimumAuthorityLevel: route.minimum_authority_level,
-      asOf: new Date().toISOString()
-    }));
-    return {
-      route,
-      retrieved,
-      context: buildIsolatedKnowledgeContext(retrieved, { limit: 8, maxCharsPerItem: 5000 }),
-      retrievalError: ""
-    };
-  } catch (error) {
-    console.warn("Aurum Knowledge OS retrieval non disponibile:", error.message || error);
-    return { route, retrieved: [], context: "", retrievalError: error.message || "Recupero non disponibile." };
-  }
-}
-
-function requireAurumKnowledgeManagement() {
-  if (aurumKnowledgeManagement) return aurumKnowledgeManagement;
-  const error = new Error("Aurum Knowledge OS è in inizializzazione. Riprova tra qualche secondo.");
-  error.status = 503;
-  throw error;
-}
-
-async function internalAurumSourceSnapshot(source = {}) {
-  if (source.source_key === "oroactive-sector-knowledge") {
-    return {
-      content: await fs.readFile(path.join(__dirname, "assets", "aurum-knowledge", "sector", "compro-oro-knowledge.json")),
-      contentType: "application/json",
-      metadata: { adapter: "bundled_sector_knowledge" }
-    };
-  }
-  if (source.source_key === "oroactive-procedure-operative") {
-    return {
-      content: await fs.readFile(aurumKnowledgeSeedFilePath),
-      contentType: "application/json",
-      metadata: { adapter: "controlled_procedure_seed" }
-    };
-  }
-  if (source.source_key === "oroactive-laboratorio-gemmologico") {
-    const result = await pool.query(
-      `SELECT COUNT(*)::int AS published_count,
-              MAX(updated_at) AS last_updated,
-              MD5(COALESCE(string_agg(id::text || ':' || COALESCE(updated_at::text, ''), ',' ORDER BY id), '')) AS content_fingerprint
-       FROM academy_gem_materials
-       WHERE active = TRUE AND published = TRUE`
-    );
-    return {
-      content: JSON.stringify(result.rows[0] || {}),
-      contentType: "application/json",
-      metadata: { adapter: "published_gemological_records", ...(result.rows[0] || {}) }
-    };
-  }
-  if (source.source_key === "oroactive-elenco-monete") {
-    return {
-      content: JSON.stringify(GOLD_COIN_AI_CATALOG.map(({ id, name, country, purity }) => ({ id, name, country, purity }))),
-      contentType: "application/json",
-      metadata: { adapter: "gold_coin_catalog", published_count: GOLD_COIN_AI_CATALOG.length }
-    };
-  }
-  if (source.source_key === "oroactive-bilancia-doro") {
-    const result = await pool.query(
-      `SELECT COUNT(*)::int AS document_count,
-              MAX(created_at) AS last_updated,
-              MD5(COALESCE(string_agg(id::text || ':' || COALESCE(metadata->>'hash', ''), ',' ORDER BY id), '')) AS content_fingerprint
-       FROM ai_documents
-       WHERE LOWER(COALESCE(titolo, '')) LIKE '%bilancia%oro%'
-          OR metadata->>'sourceType' = 'book'`
-    );
-    return {
-      content: JSON.stringify(result.rows[0] || {}),
-      contentType: "application/json",
-      metadata: { adapter: "approved_proprietary_documents", ...(result.rows[0] || {}) }
-    };
-  }
-  if (source.source_key === "oroactive-aurum-shield") {
-    const result = await pool.query(
-      `SELECT key, value, updated_at
-       FROM aurum_shield_settings
-       ORDER BY key`
-    );
-    return {
-      content: JSON.stringify(result.rows || []),
-      contentType: "application/json",
-      metadata: {
-        adapter: "aurum_shield_settings",
-        approved_record_count: result.rowCount ?? result.rows?.length ?? 0
-      }
-    };
-  }
-  if (source.source_key === "oroactive-academy") {
-    const result = await pool.query(
-      `SELECT ac.id, ac.title, ac.description, ac.level, ac.duration_minutes, ac.updated_at
-       FROM academy_courses ac
-       JOIN courses c ON c.id = ac.course_id
-       WHERE ac.active = TRUE AND c.active = TRUE
-         AND COALESCE(
-           ac.metadata->>'publicationStatus',
-           c.metadata->>'publicationStatus',
-           CASE WHEN COALESCE(c.is_published, FALSE) = TRUE
-                  AND COALESCE(c.version_status, '') = 'published'
-                THEN 'published' END
-         ) = 'published'
-       ORDER BY ac.id`
-    );
-    return {
-      content: JSON.stringify(result.rows || []),
-      contentType: "application/json",
-      metadata: {
-        adapter: "published_academy_courses",
-        published_record_count: result.rowCount ?? result.rows?.length ?? 0
-      }
-    };
-  }
-  if (source.source_key === "oroactive-casi-approvati") {
-    const result = await pool.query(
-      `SELECT case_key, title, domain, summary, facts, tests_performed,
-              initial_error, correct_decision, final_outcome, lesson_learned,
-              source_type, approved_at, updated_at
-       FROM ai_case_library
-       WHERE anonymized = TRUE AND review_status = 'approved'
-       ORDER BY case_key`
-    );
-    return {
-      content: JSON.stringify(result.rows || []),
-      contentType: "application/json",
-      metadata: {
-        adapter: "anonymized_approved_cases",
-        approved_record_count: result.rowCount ?? result.rows?.length ?? 0
-      }
-    };
-  }
-  const error = new Error("Questa fonte interna richiede un caricamento o un adapter Founder dedicato.");
-  error.status = 409;
-  throw error;
-}
-
-function aurumSourceDocumentKind(source = {}) {
-  if (["law", "eu_regulation"].includes(source.source_type)) return "legal";
-  if (["technical_standard", "market_standard", "international_guidance"].includes(source.source_type)) return "standard";
-  if (source.source_type === "internal_policy") return "procedure";
-  return "generic";
-}
-
-function aurumSourceFilename(source = {}, contentType = "") {
-  const extension = contentType === "application/pdf"
-    ? ".pdf"
-    : contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      ? ".docx"
-      : contentType === "application/json"
-        ? ".json"
-        : contentType === "text/html"
-          ? ".html"
-          : ".txt";
-  return `${source.source_key || "aurum-source"}${extension}`;
-}
-
-async function persistPendingAurumSourceDocument({ source, sourceVersion, snapshot }) {
-  const governedSource = {
-    ...source,
-    id: source.id,
-    allow_full_text: source.allow_full_text === true,
-    content_policy: source.content_policy || "metadata_abstract_only_until_rights_reviewed"
-  };
-  const contentType = snapshot.contentType || sourceVersion.metadata?.content_type || "text/plain";
-  const rawContent = snapshot.buffer || snapshot.content || snapshot.text || "";
-  const metadataAbstract = [
-    governedSource.title,
-    governedSource.organization ? `Organizzazione: ${governedSource.organization}.` : "",
-    governedSource.document_identifier ? `Identificativo: ${governedSource.document_identifier}.` : "",
-    governedSource.official_url ? `Riferimento ufficiale: ${governedSource.official_url}.` : "",
-    governedSource.allow_full_text === false ? "Contenuto integrale non memorizzato per policy di licenza." : ""
-  ].filter(Boolean).join(" ");
-  const parsed = await parseDocument({
-    title: governedSource.title,
-    mimeType: contentType,
-    content: rawContent,
-    abstract: metadataAbstract,
-    metadata: sourceVersion.metadata || {},
-    source: governedSource
-  }, {
-    maxChars: 2_000_000,
-    extractors: {
-      "application/pdf": (buffer) => extractBookTextFromBuffer({ filename: `${governedSource.source_key}.pdf`, mimeType: contentType, buffer }),
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": (buffer) => extractBookTextFromBuffer({ filename: `${governedSource.source_key}.docx`, mimeType: contentType, buffer })
-    }
-  });
-  const chunks = chunkStructuredDocument({
-    text: parsed.text,
-    kind: aurumSourceDocumentKind(governedSource),
-    sourceVersionId: sourceVersion.id,
-    domain: governedSource.domain,
-    jurisdiction: governedSource.jurisdiction || "GLOBAL",
-    authorityLevel: governedSource.authority_level,
-    validFrom: sourceVersion.effective_from,
-    validTo: sourceVersion.effective_to,
-    reviewStatus: "pending",
-    title: governedSource.title
-  }, { maxChars: 2800 });
-  let embeddings = [];
-  if (chunks.length && aurumKnowledgeEmbeddingService) {
-    try {
-      embeddings = await aurumKnowledgeEmbeddingService.embedMany(chunks.map((chunk) => chunk.content));
-    } catch (error) {
-      console.warn("Embedding nuova fonte Aurum non completati, attivo fallback full-text:", error.message || error);
-    }
-  }
-  const db = await pool.connect();
-  try {
-    await db.query("BEGIN");
-    const existing = await db.query(
-      "SELECT id FROM ai_documents WHERE source_version_id = $1::bigint ORDER BY id LIMIT 1 FOR UPDATE",
-      [sourceVersion.id]
-    );
-    let documentId = existing.rows[0]?.id || null;
-    const metadata = jsonForPostgres({
-      sourceType: "aurum_knowledge_source",
-      sourceKey: governedSource.source_key,
-      storageMode: parsed.storageMode,
-      fullTextDiscarded: parsed.fullTextDiscarded === true,
-      contentType,
-      ingestionMode: governedSource.ingestion_mode,
-      copyrightPolicy: governedSource.license
-    });
-    if (documentId) {
-      await db.query(
-        `UPDATE ai_documents SET
-           titolo = $2::text, autore = $3::text, filename = $4::text, metadata = $5::jsonb,
-           source_registry_id = $6::bigint, domain = $7::text, jurisdiction = $8::text,
-           authority_level = $9::int, official_url = $10::text, effective_from = $11::date,
-           effective_to = $12::date, content_hash = $13::text, review_status = 'pending',
-           last_verified_at = NULL, is_current = FALSE
-         WHERE id = $1::bigint`,
-        [documentId, governedSource.title, governedSource.organization, aurumSourceFilename(governedSource, contentType), metadata,
-          source.id, governedSource.domain, governedSource.jurisdiction || "GLOBAL", governedSource.authority_level,
-          governedSource.official_url || null, sourceVersion.effective_from, sourceVersion.effective_to, sourceVersion.content_hash]
-      );
-      await db.query("DELETE FROM ai_document_chunks WHERE document_id = $1::bigint", [documentId]);
-    } else {
-      const inserted = await db.query(
-        `INSERT INTO ai_documents (
-           titolo, autore, filename, metadata, source_registry_id, source_version_id,
-           domain, jurisdiction, authority_level, official_url, effective_from, effective_to,
-           content_hash, review_status, is_current
-         ) VALUES (
-           $1::text, $2::text, $3::text, $4::jsonb, $5::bigint, $6::bigint,
-           $7::text, $8::text, $9::int, $10::text, $11::date, $12::date,
-           $13::text, 'pending', FALSE
-         ) RETURNING id`,
-        [governedSource.title, governedSource.organization, aurumSourceFilename(governedSource, contentType), metadata,
-          source.id, sourceVersion.id, governedSource.domain, governedSource.jurisdiction || "GLOBAL",
-          governedSource.authority_level, governedSource.official_url || null, sourceVersion.effective_from,
-          sourceVersion.effective_to, sourceVersion.content_hash]
-      );
-      documentId = inserted.rows[0].id;
-    }
-    for (let index = 0; index < chunks.length; index += 1) {
-      const chunk = chunks[index];
-      await db.query(
-        `INSERT INTO ai_document_chunks (
-           document_id, chunk_index, title, content, content_tsv, embedding_json, metadata,
-           source_version_id, domain, jurisdiction, authority_level, section_path, article_number,
-           valid_from, valid_to, fact_type, review_status, citation_label
-         ) VALUES (
-           $1::bigint, $2::int, $3::text, $4::text, to_tsvector('italian', $4), $5::jsonb, $6::jsonb,
-           $7::bigint, $8::text, $9::text, $10::int, $11::text, $12::text,
-           $13::date, $14::date, $15::text, 'pending', $16::text
-         )`,
-        [documentId, chunk.chunk_index, governedSource.title, chunk.content,
-          embeddings[index] ? jsonForPostgres(embeddings[index]) : null, jsonForPostgres({ storageMode: parsed.storageMode }),
-          sourceVersion.id, chunk.domain, chunk.jurisdiction, chunk.authority_level, chunk.section_path,
-          chunk.article_number, chunk.valid_from, chunk.valid_to, chunk.fact_type, chunk.citation_label]
-      );
-    }
-    await db.query("COMMIT");
-    return { documentId, documentsCreated: existing.rowCount ? 0 : 1, chunksCreated: chunks.length, storageMode: parsed.storageMode };
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  } finally {
-    db.release();
-  }
-}
-
-async function ensurePendingAurumSourceDocument({ source, sourceVersion, snapshot }) {
-  const existing = await pool.query(
-    `SELECT d.id, COUNT(c.id)::int AS chunk_count
-     FROM ai_documents d
-     LEFT JOIN ai_document_chunks c ON c.document_id = d.id
-     WHERE d.source_version_id = $1::bigint
-     GROUP BY d.id
-     ORDER BY d.id
-     LIMIT 1`,
-    [sourceVersion.id]
-  );
-  const document = existing.rows[0];
-  if (document && Number(document.chunk_count || 0) > 0) {
-    return {
-      documentId: document.id,
-      documentsCreated: 0,
-      chunksCreated: Number(document.chunk_count),
-      storageMode: "existing_pending",
-      error: ""
-    };
-  }
-  try {
-    return {
-      documentId: null,
-      documentsCreated: 0,
-      chunksCreated: 0,
-      storageMode: "not_indexed",
-      error: "",
-      ...await persistPendingAurumSourceDocument({ source, sourceVersion, snapshot })
-    };
-  } catch (error) {
-    const message = String(error.message || error).slice(0, 1000);
-    console.warn(`Indicizzazione fonte Aurum in revisione non completata (${source.source_key}):`, message);
-    return {
-      documentId: document?.id || null,
-      documentsCreated: 0,
-      chunksCreated: Number(document?.chunk_count || 0),
-      storageMode: "not_indexed",
-      error: message
-    };
-  }
-}
-
-async function ensureAurumSourceVersionReview({ source, sourceVersion, previousVersion, indexed }) {
-  const priority = Number(source.authority_level || 0) >= 95 ? "high" : "normal";
-  const result = await pool.query(
-    `INSERT INTO ai_review_queue (entity_type, entity_id, reason, priority, proposed_change, status)
-     SELECT 'source_version', $1::bigint, $2::text, $3::text, $4::jsonb, 'pending'
-     WHERE NOT EXISTS (
-       SELECT 1 FROM ai_review_queue
-       WHERE entity_type = 'source_version' AND entity_id = $1::bigint AND status IN ('pending', 'in_review')
-     )
-     RETURNING id`,
-    [
-      sourceVersion.id,
-      `Variazione rilevata nella fonte ${source.source_key}; pubblicazione bloccata fino ad approvazione Founder.`,
-      priority,
-      jsonForPostgres({
-        previous_hash: previousVersion?.content_hash || null,
-        new_hash: sourceVersion.content_hash,
-        source_id: source.id,
-        document_id: indexed.documentId,
-        chunks_created: indexed.chunksCreated,
-        storage_mode: indexed.storageMode,
-        indexing_error: indexed.error || null
-      })
-    ]
-  );
-  return { priority, created: result.rowCount > 0 };
-}
-
-async function syncAurumKnowledgeSource(sourceId, user = {}, options = {}) {
-  const sourceResult = await pool.query("SELECT * FROM ai_source_registry WHERE id = $1::bigint", [sourceId]);
-  const source = sourceResult.rows[0];
-  if (!source) {
-    const error = new Error("Fonte Aurum non trovata.");
-    error.status = 404;
-    throw error;
-  }
-  if (!source.active) {
-    const error = new Error("La fonte Aurum è disattivata.");
-    error.status = 409;
-    throw error;
-  }
-  const runResult = await pool.query(
-    "INSERT INTO ai_sync_runs (source_id, status, metadata) VALUES ($1::bigint, 'running', $2::jsonb) RETURNING id",
-    [source.id, jsonForPostgres({ manual: options.manual !== false, initiated_by: user?.id || null })]
-  );
-  const runId = runResult.rows[0].id;
-  try {
-    const previousResult = await pool.query(
-      "SELECT * FROM ai_source_versions WHERE source_id = $1::bigint ORDER BY created_at DESC, id DESC LIMIT 1",
-      [source.id]
-    );
-    const previousVersion = previousResult.rows[0] || null;
-    const snapshot = source.official_url
-      ? await aurumSourceFetcher.fetchSource(source.official_url, {
-        allowedDomains: [new URL(source.official_url).hostname],
-        allowSubdomains: false
-      })
-      : await internalAurumSourceSnapshot(source);
-    const version = createSourceVersion({
-      source_id: source.id,
-      source_key: source.source_key,
-      content: snapshot.buffer || snapshot.content || snapshot.text || "",
-      previousVersion,
-      metadata: {
-        content_type: snapshot.contentType || "application/octet-stream",
-        content_length: snapshot.contentLength || Buffer.byteLength(snapshot.content || ""),
-        final_url: snapshot.finalUrl || source.official_url || null,
-        ingestion_mode: source.ingestion_mode,
-        copyright_policy: source.license,
-        ...(snapshot.metadata || {})
-      }
-    });
-    const checkedAt = new Date();
-    const nextCheck = sourceNextCheckAt({ ...source, last_checked_at: checkedAt.toISOString(), next_check_at: null }, checkedAt);
-    if (!version.changes_detected) {
-      if (previousVersion?.review_status === "pending") {
-        const indexed = await ensurePendingAurumSourceDocument({ source, sourceVersion: previousVersion, snapshot });
-        await ensureAurumSourceVersionReview({ source, sourceVersion: previousVersion, previousVersion, indexed });
-        await pool.query(
-          `UPDATE ai_source_registry SET last_checked_at = $2::timestamptz, next_check_at = $3::timestamptz, updated_at = NOW()
-           WHERE id = $1::bigint`,
-          [source.id, checkedAt.toISOString(), nextCheck?.toISOString() || null]
-        );
-        await pool.query(
-          `UPDATE ai_sync_runs SET completed_at = NOW(), status = 'pending_review', previous_hash = $2::text,
-               new_hash = $2::text, changes_detected = FALSE,
-               documents_created = $3::int, chunks_created = $4::int,
-               metadata = metadata || $5::jsonb
-           WHERE id = $1::bigint`,
-          [runId, version.content_hash, indexed.documentsCreated, indexed.chunksCreated,
-            jsonForPostgres({
-              source_version_id: previousVersion.id,
-              recovered_pending_version: true,
-              storage_mode: indexed.storageMode,
-              indexing_error: indexed.error || null
-            })]
-        );
-        return {
-          ok: true,
-          status: "pending_review",
-          source_id: source.id,
-          source_key: source.source_key,
-          source_version_id: previousVersion.id,
-          sync_run_id: runId,
-          document_id: indexed.documentId,
-          documents_created: indexed.documentsCreated,
-          chunks_created: indexed.chunksCreated,
-          storage_mode: indexed.storageMode,
-          indexing_error: indexed.error || null,
-          recovered_pending_version: true,
-          auto_approved: false
-        };
-      }
-      await pool.query(
-        `UPDATE ai_source_registry SET last_checked_at = $2::timestamptz, next_check_at = $3::timestamptz, updated_at = NOW()
-         WHERE id = $1::bigint`,
-        [source.id, checkedAt.toISOString(), nextCheck?.toISOString() || null]
-      );
-      await pool.query(
-        `UPDATE ai_sync_runs SET completed_at = NOW(), status = 'unchanged', previous_hash = $2::text,
-             new_hash = $2::text, changes_detected = FALSE, metadata = metadata || $3::jsonb
-         WHERE id = $1::bigint`,
-        [runId, version.content_hash, jsonForPostgres({ checked_at: checkedAt.toISOString() })]
-      );
-      return { ok: true, status: "unchanged", source_id: source.id, source_key: source.source_key, sync_run_id: runId };
-    }
-    const inserted = await pool.query(
-      `INSERT INTO ai_source_versions (
-         source_id, version_label, publication_date, effective_from, effective_to,
-         content_hash, metadata, change_summary, is_current, review_status
-       )
-       VALUES ($1::bigint, $2::text, $3::date, $4::date, $5::date,
-               $6::text, $7::jsonb, $8::text, FALSE, 'pending')
-       ON CONFLICT (source_id, content_hash) DO UPDATE SET
-         retrieved_at = NOW(), metadata = EXCLUDED.metadata,
-         change_summary = EXCLUDED.change_summary, is_current = FALSE,
-         review_status = 'pending', reviewed_by = NULL, reviewed_at = NULL
-       RETURNING *`,
-      [
-        source.id,
-        version.version_label,
-        version.publication_date,
-        version.effective_from,
-        version.effective_to,
-        version.content_hash,
-        jsonForPostgres(version.metadata),
-        version.change_summary
-      ]
-    );
-    const sourceVersion = inserted.rows[0];
-    const indexed = await ensurePendingAurumSourceDocument({ source, sourceVersion, snapshot });
-    const review = await ensureAurumSourceVersionReview({ source, sourceVersion, previousVersion, indexed });
-    await pool.query(
-      `UPDATE ai_source_registry SET last_checked_at = $2::timestamptz, next_check_at = $3::timestamptz, updated_at = NOW()
-       WHERE id = $1::bigint`,
-      [source.id, checkedAt.toISOString(), nextCheck?.toISOString() || null]
-    );
-    await pool.query(
-      `UPDATE ai_sync_runs SET completed_at = NOW(), status = 'pending_review', previous_hash = $2::text,
-           new_hash = $3::text, changes_detected = TRUE,
-           documents_created = $4::int, chunks_created = $5::int,
-           metadata = metadata || $6::jsonb
-       WHERE id = $1::bigint`,
-      [runId, previousVersion?.content_hash || null, version.content_hash,
-        indexed.documentsCreated, indexed.chunksCreated,
-        jsonForPostgres({ source_version_id: sourceVersion.id, storage_mode: indexed.storageMode, indexing_error: indexed.error || null })]
-    );
-    void createNotification({
-      targetRole: "founder",
-      title: "Fonte Aurum da revisionare",
-      message: `Rilevata una nuova versione per ${source.title}. La pubblicazione resta sospesa fino all'approvazione.`,
-      type: "aurum_knowledge_review",
-      severity: review.priority === "high" ? "warning" : "info",
-      entityType: "aurum_source_version",
-      entityId: sourceVersion.id,
-      actionUrl: "#aurumManagement",
-      metadata: { source_id: source.id, source_key: source.source_key, sync_run_id: runId },
-      createdBy: user?.id || null,
-      actor: user
-    });
-    return {
-      ok: true,
-      status: "pending_review",
-      source_id: source.id,
-      source_key: source.source_key,
-      source_version_id: sourceVersion.id,
-      sync_run_id: runId,
-      document_id: indexed.documentId,
-      documents_created: indexed.documentsCreated,
-      chunks_created: indexed.chunksCreated,
-      storage_mode: indexed.storageMode,
-      indexing_error: indexed.error || null,
-      auto_approved: false
-    };
-  } catch (error) {
-    await pool.query(
-      "UPDATE ai_sync_runs SET completed_at = NOW(), status = 'failed', error_message = $2::text WHERE id = $1::bigint",
-      [runId, String(error.message || error).slice(0, 1000)]
-    ).catch(() => {});
-    throw error;
-  }
-}
-
-async function checkAurumKnowledgeSourceUpdates(user = {}) {
-  const onChangePollMinutes = Math.max(15, Math.round(aurumKnowledgeSchedulerIntervalMinutes));
-  const due = await pool.query(
-    `SELECT id FROM ai_source_registry
-     WHERE active = TRUE
-       AND (
-         (update_frequency NOT IN ('manual', 'on_change')
-           AND (next_check_at IS NULL OR next_check_at <= NOW()))
-         OR
-         (update_frequency = 'on_change'
-           AND official_url IS NULL
-           AND ingestion_mode IN ('database_adapter', 'bundled_structured_data')
-           AND (last_checked_at IS NULL OR last_checked_at <= NOW() - ($1::int * INTERVAL '1 minute')))
-       )
-     ORDER BY
-       CASE WHEN update_frequency = 'on_change' THEN 0 ELSE 1 END,
-       CASE WHEN update_frequency = 'on_change' THEN last_checked_at ELSE next_check_at END NULLS FIRST,
-       authority_level DESC
-     LIMIT 12`,
-    [onChangePollMinutes]
-  );
-  const results = [];
-  for (const row of due.rows) {
-    try {
-      results.push(await syncAurumKnowledgeSource(row.id, user, { manual: false }));
-    } catch (error) {
-      results.push({ ok: false, source_id: row.id, status: "failed", error: error.message || "Sincronizzazione non riuscita." });
-    }
-  }
-  const remaining = await pool.query(
-    `SELECT COUNT(*)::int AS count FROM ai_source_registry
-     WHERE active = TRUE
-       AND (
-         (update_frequency NOT IN ('manual', 'on_change')
-           AND (next_check_at IS NULL OR next_check_at <= NOW()))
-         OR
-         (update_frequency = 'on_change'
-           AND official_url IS NULL
-           AND ingestion_mode IN ('database_adapter', 'bundled_structured_data')
-           AND (last_checked_at IS NULL OR last_checked_at <= NOW() - ($1::int * INTERVAL '1 minute')))
-       )`,
-    [onChangePollMinutes]
-  );
-  return { ok: true, checked: results.length, remaining: Number(remaining.rows[0]?.count || 0), results };
-}
-
-function startAurumKnowledgeScheduler() {
-  if (!aurumKnowledgeSchedulerEnabled || aurumKnowledgeSchedulerTimer) return false;
-  const run = () => {
-    void checkAurumKnowledgeSourceUpdates({}).catch((error) => {
-      console.warn("Scheduler Aurum Knowledge OS non completato:", error.message || error);
-    });
-  };
-  aurumKnowledgeSchedulerTimer = setInterval(run, aurumKnowledgeSchedulerIntervalMinutes * 60_000);
-  aurumKnowledgeSchedulerTimer.unref?.();
-  const initialTimer = setTimeout(run, 60_000);
-  initialTimer.unref?.();
-  return true;
-}
-
-async function extractAurumDocumentFacts(documentId, input = {}, user = {}) {
-  const documentResult = await pool.query(
-    `SELECT d.*, COALESCE(d.authority_level, s.authority_level, 0) AS resolved_authority_level,
-            COALESCE(d.domain, s.domain) AS resolved_domain,
-            COALESCE(d.jurisdiction, s.jurisdiction, 'IT') AS resolved_jurisdiction
-     FROM ai_documents d
-     LEFT JOIN ai_source_registry s ON s.id = d.source_registry_id
-     WHERE d.id = $1::bigint`,
-    [documentId]
-  );
-  const document = documentResult.rows[0];
-  if (!document) {
-    const error = new Error("Documento Aurum non trovato.");
-    error.status = 404;
-    throw error;
-  }
-  if (!Array.isArray(input.facts) || !input.facts.length || !document.source_version_id) {
-    const queued = await pool.query(
-      `INSERT INTO ai_review_queue (entity_type, entity_id, reason, priority, proposed_change, status)
-       VALUES ('document_fact_extraction', $1::bigint, $2::text, 'normal', $3::jsonb, 'pending')
-       RETURNING id`,
-      [
-        document.id,
-        document.source_version_id
-          ? "Riestrazione fatti richiesta: fornire fatti atomici strutturati e sottoporli a revisione."
-          : "Documento privo di versione fonte: collegare e approvare una versione prima dell'estrazione fatti.",
-        jsonForPostgres({ requested_by: user?.id || null, source_version_id: document.source_version_id || null })
-      ]
-    );
-    return { ok: true, status: "queued_for_review", review_queue_id: queued.rows[0].id, facts_created: 0, auto_published: false };
-  }
-  const extracted = extractStructuredFacts({
-    facts: input.facts,
-    relations: input.relations || [],
-    sourceVersionId: document.source_version_id,
-    authorityLevel: Number(document.resolved_authority_level || 0),
-    domain: document.resolved_domain,
-    jurisdiction: document.resolved_jurisdiction
-  });
-  const db = await pool.connect();
-  try {
-    await db.query("BEGIN");
-    let factsCreated = 0;
-    let relationsCreated = 0;
-    for (const fact of extracted.facts) {
-      await db.query(
-        `INSERT INTO ai_knowledge_facts (
-           fact_key, domain, subject, predicate, object_value, jurisdiction,
-           source_version_id, chunk_id, authority_level, valid_from, valid_to,
-           confidence, review_status
-         ) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::bigint, $8::bigint, $9::int,
-                   $10::date, $11::date, $12::numeric, 'pending')`,
-        [fact.fact_key, fact.domain, fact.subject, fact.predicate, jsonForPostgres(fact.object_value), fact.jurisdiction,
-          fact.source_version_id, fact.chunk_id, fact.authority_level, fact.valid_from, fact.valid_to, fact.confidence]
-      );
-      factsCreated += 1;
-    }
-    for (const relation of extracted.relations) {
-      await db.query(
-        `INSERT INTO ai_knowledge_relations (
-           source_entity, relation_type, target_entity, domain, properties, source_version_id, review_status
-         ) VALUES ($1, $2, $3, $4, $5::jsonb, $6::bigint, 'pending')`,
-        [relation.source_entity, relation.relation_type, relation.target_entity, relation.domain,
-          jsonForPostgres(relation.properties), relation.source_version_id]
-      );
-      relationsCreated += 1;
-    }
-    const queued = await db.query(
-      `INSERT INTO ai_review_queue (entity_type, entity_id, reason, priority, proposed_change, status)
-       VALUES ('document_fact_extraction', $1::bigint, $2::text, 'normal', $3::jsonb, 'pending')
-       RETURNING id`,
-      [document.id, "Fatti strutturati estratti e bloccati in revisione.", jsonForPostgres({ facts_created: factsCreated, relations_created: relationsCreated })]
-    );
-    await db.query("COMMIT");
-    return {
-      ok: true,
-      status: "pending_review",
-      facts_created: factsCreated,
-      relations_created: relationsCreated,
-      review_queue_id: queued.rows[0].id,
-      auto_published: false
-    };
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  } finally {
-    db.release();
-  }
-}
-
 async function askOroActiveAssistant(question = "", options = {}) {
   const domanda = String(question || "").trim();
   if (!domanda) {
@@ -9992,7 +8795,6 @@ async function askOroActiveAssistant(question = "", options = {}) {
         : options.mode === "normativa_operativa"
           ? "normativa_operativa"
           : "chat";
-  const knowledgeOsContext = String(options.knowledge?.context || "").slice(0, 32_000);
   const rawAurumContext = sanitizeForPostgres(options.context || {});
   const aurumContext = sanitizeAssistantContextObject(rawAurumContext) || {};
   const rawConversationHistory = Array.isArray(rawAurumContext.conversationHistory)
@@ -10119,9 +8921,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const sectorSources = sectorKnowledgeSources(sectorMatches.slice(0, 3), 10);
   const sectorContext = formatSectorKnowledgeContext(sectorMatches);
   const hasSectorContext = sectorMatches.length > 0;
-  const chunks = limitAssistantContext(await searchAiChunks(domanda, {
-    governedOnly: options.knowledge?.route?.matched_by_keywords === true
-  }));
+  const chunks = limitAssistantContext(await searchAiChunks(domanda));
   const hasBookContext = chunks.some((chunk) => !["note", "academy"].includes(chunk.metadata?.sourceType));
   const hasApprovedKnowledge = chunks.some((chunk) => chunk.metadata?.sourceType === "note");
   const hasAcademyContext = chunks.some((chunk) => chunk.metadata?.sourceType === "academy");
@@ -10390,9 +9190,6 @@ ${safePriceExplanationText || "Nessun contesto prezzo specifico."}
 
 CONTESTO NORMATIVO AURUM:
 ${safeNormativeText || "Nessun contesto normativo specifico."}
-
-AURUM KNOWLEDGE OS — EVIDENZE APPROVATE E FILTRATE:
-${knowledgeOsContext || "Nessuna evidenza Knowledge OS approvata e pertinente disponibile."}
 
 BASE SETTORIALE AURUM VERIFICATA:
 ${sectorContext || "Nessun argomento settoriale sufficientemente pertinente."}
@@ -11069,19 +9866,11 @@ function writePrivacyPolicyPdf(response, policy) {
 async function initDatabase() {
   const schema = await fs.readFile(path.join(__dirname, "schema.sql"), "utf8");
   await pool.query(schema);
-  for (const migrationName of [
-    "20260727_gemological_encyclopedia.sql",
-    "20260801_aurum_knowledge_os.sql"
-  ]) {
-    const migration = await fs.readFile(path.join(__dirname, "migrations", migrationName), "utf8");
-    await pool.query(migration);
-  }
-  await seedAurumKnowledgeOs();
-  aurumKnowledgeManagement = createAurumKnowledgeManagement({
-    query: (sql, parameters) => pool.query(sql, parameters),
-    taxonomy: await readOptionalJson(aurumTaxonomyFilePath),
-    registry: aurumSourceRegistry
-  });
+  const gemologicalEncyclopediaMigration = await fs.readFile(
+    path.join(__dirname, "migrations", "20260727_gemological_encyclopedia.sql"),
+    "utf8"
+  );
+  await pool.query(gemologicalEncyclopediaMigration);
   await setupAiVectorStorage();
   await seedAurumBundledKnowledgeDocuments();
   await bootstrapStores();
@@ -27763,70 +26552,15 @@ app.post("/api/ai/controlla-atto", async (request, response, next) => {
 
 app.post("/api/ai/assistente", async (request, response, next) => {
   try {
-    const startedAt = Date.now();
     const question = request.body.domanda || request.body.message || request.body.question || "";
-    if (!String(question).trim()) {
-      const error = new Error("Inserisci una domanda per l'assistente.");
-      error.status = 400;
-      throw error;
-    }
-    const knowledge = await prepareAurumKnowledgeQuestion(question, request.user);
-    const toolResults = [];
-    const requestedToolName = String(request.body.toolName || request.body.tool_name || "").trim();
-    if (requestedToolName) {
-      toolResults.push(executeAurumTool(
-        requestedToolName,
-        sanitizeForPostgres(request.body.toolInput || request.body.tool_input || {}),
-        { role: normalizeRole(request.user?.ruolo), userId: request.user?.id || null }
-      ));
-    }
-    const answer = knowledge.route.access_allowed
-      ? await askOroActiveAssistant(question, {
-          mode: request.body.mode,
-          section: request.body.section || "",
-          context: sanitizeForPostgres(request.body.context || {}),
-          interface: request.body.interface || "",
-          allowWeb: request.body.allowWeb === true,
-          user: request.user,
-          knowledge
-        })
-      : {
-          risposta: "Questa informazione è riservata a un ruolo autorizzato.",
-          fonte: "Controllo accessi Aurum",
-          fonti: [],
-          citazioni: [],
-          privacy_filtered: true
-        };
-    const professional = buildAurumProfessionalResponse({
-      legacy: answer,
-      route: knowledge.route,
-      retrieved: knowledge.retrieved,
-      toolResults,
-      registry: aurumSourceRegistry,
-      retrievalError: knowledge.retrievalError
+    const answer = await askOroActiveAssistant(question, {
+      mode: request.body.mode,
+      section: request.body.section || "",
+      context: sanitizeForPostgres(request.body.context || {}),
+      interface: request.body.interface || "",
+      allowWeb: request.body.allowWeb === true,
+      user: request.user
     });
-    const confidenceScore = { ALTO: 0.95, MEDIO: 0.7, BASSO: 0.4, INSUFFICIENTE: 0 }[professional.confidence] ?? 0;
-    const questionHash = crypto.createHash("sha256").update(String(question || "")).digest("hex");
-    void pool.query(
-      `INSERT INTO ai_answer_audit (
-         user_id, question_hash, domain, risk_level, sources_used, tools_used,
-         confidence, answer_status, escalation_type, processing_ms
-       )
-       VALUES ($1::bigint, $2::text, $3::text, $4::text, $5::jsonb, $6::jsonb,
-               $7::numeric, $8::text, $9::text, $10::int)`,
-      [
-        request.user?.id || null,
-        questionHash,
-        professional.domain.join(","),
-        knowledge.route.risk_level,
-        jsonForPostgres(professional.sources.map((source) => source.source_key).filter(Boolean)),
-        jsonForPostgres(toolResults.map((result) => result.tool).filter(Boolean)),
-        confidenceScore,
-        professional.confidence,
-        professional.escalation ? "human_review" : null,
-        Date.now() - startedAt
-      ]
-    ).catch((error) => console.warn("Audit risposta Aurum non salvato:", error.message || error));
     void writeAuditLog({
       req: request,
       user: request.user,
@@ -27840,345 +26574,10 @@ app.post("/api/ai/assistente", async (request, response, next) => {
         question_length: String(question || "").length
       }
     });
-    response.json({
-      ...answer,
-      ...professional,
-      risposta: professional.answer,
-      fonti: professional.sources,
-      citazioni: professional.sources.map((source) => `${source.title || source.organization || source.source_key} — ${source.url || ""}`.trim()),
-      professional
-    });
+    response.json(answer);
   } catch (error) {
-    if (error instanceof AurumToolAccessError) error.status = error.status || 403;
     if (!error.status) error.status = 502;
     if (!error.message) error.message = "Assistente IA non disponibile.";
-    next(error);
-  }
-});
-
-app.get("/api/aurum/tools", async (request, response, next) => {
-  try {
-    response.json({ tools: listAurumToolsForRole(normalizeRole(request.user?.ruolo)) });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/tools/:toolName", async (request, response, next) => {
-  try {
-    const result = executeAurumTool(
-      request.params.toolName,
-      sanitizeForPostgres(request.body || {}),
-      { role: normalizeRole(request.user?.ruolo), userId: request.user?.id || null }
-    );
-    void writeAuditLog({
-      req: request,
-      user: request.user,
-      action: "aurum_tool_execute",
-      entityType: "aurum_tool",
-      entityId: request.params.toolName,
-      entityLabel: request.params.toolName,
-      metadata: { status: result.status, risk_level: result.authorization?.riskLevel || "" }
-    });
-    response.json({ ok: true, result });
-  } catch (error) {
-    if (error instanceof AurumToolAccessError) error.status = error.status || 403;
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/overview", requireFounder, async (_request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().overview());
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/domains", requireFounder, async (_request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().domains());
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/coverage", requireFounder, async (_request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().coverage());
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/sources", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listSources(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/sources", requireFounder, async (request, response, next) => {
-  try {
-    response.status(201).json(await requireAurumKnowledgeManagement().createSource(request.body));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.put("/api/aurum/knowledge/sources/:id", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().updateSource(request.params.id, request.body));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/sources/check-updates", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await checkAurumKnowledgeSourceUpdates(request.user));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/sources/:id/sync", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await syncAurumKnowledgeSource(request.params.id, request.user, { manual: true }));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/sources/:id/versions", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().sourceVersions(request.params.id, request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/versions", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listVersions(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/versions/:id/approve", requireFounder, async (request, response, next) => {
-  try {
-    const result = await requireAurumKnowledgeManagement().approveVersion(request.params.id, {
-      ...request.body,
-      reviewedBy: request.user.id
-    });
-    response.json(result);
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/documents", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listDocuments(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/documents/:id/reindex", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await reindexAiBook(request.params.id));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/documents/:id/extract-facts", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await extractAurumDocumentFacts(request.params.id, request.body, request.user));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/facts", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listFacts(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/graph", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listGraph(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/procedures", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listProcedures(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/procedures", requireFounder, async (request, response, next) => {
-  try {
-    response.status(201).json(await requireAurumKnowledgeManagement().createProcedure(request.body));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.put("/api/aurum/knowledge/procedures/:id", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().updateProcedure(request.params.id, request.body));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/procedures/:id/publish", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().publishProcedure(request.params.id, {
-      ...request.body,
-      reviewedBy: request.user.id
-    }));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/cases", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listCases(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/cases", requireFounder, async (request, response, next) => {
-  try {
-    response.status(201).json(await requireAurumKnowledgeManagement().createCase(request.body));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/cases/:id/approve", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().approveCase(request.params.id, {
-      ...request.body,
-      approvedBy: request.user.id
-    }));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/review-queue", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listReviewQueue(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/review-queue/:id/resolve", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().resolveReviewQueueItem(request.params.id, {
-      ...request.body,
-      resolvedBy: request.user.id
-    }));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/conflicts", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listConflicts(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/conflicts/:id/resolve", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().resolveConflict(request.params.id, {
-      ...request.body,
-      resolvedBy: request.user.id
-    }));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/stale", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().stale(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/sync-runs", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listSyncRuns(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/evaluations", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listEvaluations(request.query));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/aurum/knowledge/evaluate", requireFounder, async (request, response, next) => {
-  try {
-    const question = String(request.body.question || request.body.domanda || "").trim();
-    if (!question) return response.json(await requireAurumKnowledgeManagement().evaluateSummary(request.body));
-    const knowledge = await prepareAurumKnowledgeQuestion(question, request.user);
-    const legacy = await askOroActiveAssistant(question, {
-      interface: "aurum-knowledge-evaluation",
-      mode: request.body.mode || "chat",
-      allowWeb: request.body.allowWeb === true,
-      user: request.user,
-      knowledge
-    });
-    const professional = buildAurumProfessionalResponse({
-      legacy,
-      route: knowledge.route,
-      retrieved: knowledge.retrieved,
-      registry: aurumSourceRegistry,
-      retrievalError: knowledge.retrievalError
-    });
-    response.json({
-      id: `live-${Date.now()}`,
-      title: "Valutazione domanda Aurum",
-      status: professional.confidence === "INSUFFICIENTE" ? "needs_review" : "verified",
-      ...professional,
-      retrievedCandidates: knowledge.retrieved.length,
-      autoPublished: false
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get("/api/aurum/knowledge/feedback", requireFounder, async (request, response, next) => {
-  try {
-    response.json(await requireAurumKnowledgeManagement().listFeedback(request.query));
-  } catch (error) {
     next(error);
   }
 });
@@ -30446,7 +28845,6 @@ initDatabase()
     startOroInEuroHourlySync();
     startGruppoOro24kHourlySync();
     startCompetitorAiAutoExtraction();
-    startAurumKnowledgeScheduler();
   })
   .catch((error) => {
     runtimeStatus.databaseReady = false;
