@@ -89,3 +89,23 @@ for (const question of [
     assert.equal(hasStrongComproOroSectorIntent(question, sector, coaching), false);
   });
 }
+
+for (const question of [
+  "Come funziona il lavoro del commercialista per un negozio compro oro?",
+  "Come registro in prima nota l’acquisto di oro da un privato?",
+  "Quale regime IVA applico a un lotto venduto alla fonderia?",
+  "Come riconcilio rimanenze, cali di fusione e fattura della raffineria?",
+  "Come ammortizzo lo strumento XRF tra i cespiti?"
+]) {
+  test(`la consulenza contabile del compro oro resta nel settore specialistico: ${question}`, () => {
+    const coaching = searchCoachingKnowledge(question);
+    const sector = searchSectorKnowledge(question, { limit: 5 });
+    assert.ok(sector.length > 0);
+    assert.equal(hasStrongComproOroSectorIntent(question, sector, coaching), true);
+    assert.equal(resolveAurumKnowledgeRoute({
+      question,
+      sectorMatches: sector,
+      coachingKnowledge: coaching
+    }).strongSectorPriority, true);
+  });
+}

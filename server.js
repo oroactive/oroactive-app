@@ -8636,6 +8636,15 @@ const trustedAssistantSourceDomains = [
   "mimit.gov.it",
   "inail.it",
   "garanteprivacy.it",
+  "agenziaentrate.gov.it",
+  "fiscooggi.it",
+  "def.finanze.it",
+  "finanze.gov.it",
+  "giustiziatributaria.gov.it",
+  "fondazioneoic.eu",
+  "inps.it",
+  "istat.it",
+  "cortedicassazione.it",
   "eur-lex.europa.eu",
   "iso.org",
   "oiml.org",
@@ -8726,9 +8735,15 @@ function normalizeAssistantIntentText(value = "") {
 function isComproOroNormativeQuestion(question = "") {
   const normalized = normalizeAssistantIntentText(question);
   if (!normalized) return false;
-  const hasNormativeIntent = /(legge|normativa|decreto|d lgs|dlgs|legislativo|antiriciclaggio|adempiment|obblig|norma|compliance|compro oro|registro|questura|oro usato)/.test(normalized);
-  const hasQuestionIntent = /(quale|quando|anno|emessa|emanata|ultima|recente|cosa dice|spiegami|riguarda|devo|bisogna|obbliga|prevede)/.test(normalized);
+  const hasNormativeIntent = /(legge|normativa|decreto|d lgs|dlgs|legislativo|antiriciclaggio|adempiment|obblig|norma|compliance|compro oro|registro|questura|oro usato|iva|fiscale|commercialista|contabil|bilancio|reverse charge|regime del margine|rimanenze|f24|lipe)/.test(normalized);
+  const hasQuestionIntent = /(quale|quando|come|anno|emessa|emanata|ultima|recente|cosa dice|spiegami|riguarda|devo|bisogna|obbliga|prevede|funziona|svolge|gestisce)/.test(normalized);
   return hasNormativeIntent && hasQuestionIntent;
+}
+
+function isComproOroAccountingQuestion(question = "") {
+  const normalized = normalizeAssistantIntentText(question);
+  if (!normalized) return false;
+  return /\b(?:prima nota|partita doppia|commercialista|contabilita|contabile|fiscalista|iva|reverse charge|inversione contabile|regime del margine|fattura elettronica|sdi|registri? iva|lipe|f24|rimanenze|inventario|cespiti|ammortamento|bilancio|imposte|scadenziario|cash flow|controllo di gestione)\b/.test(normalized);
 }
 
 function buildComproOroNormativeAnswer(question = "") {
@@ -8809,7 +8824,8 @@ async function askOroActiveAssistant(question = "", options = {}) {
     : rawConversationHistory;
   const aurumMemories = await loadAurumChatMemories(options.user || {});
   const aurumMemoryProfile = buildAurumMemoryProfile(aurumMemories);
-  const isNormativeQuestion = mode === "normativa_operativa" || isComproOroNormativeQuestion(domanda);
+  const isAccountingQuestion = isComproOroAccountingQuestion(domanda);
+  const isNormativeQuestion = mode === "normativa_operativa" || isComproOroNormativeQuestion(domanda) || isAccountingQuestion;
   const requestedFieldCandidate = /^[a-z0-9_]{1,80}$/i.test(String(aurumContext.requestedFieldId || ""))
     ? String(aurumContext.requestedFieldId)
     : "";
@@ -8936,7 +8952,9 @@ async function askOroActiveAssistant(question = "", options = {}) {
     ? `Modalita prezzo: spiega il prezzo in modo operativo da compro oro. Contesto prezzo JSON senza dati cliente:\n${JSON.stringify(priceExplanationContext).slice(0, 8000)}`
     : "";
   const normativeText = isNormativeQuestion
-    ? `Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Distingui sempre OCO, OPO, obbligo legale e procedura interna. Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nRisposta deterministica verificata:\n${buildComproOroNormativeAnswer(domanda)}`
+    ? `${isAccountingQuestion
+      ? "Modalita contabile-fiscale: spiega prima il principio teorico, poi i presupposti da verificare e infine la buona prassi documentale. Distingui contabilità, trattamento IVA, obblighi OCO/OPO e controllo di gestione. Non assegnare una scrittura o un regime definitivo senza forma giuridica, regime contabile, provenienza, natura e destinazione documentata dell’operazione."
+      : "Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Distingui sempre OCO, OPO, obbligo legale e procedura interna."} Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nRisposta deterministica verificata:\n${buildComproOroNormativeAnswer(domanda)}`
     : "";
   const safePriceExplanationText = redactAssistantPersonalData(priceExplanationText, 10000);
   const safeNormativeText = redactAssistantPersonalData(normativeText, 10000);
@@ -9145,6 +9163,7 @@ Se il contesto non contiene abbastanza informazioni e non sono presenti risultat
 Non inventare fonti web aggiornate: usa soltanto i risultati web forniti nel contesto.
 Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
+Per domande contabili, fiscali o economiche del compro oro separa sempre: principio teorico, presupposti da verificare, buona prassi documentale e decisione riservata al professionista. Non inventare una scrittura in partita doppia, un codice IVA, una scadenza o un’imposta applicabile senza i dati necessari.
 Per prove tecniche usa esiti proporzionati come compatibile, non compatibile, inconcludente o da riferire al laboratorio; non concludere autenticita, titolo esatto o origine da un solo screening.
 Quando è presente il contesto gemmologico, non mescolare proprietà di schede diverse: tratta una sola pietra primaria, salvo confronto esplicitamente richiesto, e distingui sempre naturale, sintetica, trattata, simulante, imitazione o assemblata.
 Quando è presente la guida dell'atto, distingui obbligo legale, procedura OroActive e campo mancante; spiega scopo, compilazione, condizioni, controlli, privacy ed errori senza chiedere o ripetere valori reali del cliente.
@@ -9350,6 +9369,9 @@ async function aiAssistantStatus() {
     sector_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
     sector_topics: AURUM_SECTOR_KNOWLEDGE.topics.length,
     sector_categories: [...new Set(AURUM_SECTOR_KNOWLEDGE.topics.map((topic) => topic.category))].sort((left, right) => left.localeCompare(right, "it")),
+    accounting_knowledge_loaded: AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => ["Fiscalità", "Contabilità e controllo"].includes(topic.category)).length >= 10,
+    accounting_topics: AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => ["Fiscalità", "Contabilità e controllo"].includes(topic.category)).length,
+    accounting_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
     gemological_knowledge_loaded: AURUM_GEM_KNOWLEDGE_STATS.materialCount === 61 && AURUM_GEM_KNOWLEDGE_STATS.toolCount === 21,
     gemological_materials: AURUM_GEM_KNOWLEDGE_STATS.materialCount,
     gemological_tools: AURUM_GEM_KNOWLEDGE_STATS.toolCount,

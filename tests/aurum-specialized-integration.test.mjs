@@ -55,10 +55,23 @@ test("il backend mantiene separate guida atto, laboratorio e conoscenza settoria
 });
 
 test("lo stato AI pubblica copertura e gap verificabili", () => {
+  assert.match(serverSource, /accounting_knowledge_loaded:/);
+  assert.match(serverSource, /accounting_topics:/);
+  assert.match(serverSource, /accounting_knowledge_verified_at:/);
   assert.match(serverSource, /gemological_knowledge_loaded:/);
   assert.match(serverSource, /gemological_materials:/);
   assert.match(serverSource, /gemological_tools:/);
   assert.match(serverSource, /sale_deed_knowledge_loaded:/);
   assert.match(serverSource, /sale_deed_fields_implemented:/);
   assert.match(serverSource, /sale_deed_known_gaps:/);
+});
+
+test("le domande contabili usano la base specialistica e non il fallback legale generico", () => {
+  assert.match(appSource, /function isAurumFiscalAccountingQuestion/);
+  assert.match(appSource, /normativeQuestion && !accountingQuestion && !isAurumNormativeAnswerAdequate/);
+  assert.match(serverSource, /function isComproOroAccountingQuestion/);
+  assert.match(serverSource, /Modalita contabile-fiscale/);
+  assert.match(serverSource, /Non assegnare una scrittura o un regime definitivo/);
+  assert.match(serverSource, /"agenziaentrate\.gov\.it"/);
+  assert.match(serverSource, /"fondazioneoic\.eu"/);
 });

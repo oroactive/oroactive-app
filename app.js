@@ -220,7 +220,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260730-store-delete-aurum-users-11";
+const OROACTIVE_CLIENT_BUILD_ID = "20260801-aurum-commercialista-12";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -9741,6 +9741,12 @@ function isAurumNormativeQuestion(question = "") {
   return hasNormativeIntent && hasQuestionIntent;
 }
 
+function isAurumFiscalAccountingQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  return /\b(?:commercialista|contabilita|contabile|fiscalista|prima nota|partita doppia|iva|reverse charge|inversione contabile|regime del margine|fattura elettronica|sdi|registri? iva|lipe|f24|rimanenze|inventario|cespiti|ammortamento|bilancio|imposte|scadenziario|cash flow|controllo di gestione)\b/.test(normalized);
+}
+
 function isAurumNormativeAnswerAdequate(answer = "") {
   const normalized = aurumNormalize(answer);
   if (!normalized) return false;
@@ -9756,7 +9762,7 @@ function buildAurumNormativeAnswer(question = "") {
     : "La disciplina organica dell’attività di compro oro resta il D.Lgs. 25 maggio 2017, n. 92, da consultare nel testo vigente.";
 
   return [
-    "Normativa compro oro — sintesi offline verificata il 30 luglio 2026",
+    "Normativa compro oro — sintesi offline verificata il 1 agosto 2026",
     "",
     opening,
     "",
@@ -10606,7 +10612,7 @@ function renderAurumMessages() {
   if (!state.aurumMessages.length) {
     aurumChatMessages.innerHTML = isPriceExplanation
       ? '<div class="empty-state">Aurum è pronto per spiegare prezzi, carature, titoli, costi, margini e scenari.</div>'
-      : '<div class="empty-state">Aurum conosce normativa compro oro, OAM/UIF, oro, argento, PGM, diamanti, gemme, strumenti, prove, sicurezza e valutazione. Le risposte settoriali mostrano le fonti verificate.</div>';
+      : '<div class="empty-state">Aurum conosce normativa compro oro, OAM/UIF, contabilità e fiscalità specialistica, lavoro del commercialista, oro, argento, PGM, diamanti, gemme, strumenti, prove, sicurezza e valutazione. Le risposte settoriali mostrano le fonti verificate.</div>';
   } else {
     aurumChatMessages.innerHTML = state.aurumMessages.map((message) => `
       <article class="aurum-message ${message.role === "user" ? "user" : "assistant"}">
@@ -11317,7 +11323,8 @@ function evaluateAurumQuizAnswer(answer = "") {
 function aurumContextPayload(question) {
   const guide = currentAurumGuide();
   const tutorialId = inferAurumTutorialId(question);
-  const normativeQuestion = isAurumNormativeQuestion(question);
+  const accountingQuestion = isAurumFiscalAccountingQuestion(question);
+  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion;
   const wantsCurrentWebVerification = normativeQuestion
     || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(String(question || ""));
   const isPriceExplanation = state.aurumMode === "price_explanation";
@@ -11360,7 +11367,7 @@ function aurumContextPayload(question) {
           "D.Lgs. 10 dicembre 2024, n. 211 — aggiornamento OPO e dichiarazioni ORO",
           "Istruzioni UIF efficaci dal 1 luglio 2026"
         ],
-        verificatoIl: "30 luglio 2026",
+        verificatoIl: "1 agosto 2026",
         rispostaLocale: buildAurumNormativeAnswer(question)
       } : null,
       conversationHistory: state.aurumMessages
@@ -11409,7 +11416,8 @@ async function askAurum(event) {
     return;
   }
 
-  const normativeQuestion = isAurumNormativeQuestion(question);
+  const accountingQuestion = isAurumFiscalAccountingQuestion(question);
+  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion;
 
   if (!requiresBackendSafety && /(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
     startAurumCuriosityQuiz();
@@ -11435,7 +11443,7 @@ async function askAurum(event) {
     });
     state.aurumMessages.push({
       role: "assistant",
-      content: normativeQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
+      content: normativeQuestion && !accountingQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
         ? buildAurumNormativeAnswer(question)
         : data.risposta || "Risposta non disponibile.",
       source: data.fonte || "",
@@ -11450,8 +11458,10 @@ async function askAurum(event) {
   } catch (error) {
     state.aurumMessages.push({
       role: "assistant",
-      content: normativeQuestion
-        ? buildAurumNormativeAnswer(question)
+      content: accountingQuestion
+        ? "La base specialistica contabile e fiscale di Aurum non è raggiungibile in questo momento. Per evitare di assegnare un regime IVA, una scrittura o una scadenza errati senza fonti e dati completi, riprova appena la connessione è disponibile."
+        : normativeQuestion
+          ? buildAurumNormativeAnswer(question)
         : state.aurumRequestedFieldKey
           ? `${explainAurumField(state.aurumRequestedFieldKey)}\n\nLa guida professionale completa non è raggiungibile in questo momento: riprova appena la connessione è disponibile.`
           : error.message || "Aurum non riesce a contattare l'Assistente IA in questo momento."
@@ -11480,6 +11490,7 @@ function renderKnowledgeStatus() {
       <span>${status.sector_knowledge_loaded ? `Base settoriale Aurum ${escapeHtml(status.sector_knowledge_version || "")}: ${Number(status.sector_topics || 0)} argomenti verificati` : "Base settoriale Aurum non caricata"}</span>
       <span>${status.sector_knowledge_verified_at ? `Fonti verificate: ${escapeHtml(status.sector_knowledge_verified_at)}` : ""}</span>
       <span>${status.gemological_knowledge_loaded ? `Laboratorio Gemmologico: ${Number(status.gemological_materials || 0)} pietre e ${Number(status.gemological_tools || 0)} strumenti` : "Conoscenza gemmologica non caricata"}</span>
+      <span>${status.accounting_knowledge_loaded ? `Commercialista e fiscalità compro oro: ${Number(status.accounting_topics || 0)} moduli verificati il ${escapeHtml(status.accounting_knowledge_verified_at || "")}` : "Conoscenza contabile e fiscale non caricata"}</span>
       <span>${status.sale_deed_knowledge_loaded ? `Guida Atto di Vendita: ${Number(status.sale_deed_fields || 0)} campi (${Number(status.sale_deed_fields_implemented || 0)} implementati, ${Number(status.sale_deed_known_gaps || 0)} gap noti)` : "Guida Atto di Vendita non caricata"}</span>
       <span>${status.sale_deed_knowledge_verified_at ? `Guida atto verificata: ${escapeHtml(status.sale_deed_knowledge_verified_at)}` : ""}</span>
       <span>${status.coaching_knowledge_loaded ? `Coaching professionale Aurum: ${Number(status.coaching_courses || 0)} corsi, ${Number(status.coaching_topics || 0)} temi, ${Number(status.coaching_exercises || 0)} esercizi` : "Conoscenza coaching non caricata"}</span>

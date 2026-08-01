@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "knowledgeVersion": "2026.07.30",
-  "verifiedAt": "30 luglio 2026",
+  "knowledgeVersion": "2026.08.01",
+  "verifiedAt": "1 agosto 2026",
   "jurisdiction": "Italia e standard tecnici internazionali di settore",
   "scope": [
     "attività compro oro",
@@ -9,7 +9,8 @@
     "diamanti naturali, prodotti in laboratorio e simulanti",
     "strumenti e prove di banco",
     "metrologia legale",
-    "antiriciclaggio, privacy, sicurezza e fiscalità di base"
+    "antiriciclaggio, privacy e sicurezza",
+    "contabilità, fiscalità e controllo economico specialistico per il settore compro oro"
   ],
   "topics": [
     {
@@ -1387,6 +1388,489 @@
           "authority": "LBMA",
           "status": "guida tecnica",
           "verifiedAt": "30 luglio 2026"
+        }
+      ]
+    },
+    {
+      "id": "commercialista-compro-oro-mandato-flusso",
+      "title": "Lavoro del commercialista con un negozio compro oro",
+      "category": "Contabilità e controllo",
+      "keywords": ["commercialista", "consulenza contabile", "mandato professionale", "flusso documentale", "contabilità compro oro", "adempimenti fiscali", "piano dei conti"],
+      "summary": "Il commercialista traduce le operazioni reali del negozio in un sistema contabile, fiscale e di controllo coerente con forma giuridica, regime contabile, attività effettive e destinazione dei lotti, mantenendo un calendario documentale condiviso con l’imprenditore.",
+      "facts": [
+        "La competenza professionale del commercialista comprende economia aziendale, materie economiche, finanziarie, tributarie, societarie e amministrative; incarico e perimetro concreto devono essere definiti nel mandato.",
+        "Il lavoro iniziale comprende almeno forma giuridica, attività e sedi, codici attività, regime contabile e IVA, status OCO ed eventuale status OPO, canali di acquisto e vendita, personale, cespiti e deleghe fiscali.",
+        "Il ciclo ordinario raccoglie documenti, classifica ogni operazione, registra e riconcilia contabilità, banca, cassa e magazzino, controlla le scadenze, prepara liquidazioni e dichiarazioni applicabili e supporta chiusure e bilancio.",
+        "Il professionista deve ricevere evidenze coerenti tra scheda OCO, pagamento, lotto fisico, documento di vendita, eventuale esito di fonderia e movimento bancario; una registrazione contabile non sana un difetto operativo o documentale.",
+        "Mandati e deleghe consentono al professionista di operare sui servizi fiscali concordati, ma non trasferiscono automaticamente all’intermediario ogni responsabilità dell’imprenditore o gli obblighi OAM, UIF, Questura e sicurezza."
+      ],
+      "checklist": [
+        "Definire per iscritto attività incluse, responsabilità, canali di consegna documenti, referenti, frequenza e scadenze interne.",
+        "Consegnare l’anagrafica fiscale e societaria, licenze e iscrizioni, piano dei conti, saldi iniziali, inventario, contratti, estratti conto e deleghe effettivamente necessarie.",
+        "Concordare un fascicolo periodico con acquisti da privati, fatture, corrispettivi, incassi e pagamenti, movimenti dei lotti, esiti di fonderia, spese, personale e cespiti.",
+        "Fare una riconciliazione periodica tra euro, documenti e quantità fisiche prima delle liquidazioni e della chiusura.",
+        "Segnalare subito operazioni nuove o anomale invece di attendere la consegna mensile: estero, oro da investimento, rivendita di gioielli, fusione, conto deposito, permuta o apertura di una nuova sede."
+      ],
+      "warnings": [
+        "Aurum fornisce teoria e domande di controllo: non sostituisce la valutazione del commercialista sul caso reale.",
+        "Non esiste un unico flusso valido per ditta individuale, società di persone e società di capitali o per contabilità ordinaria e semplificata.",
+        "Il commercialista non sostituisce il consulente del lavoro, il responsabile antiriciclaggio, il gemmologo, il revisore o il legale quando il caso richiede quelle competenze."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 28 giugno 2005 n. 139, oggetto della professione",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=005A0163&atto.dataPubblicazioneGazzetta=2005-07-19&tipoDettaglio=originario",
+          "authority": "Normattiva",
+          "status": "testo ufficiale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.P.R. 600/1973, scritture contabili delle imprese",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=073U0600&atto.dataPubblicazioneGazzetta=1973-10-16&tipoDettaglio=singolavigenza",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 92/2017, disciplina degli operatori compro oro",
+          "url": "https://www.normattiva.it/eli/id/2017/06/20/17G00109/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "prima-nota-acquisti-privati-partita-doppia",
+      "title": "Prima nota e contabilizzazione degli acquisti da privati",
+      "category": "Contabilità e controllo",
+      "keywords": ["prima nota", "partita doppia", "acquisto da privato", "scrittura contabile", "documento di acquisto", "scheda compro oro", "costo lotto", "dare avere"],
+      "summary": "La prima nota collega il fatto economico alla prova documentale e prepara la registrazione contabile; negli acquisti da privati il venditore non emette una fattura IVA e il costo deve essere sostenuto da scheda OCO, ricevuta, pagamento e dati del lotto coerenti.",
+      "facts": [
+        "Ogni riga di prima nota dovrebbe identificare data, causale, documento, controparte, importo, mezzo di pagamento, sede, lotto e classificazione fiscale provvisoria o validata.",
+        "Il privato consumatore non emette una fattura IVA: non va insegnata un’autofattura generica come obbligo automatico per ogni acquisto di preziosi usati.",
+        "La scheda OCO progressiva e la ricevuta documentano l’operazione di settore; per la contabilità occorre preservare anche costo, pagamento, provenienza, stato funzionale e destinazione del bene.",
+        "In contabilità ordinaria la partita doppia rileva almeno l’impiego economico o patrimoniale e la relativa uscita finanziaria o il debito; i conti esatti dipendono dal piano dei conti e dalla sostanza dell’operazione.",
+        "Contabilità semplificata, ordinaria e bilancio civilistico hanno regole diverse: Aurum può spiegare la logica, ma non deve proporre una scrittura definitiva senza conoscere regime e forma giuridica."
+      ],
+      "checklist": [
+        "Associare alla registrazione il numero della scheda OCO e della ricevuta, il lotto, l’importo e la prova del pagamento.",
+        "Controllare che data, ora, cliente, oggetto, peso, valutazione e importo coincidano tra applicazione, documento e movimento finanziario.",
+        "Separare contabilmente beni destinati a rivendita invariata, materiale destinato a trasformazione, oro da investimento e beni in deposito o di terzi.",
+        "Registrare storni e correzioni con traccia dell’errore originario; non alterare retroattivamente una scheda o un peso senza audit trail.",
+        "Inviare al commercialista eccezioni e documenti mancanti in un elenco separato, senza forzare una causale provvisoria come definitiva."
+      ],
+      "warnings": [
+        "Scheda OCO, ricevuta, fattura, autofattura e documento integrativo reverse charge hanno funzioni differenti e non sono intercambiabili.",
+        "La sola registrazione del pagamento non dimostra i presupposti del regime del margine o del reverse charge.",
+        "Non inserire in una richiesta ad Aurum nomi, documenti, IBAN o altri dati reali del cliente."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017, articoli 5 e 6: tracciabilità e conservazione",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2017-05-25;92~art5!vig=",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.P.R. 600/1973, articolo 18: contabilità delle imprese minori",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:presidente.repubblica:decreto:1973-09-29;600~art18=",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.P.R. 600/1973, articolo 14: scritture delle imprese commerciali",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:presidente.repubblica:decreto:1973-09-29;600~art14-com6=",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "classificazione-fiscale-lotti-preziosi",
+      "title": "Classificazione fiscale dei lotti di preziosi usati",
+      "category": "Fiscalità",
+      "keywords": ["classificazione lotto", "destinazione oggettiva", "gioiello usato", "rottame", "fusione", "affinazione", "oro industriale", "oro da investimento", "funzione residua"],
+      "summary": "Prima di determinare IVA e documento di vendita, il commercialista deve ricostruire per ogni lotto provenienza, natura, purezza, funzione residua, stato e destinazione oggettiva: l’etichetta generica “oro usato” non determina da sola il regime fiscale.",
+      "facts": [
+        "Un gioiello che conserva una funzione propria e viene rivenduto come oggetto può seguire il regime del margine se ricorrono anche i requisiti della provenienza.",
+        "Materiale d’oro o semilavorato destinato oggettivamente a fusione, affinazione o a un nuovo ciclo produttivo può rientrare nell’inversione contabile se ricorrono i presupposti soggettivi e di purezza.",
+        "L’oro da investimento è una categoria distinta con requisiti di forma, purezza e, per le monete, ulteriori condizioni; non coincide con gioielli, rottami o oro industriale.",
+        "Reverse charge, regime del margine e IVA ordinaria non sono opzioni liberamente intercambiabili: derivano dai fatti e dalla documentazione.",
+        "Nel 2026 i riferimenti operativi restano D.P.R. 633/1972 e D.L. 41/1995; il nuovo Testo unico IVA previsto dal D.Lgs. 10/2026 si applica dal 1 gennaio 2027 e non va usato anticipatamente."
+      ],
+      "checklist": [
+        "Chiedere chi ha ceduto il bene e quale regime risultava nella catena di acquisto.",
+        "Documentare se il bene è integro e riutilizzabile, da riparare, smontato o destinato a recupero del metallo.",
+        "Rilevare titolo o purezza con metodo proporzionato e indicare i limiti del dato tecnico.",
+        "Collegare la destinazione dichiarata al compratore, ordine, contratto, documento di trasporto ed esito della lavorazione quando disponibili.",
+        "Far validare al commercialista regime, natura IVA, dicitura e registrazione prima dell’emissione del documento."
+      ],
+      "warnings": [
+        "Non concludere “tutto l’oro usato è reverse charge” o “ogni acquisto da privato è automaticamente al margine”.",
+        "La sola qualità soggettiva di fonderia o operatore professionale dell’acquirente non sostituisce l’esame oggettivo del bene e della destinazione.",
+        "Non mescolare nella stessa risposta numerazione normativa 2026 e numerazione del Testo unico applicabile dal 2027."
+      ],
+      "sources": [
+        {
+          "title": "Agenzia delle Entrate, Risoluzione 92/E del 12 dicembre 2013",
+          "url": "https://def.finanze.it/DocTribFrontend/getPrassiDetail.do?id=%7BC7A6A870-5499-429C-83E7-9AAF2C05DA5F%7D",
+          "authority": "Dipartimento delle Finanze",
+          "status": "prassi ufficiale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Legge 17 gennaio 2000 n. 7, disciplina del mercato dell’oro",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=000G0033&atto.dataPubblicazioneGazzetta=2000-01-21&currentPage=1",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 10/2026, Testo unico IVA applicabile dal 1 gennaio 2027",
+          "url": "https://www.gazzettaufficiale.it/eli/gu/2026/01/30/24/so/4/sg/pdf",
+          "authority": "Gazzetta Ufficiale",
+          "status": "applicabile dal 1 gennaio 2027",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "iva-margine-gioielli-usati",
+      "title": "Regime IVA del margine per gioielli usati",
+      "category": "Fiscalità",
+      "keywords": ["regime del margine", "beni usati", "gioielli usati", "acquisto privato", "IVA incorporata", "rivendita invariata", "articolo 36", "margine analitico"],
+      "summary": "Il regime del margine evita una doppia imposizione su determinati beni usati: per i preziosi può essere pertinente quando il bene proviene da un canale ammesso e viene rivenduto conservando la propria funzione, ma richiede prova dei presupposti e gestione contabile coerente.",
+      "facts": [
+        "Sono rilevanti sia la provenienza senza IVA detraibile sia la natura di bene usato ancora riutilizzabile e rivendibile come tale.",
+        "La Risoluzione 92/E/2013 ammette nel perimetro gli oggetti d’oro o argento usati acquistati da un privato o da altro operatore al margine e destinati alla rivendita senza trasformazione.",
+        "L’IVA non è assente: è incorporata nell’eventuale margine positivo e non viene esposta separatamente al cliente.",
+        "Metodo analitico, globale o forfetario hanno presupposti e registrazioni differenti; non si possono compensare o trattare margini negativi senza sapere quale metodo sia applicabile.",
+        "La fattura di una cessione al margine richiede la specifica annotazione prevista per il regime del margine dei beni usati."
+      ],
+      "checklist": [
+        "Verificare provenienza del bene e assenza di IVA detraibile nella catena rilevante.",
+        "Dimostrare che l’oggetto conserva una funzione propria e viene ceduto come bene usato, non solo come metallo da recuperare.",
+        "Collegare costo di acquisto, spese considerate, prezzo di vendita e metodo del margine adottato.",
+        "Usare dicitura e registri corretti senza esporre separatamente l’IVA del margine.",
+        "Conservare la documentazione lotto per lotto e sottoporre i casi misti al commercialista prima della vendita."
+      ],
+      "warnings": [
+        "L’acquisto da un privato è necessario in molti casi, ma non basta da solo: stato e destinazione del bene restano decisivi.",
+        "Non applicare il margine a materiale che ha perso la funzione originaria ed è oggettivamente destinato soltanto al recupero del metallo.",
+        "Non descrivere il regime del margine come esenzione IVA."
+      ],
+      "sources": [
+        {
+          "title": "D.L. 41/1995, articolo 36: regime speciale dei beni usati",
+          "url": "https://def.finanze.it/DocTribFrontend/getAttoNormativoDetail.do?ACTION=getArticolo&articolo=Articolo+36&codiceOrdinamento=0000000000000360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000&id=%7B4EB2171D-4ECA-418D-AF4D-D1DE26DD24A1%7D",
+          "authority": "Dipartimento delle Finanze",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Agenzia delle Entrate, Risoluzione 92/E del 12 dicembre 2013",
+          "url": "https://def.finanze.it/DocTribFrontend/getPrassiDetail.do?id=%7BC7A6A870-5499-429C-83E7-9AAF2C05DA5F%7D",
+          "authority": "Dipartimento delle Finanze",
+          "status": "prassi ufficiale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Agenzia delle Entrate, disciplina IVA dei beni usati",
+          "url": "https://www.fiscooggi.it/print/pdf/node/68240",
+          "authority": "FiscoOggi - Agenzia delle Entrate",
+          "status": "approfondimento istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "reverse-charge-oro-industriale-fonderia",
+      "title": "Reverse charge per oro industriale e vendite a fonderia",
+      "category": "Fiscalità",
+      "keywords": ["reverse charge", "inversione contabile", "fonderia", "oro industriale", "semilavorato", "purezza 325", "N6.2", "TD16", "affinazione", "fusione"],
+      "summary": "L’inversione contabile può riguardare cessioni B2B di materiale d’oro o semilavorati con purezza almeno 325‰ destinati a un nuovo ciclo produttivo; non discende automaticamente dal fatto che il cedente sia un compro oro o che l’acquirente sia una fonderia.",
+      "facts": [
+        "L’articolo 17, quinto comma, del D.P.R. 633/1972 pone l’imposta a carico del cessionario soggetto passivo per le cessioni imponibili previste di oro da investimento e per materiale d’oro o semilavorati con purezza almeno 325‰.",
+        "Per i preziosi usati la funzione residua e la destinazione oggettiva a fusione, affinazione o nuovo ciclo produttivo distinguono il materiale industriale dal bene usato rivendibile come oggetto.",
+        "Il reverse charge non è una scelta di convenienza e non richiede necessariamente che il cessionario fonda personalmente il bene, purché la destinazione al ciclo produttivo sia provata.",
+        "Nella guida tecnica dell’Agenzia il codice natura N6.2 riguarda operazioni in oro e argento puro, mentre N6.1 riguarda rottami e altri materiali di recupero dell’articolo 74: non sono codici intercambiabili.",
+        "Per il reverse charge interno il cessionario può trasmettere un documento TD16 tramite SdI oppure integrare manualmente e conservare la fattura secondo le regole richiamate dall’Agenzia."
+      ],
+      "checklist": [
+        "Confermare che venditore e acquirente abbiano il ruolo soggettivo richiesto per l’operazione.",
+        "Documentare titolo o purezza e destinazione industriale del lotto con elementi coerenti e verificabili.",
+        "Far validare riferimento normativo, natura IVA, dicitura e tracciato elettronico prima dell’emissione.",
+        "Riconciliare fattura, TD16 o integrazione, registri IVA, quantità spedite, documento di trasporto ed esito di fonderia.",
+        "Gestire separatamente eventuali lotti rivendibili come gioielli o qualificabili come oro da investimento."
+      ],
+      "warnings": [
+        "Non usare reverse charge solo perché il bene è definito genericamente rottame o perché il cliente è una fonderia.",
+        "Non confondere N6.1 e N6.2 né trasformare TD16 in un’autofattura generica per l’acquisto dal privato.",
+        "Titolo, destinazione e documentazione insufficienti richiedono verifica professionale prima della fattura."
+      ],
+      "sources": [
+        {
+          "title": "D.P.R. 633/1972, articolo 17: inversione contabile sull’oro",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1972-00-00;633~art17!vig=",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Agenzia delle Entrate, guida fattura elettronica ed esterometro versione 1.9",
+          "url": "https://www.agenziaentrate.gov.it/portale/documents/20143/451259/Guida_compilazione-FE-Esterometro-V_1.9_2024-03-05.pdf",
+          "authority": "Agenzia delle Entrate",
+          "status": "guida ufficiale consultata",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Corte di cassazione, rassegna settembre 2022 sull’ordinanza 26760/2022",
+          "url": "https://www.cortedicassazione.it/resources/cms/documents/RASSEGNA_MENSILE_SETTEMBRE_2022_1.pdf",
+          "authority": "Corte Suprema di Cassazione",
+          "status": "rassegna ufficiale",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "fatturazione-elettronica-registri-iva-conservazione",
+      "title": "Fatturazione elettronica, registri IVA e conservazione",
+      "category": "Contabilità e controllo",
+      "keywords": ["fattura elettronica", "SDI", "ricevuta di scarto", "registri IVA", "liquidazione IVA", "conservazione digitale", "bollo", "deleghe fiscali", "Fatture e Corrispettivi"],
+      "summary": "Il commercialista presidia con il negozio il ciclo delle fatture emesse e ricevute, gli esiti SdI, le integrazioni, i registri IVA, la liquidazione e la conservazione, ma il trattamento di ogni documento dipende dalla corretta classificazione dell’operazione sottostante.",
+      "facts": [
+        "Una fattura elettronica è emessa tramite file strutturato e Sistema di Interscambio; ricevute di consegna, impossibilità di recapito e scarti devono essere monitorati e gestiti.",
+        "La conservazione elettronica a norma non coincide con il semplice salvataggio del file su un computer.",
+        "Le fatture in reverse charge interno richiedono integrazione dell’imposta da parte del cessionario; la guida tecnica contempla TD16 tramite SdI e l’alternativa dell’integrazione manuale con conservazione.",
+        "Acquisti da privati, fatture di fornitori, corrispettivi, note di variazione e documenti integrativi sono flussi distinti e vanno collegati senza duplicare l’operazione.",
+        "Le deleghe al commercialista facilitano consultazione e adempimenti, ma il negozio deve consegnare tempestivamente dati completi e controllare anomalie e documenti mancanti."
+      ],
+      "checklist": [
+        "Controllare giornalmente o con frequenza concordata esiti SdI, scarti, mancate consegne e numerazione.",
+        "Associare natura IVA e riferimento normativo alla classificazione validata del lotto.",
+        "Riconciliare registri vendite, acquisti, corrispettivi e integrazioni con contabilità generale e liquidazione.",
+        "Verificare separatamente eventuale imposta di bollo e gli elenchi messi a disposizione dall’Agenzia.",
+        "Conservare documenti e ricevute nel sistema a norma e mantenere un elenco delle deleghe attive e delle relative scadenze."
+      ],
+      "warnings": [
+        "Un codice natura formalmente accettato da SdI non prova che il regime IVA scelto sia sostanzialmente corretto.",
+        "Non registrare due volte la stessa operazione usando fattura e documento integrativo come due costi distinti.",
+        "Le specifiche tecniche e le scadenze possono cambiare: verificare la versione corrente dell’Agenzia prima dell’uso reale."
+      ],
+      "sources": [
+        {
+          "title": "Agenzia delle Entrate, guida alla fatturazione elettronica",
+          "url": "https://www1.agenziaentrate.gov.it/web_app_entrate/fatturazione_elettronica.html",
+          "authority": "Agenzia delle Entrate",
+          "status": "guida istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Agenzia delle Entrate, guida compilazione fatture elettroniche versione 1.9",
+          "url": "https://www.agenziaentrate.gov.it/portale/documents/20143/451259/Guida_compilazione-FE-Esterometro-V_1.9_2024-03-05.pdf",
+          "authority": "Agenzia delle Entrate",
+          "status": "guida ufficiale consultata",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Agenzia delle Entrate, imposta di bollo sulle fatture elettroniche",
+          "url": "https://www1.agenziaentrate.gov.it/web_app_entrate/bollo_fatture_2024.html",
+          "authority": "Agenzia delle Entrate",
+          "status": "guida istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "inventario-rimanenze-lotti-cali",
+      "title": "Inventario, rimanenze, lotti e cali di lavorazione",
+      "category": "Contabilità e controllo",
+      "keywords": ["inventario", "rimanenze", "magazzino", "costo specifico", "lotto", "calo", "fusione", "cut off", "giacenza", "valore netto di realizzo", "articolo 92 TUIR"],
+      "summary": "Nel compro oro l’inventario deve unire quantità fisiche e valore contabile: ogni lotto va riconciliato per proprietà, ubicazione, peso, titolo, costo, destinazione e stato, mentre cali e risultati di fonderia devono essere documentati come eventi successivi e non cancellare la storia originaria.",
+      "facts": [
+        "Le rimanenze includono beni di proprietà anche presso terzi e normalmente escludono beni di terzi in visione, deposito o lavorazione; conta la sostanza del trasferimento di rischi e proprietà.",
+        "Per le società OIC il costo è confrontato con il valore di realizzazione desumibile dall’andamento del mercato quando questo è inferiore, secondo i criteri applicabili.",
+        "Fiscalmente l’articolo 92 TUIR disciplina le variazioni delle rimanenze e i raggruppamenti omogenei; beni individuabili possono richiedere il costo specifico.",
+        "Le scritture ausiliarie di magazzino non sono obbligatorie per ogni negozio: l’obbligo fiscale dipende dal superamento congiunto delle soglie e dalle decorrenze previste, fermo restando l’inventario e la tracciabilità necessari.",
+        "Peso lordo, peso netto, titolo stimato e grammi fini sono dimensioni operative; il valore di bilancio non coincide automaticamente con la quotazione spot del metallo alla data di chiusura."
+      ],
+      "checklist": [
+        "Congelare il cut-off e contare fisicamente i lotti per sede, cassaforte, deposito presso terzi e lavorazione.",
+        "Riconciliare ID scheda, descrizione, peso, titolo, costo, proprietà, ubicazione, destinazione e documento di scarico.",
+        "Separare gioielli rivendibili, materiale da fusione, oro da investimento, pietre, beni di terzi e lotti già ceduti ma non ancora movimentati.",
+        "Documentare cali, campioni, diritti di saggio, commissioni ed esito della fonderia collegandoli al lotto originario.",
+        "Far validare al commercialista metodo di valutazione, eventuale svalutazione e trattamento fiscale delle differenze."
+      ],
+      "warnings": [
+        "Non rivalutare automaticamente tutte le giacenze al prezzo dell’oro del 31 dicembre.",
+        "Non modificare il peso originario della scheda per farlo coincidere con l’esito di fusione: registrare la riconciliazione e la differenza.",
+        "Tracciabilità OCO e obbligo delle scritture ausiliarie fiscali hanno presupposti diversi."
+      ],
+      "sources": [
+        {
+          "title": "OIC 13, Rimanenze",
+          "url": "https://www.fondazioneoic.eu/wp-content/uploads/2011/02/2024-03-OIC-13-Rimanenze.pdf",
+          "authority": "Organismo Italiano di Contabilità",
+          "status": "principio contabile vigente consultato",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "TUIR, articolo 92: variazioni delle rimanenze",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:presidente.repubblica:decreto:1986-12-22;917~art92=",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.P.R. 695/1996, articolo 1: limiti delle scritture ausiliarie di magazzino",
+          "url": "https://def.finanze.it/DocTribFrontend/executePrintArticolo.do?codiceOrdinamento=200000100000000&id=%7B4D53981D-12D0-4F4F-A0D9-E6FE4660BF4C%7D&idAttoNormativo=%7B1C97CAB9-AD73-4D08-A5A1-49126A5E94A8%7D",
+          "authority": "Dipartimento delle Finanze",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "cespiti-ammortamenti-strumentazione",
+      "title": "Cespiti e ammortamento della strumentazione",
+      "category": "Contabilità e controllo",
+      "keywords": ["cespiti", "ammortamento", "XRF", "bilancia", "cassaforte", "strumentazione", "immobilizzazioni materiali", "vita utile", "registro beni ammortizzabili"],
+      "summary": "Bilance, spettrometri XRF, microscopi, casseforti, impianti e dotazioni informatiche possono costituire beni strumentali durevoli: il commercialista ne valuta classificazione, costo, entrata in funzione, vita utile, ammortamento e deducibilità in base a destinazione e regime dell’impresa.",
+      "facts": [
+        "Un’immobilizzazione materiale è un bene tangibile destinato durevolmente all’attività e non alla vendita; la destinazione economica prevale sul nome commerciale del bene.",
+        "Il costo può comprendere prezzo e costi direttamente necessari per portare il bene nel luogo e nelle condizioni d’uso, secondo i criteri applicabili.",
+        "L’ammortamento civilistico ripartisce sistematicamente il valore ammortizzabile lungo la vita utile; il profilo fiscale segue regole e limiti propri.",
+        "Ai fini fiscali le quote dei beni materiali strumentali sono deducibili a partire dall’esercizio di entrata in funzione, entro le regole dell’articolo 102 TUIR.",
+        "Riparazioni, manutenzioni, consumabili, canoni software, leasing e acquisti di cespiti non sono automaticamente la stessa categoria contabile."
+      ],
+      "checklist": [
+        "Raccogliere fattura, contratto, seriale, ubicazione, data di consegna, collaudo ed entrata in funzione.",
+        "Distinguere bene acquistato, noleggio, leasing, manutenzione e componente separabile.",
+        "Attribuire categoria, centro di costo, vita utile e piano di ammortamento coerenti con l’uso effettivo.",
+        "Aggiornare il registro cespiti per trasferimenti tra sedi, dismissioni, furti, sostituzioni e plus o minusvalenze.",
+        "Riconciliare inventario fisico dei cespiti con contabilità almeno alla chiusura."
+      ],
+      "warnings": [
+        "Non spesare o capitalizzare automaticamente uno strumento basandosi solo sul prezzo: servono destinazione, durata, materialità e regime applicabile.",
+        "Aliquota civilistica, coefficiente fiscale e durata della garanzia non sono sinonimi.",
+        "La scelta contabile reale va validata dal professionista sulla documentazione del bene."
+      ],
+      "sources": [
+        {
+          "title": "OIC 16, Immobilizzazioni materiali, aggiornato marzo 2024",
+          "url": "https://www.fondazioneoic.eu/wp-content/uploads/2024/11/2024-03-OIC-16-Immobilizzazioni-materiali.pdf",
+          "authority": "Organismo Italiano di Contabilità",
+          "status": "principio contabile vigente consultato",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "TUIR, articolo 102: ammortamento dei beni materiali",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:presidente.repubblica:decreto:1986-12-22;917~art102=",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "chiusure-bilancio-imposte-scadenziario",
+      "title": "Chiusure periodiche, bilancio, imposte e scadenziario",
+      "category": "Contabilità e controllo",
+      "keywords": ["chiusura mensile", "bilancio", "imposte", "F24", "LIPE", "dichiarazione IVA", "redditi", "IRAP", "INPS", "scadenziario", "ratei", "risconti"],
+      "summary": "Il commercialista trasforma i dati periodici in liquidazioni, controlli e chiusure e costruisce uno scadenziario per il singolo soggetto; obblighi, dichiarazioni e versamenti cambiano con forma giuridica, regime, personale, operazioni effettuate e anno fiscale.",
+      "facts": [
+        "Una chiusura affidabile richiede registrazioni complete e riconciliazioni di banca, cassa, clienti, fornitori, IVA, magazzino, cespiti e debiti o crediti fiscali.",
+        "Liquidazioni IVA, comunicazioni periodiche, dichiarazione IVA, redditi, eventuale IRAP, ritenute, contributi e deposito del bilancio si applicano solo se ricorrono i relativi presupposti.",
+        "Ratei, risconti, fatture da ricevere o emettere, ammortamenti, rimanenze, fondi e imposte di competenza trasformano la prima nota nel risultato economico di periodo.",
+        "Ditta individuale, società di persone e società di capitali producono effetti differenti su imposte, contributi, patrimonio e adempimenti societari.",
+        "Le date non vanno memorizzate come eterne: il commercialista usa lo scadenzario ufficiale dell’anno, gestisce proroghe e costruisce scadenze interne anticipate."
+      ],
+      "checklist": [
+        "Chiudere i documenti mancanti e riconciliare saldi contabili con estratti conto, cassa e inventario.",
+        "Preparare un prospetto delle eccezioni: operazioni estere, regimi speciali, reverse charge, beni al margine, note di variazione e lotti in lavorazione.",
+        "Calcolare gli adempimenti applicabili distinguendo imposta, contributo, comunicazione, dichiarazione e deposito.",
+        "Condividere importi e scadenze con anticipo, indicando disponibilità finanziaria necessaria e deleghe di pagamento.",
+        "Alla chiusura annuale documentare criteri di valutazione, inventario, cespiti, finanziamenti, parti correlate ed eventi successivi rilevanti."
+      ],
+      "warnings": [
+        "Non elencare ogni adempimento come obbligatorio per ogni compro oro e non usare scadenze di un anno diverso.",
+        "Utile contabile, reddito imponibile, liquidità disponibile e margine commerciale sono grandezze diverse.",
+        "Aurum non calcola né autorizza un F24 reale senza dati completi e validazione professionale."
+      ],
+      "sources": [
+        {
+          "title": "Agenzia delle Entrate, scadenzario fiscale ufficiale",
+          "url": "https://www1.agenziaentrate.gov.it/servizi/scadenzario/main.php?lang=it",
+          "authority": "Agenzia delle Entrate",
+          "status": "scadenzario corrente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.P.R. 600/1973, disposizioni sulle scritture contabili",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=073U0600&atto.dataPubblicazioneGazzetta=1973-10-16&tipoDettaglio=singolavigenza",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "OIC, principi contabili nazionali in vigore",
+          "url": "https://www.fondazioneoic.eu/category/attivita-nazionale/",
+          "authority": "Organismo Italiano di Contabilità",
+          "status": "raccolta corrente",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "controllo-gestione-margini-cash-flow",
+      "title": "Controllo di gestione, margini e cash flow del compro oro",
+      "category": "Contabilità e controllo",
+      "keywords": ["controllo di gestione", "margine lordo", "cash flow", "capitale circolante", "break even", "giorni magazzino", "KPI", "redditività", "spread", "budget"],
+      "summary": "Oltre agli adempimenti, il commercialista può costruire un controllo economico per negozio, metallo e lotto: misura margine operativo, costi, rotazione del magazzino e fabbisogno finanziario senza confondere questi indicatori con margine IVA o reddito imponibile.",
+      "facts": [
+        "Il margine commerciale di un lotto confronta ricavo netto con costo e oneri direttamente attribuibili; non coincide con il margine usato per calcolare l’IVA nel regime speciale.",
+        "Peso fino acquistato, resa effettiva di fonderia, cali, diritti di saggio, trasporto, assicurazione e commissioni spiegano lo scostamento tra valore teorico e risultato reale.",
+        "Rotazione e giorni di giacenza misurano capitale immobilizzato: un margine percentuale elevato può generare poca cassa se i lotti restano fermi o i tempi di incasso sono lunghi.",
+        "Il rendiconto finanziario distingue flussi della gestione, investimento e finanziamento; utile e cassa possono muoversi in direzioni diverse.",
+        "Budget e scenari sul prezzo dei metalli devono usare ipotesi esplicite, sensibilità e limiti, non promesse di andamento futuro."
+      ],
+      "checklist": [
+        "Definire per ogni KPI formula, fonte, periodicità, responsabile e soglia di attenzione.",
+        "Misurare almeno margine per lotto e sede, resa di fonderia, cali, costo medio dei servizi, giorni di magazzino e fabbisogno di cassa.",
+        "Separare costi variabili, costi fissi, investimenti, imposte e movimenti finanziari.",
+        "Confrontare preventivo di acquisto, risultato tecnico e consuntivo economico, spiegando gli scostamenti.",
+        "Preparare scenari prudente, centrale e stressato per volumi, prezzi, spread e tempi di incasso."
+      ],
+      "warnings": [
+        "Non usare la quotazione spot come ricavo certo né come valore contabile automatico delle rimanenze.",
+        "Non confondere margine commerciale, margine IVA, EBITDA, utile netto e flusso di cassa.",
+        "Le previsioni economiche sono scenari decisionali, non garanzie di rendimento."
+      ],
+      "sources": [
+        {
+          "title": "OIC 10, Rendiconto finanziario",
+          "url": "https://www.fondazioneoic.eu/wp-content/uploads/2019/01/2016-12-OIC-10-Rendiconto-finanziario.pdf",
+          "authority": "Organismo Italiano di Contabilità",
+          "status": "principio vigente; revisione 2026 ancora in consultazione alla data di verifica",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "OIC 13, Rimanenze",
+          "url": "https://www.fondazioneoic.eu/wp-content/uploads/2011/02/2024-03-OIC-13-Rimanenze.pdf",
+          "authority": "Organismo Italiano di Contabilità",
+          "status": "principio contabile vigente consultato",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "OIC 34, Ricavi",
+          "url": "https://www.fondazioneoic.eu/wp-content/uploads/2011/02/2023-04-19-OIC-34-Ricavi-1.pdf",
+          "authority": "Organismo Italiano di Contabilità",
+          "status": "principio contabile vigente consultato",
+          "verifiedAt": "1 agosto 2026"
         }
       ]
     }

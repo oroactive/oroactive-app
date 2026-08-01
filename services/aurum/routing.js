@@ -15,6 +15,10 @@ export function hasStrongComproOroSectorIntent(question = "", sectorMatches = []
   const coachingScore = Number(coachingKnowledge.matches?.[0]?.score || 0);
   const hasUnambiguousRegulatedMarker = /\b(?:oam|uif|sos|operazione sospetta|antiriciclaggio|registro (?:oam|degli operatori compro oro|operatori compro oro)|d ?lgs ?92(?:\/2017)?|d ?m ?14 maggio 2018)\b/.test(normalized);
   if (hasUnambiguousRegulatedMarker && sectorScore >= 20) return true;
+  const hasSpecialistAccountingMarker = /\b(?:prima nota|partita doppia|regime iva|trattamento iva|natura iva|regime (?:iva )?del margine|reverse charge|inversione contabile|registri? iva|lipe|f24|sdi|rimanenze|cespiti|ammortamento|cash flow|controllo di gestione)\b/.test(normalized)
+    || /\b(?:commercialista|contabilita|contabile|fiscalista)\b.*\b(?:compro oro|negozio|oro|preziosi|iva|bilancio|adempimenti|lavoro|svolge|funziona)\b/.test(normalized)
+    || /\b(?:compro oro|negozio|oro|preziosi)\b.*\b(?:commercialista|contabilita|contabile|fiscalista)\b/.test(normalized);
+  if (hasSpecialistAccountingMarker && sectorScore >= 24) return true;
   const hasSectorMarker = /(compro oro|atto di vendita|contante|pagamento|quotazione|valutazione (?:dell |di )?oro|prezzo (?:dell |di )?oro|carat|titolo dell oro|bilancia|xrf|pietra di paragone|acido nitrico)/.test(normalized);
   return hasSectorMarker && sectorScore >= Math.max(40, coachingScore * 1.25);
 }

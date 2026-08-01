@@ -15,9 +15,9 @@ import {
 } from "../services/aurum/privacy.js";
 
 test("la base settoriale Aurum è ampia, versionata e interamente fontata", () => {
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.07.30");
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "30 luglio 2026");
-  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 28);
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.01");
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "1 agosto 2026");
+  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 46);
 
   const ids = new Set();
   const categories = new Set();
@@ -35,7 +35,7 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
       assert.match(source.url, /^https:\/\//);
       assert.ok(source.title);
       assert.ok(source.authority);
-      assert.equal(source.verifiedAt, "30 luglio 2026");
+      assert.match(source.verifiedAt, /^(?:30 luglio|1 agosto) 2026$/);
     });
   }
 
@@ -46,6 +46,7 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
     "Diamanti e gemme",
     "Sicurezza",
     "Fiscalità",
+    "Contabilità e controllo",
     "Antifrode",
     "Procedure operative"
   ].forEach((category) => assert.ok(categories.has(category), `categoria mancante: ${category}`));
@@ -61,7 +62,17 @@ const retrievalCases = [
   ["Ogni quanto va verificata la bilancia metrica?", "bilance-metrologia-legale"],
   ["Come calcolo i grammi fini di oro 18 carati?", "carati-millesimi-grammi-fini"],
   ["Quali DPI servono per gli acidi e la scheda SDS?", "sicurezza-chimica-lavoro"],
-  ["Una moneta rientra nell'oro da investimento e nell'esenzione IVA?", "oro-investimento-iva"]
+  ["Una moneta rientra nell'oro da investimento e nell'esenzione IVA?", "oro-investimento-iva"],
+  ["Come funziona il lavoro del commercialista con un negozio compro oro?", "commercialista-compro-oro-mandato-flusso"],
+  ["Come registro in prima nota un acquisto da un cliente privato?", "prima-nota-acquisti-privati-partita-doppia"],
+  ["Come classifico fiscalmente un lotto di gioielli destinato alla fusione?", "classificazione-fiscale-lotti-preziosi"],
+  ["Quando posso applicare il regime IVA del margine ai gioielli usati?", "iva-margine-gioielli-usati"],
+  ["Come fatturo in reverse charge una vendita di oro alla fonderia?", "reverse-charge-oro-industriale-fonderia"],
+  ["Come gestisco fattura elettronica, scarto SdI e registri IVA?", "fatturazione-elettronica-registri-iva-conservazione"],
+  ["Come riconcilio inventario e rimanenze dei lotti a fine anno?", "inventario-rimanenze-lotti-cali"],
+  ["Come ammortizzo lo spettrometro XRF tra i cespiti?", "cespiti-ammortamenti-strumentazione"],
+  ["Quali chiusure e F24 deve programmare il commercialista?", "chiusure-bilancio-imposte-scadenziario"],
+  ["Quali KPI uso per margine, cash flow e giorni di magazzino?", "controllo-gestione-margini-cash-flow"]
 ];
 
 for (const [query, expectedId] of retrievalCases) {
@@ -106,10 +117,20 @@ test("la risposta deterministica include limiti e fonti appartenenti ai topic re
   const answer = buildSectorKnowledgeAnswer("Posso certificare un lingotto solo con XRF?", matches);
   const allowedUrls = new Set(matches.flatMap(({ topic }) => topic.sources.map((source) => source.url)));
   assert.match(answer.risposta, /screening|compatibil|laboratorio/i);
-  assert.match(answer.risposta, /Fonti verificate il 30 luglio 2026/);
+  assert.match(answer.risposta, /Fonti verificate il 1 agosto 2026/);
   assert.ok(answer.sources.length);
   answer.sources.forEach((source) => assert.ok(allowedUrls.has(source.url), `fonte estranea al retrieval: ${source.url}`));
   assert.deepEqual(answer.sources, sectorKnowledgeSources(matches.slice(0, 1), 8));
+});
+
+test("la risposta contabile non usa l’avvertenza gemmologica e rimanda al caso concreto", () => {
+  const answer = buildSectorKnowledgeAnswer(
+    "Come registro in prima nota un acquisto da privato?",
+    searchSectorKnowledge("Come registro in prima nota un acquisto da privato?", { limit: 4 })
+  ).risposta;
+  assert.match(answer, /forma giuridica|regime contabile/i);
+  assert.match(answer, /validato dal commercialista incaricato/i);
+  assert.doesNotMatch(answer, /Le prove di banco sono screening/i);
 });
 
 test("la normativa base non viene confusa con l'aggiornamento OPO del 2024", () => {

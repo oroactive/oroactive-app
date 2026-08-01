@@ -63,7 +63,21 @@ const queryAliases = new Map([
   ["bilancia", ["metrologia", "pesatura", "verificazione"]],
   ["lingotto", ["ultrasuoni", "xrf", "densita", "contraffazione"]],
   ["antiriciclaggio", ["sos", "uif", "anomalia", "d.lgs. 231/2007"]],
-  ["iva", ["fiscale", "oro da investimento", "reverse charge"]]
+  ["iva", ["fiscale", "oro da investimento", "reverse charge", "regime del margine"]],
+  ["commercialista", ["contabilità", "fiscalità", "bilancio", "adempimenti", "piano dei conti"]],
+  ["contabilita", ["commercialista", "prima nota", "partita doppia", "bilancio", "registri"]],
+  ["contabile", ["commercialista", "contabilità", "prima nota", "partita doppia"]],
+  ["nota", ["prima nota", "scrittura contabile", "documento acquisto"]],
+  ["fonderia", ["reverse charge", "oro industriale", "fusione", "affinazione", "N6.2"]],
+  ["margine", ["regime del margine", "beni usati", "iva incorporata"]],
+  ["magazzino", ["inventario", "rimanenze", "lotto", "giacenza", "cali"]],
+  ["rimanenze", ["inventario", "magazzino", "lotto", "costo specifico"]],
+  ["cespite", ["cespiti", "ammortamento", "immobilizzazioni materiali"]],
+  ["ammortamento", ["cespiti", "strumentazione", "vita utile", "registro beni ammortizzabili"]],
+  ["fattura", ["fatturazione elettronica", "sdi", "registri iva", "conservazione"]],
+  ["bilancio", ["chiusura", "imposte", "scadenziario", "rimanenze", "cespiti"]],
+  ["f24", ["imposte", "versamento", "scadenziario", "commercialista"]],
+  ["cash", ["cash flow", "flusso di cassa", "capitale circolante", "controllo di gestione"]]
 ]);
 
 export function normalizeSectorKnowledgeText(value = "") {
@@ -170,6 +184,46 @@ const topicIntentBoosts = [
   {
     pattern: /\b(?:smeraldo|rubino|zaffiro|ametista|acquamarina|tanzanite|topazio|opale|granato)\b.*\b(?:riconosc[a-z]*|identific[a-z]*|sintetic[a-z]*|natural[a-z]*|trattat[a-z]*)\b|\b(?:riconosc[a-z]*|identific[a-z]*|sintetic[a-z]*|natural[a-z]*|trattat[a-z]*)\b.*\b(?:smeraldo|rubino|zaffiro|ametista|acquamarina|tanzanite|topazio|opale|granato)\b/,
     boosts: { "gemme-identificazione-prudente": 120 }
+  },
+  {
+    pattern: /\b(?:commercialista|contabilita|contabile|fiscalista)\b.*\b(?:compro oro|negozio|oro|preziosi|attivita|lavoro|gestione)\b|\b(?:compro oro|negozio|oro|preziosi|attivita)\b.*\b(?:commercialista|contabilita|contabile|fiscalista)\b/,
+    boosts: { "commercialista-compro-oro-mandato-flusso": 130 }
+  },
+  {
+    pattern: /\bprima nota\b|\b(?:registr[a-z]*|contabilizz[a-z]*|scrittur[a-z]*)\b.*\b(?:acquisto|privato|lotto|pagamento)\b/,
+    boosts: { "prima-nota-acquisti-privati-partita-doppia": 130 }
+  },
+  {
+    pattern: /\b(?:classific[a-z]*|trattamento|regime)\b.*\b(?:lotto|gioiello|oro usato|rottame|fusione|investimento)\b/,
+    boosts: { "classificazione-fiscale-lotti-preziosi": 105 }
+  },
+  {
+    pattern: /\bregime (?:iva )?del margine\b|\b(?:margine)\b.*\b(?:gioiello|bene usato|privato|iva)\b/,
+    boosts: { "iva-margine-gioielli-usati": 145 }
+  },
+  {
+    pattern: /\b(?:reverse charge|inversione contabile|n6 2|td16)\b|\b(?:fonderia|affinazione|fusione)\b.*\b(?:iva|fattura|oro|lotto)\b/,
+    boosts: { "reverse-charge-oro-industriale-fonderia": 150 }
+  },
+  {
+    pattern: /\b(?:fattura elettronica|sdi|scarto sdi|registri? iva|conservazione digitale|bollo)\b/,
+    boosts: { "fatturazione-elettronica-registri-iva-conservazione": 130 }
+  },
+  {
+    pattern: /\b(?:inventario|rimanenze|magazzino|giacenze|cut off|costo specifico)\b.*\b(?:lotto|oro|preziosi|compro oro|fine anno|chiusura|calo|fusione)\b|\b(?:lotto|oro|preziosi|compro oro)\b.*\b(?:inventario|rimanenze|magazzino|giacenze|cut off)\b/,
+    boosts: { "inventario-rimanenze-lotti-cali": 145 }
+  },
+  {
+    pattern: /\b(?:cespite|cespiti|ammortamento|immobilizzazione)\b.*\b(?:xrf|bilancia|strumento|strumentazione|cassaforte|microscopio)\b|\b(?:xrf|bilancia|strumento|strumentazione|cassaforte|microscopio)\b.*\b(?:cespite|cespiti|ammortamento|immobilizzazione)\b/,
+    boosts: { "cespiti-ammortamenti-strumentazione": 150 }
+  },
+  {
+    pattern: /\b(?:f24|lipe|dichiarazione iva|dichiarazione redditi|scadenziario|chiusura mensile|chiusura annuale|bilancio)\b/,
+    boosts: { "chiusure-bilancio-imposte-scadenziario": 125 }
+  },
+  {
+    pattern: /\b(?:cash flow|flusso di cassa|break even|capitale circolante|controllo di gestione|giorni di magazzino|kpi)\b|\b(?:margine|redditivita)\b.*\b(?:lotto|negozio|sede|gestione)\b/,
+    boosts: { "controllo-gestione-margini-cash-flow": 140 }
   }
 ];
 
@@ -301,7 +355,9 @@ export function buildSectorKnowledgeAnswer(question = "", matches = searchSector
     "",
     primary.category === "Normativa e compliance"
       ? "Informazione operativa generale: per il caso concreto verifica il testo vigente e il professionista competente."
-      : "Le prove di banco sono screening: una conclusione definitiva può richiedere un laboratorio qualificato."
+      : ["Fiscalità", "Contabilità e controllo"].includes(primary.category)
+        ? "Informazione teorica specialistica: il trattamento reale dipende da forma giuridica, regime contabile, documenti e fatti dell’operazione e deve essere validato dal commercialista incaricato."
+        : "Le prove di banco sono screening: una conclusione definitiva può richiedere un laboratorio qualificato."
   );
   return { risposta: lines.join("\n"), sources };
 }
