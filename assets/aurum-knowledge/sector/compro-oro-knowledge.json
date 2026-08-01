@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "knowledgeVersion": "2026.08.01",
+  "knowledgeVersion": "2026.08.01-opo-bullion",
   "verifiedAt": "1 agosto 2026",
   "jurisdiction": "Italia e standard tecnici internazionali di settore",
   "scope": [
@@ -10,7 +10,10 @@
     "strumenti e prove di banco",
     "metrologia legale",
     "antiriciclaggio, privacy e sicurezza",
-    "contabilità, fiscalità e controllo economico specialistico per il settore compro oro"
+    "contabilità, fiscalità e controllo economico specialistico per il settore compro oro",
+    "operatori professionali in oro, Registro OAM e dichiarazioni UIF",
+    "lingotti, standard Good Delivery, riserve auree e custodia",
+    "possesso, trasferimenti, frontiera e dichiarazioni dei privati"
   ],
   "topics": [
     {
@@ -91,44 +94,715 @@
       "id": "operatori-professionali-oro-dichiarazioni",
       "title": "Operatori professionali in oro e dichiarazioni ORO",
       "category": "Normativa e compliance",
-      "keywords": ["OPO", "operatore professionale in oro", "Legge 7/2000", "D.Lgs. 211/2024", "dichiarazione ORO", "10000 euro", "2500 euro", "UIF", "OAM"],
-      "summary": "Il D.Lgs. 211/2024, in vigore dal 17 gennaio 2025, ha aggiornato la Legge 7/2000, trasferito all’OAM il registro OPO e modificato le dichiarazioni delle operazioni professionali in oro; OCO e OPO restano qualifiche distinte.",
+      "keywords": ["OPO", "operatore professionale in oro", "Legge 7/2000", "D.Lgs. 211/2024", "dichiarazione ORO", "10000 euro", "2500 euro", "UIF", "OAM", "sanzioni OPO", "differenza OCO OPO"],
+      "summary": "La Legge 7/2000, modificata dal D.Lgs. 211/2024 con effetto dal 17 gennaio 2025, disciplina commercio professionale e dichiarazioni delle operazioni in oro. OAM, UIF e Banca d’Italia hanno ruoli diversi; OCO e OPO sono qualifiche separate.",
       "facts": [
+        "Dal 17 gennaio 2025 il Registro degli operatori professionali in oro è istituito e tenuto dall’OAM: il precedente elenco Banca d’Italia ha valore storico e non dimostra l’iscrizione attuale.",
         "La soglia ordinaria della dichiarazione ORO alla UIF è 10.000 euro.",
         "Sono rilevanti anche operazioni dello stesso tipo, nello stesso mese e con la stessa controparte, singolarmente pari o superiori a 2.500 euro e complessivamente pari o superiori a 10.000 euro.",
         "La dichiarazione va effettuata senza indugio e comunque entro la fine del mese successivo; dal 1 ottobre 2025 si usa il codice OAM.",
-        "SOS antiriciclaggio e dichiarazione ORO sono adempimenti distinti e possono ricorrere separatamente o insieme."
+        "SOS antiriciclaggio e dichiarazione ORO sono adempimenti distinti e possono ricorrere separatamente o insieme.",
+        "L’esercizio professionale abusivo e le violazioni dichiarative sono sanzionati dalla Legge 7/2000; per l’omessa dichiarazione la sanzione amministrativa è parametrata dal 10 al 40 per cento del valore negoziato."
       ],
       "checklist": [
         "Distinguere prima attività OCO su oggetti preziosi usati e attività professionale in oro ai sensi della Legge 7/2000.",
         "Verificare natura, purezza, destinazione del materiale, soggetti e aggregazioni mensili.",
-        "Se l’OCO svolge anche attività OPO, verificare la separata iscrizione e gli adempimenti UIF."
+        "Se l’OCO svolge anche attività OPO, verificare la separata iscrizione e gli adempimenti UIF.",
+        "Controllare la posizione nel Registro OAM corrente, non in un vecchio elenco Banca d’Italia."
       ],
       "warnings": [
         "Non trasformare automaticamente ogni acquisto di gioielleria usata in una dichiarazione ORO.",
-        "Materiale usato destinato alla fusione può richiedere verifica OPO, ma Aurum non deve decidere senza i fatti completi."
+        "Materiale usato destinato alla fusione può richiedere verifica OPO, ma Aurum non deve decidere senza i fatti completi.",
+        "Un semplice OPO non è per ciò solo autorizzato a svolgere operazioni finanziarie sull’oro riservate a banche e intermediari abilitati."
       ],
       "sources": [
+        {
+          "title": "Legge 17 gennaio 2000 n. 7, testo vigente",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=000G0033&atto.dataPubblicazioneGazzetta=2000-01-21&tipoDettaglio=vigente",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
         {
           "title": "D.Lgs. 10 dicembre 2024 n. 211",
           "url": "https://www.gazzettaufficiale.it/eli/id/2025/01/02/24G00222/sg",
           "authority": "Gazzetta Ufficiale",
           "status": "vigente dal 17 gennaio 2025",
-          "verifiedAt": "30 luglio 2026"
+          "verifiedAt": "1 agosto 2026"
         },
         {
           "title": "UIF: comunicato sul D.Lgs. 211/2024",
           "url": "https://uif.bancaditalia.it/pubblicazioni/comunicati/documenti/Comunicato-oro-d-lgs-211-2024.pdf",
           "authority": "UIF - Banca d’Italia",
           "status": "indicazioni ufficiali",
-          "verifiedAt": "30 luglio 2026"
+          "verifiedAt": "1 agosto 2026"
         },
         {
           "title": "Vademecum OPO",
           "url": "https://www.organismo-am.it/vademecum-opo/vademecum",
           "authority": "OAM",
           "status": "procedura corrente",
-          "verifiedAt": "30 luglio 2026"
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Banca d’Italia: modifiche alla disciplina del mercato dell’oro",
+          "url": "https://www.bancaditalia.it/media/notizia/modifiche-alla-disciplina-del-mercato-dell-oro-in-italia/",
+          "authority": "Banca d’Italia",
+          "status": "avviso istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "opo-requisiti-iscrizione-oam",
+      "title": "Requisiti e iscrizione OPO nel Registro OAM",
+      "category": "Normativa e compliance",
+      "keywords": ["requisiti OPO", "iscrizione OAM OPO", "Registro OPO", "capitale 50000", "forma societaria", "onorabilità", "firma digitale", "PEC", "variazione dati OPO", "contributo annuale"],
+      "summary": "L’operatore professionale in oro diverso da una banca deve essere una persona giuridica con requisiti societari, patrimoniali e di onorabilità e deve risultare effettivamente iscritto nel Registro OPO tenuto dall’OAM prima di operare.",
+      "facts": [
+        "Sono ammesse società per azioni, in accomandita per azioni, a responsabilità limitata e cooperative con oggetto sociale coerente con il commercio dell’oro.",
+        "Il capitale sociale deve essere interamente versato e almeno pari al minimo previsto per la società per azioni, attualmente 50.000 euro.",
+        "I requisiti di onorabilità riguardano soci, amministratori e dipendenti investiti della direzione tecnica e commerciale.",
+        "Registrarsi sul portale OAM crea l’area privata ma non equivale all’iscrizione: occorre presentare e concludere l’istanza firmata digitalmente.",
+        "Un soggetto già iscritto come operatore compro oro deve ottenere anche la distinta iscrizione OPO se vuole esercitare entrambe le attività.",
+        "PEC, firma digitale, sedi operative, variazioni entro dieci giorni e contributo annuale fanno parte della gestione continuativa dell’iscrizione."
+      ],
+      "checklist": [
+        "Verificare forma giuridica, capitale interamente versato, oggetto sociale e onorabilità prima dell’istanza.",
+        "Preparare PEC, firma digitale del legale rappresentante, dati societari e sedi operative richiesti dalla procedura OAM.",
+        "Controllare nel Registro pubblico l’avvenuta iscrizione prima di iniziare l’attività professionale.",
+        "Presidiare variazioni, rinnovo e contribuzione usando circolare e scadenze OAM dell’anno corrente."
+      ],
+      "warnings": [
+        "Non chiamare la sola registrazione al portale una iscrizione o autorizzazione OPO.",
+        "Non usare importi contributivi di anni precedenti senza verificare la circolare OAM vigente.",
+        "Banca d’Italia non gestisce più il Registro OPO dal 17 gennaio 2025."
+      ],
+      "sources": [
+        {
+          "title": "OAM: Operatore professionale in oro",
+          "url": "https://www.organismo-am.it/figure-professionali/operatore-professionale-in-oro",
+          "authority": "OAM",
+          "status": "procedura corrente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Vademecum OPO",
+          "url": "https://www.organismo-am.it/vademecum-opo/vademecum",
+          "authority": "OAM",
+          "status": "procedura corrente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Circolare OAM n. 62/25 sul Registro OPO",
+          "url": "https://www.organismo-am.it/documenti/Circolari/Circolare_62_25_Registro_OPO.pdf",
+          "authority": "OAM",
+          "status": "disciplina attuativa",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "opo-perimetro-operativita-oro",
+      "title": "Perimetro operativo OPO, oro da investimento e materiale da fusione",
+      "category": "Normativa e compliance",
+      "keywords": ["operatività OPO", "perimetro OPO", "oro da investimento", "oro industriale", "materiale da fusione", "conto lavorazione", "OPO OCO differenza", "operazioni finanziarie oro"],
+      "summary": "La qualifica OPO dipende dall’attività professionale e dall’oro definito dalla Legge 7/2000, non dalla parola generica “oro”: occorre classificare forma, purezza, destinazione, controparte e ruolo svolto.",
+      "facts": [
+        "È oro da investimento il lingotto o la placchetta di peso superiore a un grammo e purezza almeno 995 millesimi, oltre alle monete che soddisfano tutti i criteri legali.",
+        "L’oro industriale comprende materia prima aurifera grezza, semilavorati di purezza almeno 325 millesimi e altre forme destinate a lavorazione o trasformazione.",
+        "Dal 17 gennaio 2025 la legge considera espressamente anche materiale da destinare a fusione, dopo una valutazione concreta di natura e destinazione.",
+        "L’attività professionale può essere svolta per conto proprio o di terzi; l’acquisto destinato alla propria lavorazione e l’esclusivo conto-lavorazione nei casi previsti non trasformano automaticamente l’impresa in OPO.",
+        "Gli oggetti preziosi usati finiti trattati da un OCO non sono automaticamente operazioni OPO: l’eventuale destinazione a fusione e l’assetto dell’attività vanno documentati.",
+        "Le operazioni finanziarie sull’oro restano riservate a banche e intermediari abilitati secondo l’articolo 2 della Legge 7/2000."
+      ],
+      "checklist": [
+        "Identificare forma fisica, titolo, peso, stato e destinazione documentata di ogni lotto.",
+        "Separare acquisto OCO di oggetto prezioso usato, commercio professionale di oro e lavorazione industriale propria.",
+        "Verificare se l’attività è occasionale o organizzata professionalmente per conto proprio o altrui.",
+        "Far validare i casi misti da consulente legale, fiscale e antiriciclaggio prima dell’operazione."
+      ],
+      "warnings": [
+        "Non dedurre la qualifica OPO dalla sola presenza di oro nel bene.",
+        "Non trattare un OPO come intermediario autorizzato a offrire servizi finanziari sull’oro.",
+        "La destinazione a fusione deve risultare da fatti e documenti, non da una causale scelta a posteriori."
+      ],
+      "sources": [
+        {
+          "title": "Legge 17 gennaio 2000 n. 7, articoli 1 e 2",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=000G0033&atto.dataPubblicazioneGazzetta=2000-01-21&tipoDettaglio=vigente",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 10 dicembre 2024 n. 211",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2025/01/02/24G00222/sg",
+          "authority": "Gazzetta Ufficiale",
+          "status": "riforma vigente",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "opo-antiriciclaggio-controlli",
+      "title": "Antiriciclaggio, adeguata verifica e controlli interni OPO",
+      "category": "Normativa e compliance",
+      "keywords": ["antiriciclaggio OPO", "adeguata verifica", "titolare effettivo", "profilo rischio", "conservazione", "SOS UIF", "controlli interni OPO", "filiera oro", "D.Lgs. 231/2007"],
+      "summary": "Gli OPO sono soggetti obbligati antiriciclaggio: devono applicare un approccio basato sul rischio a cliente, titolare effettivo, scopo, operazione e filiera, conservare le evidenze e inviare una SOS quando ne ricorrono i presupposti.",
+      "facts": [
+        "L’adeguata verifica comprende identificazione e verifica di cliente e titolare effettivo, informazioni su scopo e natura del rapporto e controllo costante.",
+        "Dal 23 luglio 2026 il D.Lgs. 122/2026 consente ai soggetti obbligati, inclusi gli OPO, di accreditarsi presso la Camera di commercio per consultare il Registro dei titolari effettivi esclusivamente a supporto dell’adeguata verifica: l’accreditamento dura due anni, variazione o cessazione dello status si comunicano entro dieci giorni e i delegati devono essere interni all’organizzazione.",
+        "Intensità e profondità dei controlli dipendono dal rischio: controparte, provenienza dell’oro e dei fondi, geografia, canale, volume, frequenza e coerenza economica.",
+        "Dati, documenti e informazioni vanno conservati in modo da consentire ricostruzione, integrità e tempestiva disponibilità alle autorità.",
+        "La SOS alla UIF nasce da conoscenza, sospetto o motivi ragionevoli di sospetto e non dipende dal raggiungimento della soglia della dichiarazione ORO.",
+        "Procedure, ruoli, formazione, escalation, controlli di secondo livello e riesame periodico devono essere proporzionati a dimensione e rischio dell’operatore.",
+        "Le ispezioni UIF hanno richiamato carenze ricorrenti in profilatura, adeguata verifica, conservazione, SOS e coerenza tra fornitori, clienti e filiera.",
+        "Nel testo vigente le sanzioni base sono 2.000 euro per omessa adeguata verifica o conservazione e 3.000 euro per omessa SOS; violazioni gravi, ripetute, sistematiche o plurime hanno fasce più elevate e richiedono valutazione del procedimento concreto."
+      ],
+      "checklist": [
+        "Identificare cliente, esecutore e titolare effettivo e documentare scopo, natura e origine economica dell’operazione.",
+        "Se si usa il Registro dei titolari effettivi, accreditare il soggetto obbligato, limitare i delegati interni, documentare la finalità e presidiare rinnovo biennale e variazioni.",
+        "Attribuire e aggiornare il profilo di rischio con indicatori specifici della filiera dell’oro.",
+        "Separare il controllo della soglia ORO dalla valutazione qualitativa per la SOS.",
+        "Registrare anomalie, decisioni, escalation e riesame con accessi limitati e tracciati.",
+        "Verificare il testo consolidato alla data dell’operazione perché la riforma del luglio 2026 è recente."
+      ],
+      "warnings": [
+        "L’iscrizione OAM non sostituisce gli obblighi del D.Lgs. 231/2007.",
+        "L’assenza di superamento di 10.000 euro non esclude una SOS.",
+        "Aurum non deve confermare al cliente l’esistenza o l’invio di una SOS.",
+        "La consultazione del Registro dei titolari effettivi non sostituisce la valutazione autonoma e basata sul rischio del soggetto obbligato."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 21 novembre 2007 n. 231, testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/2007/12/14/007G0251/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 10 giugno 2026 n. 122",
+          "url": "https://www.normattiva.it/eli/id/2026/07/08/26G00140/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "status": "vigente dal 23 luglio 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "UIF: ordinamento italiano antiriciclaggio",
+          "url": "https://uif.bancaditalia.it/sistema-antiriciclaggio/ordinamento-italiano/index.html",
+          "authority": "UIF - Banca d’Italia",
+          "status": "quadro istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "UIF: segnalazioni di operazioni sospette",
+          "url": "https://uif.bancaditalia.it/adempimenti-operatori/segnalazioni-sos/index.html",
+          "authority": "UIF - Banca d’Italia",
+          "status": "istruzioni correnti",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "opo-dichiarazioni-oro-uif-infostat",
+      "title": "Dichiarazioni ORO UIF e flusso Infostat per OPO",
+      "category": "Normativa e compliance",
+      "keywords": ["Infostat UIF", "invio dichiarazione ORO", "codice OAM OPO", "data entry ORO", "XML ORO", "ORO mensile", "ORODP preventiva", "amministratore referente Infostat", "ricevuta dichiarazione oro"],
+      "summary": "Il flusso ORO combina corretta individuazione dell’obbligo, aggregazione mensile, anagrafica OAM e trasmissione telematica Infostat-UIF con ricevute, controlli di esito e gestione delle preventive di frontiera.",
+      "facts": [
+        "Le operazioni del mese si dichiarano entro la fine del mese successivo; i trasferimenti al seguito verso l’estero di oro industriale soggetti a UIF si dichiarano prima della frontiera.",
+        "Infostat-UIF consente compilazione Data entry oppure Upload di un file XML conforme allo schema tecnico.",
+        "Dal 1 ottobre 2025 le dichiarazioni usano il codice identificativo assegnato dall’OAM agli OPO, non il precedente codice Banca d’Italia.",
+        "La registrazione a Infostat per ORO avviene quando ricorrono i presupposti del primo invio e prevede Amministratore e Referente con credenziali personali.",
+        "Abilitazioni e collaboratori vanno riesaminati almeno ogni sei mesi e le variazioni anagrafiche vanno aggiornate nei termini indicati dal portale.",
+        "Il modulo di riserva per una preventiva è utilizzabile solo durante indisponibilità temporanea di Infostat e non elimina il successivo invio telematico."
+      ],
+      "checklist": [
+        "Calcolare soglia singola e aggregazione per tipo, mese e controparte prima di creare la segnalazione.",
+        "Validare codice OAM, ruoli Infostat, dati delle parti, causale, valore, quantità e data.",
+        "Trasmettere Data entry o XML, controllare gli esiti e conservare ricevuta e versione inviata.",
+        "Per la preventiva, far accompagnare l’oro dalla copia della dichiarazione e dalla prova di trasmissione."
+      ],
+      "warnings": [
+        "La ricevuta tecnica non corregge dati sostanzialmente errati: occorre gestire rettifica o annullamento secondo le istruzioni UIF.",
+        "Non usare il modulo di riserva come canale ordinario.",
+        "Non confondere dichiarazione ORO, SOS, comunicazione oggettiva e dichiarazione doganale."
+      ],
+      "sources": [
+        {
+          "title": "UIF: dichiarazioni operazioni in oro",
+          "url": "https://uif.bancaditalia.it/adempimenti-operatori/op-oro/index.html",
+          "authority": "UIF - Banca d’Italia",
+          "status": "istruzioni correnti",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "UIF: accesso al portale Infostat",
+          "url": "https://uif.bancaditalia.it/portale-infostat-uif/modalita-accesso/index.html",
+          "authority": "UIF - Banca d’Italia",
+          "status": "procedura corrente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "UIF: uso del codice OAM nelle dichiarazioni ORO",
+          "url": "https://uif.bancaditalia.it/pubblicazioni/comunicati/documenti/Comunicato_oro_20250911.pdf",
+          "authority": "UIF - Banca d’Italia",
+          "status": "comunicato ufficiale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "UIF: documentazione tecnica ORO",
+          "url": "https://uif.bancaditalia.it/adempimenti-operatori/op-oro/doc-tecnica-oro/index.html",
+          "authority": "UIF - Banca d’Italia",
+          "status": "specifiche correnti",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "opo-fiscalita-iva-contabilita",
+      "title": "Obblighi fiscali, IVA e contabilità dell’operatore professionale in oro",
+      "category": "Fiscalità",
+      "keywords": ["fiscalità OPO", "IVA OPO", "contabilità operatore professionale oro", "oro investimento esente", "reverse charge OPO", "fatture oro", "registri IVA oro", "Testo unico IVA 2027"],
+      "summary": "L’iscrizione OPO non determina da sola il regime fiscale: ogni operazione va classificata per natura dell’oro, soggetti, destinazione e documenti, poi registrata in contabilità e nei registri IVA coerenti con il regime applicabile.",
+      "facts": [
+        "Nel 2026 l’oro da investimento che soddisfa i requisiti del D.P.R. 633/1972 è ordinariamente esente IVA, con opzioni e casi particolari da verificare.",
+        "Le cessioni imponibili di oro da investimento e quelle B2B di materiale d’oro o semilavorati con purezza almeno 325 millesimi possono ricadere nell’inversione contabile dell’articolo 17, quinto comma.",
+        "Oro da investimento, oro industriale, materiale da fusione, moneta numismatica e oggetto prezioso finito possono avere regimi diversi anche se appartengono allo stesso lotto fisico.",
+        "Fattura, contratto, DDT, documento doganale, dichiarazione ORO, pagamento, seriali, peso, titolo, saggio, cali e inventario devono riconciliarsi senza duplicare l’operazione.",
+        "Imposte dirette, deducibilità, rimanenze e risultato d’impresa dipendono da forma giuridica, regime contabile, costo documentato e destinazione effettiva.",
+        "Il D.Lgs. 19 gennaio 2026 n. 10 ricolloca esenzione e reverse charge nel nuovo Testo unico IVA, ma l’articolo 171 ne rinvia l’applicazione al 1 gennaio 2027: durante il 2026 restano i riferimenti del D.P.R. 633/1972.",
+        "Dichiarazione ORO alla UIF, adempimento IVA e registrazione contabile restano flussi separati anche quando nascono dalla stessa operazione."
+      ],
+      "checklist": [
+        "Classificare forma, titolo, destinazione e controparte prima di emettere o registrare il documento.",
+        "Associare a ogni lotto documento di origine, fattura o contratto, pagamento, quantità, titolo, seriale e registrazione contabile.",
+        "Riconciliare periodicamente inventario fisico, magazzino, fatture, registri IVA, dichiarazioni ORO ed esiti di raffineria.",
+        "Far validare dal commercialista regime IVA, imposte, scritture e passaggio normativo programmato per il 2027."
+      ],
+      "warnings": [
+        "La qualifica OPO non rende automaticamente esente IVA ogni cessione di oro.",
+        "Non applicare il reverse charge per semplice convenienza o per la sola presenza di una fonderia.",
+        "Non usare nel 2026 gli articoli del nuovo Testo unico IVA come se fossero già applicabili."
+      ],
+      "sources": [
+        {
+          "title": "D.P.R. 633/1972, articolo 10 n. 11",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.presidente.repubblica:1972-10-26;633~art10!vig=",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.P.R. 633/1972, articolo 17",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1972-00-00;633~art17!vig=",
+          "authority": "Normattiva",
+          "status": "vigente nel 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 19 gennaio 2026 n. 10, Testo unico IVA, articoli 37, 64 e 171",
+          "url": "https://www.gazzettaufficiale.it/eli/gu/2026/01/30/24/so/4/sg/pdf",
+          "authority": "Gazzetta Ufficiale",
+          "status": "applicabile dal 1 gennaio 2027",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "opo-controlli-autorita-sanzioni",
+      "title": "Controlli, autorità, registrazioni e sanzioni per gli OPO",
+      "category": "Normativa e compliance",
+      "keywords": ["controlli OPO", "autorità OPO", "OAM UIF Guardia di Finanza", "sanzioni OPO", "ispezione operatore oro", "conservazione ORO", "registrazioni antiriciclaggio", "attività abusiva oro"],
+      "summary": "Il sistema dei controlli OPO è distribuito: OAM presidia Registro e requisiti, UIF riceve e analizza ORO e SOS, Guardia di Finanza esercita controlli antiriciclaggio e Banca d’Italia conserva funzioni diverse su riserve e buona consegna.",
+      "facts": [
+        "OAM verifica iscrizione, permanenza dei requisiti, dati, sedi, contribuzione e variazioni del Registro OPO.",
+        "UIF riceve dichiarazioni ORO e SOS; Guardia di Finanza e altre autorità competenti possono richiedere dati, documenti e ricostruzione delle operazioni secondo le rispettive attribuzioni.",
+        "Banca d’Italia non esercita vigilanza prudenziale sugli OPO e non tiene più il Registro; la UIF è autonoma e istituita presso la Banca.",
+        "Dati di cliente, esecutore, titolare effettivo, scopo, natura, data, importo, causale e mezzo di pagamento vanno acquisiti tempestivamente e conservati per dieci anni secondo la disciplina antiriciclaggio.",
+        "Copie delle dichiarazioni ORO, ricevute e documentazione preparatoria vanno conservate per dieci anni e rese ricostruibili.",
+        "L’esercizio professionale senza requisiti e iscrizione è penalmente sanzionato; l’omessa o irregolare dichiarazione ORO comporta una sanzione amministrativa dal 10 al 40 per cento del valore negoziato.",
+        "Nel testo antiriciclaggio vigente dal 23 luglio 2026 le sanzioni base sono 2.000 euro per omessa adeguata verifica o conservazione e 3.000 euro per omessa SOS, con fasce aggravate per violazioni gravi, ripetute, sistematiche o plurime."
+      ],
+      "checklist": [
+        "Tenere un fascicolo di iscrizione con visura, requisiti, organi, sedi, contributi, variazioni e prova di pubblicazione nel Registro OAM.",
+        "Conservare fascicolo cliente, titolare effettivo, rischio, operazione, pagamenti, lotto, dichiarazione ORO, ricevute, decisioni SOS e audit trail.",
+        "Eseguire controlli periodici su completezza, scadenze, accessi Infostat, deleghe, operazioni aggregate, inventario e riconciliazioni.",
+        "Preparare una procedura di risposta alle autorità che preservi integrità, riservatezza, divieto di comunicazione della SOS e tracciabilità delle consegne."
+      ],
+      "warnings": [
+        "Non attribuire tutti i controlli alla Banca d’Italia: ruoli e poteri sono ripartiti.",
+        "Non attendere una ispezione per ricostruire documenti, aggregazioni o provenienza dei lotti.",
+        "La sanzione concreta dipende da fatto, gravità, periodo e procedimento: Aurum deve indicare la norma vigente senza sostituire la difesa legale."
+      ],
+      "sources": [
+        {
+          "title": "Legge 17 gennaio 2000 n. 7, testo vigente",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=000G0033&atto.dataPubblicazioneGazzetta=2000-01-21&tipoDettaglio=vigente",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 21 novembre 2007 n. 231, testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/2007/12/14/007G0251/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 10 giugno 2026 n. 122",
+          "url": "https://www.normattiva.it/eli/id/2026/07/08/26G00140/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "status": "vigente dal 23 luglio 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Banca d’Italia: modifiche alla disciplina del mercato dell’oro",
+          "url": "https://www.bancaditalia.it/media/notizia/modifiche-alla-disciplina-del-mercato-dell-oro-in-italia/",
+          "authority": "Banca d’Italia",
+          "status": "avviso istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "privati-possesso-trasferimenti-oro",
+      "title": "Privati: possesso di lingotti e dichiarazioni delle operazioni in oro",
+      "category": "Normativa e compliance",
+      "keywords": ["privato lingotto dichiarazione", "possesso domestico oro", "detenzione lingotti", "dichiarazione ORO privato", "operazione gratuita oro", "trasferimento privato oro", "cassaforte privata"],
+      "summary": "La mera detenzione domestica di un lingotto non genera da sola una dichiarazione ORO; l’obbligo può nascere da una operazione o trasferimento rientrante nella Legge 7/2000 e deve essere distinto da frontiera, fiscalità e monitoraggio estero.",
+      "facts": [
+        "La Legge 7/2000 riguarda trasferimenti, commercio e altre operazioni in oro, anche gratuite o senza consegna materiale, quando ricorrono soglie e presupposti.",
+        "Il solo possesso domestico, senza operazione o trasferimento, non integra da solo l’evento dichiarativo ORO.",
+        "Se nessuna parte è banca o OPO, dichiara il soggetto che trasferisce l’oro; quando una parte è banca o OPO, l’obbligo dichiarativo ricade su tale soggetto anche se opera per conto di terzi.",
+        "La soglia è 10.000 euro, con aggregazione di operazioni dello stesso tipo nello stesso mese e con la stessa controparte quando ciascuna è almeno 2.500 euro e il totale almeno 10.000 euro.",
+        "Una cessione gratuita può essere una operazione dichiarabile pur senza corrispettivo; valore e fatti devono essere documentati.",
+        "Dichiarazione ORO, dichiarazione doganale, quadro RW e tassazione della plusvalenza rispondono a presupposti diversi."
+      ],
+      "checklist": [
+        "Chiarire se esiste mera detenzione, vendita, donazione, trasferimento, deposito o passaggio di frontiera.",
+        "Classificare il bene come oro rilevante per la Legge 7/2000 e ricostruire valore, data, controparte e operazioni collegate.",
+        "Individuare il soggetto obbligato verificando se una parte è banca o OPO.",
+        "Conservare prova di provenienza, acquisto, seriale, peso, titolo, pagamento e operazione."
+      ],
+      "warnings": [
+        "Non rispondere genericamente che ogni privato deve dichiarare il semplice possesso di oro.",
+        "Non usare la dichiarazione ORO come sinonimo di dichiarazione dei redditi o doganale.",
+        "La custodia estera richiede una verifica fiscale separata sul contratto e sulla titolarità."
+      ],
+      "sources": [
+        {
+          "title": "Legge 17 gennaio 2000 n. 7, commi 2 e seguenti",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=000G0033&atto.dataPubblicazioneGazzetta=2000-01-21&tipoDettaglio=vigente",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "UIF: chiarimenti sulle dichiarazioni in oro",
+          "url": "https://uif.bancaditalia.it/pubblicazioni/comunicati/documenti/Comunicato-chiarimenti-dichiarazioni-oro-28.02.2025.pdf",
+          "authority": "UIF - Banca d’Italia",
+          "status": "chiarimento ufficiale",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "oro-transfrontaliero-dogane-uif",
+      "title": "Oro transfrontaliero: dichiarazione doganale e dichiarazione UIF",
+      "category": "Normativa e compliance",
+      "keywords": ["oro frontiera", "lingotto dogana", "ADM oro investimento", "Regolamento 2018/1672", "D.Lgs. 195/2008", "contante oro", "trasferimento estero oro", "UIF preventiva", "no doppia dichiarazione"],
+      "summary": "Dal 17 gennaio 2025 il passaggio di frontiera richiede di classificare prima l’oro: l’oro da investimento che rientra nelle riserve altamente liquide segue la dichiarazione doganale, mentre l’oro industriale può restare nel flusso UIF.",
+      "facts": [
+        "Ai fini dei controlli sul contante, rientrano le monete con almeno il 90 per cento di oro e lingotti, barre, pepite o aggregati con almeno il 99,5 per cento di oro.",
+        "Al raggiungimento di 10.000 euro, ingresso o uscita nei casi disciplinati dal Regolamento UE 2018/1672 e dal D.Lgs. 195/2008 richiedono dichiarazione all’autorità doganale e messa a disposizione per il controllo.",
+        "Quando si applica l’obbligo doganale sull’oro da investimento, la Legge 7/2000 esclude la duplicazione della dichiarazione alla UIF per lo stesso trasferimento.",
+        "Il trasferimento al seguito verso l’estero di oro industriale soggetto alla Legge 7/2000 deve essere comunicato preventivamente alla UIF.",
+        "Copia della dichiarazione UIF preventiva e prova della trasmissione devono accompagnare l’oro alla frontiera.",
+        "L’operazione economica sottostante può mantenere una propria dichiarazione mensile anche quando il movimento fisico segue il canale di frontiera pertinente."
+      ],
+      "checklist": [
+        "Determinare forma, purezza, valore, direzione, modalità accompagnata o non accompagnata e territorio attraversato.",
+        "Applicare il canale doganale oppure UIF evitando duplicazioni ma senza omettere l’operazione sottostante.",
+        "Preparare dichiarazione, ricevuta, fattura o contratto, lista seriali, peso, titolo e documenti di trasporto.",
+        "Coordinare prima della partenza OPO, spedizioniere, vettore valori, dogana e responsabile antiriciclaggio."
+      ],
+      "warnings": [
+        "Non dichiarare automaticamente lo stesso trasferimento sia alla Dogana sia alla UIF.",
+        "Non applicare all’oro industriale la sola regola doganale prevista per le riserve altamente liquide.",
+        "Soglia, valore e classificazione vanno determinati prima della frontiera, non dopo un controllo."
+      ],
+      "sources": [
+        {
+          "title": "Regolamento UE 2018/1672 sui controlli del denaro contante",
+          "url": "https://eur-lex.europa.eu/eli/reg/2018/1672/oj",
+          "authority": "Unione europea",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 19 novembre 2008 n. 195, articolo 3",
+          "url": "https://def.giustiziatributaria.gov.it/DocTribFrontend/getAttoNormativoDetail.do?ACTION=getArticolo&articolo=Articolo+3&codiceOrdinamento=0000000000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000&id=%7B00DE539B-9634-4B14-A7EB-D4CD4D11CC33%7D",
+          "authority": "Dipartimento della Giustizia Tributaria",
+          "status": "testo vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "UIF: dichiarazioni operazioni in oro",
+          "url": "https://uif.bancaditalia.it/adempimenti-operatori/op-oro/index.html",
+          "authority": "UIF - Banca d’Italia",
+          "status": "istruzioni correnti",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "lingotti-good-delivery-storia",
+      "title": "Lingotti e storia degli standard Good Delivery",
+      "category": "Lingotti e riserve",
+      "keywords": ["London Good Delivery", "LGD", "lingotto 400 once", "12,4 kg", "buona consegna", "standard lingotti", "raffineria LBMA", "storia lingotti", "marcature lingotto"],
+      "summary": "Good Delivery è uno standard professionale di accettabilità, tracciabilità e qualità dei lingotti all’ingrosso nato per rendere affidabili gli scambi tra operatori; non è un’etichetta automatica per ogni barretta retail 999,9.",
+      "facts": [
+        "Il mercato londinese ha formalizzato nel 1987 il London Good Delivery per lingotti prodotti da raffinerie riconosciute e accettati nella catena professionale.",
+        "Il lingotto d’oro London Good Delivery pesa nominalmente circa 400 once troy, cioè circa 12,4 chilogrammi, e ha purezza minima 995 millesimi.",
+        "Le specifiche professionali ammettono un contenuto fino compreso fra 350 e 430 once troy; una oncia troy equivale a 31,1034768 grammi, quindi 400 once sono una misura indicativa e non un peso esatto obbligatorio.",
+        "Raffinatore riconosciuto, numero di serie, titolo, peso e marcature consentono identificazione e catena di custodia secondo le regole applicabili.",
+        "Lo standard nazionale di buona consegna prevede un lingotto nominale di 12.500 grammi, intervallo ammesso 11.000–13.500 grammi, titolo almeno 995 millesimi e specifiche marcature.",
+        "La Banca d’Italia conserva per legge funzioni relative alla definizione, certificazione e revoca della buona consegna nazionale.",
+        "Un lingotto non Good Delivery può essere commerciabile, ma può richiedere nuova saggiatura, applicazione di uno sconto o raffinazione."
+      ],
+      "checklist": [
+        "Verificare standard dichiarato, raffineria, seriale, peso, titolo, anno e marcature senza affidarsi al solo logo.",
+        "Confrontare il lingotto con la lista e le regole valide alla data di produzione e con la documentazione di provenienza.",
+        "Mantenere sigilli e catena di custodia e attivare controlli indipendenti quando la continuità è interrotta.",
+        "Spiegare al cliente la differenza tra oro fino, produttore accreditato e specifico lingotto Good Delivery."
+      ],
+      "warnings": [
+        "Una barretta retail da 1 grammo a 1 chilogrammo non diventa London Good Delivery solo perché il produttore è nella lista LBMA.",
+        "La buona consegna è uno standard di mercato e qualità, non una garanzia pubblica sul valore futuro.",
+        "Certificato e confezione non sostituiscono verifiche quando provenienza o integrità sono dubbie."
+      ],
+      "sources": [
+        {
+          "title": "Banca d’Italia: mercati dell’oro e London Good Delivery",
+          "url": "https://www.bancaditalia.it/compiti/riserve-portafoglio-rischi/standard-lgd/index.html",
+          "authority": "Banca d’Italia",
+          "status": "informazione istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Provvedimento UIC 23 giugno 2003 sulla buona consegna",
+          "url": "https://www.gazzettaufficiale.it/atto/serie_generale/caricaArticolo?art.codiceRedazionale=03A07856&art.dataPubblicazioneGazzetta=2003-07-02&art.idArticolo=2&art.idGruppo=0&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.progressivo=0&art.versione=1",
+          "authority": "Gazzetta Ufficiale",
+          "status": "standard nazionale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "LBMA: About Good Delivery",
+          "url": "https://www.lbma.org.uk/good-delivery/about-good-delivery",
+          "authority": "LBMA",
+          "status": "standard tecnico corrente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "LBMA OTC Guide: definizioni, pesi e conti allocated",
+          "url": "https://www.lbma.org.uk/publications/the-otc-guide/annexes",
+          "authority": "LBMA",
+          "status": "guida tecnica corrente",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "lingotti-stoccaggio-custodia-audit",
+      "title": "Stoccaggio, custodia, assicurazione e audit dei lingotti",
+      "category": "Lingotti e riserve",
+      "keywords": ["stoccaggio lingotti", "custodia oro", "allocated segregato", "unallocated", "caveau", "inventario seriali", "audit lingotti", "assicurazione oro", "doppio controllo", "catena di custodia"],
+      "summary": "Non esiste un unico modello legale di custodia privata: un sistema professionale combina titolarità contrattuale chiara, segregazione, inventario per seriale, sicurezza fisica, assicurazione esplicita e riconciliazioni indipendenti.",
+      "facts": [
+        "Nella custodia allocated o segregata il contratto deve collegare il cliente a lingotti identificati; un rapporto unallocated può rappresentare invece un credito contrattuale verso il depositario.",
+        "Inventario e prova di proprietà dovrebbero collegare proprietario, ubicazione, seriale, raffineria, peso, titolo, sigillo, documento di acquisto e certificato di saggio.",
+        "Controllo a due persone, separazione dei compiti, log accessi, allarmi, videosorveglianza e gestione chiavi riducono il rischio operativo.",
+        "Conte fisiche periodiche e a sorpresa, riconciliazione con registri e contabilità e verifica indipendente rendono rilevabili differenze e sostituzioni.",
+        "La copertura assicurativa dipende dal contratto: specie assicurate, sede, limiti, franchigie, esclusioni, trasporto e prova del sinistro vanno letti espressamente.",
+        "Trasferimenti tra caveau richiedono vettore idoneo, lista sigillata, passaggi di consegna, riscontro all’arrivo e conservazione delle evidenze."
+      ],
+      "checklist": [
+        "Leggere titolarità, segregazione, diritto di prelievo, subdeposito, audit, responsabilità e insolvenza nel contratto.",
+        "Creare inventario immutabile per seriale con foto, peso, titolo, documento, sigillo e posizione.",
+        "Applicare doppio controllo ad accessi, movimentazioni, apertura imballi, conte e correzioni.",
+        "Riconciliare periodicamente fisico, registro di custodia, contabilità e attestazione del depositario.",
+        "Verificare polizza e trasporto con assicuratore e professionisti competenti."
+      ],
+      "warnings": [
+        "Una cassetta bancaria o un deposito non sono automaticamente assicurati per l’intero valore dell’oro.",
+        "Il termine allocated deve essere provato dal contratto e dall’identificazione dei lingotti, non dalla sola pubblicità.",
+        "Certificato, blister o sigillo non rendono inutile un controllo indipendente quando la catena di custodia è interrotta."
+      ],
+      "sources": [
+        {
+          "title": "LBMA: About Good Delivery",
+          "url": "https://www.lbma.org.uk/good-delivery/about-good-delivery",
+          "authority": "LBMA",
+          "status": "standard tecnico corrente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "LBMA OTC Guide: conti allocated e unallocated",
+          "url": "https://www.lbma.org.uk/publications/the-otc-guide/annexes",
+          "authority": "LBMA",
+          "status": "guida tecnica corrente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Banca d’Italia: verifiche e custodia delle riserve auree",
+          "url": "https://www.bancaditalia.it/compiti/riserve-portafoglio-rischi/riserve-oro/index.html",
+          "authority": "Banca d’Italia",
+          "status": "riferimento istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "banca-italia-riserve-oro-storia",
+      "title": "Banca d’Italia: storia, riserve auree e controlli",
+      "category": "Lingotti e riserve",
+      "keywords": ["Banca d’Italia oro", "riserve auree italiane", "2452 tonnellate", "95493 lingotti", "storia riserve oro", "custodia riserve", "audit riserve auree", "buona consegna"],
+      "summary": "Banca d’Italia gestisce le riserve auree ufficiali italiane e concorre alle funzioni dell’Eurosistema; non è un depositario retail, non garantisce i lingotti dei privati e dal 2025 non tiene più il Registro OPO.",
+      "facts": [
+        "La consistenza ufficiale indicata da Banca d’Italia è circa 2.452 tonnellate, rappresentate da 95.493 lingotti e da una quantità residuale di monete.",
+        "La custodia è diversificata: circa 44,86 per cento in Italia, 43,29 per cento negli Stati Uniti, 6,09 per cento in Svizzera e 5,76 per cento nel Regno Unito.",
+        "Banca d’Italia esegue verifiche annuali sui lingotti detenuti in Italia e acquisisce conferme dai depositari esteri.",
+        "La storia parte dalle dotazioni confluite alla nascita della Banca nel 1893, attraversa le perdite belliche, la ricostruzione postbellica, l’uso in garanzia nel 1976 e il riassetto con UIC ed Eurosistema.",
+        "L’oro contribuisce a diversificazione, fiducia e presidio delle riserve, senza costituire una promessa di rendimento.",
+        "La Banca conserva compiti sulla buona consegna nazionale; Registro OPO e dichiarazioni ORO competono rispettivamente a OAM e UIF."
+      ],
+      "checklist": [
+        "Usare i dati pubblicati da Banca d’Italia con data di verifica e non trasformarli in consiglio di investimento.",
+        "Separare gestione delle riserve, standard di buona consegna, Registro OAM e ricezione UIF.",
+        "Per audit e custodia distinguere riserve ufficiali, deposito professionale e possesso retail.",
+        "Aggiornare quantità e distribuzione solo dalla pagina istituzionale."
+      ],
+      "warnings": [
+        "Banca d’Italia non offre al pubblico un servizio ordinario di custodia di lingotti retail.",
+        "La presenza di una raffineria in una lista o il richiamo a Banca d’Italia non garantiscono il singolo lingotto privato.",
+        "Il vecchio elenco OPO Banca d’Italia non prova una iscrizione corrente all’OAM."
+      ],
+      "sources": [
+        {
+          "title": "Banca d’Italia: le riserve auree",
+          "url": "https://www.bancaditalia.it/compiti/riserve-portafoglio-rischi/riserve-oro/index.html",
+          "authority": "Banca d’Italia",
+          "status": "dati e storia istituzionali",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Banca d’Italia: motivazioni delle riserve auree",
+          "url": "https://www.bancaditalia.it/compiti/riserve-portafoglio-rischi/motivazioni/index.html",
+          "authority": "Banca d’Italia",
+          "status": "quadro istituzionale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Legge 17 gennaio 2000 n. 7",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=000G0033&atto.dataPubblicazioneGazzetta=2000-01-21&tipoDettaglio=vigente",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "privati-fiscalita-lingotti-plusvalenze",
+      "title": "Privati: fiscalità della vendita di lingotti e monete d’oro",
+      "category": "Fiscalità",
+      "keywords": ["privato vende lingotto", "plusvalenza oro", "metalli preziosi grezzi monetati", "articolo 67 TUIR", "articolo 68 TUIR", "costo non documentato", "26 per cento", "monete oro fiscalità"],
+      "summary": "Fuori dall’attività d’impresa, la cessione onerosa di metalli preziosi allo stato grezzo o monetato può generare un reddito diverso: costo documentato, oneri inerenti e corretta natura del bene determinano la base imponibile.",
+      "facts": [
+        "L’articolo 67, comma 1, lettera c-ter del TUIR comprende le plusvalenze da cessione onerosa di metalli preziosi allo stato grezzo o monetato.",
+        "La base è normalmente la differenza positiva tra corrispettivo e costo o valore di acquisto documentato, aumentato degli oneri inerenti ammessi.",
+        "Dal 2024, se manca la documentazione del costo, per questi metalli la plusvalenza è pari all’intero corrispettivo: la precedente forfetizzazione al 25 per cento non è più applicabile.",
+        "Il prelievo sostitutivo è ordinariamente del 26 per cento, ma modalità dichiarativa e regime concreto vanno verificati nell’anno della cessione.",
+        "L’esenzione IVA dell’oro da investimento non equivale a esenzione dalla tassazione della plusvalenza del privato.",
+        "Gioiello finito, oggetto da collezione, moneta numismatica e metallo grezzo o monetato non vanno assimilati senza classificare il bene e l’operazione."
+      ],
+      "checklist": [
+        "Conservare fattura o contratto di acquisto, pagamento, seriale, peso, titolo, certificato e costi inerenti.",
+        "Classificare il bene e ricostruire costo fiscale, eventuale successione o donazione e corrispettivo.",
+        "Separare IVA dell’operazione, reddito diverso del privato e attività eventualmente svolta in forma abituale.",
+        "Far determinare imponibile, imposta e quadro dichiarativo dal commercialista sul caso e sull’anno."
+      ],
+      "warnings": [
+        "Non affermare che tutto l’oro da investimento sia fiscalmente esente.",
+        "Non usare più la vecchia regola del 25 per cento quando il costo non è documentato.",
+        "Acquisti e vendite abituali o organizzati possono richiedere una qualificazione diversa dal reddito occasionale del privato."
+      ],
+      "sources": [
+        {
+          "title": "TUIR, articolo 67 sui redditi diversi",
+          "url": "https://def.finanze.it/DocTribFrontend/getArticoloDetailFromResultList.do?codiceOrdinamento=0000000000000670000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000&id=%7B0A5A344C-C5D4-4073-A08F-1D25832C0BF3%7D&idAttoNormativo=%7B31D694E8-4398-4030-873B-FEAF5A6647F9%7D",
+          "authority": "Dipartimento delle Finanze",
+          "status": "testo vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "TUIR, articolo 68 sulla determinazione delle plusvalenze",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:presidente.repubblica:decreto:1986-12-22;917~art68-com6=",
+          "authority": "Normattiva",
+          "status": "testo vigente",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "Agenzia delle Entrate: plusvalenze di natura finanziaria, dichiarazione 2026",
+          "url": "https://infoprecompilata.agenziaentrate.gov.it/portale/semplificata-mod-plusvalenze-natura-finanziaria",
+          "authority": "Agenzia delle Entrate",
+          "status": "istruzioni dichiarative 2026",
+          "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "privati-stoccaggio-estero-monitoraggio-rw",
+      "title": "Privati: lingotti custoditi all’estero e quadro RW",
+      "category": "Fiscalità",
+      "keywords": ["lingotti estero quadro RW", "oro caveau estero", "monitoraggio fiscale oro", "attività estere", "deposito estero lingotti", "IVAFE oro fisico", "custodia estera privato"],
+      "summary": "La custodia estera di oro fisico richiede un’analisi del monitoraggio fiscale: residenza, proprietà, luogo, contratto, disponibilità e capacità di produrre redditi in Italia determinano se e come compilare il quadro RW.",
+      "facts": [
+        "Le istruzioni dichiarative 2026 includono nel monitoraggio RW i metalli preziosi detenuti all’estero e i beni patrimoniali collocati in cassette di sicurezza estere, anche se dismessi durante l’anno.",
+        "Per oro in caveau estero vanno esaminati titolarità effettiva, custodia allocated o unallocated, depositario, Paese, disponibilità e valore.",
+        "La mera custodia fisica domestica in Italia non genera quadro RW per il solo fatto di possedere un lingotto.",
+        "Monitoraggio RW, eventuale IVAFE, dichiarazione ORO, imposta sulla plusvalenza e dichiarazione doganale sono istituti distinti.",
+        "Non ogni contratto su oro estero ha lo stesso trattamento: proprietà di barre identificate, conto metallo, titolo finanziario e credito verso il depositario possono avere qualificazioni diverse.",
+        "Documenti di acquisto, contratto di custodia, estratti inventariali, seriali, valore e movimenti servono a sostenere la dichiarazione."
+      ],
+      "checklist": [
+        "Accertare residenza fiscale, Paese di custodia, proprietà, disponibilità e struttura contrattuale.",
+        "Distinguere lingotti fisici identificati da conto metallo o prodotto finanziario.",
+        "Determinare valore, periodo di detenzione, eventuali movimenti e criteri dichiarativi dell’anno.",
+        "Far validare quadro RW ed eventuali imposte patrimoniali dal commercialista con il contratto completo."
+      ],
+      "warnings": [
+        "Non dire automaticamente che ogni lingotto estero paga IVAFE: la qualificazione dell’attività è decisiva.",
+        "Non confondere il quadro RW con la dichiarazione ORO alla UIF.",
+        "La collocazione dichiarata dal venditore non sostituisce il contratto del depositario e la prova di segregazione."
+      ],
+      "sources": [
+        {
+          "title": "Agenzia delle Entrate: istruzioni Quadro RW 2026",
+          "url": "https://telematici.agenziaentrate.gov.it/webuni/pdf/help/15/Quadro_RW.pdf",
+          "authority": "Agenzia delle Entrate",
+          "status": "istruzioni dichiarative 2026",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.L. 28 giugno 1990 n. 167 sul monitoraggio fiscale",
+          "url": "https://www.normattiva.it/eli/id/1990/06/30/090G0208/CONSOLIDATED",
+          "authority": "Normattiva",
+          "status": "vigente",
+          "verifiedAt": "1 agosto 2026"
         }
       ]
     },
@@ -1282,7 +1956,8 @@
         "La direttiva IVA definisce oro da investimento i lingotti o placchette di peso accettato dal mercato con purezza almeno 995‰.",
         "Le monete devono avere purezza almeno 900‰, essere coniate dopo il 1800, avere o aver avuto corso legale e rispettare il criterio di prezzo.",
         "L’Unione pubblica ogni anno una lista di monete che soddisfano i criteri; la lista 2026 è valida dal 1 gennaio al 31 dicembre 2026.",
-        "L’assenza dalla lista annuale non esclude automaticamente una moneta che dimostri direttamente tutti i requisiti normativi."
+        "L’assenza dalla lista annuale non esclude automaticamente una moneta che dimostri direttamente tutti i requisiti normativi.",
+        "Nel 2026 resta applicabile il D.P.R. 633/1972; il nuovo Testo unico IVA, D.Lgs. 19 gennaio 2026 n. 10, rinvia l’applicazione delle proprie disposizioni al 1 gennaio 2027, quando l’esenzione sarà ricollocata nell’articolo 37."
       ],
       "checklist": [
         "Classificare separatamente gioiello usato, rottame, oro industriale e oro da investimento.",
@@ -1291,7 +1966,8 @@
       ],
       "warnings": [
         "Aurum non deve assegnare autonomamente un trattamento IVA a una transazione reale.",
-        "La qualifica commerciale di bullion non basta per l’esenzione."
+        "La qualifica commerciale di bullion non basta per l’esenzione.",
+        "Non anticipare nel 2026 i riferimenti del nuovo Testo unico IVA previsti dal 1 gennaio 2027."
       ],
       "sources": [
         {
@@ -1314,6 +1990,13 @@
           "authority": "EUR-Lex",
           "status": "valida per il 2026",
           "verifiedAt": "30 luglio 2026"
+        },
+        {
+          "title": "D.Lgs. 19 gennaio 2026 n. 10, Testo unico IVA, articolo 171",
+          "url": "https://www.gazzettaufficiale.it/eli/gu/2026/01/30/24/so/4/sg/pdf",
+          "authority": "Gazzetta Ufficiale",
+          "status": "applicabile dal 1 gennaio 2027",
+          "verifiedAt": "1 agosto 2026"
         }
       ]
     },
@@ -1598,7 +2281,8 @@
         "Per i preziosi usati la funzione residua e la destinazione oggettiva a fusione, affinazione o nuovo ciclo produttivo distinguono il materiale industriale dal bene usato rivendibile come oggetto.",
         "Il reverse charge non è una scelta di convenienza e non richiede necessariamente che il cessionario fonda personalmente il bene, purché la destinazione al ciclo produttivo sia provata.",
         "Nella guida tecnica dell’Agenzia il codice natura N6.2 riguarda operazioni in oro e argento puro, mentre N6.1 riguarda rottami e altri materiali di recupero dell’articolo 74: non sono codici intercambiabili.",
-        "Per il reverse charge interno il cessionario può trasmettere un documento TD16 tramite SdI oppure integrare manualmente e conservare la fattura secondo le regole richiamate dall’Agenzia."
+        "Per il reverse charge interno il cessionario può trasmettere un documento TD16 tramite SdI oppure integrare manualmente e conservare la fattura secondo le regole richiamate dall’Agenzia.",
+        "Il nuovo Testo unico IVA, pur entrato formalmente in vigore il 31 gennaio 2026, si applicherà dal 1 gennaio 2027: fino al 31 dicembre 2026 resta il riferimento all’articolo 17, quinto comma, del D.P.R. 633/1972; dal 2027 la disciplina è ricollocata nell’articolo 64, comma 5."
       ],
       "checklist": [
         "Confermare che venditore e acquirente abbiano il ruolo soggettivo richiesto per l’operazione.",
@@ -1610,7 +2294,8 @@
       "warnings": [
         "Non usare reverse charge solo perché il bene è definito genericamente rottame o perché il cliente è una fonderia.",
         "Non confondere N6.1 e N6.2 né trasformare TD16 in un’autofattura generica per l’acquisto dal privato.",
-        "Titolo, destinazione e documentazione insufficienti richiedono verifica professionale prima della fattura."
+        "Titolo, destinazione e documentazione insufficienti richiedono verifica professionale prima della fattura.",
+        "Non usare nel 2026 il riferimento del Testo unico IVA come se fosse già applicabile."
       ],
       "sources": [
         {
@@ -1632,6 +2317,13 @@
           "url": "https://www.cortedicassazione.it/resources/cms/documents/RASSEGNA_MENSILE_SETTEMBRE_2022_1.pdf",
           "authority": "Corte Suprema di Cassazione",
           "status": "rassegna ufficiale",
+          "verifiedAt": "1 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 19 gennaio 2026 n. 10, Testo unico IVA, articoli 64 e 171",
+          "url": "https://www.gazzettaufficiale.it/eli/gu/2026/01/30/24/so/4/sg/pdf",
+          "authority": "Gazzetta Ufficiale",
+          "status": "applicabile dal 1 gennaio 2027",
           "verifiedAt": "1 agosto 2026"
         }
       ]

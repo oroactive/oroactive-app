@@ -13,12 +13,14 @@ export function hasStrongComproOroSectorIntent(question = "", sectorMatches = []
   const normalized = normalizeIntentText(question);
   const sectorScore = Number(sectorMatches[0]?.score || 0);
   const coachingScore = Number(coachingKnowledge.matches?.[0]?.score || 0);
-  const hasUnambiguousRegulatedMarker = /\b(?:oam|uif|sos|operazione sospetta|antiriciclaggio|registro (?:oam|degli operatori compro oro|operatori compro oro)|d ?lgs ?92(?:\/2017)?|d ?m ?14 maggio 2018)\b/.test(normalized);
+  const hasUnambiguousRegulatedMarker = /\b(?:oam|uif|sos|opo|operatore professionale in oro|operazione sospetta|dichiarazione oro|infostat|legge 7(?:\/2000)?|antiriciclaggio|registro (?:oam|opo|degli operatori compro oro|operatori compro oro)|d ?lgs ?92(?:\/2017)?|d ?lgs ?211(?:\/2024)?|d ?m ?14 maggio 2018)\b/.test(normalized);
   if (hasUnambiguousRegulatedMarker && sectorScore >= 20) return true;
   const hasSpecialistAccountingMarker = /\b(?:prima nota|partita doppia|regime iva|trattamento iva|natura iva|regime (?:iva )?del margine|reverse charge|inversione contabile|registri? iva|lipe|f24|sdi|rimanenze|cespiti|ammortamento|cash flow|controllo di gestione)\b/.test(normalized)
     || /\b(?:commercialista|contabilita|contabile|fiscalista)\b.*\b(?:compro oro|negozio|oro|preziosi|iva|bilancio|adempimenti|lavoro|svolge|funziona)\b/.test(normalized)
     || /\b(?:compro oro|negozio|oro|preziosi)\b.*\b(?:commercialista|contabilita|contabile|fiscalista)\b/.test(normalized);
   if (hasSpecialistAccountingMarker && sectorScore >= 24) return true;
+  const hasBullionSpecialistMarker = /\b(?:good delivery|buona consegna|lingott[a-z]*|bullion|caveau|allocated|unallocated|riserve auree|banca d italia|quadro rw|monitoraggio fiscale|frontiera|dogana|adm)\b/.test(normalized);
+  if (hasBullionSpecialistMarker && sectorScore >= 24) return true;
   const hasSectorMarker = /(compro oro|atto di vendita|contante|pagamento|quotazione|valutazione (?:dell |di )?oro|prezzo (?:dell |di )?oro|carat|titolo dell oro|bilancia|xrf|pietra di paragone|acido nitrico)/.test(normalized);
   return hasSectorMarker && sectorScore >= Math.max(40, coachingScore * 1.25);
 }
@@ -51,11 +53,15 @@ export function resolveAurumKnowledgeRoute({
   coachingKnowledge = {},
   isNormativeQuestion = false
 } = {}) {
-  const saleIntent = hasSaleDeedIntent(question, saleMatches, { requestedFieldId, section });
-  const hasSaleDeedContext = saleIntent && (Boolean(String(requestedFieldId || "").trim()) || !gemIntent);
-  const hasGemologicalContext = Boolean(gemIntent) && !hasSaleDeedContext;
   const strongSectorPriority = Boolean(isNormativeQuestion)
     || hasStrongComproOroSectorIntent(question, sectorMatches, coachingKnowledge);
+  const saleIntent = hasSaleDeedIntent(question, saleMatches, { requestedFieldId, section });
+  const hasExplicitSaleDeedPriority = Boolean(String(requestedFieldId || "").trim())
+    || hasExplicitSaleDeedFormIntent(question);
+  const hasSaleDeedContext = saleIntent
+    && (Boolean(String(requestedFieldId || "").trim()) || !gemIntent)
+    && (!strongSectorPriority || hasExplicitSaleDeedPriority);
+  const hasGemologicalContext = Boolean(gemIntent) && !hasSaleDeedContext && !strongSectorPriority;
   return Object.freeze({
     saleIntent,
     hasSaleDeedContext,

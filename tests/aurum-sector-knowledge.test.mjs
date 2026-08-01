@@ -15,9 +15,9 @@ import {
 } from "../services/aurum/privacy.js";
 
 test("la base settoriale Aurum è ampia, versionata e interamente fontata", () => {
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.01");
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.01-opo-bullion");
   assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "1 agosto 2026");
-  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 46);
+  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 59);
 
   const ids = new Set();
   const categories = new Set();
@@ -45,6 +45,7 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
     "Strumenti e attrezzature",
     "Diamanti e gemme",
     "Sicurezza",
+    "Lingotti e riserve",
     "Fiscalità",
     "Contabilità e controllo",
     "Antifrode",
@@ -57,6 +58,19 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
 const retrievalCases = [
   ["Quanto posso pagare in contanti e cosa succede sopra 500 euro?", "identificazione-cliente-pagamenti"],
   ["Quando devo fare una dichiarazione ORO da 10.000 euro come OPO?", "operatori-professionali-oro-dichiarazioni"],
+  ["Quali requisiti societari e di capitale servono per iscrivere un OPO all’OAM?", "opo-requisiti-iscrizione-oam"],
+  ["Qual è il perimetro operativo tra oro da investimento, oro industriale e materiale da fusione?", "opo-perimetro-operativita-oro"],
+  ["Quali adeguata verifica, titolare effettivo e controlli antiriciclaggio deve fare un OPO?", "opo-antiriciclaggio-controlli"],
+  ["Come invio una dichiarazione ORO tramite Infostat UIF e quale codice OAM uso?", "opo-dichiarazioni-oro-uif-infostat"],
+  ["Quali obblighi fiscali e IVA ha un operatore professionale in oro?", "opo-fiscalita-iva-contabilita"],
+  ["Chi controlla un OPO tra OAM UIF Guardia di Finanza e Banca d’Italia e quali sanzioni applica?", "opo-controlli-autorita-sanzioni"],
+  ["Un privato che tiene un lingotto in casa deve fare una dichiarazione ORO?", "privati-possesso-trasferimenti-oro"],
+  ["Porto un lingotto oltre frontiera: devo dichiararlo in Dogana o alla UIF?", "oro-transfrontaliero-dogane-uif"],
+  ["Che cosa significa London Good Delivery per un lingotto da 400 once?", "lingotti-good-delivery-storia"],
+  ["Come organizzo custodia allocated, seriali, inventario e audit dei lingotti?", "lingotti-stoccaggio-custodia-audit"],
+  ["Quante riserve auree ha Banca d’Italia e dove sono custodite?", "banca-italia-riserve-oro-storia"],
+  ["Come si calcola la plusvalenza se un privato vende lingotti senza prova del costo?", "privati-fiscalita-lingotti-plusvalenze"],
+  ["Un lingotto custodito in un caveau estero va indicato nel quadro RW?", "privati-stoccaggio-estero-monitoraggio-rw"],
   ["Quali sono i limiti XRF su un gioiello placcato?", "xrf-fluorescenza-raggi-x"],
   ["Un tester termico distingue diamante naturale e sintetico?", "screening-diamanti-pass-refer"],
   ["Ogni quanto va verificata la bilancia metrica?", "bilance-metrologia-legale"],
@@ -131,6 +145,72 @@ test("la risposta contabile non usa l’avvertenza gemmologica e rimanda al caso
   assert.match(answer, /forma giuridica|regime contabile/i);
   assert.match(answer, /validato dal commercialista incaricato/i);
   assert.doesNotMatch(answer, /Le prove di banco sono screening/i);
+});
+
+test("le risposte su riserve e custodia dei lingotti non usano l’avvertenza gemmologica", () => {
+  for (const question of [
+    "Dove conserva le riserve auree Banca d’Italia?",
+    "Come devo inventariare lingotti allocated in un caveau?"
+  ]) {
+    const answer = buildSectorKnowledgeAnswer(question, searchSectorKnowledge(question, { limit: 4 })).risposta;
+    assert.match(answer, /custodia|riserv|contratto|inventario/i);
+    assert.doesNotMatch(answer, /Le prove di banco sono screening/i);
+  }
+});
+
+test("Aurum non confonde possesso privato, dichiarazione ORO e monitoraggio fiscale estero", () => {
+  const domestic = buildSectorKnowledgeAnswer(
+    "Un privato che possiede un lingotto nella cassaforte di casa deve dichiararlo?",
+    searchSectorKnowledge("Un privato che possiede un lingotto nella cassaforte di casa deve dichiararlo?", { limit: 4 })
+  ).risposta;
+  assert.match(domestic, /possesso domestico|mera detenzione|non genera da sol[ao]/i);
+  assert.match(domestic, /trasferimento|operazione/i);
+
+  const foreign = buildSectorKnowledgeAnswer(
+    "Lingotti fisici custoditi in un caveau estero e quadro RW",
+    searchSectorKnowledge("Lingotti fisici custoditi in un caveau estero e quadro RW", { limit: 4 })
+  ).risposta;
+  assert.match(foreign, /quadro RW|attivit[aà] estere/i);
+  assert.match(foreign, /contratto|titolarit[aà]|caso concreto/i);
+});
+
+test("Aurum separa Registro OAM, dichiarazioni UIF e riserve Banca d’Italia", () => {
+  const registration = buildSectorKnowledgeAnswer(
+    "Chi iscrive oggi gli operatori professionali in oro?",
+    searchSectorKnowledge("Chi iscrive oggi gli operatori professionali in oro?", { limit: 4 })
+  ).risposta;
+  assert.match(registration, /OAM/);
+  assert.doesNotMatch(registration, /iscrizione[^.]{0,80}Banca d.Italia/i);
+
+  const declaration = buildSectorKnowledgeAnswer(
+    "A chi invio la dichiarazione ORO?",
+    searchSectorKnowledge("A chi invio la dichiarazione ORO?", { limit: 4 })
+  ).risposta;
+  assert.match(declaration, /UIF/);
+
+  const reserves = buildSectorKnowledgeAnswer(
+    "Qual è il ruolo di Banca d’Italia sulle riserve auree?",
+    searchSectorKnowledge("Qual è il ruolo di Banca d’Italia sulle riserve auree?", { limit: 4 })
+  ).risposta;
+  assert.match(reserves, /2\.452|riserve auree/i);
+});
+
+test("Aurum applica gli aggiornamenti normativi 2026 senza anticipare il Testo unico IVA", () => {
+  const aml = buildSectorKnowledgeAnswer(
+    "Come verifica il titolare effettivo un OPO dopo il D.Lgs. 122/2026?",
+    searchSectorKnowledge("Come verifica il titolare effettivo un OPO dopo il D.Lgs. 122/2026?", { limit: 4 })
+  ).risposta;
+  assert.match(aml, /23 luglio 2026/);
+  assert.match(aml, /due anni|biennal/i);
+  assert.match(aml, /dieci giorni/i);
+
+  const vat = buildSectorKnowledgeAnswer(
+    "Quali obblighi IVA ha un OPO nel 2026 e cosa cambia nel 2027?",
+    searchSectorKnowledge("Quali obblighi IVA ha un OPO nel 2026 e cosa cambia nel 2027?", { limit: 4 })
+  ).risposta;
+  assert.match(vat, /D\.P\.R\. 633\/1972/);
+  assert.match(vat, /1 gennaio 2027/);
+  assert.match(vat, /non.*2026|durante il 2026/i);
 });
 
 test("la normativa base non viene confusa con l'aggiornamento OPO del 2024", () => {

@@ -8746,6 +8746,13 @@ function isComproOroAccountingQuestion(question = "") {
   return /\b(?:prima nota|partita doppia|commercialista|contabilita|contabile|fiscalista|iva|reverse charge|inversione contabile|regime del margine|fattura elettronica|sdi|registri? iva|lipe|f24|rimanenze|inventario|cespiti|ammortamento|bilancio|imposte|scadenziario|cash flow|controllo di gestione)\b/.test(normalized);
 }
 
+function isProfessionalGoldQuestion(question = "") {
+  const normalized = normalizeAssistantIntentText(question);
+  if (!normalized) return false;
+  return /\b(?:opo|operator[a-z]* professional[a-z]* in oro|legge 7(?:\/2000)?|dichiarazione oro|infostat|codice oam|good delivery|buona consegna|bullion|lingott[a-z]*|riserve auree|banca d italia|caveau|allocated|unallocated|quadro rw|monitoraggio fiscale|frontiera|dogana|adm)\b/.test(normalized)
+    || /\bprivat[a-z]*\b.*\b(?:oro|lingott[a-z]*)\b.*\b(?:dichiar[a-z]*|plusvalenza|custod[a-z]*|estero|possesso|detenzione)\b/.test(normalized);
+}
+
 function buildComproOroNormativeAnswer(question = "") {
   const matches = searchSectorKnowledge(question, { limit: 4 });
   return buildSectorKnowledgeAnswer(question, matches).risposta;
@@ -8825,7 +8832,11 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const aurumMemories = await loadAurumChatMemories(options.user || {});
   const aurumMemoryProfile = buildAurumMemoryProfile(aurumMemories);
   const isAccountingQuestion = isComproOroAccountingQuestion(domanda);
-  const isNormativeQuestion = mode === "normativa_operativa" || isComproOroNormativeQuestion(domanda) || isAccountingQuestion;
+  const professionalGoldQuestion = isProfessionalGoldQuestion(domanda);
+  const isNormativeQuestion = mode === "normativa_operativa"
+    || isComproOroNormativeQuestion(domanda)
+    || isAccountingQuestion
+    || professionalGoldQuestion;
   const requestedFieldCandidate = /^[a-z0-9_]{1,80}$/i.test(String(aurumContext.requestedFieldId || ""))
     ? String(aurumContext.requestedFieldId)
     : "";
@@ -8954,7 +8965,9 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const normativeText = isNormativeQuestion
     ? `${isAccountingQuestion
       ? "Modalita contabile-fiscale: spiega prima il principio teorico, poi i presupposti da verificare e infine la buona prassi documentale. Distingui contabilità, trattamento IVA, obblighi OCO/OPO e controllo di gestione. Non assegnare una scrittura o un regime definitivo senza forma giuridica, regime contabile, provenienza, natura e destinazione documentata dell’operazione."
-      : "Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Distingui sempre OCO, OPO, obbligo legale e procedura interna."} Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nRisposta deterministica verificata:\n${buildComproOroNormativeAnswer(domanda)}`
+      : professionalGoldQuestion
+        ? "Modalita OPO-lingotti: rispondi prima al quesito specifico e poi presenta controlli e documenti. Distingui OCO, OPO, banca, privato, OAM, UIF, Banca d’Italia e Dogana; non presentare Banca d’Italia come gestore attuale del Registro OPO. Separa mera detenzione, operazione, frontiera, fiscalità e monitoraggio RW. Non sommare automaticamente dichiarazione UIF e doganale; non confondere SOS e dichiarazione ORO; non trattare Good Delivery come qualifica fiscale o garanzia del singolo lingotto retail. Considera il D.Lgs. 122/2026 vigente dal 23 luglio 2026 per titolare effettivo e antiriciclaggio e indica sempre quando una regola è legge, standard di mercato o buona pratica."
+        : "Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Distingui sempre OCO, OPO, obbligo legale e procedura interna."} Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nRisposta deterministica verificata:\n${buildComproOroNormativeAnswer(domanda)}`
     : "";
   const safePriceExplanationText = redactAssistantPersonalData(priceExplanationText, 10000);
   const safeNormativeText = redactAssistantPersonalData(normativeText, 10000);
@@ -9358,6 +9371,27 @@ async function aiAssistantStatus() {
     jsonEmbeddings = 0;
   }
 
+  const professionalGoldTopicIds = new Set([
+    "operatori-professionali-oro-dichiarazioni",
+    "opo-requisiti-iscrizione-oam",
+    "opo-perimetro-operativita-oro",
+    "opo-antiriciclaggio-controlli",
+    "opo-dichiarazioni-oro-uif-infostat",
+    "opo-fiscalita-iva-contabilita",
+    "opo-controlli-autorita-sanzioni"
+  ]);
+  const bullionPrivateTopicIds = new Set([
+    "privati-possesso-trasferimenti-oro",
+    "oro-transfrontaliero-dogane-uif",
+    "lingotti-good-delivery-storia",
+    "lingotti-stoccaggio-custodia-audit",
+    "banca-italia-riserve-oro-storia",
+    "privati-fiscalita-lingotti-plusvalenze",
+    "privati-stoccaggio-estero-monitoraggio-rw"
+  ]);
+  const professionalGoldTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => professionalGoldTopicIds.has(topic.id));
+  const bullionPrivateTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => bullionPrivateTopicIds.has(topic.id));
+
   return {
     openai: Boolean(openai),
     pgvector: Boolean(aiRuntime.pgvector),
@@ -9372,6 +9406,12 @@ async function aiAssistantStatus() {
     accounting_knowledge_loaded: AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => ["Fiscalità", "Contabilità e controllo"].includes(topic.category)).length >= 10,
     accounting_topics: AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => ["Fiscalità", "Contabilità e controllo"].includes(topic.category)).length,
     accounting_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
+    professional_gold_knowledge_loaded: professionalGoldTopics.length === professionalGoldTopicIds.size,
+    professional_gold_topics: professionalGoldTopics.length,
+    professional_gold_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
+    bullion_private_knowledge_loaded: bullionPrivateTopics.length === bullionPrivateTopicIds.size,
+    bullion_private_topics: bullionPrivateTopics.length,
+    bullion_private_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
     gemological_knowledge_loaded: AURUM_GEM_KNOWLEDGE_STATS.materialCount === 61 && AURUM_GEM_KNOWLEDGE_STATS.toolCount === 21,
     gemological_materials: AURUM_GEM_KNOWLEDGE_STATS.materialCount,
     gemological_tools: AURUM_GEM_KNOWLEDGE_STATS.toolCount,

@@ -61,7 +61,16 @@ const queryAliases = new Map([
   ["privacy", ["gdpr", "dati personali", "sicurezza"]],
   ["acido", ["pietra di paragone", "corrosivo", "sds"]],
   ["bilancia", ["metrologia", "pesatura", "verificazione"]],
-  ["lingotto", ["ultrasuoni", "xrf", "densita", "contraffazione"]],
+  ["lingotto", ["bullion", "good delivery", "seriale", "titolo", "custodia"]],
+  ["lingotti", ["bullion", "good delivery", "seriali", "titolo", "custodia"]],
+  ["opo", ["operatore professionale in oro", "registro oam", "legge 7 2000", "dichiarazione oro"]],
+  ["infostat", ["uif", "dichiarazione oro", "data entry", "xml", "codice oam"]],
+  ["bullion", ["lingotto", "good delivery", "custodia", "riserva aurea"]],
+  ["caveau", ["custodia", "stoccaggio", "allocated", "inventario", "assicurazione"]],
+  ["allocated", ["segregato", "custodia", "seriale", "proprieta", "inventario"]],
+  ["riserve", ["banca d italia", "oro", "custodia", "good delivery"]],
+  ["frontiera", ["dogana", "adm", "uif", "trasferimento estero", "dichiarazione"]],
+  ["rw", ["monitoraggio fiscale", "attivita estere", "caveau estero", "lingotti"]],
   ["antiriciclaggio", ["sos", "uif", "anomalia", "d.lgs. 231/2007"]],
   ["iva", ["fiscale", "oro da investimento", "reverse charge", "regime del margine"]],
   ["commercialista", ["contabilità", "fiscalità", "bilancio", "adempimenti", "piano dei conti"]],
@@ -184,6 +193,66 @@ const topicIntentBoosts = [
   {
     pattern: /\b(?:smeraldo|rubino|zaffiro|ametista|acquamarina|tanzanite|topazio|opale|granato)\b.*\b(?:riconosc[a-z]*|identific[a-z]*|sintetic[a-z]*|natural[a-z]*|trattat[a-z]*)\b|\b(?:riconosc[a-z]*|identific[a-z]*|sintetic[a-z]*|natural[a-z]*|trattat[a-z]*)\b.*\b(?:smeraldo|rubino|zaffiro|ametista|acquamarina|tanzanite|topazio|opale|granato)\b/,
     boosts: { "gemme-identificazione-prudente": 120 }
+  },
+  {
+    pattern: /\b(?:requisit[a-z]*|iscri[a-z]*|registro|capitale|forma societaria|onorabilita)\b.*\b(?:opo|operator[a-z]* professional[a-z]* in oro)\b|\b(?:opo|operator[a-z]* professional[a-z]* in oro)\b.*\b(?:requisit[a-z]*|iscri[a-z]*|registro|capitale|forma societaria|onorabilita)\b/,
+    boosts: { "opo-requisiti-iscrizione-oam": 190 }
+  },
+  {
+    pattern: /\b(?:differenza|perimetro|operativita|oro industriale|materiale da fusione|conto lavorazione|operazioni finanziarie)\b.*\b(?:opo|oco|operator[a-z]* professional[a-z]* in oro)\b|\b(?:opo|oco|operator[a-z]* professional[a-z]* in oro)\b.*\b(?:differenza|perimetro|operativita|oro industriale|materiale da fusione|conto lavorazione)\b/,
+    boosts: { "opo-perimetro-operativita-oro": 185 }
+  },
+  {
+    pattern: /\b(?:adeguata verifica|titolare effettivo|antiriciclaggio|sos|profilo di rischio|filiera|conservazione)\b.*\b(?:opo|operator[a-z]* professional[a-z]* in oro)\b|\b(?:opo|operator[a-z]* professional[a-z]* in oro)\b.*\b(?:adeguata verifica|titolare effettivo|antiriciclaggio|sos|profilo di rischio|filiera|conservazione)\b/,
+    boosts: { "opo-antiriciclaggio-controlli": 195 }
+  },
+  {
+    pattern: /\b(?:infostat|data entry|upload xml|codice oam|orodp|ricevuta)\b.*\b(?:oro|opo|uif|dichiarazione)\b|\b(?:dichiarazione oro|opo|uif)\b.*\b(?:infostat|data entry|upload xml|codice oam|orodp|ricevuta)\b/,
+    boosts: { "opo-dichiarazioni-oro-uif-infostat": 205 }
+  },
+  {
+    pattern: /\b(?:fiscalita|iva|contabilita|fattur[a-z]*|reverse charge|imposte|registri iva)\b.*\b(?:opo|operator[a-z]* professional[a-z]* in oro)\b|\b(?:opo|operator[a-z]* professional[a-z]* in oro)\b.*\b(?:fiscalita|iva|contabilita|fattur[a-z]*|reverse charge|imposte|registri iva)\b/,
+    boosts: { "opo-fiscalita-iva-contabilita": 205 }
+  },
+  {
+    pattern: /\b(?:controll[a-z]*|autorita|ispezion[a-z]*|sanzion[a-z]*|guardia di finanza|conservazione|registrazion[a-z]*)\b.*\b(?:opo|operator[a-z]* professional[a-z]* in oro|oam|uif|banca d italia)\b|\b(?:opo|operator[a-z]* professional[a-z]* in oro)\b.*\b(?:controll[a-z]*|autorita|ispezion[a-z]*|sanzion[a-z]*|guardia di finanza|conservazione|registrazion[a-z]*)\b/,
+    boosts: { "opo-controlli-autorita-sanzioni": 215 }
+  },
+  {
+    pattern: /\b(?:10 000|10000|2 500|2500|aggregazione|soglia)\b.*\b(?:dichiarazione oro|opo|uif)\b|\b(?:dichiarazione oro|opo|uif)\b.*\b(?:10 000|10000|2 500|2500|aggregazione|soglia)\b/,
+    boosts: { "operatori-professionali-oro-dichiarazioni": 165 }
+  },
+  {
+    pattern: /\b(?:privat[a-z]*|persona fisica|possesso|detenzione|cassaforte|tenere|tiene)\b.*\b(?:lingott[a-z]*|oro)\b.*\b(?:dichiar[a-z]*|obblig[a-z]*|uif)\b|\b(?:dichiar[a-z]*|obblig[a-z]*|uif)\b.*\b(?:privat[a-z]*|persona fisica|possesso|detenzione|cassaforte)\b.*\b(?:lingott[a-z]*|oro)\b/,
+    boosts: { "privati-possesso-trasferimenti-oro": 210 }
+  },
+  {
+    pattern: /\b(?:frontiera|dogana|adm|transfrontalier[a-z]*|estero|esport[a-z]*|import[a-z]*)\b.*\b(?:lingott[a-z]*|oro)\b|\b(?:lingott[a-z]*|oro)\b.*\b(?:frontiera|dogana|adm|transfrontalier[a-z]*|estero|esport[a-z]*|import[a-z]*)\b/,
+    boosts: { "oro-transfrontaliero-dogane-uif": 190 }
+  },
+  {
+    pattern: /\b(?:good delivery|buona consegna|400 once|400 oz|12 4 kg|12 5 kg|raffineria lbma|standard)\b.*\b(?:lingott[a-z]*|oro|storia)\b|\b(?:lingott[a-z]*|oro|storia)\b.*\b(?:good delivery|buona consegna|400 once|400 oz|raffineria lbma)\b/,
+    boosts: { "lingotti-good-delivery-storia": 210 }
+  },
+  {
+    pattern: /\b(?:xrf|ultrasuoni|densita|certific[a-z]*|autentic[a-z]*|fals[a-z]*|tungsteno)\b.*\blingott[a-z]*\b|\blingott[a-z]*\b.*\b(?:xrf|ultrasuoni|densita|certific[a-z]*|autentic[a-z]*|fals[a-z]*|tungsteno)\b/,
+    boosts: { "lingotti-contraffazioni": 225 }
+  },
+  {
+    pattern: /\b(?:custod[a-z]*|stocc[a-z]*|allocated|segregat[a-z]*|unallocated|caveau|inventario|audit|assicur[a-z]*)\b.*\b(?:lingott[a-z]*|bullion|oro fisico)\b|\b(?:lingott[a-z]*|bullion|oro fisico)\b.*\b(?:custod[a-z]*|stocc[a-z]*|allocated|segregat[a-z]*|unallocated|caveau|inventario|audit|assicur[a-z]*)\b/,
+    boosts: { "lingotti-stoccaggio-custodia-audit": 205 }
+  },
+  {
+    pattern: /\b(?:banca d italia|bankitalia)\b.*\b(?:oro|riserve|lingott[a-z]*|storia|custodia|good delivery)\b|\b(?:riserve auree|storia delle riserve)\b/,
+    boosts: { "banca-italia-riserve-oro-storia": 210 }
+  },
+  {
+    pattern: /\b(?:plusvalenza|reddito diverso|costo non documentato|costo documentato|26 per cento|tassazione|fiscalita)\b.*\b(?:privat[a-z]*|lingott[a-z]*|monet[a-z]*|oro)\b|\b(?:privat[a-z]*|lingott[a-z]*|monet[a-z]*|oro)\b.*\b(?:plusvalenza|reddito diverso|costo non documentato|26 per cento|tassazione)\b/,
+    boosts: { "privati-fiscalita-lingotti-plusvalenze": 205 }
+  },
+  {
+    pattern: /\b(?:quadro rw|monitoraggio fiscale|attivita estere|caveau estero|deposito estero|ivafe)\b.*\b(?:lingott[a-z]*|oro|privat[a-z]*)\b|\b(?:lingott[a-z]*|oro|privat[a-z]*)\b.*\b(?:quadro rw|monitoraggio fiscale|attivita estere|caveau estero|deposito estero|ivafe)\b/,
+    boosts: { "privati-stoccaggio-estero-monitoraggio-rw": 215 }
   },
   {
     pattern: /\b(?:commercialista|contabilita|contabile|fiscalista)\b.*\b(?:compro oro|negozio|oro|preziosi|attivita|lavoro|gestione)\b|\b(?:compro oro|negozio|oro|preziosi|attivita)\b.*\b(?:commercialista|contabilita|contabile|fiscalista)\b/,
@@ -357,7 +426,9 @@ export function buildSectorKnowledgeAnswer(question = "", matches = searchSector
       ? "Informazione operativa generale: per il caso concreto verifica il testo vigente e il professionista competente."
       : ["Fiscalità", "Contabilità e controllo"].includes(primary.category)
         ? "Informazione teorica specialistica: il trattamento reale dipende da forma giuridica, regime contabile, documenti e fatti dell’operazione e deve essere validato dal commercialista incaricato."
-        : "Le prove di banco sono screening: una conclusione definitiva può richiedere un laboratorio qualificato."
+        : primary.category === "Lingotti e riserve"
+          ? "Informazione specialistica generale: per custodia, assicurazione, fiscalità o trasferimenti verifica contratto, giurisdizione e caso concreto con il professionista competente."
+          : "Le prove di banco sono screening: una conclusione definitiva può richiedere un laboratorio qualificato."
   );
   return { risposta: lines.join("\n"), sources };
 }

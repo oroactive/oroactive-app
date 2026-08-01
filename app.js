@@ -220,7 +220,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260801-aurum-commercialista-12";
+const OROACTIVE_CLIENT_BUILD_ID = "20260801-aurum-opo-bullion-13";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -9747,6 +9747,13 @@ function isAurumFiscalAccountingQuestion(question = "") {
   return /\b(?:commercialista|contabilita|contabile|fiscalista|prima nota|partita doppia|iva|reverse charge|inversione contabile|regime del margine|fattura elettronica|sdi|registri? iva|lipe|f24|rimanenze|inventario|cespiti|ammortamento|bilancio|imposte|scadenziario|cash flow|controllo di gestione)\b/.test(normalized);
 }
 
+function isAurumProfessionalGoldQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  return /\b(?:opo|operator[a-z]* professional[a-z]* in oro|legge 7(?:\/2000)?|dichiarazione oro|infostat|codice oam|good delivery|buona consegna|bullion|lingott[a-z]*|riserve auree|banca d italia|caveau|allocated|unallocated|quadro rw|monitoraggio fiscale|frontiera|dogana|adm)\b/.test(normalized)
+    || /\bprivat[a-z]*\b.*\b(?:oro|lingott[a-z]*)\b.*\b(?:dichiar[a-z]*|plusvalenza|custod[a-z]*|estero|possesso|detenzione)\b/.test(normalized);
+}
+
 function isAurumNormativeAnswerAdequate(answer = "") {
   const normalized = aurumNormalize(answer);
   if (!normalized) return false;
@@ -9756,7 +9763,34 @@ function isAurumNormativeAnswerAdequate(answer = "") {
 
 function buildAurumNormativeAnswer(question = "") {
   const normalized = aurumNormalize(question);
+  const asksProfessionalGold = isAurumProfessionalGoldQuestion(question);
   const asksOpo = /(opo|operatore professionale|legge 7|dichiarazione oro|211|10.?000|2.?500)/.test(normalized);
+  if (asksProfessionalGold) {
+    return [
+      "OPO, Banca d’Italia e lingotti — sintesi offline verificata il 1 agosto 2026",
+      "",
+      "Ruoli istituzionali:",
+      "1. OAM: tiene dal 17 gennaio 2025 il Registro degli operatori professionali in oro; registrarsi al portale non equivale a essere iscritti.",
+      "2. UIF presso Banca d’Italia: riceve dichiarazioni ORO e SOS, che sono adempimenti distinti.",
+      "3. Banca d’Italia: gestisce le riserve auree ufficiali e i compiti di buona consegna; non tiene più il Registro OPO e non garantisce lingotti retail.",
+      "4. Dogana/ADM: riceve la dichiarazione di frontiera per l’oro da investimento che rientra nelle riserve altamente liquide; non va duplicata automaticamente alla UIF.",
+      "",
+      "Regole essenziali:",
+      "• dichiarazione ORO da 10.000 euro; aggregazione mensile per operazioni dello stesso tipo con la stessa controparte, ciascuna da almeno 2.500 euro e totale da 10.000 euro;",
+      "• il semplice possesso domestico di un lingotto non genera da solo una dichiarazione ORO;",
+      "• Good Delivery è uno standard professionale, non una qualifica fiscale né una garanzia sul singolo lingotto retail;",
+      "• per oro all’estero, plusvalenze o quadro RW servono contratto, titolarità, costo documentato e verifica del commercialista;",
+      "• dal 23 luglio 2026 il D.Lgs. 122/2026 aggiorna anche accesso al Registro dei titolari effettivi e disciplina antiriciclaggio.",
+      "",
+      "Fonti ufficiali:",
+      "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=000G0033&atto.dataPubblicazioneGazzetta=2000-01-21&tipoDettaglio=vigente",
+      "https://www.organismo-am.it/vademecum-opo/vademecum",
+      "https://uif.bancaditalia.it/adempimenti-operatori/op-oro/index.html",
+      "https://www.bancaditalia.it/compiti/riserve-portafoglio-rischi/riserve-oro/index.html",
+      "",
+      "Per il caso concreto indica soggetto, forma e purezza dell’oro, valore, operazione o mera detenzione, luogo e data."
+    ].join("\n");
+  }
   const opening = asksOpo
     ? "Il D.Lgs. 10 dicembre 2024, n. 211, in vigore dal 17 gennaio 2025, aggiorna soprattutto la disciplina degli operatori professionali in oro (OPO), il registro OAM e le dichiarazioni ORO. Non sostituisce la legge base dei compro oro."
     : "La disciplina organica dell’attività di compro oro resta il D.Lgs. 25 maggio 2017, n. 92, da consultare nel testo vigente.";
@@ -10612,7 +10646,7 @@ function renderAurumMessages() {
   if (!state.aurumMessages.length) {
     aurumChatMessages.innerHTML = isPriceExplanation
       ? '<div class="empty-state">Aurum è pronto per spiegare prezzi, carature, titoli, costi, margini e scenari.</div>'
-      : '<div class="empty-state">Aurum conosce normativa compro oro, OAM/UIF, contabilità e fiscalità specialistica, lavoro del commercialista, oro, argento, PGM, diamanti, gemme, strumenti, prove, sicurezza e valutazione. Le risposte settoriali mostrano le fonti verificate.</div>';
+      : '<div class="empty-state">Aurum conosce normativa compro oro, OPO e Registro OAM, dichiarazioni UIF, antiriciclaggio aggiornato, Banca d’Italia, lingotti e Good Delivery, custodia, frontiera, obblighi dei privati, contabilità e fiscalità specialistica, oro, argento, PGM, diamanti, gemme, strumenti, prove, sicurezza e valutazione. Le risposte settoriali mostrano le fonti verificate.</div>';
   } else {
     aurumChatMessages.innerHTML = state.aurumMessages.map((message) => `
       <article class="aurum-message ${message.role === "user" ? "user" : "assistant"}">
@@ -11324,7 +11358,8 @@ function aurumContextPayload(question) {
   const guide = currentAurumGuide();
   const tutorialId = inferAurumTutorialId(question);
   const accountingQuestion = isAurumFiscalAccountingQuestion(question);
-  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion;
+  const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
+  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion || professionalGoldQuestion;
   const wantsCurrentWebVerification = normativeQuestion
     || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(String(question || ""));
   const isPriceExplanation = state.aurumMode === "price_explanation";
@@ -11365,7 +11400,10 @@ function aurumContextPayload(question) {
           "D.M. 14 maggio 2018 — Registro OAM",
           "D.Lgs. 21 novembre 2007, n. 231 — antiriciclaggio",
           "D.Lgs. 10 dicembre 2024, n. 211 — aggiornamento OPO e dichiarazioni ORO",
-          "Istruzioni UIF efficaci dal 1 luglio 2026"
+          "D.Lgs. 10 giugno 2026, n. 122 — aggiornamento antiriciclaggio vigente dal 23 luglio 2026",
+          "Istruzioni UIF sulle dichiarazioni ORO e portale Infostat",
+          "Banca d’Italia — riserve auree e standard Good Delivery",
+          "D.Lgs. 19 gennaio 2026, n. 10 — Testo unico IVA applicabile dal 1 gennaio 2027"
         ],
         verificatoIl: "1 agosto 2026",
         rispostaLocale: buildAurumNormativeAnswer(question)
@@ -11417,7 +11455,8 @@ async function askAurum(event) {
   }
 
   const accountingQuestion = isAurumFiscalAccountingQuestion(question);
-  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion;
+  const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
+  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion || professionalGoldQuestion;
 
   if (!requiresBackendSafety && /(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
     startAurumCuriosityQuiz();
@@ -11443,7 +11482,7 @@ async function askAurum(event) {
     });
     state.aurumMessages.push({
       role: "assistant",
-      content: normativeQuestion && !accountingQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
+      content: normativeQuestion && !accountingQuestion && !professionalGoldQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
         ? buildAurumNormativeAnswer(question)
         : data.risposta || "Risposta non disponibile.",
       source: data.fonte || "",
@@ -11460,6 +11499,8 @@ async function askAurum(event) {
       role: "assistant",
       content: accountingQuestion
         ? "La base specialistica contabile e fiscale di Aurum non è raggiungibile in questo momento. Per evitare di assegnare un regime IVA, una scrittura o una scadenza errati senza fonti e dati completi, riprova appena la connessione è disponibile."
+        : professionalGoldQuestion
+          ? buildAurumNormativeAnswer(question)
         : normativeQuestion
           ? buildAurumNormativeAnswer(question)
         : state.aurumRequestedFieldKey
@@ -11491,6 +11532,8 @@ function renderKnowledgeStatus() {
       <span>${status.sector_knowledge_verified_at ? `Fonti verificate: ${escapeHtml(status.sector_knowledge_verified_at)}` : ""}</span>
       <span>${status.gemological_knowledge_loaded ? `Laboratorio Gemmologico: ${Number(status.gemological_materials || 0)} pietre e ${Number(status.gemological_tools || 0)} strumenti` : "Conoscenza gemmologica non caricata"}</span>
       <span>${status.accounting_knowledge_loaded ? `Commercialista e fiscalità compro oro: ${Number(status.accounting_topics || 0)} moduli verificati il ${escapeHtml(status.accounting_knowledge_verified_at || "")}` : "Conoscenza contabile e fiscale non caricata"}</span>
+      <span>${status.professional_gold_knowledge_loaded ? `Operatori professionali in oro: ${Number(status.professional_gold_topics || 0)} moduli verificati il ${escapeHtml(status.professional_gold_knowledge_verified_at || "")}` : "Conoscenza OPO non caricata"}</span>
+      <span>${status.bullion_private_knowledge_loaded ? `Lingotti, riserve e privati: ${Number(status.bullion_private_topics || 0)} moduli verificati il ${escapeHtml(status.bullion_private_knowledge_verified_at || "")}` : "Conoscenza lingotti e privati non caricata"}</span>
       <span>${status.sale_deed_knowledge_loaded ? `Guida Atto di Vendita: ${Number(status.sale_deed_fields || 0)} campi (${Number(status.sale_deed_fields_implemented || 0)} implementati, ${Number(status.sale_deed_known_gaps || 0)} gap noti)` : "Guida Atto di Vendita non caricata"}</span>
       <span>${status.sale_deed_knowledge_verified_at ? `Guida atto verificata: ${escapeHtml(status.sale_deed_knowledge_verified_at)}` : ""}</span>
       <span>${status.coaching_knowledge_loaded ? `Coaching professionale Aurum: ${Number(status.coaching_courses || 0)} corsi, ${Number(status.coaching_topics || 0)} temi, ${Number(status.coaching_exercises || 0)} esercizi` : "Conoscenza coaching non caricata"}</span>

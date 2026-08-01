@@ -51,6 +51,52 @@ for (const question of [
   });
 }
 
+test("una domanda OPO nella sezione atto resta settoriale salvo richiesta esplicita di un campo", () => {
+  const question = "Come divento operatore professionale in oro e qual è la differenza con OCO?";
+  const coachingKnowledge = searchCoachingKnowledge(question);
+  const sectorMatches = searchSectorKnowledge(question, { limit: 5 });
+  const saleMatches = selectSaleDeedKnowledgeMatches(searchSaleDeedKnowledge(question, { limit: 5 }));
+  const route = resolveAurumKnowledgeRoute({
+    question,
+    section: "practice",
+    saleMatches,
+    sectorMatches,
+    coachingKnowledge
+  });
+  assert.equal(route.strongSectorPriority, true);
+  assert.equal(route.hasSaleDeedContext, false);
+
+  const explicitFieldRoute = resolveAurumKnowledgeRoute({
+    question: "Come compilo il campo operatore nell’atto di vendita?",
+    requestedFieldId: "operator_identity",
+    section: "practice",
+    saleMatches: [{ field: { id: "operator_identity" }, score: 10_000 }],
+    sectorMatches,
+    coachingKnowledge
+  });
+  assert.equal(explicitFieldRoute.hasSaleDeedContext, true);
+});
+
+for (const question of [
+  "Come iscrivo un operatore professionale in oro al Registro OAM?",
+  "Quali dichiarazioni ORO deve trasmettere un OPO alla UIF?",
+  "Come si controlla e si custodisce un lingotto Good Delivery?",
+  "Un privato deve dichiarare i lingotti custoditi all’estero?",
+  "Raccontami la storia delle riserve auree della Banca d’Italia"
+]) {
+  test(`OPO, lingotti e riserve restano nella competenza settoriale: ${question}`, () => {
+    const coaching = searchCoachingKnowledge(question);
+    const sector = searchSectorKnowledge(question, { limit: 5 });
+    assert.ok(sector.length > 0);
+    assert.equal(hasStrongComproOroSectorIntent(question, sector, coaching), true);
+    assert.equal(resolveAurumKnowledgeRoute({
+      question,
+      sectorMatches: sector,
+      coachingKnowledge: coaching
+    }).strongSectorPriority, true);
+  });
+}
+
 test("la guida atto prevale solo con un campo, il modulo o la sezione pratica espliciti", () => {
   const question = "Come compilo il campo cliente nell’atto di vendita?";
   const saleMatches = selectSaleDeedKnowledgeMatches(searchSaleDeedKnowledge(question, { limit: 5 }));

@@ -58,6 +58,10 @@ test("lo stato AI pubblica copertura e gap verificabili", () => {
   assert.match(serverSource, /accounting_knowledge_loaded:/);
   assert.match(serverSource, /accounting_topics:/);
   assert.match(serverSource, /accounting_knowledge_verified_at:/);
+  assert.match(serverSource, /professional_gold_knowledge_loaded:/);
+  assert.match(serverSource, /professional_gold_topics:/);
+  assert.match(serverSource, /bullion_private_knowledge_loaded:/);
+  assert.match(serverSource, /bullion_private_topics:/);
   assert.match(serverSource, /gemological_knowledge_loaded:/);
   assert.match(serverSource, /gemological_materials:/);
   assert.match(serverSource, /gemological_tools:/);
@@ -68,10 +72,21 @@ test("lo stato AI pubblica copertura e gap verificabili", () => {
 
 test("le domande contabili usano la base specialistica e non il fallback legale generico", () => {
   assert.match(appSource, /function isAurumFiscalAccountingQuestion/);
-  assert.match(appSource, /normativeQuestion && !accountingQuestion && !isAurumNormativeAnswerAdequate/);
+  assert.match(appSource, /normativeQuestion && !accountingQuestion && !professionalGoldQuestion && !isAurumNormativeAnswerAdequate/);
   assert.match(serverSource, /function isComproOroAccountingQuestion/);
   assert.match(serverSource, /Modalita contabile-fiscale/);
   assert.match(serverSource, /Non assegnare una scrittura o un regime definitivo/);
   assert.match(serverSource, /"agenziaentrate\.gov\.it"/);
   assert.match(serverSource, /"fondazioneoic\.eu"/);
+});
+
+test("le domande OPO, Banca d’Italia, lingotti e privati usano il percorso specialistico", () => {
+  assert.match(appSource, /function isAurumProfessionalGoldQuestion/);
+  assert.match(appSource, /const professionalGoldQuestion = isAurumProfessionalGoldQuestion\(question\)/);
+  assert.match(appSource, /!professionalGoldQuestion && !isAurumNormativeAnswerAdequate/);
+  assert.match(serverSource, /function isProfessionalGoldQuestion/);
+  assert.match(serverSource, /Modalita OPO-lingotti/);
+  assert.match(serverSource, /non presentare Banca d.Italia come gestore attuale del Registro OPO/i);
+  assert.match(serverSource, /"organismo-am\.it"/);
+  assert.match(serverSource, /"uif\.bancaditalia\.it"/);
 });
