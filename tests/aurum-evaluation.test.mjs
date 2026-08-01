@@ -66,7 +66,6 @@ test("i casi high risk richiedono fonti, cautele ed escalation", () => {
 
 test("il generatore è riproducibile e non usa rete o OpenAI", () => {
   assert.doesNotMatch(generatorSource, /from\s+["']openai["']|\bfetch\s*\(|https?\.request|WebSocket/i);
-  const node = "/Users/christiandinato/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node";
-  const regenerated = JSON.parse(execFileSync(node, [generatorUrl.pathname, "--stdout"], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 }));
+  const regenerated = JSON.parse(execFileSync(process.execPath, [generatorUrl.pathname, "--stdout"], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 }));
   assert.deepEqual(regenerated, cases);
 });
