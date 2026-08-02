@@ -220,7 +220,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260802-aurum-vendita-etica-16";
+const OROACTIVE_CLIENT_BUILD_ID = "20260802-aurum-benvenuto-17";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -303,6 +303,7 @@ const AURUM_DEFAULT_SETTINGS = {
   greeting: true,
   memory: true
 };
+const AURUM_WELCOME_MESSAGE = "Ciao, sono Aurum, l’assistente di OroActive. Sono a tua completa disposizione: puoi farmi qualsiasi domanda e userò la mia conoscenza specialistica del settore per aiutarti a trovare la risposta migliore possibile. Come posso aiutarti?";
 const AURUM_TIPS = [
   "Controlla sempre documento, firme e pagamento prima di archiviare.",
   "Ricorda il limite contanti negli ultimi 7 giorni.",
@@ -10652,18 +10653,10 @@ function maybeShowAurumDailyGreeting() {
   const key = aurumGreetingKey();
   if (localStorage.getItem(key)) return;
   localStorage.setItem(key, "shown");
-  state.aurumAskedMoodToday = true;
-  const birthdayGreeting = isAurumBirthdayToday()
-    ? `Buon compleanno ${aurumUserLabel()}! Ti auguro una giornata speciale. Come stai oggi?`
-    : `Ciao ${aurumUserLabel()}, bentornato in OroActive. Come stai oggi?`;
-  state.aurumMessages.push({
-    role: "assistant",
-    content: birthdayGreeting
-  });
-  renderAurumMessages();
+  state.aurumAskedMoodToday = false;
   showAurumTip(isAurumBirthdayToday()
     ? `Buon compleanno ${aurumUserLabel()}!`
-    : `Ciao ${aurumUserLabel()}, se vuoi sono qui per aiutarti nelle attivita di oggi.`);
+    : `Ciao ${aurumUserLabel()}, Aurum è a tua disposizione.`);
 }
 
 function sectionTipPool(section = state.aurumCurrentSection) {
@@ -10726,7 +10719,7 @@ function renderAurumMessages() {
   if (!state.aurumMessages.length) {
     aurumChatMessages.innerHTML = isPriceExplanation
       ? '<div class="empty-state">Aurum è pronto per spiegare prezzi, carature, titoli, costi, margini e scenari.</div>'
-      : '<div class="empty-state">Aurum conosce normativa compro oro, OPO e Registro OAM, dichiarazioni UIF, antiriciclaggio aggiornato, Banca d’Italia, lingotti e Good Delivery, custodia, frontiera, obblighi dei privati, contabilità e fiscalità specialistica, oro, argento, PGM, diamanti, gemme, strumenti, prove, sicurezza e valutazione. Le risposte settoriali mostrano le fonti verificate.</div>';
+      : `<article class="aurum-message assistant aurum-welcome-message">${escapeHtml(AURUM_WELCOME_MESSAGE)}</article>`;
   } else {
     aurumChatMessages.innerHTML = state.aurumMessages.map((message) => `
       <article class="aurum-message ${message.role === "user" ? "user" : "assistant"}">
