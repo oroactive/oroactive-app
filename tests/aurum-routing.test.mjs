@@ -12,6 +12,25 @@ import {
   searchSaleDeedKnowledge
 } from "../services/aurum/saleDeedKnowledge.js";
 import { searchSectorKnowledge } from "../services/aurum/sectorKnowledge.js";
+import { hasGoldCoinKnowledgeIntent, searchGoldCoinKnowledge } from "../services/aurum/goldCoinKnowledge.js";
+
+test("una scheda moneta specifica prevale su coaching, laboratorio e guida generica", () => {
+  const question = "Raccontami storia, peso e titolo del Krugerrand oro 1 oz";
+  const coinMatches = searchGoldCoinKnowledge(question, { limit: 5 });
+  const coinIntent = hasGoldCoinKnowledgeIntent(question, coinMatches);
+  assert.equal(coinIntent, true);
+  const route = resolveAurumKnowledgeRoute({
+    question,
+    coinIntent,
+    gemIntent: true,
+    sectorMatches: searchSectorKnowledge(question, { limit: 5 }),
+    coachingKnowledge: searchCoachingKnowledge(question)
+  });
+  assert.equal(route.hasGoldCoinContext, true);
+  assert.equal(route.hasGemologicalContext, false);
+  assert.equal(route.hasSaleDeedContext, false);
+  assert.equal(route.strongSectorPriority, true);
+});
 
 const regulatedCases = [
   "Quale comunicazione devo inviare all’OAM?",
@@ -48,6 +67,44 @@ for (const question of [
     assert.equal(route.hasSaleDeedContext, false);
     assert.equal(route.hasGemologicalContext, false);
     assert.equal(route.strongSectorPriority, true);
+  });
+}
+
+for (const question of [
+  "Come si forma geologicamente l'oro e come nasce un placer?",
+  "La kimberlite crea il diamante o lo trasporta?",
+  "Come si formano i PGE nel Bushveld?",
+  "Raccontami i ritrovamenti di monete d'oro delle dinastie Tudor"
+]) {
+  test(`geologia e storia numismatica restano conoscenza specialistica: ${question}`, () => {
+    const coaching = searchCoachingKnowledge(question);
+    const sector = searchSectorKnowledge(question, { limit: 5 });
+    assert.ok(sector.length > 0);
+    assert.equal(hasStrongComproOroSectorIntent(question, sector, coaching), true);
+    assert.equal(resolveAurumKnowledgeRoute({
+      question,
+      sectorMatches: sector,
+      coachingKnowledge: coaching
+    }).strongSectorPriority, true);
+  });
+}
+
+for (const question of [
+  "Come funziona la fusione e il campionamento di un lotto d'oro?",
+  "Quale trattenuta applica una fonderia al compro oro?",
+  "Come avviene il pagamento dopo il saggio della raffineria?",
+  "Quali fonderie di oro ci sono in Lombardia?"
+]) {
+  test(`la fonderia resta nella competenza settoriale: ${question}`, () => {
+    const coaching = searchCoachingKnowledge(question);
+    const sector = searchSectorKnowledge(question, { limit: 5 });
+    assert.ok(sector.length > 0);
+    assert.equal(hasStrongComproOroSectorIntent(question, sector, coaching), true);
+    assert.equal(resolveAurumKnowledgeRoute({
+      question,
+      sectorMatches: sector,
+      coachingKnowledge: coaching
+    }).strongSectorPriority, true);
   });
 }
 

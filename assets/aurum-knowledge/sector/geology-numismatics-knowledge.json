@@ -1,0 +1,398 @@
+{
+  "knowledgeVersion": "2026.08.02-geologia-numismatica",
+  "verifiedAt": "2 agosto 2026",
+  "topics": [
+    {
+      "id": "geologia-preziosi-processi-risorse",
+      "title": "Geologia dei preziosi: formazione, mineralizzazione, risorsa e riserva",
+      "category": "Geologia dei preziosi",
+      "keywords": ["formazione geologica", "genesi mineraria", "mineralizzazione", "giacimento", "risorsa mineraria", "riserva mineraria", "tenore", "tonnellaggio"],
+      "summary": "Oro, argento e platino non sono creati dai processi geologici terrestri: fluidi, magmi, metamorfismo, alterazione, erosione e sedimentazione li mobilizzano e concentrano; il diamante invece cristallizza dal carbonio nel mantello in condizioni di alta pressione.",
+      "facts": [
+        "Presenza di un elemento, mineralizzazione, risorsa e riserva economicamente estraibile sono concetti diversi e non intercambiabili.",
+        "Un indicatore mineralogico o geochimico suggerisce un modello da verificare, ma non dimostra da solo tenore, continuità, purezza, autenticità o valore.",
+        "La valutazione di un giacimento richiede campionamento rappresentativo, analisi, modello geologico, stima di tenore e tonnellaggio, recuperabilità e studio economico.",
+        "I giacimenti primari conservano il materiale nella roccia mineralizzata; quelli secondari derivano da alterazione, erosione, trasporto e riconcentrazione.",
+        "I processi supergenici agiscono vicino alla superficie e possono ridistribuire o arricchire alcuni metalli senza operare nello stesso modo in ogni clima o mineralogia."
+      ],
+      "checklist": [
+        "Chiarire se la domanda riguarda origine dell'elemento, formazione del minerale, tipo di giacimento o valutazione economica.",
+        "Separare osservazioni di terreno, indicatori, risultati analitici e inferenze geologiche.",
+        "Indicare sempre metodo, rappresentatività del campione e limiti prima di parlare di tenore o provenienza.",
+        "Per un caso reale rivolgersi a geologo e laboratorio qualificati e verificare proprietà, permessi e norme locali."
+      ],
+      "warnings": [
+        "Non dedurre una riserva mineraria, una provenienza o un valore commerciale da una fotografia o da un singolo campione.",
+        "Non proporre estrazioni improvvisate con mercurio, cianuri, acidi, esplosivi o fusione non controllata."
+      ],
+      "sources": [
+        {
+          "title": "USGS — Mineral Deposit Models",
+          "url": "https://www.usgs.gov/centers/gggsc/science/new-mineral-deposit-models-gold-phosphate-rare-earth-elements-and-placer-rare",
+          "authority": "U.S. Geological Survey",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "Geoscience Australia — Australian Mineral Facts",
+          "url": "https://www.ga.gov.au/education/minerals-energy/australian-mineral-facts",
+          "authority": "Geoscience Australia",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "geologia-oro-primario-placer",
+      "title": "Formazione geologica dell'oro: giacimenti primari e placer",
+      "category": "Geologia dei preziosi",
+      "keywords": ["geologia oro", "genesi oro", "oro primario", "oro alluvionale", "placer", "orogenico", "epitermale", "Carlin", "vena quarzo", "elettro"],
+      "summary": "L'oro può essere concentrato in rocce e vene da sistemi idrotermali, magmatici o metamorfici e poi liberato dall'alterazione; densità elevata e resistenza alla corrosione favoriscono la riconcentrazione meccanica in placer fluviali, terrazzi, spiagge e antichi canali.",
+      "facts": [
+        "I principali contesti primari comprendono depositi orogenici, epitermali, porfirici e skarn, sediment-hosted tipo Carlin e paleoplacer consolidati.",
+        "I depositi epitermali oro-argento si formano in genere nella crosta superficiale, entro circa 1.500 metri sotto la falda e sotto circa 300 °C.",
+        "L'oro può essere nativo, in lega naturale con argento come elettro, microscopico in pirite o arsenopirite oppure presente in tellururi.",
+        "Un placer nasce quando alterazione ed erosione liberano l'oro, il trasporto lo seleziona e la gravità lo concentra soprattutto nelle ghiaie e nelle trappole sedimentarie.",
+        "Forma arrotondata o appiattita di una particella può indicare trasporto, ma non determina da sola distanza dalla sorgente, purezza o valore.",
+        "Quarzo, pirite, arsenopirite o elementi guida come As, Sb, Hg, Bi e Te non provano isolatamente la presenza di oro."
+      ],
+      "checklist": [
+        "Distinguere roccia sorgente, mineralizzazione primaria, alterazione e deposito secondario.",
+        "Descrivere struttura, litologia, minerali associati e contesto tettonico senza trasformare indicatori in diagnosi.",
+        "Usare campioni rappresentativi e metodi analitici adeguati per confermare presenza e tenore.",
+        "Per provenienza o sfruttabilità integrare dati mineralogici, geochimici, strutturali ed economici."
+      ],
+      "warnings": [
+        "La presenza di pirite o quarzo non significa automaticamente che la roccia contenga oro economicamente rilevante.",
+        "La raccolta e il campionamento dipendono da proprietà del terreno, autorizzazioni e normativa locale."
+      ],
+      "sources": [
+        {
+          "title": "USGS — Descriptive models for epithermal gold-silver deposits",
+          "url": "https://www.usgs.gov/publications/descriptive-models-epithermal-gold-silver-deposits",
+          "authority": "U.S. Geological Survey",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "USGS — Gold in placer deposits",
+          "url": "https://www.usgs.gov/publications/gold-placer-deposits",
+          "authority": "U.S. Geological Survey",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "USGS — Orogenic gold deposits",
+          "url": "https://www.usgs.gov/publications/orogenic-gold-deposits-a-proposed-classification-context-their-crustal-distribution",
+          "authority": "U.S. Geological Survey",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "geologia-argento-giacimenti",
+      "title": "Formazione geologica dell'argento: minerali e sistemi di giacimento",
+      "category": "Geologia dei preziosi",
+      "keywords": ["geologia argento", "genesi argento", "argento nativo", "VMS", "SEDEX", "epitermale argento", "galena argentifera", "acantite", "clorargirite", "supergenico"],
+      "summary": "L'argento nativo è relativamente raro: più spesso è contenuto in solfuri, solfosali, cloruri, galena argentifera o elettro e si concentra in sistemi vulcanogenici, sedimentari e magmatico-idrotermali, spesso come sottoprodotto di piombo, zinco, rame o oro.",
+      "facts": [
+        "L'USGS raggruppa molti depositi ricchi in argento in quattro famiglie genetiche: VMS, SEDEX, lithogene e magmatico-idrotermali.",
+        "I VMS derivano da circolazione idrotermale in ambienti vulcanici sottomarini; i SEDEX da fluidi di bacino che depongono solfuri stratiformi.",
+        "I sistemi magmatico-idrotermali comprendono vene, sostituzioni in carbonati, depositi epitermali e sistemi porfirici.",
+        "Minerali argentiferi possono includere acantite/argentite, pirargirite, proustite, tetraedrite e clorargirite, oltre all'argento in galena o elettro.",
+        "L'ossidazione superficiale può ridistribuire l'argento e produrre arricchimenti supergenici, ma l'esito dipende da mineralogia, pH, redox, clima e idrologia.",
+        "La presenza di galena o di un solfuro non permette di stimare il contenuto d'argento senza analisi."
+      ],
+      "checklist": [
+        "Identificare minerali ospiti e paragenesi prima di attribuire il tipo di giacimento.",
+        "Distinguere mineralizzazione primaria da ossidazione e arricchimento supergenico.",
+        "Verificare l'argento con analisi mineralogiche e chimiche appropriate al campione.",
+        "Interpretare i risultati insieme a litologia, strutture, alterazioni e metalli associati."
+      ],
+      "warnings": [
+        "Aspetto e colore non distinguono in modo affidabile argento nativo, minerali argentiferi e altri solfuri.",
+        "Non usare reagenti o processi estrattivi pericolosi fuori da laboratori e impianti autorizzati."
+      ],
+      "sources": [
+        {
+          "title": "USGS — A review of silver-rich mineral deposits and their metallogeny",
+          "url": "https://www.usgs.gov/publications/a-review-silver-rich-mineral-deposits-and-their-metallogeny",
+          "authority": "U.S. Geological Survey",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "Geoscience Australia — Silver",
+          "url": "https://www.ga.gov.au/education/minerals-energy/australian-mineral-facts/silver",
+          "authority": "Geoscience Australia",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "geologia-diamante-mantello-kimberlite",
+      "title": "Formazione geologica del diamante: mantello, kimberlite e depositi secondari",
+      "category": "Geologia dei preziosi",
+      "keywords": ["geologia diamante", "formazione diamante", "mantello", "kimberlite", "lamproite", "cratone", "diamante superdeep", "deposito alluvionale diamanti", "minerali indicatori"],
+      "summary": "La maggioranza dei diamanti naturali si forma da fluidi o fusi contenenti carbonio nel mantello litosferico antico; kimberliti e, più raramente, lamproiti non creano il diamante ma lo raccolgono e lo trasportano rapidamente verso la superficie.",
+      "facts": [
+        "La maggioranza dei diamanti naturali economicamente importanti si forma normalmente a circa 150–200 km di profondità in peridotiti o eclogiti sotto antichi cratoni.",
+        "Esistono diamanti sublitosferici o superdeep formati più in profondità; sono una minoranza delle varietà geologiche studiate.",
+        "La kimberlite non crea e non produce il diamante: è il principale sistema vulcanico di trasporto verso la superficie e può essere molto più giovane dei cristalli trasportati.",
+        "Molte kimberliti sono prive di diamanti o non ne contengono quantità e qualità economicamente utili.",
+        "Erosione e trasporto possono concentrare diamanti in depositi alluvionali, costieri o marini secondari.",
+        "Granato piropo cromifero, cromite, diopside cromifero e picroilmenite sono possibili indicatori; composizione chimica e contesto, non il solo colore, ne determinano l'utilità.",
+        "Aspetto, colore o una singola inclusione non consentono normalmente di attribuire con certezza la provenienza geografica di un diamante."
+      ],
+      "checklist": [
+        "Separare sempre ambiente di crescita del diamante, roccia di trasporto e deposito minerario superficiale.",
+        "Valutare inclusioni e indicatori con microscopia e analisi chimica professionale.",
+        "Per un deposito distinguere pipe primaria, materiale alterato e accumulo secondario.",
+        "Per origine geografica dichiarare i limiti e usare solo metodi e laboratori che offrano un servizio validato."
+      ],
+      "warnings": [
+        "Kimberlite non significa automaticamente presenza di diamanti e diamante non significa automaticamente qualità gemma.",
+        "La genesi geologica non autentica una pietra né distingue da sola naturale, laboratory-grown e simulante."
+      ],
+      "sources": [
+        {
+          "title": "GIA — Diamonds from the Deep",
+          "url": "https://my.gia.edu/gems-gemology/winter-2018-how-do-diamonds-form-in-the-deep-earth",
+          "authority": "Gemological Institute of America",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "GIA — Kimberlites: Earth's Diamond Delivery System",
+          "url": "https://www.gia.edu/gems-gemology/summer-2019-kimberlites-earths-diamond-delivery-system",
+          "authority": "Gemological Institute of America",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "GIA — Geographic origin of diamonds and its limits",
+          "url": "https://www.gia.edu/gems-gemology/fall-2022-geographic-origin-diamonds",
+          "authority": "Gemological Institute of America",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "geologia-platino-pge",
+      "title": "Formazione geologica del platino e degli elementi del gruppo del platino",
+      "category": "Geologia dei preziosi",
+      "keywords": ["geologia platino", "PGE", "PGM", "Bushveld", "Stillwater", "Great Dyke", "Norilsk", "intrusione mafica", "intrusione ultramafica", "cromitite", "reef PGE", "placer platino"],
+      "summary": "Platino, palladio, rodio, rutenio, iridio e osmio tendono a concentrarsi in sistemi magmatici mafico-ultramafici, soprattutto intrusioni stratificate e solfuri Ni-Cu; alterazione ed erosione possono poi produrre placer secondari di minerali e leghe PGE resistenti.",
+      "facts": [
+        "I sei PGE sono platino, palladio, rodio, rutenio, iridio e osmio; ricorrono insieme ma in proporzioni e minerali ospiti differenti.",
+        "Le maggiori concentrazioni economiche sono associate a intrusioni mafiche-ultramafiche stratificate come Bushveld, Great Dyke e Stillwater e ai sistemi di Noril'sk-Talnakh.",
+        "Durante raffreddamento e cristallizzazione del magma, liquidi solfurei immiscibili e accumuli di minerali possono concentrare PGE, nichel e rame.",
+        "I reef sono orizzonti stratiformi relativamente sottili; i contact-type comprendono mineralizzazione disseminata o massiva vicino ai margini dell'intrusione.",
+        "Cromitite, cromite, pirrotina, pentlandite, calcopirite e magnetite possono accompagnare i PGE, ma nessuno di questi minerali ne dimostra da solo la presenza.",
+        "Alterazione ed erosione possono liberare fasi PGE resistenti e la gravità può concentrarle in ghiaie o sabbie fluviali e costiere."
+      ],
+      "checklist": [
+        "Distinguere platino elementare, lega naturale, minerale PGE e concentrazione geochimica.",
+        "Inquadrare la mineralizzazione nella stratigrafia dell'intrusione, nei contatti e nei condotti magmatici.",
+        "Verificare indicatori con mineralogia e analisi chimica, non con il solo aspetto macroscopico.",
+        "Per i placer ricostruire roccia sorgente, trasporto, minerali pesanti associati e rappresentatività del campione."
+      ],
+      "warnings": [
+        "La cromite non prova e non dimostra da sola la presenza di platino: serve analisi professionale.",
+        "Un'anomalia PGE non equivale a una riserva economicamente estraibile."
+      ],
+      "sources": [
+        {
+          "title": "USGS — Platinum-group elements",
+          "url": "https://www.usgs.gov/publications/platinum-group-elements-so-many-excellent-properties",
+          "authority": "U.S. Geological Survey",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "USGS — Magmatic ore deposits in layered intrusions",
+          "url": "https://www.usgs.gov/publications/magmatic-ore-deposits-layered-intrusions-descriptive-model-reef-type-pge-and-contact",
+          "authority": "U.S. Geological Survey",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "USGS — Platinum-group elements in layered intrusions",
+          "url": "https://www.usgs.gov/centers/gmeg/science/platinum-group-elements-layered-intrusions-associated-midcontinent-rift",
+          "authority": "U.S. Geological Survey",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "monete-auree-metodo-storico-tecnico",
+      "title": "Monete auree: metodo storico, specifiche tecniche e distinzione bullion-numismatica",
+      "category": "Numismatica e storia",
+      "keywords": ["monete auree", "moneta bullion", "moneta numismatica", "specifiche moneta", "peso moneta", "oro fino moneta", "diametro moneta", "bordo moneta", "Elenco Monete"],
+      "summary": "Una scheda professionale di moneta aurea unisce contesto storico e autorità emittente a dati misurabili: anno e zecca, nominale, titolo, peso lordo, oro fino, diametro, spessore quando disponibile, bordo, dritto, rovescio e varianti note.",
+      "facts": [
+        "L'Elenco Monete OroActive contiene 197 schede con storia e specifiche individuali consultabili da Aurum.",
+        "Una bullion coin è valutata principalmente per metallo, peso e titolo; una moneta numismatica può incorporare rarità, tiratura, variante, conservazione, provenienza e domanda collezionistica.",
+        "Peso lordo e oro fino non sono sinonimi: una moneta 22 kt può contenere la quantità dichiarata di oro fino insieme a metalli di lega che aumentano il peso totale.",
+        "Il valore nominale attesta lo status monetario ma normalmente non coincide con valore del metallo o valore collezionistico.",
+        "Dritto e rovescio possono cambiare durante la stessa famiglia per sovrano, ritratto, anniversario, zecca, finitura o anno.",
+        "La lista UE delle monete d'oro da investimento è fiscale e annuale: non autentica il singolo esemplare e non determina il premio numismatico."
+      ],
+      "checklist": [
+        "Identificare famiglia, paese, nominale, anno, zecca e variante prima di usare una specifica.",
+        "Confrontare peso, diametro, spessore se noto, bordo, titolo e oro fino con la scheda della specifica emissione.",
+        "Esaminare legende, ritratto, stemmi, segni di zecca e dettagli di dritto e rovescio.",
+        "Separare valore del metallo, trattamento fiscale, autenticità e premio numismatico."
+      ],
+      "warnings": [
+        "Non propagare automaticamente le specifiche di una versione moderna a tutte le annate della stessa famiglia.",
+        "La corrispondenza a una scheda non autentica la moneta: servono controlli fisici indipendenti e, nei casi dubbi, un esperto numismatico."
+      ],
+      "sources": [
+        {
+          "title": "Commissione europea — elenco 2026 delle monete d'oro da investimento",
+          "url": "https://eur-lex.europa.eu/eli/C/2025/5923/oj/ita",
+          "authority": "Commissione europea",
+          "verifiedAt": "2 agosto 2026",
+          "status": "vigente per il 2026"
+        },
+        {
+          "title": "United States Mint — What is bullion?",
+          "url": "https://www.usmint.gov/coin-programs/bullion-coins/",
+          "authority": "United States Mint",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "British Museum — Department of Money and Medals",
+          "url": "https://www.britishmuseum.org/our-work/departments/money-and-medals",
+          "authority": "British Museum",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "monete-auree-paesi-sovrani-dinastie",
+      "title": "Monete auree dei paesi: sovrani, dinastie e identità nazionale",
+      "category": "Numismatica e storia",
+      "keywords": ["storia monete oro", "re sulle monete", "regine monete", "sovrani monete", "dinastie monete", "Sovereign", "Marengo", "Double Eagle", "Libertad", "Krugerrand", "Panda", "Maple Leaf"],
+      "summary": "Le monete auree raccontano autorità politica, riforme monetarie, imperi, indipendenze e simboli nazionali: Aurum collega queste storie alle 197 schede tecniche individuali dell'Elenco Monete senza confondere la storia comune di una famiglia con la variante del singolo anno.",
+      "facts": [
+        "La Sovereign nasce sotto Enrico VII nel 1489; la moderna sovrana da 20 scellini viene ripristinata nel 1817 sotto Giorgio III e cambia ritratto con il monarca.",
+        "Marenghi e 20 franchi riflettono lo standard dell'Unione Monetaria Latina e le vicende di Napoleone, dei Savoia e di altri sovrani europei, ma anno e zecca restano essenziali.",
+        "Negli Stati Uniti Half Eagle ed Eagle iniziano nel 1795; il Double Eagle da 20 dollari compare nel 1849 nel contesto della corsa all'oro californiana.",
+        "La Libertad messicana riprende Vittoria Alata, vulcani e stemma nazionale; dal 1981 nasce in alcuni tagli e dal 1991 si aggiungono le frazioni minori.",
+        "Il Krugerrand del 1967 lega Paul Kruger e springbok alla commercializzazione dell'oro sudafricano; il contesto storico non va separato dalla storia dell'apartheid e delle restrizioni internazionali.",
+        "Panda cinese, Maple Leaf canadese, Kangaroo australiano e Philharmonic austriaca usano simboli culturali o nazionali e hanno specifiche che cambiano per taglio e, in alcuni casi, periodo."
+      ],
+      "checklist": [
+        "Partire dalla scheda individuale e poi ricostruire famiglia monetale, autorità emittente e contesto politico.",
+        "Verificare se il ritratto appartiene a re, regina, imperatore, presidente o figura allegorica.",
+        "Distinguere emissione originale, riconio ufficiale, commemorativa, proof, fior di conio e bullion.",
+        "Citare sempre anno e variante quando un fatto non vale per l'intera famiglia."
+      ],
+      "warnings": [
+        "Non attribuire automaticamente una moneta a un sovrano solo perché la famiglia monetale è associata a quella dinastia.",
+        "Storia affascinante e rarità non determinano da sole autenticità o valore: conservazione, tiratura, variante e mercato vanno verificati."
+      ],
+      "sources": [
+        {
+          "title": "The Royal Mint — storia dei disegni della Sovereign",
+          "url": "https://www.royalmint.com/stories/sovereign/the-sovereign-reverse-designs/",
+          "authority": "The Royal Mint",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "United States Mint — Gold Eagle Coins",
+          "url": "https://www.usmint.gov/learn/coins-and-medals/circulating-coins/gold-eagles",
+          "authority": "United States Mint",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "Banco de México — Serie Libertad oro",
+          "url": "https://www.banxico.org.mx/banknotes-and-coins/libertad-series-gold-banco-me001.html",
+          "authority": "Banco de México",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "ritrovamenti-monete-oro-sovrani-dinastie",
+      "title": "Ritrovamenti di monete d'oro collegati a sovrani e dinastie",
+      "category": "Numismatica e storia",
+      "keywords": ["ritrovamenti monete oro", "tesoro monete oro", "ripostiglio aureo", "hoard", "dinastia Tudor", "West Norfolk", "Asthall", "Hackney Hoard", "Salcombe", "Tesoro di Como", "Saddle Ridge"],
+      "summary": "Ripostigli, relitti e tesori monetali possono fissare una cronologia e mostrare reti politiche o commerciali, ma raramente rivelano con certezza chi li nascose o perché: Aurum racconta solo casi documentati da musei e istituzioni.",
+      "facts": [
+        "West Norfolk: 131 monete d'oro e quattro altri oggetti, sepolti poco dopo il 600; il gruppo comprende nove solidi bizantini e numerosi tremissi dell'Europa merovingia.",
+        "Asthall: 210 angel e half-angel inglesi, da Enrico VI alla prima monetazione di Enrico VIII, probabilmente nascosti attorno al 1526 durante l'età Tudor.",
+        "Hackney Hoard: 80 Double Eagle statunitensi datati 1854–1913 furono sepolti prima della Seconda guerra mondiale; l'erede del proprietario originario fu rintracciato dopo la scoperta del 2007.",
+        "Salcombe: oltre 400 monete d'oro, gioielli e lingotti provenienti da un relitto; molte monete appartengono alla dinastia sa'diana del Marocco e l'ultima è del 1631 sotto Muhammad al-Walid.",
+        "Tesoro di Como: il rinvenimento di via Diaz del 2018 comprende 1.000 solidi del V secolo e manufatti aurei, una fonte eccezionale sul tardo Impero romano.",
+        "Saddle Ridge: 1.427 monete d'oro statunitensi in sette contenitori, scoperte in California nel 2013; l'identità di chi le nascose resta ignota.",
+        "Un ripostiglio prova l'associazione archeologica solo quando contesto, documentazione e catena di custodia sono affidabili; non prova automaticamente il movente della deposizione."
+      ],
+      "checklist": [
+        "Citare luogo, data di scoperta, composizione, intervallo cronologico e istituzione che documenta il ritrovamento.",
+        "Distinguere fatti osservati, datazione numismatica, interpretazione storica e ipotesi sul proprietario.",
+        "Collegare re o dinastia soltanto attraverso iscrizioni, autorità emittente e cronologia documentate.",
+        "Per un ritrovamento reale preservare contesto e provenienza e contattare le autorità competenti prima di pulire o disperdere il gruppo."
+      ],
+      "warnings": [
+        "Non sappiamo con certezza perché la maggior parte dei tesori fu nascosta: guerra, risparmio, commercio o perdita restano spesso ipotesi.",
+        "Un racconto popolare, una fotografia o una provenienza commerciale non dimostrano l'unità archeologica di un ripostiglio."
+      ],
+      "sources": [
+        {
+          "title": "British Museum — West Norfolk gold coin hoard",
+          "url": "https://www.britishmuseum.org/sites/default/files/2021-11/Largest_ever_find_of_gold_coins_from_Anglo_Saxon_England.pdf",
+          "authority": "British Museum",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "National Heritage Memorial Fund — Asthall hoard of Tudor gold coins",
+          "url": "https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/231634/1373.pdf",
+          "authority": "National Heritage Memorial Fund",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "Hackney Council — Hackney Hoard",
+          "url": "https://news.hackney.gov.uk/news/gold-coin-from-the-hackney-hoard-on-display-at-hackney-museum",
+          "authority": "Hackney Council / Hackney Museum",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "British Museum — Salcombe treasure and Sa'dian dynasty",
+          "url": "https://www.britishmuseum.org/sites/default/files/2019-09/Arab_World_Resource_Web.pdf",
+          "authority": "British Museum",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "Ministero della Cultura — Il tesoro di Como, via Diaz 2018",
+          "url": "https://sabapcolc.cultura.gov.it/comunicato-stampa-presentazione-del-volume-il-tesoro-di-como-via-diaz-2018/",
+          "authority": "Ministero della Cultura — SABAP",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "Smithsonian National Museum of American History — Saddle Ridge Hoard",
+          "url": "https://americanhistory.si.edu/explore/exhibitions/value-money/online/new-acquisitions/saddle-ridge-hoard",
+          "authority": "Smithsonian Institution",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    }
+  ]
+}

@@ -116,6 +116,70 @@ test("Aurum avvia il tutorial Utenti solo su richiesta esplicita", async () => {
   assert.match(handler, /classifyAurumTutorialConfirmation/);
 });
 
+test("Aurum non avvia il tutorial Fusioni per una domanda specialistica", async () => {
+  const app = await file("app.js");
+  const names = [
+    "aurumNormalize",
+    "isAurumUsersTopic",
+    "isAurumExplicitTutorialRequest",
+    "isAurumExplicitUsersTutorialRequest",
+    "isAurumFoundryQuestion",
+    "inferAurumTutorialId"
+  ];
+  const source = names.map((name) => extractFunction(app, name)).join("\n");
+  const api = new Function(
+    "aurumSectionKey",
+    `${source}; return { inferAurumTutorialId, isAurumFoundryQuestion };`
+  )(() => "menu");
+
+  for (const question of [
+    "Come funziona la fusione dell'oro?",
+    "Quale margine trattiene la fonderia?",
+    "Quali raffinerie fondono oro in Lombardia?",
+    "Come paga una fonderia il compro oro?",
+    "Quali materiali separano oro e rame in una lega?"
+  ]) {
+    assert.equal(api.inferAurumTutorialId(question), "", question);
+    assert.equal(api.isAurumFoundryQuestion(question), true, question);
+  }
+  for (const question of [
+    "Avvia il tutorial fusioni",
+    "Guidami passo passo nella sezione fusioni",
+    "Fammi la guida del lotto fusione"
+  ]) {
+    assert.equal(api.inferAurumTutorialId(question), "tutorial_fusioni", question);
+    assert.equal(api.isAurumFoundryQuestion(question), false, question);
+  }
+});
+
+test("Aurum non scambia la formazione geologica per il tutorial Academy", async () => {
+  const app = await file("app.js");
+  const names = [
+    "aurumNormalize",
+    "isAurumUsersTopic",
+    "isAurumGeologyOrNumismaticsQuestion",
+    "isAurumExplicitTutorialRequest",
+    "isAurumExplicitUsersTutorialRequest",
+    "inferAurumTutorialId"
+  ];
+  const source = names.map((name) => extractFunction(app, name)).join("\n");
+  const api = new Function(
+    "aurumSectionKey",
+    `${source}; return { inferAurumTutorialId, isAurumGeologyOrNumismaticsQuestion };`
+  )(() => "menu");
+
+  for (const question of [
+    "Come avviene la formazione geologica dell'oro?",
+    "Come si forma un diamante nel mantello?",
+    "Raccontami la storia della Sterlina d'oro",
+    "Quali sono peso e titolo del Krugerrand?"
+  ]) {
+    assert.equal(api.isAurumGeologyOrNumismaticsQuestion(question), true, question);
+    assert.equal(api.inferAurumTutorialId(question), "", question);
+  }
+  assert.equal(api.inferAurumTutorialId("Avvia il tutorial Academy"), "tutorial_academy");
+});
+
 test("Negozi usa eliminazione logica, conferma e layout dedicato", async () => {
   const [app, server, schema, migration, index, styles] = await Promise.all([
     file("app.js"),

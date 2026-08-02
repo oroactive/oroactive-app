@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "knowledgeVersion": "2026.08.01-opo-bullion",
-  "verifiedAt": "1 agosto 2026",
+  "knowledgeVersion": "2026.08.02-fonderia-lombardia",
+  "verifiedAt": "2 agosto 2026",
   "jurisdiction": "Italia e standard tecnici internazionali di settore",
   "scope": [
     "attività compro oro",
@@ -13,7 +13,9 @@
     "contabilità, fiscalità e controllo economico specialistico per il settore compro oro",
     "operatori professionali in oro, Registro OAM e dichiarazioni UIF",
     "lingotti, standard Good Delivery, riserve auree e custodia",
-    "possesso, trasferimenti, frontiera e dichiarazioni dei privati"
+    "possesso, trasferimenti, frontiera e dichiarazioni dei privati",
+    "fonderia, fusione, campionamento, saggio, affinazione e liquidazione dei lotti",
+    "impianti lombardi per il recupero dei metalli preziosi verificati su fonti ufficiali"
   ],
   "topics": [
     {
@@ -2563,6 +2565,339 @@
           "authority": "Organismo Italiano di Contabilità",
           "status": "principio contabile vigente consultato",
           "verifiedAt": "1 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "fonderia-filiera-compro-oro",
+      "title": "Rapporto operativo tra compro oro e fonderia",
+      "category": "Fonderia e raffinazione",
+      "keywords": ["rapporto compro oro fonderia", "filiera", "conferimento lotto", "conto lavorazione", "catena di custodia", "destinatario lotto", "OCO OPO fonderia", "contratto raffinazione"],
+      "summary": "Il compro oro conferisce il lotto a una fonderia o a un operatore qualificato per vendita, fusione, saggio, affinazione o conto lavorazione: titolarità del metallo, tracciabilità, campioni, resa, fixing, costi e liquidazione devono essere definiti prima della consegna.",
+      "facts": [
+        "Fonderia e compro oro svolgono ruoli diversi: il negozio raccoglie e documenta gli oggetti usati, mentre l'impianto riceve lotti tracciati e svolge le lavorazioni industriali concordate.",
+        "La scheda dell'operazione deve poter ricondurre il lotto al destinatario al quale gli oggetti sono ceduti o conferiti per trasformazione o recupero, conservando la catena documentale prevista.",
+        "Vendita definitiva e conto lavorazione non sono equivalenti: nella vendita cambia la proprietà del metallo; nel conto lavorazione il conferente conserva normalmente la titolarità e paga il servizio, secondo contratto.",
+        "Prima del conferimento vanno distinti oro industriale, oro da investimento, oggetti preziosi usati e materiali da fusione, perché perimetro OCO/OPO, fatturazione e dichiarazioni possono cambiare.",
+        "Il lotto deve avere codice univoco, provenienza, peso di partenza, descrizione, sigilli o evidenze di integrità, documento di trasporto e autorizzazioni interne coerenti.",
+        "Il contratto deve indicare chi pesa, fonde, campiona e analizza; quale laboratorio decide; come si gestiscono campione testimone, controanalisi, contestazioni e residui recuperabili.",
+        "Per scegliere il destinatario si verificano identità societaria, sede effettiva dell'impianto, iscrizioni applicabili, coperture assicurative, capacità tecnica e condizioni economiche scritte.",
+        "Le operazioni in oro e i rapporti con un OPO possono attivare obblighi ulteriori: la qualifica della controparte non va dedotta dal nome commerciale ma verificata nel Registro OAM e nei documenti contrattuali."
+      ],
+      "checklist": [
+        "Classificare materiale, destinazione e modello contrattuale: vendita, conto lavorazione, affinazione con restituzione oppure accredito su conto metallo.",
+        "Verificare controparte, sede operativa, iscrizione OAM quando applicabile, coordinate bancarie e soggetti autorizzati al ritiro.",
+        "Creare il lotto con codice, peso, foto, documenti di origine, sigilli, trasporto assicurato e verbale di consegna.",
+        "Concordare per iscritto metodo di campionamento e saggio, tolleranze, campione testimone, laboratorio arbitro e tempi di contestazione.",
+        "Riconciliare a chiusura peso iniziale, componenti rimossi, peso fuso, titolo, peso fino pagabile, residui, costi, fattura e incasso o metallo restituito."
+      ],
+      "warnings": [
+        "Non consegnare un lotto basandosi soltanto su una quotazione telefonica: resa, fixing, costi e proprietà del metallo devono risultare da documenti coerenti.",
+        "L'iscrizione OAM come OPO non dimostra da sola che la società possieda una fonderia o una raffineria interna.",
+        "Il corretto trattamento IVA e dichiarativo dipende dalla natura effettiva del materiale e dell'operazione e deve essere validato dal commercialista."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017, disciplina dell'attività di compro oro",
+          "url": "https://www.gazzettaufficiale.it/eli/id/2017/06/20/17G00109/sg",
+          "authority": "Gazzetta Ufficiale della Repubblica Italiana",
+          "status": "testo ufficiale da consultare nella versione vigente",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "OAM, Vademecum Operatori Professionali in Oro",
+          "url": "https://www.organismo-am.it/vademecum-opo/vademecum",
+          "authority": "Organismo Agenti e Mediatori",
+          "status": "pagina istituzionale corrente",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "OAM, Registro delle sedi operative OPO",
+          "url": "https://www.organismo-am.it/elenchi-registri/opo/index_sede_operativa.html",
+          "authority": "Organismo Agenti e Mediatori",
+          "status": "registro ufficiale da interrogare al momento della verifica",
+          "verifiedAt": "2 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "fonderia-fusione-omogeneizzazione-campionamento",
+      "title": "Fusione, omogeneizzazione e campionamento del lotto",
+      "category": "Fonderia e raffinazione",
+      "keywords": ["fusione oro", "forno induzione", "crogiolo refrattario", "fondenti", "omogeneizzazione", "campione rappresentativo", "dip sample", "peso fuso", "bilancio di massa", "scorie"],
+      "summary": "La fusione professionale rende il lotto sufficientemente omogeneo per ricavarne un campione rappresentativo; non purifica da sola l'oro. Pesate, materiali rimossi, bagno fuso, campioni, scorie e residui devono restare collegati allo stesso codice di lotto.",
+      "facts": [
+        "Il flusso tipico comprende accettazione e pesatura, cernita documentata, preparazione compatibile, fusione controllata, omogeneizzazione, colata o campionamento, saggio e bilancio di massa.",
+        "Gli impianti professionali usano forni adatti alla matrice, crogioli e refrattari compatibili, sistemi di aspirazione e abbattimento, utensili di colata, bilance e contenitori identificati.",
+        "Fondenti e materiali di copertura sono selezionati dalla fonderia in funzione della lega e delle impurità; aiutano la gestione di ossidi e scorie ma non sostituiscono l'affinazione.",
+        "Pietre, acciaio, molle, riempitivi, rivestimenti, organici e altri componenti estranei vanno rimossi o gestiti con una procedura che ne registri peso e destinazione.",
+        "L'omogeneizzazione è essenziale: un campione prelevato da materiale non uniforme può produrre un titolo non rappresentativo e quindi una liquidazione errata.",
+        "Il campione può essere suddiviso tra fonderia, cliente e laboratorio arbitro; sigilli, massa e custodia dei campioni devono essere verbalizzati.",
+        "Scorie, polveri, crogioli esausti, filtri e residui possono ancora contenere preziosi e vanno inclusi nel piano di recupero e nel bilancio di massa.",
+        "Umidità, contaminanti incompatibili, refrattari degradati e fumi metallici sono pericoli industriali: la lavorazione richiede impianto, procedure, aspirazione e personale formato."
+      ],
+      "checklist": [
+        "Registrare peso lordo, tara, componenti rimossi e peso contabile del lotto prima della fusione.",
+        "Controllare corrispondenza tra codice lotto, sigilli, contenitori, forno/crogiolo e registro di lavorazione.",
+        "Chiedere come viene verificata l'omogeneità e come viene prelevato, diviso e conservato il campione testimone.",
+        "Riconciliare peso fuso, campioni, scorie, residui, titolo analitico e peso fino riconosciuto.",
+        "Conservare verbale di fusione, certificato di analisi, fotografie o pesate disponibili e condizioni di contestazione."
+      ],
+      "warnings": [
+        "Non tentare la fusione in negozio senza impianto autorizzato, valutazione dei rischi, aspirazione, dispositivi di protezione e personale qualificato.",
+        "Il calo apparente non è automaticamente oro perduto né compenso della fonderia: può includere componenti non preziosi, residui e differenze di campionamento.",
+        "Una lettura XRF superficiale prima della fusione non sostituisce il saggio concordato su un campione omogeneo."
+      ],
+      "sources": [
+        {
+          "title": "LBMA, Sampling and Assaying",
+          "url": "https://www.lbma.org.uk/publications/spotlight-on-north-american-gold-silver-refining/chapter-4-sampling-and-assaying",
+          "authority": "London Bullion Market Association",
+          "status": "guida tecnica di settore consultata",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "LBMA, Proactive Monitoring dei raffinatori",
+          "url": "https://www.lbma.org.uk/good-delivery/proactive-monitoring",
+          "authority": "London Bullion Market Association",
+          "status": "programma tecnico corrente",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "INAIL, fonderie di leghe ferrose e non ferrose",
+          "url": "https://www.inail.it/portale/ricerca-e-tecnologia/it/terza-missione/applicativi-per-la-salute-e-la-sicurezza-sul-lavoro/buone-pratiche/metallurgia/fonderie-di-leghe-ferrose-e-non-ferrose.html",
+          "authority": "INAIL",
+          "status": "buone pratiche per salute e sicurezza",
+          "verifiedAt": "2 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "fonderia-saggio-affinazione-separazione-leghe",
+      "title": "Saggio, affinazione e separazione delle leghe preziose",
+      "category": "Fonderia e raffinazione",
+      "keywords": ["saggio oro", "fire assay", "coppellazione", "XRF", "ICP", "AAS", "OES", "affinazione oro", "separazione leghe", "pirometallurgia", "idrometallurgia", "elettrolisi", "oro argento rame PGM"],
+      "summary": "La fusione omogeneizza ma non separa automaticamente oro, argento, rame e PGM. Il saggio determina la composizione del campione; l'affinazione industriale usa una combinazione di processi piro-, idrometallurgici o elettrolitici scelta in base alla matrice e agli obiettivi di purezza e recupero.",
+      "facts": [
+        "Fusione, saggio e affinazione sono fasi differenti: la prima crea un lotto omogeneo, il secondo misura il contenuto, la terza separa e purifica i metalli.",
+        "La coppellazione o fire assay è un metodo di riferimento per il titolo dell'oro su campione rappresentativo; richiede laboratorio, controllo qualità e gestione professionale dei materiali pericolosi.",
+        "XRF è rapida e non distruttiva ma misura soprattutto la superficie; ICP, AAS e OES possono integrare l'analisi secondo concentrazione, matrice e precisione richiesta.",
+        "I processi pirometallurgici sfruttano operazioni ad alta temperatura; quelli idrometallurgici trasferiscono selettivamente i metalli in soluzione; quelli elettrolitici li depositano sotto controllo elettrico.",
+        "La scelta del ciclo dipende da titolo, argento, rame, PGM, contaminanti, forma fisica, volume, specifica del prodotto finale e autorizzazioni dell'impianto.",
+        "Il recupero economico comprende anche argento e PGM quando presenti e pagabili; il contratto deve specificare quali metalli vengono analizzati e riconosciuti.",
+        "Certificato di analisi, materiali di riferimento, repliche, calibrazione, principio dei quattro occhi e laboratorio arbitro riducono errori e conflitti.",
+        "Aurum descrive principi e controlli, ma non fornisce quantità, temperature, concentrazioni o sequenze operative di reagenti: sono attività industriali per personale formato in impianto autorizzato."
+      ],
+      "checklist": [
+        "Definire quali elementi devono essere misurati, con quale metodo, limite di rilevazione, tolleranza e regola di arrotondamento.",
+        "Verificare che il campione sia rappresentativo e che siano disponibili un duplicato o un campione testimone sigillato.",
+        "Confrontare risultato XRF con metodo di riferimento o tecnica strumentale adeguata quando il valore o la matrice lo richiedono.",
+        "Chiedere quali metalli sono pagabili e come vengono rendicontati residui, scorie, polveri, filtri e soluzioni di processo.",
+        "Pretendere certificato finale con identificativo lotto, metodo, titolo, incertezza o tolleranza applicabile, data e responsabile."
+      ],
+      "warnings": [
+        "Non usare una ricetta generica di affinazione: acidi corrosivi, gas tossici, alte temperature, piombo e rifiuti pericolosi richiedono autorizzazioni e controlli specialistici.",
+        "Non considerare la XRF superficiale come certificazione definitiva di un intero lotto eterogeneo.",
+        "Un titolo più preciso non corregge un campione non rappresentativo: il campionamento è parte della misura."
+      ],
+      "sources": [
+        {
+          "title": "LBMA, Sampling and Assaying",
+          "url": "https://www.lbma.org.uk/publications/spotlight-on-north-american-gold-silver-refining/chapter-4-sampling-and-assaying",
+          "authority": "London Bullion Market Association",
+          "status": "guida tecnica di settore consultata",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "ISO 11426:2021, determinazione dell'oro mediante coppellazione",
+          "url": "https://www.iso.org/standard/75771.html",
+          "authority": "International Organization for Standardization",
+          "status": "standard pubblicato",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "Commissione europea JRC, BREF Non-Ferrous Metals Industries",
+          "url": "https://publications.jrc.ec.europa.eu/repository/handle/JRC107041",
+          "authority": "Commissione europea, Joint Research Centre",
+          "status": "documento tecnico di riferimento consultato",
+          "verifiedAt": "2 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "fonderia-costi-trattenute-margine",
+      "title": "Costi, trattenute, resa e margine della fonderia",
+      "category": "Fonderia e raffinazione",
+      "keywords": ["margine fonderia", "percentuale trattenuta", "trattenuta fonderia", "costo fusione", "costo saggio", "costo affinazione", "percentuale pagabile", "accountability", "resa", "calo fusione", "spread fixing", "preventivo"],
+      "summary": "Non esiste una percentuale ufficiale o universale trattenuta dalla fonderia. Il risultato economico dipende da titolo e peso riconosciuti, metalli pagabili, fixing, spread, resa contrattuale e costi separati di fusione, saggio, affinazione, trasporto, assicurazione e finanziamento.",
+      "facts": [
+        "La remunerazione può essere una tariffa fissa per lotto, un costo per peso, una percentuale pagabile inferiore al cento per cento, una ritenzione di metallo, uno spread sul fixing o una combinazione trasparente di queste voci.",
+        "Il margine commerciale della fonderia non coincide con il calo: calo fisico o apparente, differenza di saggio, resa pagabile, tariffa e spread sono grandezze differenti.",
+        "Il peso fino regolato deriva da peso contabile del lotto, titolo finale concordato e percentuale pagabile prevista dal contratto.",
+        "Il netto monetario deriva dal peso fino regolato valorizzato al benchmark e momento di fixing concordati, meno tutte le commissioni e spese dichiarate.",
+        "Volume, frequenza, purezza, complessità della matrice, metalli secondari recuperabili, tempi e rischio di prezzo modificano le condizioni commerciali.",
+        "Le condizioni individuali di raffinazione sono normalmente negoziate e non costituiscono un listino legale; un numero isolato non è un benchmark affidabile per il mercato italiano.",
+        "Una quotazione apparentemente alta può produrre un netto peggiore se usa un fixing diverso, una percentuale pagabile inferiore o costi non inclusi.",
+        "Il confronto corretto usa lo stesso peso, lo stesso titolo, lo stesso fixing e lo stesso momento temporale, mostrando trattenuta effettiva complessiva e tempo di incasso."
+      ],
+      "checklist": [
+        "Richiedere un preventivo scritto che separi fusione, saggio, affinazione, metalli pagabili, minimi, trasporto, assicurazione, spread e oneri finanziari.",
+        "Inserire peso e titolo ipotetici uguali in ogni offerta e calcolare peso fino riconosciuto, valore lordo, costi e netto finale.",
+        "Chiedere il benchmark di prezzo, l'orario o la finestra di fixing e chi può impartire l'ordine.",
+        "Riconciliare il consuntivo con verbale di pesata, certificato di saggio, percentuale pagabile, fatture e nota di liquidazione.",
+        "Monitorare nel tempo resa, costo effettivo per grammo fino, scostamento tra saggio interno ed esterno e giorni di liquidazione."
+      ],
+      "warnings": [
+        "Non presentare 2%, 3%, 4%, 5% o qualsiasi altra percentuale come trattenuta tipica senza un'offerta scritta riferita a lotto, data e servizi precisi.",
+        "Non imputare automaticamente ogni differenza all'oro perso: componenti non preziosi, campionamento, residui e arrotondamenti vanno riconciliati.",
+        "Un anticipo rapido può incorporare costi o rischio di prezzo diversi dalla liquidazione dopo saggio."
+      ],
+      "sources": [
+        {
+          "title": "Platform for Collaboration on Tax, Transfer Pricing in Mining with a Focus on Africa",
+          "url": "https://www.imf.org/-/media/Files/News/press-release/pr1715mineralspricing.ashx",
+          "authority": "IMF, OECD, United Nations e World Bank Group",
+          "status": "riferimento sui fattori negoziali delle refining charges; non è un listino italiano",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "LBMA, Precious Metal Losses in Refineries",
+          "url": "https://www.lbma.org.uk/alchemist/issue-101/where-did-the-gold-go-precious-metal-losses-in-refineries",
+          "authority": "London Bullion Market Association",
+          "status": "articolo tecnico di settore consultato",
+          "verifiedAt": "2 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "fonderia-pagamenti-conto-metallo",
+      "title": "Pagamenti della fonderia, fixing e conto metallo",
+      "category": "Fonderia e raffinazione",
+      "keywords": ["pagamento fonderia", "liquidazione lotto", "bonifico", "conto dedicato", "anticipo conguaglio", "conto lavorazione", "conto metallo", "ritiro fisico", "fixing", "fattura elettronica", "tempi pagamento"],
+      "summary": "La fonderia può liquidare una vendita con bonifico dopo saggio e fixing, riconoscere un anticipo con conguaglio, restituire metallo affinato in conto lavorazione oppure accreditarlo su conto metallo. Non esiste un termine unico: titolo, proprietà, prezzo, spese e scadenza dipendono dal contratto e dai documenti fiscali.",
+      "facts": [
+        "Nella vendita definitiva il corrispettivo deriva normalmente da peso fino riconosciuto e prezzo fissato, al netto delle voci contrattuali, e viene pagato con mezzo tracciabile.",
+        "Nell'anticipo con conguaglio una somma provvisoria è calcolata su stima; saggio e fixing determinano poi saldo a credito o debito e relativa documentazione.",
+        "Nel conto lavorazione il cliente paga il servizio e riceve metallo puro, semilavorati o un accredito metallico secondo le condizioni concordate; non è automaticamente una vendita.",
+        "Il conto metallo rappresenta una quantità di metallo fino, ma contratto e rendiconto devono chiarire titolarità, custodia, disponibilità, costi, ordine di vendita o ritiro e rischio di controparte.",
+        "Banco Villa pubblica, come propria condizione commerciale e non come regola generale, bonifico dopo fattura elettronica con valuta due giorni, ritiro fisico, conto metallo o trasformazione.",
+        "Per l'operatore compro oro i flussi finanziari dell'attività transitano sul conto dedicato comunicato all'OAM; le operazioni da 500 euro in su richiedono mezzi tracciabili.",
+        "In assenza di una scadenza speciale della fonderia, termini e mora nelle transazioni commerciali dipendono dal contratto e dal D.Lgs. 231/2002 quando applicabile.",
+        "La fatturazione, incluso l'eventuale reverse charge, dipende dalla natura reale del materiale e dell'operazione e non dal semplice fatto che la controparte sia una fonderia."
+      ],
+      "checklist": [
+        "Stabilire per iscritto vendita o conto lavorazione, momento di trasferimento della proprietà, metalli pagabili e documenti fiscali.",
+        "Concordare benchmark, data e ora del fixing, autorizzati a impartire l'ordine, valuta, spread e gestione di un fixing mancato.",
+        "Indicare anticipo, base di calcolo, conguaglio, termine di pagamento, IBAN dedicato e conseguenze di contestazione del saggio.",
+        "Per conto metallo verificare rendiconto, segregazione o natura del credito, costi di custodia, disponibilità, ritiro e rischio di controparte.",
+        "Riconciliare ordine di fixing, certificato di saggio, nota di liquidazione, fattura elettronica, bonifico o movimento metallico."
+      ],
+      "warnings": [
+        "Non descrivere l'anticipo o la valuta a due giorni di una singola azienda come prassi universale del settore.",
+        "Conto metallo, deposito fisico segregato e credito verso la controparte non sono necessariamente la stessa cosa.",
+        "Prima del pagamento verificare coordinate bancarie con un canale indipendente per ridurre il rischio di frode su IBAN."
+      ],
+      "sources": [
+        {
+          "title": "Banco Villa, fonderia e modalità di liquidazione",
+          "url": "https://www.bancovilla.com/fonderia.html",
+          "authority": "Banco Villa / 8853 S.p.A.",
+          "status": "condizioni commerciali aziendali da riconfermare prima del lotto",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "OAM, conto corrente dedicato alle operazioni compro oro",
+          "url": "https://www.organismo-am.it/conto-corrente-dedicato",
+          "authority": "Organismo Agenti e Mediatori",
+          "status": "pagina istituzionale corrente",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "D.Lgs. 231/2002, ritardi di pagamento nelle transazioni commerciali",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=002G0265&atto.dataPubblicazioneGazzetta=2002-10-23&tipoDettaglio=singolavigenza",
+          "authority": "Normattiva",
+          "status": "testo vigente da verificare sul caso concreto",
+          "verifiedAt": "2 agosto 2026"
+        }
+      ]
+    },
+    {
+      "id": "fonderie-lombardia-verificate",
+      "title": "Fonderie e raffinerie di oro verificate in Lombardia",
+      "category": "Fonderia e raffinazione",
+      "keywords": ["fonderie Lombardia", "raffinerie Lombardia", "fondere oro Milano", "fonderia Bergamo", "fonderia Brescia", "fonderia Monza Brianza", "Carrara Bussero", "CIMI Burago", "Banco Villa Pero", "Aurea Gussago", "Simply Gold Albino", "Target Valmadonna"],
+      "summary": "Elenco informativo non esaustivo verificato il 2 agosto 2026 su pagine ufficiali: distingue impianti lombardi che dichiarano fusione o affinazione da sedi soltanto commerciali e intermediari. Prima di affidare un lotto vanno riconfermati Registro OAM, sede operativa, servizi, minimi, assicurazione, certificazioni e condizioni.",
+      "facts": [
+        "Carrara S.p.A., Bussero (MI): dichiara fusione con impianti dedicati, affinazione di oro, argento, platino e palladio e laboratorio con coppellazione, XRF e ICP-OES; il certificato RJC consultato include il sito lombardo.",
+        "CIMI S.p.A., stabilimento di Burago di Molgora (MB): dichiara recupero e affinazione di scarti, analisi, lingotti e semilavorati; il certificato RJC consultato identifica Burago come sito produttivo.",
+        "8853 S.p.A. / Banco Villa, Pero (MI): dichiara fusione, omogeneizzazione, laboratorio interno e più modalità di liquidazione per compro oro e imprese; lo stato delle certificazioni va ricontrollato perché alcune date cadono nel 2026.",
+        "Aurea Operatore dell'Oro S.r.l., Gussago (BS): dichiara fonderia interna, omogeneizzazione, affinazione e laboratorio di saggio; iscrizioni e condizioni devono essere verificate direttamente prima del conferimento.",
+        "Simply Gold S.r.l., Albino (BG): dichiara fusione e affinazione di oro e altri preziosi e laboratorio con coppellazione e tecniche strumentali; iscrizioni, metodi, prezzi e quantità minime vanno riconfermati.",
+        "Target S.r.l. ha sede centrale e commerciale a Milano, ma il certificato RJC colloca fonderia e raffineria a Valmadonna (AL), in Piemonte: non è classificata qui come impianto lombardo.",
+        "Iride Metalli opera in Lombardia ma dichiara di usare fonderie partner: non va presentata come fonderia propria senza una nuova evidenza ufficiale.",
+        "La presenza nell'elenco non è una raccomandazione commerciale né prova automatica di autorizzazione per ogni materiale: il Registro OAM e i documenti dell'impianto vanno verificati alla data del lotto."
+      ],
+      "checklist": [
+        "Interrogare il Registro OAM alla data del conferimento e confrontare ragione sociale, codice, sede legale e sede operativa.",
+        "Chiedere conferma scritta che il lotto sia lavorato nell'impianto indicato e non trasferito a un partner non dichiarato.",
+        "Confrontare metalli accettati, minimi di lotto, campionamento, saggio, certificazioni, assicurazione, tempi e modalità di liquidazione.",
+        "Richiedere preventivo omogeneo con resa pagabile, fixing, commissioni e procedura di contestazione.",
+        "Aggiornare l'elenco quando cambiano iscrizioni, sedi, certificazioni, servizi o pagine ufficiali."
+      ],
+      "warnings": [
+        "L'elenco è informativo, non esaustivo e fotografato al 2 agosto 2026; non sostituisce una due diligence sul fornitore.",
+        "Una sede commerciale in Lombardia non dimostra che la fusione avvenga fisicamente in Lombardia.",
+        "Certificazione RJC, iscrizione OAM e autorizzazioni ambientali hanno funzioni diverse e nessuna, isolatamente, prova tutte le capacità dichiarate."
+      ],
+      "sources": [
+        {
+          "title": "Carrara S.p.A., servizio di fusione",
+          "url": "https://carraraspa.it/fusione/",
+          "authority": "Carrara S.p.A.",
+          "status": "pagina aziendale ufficiale da riconfermare",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "CIMI S.p.A., certificazioni e processi dello stabilimento di Burago",
+          "url": "https://www.cimispa.it/azienda/certificazioni/",
+          "authority": "CIMI S.p.A.",
+          "status": "pagina aziendale ufficiale da riconfermare",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "Banco Villa, fonderia",
+          "url": "https://www.bancovilla.com/fonderia.html",
+          "authority": "Banco Villa / 8853 S.p.A.",
+          "status": "pagina aziendale ufficiale da riconfermare",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "Aurea, fonderia e raffineria",
+          "url": "https://www.aurea-operatoreoro.it/fonderia-e-raffineria",
+          "authority": "Aurea Operatore dell'Oro S.r.l.",
+          "status": "pagina aziendale ufficiale da riconfermare",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "Simply Gold, fusione metalli preziosi",
+          "url": "https://www.simply-gold.it/servizi/fusione-metalli-preziosi/",
+          "authority": "Simply Gold S.r.l.",
+          "status": "pagina aziendale ufficiale da riconfermare",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "RJC, certificato Target S.r.l.",
+          "url": "https://www.responsiblejewellery.com/wp-content/uploads/Target-Srl-RJC-Certificate-COP-20192-Template-C-EU.pdf",
+          "authority": "Responsible Jewellery Council",
+          "status": "certificato consultato per distinguere sede commerciale e impianto",
+          "verifiedAt": "2 agosto 2026"
+        },
+        {
+          "title": "OAM, Registro delle sedi operative OPO",
+          "url": "https://www.organismo-am.it/elenchi-registri/opo/index_sede_operativa.html",
+          "authority": "Organismo Agenti e Mediatori",
+          "status": "registro ufficiale da interrogare al momento della verifica",
+          "verifiedAt": "2 agosto 2026"
         }
       ]
     }

@@ -49,6 +49,14 @@ import {
   sectorKnowledgeSources
 } from "./services/aurum/sectorKnowledge.js";
 import {
+  AURUM_GOLD_COIN_CATALOG,
+  buildGoldCoinKnowledgeAnswer,
+  formatGoldCoinKnowledgeContext,
+  goldCoinKnowledgeSources,
+  hasGoldCoinKnowledgeIntent,
+  searchGoldCoinKnowledge
+} from "./services/aurum/goldCoinKnowledge.js";
+import {
   AURUM_GEM_KNOWLEDGE_STATS,
   buildGemologicalKnowledgeAnswer,
   formatGemologicalKnowledgeContext,
@@ -7082,7 +7090,7 @@ La confidence deve essere: alto, medio, basso oppure stringa vuota.`
 }
 
 function normalizeCoinCatalogForAi(inputCatalog = []) {
-  const allowedIds = new Set(GOLD_COIN_AI_CATALOG.map((coin) => coin.id));
+  const allowedIds = new Set(AURUM_GOLD_COIN_CATALOG.coins.map((coin) => coin.id));
   const fromClient = Array.isArray(inputCatalog)
     ? inputCatalog
       .filter((coin) => allowedIds.has(String(coin.id || "")))
@@ -7098,7 +7106,19 @@ function normalizeCoinCatalogForAi(inputCatalog = []) {
         hints: Array.isArray(coin.recognitionHints) ? coin.recognitionHints.slice(0, 8) : []
       }))
     : [];
-  return fromClient.length ? fromClient : GOLD_COIN_AI_CATALOG;
+  const synchronizedCatalog = AURUM_GOLD_COIN_CATALOG.coins.map((coin) => ({
+    id: coin.id,
+    name: coin.name,
+    country: coin.country,
+    purity: coin.purityLabel,
+    grossWeight: coin.grossWeight,
+    diameter: coin.diameter,
+    obverse: coin.obverse,
+    reverse: coin.reverse,
+    hints: (coin.recognitionHints || []).slice(0, 8)
+  }));
+  const clientById = new Map(fromClient.map((coin) => [coin.id, coin]));
+  return synchronizedCatalog.map((coin) => clientById.get(coin.id) || coin);
 }
 
 async function identifyGoldCoinWithOpenAi({ image = "", catalog = [] } = {}) {
@@ -7134,7 +7154,7 @@ Non usare questa analisi come autenticazione definitiva: e solo supporto formati
 Restituisci solo JSON valido secondo schema.
 
 CATALOGO AMMESSO:
-${JSON.stringify(referenceCatalog).slice(0, 14000)}`
+${JSON.stringify(referenceCatalog)}`
         },
         { type: "input_image", image_url: imageDataUrl, detail: "high" }
       ]
@@ -8657,7 +8677,23 @@ const trustedAssistantSourceDomains = [
   "osha.europa.eu",
   "camcom.it",
   "poliziadistato.it",
-  "rsc.org"
+  "rsc.org",
+  "usgs.gov",
+  "ga.gov.au",
+  "usmint.gov",
+  "royalmint.com",
+  "mint.ca",
+  "banxico.org.mx",
+  "samint.co.za",
+  "perthmint.com",
+  "muenzeoesterreich.at",
+  "pbc.gov.cn",
+  "britishmuseum.org",
+  "si.edu",
+  "cultura.gov.it",
+  "finds.org.uk",
+  "assets.publishing.service.gov.uk",
+  "news.hackney.gov.uk"
 ];
 
 function isTrustedAssistantSourceUrl(value = "") {
@@ -8753,6 +8789,16 @@ function isProfessionalGoldQuestion(question = "") {
     || /\bprivat[a-z]*\b.*\b(?:oro|lingott[a-z]*)\b.*\b(?:dichiar[a-z]*|plusvalenza|custod[a-z]*|estero|possesso|detenzione)\b/.test(normalized);
 }
 
+function isFoundryQuestion(question = "") {
+  const normalized = normalizeAssistantIntentText(question);
+  if (!normalized) return false;
+  const requestsAppTutorial = /\b(?:tutorial|guida|passo passo|sezione fusioni|nell app|dell app)\b/.test(normalized);
+  if (requestsAppTutorial) return false;
+  return /\b(?:fonderia|fonderie|raffineria|raffinerie|conto metallo|conto lavorazione|fire assay|coppellazione|campione testimone)\b/.test(normalized)
+    || /\b(?:fusione|affinazione|campionamento|saggio|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b.*\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b/.test(normalized)
+    || /\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b.*\b(?:fusione|affinazione|campionamento|saggio|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b/.test(normalized);
+}
+
 function buildComproOroNormativeAnswer(question = "") {
   const matches = searchSectorKnowledge(question, { limit: 4 });
   return buildSectorKnowledgeAnswer(question, matches).risposta;
@@ -8775,6 +8821,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
       citazioni: [],
       fonti: [],
       guida_atto: [],
+      conoscenza_numismatica: [],
       conoscenza_gemmologica: null,
       conoscenza_coaching: null,
       conoscenza_settoriale: [],
@@ -8809,6 +8856,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
       citazioni: [],
       fonti: [],
       guida_atto: [],
+      conoscenza_numismatica: [],
       conoscenza_gemmologica: null,
       conoscenza_coaching: null,
       conoscenza_settoriale: [],
@@ -8833,15 +8881,19 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const aurumMemoryProfile = buildAurumMemoryProfile(aurumMemories);
   const isAccountingQuestion = isComproOroAccountingQuestion(domanda);
   const professionalGoldQuestion = isProfessionalGoldQuestion(domanda);
+  const foundryQuestion = isFoundryQuestion(domanda);
   const isNormativeQuestion = mode === "normativa_operativa"
     || isComproOroNormativeQuestion(domanda)
     || isAccountingQuestion
-    || professionalGoldQuestion;
+    || professionalGoldQuestion
+    || foundryQuestion;
   const requestedFieldCandidate = /^[a-z0-9_]{1,80}$/i.test(String(aurumContext.requestedFieldId || ""))
     ? String(aurumContext.requestedFieldId)
     : "";
   const requestedSaleField = findSaleDeedFieldById(requestedFieldCandidate);
   const requestedFieldId = requestedSaleField?.id || "";
+  const coinMatches = searchGoldCoinKnowledge(domanda, { limit: 8 });
+  const coinIntent = hasGoldCoinKnowledgeIntent(domanda, coinMatches);
   const gemKnowledge = searchGemologicalKnowledge(domanda, { maxMaterials: 6, maxTools: 8 });
   const gemIntent = hasGemologicalKnowledgeIntent(gemKnowledge);
   const saleMatchesCandidate = requestedSaleField
@@ -8854,6 +8906,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     requestedFieldId,
     section: options.section || aurumContext.currentSection,
     gemIntent,
+    coinIntent,
     saleMatches: saleMatchesCandidate,
     sectorMatches: sectorMatchesCandidate,
     coachingKnowledge,
@@ -8861,10 +8914,12 @@ async function askOroActiveAssistant(question = "", options = {}) {
   });
   const {
     hasSaleDeedContext,
+    hasGoldCoinContext,
     hasGemologicalContext,
     strongSectorPriority
   } = knowledgeRoute;
   const hasCoachingContext = !hasSaleDeedContext
+    && !hasGoldCoinContext
     && !hasGemologicalContext
     && !strongSectorPriority
     && hasCoachingIntent(coachingKnowledge);
@@ -8903,6 +8958,11 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const coachingContext = hasCoachingContext
     ? formatCoachingKnowledgeContext(coachingKnowledge, { limit: 1 })
     : "";
+  const coinAnswer = buildGoldCoinKnowledgeAnswer(domanda, coinMatches);
+  const coinSources = hasGoldCoinContext ? goldCoinKnowledgeSources(coinMatches, 10) : [];
+  const coinContext = hasGoldCoinContext
+    ? formatGoldCoinKnowledgeContext(coinMatches, { limit: 5 })
+    : "";
   const gemAnswer = buildGemologicalKnowledgeAnswer(domanda, gemKnowledge);
   const gemSources = hasGemologicalContext ? gemologicalKnowledgeSources(gemKnowledge, 10) : [];
   const gemContext = hasGemologicalContext
@@ -8914,7 +8974,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const saleContext = hasSaleDeedContext
     ? formatSaleDeedKnowledgeContext(saleMatches, { limit: 3 })
     : "";
-  const sectorMatches = hasGemologicalContext || hasSaleDeedContext || hasCoachingContext
+  const sectorMatches = hasGoldCoinContext || hasGemologicalContext || hasSaleDeedContext || hasCoachingContext
     ? []
     : sectorMatchesCandidate;
   const sectorAnswer = buildSectorKnowledgeAnswer(domanda, sectorMatches);
@@ -8929,7 +8989,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(domanda);
   const shouldUseWeb = !hasRestrictedPersonalData
     && !hasCoachingContext
-    && (options.allowWeb === true || wantsCurrentWebVerification || (!hasSectorContext && !hasGemologicalContext && !hasSaleDeedContext && chunks.length < 3));
+    && (options.allowWeb === true || wantsCurrentWebVerification || (!hasSectorContext && !hasGoldCoinContext && !hasGemologicalContext && !hasSaleDeedContext && chunks.length < 3));
   const web = shouldUseWeb ? await webSearchFallback(externalSafeQuestion) : { available: false, results: [] };
   const redactedQuestion = redactAssistantPersonalData(externalSafeQuestion);
   const priceExplanationContext = aurumContext.priceExplanationContext && typeof aurumContext.priceExplanationContext === "object"
@@ -8967,7 +9027,9 @@ async function askOroActiveAssistant(question = "", options = {}) {
       ? "Modalita contabile-fiscale: spiega prima il principio teorico, poi i presupposti da verificare e infine la buona prassi documentale. Distingui contabilità, trattamento IVA, obblighi OCO/OPO e controllo di gestione. Non assegnare una scrittura o un regime definitivo senza forma giuridica, regime contabile, provenienza, natura e destinazione documentata dell’operazione."
       : professionalGoldQuestion
         ? "Modalita OPO-lingotti: rispondi prima al quesito specifico e poi presenta controlli e documenti. Distingui OCO, OPO, banca, privato, OAM, UIF, Banca d’Italia e Dogana; non presentare Banca d’Italia come gestore attuale del Registro OPO. Separa mera detenzione, operazione, frontiera, fiscalità e monitoraggio RW. Non sommare automaticamente dichiarazione UIF e doganale; non confondere SOS e dichiarazione ORO; non trattare Good Delivery come qualifica fiscale o garanzia del singolo lingotto retail. Considera il D.Lgs. 122/2026 vigente dal 23 luglio 2026 per titolare effettivo e antiriciclaggio e indica sempre quando una regola è legge, standard di mercato o buona pratica."
-        : "Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Distingui sempre OCO, OPO, obbligo legale e procedura interna."} Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nRisposta deterministica verificata:\n${buildComproOroNormativeAnswer(domanda)}`
+        : foundryQuestion
+          ? "Modalita fonderia-raffinazione: rispondi prima al quesito specifico e poi presenta controlli, documenti e condizioni contrattuali. Distingui sempre fusione, omogeneizzazione, campionamento, saggio e affinazione; separa calo, resa pagabile, tariffa, ritenzione di metallo e spread sul fixing. Spiega che non esiste una percentuale universale trattenuta dalla fonderia. Per impianti e servizi indica data della verifica e differenzia impianto produttivo, sede commerciale e intermediario. Descrivi soltanto principi, attrezzature e materiali per categorie: non fornire ricette operative, quantità, temperature, concentrazioni o sequenze di reagenti pericolosi."
+          : "Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Distingui sempre OCO, OPO, obbligo legale e procedura interna."} Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nRisposta deterministica verificata:\n${buildComproOroNormativeAnswer(domanda)}`
     : "";
   const safePriceExplanationText = redactAssistantPersonalData(priceExplanationText, 10000);
   const safeNormativeText = redactAssistantPersonalData(normativeText, 10000);
@@ -8977,11 +9039,14 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const webContext = (web.results || []).map((item, index) => (
     `[Web ${index + 1}: ${sanitizeAssistantUntrustedContext(item.title || "Fonte web", 240)}]\n${sanitizeAssistantUntrustedContext(item.snippet || "", 1600)}\n${item.url || ""}`
   )).join("\n\n---\n\n");
-  const responseSources = [...new Map([
+  const curatedResponseSources = [
+    ...coinSources,
     ...gemSources,
     ...saleSources,
     ...coachingSources,
-    ...sectorSources,
+    ...sectorSources
+  ].filter((source) => /^https:\/\//i.test(String(source?.url || "")));
+  const liveWebSources = [
     ...(web.results || []).map((item) => ({
       title: item.title || "Fonte web ufficiale",
       url: item.url || "",
@@ -8989,13 +9054,30 @@ async function askOroActiveAssistant(question = "", options = {}) {
       verifiedAt: "",
       status: "risultato consultato in tempo reale; verificare vigenza e pertinenza"
     }))
-  ].filter((source) => isTrustedAssistantSourceUrl(source.url)).map((source) => [source.url, source])).values()];
+  ].filter((source) => isTrustedAssistantSourceUrl(source.url));
+  const responseSources = [...new Map(
+    [...curatedResponseSources, ...liveWebSources].map((source) => [source.url, source])
+  ).values()];
   const sectorResults = sectorMatches.map(({ topic, score }) => ({
     id: topic.id,
     titolo: topic.title,
     categoria: topic.category,
     score
   }));
+  const coinResults = hasGoldCoinContext
+    ? coinMatches.map(({ coin, score }) => ({
+        id: coin.id,
+        titolo: coin.name,
+        paese: coin.country,
+        periodo: coin.mintYears,
+        nominale: coin.nominal,
+        titolo_oro: coin.purityLabel,
+        peso_lordo_g: coin.grossWeight,
+        oro_fino_g: coin.fineGold,
+        diametro_mm: coin.diameter,
+        score
+      }))
+    : [];
   const gemResults = hasGemologicalContext
     ? {
         materiali: gemKnowledge.materials.map((match) => ({
@@ -9034,6 +9116,10 @@ async function askOroActiveAssistant(question = "", options = {}) {
     ? web.results?.length
       ? "Guida professionale Atto di Vendita OroActive + ricerca web ufficiale"
       : "Guida professionale Atto di Vendita OroActive"
+    : hasGoldCoinContext
+      ? web.results?.length
+        ? "Elenco Monete OroActive + fonti numismatiche ufficiali + ricerca web ufficiale"
+        : "Elenco Monete OroActive + fonti numismatiche ufficiali"
     : hasGemologicalContext
       ? web.results?.length
         ? "Laboratorio Gemmologico OroActive + ricerca web ufficiale"
@@ -9060,6 +9146,25 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const privacyNotice = hasRestrictedPersonalData
       ? "\n\nNota privacy: ho escluso i dati personali rilevati e non li ho inviati a servizi esterni. Per una risposta più specifica, riformula usando dati anonimi."
       : "";
+    if (hasGoldCoinContext) {
+      return {
+        risposta: `${coinAnswer.risposta}${privacyNotice}`,
+        fonte: defaultSource,
+        dal_libro: false,
+        citazioni: coinSources.map((source) => `${source.title} — ${source.url}`),
+        fonti: coinSources,
+        guida_atto: [],
+        conoscenza_numismatica: coinResults,
+        conoscenza_gemmologica: null,
+        conoscenza_coaching: [],
+        conoscenza_settoriale: [],
+        risultati: [],
+        error: hasRestrictedPersonalData ? "Invio esterno bloccato per tutela dei dati personali" : "OpenAI non configurato",
+        privacy_filtered: hasRestrictedPersonalData,
+        safety: coachingSafety,
+        memory_used: aiMemories.length
+      };
+    }
     if (hasCoachingContext) {
       return {
         risposta: `${coachingAnswer.risposta}${privacyNotice}`,
@@ -9068,6 +9173,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
         citazioni: coachingAnswer.sources.map((source) => `${source.title} — ${source.url}`),
         fonti: coachingAnswer.sources,
         guida_atto: [],
+        conoscenza_numismatica: [],
         conoscenza_gemmologica: null,
         conoscenza_coaching: coachingResults,
         conoscenza_settoriale: [],
@@ -9086,6 +9192,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
         citazioni: saleAnswer.sources.filter((source) => source.url).map((source) => `${source.title} — ${source.url}`),
         fonti: saleAnswer.sources.filter((source) => source.url),
         guida_atto: saleResults,
+        conoscenza_numismatica: [],
         conoscenza_gemmologica: null,
         conoscenza_coaching: [],
         conoscenza_settoriale: [],
@@ -9102,6 +9209,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
         citazioni: gemAnswer.fonti.map((source) => `${source.title} — ${source.url}`),
         fonti: gemAnswer.fonti,
         guida_atto: [],
+        conoscenza_numismatica: [],
         conoscenza_gemmologica: gemResults,
         conoscenza_coaching: [],
         conoscenza_settoriale: [],
@@ -9118,6 +9226,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
         citazioni: sectorAnswer.sources.map((source) => `${source.title} — ${source.url}`),
         fonti: sectorAnswer.sources,
         guida_atto: [],
+        conoscenza_numismatica: [],
         conoscenza_gemmologica: null,
         conoscenza_coaching: [],
         conoscenza_settoriale: sectorResults,
@@ -9140,6 +9249,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
       citazioni: [],
       fonti: responseSources,
       guida_atto: saleResults,
+      conoscenza_numismatica: coinResults,
       conoscenza_gemmologica: gemResults,
       conoscenza_coaching: coachingResults,
       conoscenza_settoriale: sectorResults,
@@ -9160,7 +9270,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const client = openai;
     const result = await client.responses.create({
       model: openaiModel,
-      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Prima di rispondere devi capire l'intento reale della domanda: normativa, procedura, campo dell'app, prezzo, corso o supporto generale. Rispondi alla domanda dell'utente, non al campo visibile sullo schermo, salvo quando l'utente chiede esplicitamente "questo campo" o "spiegami il campo". Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}${isNormativeQuestion ? " Quando la domanda riguarda legge, normativa, decreti, antiriciclaggio o compro oro, rispondi prima con il riferimento normativo corretto e poi con gli effetti pratici per l'operatore. Non trasformare una domanda normativa in una spiegazione di un campo app." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, gestione negozio, procedure operative e formazione operatori.`}
+      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Prima di rispondere devi capire l'intento reale della domanda: normativa, procedura, geologia dei preziosi, numismatica, campo dell'app, prezzo, corso o supporto generale. Rispondi alla domanda dell'utente, non al campo visibile sullo schermo, salvo quando l'utente chiede esplicitamente "questo campo" o "spiegami il campo". Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}${isNormativeQuestion ? " Quando la domanda riguarda legge, normativa, decreti, antiriciclaggio o compro oro, rispondi prima con il riferimento normativo corretto e poi con gli effetti pratici per l'operatore. Non trasformare una domanda normativa in una spiegazione di un campo app." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, monete auree, gestione negozio, procedure operative e formazione operatori.`}
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Quando operi in coaching dichiara con chiarezza di essere un sistema IA, non un coach umano certificato e non un terapeuta. Ascolta e riformula prima di proporre soluzioni, chiedi quale esito sarebbe utile e poni una sola domanda aperta alla volta.
 Mantieni sempre autonomia e libertà decisionale dell'utente: non diagnosticare, non prescrivere, non promettere risultati, non esercitare pressione, non fare valutazioni occulte e non usare le confidenze per persuadere o profilare.
@@ -9178,6 +9288,8 @@ Non attribuire al libro contenuti non presenti nei passaggi forniti.
 Non citare leggi o norme come certe se non sono presenti nel contesto: in quel caso suggerisci verifica professionale.
 Per domande contabili, fiscali o economiche del compro oro separa sempre: principio teorico, presupposti da verificare, buona prassi documentale e decisione riservata al professionista. Non inventare una scrittura in partita doppia, un codice IVA, una scadenza o un’imposta applicabile senza i dati necessari.
 Per prove tecniche usa esiti proporzionati come compatibile, non compatibile, inconcludente o da riferire al laboratorio; non concludere autenticita, titolo esatto o origine da un solo screening.
+Per fusione e affinazione descrivi soltanto il processo professionale ad alto livello, i controlli e le categorie di impianti o materiali; non fornire ricette operative, quantità, temperature, concentrazioni o sequenze con reagenti pericolosi.
+Quando è presente il contesto dell'Elenco Monete, usa esclusivamente la scheda o le schede recuperate: non trasferire peso, diametro, titolo, storia o iconografia fra emissioni, tagli, anni, zecche e finiture diversi. Distingui storia, specifica tecnica, autenticazione e valutazione economica; una foto o una scheda non autentica né valuta il singolo esemplare.
 Quando è presente il contesto gemmologico, non mescolare proprietà di schede diverse: tratta una sola pietra primaria, salvo confronto esplicitamente richiesto, e distingui sempre naturale, sintetica, trattata, simulante, imitazione o assemblata.
 Quando è presente la guida dell'atto, distingui obbligo legale, procedura OroActive e campo mancante; spiega scopo, compilazione, condizioni, controlli, privacy ed errori senza chiedere o ripetere valori reali del cliente.
 Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : mode === "price_explanation" ? "Spiegazione prezzo Quotazione. Rispondi con questa struttura: titolo, punto di partenza, calcolo purezza, valore teorico, costi e rientro compro oro, massimo pagabile, prezzo consigliato, fluttuazione prevista, confronto competitor se disponibile, avviso finale. Usa solo i dati nel contesto prezzo; se un dato manca, dichiaralo." : mode === "normativa_operativa" ? "Normativa operativa. Rispondi con il riferimento normativo, anno, decreto, implicazioni operative e avviso di verifica professionale. Se il contesto e parziale, usa i riferimenti normativi caricati e dichiarane il limite." : "Assistente operativo."}
@@ -9193,6 +9305,9 @@ ${safeNormativeText || "Nessun contesto normativo specifico."}
 
 BASE SETTORIALE AURUM VERIFICATA:
 ${sectorContext || "Nessun argomento settoriale sufficientemente pertinente."}
+
+ELENCO MONETE OROACTIVE:
+${coinContext || "Nessuna moneta identificata con sufficiente precisione."}
 
 LABORATORIO GEMMOLOGICO OROACTIVE:
 ${gemContext || "Nessuna pietra o strumentazione identificata con sufficiente sicurezza."}
@@ -9239,7 +9354,7 @@ ${redactedQuestion}`,
       : parsedAnswer;
     return {
       risposta: locallyPersonalizedAnswer,
-      fonte: hasSectorContext || hasGemologicalContext || hasSaleDeedContext || hasCoachingContext
+      fonte: hasSectorContext || hasGoldCoinContext || hasGemologicalContext || hasSaleDeedContext || hasCoachingContext
         ? defaultSource
         : (parsed.fonte || defaultSource),
       dal_libro: Boolean(parsed.dal_libro && hasBookContext),
@@ -9248,6 +9363,7 @@ ${redactedQuestion}`,
         : Array.isArray(parsed.citazioni) ? parsed.citazioni : [],
       fonti: responseSources,
       guida_atto: saleResults,
+      conoscenza_numismatica: coinResults,
       conoscenza_gemmologica: gemResults,
       conoscenza_coaching: coachingResults,
       conoscenza_settoriale: sectorResults,
@@ -9262,6 +9378,24 @@ ${redactedQuestion}`,
       memory_used: aiMemories.length
     };
   } catch (error) {
+    if (hasGoldCoinContext) {
+      return {
+        risposta: coinAnswer.risposta,
+        fonte: defaultSource,
+        dal_libro: false,
+        citazioni: coinSources.map((source) => `${source.title} — ${source.url}`),
+        fonti: coinSources,
+        guida_atto: [],
+        conoscenza_numismatica: coinResults,
+        conoscenza_gemmologica: null,
+        conoscenza_coaching: [],
+        conoscenza_settoriale: [],
+        risultati: [],
+        safety: coachingSafety,
+        memory_used: aiMemories.length,
+        error: error.message || "OpenAI non disponibile"
+      };
+    }
     if (hasCoachingContext) {
       return {
         risposta: coachingAnswer.risposta,
@@ -9270,6 +9404,7 @@ ${redactedQuestion}`,
         citazioni: coachingAnswer.sources.map((source) => `${source.title} — ${source.url}`),
         fonti: coachingAnswer.sources,
         guida_atto: [],
+        conoscenza_numismatica: [],
         conoscenza_gemmologica: null,
         conoscenza_coaching: coachingResults,
         conoscenza_settoriale: [],
@@ -9287,6 +9422,7 @@ ${redactedQuestion}`,
         citazioni: saleAnswer.sources.filter((source) => source.url).map((source) => `${source.title} — ${source.url}`),
         fonti: saleAnswer.sources.filter((source) => source.url),
         guida_atto: saleResults,
+        conoscenza_numismatica: [],
         conoscenza_gemmologica: null,
         conoscenza_coaching: [],
         conoscenza_settoriale: [],
@@ -9302,6 +9438,7 @@ ${redactedQuestion}`,
         citazioni: gemAnswer.fonti.map((source) => `${source.title} — ${source.url}`),
         fonti: gemAnswer.fonti,
         guida_atto: [],
+        conoscenza_numismatica: [],
         conoscenza_gemmologica: gemResults,
         conoscenza_coaching: [],
         conoscenza_settoriale: [],
@@ -9317,6 +9454,7 @@ ${redactedQuestion}`,
         citazioni: sectorAnswer.sources.map((source) => `${source.title} — ${source.url}`),
         fonti: sectorAnswer.sources,
         guida_atto: [],
+        conoscenza_numismatica: [],
         conoscenza_gemmologica: null,
         conoscenza_coaching: [],
         conoscenza_settoriale: sectorResults,
@@ -9338,6 +9476,7 @@ ${redactedQuestion}`,
       citazioni: [],
       fonti: responseSources,
       guida_atto: saleResults,
+      conoscenza_numismatica: coinResults,
       conoscenza_gemmologica: gemResults,
       conoscenza_coaching: coachingResults,
       conoscenza_settoriale: sectorResults,
@@ -9389,8 +9528,19 @@ async function aiAssistantStatus() {
     "privati-fiscalita-lingotti-plusvalenze",
     "privati-stoccaggio-estero-monitoraggio-rw"
   ]);
+  const foundryTopicIds = new Set([
+    "fonderia-filiera-compro-oro",
+    "fonderia-fusione-omogeneizzazione-campionamento",
+    "fonderia-saggio-affinazione-separazione-leghe",
+    "fonderia-costi-trattenute-margine",
+    "fonderia-pagamenti-conto-metallo",
+    "fonderie-lombardia-verificate"
+  ]);
   const professionalGoldTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => professionalGoldTopicIds.has(topic.id));
   const bullionPrivateTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => bullionPrivateTopicIds.has(topic.id));
+  const foundryTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => foundryTopicIds.has(topic.id));
+  const geologyTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Geologia dei preziosi");
+  const numismaticTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Numismatica e storia");
 
   return {
     openai: Boolean(openai),
@@ -9412,6 +9562,18 @@ async function aiAssistantStatus() {
     bullion_private_knowledge_loaded: bullionPrivateTopics.length === bullionPrivateTopicIds.size,
     bullion_private_topics: bullionPrivateTopics.length,
     bullion_private_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
+    foundry_knowledge_loaded: foundryTopics.length === foundryTopicIds.size,
+    foundry_topics: foundryTopics.length,
+    foundry_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
+    geology_knowledge_loaded: geologyTopics.length === 5,
+    geology_topics: geologyTopics.length,
+    geology_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
+    numismatic_knowledge_loaded: numismaticTopics.length === 3 && AURUM_GOLD_COIN_CATALOG.coins.length === 197,
+    numismatic_topics: numismaticTopics.length,
+    gold_coin_catalog_loaded: AURUM_GOLD_COIN_CATALOG.coins.length === 197,
+    gold_coin_catalog_count: AURUM_GOLD_COIN_CATALOG.coins.length,
+    gold_coin_catalog_version: AURUM_GOLD_COIN_CATALOG.catalogVersion,
+    gold_coin_catalog_verified_at: AURUM_GOLD_COIN_CATALOG.verifiedAt,
     gemological_knowledge_loaded: AURUM_GEM_KNOWLEDGE_STATS.materialCount === 61 && AURUM_GEM_KNOWLEDGE_STATS.toolCount === 21,
     gemological_materials: AURUM_GEM_KNOWLEDGE_STATS.materialCount,
     gemological_tools: AURUM_GEM_KNOWLEDGE_STATS.toolCount,

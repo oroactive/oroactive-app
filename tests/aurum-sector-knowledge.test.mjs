@@ -15,9 +15,9 @@ import {
 } from "../services/aurum/privacy.js";
 
 test("la base settoriale Aurum è ampia, versionata e interamente fontata", () => {
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.01-opo-bullion");
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "1 agosto 2026");
-  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 59);
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.02-geologia-numismatica");
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "2 agosto 2026");
+  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 72);
 
   const ids = new Set();
   const categories = new Set();
@@ -35,7 +35,7 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
       assert.match(source.url, /^https:\/\//);
       assert.ok(source.title);
       assert.ok(source.authority);
-      assert.match(source.verifiedAt, /^(?:30 luglio|1 agosto) 2026$/);
+      assert.match(source.verifiedAt, /^(?:30 luglio|1 agosto|2 agosto) 2026$/);
     });
   }
 
@@ -49,7 +49,10 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
     "Fiscalità",
     "Contabilità e controllo",
     "Antifrode",
-    "Procedure operative"
+    "Procedure operative",
+    "Fonderia e raffinazione",
+    "Geologia dei preziosi",
+    "Numismatica e storia"
   ].forEach((category) => assert.ok(categories.has(category), `categoria mancante: ${category}`));
   const sourceUrls = new Set(AURUM_SECTOR_KNOWLEDGE.topics.flatMap((topic) => topic.sources.map((source) => source.url)));
   assert.ok(sourceUrls.has("https://www.gia.edu/gems-gemology/summer-2021-labnotes-cvd-laboratory-grown-diamond-with-counterfeit-gia-inscription"));
@@ -86,7 +89,21 @@ const retrievalCases = [
   ["Come riconcilio inventario e rimanenze dei lotti a fine anno?", "inventario-rimanenze-lotti-cali"],
   ["Come ammortizzo lo spettrometro XRF tra i cespiti?", "cespiti-ammortamenti-strumentazione"],
   ["Quali chiusure e F24 deve programmare il commercialista?", "chiusure-bilancio-imposte-scadenziario"],
-  ["Quali KPI uso per margine, cash flow e giorni di magazzino?", "controllo-gestione-margini-cash-flow"]
+  ["Quali KPI uso per margine, cash flow e giorni di magazzino?", "controllo-gestione-margini-cash-flow"],
+  ["Qual è il rapporto operativo e documentale tra compro oro e fonderia?", "fonderia-filiera-compro-oro"],
+  ["Come funziona la fusione dell’oro dalla pesata all’omogeneizzazione e al campione?", "fonderia-fusione-omogeneizzazione-campionamento"],
+  ["Come si separano oro argento rame e leghe durante l’affinazione?", "fonderia-saggio-affinazione-separazione-leghe"],
+  ["Quale percentuale o margine trattiene solitamente la fonderia sul lotto?", "fonderia-costi-trattenute-margine"],
+  ["Quanto trattiene solitamente una fonderia?", "fonderia-costi-trattenute-margine"],
+  ["Come paga la fonderia il negozio compro oro dopo il saggio?", "fonderia-pagamenti-conto-metallo"],
+  ["Quali fonderie in Lombardia fondono e affinano oro?", "fonderie-lombardia-verificate"],
+  ["Come si formano i giacimenti primari e i placer di oro?", "geologia-oro-primario-placer"],
+  ["Come si forma geologicamente l'argento nei sistemi VMS e SEDEX?", "geologia-argento-giacimenti"],
+  ["A quale profondità si forma il diamante e la kimberlite lo crea?", "geologia-diamante-mantello-kimberlite"],
+  ["Come si formano platino e PGE nelle intrusioni mafiche stratificate?", "geologia-platino-pge"],
+  ["Qual è la differenza fra moneta bullion e moneta numismatica?", "monete-auree-metodo-storico-tecnico"],
+  ["Raccontami ritrovamenti di monete d'oro legati a re e dinastie", "ritrovamenti-monete-oro-sovrani-dinastie"],
+  ["Quale IVA applico alla fattura verso la fonderia?", "reverse-charge-oro-industriale-fonderia"]
 ];
 
 for (const [query, expectedId] of retrievalCases) {
@@ -131,10 +148,83 @@ test("la risposta deterministica include limiti e fonti appartenenti ai topic re
   const answer = buildSectorKnowledgeAnswer("Posso certificare un lingotto solo con XRF?", matches);
   const allowedUrls = new Set(matches.flatMap(({ topic }) => topic.sources.map((source) => source.url)));
   assert.match(answer.risposta, /screening|compatibil|laboratorio/i);
-  assert.match(answer.risposta, /Fonti verificate il 1 agosto 2026/);
+  assert.match(answer.risposta, /Fonti verificate il 2 agosto 2026/);
   assert.ok(answer.sources.length);
   answer.sources.forEach((source) => assert.ok(allowedUrls.has(source.url), `fonte estranea al retrieval: ${source.url}`));
   assert.deepEqual(answer.sources, sectorKnowledgeSources(matches.slice(0, 1), 8));
+});
+
+test("Aurum distingue trattenuta, calo, spread e costi senza inventare una percentuale universale", () => {
+  const answer = buildSectorKnowledgeAnswer(
+    "Quale percentuale trattiene solitamente la fonderia?",
+    searchSectorKnowledge("Quale percentuale trattiene solitamente la fonderia?", { limit: 4 })
+  ).risposta;
+  assert.match(answer, /non esiste una percentuale.*universale/i);
+  assert.match(answer, /calo|resa/i);
+  assert.match(answer, /spread|fixing/i);
+  assert.match(answer, /saggio|affinazione/i);
+  assert.doesNotMatch(answer, /(?:trattiene|margine).{0,24}\b(?:2|3|4|5)\s*%/i);
+});
+
+test("Aurum tratta la raffinazione come processo industriale e non fornisce ricette pericolose", () => {
+  const answer = buildSectorKnowledgeAnswer(
+    "Quali materiali e reagenti separano le leghe durante l'affinazione?",
+    searchSectorKnowledge("Quali materiali e reagenti separano le leghe durante l'affinazione?", { limit: 4 })
+  ).risposta;
+  assert.match(answer, /fusione.*non.*separa|non separa.*fusione/i);
+  assert.match(answer, /pirometallurgic|idrometallurgic|elettrolitic/i);
+  assert.match(answer, /impianto.*autorizzat|personale.*format|laboratorio/i);
+  assert.match(answer, /non.*(?:quantit[aà]|temperature|concentrazioni|ricett)/i);
+});
+
+test("Aurum distingue formazione geologica, trasporto e indicatori non diagnostici", () => {
+  const diamond = buildSectorKnowledgeAnswer(
+    "La kimberlite crea i diamanti?",
+    searchSectorKnowledge("La kimberlite crea i diamanti?", { limit: 4 })
+  ).risposta;
+  assert.match(diamond, /non crea|non produce/i);
+  assert.match(diamond, /150.{0,8}200 km|150–200 km/i);
+  assert.match(diamond, /trasport/i);
+
+  const gold = buildSectorKnowledgeAnswer(
+    "Come si forma un placer d'oro?",
+    searchSectorKnowledge("Come si forma un placer d'oro?", { limit: 4 })
+  ).risposta;
+  assert.match(gold, /erosione|alterazione/i);
+  assert.match(gold, /densit[aà]/i);
+  assert.match(gold, /fluvial|ghiai/i);
+
+  const platinum = buildSectorKnowledgeAnswer(
+    "La cromite prova che c'è platino?",
+    searchSectorKnowledge("La cromite prova che c'è platino?", { limit: 4 })
+  ).risposta;
+  assert.match(platinum, /non.*prova|non.*dimostra/i);
+  assert.match(platinum, /analisi/i);
+});
+
+test("Aurum racconta i tesori monetali come fatti archeologici, non come leggende certe", () => {
+  const answer = buildSectorKnowledgeAnswer(
+    "Quali ritrovamenti di monete d'oro sono legati a re e dinastie?",
+    searchSectorKnowledge("Quali ritrovamenti di monete d'oro sono legati a re e dinastie?", { limit: 4 })
+  ).risposta;
+  assert.match(answer, /West Norfolk|Asthall|Hackney|Salcombe/i);
+  assert.match(answer, /dinastia|sovran|re /i);
+  assert.match(answer, /non.*dimostra|ipotesi|non sappiamo/i);
+  assert.match(answer, /British Museum|museo/i);
+});
+
+test("la directory lombarda è datata, non esaustiva e distingue gli impianti dalle sedi commerciali", () => {
+  const answer = buildSectorKnowledgeAnswer(
+    "Quali fonderie in Lombardia fondono oro?",
+    searchSectorKnowledge("Quali fonderie in Lombardia fondono oro?", { limit: 4 })
+  ).risposta;
+  for (const expected of ["Carrara", "CIMI", "Banco Villa", "Aurea", "Simply Gold"]) {
+    assert.match(answer, new RegExp(expected, "i"));
+  }
+  assert.match(answer, /non esaustiv/i);
+  assert.match(answer, /2 agosto 2026/i);
+  assert.match(answer, /Target.*Piemonte|Valmadonna.*Piemonte/i);
+  assert.match(answer, /verificare.*OAM|Registro OAM/i);
 });
 
 test("la risposta contabile non usa l’avvertenza gemmologica e rimanda al caso concreto", () => {

@@ -21,6 +21,13 @@ export function hasStrongComproOroSectorIntent(question = "", sectorMatches = []
   if (hasSpecialistAccountingMarker && sectorScore >= 24) return true;
   const hasBullionSpecialistMarker = /\b(?:good delivery|buona consegna|lingott[a-z]*|bullion|caveau|allocated|unallocated|riserve auree|banca d italia|quadro rw|monitoraggio fiscale|frontiera|dogana|adm)\b/.test(normalized);
   if (hasBullionSpecialistMarker && sectorScore >= 24) return true;
+  const requestsAppTutorial = /\b(?:tutorial|guida|passo passo|sezione fusioni|nell app|dell app)\b/.test(normalized);
+  const hasFoundrySpecialistMarker = /\b(?:fonderia|fonderie|raffineria|raffinerie|conto metallo|conto lavorazione|campione testimone|fire assay|coppellazione)\b/.test(normalized)
+    || /\b(?:fusione|affinazione|saggio|campionamento|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b.*\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b/.test(normalized)
+    || /\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b.*\b(?:fusione|affinazione|saggio|campionamento|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b/.test(normalized);
+  if (!requestsAppTutorial && hasFoundrySpecialistMarker && sectorScore >= 24) return true;
+  const hasGeologyOrNumismaticMarker = /\b(?:geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|placer|alluvional[a-z]*|orogenic[a-z]*|epitermal[a-z]*|vms|sedex|kimberlit[a-z]*|lamproit[a-z]*|mantello|pge|bushveld|cromitite|numismatic[a-z]*|monet[a-z]* aure[a-z]*|ritrovament[a-z]* di monet[a-z]*|tesor[a-z]* monetal[a-z]*|ripostigli[a-z]*|hoard|dinasti[a-z]* tudor)\b/.test(normalized);
+  if (hasGeologyOrNumismaticMarker && sectorScore >= 24) return true;
   const hasSectorMarker = /(compro oro|atto di vendita|contante|pagamento|quotazione|valutazione (?:dell |di )?oro|prezzo (?:dell |di )?oro|carat|titolo dell oro|bilancia|xrf|pietra di paragone|acido nitrico)/.test(normalized);
   return hasSectorMarker && sectorScore >= Math.max(40, coachingScore * 1.25);
 }
@@ -48,12 +55,14 @@ export function resolveAurumKnowledgeRoute({
   requestedFieldId = "",
   section = "",
   gemIntent = false,
+  coinIntent = false,
   saleMatches = [],
   sectorMatches = [],
   coachingKnowledge = {},
   isNormativeQuestion = false
 } = {}) {
   const strongSectorPriority = Boolean(isNormativeQuestion)
+    || Boolean(coinIntent)
     || hasStrongComproOroSectorIntent(question, sectorMatches, coachingKnowledge);
   const saleIntent = hasSaleDeedIntent(question, saleMatches, { requestedFieldId, section });
   const hasExplicitSaleDeedPriority = Boolean(String(requestedFieldId || "").trim())
@@ -61,10 +70,12 @@ export function resolveAurumKnowledgeRoute({
   const hasSaleDeedContext = saleIntent
     && (Boolean(String(requestedFieldId || "").trim()) || !gemIntent)
     && (!strongSectorPriority || hasExplicitSaleDeedPriority);
-  const hasGemologicalContext = Boolean(gemIntent) && !hasSaleDeedContext && !strongSectorPriority;
+  const hasGoldCoinContext = Boolean(coinIntent) && !hasSaleDeedContext;
+  const hasGemologicalContext = Boolean(gemIntent) && !hasSaleDeedContext && !hasGoldCoinContext && !strongSectorPriority;
   return Object.freeze({
     saleIntent,
     hasSaleDeedContext,
+    hasGoldCoinContext,
     hasGemologicalContext,
     strongSectorPriority
   });

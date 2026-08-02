@@ -41,13 +41,16 @@ test("la richiesta del campo passa al backend senza valori personali", () => {
   });
 });
 
-test("il backend mantiene separate guida atto, laboratorio e conoscenza settoriale", () => {
+test("il backend mantiene separate guida atto, monete, laboratorio e conoscenza settoriale", () => {
+  assert.match(serverSource, /searchGoldCoinKnowledge\(domanda/);
+  assert.match(serverSource, /hasGoldCoinKnowledgeIntent\(domanda, coinMatches\)/);
   assert.match(serverSource, /searchGemologicalKnowledge\(domanda/);
   assert.match(serverSource, /hasGemologicalKnowledgeIntent\(gemKnowledge\)/);
   assert.match(serverSource, /findSaleDeedFieldById\(requestedFieldCandidate\)/);
   assert.match(serverSource, /requestedSaleField[\s\S]{0,200}?score:\s*10_000/);
   assert.match(serverSource, /resolveAurumKnowledgeRoute\(\{/);
-  assert.match(serverSource, /hasGemologicalContext\s*\|\|\s*hasSaleDeedContext\s*\|\|\s*hasCoachingContext\s*\?\s*\[\]/);
+  assert.match(serverSource, /hasGoldCoinContext\s*\|\|\s*hasGemologicalContext\s*\|\|\s*hasSaleDeedContext\s*\|\|\s*hasCoachingContext\s*\?\s*\[\]/);
+  assert.match(serverSource, /ELENCO MONETE OROACTIVE:/);
   assert.match(serverSource, /LABORATORIO GEMMOLOGICO OROACTIVE:/);
   assert.match(serverSource, /GUIDA PROFESSIONALE ATTO DI VENDITA:/);
   assert.match(serverSource, /non mescolare proprietà di schede diverse/i);
@@ -62,6 +65,14 @@ test("lo stato AI pubblica copertura e gap verificabili", () => {
   assert.match(serverSource, /professional_gold_topics:/);
   assert.match(serverSource, /bullion_private_knowledge_loaded:/);
   assert.match(serverSource, /bullion_private_topics:/);
+  assert.match(serverSource, /foundry_knowledge_loaded:/);
+  assert.match(serverSource, /foundry_topics:/);
+  assert.match(serverSource, /foundry_knowledge_verified_at:/);
+  assert.match(serverSource, /geology_knowledge_loaded:/);
+  assert.match(serverSource, /geology_topics:/);
+  assert.match(serverSource, /numismatic_knowledge_loaded:/);
+  assert.match(serverSource, /gold_coin_catalog_count:/);
+  assert.match(serverSource, /gold_coin_catalog_version:/);
   assert.match(serverSource, /gemological_knowledge_loaded:/);
   assert.match(serverSource, /gemological_materials:/);
   assert.match(serverSource, /gemological_tools:/);
@@ -70,9 +81,35 @@ test("lo stato AI pubblica copertura e gap verificabili", () => {
   assert.match(serverSource, /sale_deed_known_gaps:/);
 });
 
+test("Aurum collega l'Elenco Monete e il riconoscimento AI allo stesso catalogo da 197 schede", () => {
+  assert.match(appSource, /coinEncyclopedia:\s*"elenco_monete"/);
+  assert.match(appSource, /elenco_monete:\s*\{/);
+  assert.match(serverSource, /AURUM_GOLD_COIN_CATALOG\.coins\.map/);
+  assert.match(serverSource, /AURUM_GOLD_COIN_CATALOG\.coins\.length === 197/);
+  assert.match(serverSource, /const clientById = new Map/);
+  assert.match(serverSource, /return synchronizedCatalog\.map/);
+  assert.match(serverSource, /CATALOGO AMMESSO:[\s\S]{0,80}?\$\{JSON\.stringify\(referenceCatalog\)\}/);
+  assert.doesNotMatch(serverSource, /JSON\.stringify\(referenceCatalog\)\.slice/);
+  assert.match(serverSource, /conoscenza_numismatica:\s*coinResults/);
+  for (const domain of ["usgs.gov", "usmint.gov", "royalmint.com", "mint.ca", "britishmuseum.org"]) {
+    assert.match(serverSource, new RegExp(`"${domain.replaceAll(".", "\\.")}"`));
+  }
+});
+
+test("le domande di fonderia usano il percorso specialistico sicuro", () => {
+  assert.match(appSource, /function isAurumFoundryQuestion/);
+  assert.match(appSource, /const foundryQuestion = isAurumFoundryQuestion\(question\)/);
+  assert.match(serverSource, /function isFoundryQuestion/);
+  assert.match(serverSource, /Modalita fonderia-raffinazione/);
+  assert.match(serverSource, /non fornire ricette operative/i);
+  assert.match(serverSource, /non esiste una percentuale universale/i);
+  assert.match(serverSource, /curatedResponseSources/);
+  assert.match(serverSource, /liveWebSources/);
+});
+
 test("le domande contabili usano la base specialistica e non il fallback legale generico", () => {
   assert.match(appSource, /function isAurumFiscalAccountingQuestion/);
-  assert.match(appSource, /normativeQuestion && !accountingQuestion && !professionalGoldQuestion && !isAurumNormativeAnswerAdequate/);
+  assert.match(appSource, /normativeQuestion && !accountingQuestion && !professionalGoldQuestion && !foundryQuestion && !isAurumNormativeAnswerAdequate/);
   assert.match(serverSource, /function isComproOroAccountingQuestion/);
   assert.match(serverSource, /Modalita contabile-fiscale/);
   assert.match(serverSource, /Non assegnare una scrittura o un regime definitivo/);
@@ -83,7 +120,7 @@ test("le domande contabili usano la base specialistica e non il fallback legale 
 test("le domande OPO, Banca d’Italia, lingotti e privati usano il percorso specialistico", () => {
   assert.match(appSource, /function isAurumProfessionalGoldQuestion/);
   assert.match(appSource, /const professionalGoldQuestion = isAurumProfessionalGoldQuestion\(question\)/);
-  assert.match(appSource, /!professionalGoldQuestion && !isAurumNormativeAnswerAdequate/);
+  assert.match(appSource, /!professionalGoldQuestion && !foundryQuestion && !isAurumNormativeAnswerAdequate/);
   assert.match(serverSource, /function isProfessionalGoldQuestion/);
   assert.match(serverSource, /Modalita OPO-lingotti/);
   assert.match(serverSource, /non presentare Banca d.Italia come gestore attuale del Registro OPO/i);

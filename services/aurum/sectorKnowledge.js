@@ -3,10 +3,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const knowledgeFilePath = path.resolve(__dirname, "../../assets/aurum-knowledge/sector/compro-oro-knowledge.json");
+const knowledgeFilePaths = [
+  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/compro-oro-knowledge.json"),
+  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/geology-numismatics-knowledge.json")
+];
 
 function loadKnowledge() {
-  const parsed = JSON.parse(readFileSync(knowledgeFilePath, "utf8"));
+  const documents = knowledgeFilePaths.map((filePath) => JSON.parse(readFileSync(filePath, "utf8")));
+  const latest = documents.at(-1);
+  const parsed = {
+    ...documents[0],
+    knowledgeVersion: latest.knowledgeVersion,
+    verifiedAt: latest.verifiedAt,
+    topics: documents.flatMap((document) => document.topics || [])
+  };
   if (!parsed || !Array.isArray(parsed.topics) || !parsed.topics.length) {
     throw new Error("Knowledge base settoriale Aurum non valida.");
   }
@@ -77,7 +87,18 @@ const queryAliases = new Map([
   ["contabilita", ["commercialista", "prima nota", "partita doppia", "bilancio", "registri"]],
   ["contabile", ["commercialista", "contabilità", "prima nota", "partita doppia"]],
   ["nota", ["prima nota", "scrittura contabile", "documento acquisto"]],
-  ["fonderia", ["reverse charge", "oro industriale", "fusione", "affinazione", "N6.2"]],
+  ["fonderia", ["fusione", "affinazione", "raffineria", "saggio", "campionamento", "conto lavorazione"]],
+  ["fonderie", ["fusione", "affinazione", "raffinerie", "impianti", "recupero preziosi"]],
+  ["raffineria", ["fonderia", "affinazione", "saggio", "campionamento", "metalli pagabili"]],
+  ["raffinerie", ["fonderie", "affinazione", "impianti", "recupero preziosi"]],
+  ["fondere", ["fusione", "forno", "crogiolo", "omogeneizzazione", "campionamento"]],
+  ["fusione", ["fonderia", "omogeneizzazione", "campionamento", "peso fuso", "scorie"]],
+  ["affinazione", ["raffinazione", "separazione", "saggio", "pirometallurgia", "idrometallurgia", "elettrolisi"]],
+  ["trattenuta", ["percentuale pagabile", "resa", "costi", "commissione", "spread fixing"]],
+  ["trattenute", ["percentuale pagabile", "resa", "costi", "commissioni", "spread fixing"]],
+  ["trattiene", ["trattenuta", "percentuale pagabile", "resa", "costi", "commissione", "spread fixing"]],
+  ["liquidazione", ["pagamento", "bonifico", "fixing", "conto metallo", "conguaglio"]],
+  ["lombardia", ["fonderie lombardia", "raffinerie lombardia", "milano", "bergamo", "brescia", "monza brianza"]],
   ["margine", ["regime del margine", "beni usati", "iva incorporata"]],
   ["magazzino", ["inventario", "rimanenze", "lotto", "giacenza", "cali"]],
   ["rimanenze", ["inventario", "magazzino", "lotto", "costo specifico"]],
@@ -86,7 +107,23 @@ const queryAliases = new Map([
   ["fattura", ["fatturazione elettronica", "sdi", "registri iva", "conservazione"]],
   ["bilancio", ["chiusura", "imposte", "scadenziario", "rimanenze", "cespiti"]],
   ["f24", ["imposte", "versamento", "scadenziario", "commercialista"]],
-  ["cash", ["cash flow", "flusso di cassa", "capitale circolante", "controllo di gestione"]]
+  ["cash", ["cash flow", "flusso di cassa", "capitale circolante", "controllo di gestione"]],
+  ["geologia", ["formazione geologica", "genesi", "giacimento", "mineralizzazione"]],
+  ["geologico", ["geologia", "formazione", "giacimento", "mineralizzazione"]],
+  ["giacimento", ["geologia", "mineralizzazione", "risorsa", "riserva"]],
+  ["placer", ["alluvionale", "secondario", "erosione", "trasporto", "densita"]],
+  ["alluvionale", ["placer", "secondario", "erosione", "trasporto"]],
+  ["kimberlite", ["diamante", "mantello", "trasporto", "cratone"]],
+  ["pge", ["platino", "palladio", "intrusione mafica", "bushveld"]],
+  ["bushveld", ["platino", "pge", "intrusione stratificata", "reef"]],
+  ["numismatica", ["monete auree", "storia", "specifiche tecniche", "varianti"]],
+  ["numismatico", ["monete auree", "storia", "rarita", "conservazione"]],
+  ["moneta", ["monete auree", "peso", "titolo", "diametro", "storia"]],
+  ["monete", ["monete auree", "peso", "titolo", "diametro", "storia"]],
+  ["ritrovamento", ["tesoro", "ripostiglio", "hoard", "archeologia"]],
+  ["ritrovamenti", ["tesori", "ripostigli", "hoard", "archeologia"]],
+  ["dinastia", ["sovrani", "monete", "storia", "tesoro"]],
+  ["sovrano", ["re", "regina", "monete", "storia"]]
 ]);
 
 export function normalizeSectorKnowledgeText(value = "") {
@@ -174,6 +211,38 @@ function wholePhraseIncludes(text = "", phrase = "") {
 }
 
 const topicIntentBoosts = [
+  {
+    pattern: /\b(?:formazione|formarsi|forma|genesi|geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|placer|alluvional[a-z]*|orogenic[a-z]*|epitermal[a-z]*)\b.*\boro\b|\boro\b.*\b(?:formazione|formarsi|forma|genesi|geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|placer|alluvional[a-z]*|orogenic[a-z]*|epitermal[a-z]*)\b/,
+    boosts: { "geologia-oro-primario-placer": 340 }
+  },
+  {
+    pattern: /\b(?:formazione|formarsi|forma|genesi|geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|vms|sedex|supergenic[a-z]*)\b.*\bargento\b|\bargento\b.*\b(?:formazione|formarsi|forma|genesi|geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|vms|sedex|supergenic[a-z]*)\b/,
+    boosts: { "geologia-argento-giacimenti": 350 }
+  },
+  {
+    pattern: /\b(?:diamant[a-z]*|kimberlit[a-z]*|lamproit[a-z]*)\b.*\b(?:formazione|formarsi|forma|genesi|geologia|mantello|profondita|trasport[a-z]*|alluvional[a-z]*)\b|\b(?:formazione|formarsi|forma|genesi|geologia|mantello|profondita|trasport[a-z]*|alluvional[a-z]*)\b.*\b(?:diamant[a-z]*|kimberlit[a-z]*|lamproit[a-z]*)\b/,
+    boosts: { "geologia-diamante-mantello-kimberlite": 360 }
+  },
+  {
+    pattern: /\b(?:platino|pge|palladio|rodio|bushveld|stillwater|great dyke|norilsk|cromite|cromitite)\b.*\b(?:formazione|formarsi|forma|genesi|geologia|giaciment[a-z]*|intrusion[a-z]*|reef|prova|dimostra)\b|\b(?:formazione|formarsi|forma|genesi|geologia|giaciment[a-z]*|intrusion[a-z]*|reef|prova|dimostra)\b.*\b(?:platino|pge|palladio|rodio|bushveld|stillwater|great dyke|norilsk|cromite|cromitite)\b/,
+    boosts: { "geologia-platino-pge": 360 }
+  },
+  {
+    pattern: /\b(?:presenza|mineralizzazione|risorsa|riserva|tenore|tonnellaggio)\b.*\b(?:geologia|giacimento|oro|argento|platino|diamante|preziosi)\b|\b(?:geologia|giacimento|preziosi)\b.*\b(?:presenza|mineralizzazione|risorsa|riserva|tenore|tonnellaggio)\b/,
+    boosts: { "geologia-preziosi-processi-risorse": 310 }
+  },
+  {
+    pattern: /\b(?:bullion|numismatic[a-z]*|specifiche tecniche|peso|titolo|diametro|bordo|dritto|rovescio|anno|zecca|variante|autentic[a-z]*)\b.*\b(?:monet[a-z]*|sterlina|sovereign|marengo|krugerrand|libertad|panda|maple leaf|american eagle)\b|\b(?:monet[a-z]*|sterlina|sovereign|marengo|krugerrand|libertad|panda|maple leaf|american eagle)\b.*\b(?:bullion|numismatic[a-z]*|specifiche tecniche|peso|titolo|diametro|bordo|dritto|rovescio|anno|zecca|variante|autentic[a-z]*)\b/,
+    boosts: { "monete-auree-metodo-storico-tecnico": 320 }
+  },
+  {
+    pattern: /\b(?:monet[a-z]*|sterlina|sovereign|marengo|krugerrand|libertad|panda|maple leaf|american eagle)\b.*\b(?:storia|paes[a-z]*|sovran[a-z]*|dinasti[a-z]*|re|regina|imperator[a-z]*|identita nazionale)\b|\b(?:storia|paes[a-z]*|sovran[a-z]*|dinasti[a-z]*|re|regina|imperator[a-z]*|identita nazionale)\b.*\b(?:monet[a-z]*|sterlina|sovereign|marengo|krugerrand|libertad|panda|maple leaf|american eagle)\b/,
+    boosts: { "monete-auree-paesi-sovrani-dinastie": 330 }
+  },
+  {
+    pattern: /\b(?:ritrovament[a-z]*|tesor[a-z]*|ripostigli[a-z]*|hoard|scopert[a-z]*|archeolog[a-z]*)\b.*\b(?:monet[a-z]*|oro|aure[a-z]*|sovran[a-z]*|dinasti[a-z]*|re|regina)\b|\b(?:monet[a-z]*|oro|aure[a-z]*|sovran[a-z]*|dinasti[a-z]*)\b.*\b(?:ritrovament[a-z]*|tesor[a-z]*|ripostigli[a-z]*|hoard|scopert[a-z]*|archeolog[a-z]*)\b/,
+    boosts: { "ritrovamenti-monete-oro-sovrani-dinastie": 370 }
+  },
   {
     pattern: /\b(?:vale|valore|valut[a-z]*|prezzo|quotazione|offerta|stima)\b.*\b(?:oro|argento|platino|palladio|metallo|usato)\b|\b(?:oro|argento|platino|palladio|metallo|usato)\b.*\b(?:vale|valore|valut[a-z]*|prezzo|quotazione|offerta|stima)\b/,
     boosts: { "prezzo-quotazione-spread": 90 }
@@ -271,8 +340,32 @@ const topicIntentBoosts = [
     boosts: { "iva-margine-gioielli-usati": 145 }
   },
   {
-    pattern: /\b(?:reverse charge|inversione contabile|n6 2|td16)\b|\b(?:fonderia|affinazione|fusione)\b.*\b(?:iva|fattura|oro|lotto)\b/,
+    pattern: /\b(?:reverse charge|inversione contabile|n6 2|td16)\b|\b(?:fonderia|affinazione|fusione)\b.*\b(?:iva|fattur[a-z]*|reverse charge|inversione contabile|n6 2|td16)\b|\b(?:iva|fattur[a-z]*|reverse charge|inversione contabile|n6 2|td16)\b.*\b(?:fonderia|affinazione|fusione)\b/,
     boosts: { "reverse-charge-oro-industriale-fonderia": 150 }
+  },
+  {
+    pattern: /\b(?:rapporto|filiera|conferiment[a-z]*|contratt[a-z]*|destinatar[a-z]*|catena di custodia|conto lavorazione)\b.*\b(?:fonderia|raffineria|compro oro|oco)\b|\b(?:fonderia|raffineria)\b.*\b(?:compro oro|oco|negozio)\b.*\b(?:rapporto|filiera|conferiment[a-z]*|contratt[a-z]*|destinatar[a-z]*)\b/,
+    boosts: { "fonderia-filiera-compro-oro": 260 }
+  },
+  {
+    pattern: /\b(?:come funziona|procedura|processo|fasi|pesat[a-z]*|forno|crogiol[a-z]*|omogeneizz[a-z]*|campion[a-z]*|dip sample)\b.*\b(?:fusione|fondere|fonderia|lotto)\b|\b(?:fusione|fondere|fonderia|lotto)\b.*\b(?:come funziona|procedura|processo|fasi|pesat[a-z]*|forno|crogiol[a-z]*|omogeneizz[a-z]*|campion[a-z]*)\b/,
+    boosts: { "fonderia-fusione-omogeneizzazione-campionamento": 270 }
+  },
+  {
+    pattern: /\b(?:separ[a-z]*|purific[a-z]*|affin[a-z]*|raffin[a-z]*|saggio|fire assay|coppellazione|pirometallurg[a-z]*|idrometallurg[a-z]*|elettrolit[a-z]*)\b.*\b(?:oro|argento|rame|lega|leghe|pgm|metall[a-z]*)\b|\b(?:oro|argento|rame|lega|leghe|pgm)\b.*\b(?:separ[a-z]*|purific[a-z]*|affin[a-z]*|raffin[a-z]*|saggio|coppellazione)\b/,
+    boosts: { "fonderia-saggio-affinazione-separazione-leghe": 280 }
+  },
+  {
+    pattern: /\b(?:percentuale|margine|trattenut[a-z]*|trattien[a-z]*|costo|costi|commission[a-z]*|spread)\b.*\b(?:fonderia|raffineria|fusione|affinazione|lotto)\b|\b(?:fonderia|raffineria)\b.*\b(?:percentuale|margine|trattenut[a-z]*|trattien[a-z]*|costo|costi|commission[a-z]*|resa|calo|spread)\b/,
+    boosts: { "fonderia-costi-trattenute-margine": 290 }
+  },
+  {
+    pattern: /\b(?:pag[a-z]*|pagamento|liquidazion[a-z]*|bonifico|anticipo|saldo|conguaglio|conto metallo|ritiro fisico|fixing)\b.*\b(?:fonderia|raffineria|lotto|saggio|compro oro)\b|\b(?:fonderia|raffineria)\b.*\b(?:pag[a-z]*|liquidazion[a-z]*|bonifico|anticipo|saldo|conguaglio|conto metallo|fixing)\b/,
+    boosts: { "fonderia-pagamenti-conto-metallo": 300 }
+  },
+  {
+    pattern: /\b(?:fonderie|raffinerie|fonderia|raffineria)\b.*\b(?:lombardia|milano|bergamo|brescia|monza|brianza|bussero|burago|pero|gussago|albino)\b|\b(?:lombardia|milano|bergamo|brescia|monza|brianza)\b.*\b(?:fonderie|raffinerie|fonderia|raffineria|fond[a-z]*|affin[a-z]*)\b/,
+    boosts: { "fonderie-lombardia-verificate": 320 }
   },
   {
     pattern: /\b(?:fattura elettronica|sdi|scarto sdi|registri? iva|conservazione digitale|bollo)\b/,
@@ -300,7 +393,10 @@ function topicScore(entry, normalizedQuery, originalTerms, aliasTerms) {
   let score = 0;
   let anchored = false;
   let originalCoverage = 0;
-  if (wholePhraseIncludes(entry.title, normalizedQuery)) {
+  if (entry.title === normalizedQuery) {
+    score += 500;
+    anchored = true;
+  } else if (wholePhraseIncludes(entry.title, normalizedQuery)) {
     score += 40;
     anchored = true;
   }
@@ -428,7 +524,13 @@ export function buildSectorKnowledgeAnswer(question = "", matches = searchSector
         ? "Informazione teorica specialistica: il trattamento reale dipende da forma giuridica, regime contabile, documenti e fatti dell’operazione e deve essere validato dal commercialista incaricato."
         : primary.category === "Lingotti e riserve"
           ? "Informazione specialistica generale: per custodia, assicurazione, fiscalità o trasferimenti verifica contratto, giurisdizione e caso concreto con il professionista competente."
-          : "Le prove di banco sono screening: una conclusione definitiva può richiedere un laboratorio qualificato."
+          : primary.category === "Fonderia e raffinazione"
+            ? "Informazione professionale generale: fusione, saggio e affinazione richiedono impianto idoneo, personale formato e condizioni contrattuali verificate; non eseguire lavorazioni industriali in negozio."
+            : primary.category === "Geologia dei preziosi"
+              ? "Informazione geologica generale: presenza, mineralizzazione, risorsa e riserva non sono sinonimi. Provenienza, tenore e valore richiedono campionamento rappresentativo, analisi professionali e interpretazione di un geologo o laboratorio qualificato."
+              : primary.category === "Numismatica e storia"
+                ? "Informazione storico-numismatica generale: verifica sempre anno, zecca, variante, autenticità e stato di conservazione del singolo esemplare; il racconto storico non costituisce una stima economica."
+                : "Le prove di banco sono screening: una conclusione definitiva può richiedere un laboratorio qualificato."
   );
   return { risposta: lines.join("\n"), sources };
 }

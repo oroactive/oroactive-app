@@ -220,7 +220,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260801-aurum-opo-bullion-13";
+const OROACTIVE_CLIENT_BUILD_ID = "20260802-aurum-geologia-monete-15";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -395,6 +395,7 @@ const AURUM_SECTION_MAP = {
   training: "academy",
   aurumBlocks: "academy",
   gaming: "academy",
+  coinEncyclopedia: "elenco_monete",
   backups: "backup",
   quotazione: "quotazioni",
   aurumAdmin: "assistente_ai",
@@ -475,6 +476,16 @@ const OROACTIVE_APP_GUIDE = {
     checks: ["materiali validi", "corso attivo", "permesso gestione Academy"],
     commonErrors: ["file non valido", "corso non trovato", "permesso insufficiente"],
     permissions: ["commesso", "responsabile", "supervisore", "founder"]
+  },
+  elenco_monete: {
+    title: "Elenco Monete",
+    description: "Catalogo tecnico e storico delle monete d'oro, con ricerca, schede complete e riconoscimento fotografico formativo.",
+    fields: ["nome moneta", "paese", "periodo", "valore nominale", "titolo", "peso lordo", "oro fino", "diametro", "bordo", "dritto", "rovescio", "storia"],
+    actions: ["cerca moneta", "filtra per paese", "apri scheda", "consulta storia e specifiche", "avvia riconoscimento fotografico"],
+    steps: ["Cerca per nome, paese, sovrano o valore", "Apri la scheda corrispondente", "Confronta anno, zecca e variante", "Verifica peso, diametro, titolo e iconografia", "Usa più controlli indipendenti prima di concludere"],
+    checks: ["anno ed emissione corretti", "peso e diametro coerenti", "dritto e rovescio compatibili", "bordo e legenda verificati", "autenticità non dedotta dalla sola fotografia"],
+    commonErrors: ["confondere tagli simili", "usare specifiche di un altro anno", "considerare la storia una stima", "autenticare da una sola immagine"],
+    permissions: ["commesso", "aiuto_commesso", "responsabile", "supervisore", "founder"]
   },
   training_operatore: {
     title: "Training Operatore",
@@ -9754,6 +9765,27 @@ function isAurumProfessionalGoldQuestion(question = "") {
     || /\bprivat[a-z]*\b.*\b(?:oro|lingott[a-z]*)\b.*\b(?:dichiar[a-z]*|plusvalenza|custod[a-z]*|estero|possesso|detenzione)\b/.test(normalized);
 }
 
+function isAurumFoundryQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  const hasFoundryMarker = /\b(?:fonderia|fonderie|raffineria|raffinerie|conto metallo|conto lavorazione|fire assay|coppellazione|campione testimone)\b/.test(normalized)
+    || /\b(?:fusione|affinazione|campionamento|saggio|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b.*\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b/.test(normalized)
+    || /\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b.*\b(?:fusione|affinazione|campionamento|saggio|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b/.test(normalized);
+  if (!hasFoundryMarker) return false;
+  return !isAurumExplicitTutorialRequest(question);
+}
+
+function isAurumGeologyOrNumismaticsQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  const geology = /\b(?:geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|placer|alluvional[a-z]*|orogenic[a-z]*|epitermal[a-z]*|vms|sedex|kimberlit[a-z]*|lamproit[a-z]*|mantello|pge|bushveld|cromitite)\b/.test(normalized)
+    || /\b(?:formazione|formarsi|forma|genesi|profondita)\b.*\b(?:oro|argento|diamant[a-z]*|platino|palladio)\b/.test(normalized)
+    || /\b(?:oro|argento|diamant[a-z]*|platino|palladio)\b.*\b(?:formazione|formarsi|forma|genesi|profondita)\b/.test(normalized);
+  const numismatics = /\b(?:numismatic[a-z]*|monet[a-z]* aure[a-z]*|ritrovament[a-z]* di monet[a-z]*|tesor[a-z]* monetal[a-z]*|ripostigli[a-z]*|hoard|sterlina|sovereign|marengo|krugerrand|libertad|panda|maple leaf|american eagle|aquila americana|double eagle|kangaroo|canguro|filarmonica|philharmonic)\b/.test(normalized)
+    && /\b(?:storia|specific[a-z]*|peso|titolo|diametro|bordo|dritto|rovescio|anno|zecca|variante|sovran[a-z]*|dinasti[a-z]*|ritrovament[a-z]*|monet[a-z]*)\b/.test(normalized);
+  return geology || numismatics;
+}
+
 function isAurumNormativeAnswerAdequate(answer = "") {
   const normalized = aurumNormalize(answer);
   if (!normalized) return false;
@@ -9763,8 +9795,30 @@ function isAurumNormativeAnswerAdequate(answer = "") {
 
 function buildAurumNormativeAnswer(question = "") {
   const normalized = aurumNormalize(question);
+  const asksFoundry = isAurumFoundryQuestion(question);
   const asksProfessionalGold = isAurumProfessionalGoldQuestion(question);
   const asksOpo = /(opo|operatore professionale|legge 7|dichiarazione oro|211|10.?000|2.?500)/.test(normalized);
+  if (asksFoundry) {
+    return [
+      "Fonderia e raffinazione — sintesi offline verificata il 2 agosto 2026",
+      "",
+      "La fusione omogeneizza il lotto per ricavare un campione rappresentativo; non separa da sola oro, argento, rame e PGM. Il saggio misura il titolo, mentre l'affinazione industriale separa e purifica i metalli con processi e impianti scelti in funzione della matrice.",
+      "",
+      "Punti essenziali:",
+      "1. lotto, pesate, componenti rimossi, campioni, residui e certificato devono restare tracciati con un codice univoco;",
+      "2. non esiste una percentuale universale trattenuta dalla fonderia: separa resa pagabile, calo, saggio, fusione, affinazione, spread sul fixing, trasporto e assicurazione;",
+      "3. la liquidazione può avvenire con bonifico dopo saggio e fixing, anticipo con conguaglio, restituzione in conto lavorazione o accredito su conto metallo;",
+      "4. prima del conferimento verifica proprietà del metallo, metodo di saggio, campione testimone, laboratorio arbitro, metalli pagabili, costi e tempi;",
+      "5. fusione e affinazione richiedono impianto idoneo e personale formato: Aurum non fornisce ricette con temperature, quantità o concentrazioni di reagenti.",
+      "",
+      "Fonti tecniche e istituzionali:",
+      "https://www.lbma.org.uk/publications/spotlight-on-north-american-gold-silver-refining/chapter-4-sampling-and-assaying",
+      "https://www.organismo-am.it/conto-corrente-dedicato",
+      "https://www.inail.it/portale/ricerca-e-tecnologia/it/terza-missione/applicativi-per-la-salute-e-la-sicurezza-sul-lavoro/buone-pratiche/metallurgia/fonderie-di-leghe-ferrose-e-non-ferrose.html",
+      "",
+      "Riprova con la connessione disponibile per la risposta completa, il calcolo delle voci contrattuali e l'elenco verificato degli impianti lombardi."
+    ].join("\n");
+  }
   if (asksProfessionalGold) {
     return [
       "OPO, Banca d’Italia e lingotti — sintesi offline verificata il 1 agosto 2026",
@@ -9922,9 +9976,10 @@ function inferAurumTutorialId(question = "") {
   if (/(copia aziendale|stampa aziendale|stampare.*aziendale|pdf aziendale)/.test(normalized)) return "tutorial_stampa_copia_aziendale";
   if (/(elenco|archivio|lista atti|atti creati)/.test(normalized)) return "tutorial_elenco_atti";
   if (/(giacenza|grammi|materiale in giacenza)/.test(normalized)) return "tutorial_giacenza";
-  if (/(fusione|fusioni|lotto|raffineria)/.test(normalized)) return "tutorial_fusioni";
+  if (/(fusione|fusioni|lotto|raffineria)/.test(normalized) && isAurumExplicitTutorialRequest(question)) return "tutorial_fusioni";
   if (/(crm|cliente crm|storico cliente|modifico un cliente)/.test(normalized)) return "tutorial_crm";
-  if (/(academy|corso|corsi|badge|certificazione|formazione)/.test(normalized)) return "tutorial_academy";
+  if (/(academy|corso|corsi|badge|certificazione)/.test(normalized)
+    || (/\bformazione\b/.test(normalized) && !isAurumGeologyOrNumismaticsQuestion(question))) return "tutorial_academy";
   if (/(backup|restore|scarica backup|verifica backup)/.test(normalized)) return "tutorial_backup";
   if (isAurumExplicitUsersTutorialRequest(question)) return "tutorial_utenti";
   if (/(atto di vendita|compil.*atto|nuovo atto|archiviare|completa pratica|cosa devo controllare)/.test(normalized)) return "tutorial_compila_atto";
@@ -11359,7 +11414,8 @@ function aurumContextPayload(question) {
   const tutorialId = inferAurumTutorialId(question);
   const accountingQuestion = isAurumFiscalAccountingQuestion(question);
   const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
-  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion || professionalGoldQuestion;
+  const foundryQuestion = isAurumFoundryQuestion(question);
+  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
   const wantsCurrentWebVerification = normativeQuestion
     || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(String(question || ""));
   const isPriceExplanation = state.aurumMode === "price_explanation";
@@ -11403,9 +11459,11 @@ function aurumContextPayload(question) {
           "D.Lgs. 10 giugno 2026, n. 122 — aggiornamento antiriciclaggio vigente dal 23 luglio 2026",
           "Istruzioni UIF sulle dichiarazioni ORO e portale Infostat",
           "Banca d’Italia — riserve auree e standard Good Delivery",
+          "LBMA — campionamento, saggio e controllo dei raffinatori",
+          "INAIL e BREF UE — sicurezza e migliori tecniche per le fonderie",
           "D.Lgs. 19 gennaio 2026, n. 10 — Testo unico IVA applicabile dal 1 gennaio 2027"
         ],
-        verificatoIl: "1 agosto 2026",
+        verificatoIl: "2 agosto 2026",
         rispostaLocale: buildAurumNormativeAnswer(question)
       } : null,
       conversationHistory: state.aurumMessages
@@ -11456,7 +11514,8 @@ async function askAurum(event) {
 
   const accountingQuestion = isAurumFiscalAccountingQuestion(question);
   const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
-  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion || professionalGoldQuestion;
+  const foundryQuestion = isAurumFoundryQuestion(question);
+  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
 
   if (!requiresBackendSafety && /(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
     startAurumCuriosityQuiz();
@@ -11482,7 +11541,7 @@ async function askAurum(event) {
     });
     state.aurumMessages.push({
       role: "assistant",
-      content: normativeQuestion && !accountingQuestion && !professionalGoldQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
+      content: normativeQuestion && !accountingQuestion && !professionalGoldQuestion && !foundryQuestion && !isAurumNormativeAnswerAdequate(data.risposta)
         ? buildAurumNormativeAnswer(question)
         : data.risposta || "Risposta non disponibile.",
       source: data.fonte || "",
@@ -11534,6 +11593,9 @@ function renderKnowledgeStatus() {
       <span>${status.accounting_knowledge_loaded ? `Commercialista e fiscalità compro oro: ${Number(status.accounting_topics || 0)} moduli verificati il ${escapeHtml(status.accounting_knowledge_verified_at || "")}` : "Conoscenza contabile e fiscale non caricata"}</span>
       <span>${status.professional_gold_knowledge_loaded ? `Operatori professionali in oro: ${Number(status.professional_gold_topics || 0)} moduli verificati il ${escapeHtml(status.professional_gold_knowledge_verified_at || "")}` : "Conoscenza OPO non caricata"}</span>
       <span>${status.bullion_private_knowledge_loaded ? `Lingotti, riserve e privati: ${Number(status.bullion_private_topics || 0)} moduli verificati il ${escapeHtml(status.bullion_private_knowledge_verified_at || "")}` : "Conoscenza lingotti e privati non caricata"}</span>
+      <span>${status.foundry_knowledge_loaded ? `Fonderia e raffinazione: ${Number(status.foundry_topics || 0)} moduli verificati il ${escapeHtml(status.foundry_knowledge_verified_at || "")}` : "Conoscenza fonderia e raffinazione non caricata"}</span>
+      <span>${status.geology_knowledge_loaded ? `Geologia dei preziosi: ${Number(status.geology_topics || 0)} moduli verificati il ${escapeHtml(status.geology_knowledge_verified_at || "")}` : "Conoscenza geologica non caricata"}</span>
+      <span>${status.gold_coin_catalog_loaded ? `Numismatica: ${Number(status.gold_coin_catalog_count || 0)} schede Elenco Monete e ${Number(status.numismatic_topics || 0)} moduli storico-metodologici` : "Catalogo numismatico Aurum non caricato"}</span>
       <span>${status.sale_deed_knowledge_loaded ? `Guida Atto di Vendita: ${Number(status.sale_deed_fields || 0)} campi (${Number(status.sale_deed_fields_implemented || 0)} implementati, ${Number(status.sale_deed_known_gaps || 0)} gap noti)` : "Guida Atto di Vendita non caricata"}</span>
       <span>${status.sale_deed_knowledge_verified_at ? `Guida atto verificata: ${escapeHtml(status.sale_deed_knowledge_verified_at)}` : ""}</span>
       <span>${status.coaching_knowledge_loaded ? `Coaching professionale Aurum: ${Number(status.coaching_courses || 0)} corsi, ${Number(status.coaching_topics || 0)} temi, ${Number(status.coaching_exercises || 0)} esercizi` : "Conoscenza coaching non caricata"}</span>
