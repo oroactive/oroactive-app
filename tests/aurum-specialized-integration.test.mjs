@@ -68,6 +68,9 @@ test("lo stato AI pubblica copertura e gap verificabili", () => {
   assert.match(serverSource, /foundry_knowledge_loaded:/);
   assert.match(serverSource, /foundry_topics:/);
   assert.match(serverSource, /foundry_knowledge_verified_at:/);
+  assert.match(serverSource, /sales_knowledge_loaded:/);
+  assert.match(serverSource, /sales_topics:/);
+  assert.match(serverSource, /sales_knowledge_verified_at:/);
   assert.match(serverSource, /geology_knowledge_loaded:/);
   assert.match(serverSource, /geology_topics:/);
   assert.match(serverSource, /numismatic_knowledge_loaded:/);
@@ -105,6 +108,29 @@ test("le domande di fonderia usano il percorso specialistico sicuro", () => {
   assert.match(serverSource, /non esiste una percentuale universale/i);
   assert.match(serverSource, /curatedResponseSources/);
   assert.match(serverSource, /liveWebSources/);
+});
+
+test("la vendita consulenziale usa conoscenza dedicata e un gate anti-coercizione", () => {
+  assert.match(appSource, /function isAurumSalesCommunicationQuestion/);
+  assert.match(appSource, /salesQuestion \? "sales_consultation"/);
+  assert.match(appSource, /!normativeQuestion && !salesQuestion && handleAurumTutorRequest/);
+  assert.match(appSource, /blockMemoryBySafety/);
+  assert.match(serverSource, /function isCustomerSalesCommunicationQuestion/);
+  assert.match(serverSource, /classifySalesCommunicationSafety\(domanda\)/);
+  assert.match(serverSource, /salesSafety\.level === "coercive_sales"/);
+  assert.match(serverSource, /buildCoerciveSalesSafetyResponse/);
+  assert.match(serverSource, /blockPersonalMemory: salesQuestion/);
+  assert.match(serverSource, /CONTESTO VENDITA CONSULENZIALE AURUM:/);
+  assert.match(serverSource, /Nessuna tecnica garantisce ogni cliente o una conversione del 100%/);
+  assert.match(serverSource, /Non usare memorie Aurum o dati personali per personalizzare pressione, prezzo o probabilita di chiusura/);
+  assert.match(serverSource, /sospendi la chiusura e proponi preventivo scritto/);
+  for (const domain of ["agcm.it", "oecd.org", "commission.europa.eu", "ahrq.gov"]) {
+    assert.match(serverSource, new RegExp(`"${domain.replaceAll(".", "\\.")}"`));
+  }
+
+  const assistantStart = serverSource.indexOf("async function askOroActiveAssistant");
+  const assistantBlock = serverSource.slice(assistantStart, serverSource.indexOf("async function aiAssistantStatus", assistantStart));
+  assert.ok(assistantBlock.indexOf("classifySalesCommunicationSafety(domanda)") < assistantBlock.indexOf("loadAurumChatMemories"));
 });
 
 test("le domande contabili usano la base specialistica e non il fallback legale generico", () => {

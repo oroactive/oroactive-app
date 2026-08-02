@@ -28,6 +28,10 @@ export function hasStrongComproOroSectorIntent(question = "", sectorMatches = []
   if (!requestsAppTutorial && hasFoundrySpecialistMarker && sectorScore >= 24) return true;
   const hasGeologyOrNumismaticMarker = /\b(?:geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|placer|alluvional[a-z]*|orogenic[a-z]*|epitermal[a-z]*|vms|sedex|kimberlit[a-z]*|lamproit[a-z]*|mantello|pge|bushveld|cromitite|numismatic[a-z]*|monet[a-z]* aure[a-z]*|ritrovament[a-z]* di monet[a-z]*|tesor[a-z]* monetal[a-z]*|ripostigli[a-z]*|hoard|dinasti[a-z]* tudor)\b/.test(normalized);
   if (hasGeologyOrNumismaticMarker && sectorScore >= 24) return true;
+  const hasConsultativeSalesMarker = /\b(?:vendita consulenziale|persuasion[a-z]*|obiezion[a-z]*|gestisc[a-z]*.{0,30}obiezion[a-z]*|negoziazion[a-z]*|closing|chiusura consensuale|prova sociale|falsa urgenza|dark pattern|client[a-z]* vulnerabil[a-z]*|role ?play.{0,30}vendit[a-z]*|formazione avanzata.{0,30}vendit[a-z]*)\b/.test(normalized)
+    || /\b(?:convinc[a-z]*|chiud[a-z]*|present[a-z]* l offerta|spieg[a-z]* la valutazione)\b.*\b(?:client[a-z]*|compro oro|gioielleria|oro)\b/.test(normalized)
+    || /\b(?:client[a-z]*|compro oro|gioielleria)\b.*\b(?:obiezion[a-z]*|offerta senza pressione|scelta informata|decisione libera|vendere solo alcuni|pensarci)\b/.test(normalized);
+  if (hasConsultativeSalesMarker && sectorScore >= 24) return true;
   const hasSectorMarker = /(compro oro|atto di vendita|contante|pagamento|quotazione|valutazione (?:dell |di )?oro|prezzo (?:dell |di )?oro|carat|titolo dell oro|bilancia|xrf|pietra di paragone|acido nitrico)/.test(normalized);
   return hasSectorMarker && sectorScore >= Math.max(40, coachingScore * 1.25);
 }

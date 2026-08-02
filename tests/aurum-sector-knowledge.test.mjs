@@ -15,9 +15,9 @@ import {
 } from "../services/aurum/privacy.js";
 
 test("la base settoriale Aurum è ampia, versionata e interamente fontata", () => {
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.02-geologia-numismatica");
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.02-vendita-consulenziale-etica");
   assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "2 agosto 2026");
-  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 72);
+  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 85);
 
   const ids = new Set();
   const categories = new Set();
@@ -52,7 +52,8 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
     "Procedure operative",
     "Fonderia e raffinazione",
     "Geologia dei preziosi",
-    "Numismatica e storia"
+    "Numismatica e storia",
+    "Vendita consulenziale e comunicazione"
   ].forEach((category) => assert.ok(categories.has(category), `categoria mancante: ${category}`));
   const sourceUrls = new Set(AURUM_SECTOR_KNOWLEDGE.topics.flatMap((topic) => topic.sources.map((source) => source.url)));
   assert.ok(sourceUrls.has("https://www.gia.edu/gems-gemology/summer-2021-labnotes-cvd-laboratory-grown-diamond-with-counterfeit-gia-inscription"));

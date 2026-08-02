@@ -1,0 +1,527 @@
+{
+  "knowledgeVersion": "2026.08.02-vendita-consulenziale-etica",
+  "verifiedAt": "2 agosto 2026",
+  "topics": [
+    {
+      "id": "vendita-ascolto-diagnosi-consulenziale",
+      "title": "Vendita consulenziale: accoglienza, ascolto e diagnosi del bisogno",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["vendita consulenziale", "ascolto cliente", "domande aperte", "domande di follow up", "riformulazione", "diagnosi bisogno", "accoglienza compro oro", "obiettivo cliente"],
+      "summary": "Una comunicazione commerciale avanzata parte dall'obiettivo dichiarato dal cliente e dalla comprensione, non dalla pressione: Aurum usa domande aperte, approfondimenti pertinenti, riepilogo neutrale e permesso prima di spiegare prove e offerta.",
+      "facts": [
+        "La prima domanda utile distingue valutazione informativa, confronto, vendita parziale e intenzione di vendere: non presume che chi entra debba concludere.",
+        "Le domande di follow-up realmente collegate alla risposta aumentano la percezione di ascolto e comprensione più di una sequenza di domande standard.",
+        "Riformulare con «Se ho capito bene...» consente al cliente di correggere il significato prima che l'operatore presenti una proposta.",
+        "Il teach-back verifica la chiarezza dell'operatore: non è un esame del cliente e va proposto senza umiliarlo.",
+        "Il metodo OroActive VERO significa Valutare l'obiettivo, Esplorare le priorità, Rendere trasparente il calcolo, Offrire una scelta libera."
+      ],
+      "checklist": [
+        "Accogliere e chiedere: «Oggi desidera una valutazione, confrontare le possibilità o valutare anche una vendita?»",
+        "Usare una domanda aperta per volta e una domanda successiva collegata a ciò che il cliente ha appena detto.",
+        "Riepilogare priorità e vincoli senza interpretare motivazioni personali o economiche non dichiarate.",
+        "Chiedere il permesso prima di passare alle prove: «Le mostro come verifichiamo peso e titolo?»",
+        "Concludere la fase di ascolto chiedendo se manca qualcosa di importante per una decisione informata."
+      ],
+      "warnings": [
+        "Non trasformare domande personali in leve di pressione, segmentazione del prezzo o profilazione occulta.",
+        "Non usare una finta empatia per ottenere confidenze da sfruttare nella chiusura."
+      ],
+      "sources": [
+        {
+          "title": "Harvard / JPSP — It Doesn't Hurt to Ask: Question-Asking Increases Liking",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/28447835/",
+          "authority": "Journal of Personality and Social Psychology / PubMed",
+          "verifiedAt": "2 agosto 2026",
+          "status": "studio verificato"
+        },
+        {
+          "title": "AHRQ — Use the Teach-Back Method",
+          "url": "https://www.ahrq.gov/health-literacy/improve/precautions/tool5.html",
+          "authority": "Agency for Healthcare Research and Quality",
+          "verifiedAt": "2 agosto 2026",
+          "status": "metodo adattato al retail, verificato"
+        }
+      ]
+    },
+    {
+      "id": "vendita-valutazione-trasparente-offerta",
+      "title": "Comunicare una valutazione trasparente: dal peso all'offerta",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["spiegare valutazione", "peso titolo quotazione offerta", "prezzo al grammo", "grammi fini", "spread", "deduzioni", "offerta compro oro", "ricevuta cliente"],
+      "summary": "La persuasione più solida nel compro oro è una valutazione ripetibile: mostrare peso lordo e netto, titolo e metodo, quotazione indipendente con fonte e ora, valore teorico, deduzioni e prezzo effettivo fino al totale offerto.",
+      "facts": [
+        "La scheda dell'operazione deve riportare descrizione e qualità dell'oggetto, quotazione da fonte affidabile e indipendente, valutazione, data e ora, importo e mezzo di pagamento.",
+        "Prezzo dell'oro puro, valore teorico del metallo fino e offerta al cliente sono grandezze diverse e vanno nominate separatamente.",
+        "Il benchmark deve indicare unità, titolo, valuta, fonte e timestamp; un prezzo «fino a» senza condizioni visibili può indurre in errore.",
+        "Componenti non preziose, pietre, saldature, incertezze di titolo, costi e margine vanno spiegati prima della firma, senza detrazioni nascoste.",
+        "La ricevuta riepilogativa consolida la comprensione e non sostituisce la spiegazione orale."
+      ],
+      "checklist": [
+        "Mostrare la bilancia leggibile al cliente e separare peso lordo, elementi esclusi e peso considerato.",
+        "Indicare titolo, metodo di prova, limiti dello screening e grammi fini calcolati.",
+        "Mostrare quotazione, fonte e ora; calcolare davanti al cliente il valore teorico.",
+        "Elencare costi, spread, buffer e margine applicati senza presentarli come obblighi di legge.",
+        "Dichiarare prezzo effettivo al grammo, totale offerto, validità reale dell'offerta e opzioni disponibili.",
+        "Chiedere: «Per assicurarmi di aver spiegato bene, mi dice come siamo arrivati al totale?»"
+      ],
+      "warnings": [
+        "Non usare il prezzo dell'oro 999‰ come se fosse il prezzo applicabile indistintamente a gioielli 750‰ o di titolo incerto.",
+        "Non omettere deduzioni, limiti delle prove o condizioni per rendere l'offerta artificialmente più attraente."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017 — Articolo 5, tracciabilità dell'operazione",
+          "url": "https://www.gazzettaufficiale.it/atto/serie_generale/caricaArticolo?art.codiceRedazionale=17G00109&art.dataPubblicazioneGazzetta=2017-06-20&art.flagTipoArticolo=0&art.idArticolo=5&art.idGruppo=0&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.progressivo=0&art.versione=1",
+          "authority": "Gazzetta Ufficiale della Repubblica Italiana",
+          "verifiedAt": "2 agosto 2026",
+          "status": "vigente/verificata"
+        },
+        {
+          "title": "AGCM — Bollettino 24/2014, caso Mirkoro",
+          "url": "https://www.agcm.it/dotcmsdoc/bollettini/24-14.pdf",
+          "authority": "Autorità Garante della Concorrenza e del Mercato",
+          "verifiedAt": "2 agosto 2026",
+          "status": "provvedimento verificato"
+        }
+      ]
+    },
+    {
+      "id": "vendita-obiezioni-autonomia-cliente",
+      "title": "Gestione avanzata delle obiezioni senza pressione",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["gestione obiezioni", "ci devo pensare", "altra valutazione", "offerta troppo bassa", "senza pressione", "cliente indeciso", "autonomia cliente", "ascolta chiarisci rispondi"],
+      "summary": "Un'obiezione è informazione, non un ostacolo da abbattere: Aurum insegna ad ascoltare, riconoscere, chiarire, rispondere con dati e restituire la decisione al cliente, interrompendo la chiusura dopo un rifiuto o un dubbio non risolto.",
+      "facts": [
+        "«Ci devo pensare» può indicare bisogno di tempo, confronto, attaccamento emotivo o mancata comprensione; non autorizza l'operatore a insistere.",
+        "Riconoscere l'obiezione non significa concordare con ogni affermazione, ma mostrare che è stata compresa prima di rispondere.",
+        "Una sola domanda chiarificatrice è sufficiente: una catena di confutazioni può diventare pressione o indebito condizionamento.",
+        "Il cliente ha diritto di confrontare altre valutazioni e di uscire con i propri oggetti senza penalità o svalutazioni personali.",
+        "La risposta efficace torna a dati verificabili: peso, titolo, fonte, orario, calcolo, condizioni e durata reale dell'offerta."
+      ],
+      "checklist": [
+        "Ascoltare fino alla fine e riformulare: «Mi sembra che il punto principale sia...»",
+        "Chiedere una sola precisazione: «Preferisce più dettaglio sul calcolo o tempo per confrontare?»",
+        "Rispondere con una prova o un dato pertinente, senza sommergere il cliente di argomenti.",
+        "Offrire preventivo o riepilogo scritto e ricordare che può vendere tutto, solo alcuni oggetti, non vendere o tornare.",
+        "Accettare il no con professionalità e chiudere la conversazione senza ritorsioni o follow-up non consentiti."
+      ],
+      "warnings": [
+        "Non usare colpa, vergogna, paura, svalutazione sentimentale o ripetizione estenuante per superare un'obiezione.",
+        "Non impedire il confronto con concorrenti e non screditare offerte che non sono state verificate in modo omogeneo."
+      ],
+      "sources": [
+        {
+          "title": "AGCM — Diritto di decidere senza condizionamenti",
+          "url": "https://convienesaperlo.agcm.it/diritto/diritto-di-decidere-senza-condizionamenti/",
+          "authority": "Autorità Garante della Concorrenza e del Mercato",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "Codice del consumo — testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/2005/10/08/005G0232/CONSOLIDATED/20250521",
+          "authority": "Normattiva",
+          "verifiedAt": "2 agosto 2026",
+          "status": "vigente/verificata"
+        }
+      ]
+    },
+    {
+      "id": "vendita-negoziazione-ancoraggio-etico",
+      "title": "Negoziazione e ancoraggio etico nel compro oro",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["negoziazione prezzo oro", "ancoraggio etico", "benchmark oggettivo", "framing simmetrico", "reciprocità", "concessione", "prezzo minimo", "svalutare cliente"],
+      "summary": "La negoziazione professionale usa un benchmark oggettivo e dichiarato, criteri coerenti e concessioni motivate; non costruisce un'àncora artificiosamente bassa né sfrutta bisogno di denaro, ignoranza tecnica o informazioni personali.",
+      "facts": [
+        "Un'àncora lecita è una quotazione pertinente con titolo, unità, fonte e ora; un numero non comparabile può alterare la percezione del cliente.",
+        "Il framing deve essere simmetrico: descrivere vantaggi, costi, rischi e incertezze con lo stesso rilievo, non solo ciò che favorisce la chiusura.",
+        "La valutazione gratuita è reciprocità professionale e non crea alcun obbligo morale a vendere.",
+        "Ogni concessione deve avere una ragione documentabile, come una variazione di margine autorizzata o una diversa composizione del lotto.",
+        "Prezzi differenziati sulla base di urgenza, età, fragilità o dati personali sono incompatibili con una vendita equa."
+      ],
+      "checklist": [
+        "Definire prima della trattativa massimo pagabile, margine minimo e autorità dell'operatore.",
+        "Presentare benchmark e formula completa prima di chiedere una decisione.",
+        "Chiedere quale elemento dell'offerta il cliente ritiene non adeguato e verificare se è comparabile.",
+        "Motivare ogni revisione e registrare l'autorizzazione prevista dalla policy OroActive.",
+        "Se non esiste spazio sostenibile, dichiararlo con rispetto e lasciare il cliente libero di confrontare."
+      ],
+      "warnings": [
+        "Non iniziare con un'offerta ingannevolmente bassa per sfruttare l'effetto àncora.",
+        "Non promettere di «pagare più di tutti» senza confronto omogeneo, aggiornato e dimostrabile."
+      ],
+      "sources": [
+        {
+          "title": "OECD — Consumer behavioural insights",
+          "url": "https://www.oecd.org/en/topics/sub-issues/consumer-behavioural-insights.html",
+          "authority": "Organisation for Economic Co-operation and Development",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "AGCM — Bollettino 24/2014, claim di prezzo nel compro oro",
+          "url": "https://www.agcm.it/dotcmsdoc/bollettini/24-14.pdf",
+          "authority": "Autorità Garante della Concorrenza e del Mercato",
+          "verifiedAt": "2 agosto 2026",
+          "status": "provvedimento verificato"
+        }
+      ]
+    },
+    {
+      "id": "vendita-chiusura-consensuale-follow-up",
+      "title": "Chiusura consensuale, conferma e follow-up",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["chiusura vendita oro", "closing etico", "scelta libera", "opzioni reali", "vendere alcuni oggetti", "pensarci", "preventivo scritto", "follow up consenso"],
+      "summary": "La chiusura avanzata non cerca un sì inevitabile: verifica comprensione e libertà, formula una domanda decisionale neutra, documenta l'esito e svolge follow-up solo con base giuridica e preferenze di contatto rispettate.",
+      "facts": [
+        "Nessuna tecnica può né deve convincere ogni cliente: una conversione sana esiste solo quando offerta e priorità del cliente coincidono.",
+        "Le opzioni reali sono procedere, vendere solo alcuni oggetti, non vendere, chiedere una seconda valutazione o pensarci e tornare.",
+        "Il silenzio non è consenso e un'incertezza persistente richiede pausa, non una nuova sequenza di chiusura.",
+        "Prima della firma vanno riepilogati peso, titolo, quotazione, offerta, pagamento, destinazione prevista e limiti delle prove.",
+        "Il follow-up commerciale non può essere dedotto dalla sola operazione obbligatoria: marketing e profilazione seguono finalità e consensi separati."
+      ],
+      "checklist": [
+        "Chiedere: «Vuole procedere, vendere solo alcuni oggetti, preferisce pensarci oppure confrontare un'altra valutazione?»",
+        "Aggiungere: «La valutazione non comporta alcun obbligo e resta libero di non vendere.»",
+        "Se il cliente procede, fargli riepilogare gli elementi essenziali e consegnare la documentazione prevista.",
+        "Se non procede, restituire subito oggetti e documenti e offrire un preventivo scritto senza condizioni punitive.",
+        "Richiamare o inviare promozioni solo se il contatto è consentito e rispettando immediatamente opposizione o revoca."
+      ],
+      "warnings": [
+        "Non usare «oggi o mai più», paura del crollo o perdita dell'offerta se la scadenza non è reale e documentata.",
+        "Dopo un no, non continuare a confutare e non subordinare la restituzione degli oggetti a ulteriori tentativi."
+      ],
+      "sources": [
+        {
+          "title": "AGCM — Pratiche commerciali scorrette e pubblicità ingannevole",
+          "url": "https://www.agcm.it/per-i-consumatori/le-pratiche-commerciali-scorrette-e-la-pubblicit-ingannevole/",
+          "authority": "Autorità Garante della Concorrenza e del Mercato",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "GDPR — Articolo 21, diritto di opposizione al marketing diretto",
+          "url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=it",
+          "authority": "Unione europea — EUR-Lex",
+          "verifiedAt": "2 agosto 2026",
+          "status": "vigente/verificata"
+        }
+      ]
+    },
+    {
+      "id": "vendita-prova-sociale-autorita-vere",
+      "title": "Autorità, prova sociale e fiducia verificabile",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["prova sociale", "recensioni vere", "autorità", "credenziali", "strumenti calibrati", "fiducia cliente", "testimonianze", "certificazioni verificabili"],
+      "summary": "Autorità e prova sociale sono persuasive soltanto quando vere e verificabili: iscrizione, licenze, competenze, tarature, rapporti e recensioni genuine devono essere mostrati senza gonfiare risultati o nascondere limiti.",
+      "facts": [
+        "Un'iscrizione o una licenza va indicata con soggetto, numero e ambito reale; non implica competenze o garanzie ulteriori.",
+        "Mostrare bilancia, fonte della quotazione e sequenza di prova crea fiducia perché rende il processo controllabile.",
+        "Recensioni, percentuali di soddisfazione e confronti devono essere autentici, aggiornati, rappresentativi e metodologicamente spiegati.",
+        "Un rapporto gemmologico descrive il campione nei limiti indicati e non garantisce rendimento, rivendibilità o valore futuro.",
+        "Una prova sociale selezionata o inventata è un'informazione commerciale potenzialmente ingannevole."
+      ],
+      "checklist": [
+        "Mostrare soltanto qualifiche, iscrizioni e strumenti effettivamente disponibili nel punto vendita.",
+        "Spiegare cosa dimostra e cosa non dimostra ogni test, rapporto o certificazione.",
+        "Usare recensioni provenienti da processi aperti e non condizionare premi o assistenza a giudizi positivi.",
+        "Datare statistiche e claim e conservare evidenza del metodo di calcolo.",
+        "Preferire dimostrazione trasparente del processo a formule assolute come «siamo i migliori»."
+      ],
+      "warnings": [
+        "Non inventare recensioni, clienti soddisfatti, premi, certificazioni o risultati di laboratorio.",
+        "Non presentare un singolo test o marchio come garanzia universale di autenticità o convenienza."
+      ],
+      "sources": [
+        {
+          "title": "AGCM — Caso Trustpilot PS12962",
+          "url": "https://www.agcm.it/media/comunicati-stampa/2026/3/PS12962",
+          "authority": "Autorità Garante della Concorrenza e del Mercato",
+          "verifiedAt": "2 agosto 2026",
+          "status": "provvedimento 2026 verificato"
+        },
+        {
+          "title": "GIA — Disclosing treated or laboratory-grown gem material",
+          "url": "https://www.gia.edu/gem-lab-disclosure",
+          "authority": "Gemological Institute of America",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "vendita-urgenza-reale-no-dark-pattern",
+      "title": "Scarsità e urgenza: solo condizioni reali, niente dark pattern",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["scarsità", "urgenza", "falsa urgenza", "countdown", "dark pattern", "offerta scade", "quotazione volatile", "timestamp", "solo oggi"],
+      "summary": "Urgenza e scarsità possono essere comunicate solo se reali, verificabili e proporzionate: nel compro oro la volatilità giustifica un timestamp dell'offerta, non countdown fittizi, previsioni certe o paura costruita.",
+      "facts": [
+        "Una validità temporale è legittima quando deriva da quotazione, orari di fixing o policy reale ed è comunicata con fonte e timestamp.",
+        "Un countdown che si rinnova, una scadenza inesistente o un'affermazione di scarsità non documentata sono dark pattern.",
+        "Dire che l'oro «sta per crollare» o che il cliente perderà certamente denaro è improprio senza evidenza e resta comunque una previsione incerta.",
+        "La pressione temporale riduce la capacità di confrontare e può diventare indebito condizionamento, soprattutto in situazioni vulnerabili.",
+        "Aurum deve spiegare volatilità e durata tecnica dell'offerta senza trasformarle in una minaccia."
+      ],
+      "checklist": [
+        "Indicare quotazione, fonte, ora di rilevazione e durata effettiva dell'offerta.",
+        "Spiegare che una nuova quotazione può produrre un nuovo calcolo in rialzo o in ribasso.",
+        "Usare parole neutrali: «Questa offerta è calcolata sui dati delle ore...»",
+        "Lasciare sempre il tempo ragionevole per leggere, chiedere chiarimenti e confrontare.",
+        "Rimuovere timer, claim o script che non corrispondono a una scadenza tecnica reale."
+      ],
+      "warnings": [
+        "Mai usare falsa urgenza, countdown che riparte, scarsità inventata o paura di un crollo certo.",
+        "«Solo oggi» è ammesso soltanto se vero, motivato, tracciabile e non usato per comprimere una decisione vulnerabile."
+      ],
+      "sources": [
+        {
+          "title": "AGCM — Caso Deghi PS13027, urgenza fittizia",
+          "url": "https://www.agcm.it/media/comunicati-stampa/2026/6/PS13027",
+          "authority": "Autorità Garante della Concorrenza e del Mercato",
+          "verifiedAt": "2 agosto 2026",
+          "status": "provvedimento 2026 verificato"
+        },
+        {
+          "title": "Commissione europea — Sweep sui dark pattern",
+          "url": "https://commission.europa.eu/topics/consumers/consumer-rights-and-complaints/enforcement-consumer-protection/sweeps_en",
+          "authority": "Commissione europea",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "OECD — Dark commercial patterns",
+          "url": "https://www.oecd.org/en/publications/dark-commercial-patterns_44f5e846-en.html",
+          "authority": "Organisation for Economic Co-operation and Development",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "vendita-limiti-coercizione-vulnerabilita",
+      "title": "Clienti vulnerabili e arresto della pressione commerciale",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["cliente vulnerabile", "anziano confuso", "lutto", "difficoltà economica", "debiti", "fragilità", "indebito condizionamento", "pratica aggressiva", "persona di fiducia", "sospendere vendita"],
+      "summary": "Se emergono confusione, lutto, forte agitazione, alterazione, difficoltà linguistiche, bisogno economico urgente o attaccamento emotivo, l'operatore non diagnostica ma sospende ogni pressione e rende la decisione più lenta, accessibile e verificabile.",
+      "facts": [
+        "Il Codice del consumo vieta molestie, coercizione e indebito condizionamento e considera la vulnerabilità prevedibile del gruppo interessato.",
+        "Sfruttare una disgrazia o una circostanza grave che altera la capacità di valutazione può integrare una pratica aggressiva.",
+        "La vulnerabilità può essere temporanea o situazionale: non è un'etichetta permanente né autorizza raccolta indiscriminata di dati sensibili.",
+        "Incapacità di riepilogare peso, titolo, quotazione e totale è un segnale per interrompere e spiegare di nuovo, non per ottenere una firma.",
+        "Una persona di fiducia può assistere se il cliente lo desidera e se privacy, proprietà e rappresentanza restano correttamente gestite."
+      ],
+      "checklist": [
+        "Interrompere o sospendere la chiusura quando la decisione non appare libera, stabile o compresa.",
+        "Offrire preventivo scritto, più tempo, linguaggio semplice e possibilità di tornare.",
+        "Proporre, senza imporre, la presenza di un accompagnatore o persona di fiducia scelta dal cliente.",
+        "Ripetere il calcolo e usare teach-back; se resta confusione, rinviare l'operazione.",
+        "Escalare dubbi su proprietà, alterazione o rischio alle procedure di sicurezza e compliance, senza rivelare una SOS."
+      ],
+      "warnings": [
+        "Non sfruttare lutto, debiti, urgenza economica, età, disabilità, dipendenza o ridotta comprensione.",
+        "Non isolare il cliente, ostacolare l'uscita, trattenere oggetti o usare minacce e senso di colpa: possono essere pratiche aggressive."
+      ],
+      "sources": [
+        {
+          "title": "Codice del consumo — articoli 20 e 24-25",
+          "url": "https://www.normattiva.it/eli/id/2005/10/08/005G0232/CONSOLIDATED/20250521",
+          "authority": "Normattiva",
+          "verifiedAt": "2 agosto 2026",
+          "status": "vigente/verificata"
+        },
+        {
+          "title": "Commissione europea — Guidance sulla direttiva pratiche commerciali sleali",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX%3A52021XC1229%2805%29",
+          "authority": "Commissione europea — EUR-Lex",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "ISO 22458:2022 — Consumer vulnerability",
+          "url": "https://www.iso.org/standard/73261.html",
+          "authority": "International Organization for Standardization",
+          "verifiedAt": "2 agosto 2026",
+          "status": "standard pubblicato"
+        }
+      ]
+    },
+    {
+      "id": "gioielleria-storytelling-disclosure-consulenziale",
+      "title": "Gioielleria: storytelling verificabile e disclosure completa",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["vendita gioielleria", "storytelling gioiello", "disclosure diamante", "origine pietra", "trattamenti", "diamante sintetico", "laboratory grown", "rapporto gemmologico", "budget cliente"],
+      "summary": "In gioielleria la narrazione deve valorizzare design, manifattura, epoca e simbolismo senza sostituire i fatti: identità, naturale o laboratory-grown, trattamenti, metallo, titolo, peso, rapporto, provenienza e assistenza vanno dichiarati con precisione.",
+      "facts": [
+        "Storytelling e dati tecnici sono piani distinti: una storia plausibile non prova origine geografica, epoca, autore o autenticità.",
+        "Il cliente deve sapere se la gemma è naturale, sintetica/laboratory-grown, trattata, simulante, imitazione o assemblata.",
+        "Rapporto gemmologico e iscrizione vanno verificati e confrontati con il campione; non sono una garanzia di investimento.",
+        "Le opzioni vanno confrontate allo stesso budget e uso, includendo manutenzione, fragilità, garanzia e politica post-vendita.",
+        "Dichiarare un sospetto di trattamento o sintesi protegge fiducia e mercato quando l'identificazione non è conclusiva."
+      ],
+      "checklist": [
+        "Chiedere occasione, stile, frequenza d'uso, budget e preferenze senza spingere oltre il limite dichiarato.",
+        "Separare racconto estetico e storico dalle caratteristiche documentate.",
+        "Dichiarare metallo, titolo, gemma, origine naturale o sintetica, trattamenti noti o sospetti e limiti del test.",
+        "Mostrare rapporto e verifica quando disponibili e spiegare cosa coprono.",
+        "Confrontare due o tre opzioni coerenti, lasciando esplicita la possibilità di non acquistare."
+      ],
+      "warnings": [
+        "Non presentare diamanti, gemme o gioielli come investimento a rendimento garantito.",
+        "Non occultare sintesi, trattamenti, simulanti, difetti rilevanti o incertezza diagnostica per favorire la vendita."
+      ],
+      "sources": [
+        {
+          "title": "GIA — Disclosing treated or laboratory-grown gem material",
+          "url": "https://www.gia.edu/gem-lab-disclosure",
+          "authority": "Gemological Institute of America",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "GIA — Man-made Diamonds: Questions and Answers",
+          "url": "https://www.gia.edu/gia-news-research/manmade-diamonds-questions-answers",
+          "authority": "Gemological Institute of America",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "vendita-privacy-personalizzazione-consentita",
+      "title": "Personalizzazione, CRM e privacy nella comunicazione commerciale",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["privacy vendita", "profilazione cliente", "consenso marketing", "compleanno cliente", "memorie Aurum", "dati sensibili", "personalizzazione", "opposizione marketing", "follow up CRM"],
+      "summary": "Personalizzare significa adattare chiarezza, canale e livello di dettaglio con finalità lecita; non significa usare memorie, compleanno, lutto, salute, debiti o difficoltà economiche per aumentare pressione, abbassare il prezzo o prevedere la chiusura.",
+      "facts": [
+        "I dati raccolti per obblighi dell'operazione non diventano automaticamente utilizzabili per marketing o profilazione.",
+        "Marketing e profilazione richiedono basi giuridiche, informative e, quando necessario, consensi distinti, liberi, specifici e documentabili.",
+        "Il cliente può opporsi in qualsiasi momento al marketing diretto e i successivi contatti devono cessare per quella finalità.",
+        "Aurum non deve selezionare o condividere memorie personali per formulare una strategia di vendita.",
+        "Adattare font, lingua, ritmo o spiegazione per accessibilità è assistenza; adattare pressione o prezzo alla fragilità è sfruttamento."
+      ],
+      "checklist": [
+        "Usare solo i dati necessari alla finalità dichiarata e separare operazione, assistenza, marketing e profilazione.",
+        "Registrare preferenza di canale e consenso senza caselle preselezionate.",
+        "Non usare dati personali o inferenze di vulnerabilità per decidere offerta, insistenza o script.",
+        "Rispettare opposizione e revoca senza rendere più difficile il servizio.",
+        "Per una domanda commerciale ad Aurum usare contesto anonimo e non includere valori reali del cliente."
+      ],
+      "warnings": [
+        "È vietato usare compleanno, lutto, difficoltà economiche, salute, debiti o confidenze per convincere il cliente.",
+        "Non salvare in memoria Aurum dati del cliente o strategie di pressione individuale."
+      ],
+      "sources": [
+        {
+          "title": "GDPR — Regolamento (UE) 2016/679",
+          "url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=it",
+          "authority": "Unione europea — EUR-Lex",
+          "verifiedAt": "2 agosto 2026",
+          "status": "vigente/verificata"
+        },
+        {
+          "title": "Garante Privacy — Linee guida attività promozionale e contrasto allo spam",
+          "url": "https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/2542348",
+          "authority": "Garante per la protezione dei dati personali",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        },
+        {
+          "title": "Garante Privacy — Codice di condotta telemarketing e teleselling",
+          "url": "https://www.garanteprivacy.it/documents/10160/0/Codice%2Bdi%2Bcondotta%2Bper%2Ble%2Battivit%C3%A0%2Bdi%2Btelemarketing%2Be%2Bteleselling%2B-%2Bmarzo%2B2024.pdf/7c3e438f-b9fd-7f7e-2f78-e03aa61104be?version=4.0",
+          "authority": "Garante per la protezione dei dati personali",
+          "verifiedAt": "2 agosto 2026",
+          "status": "approvato/verificato"
+        }
+      ]
+    },
+    {
+      "id": "vendita-kpi-qualita-formazione",
+      "title": "KPI, qualità e formazione della vendita etica",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["KPI vendita etica", "conversione", "qualità vendita", "reclami", "preventivi", "formazione operatori", "mystery audit", "compliance commerciale"],
+      "summary": "La conversione da sola premia la pressione: OroActive deve misurare anche comprensione, completezza della spiegazione, reclami, rettifiche, ritorni volontari, conformità, margine sostenibile e qualità documentale.",
+      "facts": [
+        "Un obiettivo esclusivo di chiusura può creare incentivi a omettere informazioni o insistere oltre il consenso.",
+        "KPI di qualità includono preventivi completi, teach-back riuscito, accuratezza della scheda, reclami fondati, rettifiche e follow-up conformi.",
+        "Ripetizione volontaria, referral spontanei e recensioni non incentivate misurano fiducia meglio di una chiusura ottenuta sotto pressione.",
+        "Margine e conversione vanno letti insieme a scostamenti di prezzo, autorizzazioni e caratteristiche dei lotti.",
+        "Role play e audit devono valutare anche la capacità di accettare un no e sospendere su vulnerabilità."
+      ],
+      "checklist": [
+        "Creare una scorecard bilanciata: conversione, margine, trasparenza, qualità documentale, reclami e conformità.",
+        "Campionare conversazioni o pratiche nel rispetto di privacy e policy, cercando omissioni e pressioni.",
+        "Allenare mensilmente ascolto, spiegazione del calcolo, obiezioni, vulnerabilità e chiusura consensuale.",
+        "Correggere incentivi che premiano solo il numero o il valore delle operazioni concluse.",
+        "Registrare azioni correttive e verificare che riducano reclami senza spostare il problema su altri negozi."
+      ],
+      "warnings": [
+        "Non usare conversione o margine come unico indicatore della qualità dell'operatore.",
+        "Non condizionare premi, assistenza o restituzione degli oggetti a recensioni positive."
+      ],
+      "sources": [
+        {
+          "title": "ISO 22458:2022 — Consumer vulnerability e servizi inclusivi",
+          "url": "https://www.iso.org/standard/73261.html",
+          "authority": "International Organization for Standardization",
+          "verifiedAt": "2 agosto 2026",
+          "status": "standard pubblicato"
+        },
+        {
+          "title": "AGCM — Pratiche commerciali scorrette e pubblicità ingannevole",
+          "url": "https://www.agcm.it/per-i-consumatori/le-pratiche-commerciali-scorrette-e-la-pubblicit-ingannevole/",
+          "authority": "Autorità Garante della Concorrenza e del Mercato",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    },
+    {
+      "id": "vendita-script-roleplay-compro-oro",
+      "title": "Script e role play completo per il banco compro oro",
+      "category": "Vendita consulenziale e comunicazione",
+      "keywords": ["script vendita compro oro", "role play", "simulazione cliente indeciso", "dialogo operatore cliente", "formazione vendita", "gestione obiezioni prezzo", "copione etico"],
+      "summary": "Aurum può simulare conversazioni complete per allenare accoglienza, scoperta, prove, calcolo, obiezioni e chiusura consensuale; lo script è una struttura adattabile, non un copione per spingere ogni cliente alla vendita.",
+      "facts": [
+        "Ogni role play deve includere almeno una possibilità legittima di non concludere e una spiegazione completa del calcolo.",
+        "Il format OSSERVA comprende Obiettivo, Spiegazione, Scelta, Evidenze, Riepilogo, Verifica e Autonomia.",
+        "Le obiezioni vanno variate tra prezzo, tempo, confronto, attaccamento emotivo, prova tecnica e pagamento.",
+        "Il valutatore distingue correttezza tecnica, chiarezza, ascolto, autonomia, privacy e compliance.",
+        "Un buon role play misura se l'operatore sa fermarsi, non soltanto se sa chiedere la vendita."
+      ],
+      "checklist": [
+        "Scenario: il cliente porta più oggetti ed è indeciso; l'operatore chiarisce se vuole valutazione o vendita.",
+        "Dimostrazione: l'operatore mostra peso, titolo, metodo, quotazione con timestamp, valore teorico, deduzioni e offerta.",
+        "Obiezione: il cliente dice «ci devo pensare»; l'operatore ascolta, chiarisce una volta e offre riepilogo scritto.",
+        "Chiusura: «Vuole procedere, vendere solo alcuni oggetti, pensarci o confrontare?» e «Non ha alcun obbligo.»",
+        "Debrief: valutare comprensione, dati mostrati, libertà, errori, frase alternativa e controllo documentale."
+      ],
+      "warnings": [
+        "Non addestrare script per paura, colpa, falsa scarsità, occultamento delle deduzioni o insistenza dopo il no.",
+        "Non usare dati personali reali nei role play; creare profili fittizi e non vulnerabilità da sfruttare."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017 — Articolo 5, elementi della scheda e ricevuta",
+          "url": "https://www.gazzettaufficiale.it/atto/serie_generale/caricaArticolo?art.codiceRedazionale=17G00109&art.dataPubblicazioneGazzetta=2017-06-20&art.flagTipoArticolo=0&art.idArticolo=5&art.idGruppo=0&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.progressivo=0&art.versione=1",
+          "authority": "Gazzetta Ufficiale della Repubblica Italiana",
+          "verifiedAt": "2 agosto 2026",
+          "status": "vigente/verificata"
+        },
+        {
+          "title": "AHRQ — Use the Teach-Back Method",
+          "url": "https://www.ahrq.gov/health-literacy/improve/precautions/tool5.html",
+          "authority": "Agency for Healthcare Research and Quality",
+          "verifiedAt": "2 agosto 2026",
+          "status": "metodo adattato al retail, verificato"
+        },
+        {
+          "title": "AGCM — Diritto di decidere senza condizionamenti",
+          "url": "https://convienesaperlo.agcm.it/diritto/diritto-di-decidere-senza-condizionamenti/",
+          "authority": "Autorità Garante della Concorrenza e del Mercato",
+          "verifiedAt": "2 agosto 2026",
+          "status": "verificata"
+        }
+      ]
+    }
+  ]
+}

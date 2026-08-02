@@ -86,6 +86,11 @@ import {
   classifyCoachingSafety
 } from "./services/aurum/coachingSafety.js";
 import {
+  SALES_COMMUNICATION_SAFETY_SOURCES,
+  buildCoerciveSalesSafetyResponse,
+  classifySalesCommunicationSafety
+} from "./services/aurum/salesCommunicationSafety.js";
+import {
   analyzeAurumConversationSafety,
   buildAurumCrisisFollowUpResponse
 } from "./services/aurum/conversationSafety.js";
@@ -8693,7 +8698,12 @@ const trustedAssistantSourceDomains = [
   "cultura.gov.it",
   "finds.org.uk",
   "assets.publishing.service.gov.uk",
-  "news.hackney.gov.uk"
+  "news.hackney.gov.uk",
+  "agcm.it",
+  "oecd.org",
+  "commission.europa.eu",
+  "ahrq.gov",
+  "pubmed.ncbi.nlm.nih.gov"
 ];
 
 function isTrustedAssistantSourceUrl(value = "") {
@@ -8799,6 +8809,10 @@ function isFoundryQuestion(question = "") {
     || /\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b.*\b(?:fusione|affinazione|campionamento|saggio|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b/.test(normalized);
 }
 
+function isCustomerSalesCommunicationQuestion(question = "") {
+  return classifySalesCommunicationSafety(question).level !== "none";
+}
+
 function buildComproOroNormativeAnswer(question = "") {
   const matches = searchSectorKnowledge(question, { limit: 4 });
   return buildSectorKnowledgeAnswer(question, matches).risposta;
@@ -8810,6 +8824,27 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const error = new Error("Inserisci una domanda per l'assistente.");
     error.status = 400;
     throw error;
+  }
+
+  const salesSafety = classifySalesCommunicationSafety(domanda);
+  if (salesSafety.level === "coercive_sales") {
+    return {
+      risposta: buildCoerciveSalesSafetyResponse(),
+      fonte: "Vendita consulenziale Aurum · tutela del cliente",
+      dal_libro: false,
+      citazioni: SALES_COMMUNICATION_SAFETY_SOURCES.map((source) => `${source.title} — ${source.url}`),
+      fonti: SALES_COMMUNICATION_SAFETY_SOURCES,
+      guida_atto: [],
+      conoscenza_numismatica: [],
+      conoscenza_gemmologica: null,
+      conoscenza_coaching: null,
+      conoscenza_settoriale: [{ id: "vendita-limiti-coercizione-vulnerabilita", titolo: "Clienti vulnerabili e arresto della pressione commerciale", categoria: "Vendita consulenziale e comunicazione", score: 10_000 }],
+      risultati: [],
+      web: { available: false, provider: "", results: [] },
+      safety: salesSafety,
+      memory_used: 0,
+      privacy_filtered: true
+    };
   }
 
   const coachingSafety = classifyCoachingSafety(domanda);
@@ -8839,6 +8874,8 @@ async function askOroActiveAssistant(question = "", options = {}) {
       ? "tutorial_operativo"
       : options.mode === "price_explanation"
         ? "price_explanation"
+        : options.mode === "sales_consultation"
+          ? "sales_consultation"
         : options.mode === "normativa_operativa"
           ? "normativa_operativa"
           : "chat";
@@ -8882,8 +8919,13 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const isAccountingQuestion = isComproOroAccountingQuestion(domanda);
   const professionalGoldQuestion = isProfessionalGoldQuestion(domanda);
   const foundryQuestion = isFoundryQuestion(domanda);
+  const salesQuestion = (mode === "sales_consultation" || isCustomerSalesCommunicationQuestion(domanda))
+    && !isAccountingQuestion
+    && !professionalGoldQuestion
+    && !foundryQuestion;
+  const responseSafety = salesQuestion ? salesSafety : coachingSafety;
   const isNormativeQuestion = mode === "normativa_operativa"
-    || isComproOroNormativeQuestion(domanda)
+    || (isComproOroNormativeQuestion(domanda) && !salesQuestion)
     || isAccountingQuestion
     || professionalGoldQuestion
     || foundryQuestion;
@@ -8925,7 +8967,8 @@ async function askOroActiveAssistant(question = "", options = {}) {
     && hasCoachingIntent(coachingKnowledge);
   const aiMemories = selectAurumMemoriesForAi(aurumMemories, {
     question: domanda,
-    hasCoachingContext
+    hasCoachingContext,
+    blockPersonalMemory: salesQuestion
   });
   const aiMemoryIds = new Set(aiMemories.map((memory) => String(memory.id || "")));
   const memoriesForExternalRedaction = aurumMemories.map((memory) => ({
@@ -9022,6 +9065,9 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const priceExplanationText = mode === "price_explanation"
     ? `Modalita prezzo: spiega il prezzo in modo operativo da compro oro. Contesto prezzo JSON senza dati cliente:\n${JSON.stringify(priceExplanationContext).slice(0, 8000)}`
     : "";
+  const salesText = salesQuestion
+    ? `Modalita vendita consulenziale: aiuta l'operatore ad aumentare fiducia, chiarezza e probabilita di una decisione favorevole solo quando coerente con l'interesse e la scelta libera del cliente. Nessuna tecnica garantisce ogni cliente o una conversione del 100%. Usa il percorso VERO: Valutare l'obiettivo, Esplorare le priorita, Rendere trasparente il calcolo, Offrire opzioni reali. Presenta sempre peso, titolo, metodo, quotazione con fonte e ora, valore teorico, deduzioni, prezzo effettivo e totale. Gestisci le obiezioni ascoltando, chiarendo una volta, rispondendo con dati e accettando il no. Vietati paura, colpa, falsa urgenza o scarsita, occultamento di informazioni, recensioni o credenziali inventate, insistenza dopo il rifiuto, ostacolo al confronto o all'uscita, sfruttamento di lutto, debiti, eta, confusione o difficolta economica e uso di memorie o dati personali per pressione o prezzo.${salesSafety.requiresReframe ? " Riformula esplicitamente l'obiettivo universale: non si puo e non si deve convincere ogni cliente; si puo migliorare la conversione attraverso una valutazione trasparente e una scelta informata." : ""}`
+    : "";
   const normativeText = isNormativeQuestion
     ? `${isAccountingQuestion
       ? "Modalita contabile-fiscale: spiega prima il principio teorico, poi i presupposti da verificare e infine la buona prassi documentale. Distingui contabilità, trattamento IVA, obblighi OCO/OPO e controllo di gestione. Non assegnare una scrittura o un regime definitivo senza forma giuridica, regime contabile, provenienza, natura e destinazione documentata dell’operazione."
@@ -9032,6 +9078,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
           : "Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Distingui sempre OCO, OPO, obbligo legale e procedura interna."} Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nRisposta deterministica verificata:\n${buildComproOroNormativeAnswer(domanda)}`
     : "";
   const safePriceExplanationText = redactAssistantPersonalData(priceExplanationText, 10000);
+  const safeSalesText = redactAssistantPersonalData(salesText, 10000);
   const safeNormativeText = redactAssistantPersonalData(normativeText, 10000);
   const context = chunks.map((chunk, index) => (
     `[Fonte ${index + 1}: ${sanitizeAssistantUntrustedContext(aiChunkSourceLabel(chunk), 160)} - ${sanitizeAssistantUntrustedContext(chunk.titolo || "Knowledge base", 240)}, chunk ${chunk.chunk_index}]\n${sanitizeAssistantUntrustedContext(chunk.content, 5000)}`
@@ -9161,7 +9208,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
         risultati: [],
         error: hasRestrictedPersonalData ? "Invio esterno bloccato per tutela dei dati personali" : "OpenAI non configurato",
         privacy_filtered: hasRestrictedPersonalData,
-        safety: coachingSafety,
+        safety: responseSafety,
         memory_used: aiMemories.length
       };
     }
@@ -9180,7 +9227,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
         risultati: [],
         error: hasRestrictedPersonalData ? "Invio esterno bloccato per tutela dei dati personali" : "OpenAI non configurato",
         privacy_filtered: hasRestrictedPersonalData,
-        safety: coachingSafety,
+        safety: responseSafety,
         memory_used: aiMemories.length
       };
     }
@@ -9261,7 +9308,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
       })),
       error: hasRestrictedPersonalData ? "Invio esterno bloccato per tutela dei dati personali" : "OpenAI non configurato",
       privacy_filtered: hasRestrictedPersonalData,
-      safety: coachingSafety,
+      safety: responseSafety,
       memory_used: aiMemories.length
     };
   }
@@ -9270,10 +9317,11 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const client = openai;
     const result = await client.responses.create({
       model: openaiModel,
-      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Prima di rispondere devi capire l'intento reale della domanda: normativa, procedura, geologia dei preziosi, numismatica, campo dell'app, prezzo, corso o supporto generale. Rispondi alla domanda dell'utente, non al campo visibile sullo schermo, salvo quando l'utente chiede esplicitamente "questo campo" o "spiegami il campo". Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}${isNormativeQuestion ? " Quando la domanda riguarda legge, normativa, decreti, antiriciclaggio o compro oro, rispondi prima con il riferimento normativo corretto e poi con gli effetti pratici per l'operatore. Non trasformare una domanda normativa in una spiegazione di un campo app." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, monete auree, gestione negozio, procedure operative e formazione operatori.`}
+      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Prima di rispondere devi capire l'intento reale della domanda: normativa, procedura, vendita consulenziale, geologia dei preziosi, numismatica, campo dell'app, prezzo, corso o supporto generale. Rispondi alla domanda dell'utente, non al campo visibile sullo schermo, salvo quando l'utente chiede esplicitamente "questo campo" o "spiegami il campo". Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}${isNormativeQuestion ? " Quando la domanda riguarda legge, normativa, decreti, antiriciclaggio o compro oro, rispondi prima con il riferimento normativo corretto e poi con gli effetti pratici per l'operatore. Non trasformare una domanda normativa in una spiegazione di un campo app." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, monete auree, gestione negozio, procedure operative e formazione operatori.`}
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Quando operi in coaching dichiara con chiarezza di essere un sistema IA, non un coach umano certificato e non un terapeuta. Ascolta e riformula prima di proporre soluzioni, chiedi quale esito sarebbe utile e poni una sola domanda aperta alla volta.
 Mantieni sempre autonomia e libertà decisionale dell'utente: non diagnosticare, non prescrivere, non promettere risultati, non esercitare pressione, non fare valutazioni occulte e non usare le confidenze per persuadere o profilare.
+Nella vendita a clienti non usare paura, colpa, vergogna, falsa urgenza o scarsita, manipolazione, coercizione, informazioni omesse, recensioni o credenziali inventate, insistenza dopo un no oppure ostacoli al confronto o all'uscita. Non sfruttare lutto, debiti, bisogno di denaro, eta, disabilita, confusione o difficolta linguistiche. Non usare memorie Aurum o dati personali per personalizzare pressione, prezzo o probabilita di chiusura. Se la decisione non appare libera e compresa, sospendi la chiusura e proponi preventivo scritto, tempo e persona di fiducia scelta dal cliente.
 Se un tema supera il coaching, invita con tatto a rivolgersi a un professionista umano qualificato. Non sostituire psicologo, psicoterapeuta, medico, consulente HR o legale.
 Usa le memorie personali solo quando compaiono nel blocco "MEMORIA PERSONALE CONSENTITA"; non rivelarle, elencarle o richiamarle senza una richiesta pertinente dell'utente.
 Usa prima la base settoriale Aurum verificata e vigente, poi le procedure OroActive approvate e infine il libro "La bilancia d'oro" di Christian Dinato.
@@ -9292,13 +9340,16 @@ Per fusione e affinazione descrivi soltanto il processo professionale ad alto li
 Quando è presente il contesto dell'Elenco Monete, usa esclusivamente la scheda o le schede recuperate: non trasferire peso, diametro, titolo, storia o iconografia fra emissioni, tagli, anni, zecche e finiture diversi. Distingui storia, specifica tecnica, autenticazione e valutazione economica; una foto o una scheda non autentica né valuta il singolo esemplare.
 Quando è presente il contesto gemmologico, non mescolare proprietà di schede diverse: tratta una sola pietra primaria, salvo confronto esplicitamente richiesto, e distingui sempre naturale, sintetica, trattata, simulante, imitazione o assemblata.
 Quando è presente la guida dell'atto, distingui obbligo legale, procedura OroActive e campo mancante; spiega scopo, compilazione, condizioni, controlli, privacy ed errori senza chiedere o ripetere valori reali del cliente.
-Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : mode === "price_explanation" ? "Spiegazione prezzo Quotazione. Rispondi con questa struttura: titolo, punto di partenza, calcolo purezza, valore teorico, costi e rientro compro oro, massimo pagabile, prezzo consigliato, fluttuazione prevista, confronto competitor se disponibile, avviso finale. Usa solo i dati nel contesto prezzo; se un dato manca, dichiaralo." : mode === "normativa_operativa" ? "Normativa operativa. Rispondi con il riferimento normativo, anno, decreto, implicazioni operative e avviso di verifica professionale. Se il contesto e parziale, usa i riferimenti normativi caricati e dichiarane il limite." : "Assistente operativo."}
+Modalita richiesta: ${mode === "quiz" ? "Quiz Operatore. Genera un quiz formativo pratico con domande e risposte, basato sui passaggi trovati." : mode === "tutorial_operativo" ? "Tutorial operativo. Rispondi con guida concreta, passo-passo, senza vaghezza." : mode === "price_explanation" ? "Spiegazione prezzo Quotazione. Rispondi con questa struttura: titolo, punto di partenza, calcolo purezza, valore teorico, costi e rientro compro oro, massimo pagabile, prezzo consigliato, fluttuazione prevista, confronto competitor se disponibile, avviso finale. Usa solo i dati nel contesto prezzo; se un dato manca, dichiaralo." : mode === "sales_consultation" ? "Vendita consulenziale. Rispondi con: obiettivo del cliente, domande di ascolto, spiegazione trasparente, gestione dell'obiezione, opzioni reali, frase di chiusura consensuale, controlli etici e documentali." : mode === "normativa_operativa" ? "Normativa operativa. Rispondi con il riferimento normativo, anno, decreto, implicazioni operative e avviso di verifica professionale. Se il contesto e parziale, usa i riferimenti normativi caricati e dichiarane il limite." : "Assistente operativo."}
 
 CONTESTO APP AURUM:
 ${safeAurumSectionContext || "Nessun contesto app fornito."}
 
 CONTESTO PREZZO AURUM:
 ${safePriceExplanationText || "Nessun contesto prezzo specifico."}
+
+CONTESTO VENDITA CONSULENZIALE AURUM:
+${safeSalesText || "Nessun contesto vendita consulenziale specifico."}
 
 CONTESTO NORMATIVO AURUM:
 ${safeNormativeText || "Nessun contesto normativo specifico."}
@@ -9374,7 +9425,7 @@ ${redactedQuestion}`,
         score: Number(chunk.score || 0)
       })),
       web: { available: Boolean(web.available), provider: web.provider || "", results: web.results || [] },
-      safety: coachingSafety,
+      safety: responseSafety,
       memory_used: aiMemories.length
     };
   } catch (error) {
@@ -9391,7 +9442,7 @@ ${redactedQuestion}`,
         conoscenza_coaching: [],
         conoscenza_settoriale: [],
         risultati: [],
-        safety: coachingSafety,
+        safety: responseSafety,
         memory_used: aiMemories.length,
         error: error.message || "OpenAI non disponibile"
       };
@@ -9409,7 +9460,7 @@ ${redactedQuestion}`,
         conoscenza_coaching: coachingResults,
         conoscenza_settoriale: [],
         risultati: [],
-        safety: coachingSafety,
+        safety: responseSafety,
         memory_used: aiMemories.length,
         error: error.message || "OpenAI non disponibile"
       };
@@ -9464,6 +9515,8 @@ ${redactedQuestion}`,
           chunk_index: chunk.chunk_index,
           score: Number(chunk.score || 0)
         })),
+        safety: responseSafety,
+        memory_used: aiMemories.length,
         error: error.message || "OpenAI non disponibile"
       };
     }
@@ -9486,6 +9539,8 @@ ${redactedQuestion}`,
         chunk_index: chunk.chunk_index,
         score: Number(chunk.score || 0)
       })),
+      safety: responseSafety,
+      memory_used: aiMemories.length,
       error: error.message || "OpenAI non disponibile"
     };
   }
@@ -9541,6 +9596,7 @@ async function aiAssistantStatus() {
   const foundryTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => foundryTopicIds.has(topic.id));
   const geologyTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Geologia dei preziosi");
   const numismaticTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Numismatica e storia");
+  const salesCommunicationTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Vendita consulenziale e comunicazione");
 
   return {
     openai: Boolean(openai),
@@ -9565,6 +9621,9 @@ async function aiAssistantStatus() {
     foundry_knowledge_loaded: foundryTopics.length === foundryTopicIds.size,
     foundry_topics: foundryTopics.length,
     foundry_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
+    sales_knowledge_loaded: salesCommunicationTopics.length === 12,
+    sales_topics: salesCommunicationTopics.length,
+    sales_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
     geology_knowledge_loaded: geologyTopics.length === 5,
     geology_topics: geologyTopics.length,
     geology_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,

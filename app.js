@@ -220,7 +220,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260802-aurum-geologia-monete-15";
+const OROACTIVE_CLIENT_BUILD_ID = "20260802-aurum-vendita-etica-16";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -9775,6 +9775,30 @@ function isAurumFoundryQuestion(question = "") {
   return !isAurumExplicitTutorialRequest(question);
 }
 
+function isAurumSalesCommunicationQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  return /\b(?:vendita consulenziale|persuasion[a-z]*|convinc[a-z]*|gestione (?:avanzata )?(?:delle )?obiezion[a-z]*|negoziazion[a-z]*|closing|chiusura consensuale|conversione|prova sociale|falsa urgenza|dark pattern|client[a-z]* vulnerabil[a-z]*|formazione avanzata.{0,30}vendit[a-z]*|role ?play.{0,30}vendit[a-z]*)\b/.test(normalized)
+    || /\b(?:client[a-z]*|compro oro|gioielleria)\b.*\b(?:obiezion[a-z]*|offerta senza pressione|scelta informata|decisione libera|vendere solo alcuni|pensarci|pressione commerciale)\b/.test(normalized)
+    || /\b(?:gioielleria|gioiell[a-z]*|diamant[a-z]*)\b.*\b(?:vend[a-z]*|storytelling|disclosure|present[a-z]*)\b/.test(normalized);
+}
+
+function buildAurumSalesFallbackAnswer() {
+  return [
+    "Vendita consulenziale OroActive",
+    "",
+    "Nessuna tecnica può garantire che ogni cliente venda. La comunicazione professionale aumenta fiducia e qualità della decisione senza pressione.",
+    "",
+    "1. chiarisci se il cliente vuole valutare, confrontare o procedere;",
+    "2. mostra peso, titolo, metodo, quotazione con fonte e ora, deduzioni e totale;",
+    "3. ascolta l'obiezione, chiarisci una volta e rispondi con dati;",
+    "4. offri scelte reali: vendere tutto, solo alcuni oggetti, pensarci, confrontare o non vendere;",
+    "5. sospendi se emergono confusione, lutto o vulnerabilità e proponi tempo e preventivo scritto.",
+    "",
+    "Sono vietati paura, colpa, falsa urgenza, omissioni, insistenza dopo il no e uso di dati personali per pressione o prezzo."
+  ].join("\n");
+}
+
 function isAurumGeologyOrNumismaticsQuestion(question = "") {
   const normalized = aurumNormalize(question);
   if (!normalized) return false;
@@ -9972,6 +9996,7 @@ function explainAurumField(fieldKey = "") {
 
 function inferAurumTutorialId(question = "") {
   const normalized = aurumNormalize(question);
+  if (isAurumSalesCommunicationQuestion(question)) return "";
   if (/(copia cliente|stampa cliente|stampare.*cliente|pdf cliente)/.test(normalized)) return "tutorial_stampa_copia_cliente";
   if (/(copia aziendale|stampa aziendale|stampare.*aziendale|pdf aziendale)/.test(normalized)) return "tutorial_stampa_copia_aziendale";
   if (/(elenco|archivio|lista atti|atti creati)/.test(normalized)) return "tutorial_elenco_atti";
@@ -11415,7 +11440,11 @@ function aurumContextPayload(question) {
   const accountingQuestion = isAurumFiscalAccountingQuestion(question);
   const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
   const foundryQuestion = isAurumFoundryQuestion(question);
-  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
+  const salesQuestion = isAurumSalesCommunicationQuestion(question)
+    && !accountingQuestion
+    && !professionalGoldQuestion
+    && !foundryQuestion;
+  const normativeQuestion = (!salesQuestion && isAurumNormativeQuestion(question)) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
   const wantsCurrentWebVerification = normativeQuestion
     || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(String(question || ""));
   const isPriceExplanation = state.aurumMode === "price_explanation";
@@ -11423,7 +11452,7 @@ function aurumContextPayload(question) {
     domanda: question,
     message: question,
     allowWeb: wantsCurrentWebVerification,
-    mode: isPriceExplanation ? "price_explanation" : normativeQuestion ? "normativa_operativa" : tutorialId ? "tutorial_operativo" : "chat",
+    mode: isPriceExplanation ? "price_explanation" : salesQuestion ? "sales_consultation" : normativeQuestion ? "normativa_operativa" : tutorialId ? "tutorial_operativo" : "chat",
     interface: "aurum_operational_tutor",
     section: isPriceExplanation ? "quotazione" : aurumSectionKey(),
     userId: state.currentUser?.id || null,
@@ -11515,7 +11544,11 @@ async function askAurum(event) {
   const accountingQuestion = isAurumFiscalAccountingQuestion(question);
   const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
   const foundryQuestion = isAurumFoundryQuestion(question);
-  const normativeQuestion = isAurumNormativeQuestion(question) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
+  const salesQuestion = isAurumSalesCommunicationQuestion(question)
+    && !accountingQuestion
+    && !professionalGoldQuestion
+    && !foundryQuestion;
+  const normativeQuestion = (!salesQuestion && isAurumNormativeQuestion(question)) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
 
   if (!requiresBackendSafety && /(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
     startAurumCuriosityQuiz();
@@ -11527,7 +11560,7 @@ async function askAurum(event) {
     return;
   }
 
-  if (!requiresBackendSafety && !normativeQuestion && handleAurumTutorRequest(question)) {
+  if (!requiresBackendSafety && !normativeQuestion && !salesQuestion && handleAurumTutorRequest(question)) {
     return;
   }
 
@@ -11548,8 +11581,9 @@ async function askAurum(event) {
       fonti: Array.isArray(data.fonti) ? data.fonti : []
     });
     const safetyLevel = String(data.safety?.level || data.safety_level || "").toLowerCase();
+    const blockMemoryBySafety = data.safety?.blockMemory === true;
     showAurumMemoryConsent(
-      ["crisis", "crisis_follow_up", "mental_health_boundary"].includes(safetyLevel)
+      blockMemoryBySafety || ["crisis", "crisis_follow_up", "mental_health_boundary", "coercive_sales"].includes(safetyLevel)
         ? null
         : detectAurumMemoryCandidate(question)
     );
@@ -11560,6 +11594,8 @@ async function askAurum(event) {
         ? "La base specialistica contabile e fiscale di Aurum non è raggiungibile in questo momento. Per evitare di assegnare un regime IVA, una scrittura o una scadenza errati senza fonti e dati completi, riprova appena la connessione è disponibile."
         : professionalGoldQuestion
           ? buildAurumNormativeAnswer(question)
+        : salesQuestion
+          ? buildAurumSalesFallbackAnswer()
         : normativeQuestion
           ? buildAurumNormativeAnswer(question)
         : state.aurumRequestedFieldKey
@@ -11594,6 +11630,7 @@ function renderKnowledgeStatus() {
       <span>${status.professional_gold_knowledge_loaded ? `Operatori professionali in oro: ${Number(status.professional_gold_topics || 0)} moduli verificati il ${escapeHtml(status.professional_gold_knowledge_verified_at || "")}` : "Conoscenza OPO non caricata"}</span>
       <span>${status.bullion_private_knowledge_loaded ? `Lingotti, riserve e privati: ${Number(status.bullion_private_topics || 0)} moduli verificati il ${escapeHtml(status.bullion_private_knowledge_verified_at || "")}` : "Conoscenza lingotti e privati non caricata"}</span>
       <span>${status.foundry_knowledge_loaded ? `Fonderia e raffinazione: ${Number(status.foundry_topics || 0)} moduli verificati il ${escapeHtml(status.foundry_knowledge_verified_at || "")}` : "Conoscenza fonderia e raffinazione non caricata"}</span>
+      <span>${status.sales_knowledge_loaded ? `Vendita consulenziale etica: ${Number(status.sales_topics || 0)} moduli verificati il ${escapeHtml(status.sales_knowledge_verified_at || "")}` : "Conoscenza vendita consulenziale non caricata"}</span>
       <span>${status.geology_knowledge_loaded ? `Geologia dei preziosi: ${Number(status.geology_topics || 0)} moduli verificati il ${escapeHtml(status.geology_knowledge_verified_at || "")}` : "Conoscenza geologica non caricata"}</span>
       <span>${status.gold_coin_catalog_loaded ? `Numismatica: ${Number(status.gold_coin_catalog_count || 0)} schede Elenco Monete e ${Number(status.numismatic_topics || 0)} moduli storico-metodologici` : "Catalogo numismatico Aurum non caricato"}</span>
       <span>${status.sale_deed_knowledge_loaded ? `Guida Atto di Vendita: ${Number(status.sale_deed_fields || 0)} campi (${Number(status.sale_deed_fields_implemented || 0)} implementati, ${Number(status.sale_deed_known_gaps || 0)} gap noti)` : "Guida Atto di Vendita non caricata"}</span>

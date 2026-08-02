@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const knowledgeFilePaths = [
   path.resolve(__dirname, "../../assets/aurum-knowledge/sector/compro-oro-knowledge.json"),
-  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/geology-numismatics-knowledge.json")
+  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/geology-numismatics-knowledge.json"),
+  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/sales-communication-knowledge.json")
 ];
 
 function loadKnowledge() {
@@ -45,7 +46,7 @@ const stopWords = new Set([
   "degli", "dei", "del", "della", "delle", "dello", "dopo", "essere", "fare", "fatto", "gli", "nella",
   "nelle", "ogni", "oggi", "perche", "posso", "prima", "quale", "quali", "quando", "quanto", "questa",
   "queste", "questi", "questo", "sono", "sulla", "sulle", "tutto", "tutte", "tutti", "una", "uno",
-  "usare", "viene"
+  "usare", "viene", "devo", "deve", "dovrei"
 ]);
 
 const queryAliases = new Map([
@@ -123,7 +124,22 @@ const queryAliases = new Map([
   ["ritrovamento", ["tesoro", "ripostiglio", "hoard", "archeologia"]],
   ["ritrovamenti", ["tesori", "ripostigli", "hoard", "archeologia"]],
   ["dinastia", ["sovrani", "monete", "storia", "tesoro"]],
-  ["sovrano", ["re", "regina", "monete", "storia"]]
+  ["sovrano", ["re", "regina", "monete", "storia"]],
+  ["vendita", ["vendita consulenziale", "cliente", "offerta", "chiusura", "autonomia"]],
+  ["vendere", ["vendita consulenziale", "cliente", "offerta", "decisione libera"]],
+  ["persuasione", ["vendita consulenziale", "fiducia", "trasparenza", "autonomia cliente"]],
+  ["convincere", ["persuasione etica", "scelta informata", "chiusura consensuale", "autonomia"]],
+  ["obiezione", ["gestione obiezioni", "ascolto", "chiarimento", "senza pressione"]],
+  ["obiezioni", ["gestione obiezioni", "ascolto", "chiarimento", "senza pressione"]],
+  ["negoziare", ["negoziazione", "ancoraggio etico", "benchmark", "concessione"]],
+  ["recensioni", ["prova sociale", "fiducia", "autenticità", "claim verificabili"]],
+  ["urgenza", ["scarsità", "timestamp", "falsa urgenza", "dark pattern"]],
+  ["vulnerabile", ["vulnerabilità", "indebito condizionamento", "sospendere", "persona di fiducia"]],
+  ["anziano", ["vulnerabilità", "comprensione", "tempo", "persona di fiducia"]],
+  ["gioielleria", ["vendita consulenziale", "storytelling", "disclosure", "trattamenti"]],
+  ["profilazione", ["privacy", "consenso", "personalizzazione", "memorie"]],
+  ["conversione", ["KPI vendita etica", "qualità", "reclami", "compliance"]],
+  ["role", ["role play", "script vendita", "simulazione", "debrief"]]
 ]);
 
 export function normalizeSectorKnowledgeText(value = "") {
@@ -211,6 +227,54 @@ function wholePhraseIncludes(text = "", phrase = "") {
 }
 
 const topicIntentBoosts = [
+  {
+    pattern: /\b(?:accogli[a-z]*|ascolt[a-z]*|domand[a-z]* apert[a-z]*|diagnosi del bisogno|capire il cliente)\b.*\b(?:client[a-z]*|oro|valutazion[a-z]*|vendit[a-z]*)\b|\b(?:client[a-z]*|compro oro)\b.*\b(?:accogli[a-z]*|ascolt[a-z]*|domand[a-z]* apert[a-z]*|diagnosi del bisogno)\b/,
+    boosts: { "vendita-ascolto-diagnosi-consulenziale": 420 }
+  },
+  {
+    pattern: /\b(?:spieg[a-z]*|mostr[a-z]*|trasparen[a-z]*)\b.*\b(?:peso|titolo|quotazione|offerta|deduzion[a-z]*|spread)\b|\b(?:peso|titolo|quotazione|deduzion[a-z]*|spread)\b.*\b(?:offerta|spieg[a-z]*|client[a-z]*)\b/,
+    boosts: { "vendita-valutazione-trasparente-offerta": 430 }
+  },
+  {
+    pattern: /\b(?:obiezion[a-z]*|ci devo pensare|cliente indecis[a-z]*|altra valutazione)\b/,
+    boosts: { "vendita-obiezioni-autonomia-cliente": 440 }
+  },
+  {
+    pattern: /\b(?:negozi(?:o|are|amo|ate|ano|azione|azioni)|ancoraggio|ancora di prezzo|svalutare il cliente|concession[a-z]*)\b.{0,60}\b(?:prezzo|offerta)\b|\b(?:prezzo|offerta)\b.*\b(?:negozi(?:o|are|amo|ate|ano|azione|azioni)|ancoraggio|concession[a-z]*)\b/,
+    boosts: { "vendita-negoziazione-ancoraggio-etico": 430 }
+  },
+  {
+    pattern: /\b(?:chiud[a-z]*|closing|procedere|follow up|convinc[a-z]* ogni cliente)\b.*\b(?:vendit[a-z]*|oro|offerta|client[a-z]*)\b|\b(?:vendit[a-z]*|client[a-z]*)\b.*\b(?:chiusura|closing|pensarci|vendere solo|convinc[a-z]* ogni)\b/,
+    boosts: { "vendita-chiusura-consensuale-follow-up": 450 }
+  },
+  {
+    pattern: /\b(?:prova sociale|recension[a-z]*|credenzial[a-z]*|certificazion[a-z]*|autorita)\b.*\b(?:fiducia|client[a-z]*|strument[a-z]*|vendit[a-z]*)\b|\b(?:fiducia|client[a-z]*)\b.*\b(?:recension[a-z]*|credenzial[a-z]*|strument[a-z]*|prova sociale)\b/,
+    boosts: { "vendita-prova-sociale-autorita-vere": 440 }
+  },
+  {
+    pattern: /\b(?:scarsit[a-z]*|urgenza|countdown|solo oggi|dark pattern|offerta scade)\b/,
+    boosts: { "vendita-urgenza-reale-no-dark-pattern": 450 }
+  },
+  {
+    pattern: /\b(?:vulnerabil[a-z]*|anzian[a-z]* confus[a-z]*|lutto|vedov[a-z]*|debit[a-z]*|difficolt[a-z]* economic[a-z]*|persona di fiducia|indebito condizionamento)\b/,
+    boosts: { "vendita-limiti-coercizione-vulnerabilita": 750 }
+  },
+  {
+    pattern: /\b(?:vend[a-z]*|present[a-z]*|storytelling|consigli[a-z]*)\b.*\b(?:gioiell[a-z]*|diamant[a-z]*|gemm[a-z]*)\b.*\b(?:trattament[a-z]*|origine|sintetic[a-z]*|disclosure|rapport[a-z]*)\b|\b(?:gioielleria|gioiell[a-z]*|diamant[a-z]*)\b.*\b(?:vend[a-z]*|storytelling|dichiar[a-z]*|trattament[a-z]*|origine)\b/,
+    boosts: { "gioielleria-storytelling-disclosure-consulenziale": 460 }
+  },
+  {
+    pattern: /\b(?:compleanno|lutto|confidenz[a-z]*|memori[a-z]*|profilazion[a-z]*|dat[a-z]* sensibil[a-z]*)\b.*\b(?:convinc[a-z]*|vendit[a-z]*|client[a-z]*|pressione|prezzo)\b|\b(?:personalizz[a-z]*|crm|marketing)\b.*\b(?:privacy|consenso|profilazion[a-z]*)\b/,
+    boosts: { "vendita-privacy-personalizzazione-consentita": 900 }
+  },
+  {
+    pattern: /\b(?:kpi|metric[a-z]*|misur[a-z]*|scorecard|incentiv[a-z]*)\b.*\b(?:vendit[a-z]*|conversione|qualita|operator[a-z]*)\b|\b(?:conversione|qualita della vendita)\b.*\b(?:kpi|metric[a-z]*|misur[a-z]*)\b/,
+    boosts: { "vendita-kpi-qualita-formazione": 450 }
+  },
+  {
+    pattern: /\b(?:role ?play|simulazion[a-z]*|copione|script.{0,30}(?:completo|dialogo|role ?play))\b.*\b(?:compro oro|vendit[a-z]*|client[a-z]*|obiezion[a-z]*)\b|\b(?:formazione avanzata|allenamento)\b.*\b(?:vendit[a-z]*|compro oro|gioielleria)\b/,
+    boosts: { "vendita-script-roleplay-compro-oro": 470 }
+  },
   {
     pattern: /\b(?:formazione|formarsi|forma|genesi|geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|placer|alluvional[a-z]*|orogenic[a-z]*|epitermal[a-z]*)\b.*\boro\b|\boro\b.*\b(?:formazione|formarsi|forma|genesi|geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|placer|alluvional[a-z]*|orogenic[a-z]*|epitermal[a-z]*)\b/,
     boosts: { "geologia-oro-primario-placer": 340 }
@@ -530,6 +594,8 @@ export function buildSectorKnowledgeAnswer(question = "", matches = searchSector
               ? "Informazione geologica generale: presenza, mineralizzazione, risorsa e riserva non sono sinonimi. Provenienza, tenore e valore richiedono campionamento rappresentativo, analisi professionali e interpretazione di un geologo o laboratorio qualificato."
               : primary.category === "Numismatica e storia"
                 ? "Informazione storico-numismatica generale: verifica sempre anno, zecca, variante, autenticità e stato di conservazione del singolo esemplare; il racconto storico non costituisce una stima economica."
+                : primary.category === "Vendita consulenziale e comunicazione"
+                  ? "Vendita consulenziale professionale: nessuna tecnica può garantire la conversione di ogni cliente. Usa queste indicazioni solo per aumentare chiarezza, fiducia e qualità della decisione; autonomia, decisione libera e scelta informata vengono prima della chiusura. Il cliente deve restare libero di vendere tutto, vendere solo alcuni oggetti, confrontare, pensarci o non vendere."
                 : "Le prove di banco sono screening: una conclusione definitiva può richiedere un laboratorio qualificato."
   );
   return { risposta: lines.join("\n"), sources };

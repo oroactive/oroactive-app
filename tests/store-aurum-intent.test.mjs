@@ -39,6 +39,7 @@ test("Aurum avvia il tutorial Utenti solo su richiesta esplicita", async () => {
   const app = await file("app.js");
   const names = [
     "aurumNormalize",
+    "isAurumSalesCommunicationQuestion",
     "isAurumUsersTopic",
     "isAurumExplicitTutorialRequest",
     "isAurumExplicitUsersTutorialRequest",
@@ -120,6 +121,7 @@ test("Aurum non avvia il tutorial Fusioni per una domanda specialistica", async 
   const app = await file("app.js");
   const names = [
     "aurumNormalize",
+    "isAurumSalesCommunicationQuestion",
     "isAurumUsersTopic",
     "isAurumExplicitTutorialRequest",
     "isAurumExplicitUsersTutorialRequest",
@@ -156,6 +158,7 @@ test("Aurum non scambia la formazione geologica per il tutorial Academy", async 
   const app = await file("app.js");
   const names = [
     "aurumNormalize",
+    "isAurumSalesCommunicationQuestion",
     "isAurumUsersTopic",
     "isAurumGeologyOrNumismaticsQuestion",
     "isAurumExplicitTutorialRequest",
@@ -175,6 +178,35 @@ test("Aurum non scambia la formazione geologica per il tutorial Academy", async 
     "Quali sono peso e titolo del Krugerrand?"
   ]) {
     assert.equal(api.isAurumGeologyOrNumismaticsQuestion(question), true, question);
+    assert.equal(api.inferAurumTutorialId(question), "", question);
+  }
+  assert.equal(api.inferAurumTutorialId("Avvia il tutorial Academy"), "tutorial_academy");
+});
+
+test("Aurum non trasforma formazione vendita e gestione obiezioni in tutorial app", async () => {
+  const app = await file("app.js");
+  const names = [
+    "aurumNormalize",
+    "isAurumSalesCommunicationQuestion",
+    "isAurumUsersTopic",
+    "isAurumGeologyOrNumismaticsQuestion",
+    "isAurumExplicitTutorialRequest",
+    "isAurumExplicitUsersTutorialRequest",
+    "inferAurumTutorialId"
+  ];
+  const source = names.map((name) => extractFunction(app, name)).join("\n");
+  const api = new Function(
+    "aurumSectionKey",
+    `${source}; return { inferAurumTutorialId, isAurumSalesCommunicationQuestion };`
+  )(() => "academy");
+
+  for (const question of [
+    "Formazione avanzata vendita consulenziale per compro oro",
+    "Guidami passo passo nella gestione delle obiezioni sul prezzo",
+    "Tecniche di persuasione etica per la gioielleria",
+    "Fammi un role play di vendita con un cliente indeciso"
+  ]) {
+    assert.equal(api.isAurumSalesCommunicationQuestion(question), true, question);
     assert.equal(api.inferAurumTutorialId(question), "", question);
   }
   assert.equal(api.inferAurumTutorialId("Avvia il tutorial Academy"), "tutorial_academy");

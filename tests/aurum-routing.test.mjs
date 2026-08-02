@@ -71,6 +71,26 @@ for (const question of [
 }
 
 for (const question of [
+  "Quali tecniche di persuasione etica uso con un cliente indeciso?",
+  "Come gestisco le obiezioni sul prezzo senza pressione?",
+  "Come convinco il cliente spiegando peso, titolo e offerta in modo trasparente?",
+  "Fammi un role play di vendita consulenziale per un compro oro",
+  "Come tutelo un cliente vulnerabile durante la valutazione?"
+]) {
+  test(`la vendita consulenziale resta conoscenza settoriale: ${question}`, () => {
+    const coachingKnowledge = searchCoachingKnowledge(question);
+    const sectorMatches = searchSectorKnowledge(question, { limit: 5 });
+    assert.ok(sectorMatches.length > 0);
+    assert.equal(hasStrongComproOroSectorIntent(question, sectorMatches, coachingKnowledge), true);
+    assert.equal(resolveAurumKnowledgeRoute({
+      question,
+      sectorMatches,
+      coachingKnowledge
+    }).strongSectorPriority, true);
+  });
+}
+
+for (const question of [
   "Come si forma geologicamente l'oro e come nasce un placer?",
   "La kimberlite crea il diamante o lo trasporta?",
   "Come si formano i PGE nel Bushveld?",

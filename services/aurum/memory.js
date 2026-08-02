@@ -200,6 +200,7 @@ function normalizeMemoryIntentText(value = "") {
 }
 
 export function selectAurumMemoriesForAi(memories = [], options = {}) {
+  if (options.blockPersonalMemory === true) return [];
   const question = normalizeMemoryIntentText(options.question || "");
   const hasCoachingContext = options.hasCoachingContext === true;
   const requestedTypes = new Set();

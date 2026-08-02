@@ -132,6 +132,14 @@ test("al provider arrivano soltanto memorie condivise e pertinenti alla domanda"
     }).map((memory) => memory.id),
     ["birthday"]
   );
+  assert.deepEqual(
+    selectAurumMemoriesForAi(memories, {
+      question: "Posso usare il compleanno per personalizzare una trattativa di vendita?",
+      hasCoachingContext: false,
+      blockPersonalMemory: true
+    }),
+    []
+  );
 });
 
 test("il valore della memoria è cifrato e vincolato all'utente", () => {
