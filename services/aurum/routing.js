@@ -15,6 +15,12 @@ export function hasStrongComproOroSectorIntent(question = "", sectorMatches = []
   const coachingScore = Number(coachingKnowledge.matches?.[0]?.score || 0);
   const hasUnambiguousRegulatedMarker = /\b(?:oam|uif|sos|opo|operatore professionale in oro|operazione sospetta|dichiarazione oro|infostat|legge 7(?:\/2000)?|antiriciclaggio|registro (?:oam|opo|degli operatori compro oro|operatori compro oro)|d ?lgs ?92(?:\/2017)?|d ?lgs ?211(?:\/2024)?|d ?m ?14 maggio 2018)\b/.test(normalized);
   if (hasUnambiguousRegulatedMarker && sectorScore >= 20) return true;
+  const hasAuthoritiesSuapOpeningMarker = /\b(?:guardia di finanza|gdf|carabinieri|polizia di stato|questura|questore|suap|sportello unico attivita produttive|scia|silenzio assenso|silenzio-assenso|articolo 127|art 127|nspv|nucleo speciale polizia valutaria|accesso ispettivo|ispezione|processo verbale di constatazione|pvc)\b/.test(normalized)
+    || /\bpolizia\b.*\b(?:compro oro|prezios[a-z]*|tulps|licenza|controll[a-z]*|verific[a-z]*)\b/.test(normalized)
+    || /\bautorit[a-z]*\b.*\b(?:compro oro|controll[a-z]*|competenz[a-z]*)\b/.test(normalized)
+    || /\b(?:apr[a-z]*|apertura|avvi[a-z]*|inizi[a-z]*)\b.*\b(?:compro oro|oro usato|negozio\b.{0,40}\b(?:compr[a-z]*|acquist[a-z]*)\b.{0,20}\boro)\b/.test(normalized)
+    || /\b(?:nuova sede|filiale|trasferimento|preposto|cessazione)\b.*\b(?:compro oro|oam|questura|suap)\b/.test(normalized);
+  if (hasAuthoritiesSuapOpeningMarker && sectorScore >= 20) return true;
   const hasSpecialistAccountingMarker = /\b(?:prima nota|partita doppia|regime iva|trattamento iva|natura iva|regime (?:iva )?del margine|reverse charge|inversione contabile|registri? iva|lipe|f24|sdi|rimanenze|cespiti|ammortamento|cash flow|controllo di gestione)\b/.test(normalized)
     || /\b(?:commercialista|contabilita|contabile|fiscalista)\b.*\b(?:compro oro|negozio|oro|preziosi|iva|bilancio|adempimenti|lavoro|svolge|funziona)\b/.test(normalized)
     || /\b(?:compro oro|negozio|oro|preziosi)\b.*\b(?:commercialista|contabilita|contabile|fiscalista)\b/.test(normalized);

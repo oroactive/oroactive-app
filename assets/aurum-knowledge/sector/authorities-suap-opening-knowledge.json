@@ -1,0 +1,558 @@
+{
+  "schemaVersion": 1,
+  "knowledgeVersion": "2026.08.03-autorita-suap-apertura",
+  "verifiedAt": "3 agosto 2026",
+  "jurisdiction": "Italia; procedure territoriali da verificare presso SUAP e Questura competenti",
+  "scope": [
+    "Guardia di Finanza e controlli D.Lgs. 92/2017",
+    "verifiche fiscali, tributarie ed economico-finanziarie",
+    "Polizia di Stato, Questura e autorizzazioni TULPS",
+    "Carabinieri e funzioni di polizia giudiziaria",
+    "UIF, SOS e Nucleo Speciale Polizia Valutaria",
+    "SUAP, SCIA condizionata e apertura del negozio compro oro",
+    "accessi, ispezioni, verbali, diritti e gestione documentale",
+    "nuove sedi, trasferimenti, preposti e cessazione"
+  ],
+  "topics": [
+    {
+      "id": "autorita-controlli-compro-oro-mappa-competenze",
+      "title": "Autorità e controlli del compro oro: mappa delle competenze",
+      "category": "Normativa e compliance",
+      "keywords": ["autorità compro oro", "chi controlla compro oro", "Guardia di Finanza Polizia Carabinieri", "riparto competenze", "MEF OAM UIF Questura", "controlli negozio oro"],
+      "summary": "I controlli sul compro oro seguono binari distinti: Guardia di Finanza per il D.Lgs. 92/2017 e la polizia economico-finanziaria, Questore e pubblica sicurezza per il TULPS, OAM per il Registro, UIF per l'analisi delle SOS e polizia giudiziaria per i reati.",
+      "facts": [
+        "Il D.Lgs. 92/2017 individua come autorità competenti MEF, UIF e Guardia di Finanza, che nei casi previsti opera tramite il Nucleo Speciale Polizia Valutaria.",
+        "La Guardia di Finanza accerta e contesta in via esclusiva le violazioni amministrative del D.Lgs. 92/2017; il MEF irroga le sanzioni del decreto, salvo le specifiche competenze OAM.",
+        "Il Questore rilascia l'autorizzazione per gli oggetti preziosi ai sensi dell'art. 127 TULPS; Polizia e Carabinieri, secondo le rispettive qualifiche, conservano i diversi poteri di pubblica sicurezza e polizia giudiziaria.",
+        "L'OAM tiene il Registro degli operatori compro oro e riceve le comunicazioni su operatore, sedi e preposti, ma non sostituisce Questore, MEF, UIF o autorità giudiziaria.",
+        "Una stessa visita può far emergere profili amministrativi, TULPS, fiscali o penali, ma base giuridica, autorità competente, verbale e conseguenze devono essere identificati separatamente."
+      ],
+      "checklist": [
+        "Chiedere quale tipo di controllo è in corso: TULPS, D.Lgs. 92/2017, fiscale-tributario oppure di polizia giudiziaria.",
+        "Identificare autorità procedente, base normativa, oggetto, documenti richiesti e verbale rilasciato.",
+        "Tenere distinti rilievo, contestazione, prescrizione, sospensione e sanzione: non sono sinonimi.",
+        "Coinvolgere commercialista, consulente antiriciclaggio o legale in funzione del profilo concreto."
+      ],
+      "warnings": [
+        "Non affermare che Guardia di Finanza, Polizia e Carabinieri svolgano sempre gli stessi controlli o possiedano poteri intercambiabili.",
+        "Non attribuire alla Guardia di Finanza il rilascio della licenza art. 127 TULPS né a Polizia o Carabinieri l'ordinaria irrogazione delle sanzioni del D.Lgs. 92/2017.",
+        "Un controllo o un rilievo non dimostra da solo un reato o la responsabilità definitiva dell'operatore."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 25 maggio 2017 n. 92, testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/2017/06/20/17G00109/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "OAM — autorità competente per accertare e contestare le violazioni compro oro",
+          "url": "https://www.organismo-am.it/info-point/domande-frequenti/384-compro-oro/compro-oro-vigilanza/666-quale-autorita-e-competente-ad-accertare-e-contestare-le-violazioni-delle-norme-dettate-in-materia-antiriciclaggio-sui-compro-oro-dal-decreto-legislativo-25-maggio-2017-n92",
+          "authority": "Organismo Agenti e Mediatori",
+          "verifiedAt": "3 agosto 2026",
+          "status": "FAQ istituzionale verificata"
+        },
+        {
+          "title": "TULPS, testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/1931/06/26/031U0773/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        }
+      ]
+    },
+    {
+      "id": "gdf-controlli-antiriciclaggio-compro-oro",
+      "title": "Guardia di Finanza: controlli antiriciclaggio e D.Lgs. 92/2017 nel compro oro",
+      "category": "Normativa e compliance",
+      "keywords": ["Guardia di Finanza compro oro", "GdF controllo antiriciclaggio", "D.Lgs. 92 controlli", "schede fotografie conto dedicato", "sanzioni compro oro", "Nucleo Speciale Polizia Valutaria"],
+      "summary": "Nel controllo settoriale la Guardia di Finanza verifica la tracciabilità completa delle operazioni, dall'identificazione del cliente alla destinazione dell'oggetto, inclusi pagamenti, conto dedicato, schede, fotografie, ricevute, conservazione e presidio SOS.",
+      "facts": [
+        "L'art. 11 D.Lgs. 92/2017 attribuisce alla Guardia di Finanza il controllo sull'osservanza del decreto e l'accertamento e contestazione delle relative violazioni.",
+        "Il riscontro può riguardare identificazione prima dell'operazione, limite di 500 euro al contante comprese operazioni frazionate, conto dedicato e coerenza del mezzo di pagamento.",
+        "Per ogni operazione sono centrali scheda numerata, descrizione e qualità, quotazione da fonte affidabile e indipendente, valutazione, due fotografie, data, ora, importo, pagamento e ricevuta al cliente.",
+        "La destinazione successiva dell'oggetto e il destinatario devono restare tracciabili; dati e documenti sono conservati per dieci anni con integrità, completezza e storicità.",
+        "La Guardia di Finanza accerta e contesta, mentre il MEF irroga le sanzioni previste dal decreto salvo le competenze OAM; non esiste una frequenza legale fissa dei controlli."
+      ],
+      "checklist": [
+        "Mantenere disponibili licenza art. 127, iscrizione OAM attiva, sedi, preposti e conto dedicato coerenti.",
+        "Riconciliare periodicamente schede, fotografie, pagamenti, giacenza fisica, fermo di dieci giorni e destinazioni successive.",
+        "Verificare che l'archivio decennale sia ricercabile, integro e non alterabile e che le ricevute siano consegnate.",
+        "Testare la procedura SOS, le credenziali UIF e la formazione del personale senza annotare la SOS in documenti visibili al cliente."
+      ],
+      "warnings": [
+        "Non interpretare una circolare operativa storica come periodicità legale o calendario obbligatorio dei controlli.",
+        "Non modificare o ricostruire retroattivamente schede, fotografie o pagamenti quando viene rilevata un'anomalia.",
+        "L'operatore compro oro ordinario è soggetto al regime specifico D.Lgs. 92/2017 e non va automaticamente equiparato a un OPO per ogni obbligo."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017, articoli 4-11",
+          "url": "https://www.normattiva.it/eli/id/2017/06/20/17G00109/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "Guardia di Finanza — attività antiriciclaggio",
+          "url": "https://www.gdf.gov.it/it/cosa-facciamo/polizia-economico-finanziaria/criminalita-economica-e-finanziaria/polizia-valutaria/antiriciclaggio",
+          "authority": "Guardia di Finanza",
+          "verifiedAt": "3 agosto 2026",
+          "status": "pagina istituzionale verificata"
+        },
+        {
+          "title": "Guardia di Finanza — circolare sulla disciplina compro oro",
+          "url": "https://www.gdf.gov.it/it/gdf-comunica/documenti-e-pubblicazioni/circolari/210557-del-07-luglio-2017/circolare/%40%40download/file_principale/Circolare-26-7-2017.pdf",
+          "authority": "Guardia di Finanza",
+          "verifiedAt": "3 agosto 2026",
+          "status": "documento operativo storico verificato"
+        }
+      ]
+    },
+    {
+      "id": "gdf-verifica-fiscale-tributaria-compro-oro",
+      "title": "Guardia di Finanza: verifica fiscale, tributaria ed economico-finanziaria del compro oro",
+      "category": "Fiscalità",
+      "keywords": ["verifica fiscale Guardia di Finanza", "controllo tributario compro oro", "accesso fiscale", "PVC processo verbale constatazione", "Statuto contribuente", "documenti contabili oro"],
+      "summary": "La verifica fiscale è un binario autonomo dal controllo D.Lgs. 92 e può confrontare contabilità, dichiarazioni e flussi finanziari con la realtà fisica e documentale dei lotti, nel rispetto dei poteri tributari e delle garanzie dello Statuto del contribuente.",
+      "facts": [
+        "La Guardia di Finanza esercita funzioni di polizia economico-finanziaria, coopera con l'Amministrazione finanziaria e può svolgere controlli fiscali e indagini sui reati tributari.",
+        "Possono essere esaminati, nei limiti dell'oggetto e dei poteri esercitati, libri, registri, fatture, dichiarazioni, documenti, dati bancari e scritture pertinenti.",
+        "Nel compro oro è possibile verificare coerenza tra schede, giacenze, cessioni a fonderie, fatture, corrispettivi, conto dedicato, costi e ricavi dichiarati: è una metodologia di riscontro, non un elenco legale chiuso.",
+        "Gli accessi fiscali nei locali commerciali devono fondarsi su effettive esigenze di indagine; salvo urgenze documentate avvengono nell'orario ordinario arrecando la minore turbativa possibile.",
+        "All'inizio il contribuente ha diritto di conoscere ragioni e oggetto della verifica, di farsi assistere da un professionista abilitato e di far verbalizzare osservazioni e rilievi.",
+        "Il processo verbale di constatazione documenta i rilievi dei verificatori ma non coincide automaticamente con l'atto impositivo definitivo."
+      ],
+      "checklist": [
+        "Designare un referente, avvisare il commercialista e comprendere periodo, tributi e oggetto della verifica.",
+        "Produrre i documenti pertinenti richiesti mantenendo un elenco di copie, supporti o originali consegnati.",
+        "Riconciliare dati contabili e fiscali con banca, cassa, magazzino, schede OCO e documenti di fonderia senza alterare lo storico.",
+        "Leggere i verbali, far inserire osservazioni, richiederne copia e gestire i termini successivi con il professionista."
+      ],
+      "warnings": [
+        "Non confondere l'accesso TULPS nei locali autorizzati con le diverse condizioni e garanzie dell'accesso fiscale.",
+        "Non affermare che ogni controllo amministrativo sul compro oro diventi automaticamente una verifica fiscale completa.",
+        "Aurum non può assegnare un trattamento IVA o tributario definitivo senza conoscere forma giuridica, documenti, provenienza e destinazione dell'operazione."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 19 marzo 2001 n. 68, funzioni di polizia economica e finanziaria",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2001-03-19;68~art2!vig=",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "Legge 212/2000 — Statuto dei diritti del contribuente",
+          "url": "https://www.normattiva.it/eli/id/2000/07/31/000G0265/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "Guardia di Finanza — controlli fiscali sulle imposte dirette",
+          "url": "https://www.gdf.gov.it/it/cosa-facciamo/polizia-economico-finanziaria/evasione-elusione-e-frodi-fiscali/controlli-fiscali/imposte-dirette",
+          "authority": "Guardia di Finanza",
+          "verifiedAt": "3 agosto 2026",
+          "status": "pagina istituzionale verificata"
+        }
+      ]
+    },
+    {
+      "id": "questura-polizia-tulps-controlli-preziosi",
+      "title": "Questura e Polizia di Stato: licenza TULPS e controlli sugli oggetti preziosi",
+      "category": "Normativa e compliance",
+      "keywords": ["Questura compro oro", "Polizia controlli preziosi", "licenza art 127 TULPS", "articolo 16 TULPS accesso", "articolo 128 registro", "sospensione licenza"],
+      "summary": "Il Questore è l'autorità che rilascia l'autorizzazione ex art. 127 TULPS; gli ufficiali e agenti di pubblica sicurezza possono accedere nei locali autorizzati per verificare licenza, prescrizioni, personale, registrazioni e regole di pubblica sicurezza.",
+      "facts": [
+        "La licenza per commercio, fabbricazione o intermediazione di oggetti preziosi è rilasciata dal Questore ai sensi dell'art. 127 TULPS ed è presupposto della successiva iscrizione OAM.",
+        "L'art. 16 TULPS consente a ufficiali e agenti di pubblica sicurezza di accedere nei locali destinati all'attività autorizzata per assicurarsi dell'adempimento delle prescrizioni di legge, regolamento o autorità.",
+        "L'art. 128 disciplina identificazione e registrazione delle operazioni; per il compro oro gli adempimenti del D.Lgs. 92 coordinano la tracciabilità, mentre resta il fermo di dieci giorni prima di alterare o alienare i preziosi usati.",
+        "La Questura può verificare validità della licenza, titolare, rappresentanti, preposti, personale e condizioni imposte dal titolo di pubblica sicurezza.",
+        "Il Questore può adottare sospensione o revoca nei casi consentiti dal TULPS; tale provvedimento è distinto dall'eventuale sospensione MEF prevista dal D.Lgs. 92/2017."
+      ],
+      "checklist": [
+        "Conservare licenza, prescrizioni, estremi dei rappresentanti e preposti e mantenerli coerenti con attività e sede effettive.",
+        "Rendere disponibili registrazioni, schede e oggetti soggetti al fermo senza modificare i dati durante il controllo.",
+        "Chiedere copia di verbali, prescrizioni o richieste e rispettare i termini assegnati.",
+        "Coordinare ogni variazione con SUAP, Questura e OAM senza presumere che la comunicazione a un ente aggiorni gli altri."
+      ],
+      "warnings": [
+        "L'accesso nei locali autorizzati non costituisce un potere illimitato su abitazioni o dati estranei all'attività.",
+        "Non trasformare un comunicato relativo a un singolo esercizio in una sanzione automatica applicabile a ogni caso.",
+        "Le contestazioni amministrative del D.Lgs. 92/2017 restano distinte e di competenza della Guardia di Finanza."
+      ],
+      "sources": [
+        {
+          "title": "TULPS, articoli 16, 127 e 128",
+          "url": "https://www.normattiva.it/eli/id/1931/06/26/031U0773/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "Polizia di Stato — licenza in materia di oggetti preziosi",
+          "url": "https://poliziadistato.it/articolo/208-Licenza_in_materia_di_oggetti_preziosi/",
+          "authority": "Polizia di Stato",
+          "verifiedAt": "3 agosto 2026",
+          "status": "scheda istituzionale verificata"
+        },
+        {
+          "title": "Questura di Venezia — sospensione licenza compro oro nel 2026",
+          "url": "https://questure.poliziadistato.it/it/Venezia/articolo/21496a01ba5f62045515785652/",
+          "authority": "Polizia di Stato — Questura di Venezia",
+          "verifiedAt": "3 agosto 2026",
+          "status": "caso istituzionale, non regola generale"
+        }
+      ]
+    },
+    {
+      "id": "carabinieri-polizia-giudiziaria-provenienza-preziosi",
+      "title": "Carabinieri e polizia giudiziaria: provenienza, refurtiva e reati sui preziosi",
+      "category": "Normativa e compliance",
+      "keywords": ["Carabinieri compro oro", "polizia giudiziaria gioielli", "refurtiva preziosi", "ricettazione riciclaggio oro", "furto rapina compro oro", "sequestro monili"],
+      "summary": "L'Arma dei Carabinieri è forza di polizia a competenza generale e può svolgere attività di pubblica sicurezza e indagini di polizia giudiziaria su furto, rapina, ricettazione, riciclaggio, falso e provenienza dei preziosi, senza diventare per questo l'autorità fiscale ordinaria.",
+      "facts": [
+        "Gli appartenenti all'Arma possiedono, secondo ruolo, qualifiche di ufficiale o agente di polizia giudiziaria e di pubblica sicurezza.",
+        "Nelle indagini coordinate dall'autorità giudiziaria o nei casi d'iniziativa previsti dal codice possono acquisire documenti, rintracciare beni e compiere gli atti urgenti consentiti.",
+        "Schede, fotografie, identificazione, pagamento tracciabile, fermo di dieci giorni e destinazione dell'oggetto aiutano a ricostruire provenienza e catena documentale.",
+        "Se emerge un sospetto concreto di refurtiva, la condotta prudente è non alterare l'oggetto, preservare quanto legittimamente acquisito e contattare le Forze di polizia senza affrontare il cliente in modo rischioso.",
+        "Perquisizione e sequestro penale richiedono i presupposti e le formalità del codice; non conseguono automaticamente a qualunque irregolarità amministrativa."
+      ],
+      "checklist": [
+        "Preservare oggetto, scheda, immagini, video lecitamente disponibili, pagamenti e log senza aggiunte retroattive.",
+        "Annotare separatamente fatti osservati e valutazioni, evitando di qualificare il cliente come colpevole.",
+        "Contattare le Forze di polizia in sicurezza e seguire le istruzioni ricevute senza trattenere persone o effettuare perquisizioni private.",
+        "In caso di acquisizione o sequestro chiedere verbale, elenco dei beni e supporto del legale."
+      ],
+      "warnings": [
+        "Non presentare i Carabinieri come autorità ordinaria della verifica fiscale o come ente che rilascia la licenza art. 127.",
+        "Prezzo basso, urgenza o nervosismo non dimostrano da soli furto, ricettazione o riciclaggio.",
+        "I comunicati su indagini preliminari non equivalgono a sentenze definitive."
+      ],
+      "sources": [
+        {
+          "title": "Carabinieri — compiti, funzioni e dipendenze",
+          "url": "https://www.carabinieri.it/chi-siamo/oggi/organizzazione/in-generale/compiti-funzioni-e-dipendenze",
+          "authority": "Arma dei Carabinieri",
+          "verifiedAt": "3 agosto 2026",
+          "status": "pagina istituzionale verificata"
+        },
+        {
+          "title": "Codice di procedura penale, articolo 253 — sequestro probatorio",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.procedura.penale:1988-09-22;447~art253!vig=",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "Carabinieri — indagine su furti, ricettazione e riciclaggio di preziosi",
+          "url": "https://www.carabinieri.it/in-vostro-aiuto/informazioni/comunicati-stampa/associazione-a-delinquere-furti-ad-anziani-e-riciclaggio.-21-misure-cautelari",
+          "authority": "Arma dei Carabinieri",
+          "verifiedAt": "3 agosto 2026",
+          "status": "caso istituzionale, presunzione di non colpevolezza"
+        }
+      ]
+    },
+    {
+      "id": "uif-nspv-sos-compro-oro",
+      "title": "UIF, Nucleo Speciale Polizia Valutaria e SOS del compro oro",
+      "category": "Normativa e compliance",
+      "keywords": ["SOS compro oro", "segnalazione operazione sospetta UIF", "NSPV", "Nucleo Speciale Polizia Valutaria", "riservatezza SOS", "istruzioni UIF 2025 2026"],
+      "summary": "La segnalazione di operazione sospetta viene trasmessa senza ritardo alla UIF quando ricorrono i presupposti; la UIF svolge l'analisi finanziaria e inoltra i casi meritevoli di approfondimento al NSPV della Guardia di Finanza e alla DIA, con rigorosa riservatezza.",
+      "facts": [
+        "La SOS non è una denuncia penale e non va inviata ordinariamente a Questura o Carabinieri: il canale previsto è la UIF.",
+        "La UIF analizza le segnalazioni e trasmette quelle meritevoli di approfondimento investigativo al Nucleo Speciale Polizia Valutaria e alla Direzione Investigativa Antimafia.",
+        "Le istruzioni UIF del 18 dicembre 2025 per la rilevazione e segnalazione delle operazioni sospette sono applicabili dal 1 luglio 2026.",
+        "L'esistenza di uno o più indicatori di anomalia non prova un reato e non determina automaticamente la SOS: serve una valutazione complessiva del caso concreto.",
+        "È vietato informare il cliente o terzi dell'avvenuta SOS o della probabilità di approfondimenti, salvo le eccezioni previste dalla legge."
+      ],
+      "checklist": [
+        "Raccogliere soltanto i fatti necessari, applicare la procedura interna e coinvolgere il referente antiriciclaggio.",
+        "Usare le istruzioni UIF vigenti dal 1 luglio 2026 e verificare credenziali, profili e ricevute del canale ufficiale.",
+        "Mantenere riservati valutazione e invio, limitando accesso e conversazioni al personale autorizzato.",
+        "Distinguere SOS, denuncia, emergenza e dichiarazione ORO: presupposti, destinatari e finalità sono diversi."
+      ],
+      "warnings": [
+        "Non annotare in una scheda consegnata al cliente che è stata trasmessa una SOS e non anticipare controlli o indagini.",
+        "Non inserire nella chat di Aurum nomi, documenti o dati completi di un cliente sospetto.",
+        "Una denuncia non rende automaticamente obbligatoria la SOS e una SOS non prova la responsabilità penale."
+      ],
+      "sources": [
+        {
+          "title": "UIF — segnalazioni di operazioni sospette",
+          "url": "https://uif.bancaditalia.it/adempimenti-operatori/segnalazioni-sos/index.html",
+          "authority": "Unità di Informazione Finanziaria per l'Italia",
+          "verifiedAt": "3 agosto 2026",
+          "status": "pagina istituzionale verificata"
+        },
+        {
+          "title": "UIF — istruzioni del 18 dicembre 2025 applicabili dal 1 luglio 2026",
+          "url": "https://uif.bancaditalia.it/normativa/norm-antiric/Istruzioni_UIF_rilevazione_e_segnalazione_operazioni_sospette.pdf",
+          "authority": "Unità di Informazione Finanziaria per l'Italia",
+          "verifiedAt": "3 agosto 2026",
+          "status": "istruzioni vigenti verificate"
+        },
+        {
+          "title": "D.Lgs. 231/2007, articolo 35",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2007-11-21;231~art35!vig=",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        }
+      ]
+    },
+    {
+      "id": "accesso-ispezione-verbale-documenti-difesa",
+      "title": "Accesso, ispezione e verifica: documenti, verbali e gestione professionale",
+      "category": "Normativa e compliance",
+      "keywords": ["accesso ispettivo compro oro", "ispezione negozio", "verbale controllo", "documenti da mostrare", "diritti durante verifica", "cooperare controllo", "non alterare documenti"],
+      "summary": "La gestione corretta di un controllo parte dall'identificazione degli operanti e del tipo di attività, prosegue con cooperazione e consegna tracciata dei documenti pertinenti e termina con copia dei verbali, rispetto dei termini e correzione futura senza alterare lo storico.",
+      "facts": [
+        "Accesso TULPS, controllo D.Lgs. 92, verifica fiscale e attività di polizia giudiziaria hanno basi, limiti, documenti e garanzie differenti.",
+        "Il titolare può chiedere cortesemente identificazione degli operanti, autorità, oggetto del controllo e verbale, senza ostacolare le attività legittime.",
+        "Durante una verifica fiscale il contribuente può farsi assistere da un professionista abilitato e chiedere che osservazioni proprie o del professionista siano verbalizzate.",
+        "Documenti e dati non devono essere cancellati, alterati, retrodatati o ricostruiti; una correzione successiva deve preservare il dato storico e la tracciabilità.",
+        "Verbali, richieste, elenco di documenti o beni acquisiti e termini assegnati devono essere conservati e gestiti separando rilievi, contestazioni e provvedimenti."
+      ],
+      "checklist": [
+        "Chiedere identificazione degli operanti e chiarire se si tratta di TULPS, D.Lgs. 92, fiscale o penale.",
+        "Cooperare, nominare un referente, fornire documenti pertinenti e tenere traccia di quanto consegnato.",
+        "Non cancellare, modificare o ricostruire dati; far inserire nel verbale le osservazioni rilevanti.",
+        "Richiedere copia dei verbali e l'elenco di documenti o oggetti acquisiti e avvisare il professionista competente.",
+        "Dopo il controllo rispettare termini e prescrizioni e correggere i processi futuri senza alterare lo storico."
+      ],
+      "warnings": [
+        "Non ostacolare un controllo legittimo, nascondere documenti, distruggere prove o suggerire al personale risposte concordate non veritiere.",
+        "Non consegnare indiscriminatamente dati estranei: comprendere la richiesta e usare il professionista senza impedire l'attività autorizzata.",
+        "In caso di sequestro o indagine penale non discutere il merito sul posto oltre il necessario e contattare tempestivamente un legale."
+      ],
+      "sources": [
+        {
+          "title": "Legge 212/2000 — diritti e garanzie del contribuente sottoposto a verifica",
+          "url": "https://www.normattiva.it/eli/id/2000/07/31/000G0265/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "TULPS, articolo 16 e testo consolidato",
+          "url": "https://www.normattiva.it/eli/id/1931/06/26/031U0773/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "Guardia di Finanza — Manuale operativo in materia di contrasto all'evasione",
+          "url": "https://www.gdf.gov.it/it/gdf-comunica/documenti-e-pubblicazioni/circolari/357600-del-27-novembre-2017/volume-i/%40%40download/file_principale",
+          "authority": "Guardia di Finanza",
+          "verifiedAt": "3 agosto 2026",
+          "status": "documento operativo verificato nel suo contesto"
+        }
+      ]
+    },
+    {
+      "id": "suap-funzione-procedimento-compro-oro",
+      "title": "SUAP: funzione e procedimento unico per il negozio compro oro",
+      "category": "Normativa e compliance",
+      "keywords": ["SUAP compro oro", "Sportello Unico Attività Produttive", "funzione SUAP", "procedimento telematico", "Impresa in un giorno", "pratica apertura negozio"],
+      "summary": "Il SUAP territoriale è il punto pubblico unico e telematico per i procedimenti dell'attività produttiva: riceve la pratica commerciale e la domanda preziosi, coordina e inoltra gli atti alle amministrazioni competenti e trasmette l'esito, senza sostituirsi al Questore o all'OAM.",
+      "facts": [
+        "Il D.P.R. 160/2010 configura il SUAP come unico punto di accesso pubblico per le vicende amministrative dell'attività produttiva e come canale della risposta unica e tempestiva.",
+        "La pratica va presentata al SUAP competente per il luogo del negozio, individuabile sul portale Impresa in un giorno o sul portale territoriale indicato.",
+        "Per la vendita al dettaglio di oggetti preziosi il SUAP riceve la domanda art. 127 TULPS e la trasmette al Questore, che resta l'autorità competente a rilasciare l'autorizzazione.",
+        "ComUnica coordina gli adempimenti di costituzione verso Registro imprese, Agenzia delle Entrate, INPS e INAIL, ma non sostituisce licenza TULPS, iscrizione OAM o titoli locali.",
+        "Diritti, bolli, allegati, moduli, portale e verifiche urbanistiche possono variare territorialmente e devono essere verificati prima dell'invio."
+      ],
+      "checklist": [
+        "Individuare il SUAP del Comune della sede e leggere scheda, modulistica, allegati e diritti aggiornati.",
+        "Verificare in pre-locazione destinazione d'uso, conformità edilizia, agibilità, accessibilità, impianti, insegna e vincoli locali.",
+        "Preparare pratica commerciale e domanda art. 127 con firma digitale, PEC e allegati richiesti.",
+        "Conservare ricevute e comunicazioni distinguendo la ricezione SUAP dall'autorizzazione espressa del Questore."
+      ],
+      "warnings": [
+        "Il SUAP non rilascia al posto del Questore la licenza art. 127 e non iscrive l'operatore nel Registro OAM.",
+        "La ricevuta di presentazione non equivale all'autorizzazione ad acquistare oro.",
+        "Non usare tariffe, moduli o requisiti di un Comune come regola nazionale senza verifica territoriale."
+      ],
+      "sources": [
+        {
+          "title": "D.P.R. 7 settembre 2010 n. 160 — disciplina del SUAP",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.del.presidente.della.repubblica:2010-09-07;160!vig=",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "Impresa in un giorno — ricerca SUAP e servizi telematici",
+          "url": "https://www.impresainungiorno.gov.it/",
+          "authority": "Sistema camerale italiano per i SUAP",
+          "verifiedAt": "3 agosto 2026",
+          "status": "portale istituzionale corrente"
+        },
+        {
+          "title": "Registro imprese — Comunicazione Unica d'impresa",
+          "url": "https://www.registroimprese.it/comunicazione-unica-d-impresa",
+          "authority": "Registro Imprese / Camere di Commercio",
+          "verifiedAt": "3 agosto 2026",
+          "status": "procedura istituzionale verificata"
+        }
+      ]
+    },
+    {
+      "id": "apertura-compro-oro-procedura-coordinata",
+      "title": "Apertura di un compro oro: procedura coordinata SUAP, Questura e OAM",
+      "category": "Normativa e compliance",
+      "keywords": ["aprire compro oro", "apertura negozio oro", "procedura completa compro oro", "SUAP Questura OAM ordine", "titoli apertura", "avvio attività preziosi"],
+      "summary": "L'apertura richiede una sequenza coordinata: impresa e locale compatibili, pratica commerciale al SUAP con domanda art. 127, autorizzazione espressa del Questore, successiva iscrizione OAM e infine readiness operativa completa prima della prima compravendita.",
+      "facts": [
+        "Chi acquista, permuta o rivende oggetti preziosi usati è operatore compro oro anche quando l'attività è secondaria rispetto a gioielleria, artigianato o attività OPO.",
+        "PEC e firma digitale sono prerequisiti pratici; l'impresa viene costituita o avviata tramite ComUnica, ma i titoli speciali restano autonomi.",
+        "Prima SUAP: riceve la pratica commerciale e la domanda art. 127; poi Questura: istruisce e deve autorizzare espressamente; infine OAM: iscrive l'operatore sulla base della licenza.",
+        "L'attività può iniziare solo quando sono efficaci il titolo commerciale applicabile, l'autorizzazione art. 127 e l'iscrizione nel Registro OAM degli operatori compro oro.",
+        "Prima della prima operazione devono essere pronti conto dedicato, bilancia metrologicamente conforme, identificazione, schede, due fotografie, ricevute, pagamenti, archivio decennale, fermo di dieci giorni, SOS, privacy e sicurezza."
+      ],
+      "checklist": [
+        "Fase 1 — definire attività e forma giuridica e verificare requisiti morali, antimafia e TULPS dei soggetti interessati.",
+        "Fase 2 — verificare con SUAP e Questura locale, impianti, agibilità, accessibilità, urbanistica, insegna e misure di sicurezza prima di un vincolo immobiliare definitivo.",
+        "Fase 3 — attivare impresa, PEC e firma digitale; presentare al SUAP pratica commerciale e domanda art. 127 con allegati territoriali.",
+        "Fase 4 — attendere il provvedimento espresso del Questore e poi presentare la distinta domanda di iscrizione OAM con licenza, sedi, preposti e conto dedicato.",
+        "Fase 5 — aprire solo con tutti i titoli efficaci e dopo test documentale, metrologico, antiriciclaggio, privacy e sicurezza."
+      ],
+      "warnings": [
+        "Semaforo verde solo con tutti e tre i titoli: la SCIA presentata non abilita da sola e l'iscrizione OAM non sostituisce la licenza.",
+        "Non usare l'abrogato art. 126 TULPS come ulteriore licenza nazionale standard per il commercio di cose usate.",
+        "Requisiti edilizi, commerciali e di sicurezza dipendono anche da Regione, Comune, locale e prescrizioni della Questura competente."
+      ],
+      "sources": [
+        {
+          "title": "D.Lgs. 92/2017 — accesso all'attività e Registro operatori compro oro",
+          "url": "https://www.normattiva.it/eli/id/2017/06/20/17G00109/CONSOLIDATED/",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "OAM — iscrizione al Registro degli operatori compro oro",
+          "url": "https://www.organismo-am.it/risposte-assistenza/iscrizione-al-registro-degli-operatori-compro-oro",
+          "authority": "Organismo Agenti e Mediatori",
+          "verifiedAt": "3 agosto 2026",
+          "status": "procedura corrente verificata"
+        },
+        {
+          "title": "Polizia di Stato — licenza in materia di oggetti preziosi",
+          "url": "https://poliziadistato.it/articolo/208-Licenza_in_materia_di_oggetti_preziosi/",
+          "authority": "Polizia di Stato",
+          "verifiedAt": "3 agosto 2026",
+          "status": "scheda istituzionale verificata"
+        },
+        {
+          "title": "Impresa in un giorno — SCIA contestuale alla Comunicazione Unica",
+          "url": "https://www.impresainungiorno.gov.it/it/web/l-impresa-e-il-comune/scia-contestuali-alla-comunicazione-unica",
+          "authority": "Sistema camerale italiano per i SUAP",
+          "verifiedAt": "3 agosto 2026",
+          "status": "procedura istituzionale verificata"
+        }
+      ]
+    },
+    {
+      "id": "scia-condizionata-art127-no-silenzio-assenso",
+      "title": "SCIA condizionata e autorizzazione art. 127: niente silenzio-assenso",
+      "category": "Normativa e compliance",
+      "keywords": ["SCIA condizionata preziosi", "silenzio assenso compro oro", "art 127 TULPS SUAP", "Legge 182 2025 articolo 66", "autorizzazione espressa Questore", "sola SCIA"],
+      "summary": "Dal dicembre 2025 la vendita di preziosi non beneficia più del silenzio-assenso: nell'esercizio di vicinato la SCIA commerciale è condizionata all'autorizzazione art. 127 richiesta tramite SUAP e l'attività non può iniziare prima del provvedimento espresso del Questore.",
+      "facts": [
+        "La Legge 2 dicembre 2025 n. 182, art. 66, ha modificato l'attività 35 della Tabella A del D.Lgs. 222/2016 eliminando i richiami al silenzio-assenso per la vendita di oggetti preziosi.",
+        "Per l'esercizio di vicinato il regime è SCIA condizionata: SCIA commerciale più domanda di autorizzazione ex art. 127 TULPS presentata al SUAP e trasmessa al Questore.",
+        "Il SUAP convoca la conferenza di servizi entro cinque giorni e il termine del procedimento decorre dalla ricezione della domanda da parte del Questore.",
+        "L'attività non può iniziare prima dell'autorizzazione espressa del Questore: ricevuta SUAP, sola SCIA o mero decorso del tempo non sono sufficienti.",
+        "Per medie e grandi strutture resta necessario coordinare il relativo titolo commerciale con l'autorizzazione per oggetti preziosi."
+      ],
+      "checklist": [
+        "Presentare insieme al SUAP il titolo commerciale applicabile e la domanda art. 127 completa degli allegati richiesti.",
+        "Monitorare richieste di integrazione e comunicazioni SUAP/Questura senza interpretare una ricevuta come nulla osta.",
+        "Attendere e archiviare il provvedimento espresso del Questore prima di chiedere l'iscrizione OAM.",
+        "Avviare compravendite di preziosi usati solo dopo anche l'effettiva iscrizione OAM."
+      ],
+      "warnings": [
+        "Non affermare che il silenzio dell'amministrazione abiliti l'apertura: il richiamo al silenzio-assenso è stato eliminato dalla riforma del 2025.",
+        "Non confondere SCIA condizionata con SCIA a efficacia immediata.",
+        "Verificare sempre il procedimento corrente presso il SUAP e la Questura territorialmente competenti."
+      ],
+      "sources": [
+        {
+          "title": "Legge 2 dicembre 2025 n. 182, articolo 66 e Tabella A aggiornata",
+          "url": "https://www.gazzettaufficiale.it/do/gazzetta/downloadPdf?dataPubblicazioneGazzetta=20251203&edizione=0&estensione=pdf&numeroGazzetta=281&numeroSupplemento=0&progressivo=0&tipoSerie=SG&tipoSupplemento=GU",
+          "authority": "Gazzetta Ufficiale della Repubblica Italiana",
+          "verifiedAt": "3 agosto 2026",
+          "status": "legge vigente verificata"
+        },
+        {
+          "title": "D.Lgs. 25 novembre 2016 n. 222, testo vigente",
+          "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=16G00237&atto.dataPubblicazioneGazzetta=2016-11-26&bloccoAggiornamentoBreadCrumb=true&classica=true&dataVigenza=21%2F02%2F2026&generaTabId=true&qId=&tabID=&tipoDettaglio=singolavigenza&title=lbl.dettaglioAtto",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        },
+        {
+          "title": "TULPS, articolo 127",
+          "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1931-06-18;773:1~art127=",
+          "authority": "Normattiva",
+          "verifiedAt": "3 agosto 2026",
+          "status": "testo vigente verificato"
+        }
+      ]
+    },
+    {
+      "id": "sedi-preposti-variazioni-cessazione-compro-oro",
+      "title": "Nuove sedi, trasferimenti, preposti e cessazione del compro oro",
+      "category": "Normativa e compliance",
+      "keywords": ["nuova sede compro oro", "trasferimento negozio", "preposto compro oro", "variazione OAM dieci giorni", "cessazione sede", "conto dedicato per sede"],
+      "summary": "Apertura di una filiale, trasferimento, cambio del preposto o cessazione richiedono adempimenti coordinati e autonomi verso commercio/SUAP, pubblica sicurezza/Questura e Registro OAM; l'aggiornamento presso un ente non aggiorna automaticamente gli altri.",
+      "facts": [
+        "Ogni punto vendita nel quale si svolgono operazioni compro oro è sede operativa OAM, anche quando l'attività è gestita da un preposto.",
+        "Nuova filiale o trasferimento richiedono la pratica commerciale territoriale e la verifica del titolo art. 127 tramite il canale indicato da SUAP e Questura; non basta presumere estesa la vecchia licenza.",
+        "Variazioni di sede, preposto, rappresentanti e dati registrati vanno comunicate autonomamente all'OAM entro dieci giorni secondo la procedura corrente.",
+        "Per ogni sede operativa deve essere indicato un conto corrente bancario o postale dedicato in via esclusiva alle operazioni compro oro.",
+        "Canale e allegati per variazioni del preposto ai fini della licenza possono variare territorialmente; occorre verificare presso Questura e SUAP competenti.",
+        "Contributi e importi OAM cambiano per circolare annuale e devono essere verificati nell'anno della variazione."
+      ],
+      "checklist": [
+        "Prima della variazione verificare con SUAP e Questura pratica commerciale, estensione o nuova istanza art. 127 e condizioni del locale.",
+        "Aggiornare l'OAM entro dieci giorni tramite il servizio corretto, includendo sede, preposto e conto dedicato quando richiesti.",
+        "Conservare ricevute ed esiti distinti dei tre binari SUAP, Questura e OAM.",
+        "Prima della prima operazione nella nuova sede testare bilancia, conto dedicato, schede, archivio, privacy, sicurezza e formazione del preposto.",
+        "Per cessazione chiudere ordinatamente titoli e registrazioni senza perdere l'archivio decennale dovuto."
+      ],
+      "warnings": [
+        "Non iniziare nella nuova sede sulla sola base della comunicazione OAM o della validità del titolo della vecchia sede.",
+        "Non considerare permanente un contributo OAM indicato da una circolare annuale.",
+        "La cessazione dell'attività non autorizza a distruggere schede e documenti ancora soggetti al periodo legale di conservazione."
+      ],
+      "sources": [
+        {
+          "title": "OAM — iscrizione e variazioni del Registro operatori compro oro",
+          "url": "https://www.organismo-am.it/iscrizione-al-registro",
+          "authority": "Organismo Agenti e Mediatori",
+          "verifiedAt": "3 agosto 2026",
+          "status": "procedura corrente verificata"
+        },
+        {
+          "title": "OAM — guida alle variazioni per operatori compro oro",
+          "url": "https://www.organismo-am.it/documenti/guide/VARIAZIONE_COMPROORO.pdf",
+          "authority": "Organismo Agenti e Mediatori",
+          "verifiedAt": "3 agosto 2026",
+          "status": "guida istituzionale verificata"
+        },
+        {
+          "title": "OAM — conto corrente dedicato",
+          "url": "https://www.organismo-am.it/conto-corrente-dedicato",
+          "authority": "Organismo Agenti e Mediatori",
+          "verifiedAt": "3 agosto 2026",
+          "status": "indicazioni istituzionali verificate"
+        }
+      ]
+    }
+  ]
+}

@@ -220,7 +220,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260802-aurum-benvenuto-17";
+const OROACTIVE_CLIENT_BUILD_ID = "20260803-aurum-autorita-suap-18";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -9753,6 +9753,16 @@ function isAurumNormativeQuestion(question = "") {
   return hasNormativeIntent && hasQuestionIntent;
 }
 
+function isAurumAuthoritiesSuapOpeningQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  return /\b(?:guardia di finanza|gdf|carabinieri|polizia di stato|questura|questore|suap|sportello unico attivita produttive|scia|silenzio assenso|silenzio-assenso|articolo 127|art 127|nspv|nucleo speciale polizia valutaria|accesso ispettivo|ispezion[a-z]*|processo verbale di constatazione|pvc)\b/.test(normalized)
+    || /\bpolizia\b.*\b(?:compro oro|prezios[a-z]*|tulps|licenza|controll[a-z]*|verific[a-z]*)\b/.test(normalized)
+    || /\bautorit[a-z]*\b.*\b(?:compro oro|controll[a-z]*|competenz[a-z]*)\b/.test(normalized)
+    || /\b(?:apr[a-z]*|apertura|avvi[a-z]*|inizi[a-z]*)\b.*\b(?:compro oro|oro usato|negozio\b.{0,40}\b(?:compr[a-z]*|acquist[a-z]*)\b.{0,20}\boro)\b/.test(normalized)
+    || /\b(?:nuova sede|filiale|trasferiment[a-z]*|prepost[a-z]*|cessazion[a-z]*)\b.*\b(?:compro oro|oam|questura|suap)\b/.test(normalized);
+}
+
 function isAurumFiscalAccountingQuestion(question = "") {
   const normalized = aurumNormalize(question);
   if (!normalized) return false;
@@ -9818,11 +9828,71 @@ function isAurumNormativeAnswerAdequate(answer = "") {
     && /(2017|92|2024|211|compro oro|antiriciclaggio)/.test(normalized);
 }
 
+function buildAurumAuthoritiesSuapAnswer(question = "") {
+  const normalized = aurumNormalize(question);
+  const asksOpening = /\b(?:suap|scia|silenzio assenso|silenzio-assenso|apr[a-z]*|apertura|avvi[a-z]*|inizi[a-z]*)\b/.test(normalized);
+  const asksFiscal = /\b(?:verifica fiscale|controllo fiscale|tributari[a-z]*|pvc|processo verbale di constatazione)\b/.test(normalized);
+  const asksCarabinieri = /\b(?:carabinieri|refurtiva|ricettazione|furto|polizia giudiziaria)\b/.test(normalized);
+  const asksPoliceTulps = /\b(?:polizia|questura|questore)\b.*\b(?:compro oro|prezios[a-z]*|tulps|licenza|controll[a-z]*|verific[a-z]*)\b/.test(normalized)
+    || /\b(?:articolo 127|art 127|tulps|licenza)\b.*\b(?:controll[a-z]*|verific[a-z]*|sospend[a-z]*|revoc[a-z]*|prezios[a-z]*)\b/.test(normalized);
+  const asksSos = /\b(?:sos|uif|nspv|operazione sospetta)\b/.test(normalized);
+  const asksInspection = /\b(?:accesso|ispezion[a-z]*|verbale|operant[a-z]*)\b/.test(normalized);
+  const asksLocations = /\b(?:nuova sede|filiale|trasferiment[a-z]*|prepost[a-z]*|cessazion[a-z]*)\b/.test(normalized);
+
+  if (asksOpening) {
+    return [
+      "Apertura compro oro — sintesi offline verificata il 3 agosto 2026",
+      "",
+      "Sequenza nazionale: prima SUAP, poi autorizzazione espressa della Questura, infine iscrizione OAM. Nessun acquisto di oro prima che tutti i titoli siano efficaci.",
+      "",
+      "1. definisci attività e forma giuridica, attiva PEC e firma digitale e verifica il locale con il SUAP territoriale;",
+      "2. costituisci o avvia l'impresa con ComUnica, che non sostituisce i titoli di settore;",
+      "3. presenta al SUAP la pratica commerciale e la domanda art. 127 TULPS rivolta al Questore;",
+      "4. attendi l'autorizzazione espressa: la L. 182/2025 ha eliminato il silenzio-assenso e la sola SCIA è una SCIA condizionata, non abilita l'avvio;",
+      "5. dopo la licenza presenta la distinta domanda di iscrizione nel Registro OAM operatori compro oro;",
+      "6. prima della prima operazione prepara conto dedicato, bilancia legale, schede, due fotografie, ricevute, archivio decennale, fermo di dieci giorni, SOS, privacy e sicurezza.",
+      "",
+      "SUAP, Questura e OAM conservano competenze autonome; per sede, trasferimento o preposto verifica anche la procedura territoriale e aggiorna l'OAM entro dieci giorni.",
+      "",
+      "Fonti: https://www.gazzettaufficiale.it/do/gazzetta/downloadPdf?dataPubblicazioneGazzetta=20251203&edizione=0&estensione=pdf&numeroGazzetta=281&numeroSupplemento=0&progressivo=0&tipoSerie=SG&tipoSupplemento=GU",
+      "https://www.impresainungiorno.gov.it/",
+      "https://www.organismo-am.it/risposte-assistenza/iscrizione-al-registro-degli-operatori-compro-oro"
+    ].join("\n");
+  }
+
+  const focus = asksFiscal
+    ? "La verifica fiscale è distinta dal controllo D.Lgs. 92: la Guardia di Finanza può confrontare libri, registri, fatture, banca, schede, giacenze, cessioni a fonderia e dichiarazioni. Il contribuente deve essere informato di ragioni e oggetto, può farsi assistere da un professionista e far verbalizzare le osservazioni."
+    : asksCarabinieri
+      ? "I Carabinieri operano come forza di polizia generale e polizia giudiziaria su furto, ricettazione, riciclaggio e provenienza dei preziosi; non sono l'autorità fiscale ordinaria e non rilasciano la licenza art. 127."
+      : asksPoliceTulps
+        ? "Il Questore rilascia l'autorizzazione art. 127 TULPS. Polizia e altri ufficiali o agenti di pubblica sicurezza, secondo le rispettive qualifiche, possono accedere nei locali autorizzati per verificare licenza e prescrizioni; questo controllo resta distinto dalle contestazioni D.Lgs. 92 di competenza della Guardia di Finanza."
+      : asksSos
+        ? "La SOS si invia senza ritardo alla UIF, che analizza e inoltra i casi meritevoli al NSPV della Guardia di Finanza e alla DIA. Le istruzioni UIF del 18 dicembre 2025 si applicano dal 1 luglio 2026 e la segnalazione deve restare riservata al cliente."
+        : asksInspection
+          ? "All'accesso identifica cortesemente operanti, autorità, base e tipo di controllo; coopera, non cancellare o modificare dati, traccia i documenti consegnati, fai verbalizzare le osservazioni e chiedi copia di verbali ed eventuali acquisizioni."
+          : asksLocations
+            ? "Per nuova sede, trasferimento, preposto o cessazione coordina gli adempimenti presso SUAP e Questura con l'aggiornamento separato del Registro OAM. Prima di operare verifica l'efficacia del titolo per la sede, il preposto, il conto dedicato e ogni altro requisito applicabile; le variazioni OAM vanno comunicate nei termini previsti."
+            : "La Guardia di Finanza accerta e contesta le violazioni del D.Lgs. 92; il MEF irroga le relative sanzioni salvo le competenze OAM. Il Questore rilascia la licenza art. 127, Polizia e Carabinieri esercitano i diversi poteri di pubblica sicurezza e polizia giudiziaria, la UIF analizza le SOS e l'OAM gestisce il Registro.";
+  return [
+    "Autorità e controlli compro oro — sintesi offline verificata il 3 agosto 2026",
+    "",
+    focus,
+    "",
+    "Non tutte le Forze hanno gli stessi poteri: distingui sempre controllo TULPS, D.Lgs. 92, fiscale e penale. Non ostacolare, non alterare documenti e coinvolgi il professionista competente per verbali o contestazioni.",
+    "",
+    "Fonti: https://www.normattiva.it/eli/id/2017/06/20/17G00109/CONSOLIDATED/",
+    "https://www.gdf.gov.it/it/cosa-facciamo/polizia-economico-finanziaria/criminalita-economica-e-finanziaria/polizia-valutaria/antiriciclaggio",
+    "https://www.normattiva.it/eli/id/1931/06/26/031U0773/CONSOLIDATED/"
+  ].join("\n");
+}
+
 function buildAurumNormativeAnswer(question = "") {
   const normalized = aurumNormalize(question);
+  const asksAuthoritiesSuap = isAurumAuthoritiesSuapOpeningQuestion(question);
   const asksFoundry = isAurumFoundryQuestion(question);
   const asksProfessionalGold = isAurumProfessionalGoldQuestion(question);
   const asksOpo = /(opo|operatore professionale|legge 7|dichiarazione oro|211|10.?000|2.?500)/.test(normalized);
+  if (asksAuthoritiesSuap) return buildAurumAuthoritiesSuapAnswer(question);
   if (asksFoundry) {
     return [
       "Fonderia e raffinazione — sintesi offline verificata il 2 agosto 2026",
@@ -11433,11 +11503,13 @@ function aurumContextPayload(question) {
   const accountingQuestion = isAurumFiscalAccountingQuestion(question);
   const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
   const foundryQuestion = isAurumFoundryQuestion(question);
+  const authoritiesSuapQuestion = isAurumAuthoritiesSuapOpeningQuestion(question);
   const salesQuestion = isAurumSalesCommunicationQuestion(question)
     && !accountingQuestion
     && !professionalGoldQuestion
-    && !foundryQuestion;
-  const normativeQuestion = (!salesQuestion && isAurumNormativeQuestion(question)) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
+    && !foundryQuestion
+    && !authoritiesSuapQuestion;
+  const normativeQuestion = authoritiesSuapQuestion || (!salesQuestion && isAurumNormativeQuestion(question)) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
   const wantsCurrentWebVerification = normativeQuestion
     || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(String(question || ""));
   const isPriceExplanation = state.aurumMode === "price_explanation";
@@ -11479,13 +11551,18 @@ function aurumContextPayload(question) {
           "D.Lgs. 21 novembre 2007, n. 231 — antiriciclaggio",
           "D.Lgs. 10 dicembre 2024, n. 211 — aggiornamento OPO e dichiarazioni ORO",
           "D.Lgs. 10 giugno 2026, n. 122 — aggiornamento antiriciclaggio vigente dal 23 luglio 2026",
+          "TULPS — artt. 16, 127 e 128: accessi, licenza preziosi e registrazione",
+          "D.P.R. 7 settembre 2010, n. 160 — Sportello Unico per le Attività Produttive",
+          "D.Lgs. 25 novembre 2016, n. 222 e L. 2 dicembre 2025, n. 182 art. 66 — SCIA condizionata e autorizzazione preziosi senza silenzio-assenso",
+          "D.Lgs. 19 marzo 2001, n. 68 e L. 27 luglio 2000, n. 212 — polizia economico-finanziaria e garanzie nelle verifiche fiscali",
+          "Istruzioni UIF 18 dicembre 2025 sulle SOS, applicabili dal 1 luglio 2026",
           "Istruzioni UIF sulle dichiarazioni ORO e portale Infostat",
           "Banca d’Italia — riserve auree e standard Good Delivery",
           "LBMA — campionamento, saggio e controllo dei raffinatori",
           "INAIL e BREF UE — sicurezza e migliori tecniche per le fonderie",
           "D.Lgs. 19 gennaio 2026, n. 10 — Testo unico IVA applicabile dal 1 gennaio 2027"
         ],
-        verificatoIl: "2 agosto 2026",
+        verificatoIl: "3 agosto 2026",
         rispostaLocale: buildAurumNormativeAnswer(question)
       } : null,
       conversationHistory: state.aurumMessages
@@ -11537,11 +11614,13 @@ async function askAurum(event) {
   const accountingQuestion = isAurumFiscalAccountingQuestion(question);
   const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
   const foundryQuestion = isAurumFoundryQuestion(question);
+  const authoritiesSuapQuestion = isAurumAuthoritiesSuapOpeningQuestion(question);
   const salesQuestion = isAurumSalesCommunicationQuestion(question)
     && !accountingQuestion
     && !professionalGoldQuestion
-    && !foundryQuestion;
-  const normativeQuestion = (!salesQuestion && isAurumNormativeQuestion(question)) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
+    && !foundryQuestion
+    && !authoritiesSuapQuestion;
+  const normativeQuestion = authoritiesSuapQuestion || (!salesQuestion && isAurumNormativeQuestion(question)) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
 
   if (!requiresBackendSafety && /(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
     startAurumCuriosityQuiz();
@@ -11623,6 +11702,7 @@ function renderKnowledgeStatus() {
       <span>${status.professional_gold_knowledge_loaded ? `Operatori professionali in oro: ${Number(status.professional_gold_topics || 0)} moduli verificati il ${escapeHtml(status.professional_gold_knowledge_verified_at || "")}` : "Conoscenza OPO non caricata"}</span>
       <span>${status.bullion_private_knowledge_loaded ? `Lingotti, riserve e privati: ${Number(status.bullion_private_topics || 0)} moduli verificati il ${escapeHtml(status.bullion_private_knowledge_verified_at || "")}` : "Conoscenza lingotti e privati non caricata"}</span>
       <span>${status.foundry_knowledge_loaded ? `Fonderia e raffinazione: ${Number(status.foundry_topics || 0)} moduli verificati il ${escapeHtml(status.foundry_knowledge_verified_at || "")}` : "Conoscenza fonderia e raffinazione non caricata"}</span>
+      <span>${status.authorities_suap_knowledge_loaded ? `Autorità, controlli, SUAP e apertura: ${Number(status.authorities_suap_topics || 0)} moduli verificati il ${escapeHtml(status.authorities_suap_knowledge_verified_at || "")}` : "Conoscenza autorità, controlli e apertura non caricata"}</span>
       <span>${status.sales_knowledge_loaded ? `Vendita consulenziale etica: ${Number(status.sales_topics || 0)} moduli verificati il ${escapeHtml(status.sales_knowledge_verified_at || "")}` : "Conoscenza vendita consulenziale non caricata"}</span>
       <span>${status.geology_knowledge_loaded ? `Geologia dei preziosi: ${Number(status.geology_topics || 0)} moduli verificati il ${escapeHtml(status.geology_knowledge_verified_at || "")}` : "Conoscenza geologica non caricata"}</span>
       <span>${status.gold_coin_catalog_loaded ? `Numismatica: ${Number(status.gold_coin_catalog_count || 0)} schede Elenco Monete e ${Number(status.numismatic_topics || 0)} moduli storico-metodologici` : "Catalogo numismatico Aurum non caricato"}</span>

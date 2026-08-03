@@ -212,6 +212,37 @@ test("Aurum non trasforma formazione vendita e gestione obiezioni in tutorial ap
   assert.equal(api.inferAurumTutorialId("Avvia il tutorial Academy"), "tutorial_academy");
 });
 
+test("Aurum non trasforma autorità, SUAP e apertura in tutorial dell'app", async () => {
+  const app = await file("app.js");
+  const names = [
+    "aurumNormalize",
+    "isAurumAuthoritiesSuapOpeningQuestion",
+    "isAurumSalesCommunicationQuestion",
+    "isAurumUsersTopic",
+    "isAurumGeologyOrNumismaticsQuestion",
+    "isAurumExplicitTutorialRequest",
+    "isAurumExplicitUsersTutorialRequest",
+    "inferAurumTutorialId"
+  ];
+  const source = names.map((name) => extractFunction(app, name)).join("\n");
+  const api = new Function(
+    "aurumSectionKey",
+    `${source}; return { inferAurumTutorialId, isAurumAuthoritiesSuapOpeningQuestion };`
+  )(() => "menu");
+
+  for (const question of [
+    "Qual è la procedura completa per aprire un compro oro?",
+    "Che funzione ha il SUAP per il negozio compro oro?",
+    "Cosa controlla la Guardia di Finanza in un compro oro?",
+    "Qual è il ruolo dei Carabinieri sulla provenienza dei preziosi?",
+    "Posso iniziare con la sola SCIA e il silenzio-assenso?",
+    "Come gestisco una nuova sede o un nuovo preposto OAM?"
+  ]) {
+    assert.equal(api.isAurumAuthoritiesSuapOpeningQuestion(question), true, question);
+    assert.equal(api.inferAurumTutorialId(question), "", question);
+  }
+});
+
 test("Negozi usa eliminazione logica, conferma e layout dedicato", async () => {
   const [app, server, schema, migration, index, styles] = await Promise.all([
     file("app.js"),

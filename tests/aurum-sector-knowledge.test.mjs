@@ -15,9 +15,9 @@ import {
 } from "../services/aurum/privacy.js";
 
 test("la base settoriale Aurum è ampia, versionata e interamente fontata", () => {
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.02-vendita-consulenziale-etica");
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "2 agosto 2026");
-  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 85);
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.03-autorita-suap-apertura");
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "3 agosto 2026");
+  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 96);
 
   const ids = new Set();
   const categories = new Set();
@@ -35,7 +35,7 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
       assert.match(source.url, /^https:\/\//);
       assert.ok(source.title);
       assert.ok(source.authority);
-      assert.match(source.verifiedAt, /^(?:30 luglio|1 agosto|2 agosto) 2026$/);
+      assert.match(source.verifiedAt, /^(?:30 luglio|1 agosto|2 agosto|3 agosto) 2026$/);
     });
   }
 
@@ -149,7 +149,7 @@ test("la risposta deterministica include limiti e fonti appartenenti ai topic re
   const answer = buildSectorKnowledgeAnswer("Posso certificare un lingotto solo con XRF?", matches);
   const allowedUrls = new Set(matches.flatMap(({ topic }) => topic.sources.map((source) => source.url)));
   assert.match(answer.risposta, /screening|compatibil|laboratorio/i);
-  assert.match(answer.risposta, /Fonti verificate il 2 agosto 2026/);
+  assert.match(answer.risposta, /Fonti verificate il 3 agosto 2026/);
   assert.ok(answer.sources.length);
   answer.sources.forEach((source) => assert.ok(allowedUrls.has(source.url), `fonte estranea al retrieval: ${source.url}`));
   assert.deepEqual(answer.sources, sectorKnowledgeSources(matches.slice(0, 1), 8));

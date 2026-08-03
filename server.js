@@ -8682,6 +8682,13 @@ const trustedAssistantSourceDomains = [
   "osha.europa.eu",
   "camcom.it",
   "poliziadistato.it",
+  "gdf.gov.it",
+  "carabinieri.it",
+  "impresainungiorno.gov.it",
+  "registroimprese.it",
+  "interno.gov.it",
+  "vigilfuoco.it",
+  "ispettorato.gov.it",
   "rsc.org",
   "usgs.gov",
   "ga.gov.au",
@@ -8784,6 +8791,16 @@ function isComproOroNormativeQuestion(question = "") {
   const hasNormativeIntent = /(legge|normativa|decreto|d lgs|dlgs|legislativo|antiriciclaggio|adempiment|obblig|norma|compliance|compro oro|registro|questura|oro usato|iva|fiscale|commercialista|contabil|bilancio|reverse charge|regime del margine|rimanenze|f24|lipe)/.test(normalized);
   const hasQuestionIntent = /(quale|quando|come|anno|emessa|emanata|ultima|recente|cosa dice|spiegami|riguarda|devo|bisogna|obbliga|prevede|funziona|svolge|gestisce)/.test(normalized);
   return hasNormativeIntent && hasQuestionIntent;
+}
+
+function isAuthoritiesSuapOpeningQuestion(question = "") {
+  const normalized = normalizeAssistantIntentText(question);
+  if (!normalized) return false;
+  return /\b(?:guardia di finanza|gdf|carabinieri|polizia di stato|questura|questore|suap|sportello unico attivita produttive|scia|silenzio assenso|silenzio-assenso|articolo 127|art 127|nspv|nucleo speciale polizia valutaria|accesso ispettivo|ispezion[a-z]*|processo verbale di constatazione|pvc)\b/.test(normalized)
+    || /\bpolizia\b.*\b(?:compro oro|prezios[a-z]*|tulps|licenza|controll[a-z]*|verific[a-z]*)\b/.test(normalized)
+    || /\bautorit[a-z]*\b.*\b(?:compro oro|controll[a-z]*|competenz[a-z]*)\b/.test(normalized)
+    || /\b(?:apr[a-z]*|apertura|avvi[a-z]*|inizi[a-z]*)\b.*\b(?:compro oro|oro usato|negozio\b.{0,40}\b(?:compr[a-z]*|acquist[a-z]*)\b.{0,20}\boro)\b/.test(normalized)
+    || /\b(?:nuova sede|filiale|trasferiment[a-z]*|prepost[a-z]*|cessazion[a-z]*)\b.*\b(?:compro oro|oam|questura|suap)\b/.test(normalized);
 }
 
 function isComproOroAccountingQuestion(question = "") {
@@ -8919,12 +8936,15 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const isAccountingQuestion = isComproOroAccountingQuestion(domanda);
   const professionalGoldQuestion = isProfessionalGoldQuestion(domanda);
   const foundryQuestion = isFoundryQuestion(domanda);
+  const authoritiesSuapQuestion = isAuthoritiesSuapOpeningQuestion(domanda);
   const salesQuestion = (mode === "sales_consultation" || isCustomerSalesCommunicationQuestion(domanda))
     && !isAccountingQuestion
     && !professionalGoldQuestion
-    && !foundryQuestion;
+    && !foundryQuestion
+    && !authoritiesSuapQuestion;
   const responseSafety = salesQuestion ? salesSafety : coachingSafety;
-  const isNormativeQuestion = mode === "normativa_operativa"
+  const isNormativeQuestion = authoritiesSuapQuestion
+    || mode === "normativa_operativa"
     || (isComproOroNormativeQuestion(domanda) && !salesQuestion)
     || isAccountingQuestion
     || professionalGoldQuestion
@@ -9069,7 +9089,9 @@ async function askOroActiveAssistant(question = "", options = {}) {
     ? `Modalita vendita consulenziale: aiuta l'operatore ad aumentare fiducia, chiarezza e probabilita di una decisione favorevole solo quando coerente con l'interesse e la scelta libera del cliente. Nessuna tecnica garantisce ogni cliente o una conversione del 100%. Usa il percorso VERO: Valutare l'obiettivo, Esplorare le priorita, Rendere trasparente il calcolo, Offrire opzioni reali. Presenta sempre peso, titolo, metodo, quotazione con fonte e ora, valore teorico, deduzioni, prezzo effettivo e totale. Gestisci le obiezioni ascoltando, chiarendo una volta, rispondendo con dati e accettando il no. Vietati paura, colpa, falsa urgenza o scarsita, occultamento di informazioni, recensioni o credenziali inventate, insistenza dopo il rifiuto, ostacolo al confronto o all'uscita, sfruttamento di lutto, debiti, eta, confusione o difficolta economica e uso di memorie o dati personali per pressione o prezzo.${salesSafety.requiresReframe ? " Riformula esplicitamente l'obiettivo universale: non si puo e non si deve convincere ogni cliente; si puo migliorare la conversione attraverso una valutazione trasparente e una scelta informata." : ""}`
     : "";
   const normativeText = isNormativeQuestion
-    ? `${isAccountingQuestion
+    ? `${authoritiesSuapQuestion
+      ? "Modalita autorita-controlli-SUAP-apertura: rispondi prima al quesito specifico e identifica sempre autorità, base normativa e tipo di controllo. Distingui controllo D.Lgs. 92 della Guardia di Finanza, verifica fiscale-tributaria, TULPS e autorizzazione del Questore, pubblica sicurezza, polizia giudiziaria di Polizia e Carabinieri, Registro OAM, analisi UIF e funzione procedimentale del SUAP. Non attribuire a tutte le Forze gli stessi poteri; non presentare Carabinieri o Polizia come autorità fiscale ordinaria né la Guardia di Finanza come autorità che rilascia la licenza. Per l'apertura usa la sequenza SUAP, autorizzazione espressa Questura, iscrizione OAM e readiness operativa. Considera la L. 182/2025 art. 66: la SCIA è condizionata, non opera il silenzio-assenso e l'attività non può iniziare prima dell'autorizzazione espressa. In caso di controllo raccomanda cooperazione, integrità dello storico, verbali e assistenza professionale; non suggerire ostacolo, occultamento, distruzione o divulgazione della SOS. Distingui sempre regola nazionale, prassi locale e buona pratica."
+      : isAccountingQuestion
       ? "Modalita contabile-fiscale: spiega prima il principio teorico, poi i presupposti da verificare e infine la buona prassi documentale. Distingui contabilità, trattamento IVA, obblighi OCO/OPO e controllo di gestione. Non assegnare una scrittura o un regime definitivo senza forma giuridica, regime contabile, provenienza, natura e destinazione documentata dell’operazione."
       : professionalGoldQuestion
         ? "Modalita OPO-lingotti: rispondi prima al quesito specifico e poi presenta controlli e documenti. Distingui OCO, OPO, banca, privato, OAM, UIF, Banca d’Italia e Dogana; non presentare Banca d’Italia come gestore attuale del Registro OPO. Separa mera detenzione, operazione, frontiera, fiscalità e monitoraggio RW. Non sommare automaticamente dichiarazione UIF e doganale; non confondere SOS e dichiarazione ORO; non trattare Good Delivery come qualifica fiscale o garanzia del singolo lingotto retail. Considera il D.Lgs. 122/2026 vigente dal 23 luglio 2026 per titolare effettivo e antiriciclaggio e indica sempre quando una regola è legge, standard di mercato o buona pratica."
@@ -9591,9 +9613,23 @@ async function aiAssistantStatus() {
     "fonderia-pagamenti-conto-metallo",
     "fonderie-lombardia-verificate"
   ]);
+  const authoritiesSuapTopicIds = new Set([
+    "autorita-controlli-compro-oro-mappa-competenze",
+    "gdf-controlli-antiriciclaggio-compro-oro",
+    "gdf-verifica-fiscale-tributaria-compro-oro",
+    "questura-polizia-tulps-controlli-preziosi",
+    "carabinieri-polizia-giudiziaria-provenienza-preziosi",
+    "uif-nspv-sos-compro-oro",
+    "accesso-ispezione-verbale-documenti-difesa",
+    "suap-funzione-procedimento-compro-oro",
+    "apertura-compro-oro-procedura-coordinata",
+    "scia-condizionata-art127-no-silenzio-assenso",
+    "sedi-preposti-variazioni-cessazione-compro-oro"
+  ]);
   const professionalGoldTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => professionalGoldTopicIds.has(topic.id));
   const bullionPrivateTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => bullionPrivateTopicIds.has(topic.id));
   const foundryTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => foundryTopicIds.has(topic.id));
+  const authoritiesSuapTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => authoritiesSuapTopicIds.has(topic.id));
   const geologyTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Geologia dei preziosi");
   const numismaticTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Numismatica e storia");
   const salesCommunicationTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Vendita consulenziale e comunicazione");
@@ -9621,6 +9657,9 @@ async function aiAssistantStatus() {
     foundry_knowledge_loaded: foundryTopics.length === foundryTopicIds.size,
     foundry_topics: foundryTopics.length,
     foundry_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
+    authorities_suap_knowledge_loaded: authoritiesSuapTopics.length === authoritiesSuapTopicIds.size,
+    authorities_suap_topics: authoritiesSuapTopics.length,
+    authorities_suap_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
     sales_knowledge_loaded: salesCommunicationTopics.length === 12,
     sales_topics: salesCommunicationTopics.length,
     sales_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,

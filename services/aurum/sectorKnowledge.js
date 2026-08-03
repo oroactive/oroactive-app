@@ -6,7 +6,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const knowledgeFilePaths = [
   path.resolve(__dirname, "../../assets/aurum-knowledge/sector/compro-oro-knowledge.json"),
   path.resolve(__dirname, "../../assets/aurum-knowledge/sector/geology-numismatics-knowledge.json"),
-  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/sales-communication-knowledge.json")
+  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/sales-communication-knowledge.json"),
+  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/authorities-suap-opening-knowledge.json")
 ];
 
 function loadKnowledge() {
@@ -69,6 +70,23 @@ const queryAliases = new Map([
   ["strumenti", ["attrezzatura", "bilancia", "xrf", "tester"]],
   ["legge", ["normativa", "decreto", "obblighi"]],
   ["licenza", ["tulps", "questura", "oam", "registro"]],
+  ["gdf", ["guardia di finanza", "polizia economico finanziaria", "controllo fiscale", "d.lgs. 92/2017"]],
+  ["guardia", ["guardia di finanza", "gdf", "controlli", "verifica fiscale"]],
+  ["finanza", ["guardia di finanza", "gdf", "fiscale", "tributaria", "antiriciclaggio"]],
+  ["questura", ["questore", "polizia di stato", "tulps", "articolo 127", "licenza preziosi"]],
+  ["questore", ["questura", "tulps", "articolo 127", "autorizzazione espressa"]],
+  ["polizia", ["pubblica sicurezza", "questura", "polizia giudiziaria", "tulps"]],
+  ["carabinieri", ["arma dei carabinieri", "polizia giudiziaria", "pubblica sicurezza", "refurtiva", "ricettazione"]],
+  ["suap", ["sportello unico attivita produttive", "procedimento telematico", "impresa in un giorno", "questura"]],
+  ["scia", ["scia condizionata", "articolo 127", "autorizzazione espressa", "no silenzio assenso"]],
+  ["apertura", ["aprire", "avvio", "suap", "questura", "oam", "titoli"]],
+  ["aprire", ["apertura", "avvio", "suap", "questura", "oam"]],
+  ["ispezione", ["accesso", "controllo", "verbale", "documenti", "operanti"]],
+  ["ispettivo", ["ispezione", "accesso", "verbale", "documenti"]],
+  ["verbale", ["accesso", "ispezione", "processo verbale", "osservazioni", "copia"]],
+  ["preposto", ["sede operativa", "variazione oam", "questura", "conto dedicato"]],
+  ["refurtiva", ["carabinieri", "polizia giudiziaria", "ricettazione", "provenienza preziosi"]],
+  ["nspv", ["nucleo speciale polizia valutaria", "uif", "sos", "guardia di finanza"]],
   ["privacy", ["gdpr", "dati personali", "sicurezza"]],
   ["acido", ["pietra di paragone", "corrosivo", "sds"]],
   ["bilancia", ["metrologia", "pesatura", "verificazione"]],
@@ -227,6 +245,50 @@ function wholePhraseIncludes(text = "", phrase = "") {
 }
 
 const topicIntentBoosts = [
+  {
+    pattern: /\b(?:quali?|chi|mappa|riparto|divid[a-z]*)\b.*\b(?:autorit[a-z]*|forze dell ordine|guardia di finanza|polizia|carabinieri)\b.*\b(?:compro oro|controll[a-z]*|competenz[a-z]*)\b|\b(?:autorit[a-z]*|forze dell ordine)\b.*\b(?:competenz[a-z]*|controll[a-z]*)\b.*\bcompro oro\b/,
+    boosts: { "autorita-controlli-compro-oro-mappa-competenze": 800 }
+  },
+  {
+    pattern: /\b(?:guardia di finanza|gdf)\b.*\b(?:antiriciclaggio|d ?lgs ?92|schede|fotograf[a-z]*|conto dedicato|tracciabilit[a-z]*|compro oro)\b|\b(?:antiriciclaggio|d ?lgs ?92)\b.*\b(?:guardia di finanza|gdf)\b/,
+    boosts: { "gdf-controlli-antiriciclaggio-compro-oro": 820 }
+  },
+  {
+    pattern: /\b(?:guardia di finanza|gdf)\b.*\b(?:verifica fiscale|controllo fiscale|tributari[a-z]*|impost[a-z]*|pvc|processo verbale di constatazione|contabilit[a-z]*)\b|\b(?:verifica fiscale|tributari[a-z]*|pvc)\b.*\b(?:guardia di finanza|gdf)\b/,
+    boosts: { "gdf-verifica-fiscale-tributaria-compro-oro": 850 }
+  },
+  {
+    pattern: /\b(?:questura|questore|polizia(?: di stato)?)\b.*\b(?:tulps|licenza|articolo 127|art 127|prezios[a-z]*|compro oro|controll[a-z]*|verific[a-z]*|sospension[a-z]*)\b|\b(?:licenza|tulps|articolo 127|art 127|prezios[a-z]*)\b.*\b(?:questura|questore|polizia)\b/,
+    boosts: { "questura-polizia-tulps-controlli-preziosi": 830 }
+  },
+  {
+    pattern: /\bcarabinieri\b.*\b(?:compro oro|gioiell[a-z]*|prezios[a-z]*|refurtiva|furto|ricettazione|riciclaggio|polizia giudiziaria|provenienza)\b|\b(?:refurtiva|ricettazione|furto)\b.*\bcarabinieri\b/,
+    boosts: { "carabinieri-polizia-giudiziaria-provenienza-preziosi": 850 }
+  },
+  {
+    pattern: /\b(?:sos|segnalazione di operazione sospetta|operazione sospetta|nspv|nucleo speciale polizia valutaria)\b.*\b(?:uif|compro oro|guardia di finanza|invia[a-z]*)\b|\buif\b.*\b(?:sos|nspv|operazione sospetta)\b/,
+    boosts: { "uif-nspv-sos-compro-oro": 860 }
+  },
+  {
+    pattern: /\b(?:accesso|ispezion[a-z]*|controllo|verifica)\b.*\b(?:ispettiv[a-z]*|operant[a-z]*|verbale|document[a-z]*|diritti|difesa|professionista)\b|\b(?:verbale|document[a-z]*|diritti)\b.*\b(?:accesso|ispezion[a-z]*|controllo|verifica)\b/,
+    boosts: { "accesso-ispezione-verbale-documenti-difesa": 780 }
+  },
+  {
+    pattern: /\bsuap\b.*\b(?:funzion[a-z]*|serve|ruolo|procediment[a-z]*|punto unico|sportello unico|aprire|apertura)\b|\b(?:funzion[a-z]*|ruolo|procediment[a-z]*)\b.*\bsuap\b/,
+    boosts: { "suap-funzione-procedimento-compro-oro": 1_100 }
+  },
+  {
+    pattern: /\b(?:apr[a-z]*|apertura|avvi[a-z]*|inizi[a-z]*)\b.*\b(?:compro oro|oro usato|negozio\b.{0,40}\b(?:compr[a-z]*|acquist[a-z]*)\b.{0,20}\boro)\b|\b(?:procedura completa|passaggi|cosa serve)\b.*\bcompro oro\b.*\b(?:apr[a-z]*|apertura|avvi[a-z]*)\b/,
+    boosts: { "apertura-compro-oro-procedura-coordinata": 900 }
+  },
+  {
+    pattern: /\b(?:scia|silenzio assenso|silenzio-assenso)\b.*\b(?:prezios[a-z]*|articolo 127|art 127|questore|questura|licenza|aprire|apertura)\b|\b(?:sola scia|scia condizionata|autorizzazione espressa)\b/,
+    boosts: { "scia-condizionata-art127-no-silenzio-assenso": 930 }
+  },
+  {
+    pattern: /\b(?:nuova sede|filiale|trasferiment[a-z]*|prepost[a-z]*|cessazion[a-z]*)\b.*\b(?:compro oro|oam|questura|suap|conto dedicato)\b|\b(?:compro oro|oam)\b.*\b(?:nuova sede|filiale|trasferiment[a-z]*|prepost[a-z]*|cessazion[a-z]*)\b/,
+    boosts: { "sedi-preposti-variazioni-cessazione-compro-oro": 880 }
+  },
   {
     pattern: /\b(?:accogli[a-z]*|ascolt[a-z]*|domand[a-z]* apert[a-z]*|diagnosi del bisogno|capire il cliente)\b.*\b(?:client[a-z]*|oro|valutazion[a-z]*|vendit[a-z]*)\b|\b(?:client[a-z]*|compro oro)\b.*\b(?:accogli[a-z]*|ascolt[a-z]*|domand[a-z]* apert[a-z]*|diagnosi del bisogno)\b/,
     boosts: { "vendita-ascolto-diagnosi-consulenziale": 420 }
