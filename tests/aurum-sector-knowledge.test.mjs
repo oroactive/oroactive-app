@@ -15,9 +15,9 @@ import {
 } from "../services/aurum/privacy.js";
 
 test("la base settoriale Aurum è ampia, versionata e interamente fontata", () => {
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.03-autorita-suap-apertura");
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.03-estrazione-preziosi-gemme");
   assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "3 agosto 2026");
-  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 96);
+  assert.ok(AURUM_SECTOR_KNOWLEDGE.topics.length >= 112);
 
   const ids = new Set();
   const categories = new Set();
@@ -53,7 +53,8 @@ test("la base settoriale Aurum è ampia, versionata e interamente fontata", () =
     "Fonderia e raffinazione",
     "Geologia dei preziosi",
     "Numismatica e storia",
-    "Vendita consulenziale e comunicazione"
+    "Vendita consulenziale e comunicazione",
+    "Estrazione e approvvigionamento responsabile"
   ].forEach((category) => assert.ok(categories.has(category), `categoria mancante: ${category}`));
   const sourceUrls = new Set(AURUM_SECTOR_KNOWLEDGE.topics.flatMap((topic) => topic.sources.map((source) => source.url)));
   assert.ok(sourceUrls.has("https://www.gia.edu/gems-gemology/summer-2021-labnotes-cvd-laboratory-grown-diamond-with-counterfeit-gia-inscription"));
@@ -149,7 +150,7 @@ test("la risposta deterministica include limiti e fonti appartenenti ai topic re
   const answer = buildSectorKnowledgeAnswer("Posso certificare un lingotto solo con XRF?", matches);
   const allowedUrls = new Set(matches.flatMap(({ topic }) => topic.sources.map((source) => source.url)));
   assert.match(answer.risposta, /screening|compatibil|laboratorio/i);
-  assert.match(answer.risposta, /Fonti verificate il 3 agosto 2026/);
+  assert.match(answer.risposta, /Fonti verificate il 30 luglio 2026/);
   assert.ok(answer.sources.length);
   answer.sources.forEach((source) => assert.ok(allowedUrls.has(source.url), `fonte estranea al retrieval: ${source.url}`));
   assert.deepEqual(answer.sources, sectorKnowledgeSources(matches.slice(0, 1), 8));

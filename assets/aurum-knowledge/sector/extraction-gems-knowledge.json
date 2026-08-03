@@ -1,0 +1,587 @@
+{
+  "knowledgeVersion": "2026.08.03-estrazione-preziosi-gemme",
+  "verifiedAt": "3 agosto 2026",
+  "topics": [
+    {
+      "id": "estrazione-ciclo-minerario-esplorazione-risorse",
+      "title": "Estrazione mineraria: esplorazione, risorse, riserve e ciclo di una miniera",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione mineraria", "esplorazione", "miniera", "risorsa", "riserva", "tenore", "tonnellaggio", "prefattibilità", "fattibilità", "geometallurgia", "chiusura miniera"],
+      "summary": "Un progetto estrattivo passa da modello geologico e campionamento a stima delle risorse, studi minerari e metallurgici, autorizzazioni, costruzione, coltivazione, trattamento, chiusura e post-chiusura; un'anomalia o un campione ricco non costituiscono una riserva.",
+      "facts": [
+        "L'esplorazione integra cartografia, strutture, geochimica, geofisica, telerilevamento, campionamento e perforazione; ogni dato deve conservare posizione, metodo, custodia e qualità.",
+        "Una risorsa richiede evidenza geologica e ragionevoli prospettive di estrazione economica; una riserva è la parte economicamente estraibile dopo l'applicazione dei fattori minerari, metallurgici, economici, ambientali, sociali e legali.",
+        "Cielo aperto, sotterraneo, cava e recupero di placer sono alternative progettuali dipendenti da geometria, profondità, geotecnica, diluizione, recupero minerario, sicurezza, costi, permessi e impatti.",
+        "Mineralogia, granulometria, tessitura, alterazione e associazioni dei minerali influenzano recuperabilità e progetto del processo almeno quanto il tenore.",
+        "La chiusura e il post-chiusura devono essere pianificati e finanziati fin dalle prime fasi, non aggiunti soltanto al termine della coltivazione."
+      ],
+      "checklist": [
+        "Definire il modello del giacimento, i domini geologici e la domanda tecnica da dimostrare.",
+        "Separare obiettivo esplorativo, mineralizzazione, risorsa e riserva usando lo standard di rendicontazione applicabile.",
+        "Integrare geometallurgia, geotecnica, idrogeologia e baseline ambientale e sociale prima delle decisioni di progetto.",
+        "Confrontare metodi minerari e processi soltanto con campioni rappresentativi, studi professionali e autorizzazioni del Paese interessato.",
+        "Aggiornare rischi, costi, recuperi, piano di chiusura e consultazione delle comunità a ogni fase decisionale."
+      ],
+      "warnings": [
+        "Una pepita, un campione ricco o un'anomalia non dimostrano continuità, tonnellaggio, recupero o fattibilità economica.",
+        "Aurum non autorizza accessi, scavi o raccolte e non sostituisce geologo, ingegnere minerario, autorità o proprietario del terreno.",
+        "Non usare risorsa e riserva come sinonimi né trasformare una stima geologica in promessa commerciale."
+      ],
+      "sources": [
+        {"title": "USGS — Assessing Mineral Resources", "url": "https://www.usgs.gov/programs/mineral-resources-program/science/assessing-mineral-resources", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "USGS — Mineral Commodity Summaries 2026, appendici", "url": "https://pubs.usgs.gov/periodicals/mcs2026/mcs2026-appendixes.pdf", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "CIM — Definition Standards for Mineral Resources and Mineral Reserves", "url": "https://mrmr.cim.org/media/1068/cim_definition_standards_2014.pdf", "authority": "Canadian Institute of Mining, Metallurgy and Petroleum", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-oro-beneficiamento-recupero",
+      "title": "Estrazione dell'oro: miniera, beneficiamento, recupero e doré",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione oro", "miniera oro", "oro alluvionale", "placer", "beneficiamento", "gravità", "flottazione", "free milling", "refrattario", "doré", "cianuro", "mercurio"],
+      "summary": "Il percorso dell'oro dipende da giacimento, mineralogia e liberazione: coltivazione, comminuzione, concentrazione o recupero industriale producono concentrato o doré, mentre la raffinazione successiva separa oro, argento e impurità.",
+      "facts": [
+        "L'oro grossolano e libero può essere preconcentrato per gravità; quello associato a solfuri può richiedere flottazione e quello refrattario un pretrattamento industriale progettato sul minerale.",
+        "Frantumazione e macinazione liberano le particelle ma non sono raffinazione; una macinazione eccessiva può generare fini, perdite e maggiori consumi.",
+        "Il recupero da soluzione, la produzione di precipitato o carbone carico, la fusione a doré e la raffinazione sono stadi distinti con bilanci e controlli separati.",
+        "Recupero metallurgico, titolo del doré, titolo raffinato e metallo pagabile non sono la stessa grandezza.",
+        "Nell'estrazione artigianale e su piccola scala il mercurio è un grave rischio sanitario e ambientale; la Convenzione di Minamata richiede riduzione e, ove possibile, eliminazione del suo impiego.",
+        "La selezione del circuito richiede testwork rappresentativo dei domini e non può essere dedotta da una sola analisi o fotografia."
+      ],
+      "checklist": [
+        "Caratterizzare tenore, minerali portatori, liberazione, elementi penalizzanti e variabilità spaziale.",
+        "Separare recupero minerario, recupero dell'impianto, raffinazione e metallo effettivamente pagabile.",
+        "Confrontare gravità, flottazione e altri processi soltanto mediante prove professionali e bilanci completi.",
+        "Definire prodotto, specifiche, inventario in circuito, effluenti, residui, controlli e condizioni della raffineria.",
+        "Per reagenti pericolosi applicare esclusivamente sistemi industriali autorizzati, personale formato, contenimento ed emergenza."
+      ],
+      "warnings": [
+        "Aurum non fornisce dosi, concentrazioni, temperature, ricette o sequenze operative per cianuro, mercurio, acidi, esplosivi o fusione.",
+        "Un recupero favorevole su campione selezionato non è automaticamente scalabile al giacimento o all'impianto.",
+        "Oro presente nei tailings non rende automaticamente il ritrattamento sicuro, autorizzabile o economico."
+      ],
+      "sources": [
+        {"title": "Geoscience Australia — Gold", "url": "https://www.ga.gov.au/education/minerals-energy/australian-mineral-facts/gold", "authority": "Geoscience Australia", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "CIM — Practice Guidelines for Mineral Processing 2022", "url": "https://mrmr.cim.org/media/1157/cim-practice-guidelines-for-mineral-processing-2022.pdf", "authority": "Canadian Institute of Mining, Metallurgy and Petroleum", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "International Cyanide Management Code", "url": "https://cyanidecode.org/the-cyanide-code/", "authority": "International Cyanide Management Institute", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "Minamata Convention — Artisanal and small-scale gold mining", "url": "https://minamataconvention.org/en/topics/artisanal-and-small-scale-gold-mining", "authority": "Segretariato della Convenzione di Minamata", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-argento-sottoprodotto-concentrati",
+      "title": "Estrazione dell'argento: sottoprodotti, concentrati e raffinazione",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione argento", "miniera argento", "galena argentifera", "piombo zinco argento", "concentrato", "flottazione", "doré", "metallo pagabile", "assay exchange"],
+      "summary": "Gran parte dell'argento è recuperata come co-prodotto o sottoprodotto di piombo-zinco, rame e oro; il suo percorso segue il minerale ospite verso concentrati o doré e continua nella fusione e raffinazione industriale.",
+      "facts": [
+        "L'argento può trovarsi in solfuri, solfosali, galena argentifera, tetraedrite, elettro o minerali specifici e non è sempre liberato nello stesso stadio.",
+        "Nei minerali piombo-zinco-argento, comminuzione e flottazione producono concentrati; l'argento viene poi recuperato durante fusione e raffinazione del metallo base.",
+        "Nei sistemi oro-argento può seguire il circuito del doré, mentre in altri depositi è contenuto nei concentrati di rame o piombo.",
+        "Massa secca, umidità, campionamento rappresentativo, titolo, elementi penalizzanti e condizioni commerciali determinano il settlement del concentrato.",
+        "Argento analizzato, argento recuperato e argento pagabile sono quantità distinte."
+      ],
+      "checklist": [
+        "Identificare minerale ospite e deportazione dell'argento lungo ogni corrente del processo.",
+        "Distinguere miniera primaria d'argento, sottoprodotto, concentrato e argento contenuto nel doré.",
+        "Controllare massa umida e secca, campionamento del lotto, assay exchange, umpire e tolleranze contrattuali.",
+        "Misurare separatamente recuperi di concentrazione, fusione, raffinazione e payability.",
+        "Valutare piombo, arsenico, antimonio, mercurio e altri elementi penalizzanti o ambientali."
+      ],
+      "warnings": [
+        "XRF portatile e osservazione visiva non stimano in modo affidabile l'argento recuperabile in un minerale eterogeneo.",
+        "Argento contenuto non significa argento pagato e un campione privo di protocollo può distorcere fortemente la stima.",
+        "Le regole Good Delivery riguardano barre raffinate e raffinerie, non certificano un minerale o un concentrato di miniera."
+      ],
+      "sources": [
+        {"title": "Geoscience Australia — Silver", "url": "https://www.ga.gov.au/education/minerals-energy/australian-mineral-facts/silver", "authority": "Geoscience Australia", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "USGS — Silver Statistics and Information", "url": "https://www.usgs.gov/centers/national-minerals-information-center/silver-statistics-and-information", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "ISO 12743:2021 — Sampling of copper, lead, zinc and nickel concentrates", "url": "https://www.iso.org/standard/81126.html", "authority": "International Organization for Standardization", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-platino-pge-concentrazione",
+      "title": "Estrazione di platino e PGE: minerale, concentrazione e separazione industriale",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione platino", "estrazione palladio", "PGE", "PGM", "reef", "Ni Cu PGE", "flottazione PGE", "basket PGE", "smelter", "raffinazione platino"],
+      "summary": "Platino, palladio, rodio e gli altri PGE sono estratti soprattutto da reef stratiformi e sistemi magmatici Ni-Cu-PGE; dopo la miniera, la concentrazione e una complessa catena industriale separano elementi presenti a bassi tenori.",
+      "facts": [
+        "I PGE coesistono ma hanno minerali portatori, distribuzioni, recuperi e valori differenti; un tenore PGE totale non sostituisce l'analisi dei singoli elementi.",
+        "La coltivazione può essere a cielo aperto o sotterranea secondo geometria e profondità del reef o del corpo mineralizzato.",
+        "Nei minerali solfurati il percorso generale comprende comminuzione, flottazione, concentrato e successivi stadi industriali di fusione, rimozione dei metalli base e raffinazione.",
+        "La raffinazione è complessa perché i PGE sono chimicamente affini e accompagnati da nichel, rame, ferro, zolfo e possibili elementi nocivi.",
+        "Ricavi e payability dipendono dal basket Pt-Pd-Rh, dagli altri PGE, dai recuperi individuali e dal contratto con smelter e raffineria.",
+        "Il riciclo dei catalizzatori è una fonte secondaria importante ma non è estrazione mineraria e richiede assay e tracciabilità propri."
+      ],
+      "checklist": [
+        "Richiedere la suite PGE pertinente e non soltanto platino o PGE totale.",
+        "Mappare minerali portatori e recupero di ogni elemento per dominio geometallurgico.",
+        "Verificare campioni, metodi analitici, limiti di rilevabilità e controlli interlaboratorio.",
+        "Definire nichel, rame, zolfo, cromite e impurità che condizionano flottazione, fusione e payability.",
+        "Modellare recuperi e ricavi per singolo metallo con scenari, non con un unico valore medio."
+      ],
+      "warnings": [
+        "Colore, densità o magnetismo non identificano il platino e il recupero del Pt non è un proxy automatico per Pd o Rh.",
+        "Aurum non descrive ricette di fusione o separazione chimica dei PGE, che richiedono impianti e controlli specialistici.",
+        "La presenza di cromite o un'anomalia geochimica non equivale a una riserva PGE."
+      ],
+      "sources": [
+        {"title": "USGS — Platinum-Group Metals Statistics and Information", "url": "https://www.usgs.gov/centers/national-minerals-information-center/platinum-group-metals-statistics-and-information", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "USGS — Platinum-group elements", "url": "https://www.usgs.gov/publications/platinum-group-elements", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "USGS — Mineral Commodity Summaries 2026", "url": "https://pubs.usgs.gov/publication/mcs2026", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-campionamento-assay-qaqc",
+      "title": "Miniere: campionamento, assay, QA/QC e testwork geometallurgico",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["campionamento miniera", "assay", "QAQC", "blank", "CRM", "duplicati", "laboratorio ISO 17025", "testwork", "geometallurgia", "catena di custodia"],
+      "summary": "Tenore e recuperabilità sono credibili soltanto se campioni, preparazione, analisi e database sono rappresentativi e controllati con blank, materiali di riferimento, duplicati, laboratori competenti e regole documentate.",
+      "facts": [
+        "L'errore di campionamento può superare quello strumentale: un risultato analitico vale soltanto per il materiale effettivamente rappresentato.",
+        "Un programma QA/QC include blank, materiali di riferimento certificati, duplicati a livelli diversi e verifiche presso laboratorio indipendente.",
+        "Identificazione univoca, catena di custodia, preparazione, conservazione di scarti e polpe e controllo del database fanno parte del sistema.",
+        "L'accreditamento ISO/IEC 17025 deve essere verificato nello specifico scopo: il logo non prova competenza per ogni matrice o metodo.",
+        "I campioni metallurgici devono rappresentare domini, variabilità, materiale vicino al cut-off, estremi e componenti problematiche.",
+        "Il fallimento dei controlli richiede indagine, quarantena dei dati e azione correttiva, non eliminazione selettiva dei risultati scomodi."
+      ],
+      "checklist": [
+        "Definire prima del prelievo massa, granulometria, divisione, custodia, preparazione e metodo analitico.",
+        "Inserire controlli con frequenze e criteri pass/fail stabiliti dal professionista competente.",
+        "Monitorare blank, CRM e duplicati come serie e tendenze, non soltanto come singoli risultati.",
+        "Verificare lo scope ISO 17025, prestazioni del laboratorio e check assay indipendenti.",
+        "Dimostrare come il testwork rappresenta il futuro feed e la sequenza mineraria."
+      ],
+      "warnings": [
+        "Sotto il limite di rilevabilità non significa assenza assoluta e lo screening XRF non sostituisce l'assay appropriato per bassi tenori di Au o PGE.",
+        "Ripetere soltanto i campioni alti crea bias; ripetizioni e re-assay devono seguire regole predefinite.",
+        "Nessun certificato analitico corregge un campione non rappresentativo o una catena di custodia interrotta."
+      ],
+      "sources": [
+        {"title": "CIM — Mineral Exploration Best Practice Guidelines", "url": "https://mrmr.cim.org/media/1163/cim-mineral-exploration-best-practice-guidelines-2018.pdf", "authority": "Canadian Institute of Mining, Metallurgy and Petroleum", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "CIM — Practice Guidelines for Mineral Processing 2022", "url": "https://mrmr.cim.org/media/1157/cim-practice-guidelines-for-mineral-processing-2022.pdf", "authority": "Canadian Institute of Mining, Metallurgy and Petroleum", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "ISO/IEC 17025:2017", "url": "https://www.iso.org/standard/66912.html", "authority": "International Organization for Standardization", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-recuperi-bilancio-massa",
+      "title": "Estrazione: recupero metallurgico, bilancio di massa e riconciliazione",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["recupero metallurgico", "bilancio di massa", "metal accounting", "riconciliazione", "mine to mill", "feed", "tailings", "inventario circuito", "payability"],
+      "summary": "Il bilancio metallurgico riconcilia masse, umidità e assay di alimentazione, prodotti, residui e inventario di circuito; distingue ciò che è estratto, recuperato, raffinato e contrattualmente pagato.",
+      "facts": [
+        "Il recupero è la quota di metallo contenuto nel feed che riporta nel prodotto, riferita alla stessa base secca, allo stesso periodo e allo stesso confine.",
+        "Un bilancio richiede masse o portate, umidità, assay e variazioni di stock e work-in-progress; la differenza tra due analisi non basta.",
+        "Recupero minerario, diluizione, recupero dell'impianto, recupero di fusione o raffinazione e payability sono indicatori diversi.",
+        "Metallo nell'inventario di circuito crea ritardi tra alimentazione e produzione e deve essere incluso nella riconciliazione.",
+        "Bilance, campionatori, misuratori e laboratorio hanno incertezze diverse; il bilanciamento non deve nascondere scarti o bias.",
+        "La riconciliazione mine-to-mill confronta modello, materiale estratto, feed, prodotto e residui per localizzare errori o perdite."
+      ],
+      "checklist": [
+        "Dichiarare periodo, confini, punti di custodia e base secca del bilancio.",
+        "Calibrare misure di massa e verificare rappresentatività dei campionatori.",
+        "Registrare stock e inventario di circuito all'inizio e alla fine del periodo.",
+        "Riconciliare feed, concentrato o doré, tailings, residui e documenti di raffineria.",
+        "Separare indicatori tecnici da deduzioni, costi e condizioni economiche del contratto."
+      ],
+      "warnings": [
+        "Non stimare un recupero da un grab sample o da dati riferiti a periodi e basi diverse.",
+        "Un bilancio può chiudere matematicamente e restare errato se i dati condividono lo stesso bias.",
+        "Metallo recuperato non significa necessariamente metallo raffinato, consegnato e pagato."
+      ],
+      "sources": [
+        {"title": "CIM — Practice Guidelines for Mineral Processing 2022", "url": "https://mrmr.cim.org/media/1157/cim-practice-guidelines-for-mineral-processing-2022.pdf", "authority": "Canadian Institute of Mining, Metallurgy and Petroleum", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "ISO 12743:2021 — Sampling of concentrates", "url": "https://www.iso.org/standard/81126.html", "authority": "International Organization for Standardization", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "USGS — Rock-to-metal ratio and mine wastes", "url": "https://www.usgs.gov/publications/rock-metal-ratio-a-foundational-metric-understanding-mine-wastes", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-hse-acque-tailings-chiusura",
+      "title": "Miniere: sicurezza, acque, sterili, tailings e chiusura",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["sicurezza miniera", "HSE", "sterili", "tailings", "drenaggio acido", "acque miniera", "silice", "ventilazione", "GISTM", "rifiuti estrattivi", "chiusura"],
+      "summary": "L'estrazione richiede gestione integrata di rischi per lavoratori e comunità, acqua, sterili, tailings, effluenti, stabilità fisica e chimica, emergenze, riabilitazione e post-chiusura per tutto il ciclo della miniera.",
+      "facts": [
+        "I rischi comprendono fronti e sotterraneo, mezzi mobili, perforazione e brillamento, silice, rumore, ventilazione, calore, spazi confinati, reagenti e processi termici.",
+        "La gerarchia dei controlli privilegia eliminazione, sostituzione e misure tecniche prima di procedure e DPI.",
+        "Sterili e tailings possono generare drenaggio e rilascio di metalli secondo mineralogia, potenziale acidogeno e capacità neutralizzante.",
+        "Il Global Industry Standard on Tailings Management copre ciclo di vita, governance, comunità, monitoraggio, emergenze, revisione indipendente e divulgazione.",
+        "Nell'Unione europea i rifiuti estrattivi richiedono gestione autorizzata, piano, stabilità a lungo termine e prevenzione dell'inquinamento.",
+        "Il bilancio idrico deve includere afflussi, riciclo, seepage, eventi estremi e cambiamento climatico; chiusura e garanzia finanziaria vanno pianificate dall'inizio."
+      ],
+      "checklist": [
+        "Mantenere registro dei rischi, critical controls, verifiche, competenze ed esercitazioni.",
+        "Caratterizzare mineralogicamente e geochimicamente minerale, sterili, tailings ed effluenti.",
+        "Aggiornare bilancio idrico e monitorare acque superficiali, sotterranee e seepage.",
+        "Classificare le strutture di tailings per conseguenza e predisporre risposta alle emergenze.",
+        "Integrare riabilitazione progressiva, chiusura, post-chiusura e costi nel progetto."
+      ],
+      "warnings": [
+        "Dry stacking non significa rischio zero e diluire un effluente non equivale a trattarlo.",
+        "Tailings storici valorizzabili restano materiali da caratterizzare e autorizzare prima di ogni intervento.",
+        "Nessuna guida generale sostituisce progetto geotecnico, idrologico, ambientale e di sicurezza sito-specifico."
+      ],
+      "sources": [
+        {"title": "ILO — Occupational safety and health in the mining sector", "url": "https://www.ilo.org/resource/occupational-safety-and-health-mining-coal-and-other-mining-sector", "authority": "International Labour Organization", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "UNEP — Global Industry Standard on Tailings Management", "url": "https://www.unep.org/resources/report/global-industry-standard-tailings-management", "authority": "United Nations Environment Programme", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "Commissione europea — Mining waste", "url": "https://environment.ec.europa.eu/topics/waste-and-recycling/mining-waste_en", "authority": "Commissione europea", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "JRC — BAT Reference Document for Extractive Waste", "url": "https://publications.jrc.ec.europa.eu/repository/handle/JRC109657", "authority": "Joint Research Centre della Commissione europea", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-responsabile-asm-tracciabilita",
+      "title": "Estrazione responsabile: ASM, due diligence, tracciabilità e catena di custodia",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["ASM", "ASGM", "origine mineraria", "tracciabilità", "catena di custodia", "oro responsabile", "conflict free", "due diligence OECD", "diritti umani", "lavoro minorile", "Kimberley Process"],
+      "summary": "La due diligence di filiera identifica e gestisce rischi di conflitto, abusi, lavoro minorile o forzato, corruzione, riciclaggio, ambiente e falsa origine; la tracciabilità documenta il percorso ma non sostituisce la valutazione del rischio.",
+      "facts": [
+        "ASM indica estrazione artigianale o su piccola scala, formale o informale: non equivale automaticamente a attività criminale o irresponsabile.",
+        "Il modello OECD comprende sistemi di gestione, identificazione e valutazione dei rischi, strategia di risposta, audit indipendente nei punti pertinenti e rendicontazione.",
+        "Catena di custodia e tracciabilità registrano soggetti, lotti e trasformazioni; la due diligence valuta conflitto, abusi, corruzione, riciclaggio, lavoro, ambiente e plausibilità dell'origine.",
+        "Il Kimberley Process disciplina il commercio internazionale di diamanti grezzi e non certifica automaticamente il singolo diamante lucidato né tutti i rischi sociali e ambientali.",
+        "La Convenzione di Minamata richiede strategie per ridurre e, ove possibile, eliminare il mercurio nell'ASGM.",
+        "Etico, sostenibile, responsabile, tracciabile, riciclato e conflict-free sono claim diversi che richiedono evidenze specifiche."
+      ],
+      "checklist": [
+        "Identificare fornitore, titolare effettivo, licenze, miniera o area, aggregatori, trader, impianti e raffineria.",
+        "Conservare lotto, massa, assay, trasporto, pagamenti, royalty, trasformazioni e documenti di esportazione.",
+        "Valutare CAHRA, sanzioni, corruzione, riciclaggio, diritti umani, lavoro minorile o forzato e rischi ambientali.",
+        "Gestire i red flag con escalation, mitigazione, monitoraggio o sospensione proporzionata e documentata.",
+        "Limitare ogni claim commerciale a ciò che documenti, audit e perimetro dello standard dimostrano realmente."
+      ],
+      "warnings": [
+        "Certificato, fattura o blockchain sono elementi di prova, non una garanzia assoluta di origine responsabile.",
+        "Non escludere automaticamente l'ASM legittima, ma non acquistare alla cieca da origini ignote o non autorizzate.",
+        "Kimberley compliant non significa automaticamente diamante etico, provenienza da una miniera specifica o assenza di ogni rischio."
+      ],
+      "sources": [
+        {"title": "OECD — Responsible mineral supply chains", "url": "https://www.oecd.org/en/topics/sub-issues/due-diligence-guidance-for-responsible-business-conduct/responsible-mineral-supply-chains.html", "authority": "Organisation for Economic Co-operation and Development", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "Kimberley Process — Information for Business", "url": "https://www.kimberleyprocess.com/information-for-business", "authority": "Kimberley Process", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "CIBJO — Responsible Sourcing Book", "url": "https://cibjo.org/wp-content/uploads/2022/08/CIBJO-Responsible-Sourcing-Blue-Book-2019-01-06.pdf", "authority": "World Jewellery Confederation — CIBJO", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "ILO — Child labour in mining and global supply chains", "url": "https://www.ilo.org/publications/child-labour-mining-and-global-supply-chains", "authority": "International Labour Organization", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-diamanti-primari-secondari-recovery",
+      "title": "Estrazione dei diamanti: kimberlite, placer, recovery e tracciabilità del grezzo",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione diamanti", "miniera diamanti", "kimberlite", "lamproite", "pipe", "diamanti alluvionali", "diamanti marini", "DMS", "raggi X sorting", "rough diamond", "Kimberley Process"],
+      "summary": "I diamanti naturali vengono estratti da giacimenti primari associati a pipe o dicchi kimberlitici e lamproitici oppure recuperati da depositi eluviali, alluvionali, costieri e marini; il recovery controlla frantumazione, concentrazione, sensori, sorting e sicurezza del lotto.",
+      "facts": [
+        "Kimberlite e lamproite trasportano diamanti dal mantello ma molte intrusioni sono sterili o non economiche.",
+        "Le sorgenti primarie possono essere coltivate a cielo aperto o in sotterraneo; i depositi secondari richiedono scavo o dragaggio autorizzato e trattamento dei sedimenti.",
+        "Il recovery industriale comprende comminuzione controllata, scrubbing, vagliatura, separazione in mezzo denso e sensori, seguiti da sorting protetto.",
+        "La liberazione deve ridurre al minimo la rottura dei cristalli e gli scarti richiedono audit per verificare perdite e prestazioni del circuito.",
+        "Il Kimberley Process riguarda spedizioni internazionali di grezzo fra partecipanti e non prova da solo la miniera del singolo diamante tagliato.",
+        "Origine geografica dichiarata, identità naturale e qualità gemma sono conclusioni diverse."
+      ],
+      "checklist": [
+        "Distinguere sorgente primaria, deposito secondario e punto commerciale del grezzo.",
+        "Registrare lotto, massa, granulometria, recovery, scarti, sorting, sigilli e trasferimenti.",
+        "Verificare licenza mineraria, documenti di trasporto e certificato Kimberley quando applicabile.",
+        "Conservare la separazione dei lotti se viene formulato un claim di miniera o Paese.",
+        "Richiedere laboratorio per identità naturale o sintetica e per origine quando il servizio è validato."
+      ],
+      "warnings": [
+        "Kimberlite non significa automaticamente diamanti e una pietra recuperata non è automaticamente qualità gemma.",
+        "Il Kimberley Process ha un perimetro circoscritto e non certifica ogni rischio ambientale, sociale o di lavoro.",
+        "Aurum non fornisce istruzioni per brillamento, dragaggio, accesso a miniera o manomissione dei sistemi di sicurezza."
+      ],
+      "materials": [
+        {"slug": "diamante-naturale", "name": "Diamante naturale", "classification": "Naturale", "aliases": ["diamante", "diamanti naturali"], "occurrence": "Pipe e dicchi kimberlitici o lamproitici e depositi eluviali, alluvionali, costieri o marini derivati.", "extraction": "Coltivazione primaria a cielo aperto o sotterranea oppure recupero autorizzato di sedimenti secondari e marini.", "primaryProcessing": "Scrubbing, vagliatura, concentrazione in mezzo denso, sensori e sorting protetto del grezzo con riconciliazione del lotto.", "caveat": "Kimberlite, certificato KP e aspetto del grezzo non provano da soli qualità gemma o miniera del singolo lucidato."}
+      ],
+      "sources": [
+        {"title": "GIA — Kimberlites: Earth's Diamond Delivery System", "url": "https://www.gia.edu/gems-gemology/summer-2019-kimberlites-earths-diamond-delivery-system", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "GIA — Diavik diamond recovery plant", "url": "https://www.gia.edu/gems-gemology/summer-2016-diamonds-canadian-arctic-diavik-mine", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "Kimberley Process — Core document", "url": "https://www.kimberleyprocess.com/hubfs/Kimberley%20Process%20Website/Documents/kpcs_core_document.pdf?hsLang=en", "authority": "Kimberley Process", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-gemme-corindoni-spinelli-granati",
+      "title": "Estrazione di corindoni, spinelli, granati e crisoberilli",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione rubino", "estrazione zaffiro", "estrazione spinello", "estrazione granato", "rodolite", "tsavorite", "demantoide", "alessandrite", "crisoberillo", "placer gemme"],
+      "summary": "Rubini, zaffiri, spinelli, granati e crisoberilli provengono da diversi contesti metamorfici, metasomatici o magmatici e spesso da depositi secondari, con estrazione selettiva hard-rock o lavaggio e sorting delle ghiaie.",
+      "facts": [
+        "Corindone e spinello possono formarsi in marmi, gneiss e rocce mafiche-ultramafiche e concentrarsi successivamente in depositi alluvionali.",
+        "I granati coprono specie e varietà con ambienti diversi: scisti e gneiss, peridotiti, rocce calc-silicatiche, serpentiniti e skarn.",
+        "Crisoberillo e alessandrite possono ricorrere in pegmatiti, zone di reazione e metamorfismo di alto grado, oltre che in placer.",
+        "Il recovery secondario usa scavo autorizzato, lavaggio, vagliatura e selezione; l'hard-rock privilegia estrazione manuale e controllo delle fratture.",
+        "Colore, gatteggiamento o cambio di colore non identificano da soli il deposito o l'origine geografica."
+      ],
+      "checklist": [
+        "Identificare specie, varietà, roccia ospite e natura primaria o secondaria del deposito.",
+        "Documentare area, fronte o lotto e mantenere separati i materiali se si dichiara la provenienza.",
+        "Ridurre urti e sovrafrantumazione durante recupero e cernita del grezzo.",
+        "Dichiarare trattamenti successivi e non confonderli con la normale pulizia del materiale estratto."
+      ],
+      "warnings": [
+        "Una famiglia gemmologica non corrisponde a un solo ambiente geologico o metodo di estrazione.",
+        "Una fotografia o una singola inclusione non dimostrano origine geografica.",
+        "Scavi artigianali, gallerie e lavaggio dei sedimenti richiedono titoli, sicurezza e gestione ambientale locali."
+      ],
+      "materials": [
+        {"slug": "rubino-naturale", "name": "Rubino naturale", "classification": "Naturale", "aliases": ["rubino"], "occurrence": "Corindone in marmi, gneiss, rocce mafiche-ultramafiche e relativi depositi eluviali o alluvionali.", "extraction": "Scavo selettivo della roccia primaria oppure recupero autorizzato da ghiaie con lavaggio, vagliatura e cernita.", "primaryProcessing": "Pulizia delicata, separazione per dimensione e qualità del grezzo, registrazione del lotto e protezione dalle fratture.", "caveat": "Il colore rosso non prova origine, assenza di trattamento o provenienza da un determinato tipo di deposito."},
+        {"slug": "zaffiro-blu-naturale", "name": "Zaffiro blu naturale", "classification": "Naturale", "aliases": ["zaffiro blu"], "occurrence": "Corindone di origine metamorfica o magmatica, spesso riconcentrato in depositi secondari alluvionali.", "extraction": "Hard-rock selettivo oppure scavo e trattamento di ghiaie con lavaggio, classificazione granulometrica e sorting.", "primaryProcessing": "Cernita del grezzo, pulizia, classificazione e conservazione della provenienza del lotto prima di eventuali trattamenti.", "caveat": "Il blu e le inclusioni non determinano da soli origine geografica, trattamento termico o valore commerciale."},
+        {"slug": "zaffiri-fancy", "name": "Zaffiri fancy", "classification": "Naturale", "aliases": ["zaffiro fancy", "zaffiri colorati"], "occurrence": "Corindoni naturali di colori diversi in depositi metamorfici, magmatici e secondari analoghi agli altri zaffiri.", "extraction": "Hard-rock o recupero da placer con metodi selettivi, lavaggio e cernita dipendenti dal deposito locale.", "primaryProcessing": "Pulizia, separazione cromatica e qualitativa e registrazione del lotto prima di taglio o trattamento dichiarato.", "caveat": "Il colore fancy non definisce una miniera, una genesi autonoma o l'assenza di riscaldamento e diffusione."},
+        {"slug": "spinello-naturale", "name": "Spinello naturale", "classification": "Naturale", "aliases": ["spinello"], "occurrence": "Marmi e complessi metamorfici, talvolta associato al rubino e spesso recuperato in ghiaie o cavità carsiche.", "extraction": "Estrazione selettiva della roccia o recupero dai sedimenti mediante scavo, lavaggio, vagliatura e selezione manuale.", "primaryProcessing": "Pulizia e classificazione del cristallo grezzo con controllo dell'identità rispetto a corindone e simulanti.", "caveat": "Associazione con rubino o colore simile non prova specie, località o qualità e richiede identificazione gemmologica."},
+        {"slug": "granato-almandino", "name": "Granato almandino", "classification": "Naturale", "aliases": ["almandino"], "occurrence": "Cristalli in scisti e gneiss metamorfici e concentrazioni secondarie prodotte da alterazione ed erosione.", "extraction": "Coltivazione hard-rock della roccia ospite oppure recupero da placer con lavaggio e concentrazione dei minerali pesanti.", "primaryProcessing": "Separazione manuale o gravimetrica, pulizia, classificazione per colore, trasparenza, dimensione e fratture.", "caveat": "Il nome almandino richiede identificazione della composizione e non è deducibile dalla sola tonalità rosso-bruna."},
+        {"slug": "granato-piropo", "name": "Granato piropo", "classification": "Naturale", "aliases": ["piropo"], "occurrence": "Peridotiti, xenoliti basaltici o kimberlitici, contesti metamorfici e depositi secondari derivati.", "extraction": "Recupero dalla roccia primaria o più spesso da sedimenti alterati con lavaggio, vagliatura e cernita.", "primaryProcessing": "Pulizia e classificazione del grezzo con separazione da altri granati e minerali indicatori associati.", "caveat": "Essere indicatore kimberlitico non significa provenire da un deposito diamantifero o contenere diamanti."},
+        {"slug": "rodolite", "name": "Rodolite", "classification": "Naturale", "aliases": ["granato rodolite"], "occurrence": "Granato intermedio piropo-almandino in rocce metamorfiche e frequenti depositi alluvionali secondari.", "extraction": "Estrazione hard-rock o recupero da ghiaie mediante lavaggio, concentrazione dei minerali pesanti e sorting manuale.", "primaryProcessing": "Pulizia e classificazione per composizione, colore, trasparenza e integrità mantenendo l'identità del lotto.", "caveat": "Rodolite è un termine varietale per composizioni intermedie e non una specie minerale o genesi autonoma."},
+        {"slug": "tsavorite", "name": "Tsavorite", "classification": "Naturale", "aliases": ["granato tsavorite"], "occurrence": "Grossularia verde in noduli e lenti di rocce calc-silicatiche, scisti e gneiss panafricani.", "extraction": "Scavi, pozzi e gallerie selettive nella roccia primaria, con recupero più limitato da materiale alterato secondario.", "primaryProcessing": "Estrazione manuale, pulizia e cernita del grezzo fragile per colore, trasparenza, dimensione e fratture.", "caveat": "Il verde non basta a separare tsavorite da altri granati o simulanti né a dichiararne l'origine."},
+        {"slug": "demantoide", "name": "Demantoide", "classification": "Naturale", "aliases": ["granato demantoide"], "occurrence": "Andradite verde in vene di serpentinite e in alcuni skarn, con possibili accumuli secondari locali.", "extraction": "Estrazione selettiva hard-rock delle vene oppure recupero autorizzato da depositi secondari con cernita manuale.", "primaryProcessing": "Pulizia delicata e classificazione del grezzo per colore, dispersione, integrità e inclusioni senza attribuire origine automatica.", "caveat": "Inclusioni dette horsetail possono supportare l'identificazione ma non provano da sole una località geografica."},
+        {"slug": "alessandrite", "name": "Alessandrite", "classification": "Naturale", "aliases": ["crisoberillo alessandrite"], "occurrence": "Crisoberillo in pegmatiti e zone di reazione ricche in alluminio e cromo o in placer derivati.", "extraction": "Scavo selettivo hard-rock delle zone mineralizzate oppure recupero dai sedimenti mediante lavaggio e sorting.", "primaryProcessing": "Pulizia e classificazione controllata del grezzo valutando cambio di colore, trasparenza, dimensione e fratture.", "caveat": "Il cambio di colore non definisce da solo specie, origine o valore e va osservato con illuminazioni documentate."},
+        {"slug": "crisoberillo-occhio-di-gatto", "name": "Crisoberillo occhio di gatto", "classification": "Naturale", "aliases": ["occhio di gatto crisoberillo", "occhio di gatto"], "occurrence": "Crisoberillo di pegmatiti, zone metamorfiche di reazione e depositi alluvionali derivati dall'erosione.", "extraction": "Estrazione selettiva della roccia o recupero da placer tramite lavaggio, concentrazione e cernita del grezzo.", "primaryProcessing": "Selezione dell'orientazione delle inclusioni, pulizia e classificazione prima del taglio cabochon controllato.", "caveat": "Gatteggiamento è un fenomeno ottico presente anche in altri materiali e non identifica da solo il crisoberillo."}
+      ],
+      "sources": [
+        {"title": "GIA — Gems Formed in Metamorphic Rocks", "url": "https://www.gia.edu/gems-gemology/summer-2023-colored-stones-unearthed0", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "GIA — Gems Recovered from Sedimentary Rocks", "url": "https://www.gia.edu/gems-gemology/winter-2023-colored-stones-unearthed", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "USGS — Geologic Environment of Natural Gemstones", "url": "https://pubs.usgs.gov/gip/gemstones/environment.html", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-gemme-berilli-pegmatiti-quarzi",
+      "title": "Estrazione di berilli, tormaline, topazi, quarzi e calcedoni",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione smeraldo", "estrazione acquamarina", "pegmatite", "estrazione tormalina", "Paraíba", "estrazione topazio", "estrazione ametista", "quarzo", "agata", "onice", "calcedonio"],
+      "summary": "Berilli, tormaline, topazi e molti quarzi sono recuperati da pegmatiti, vene, geodi, cavità e depositi secondari; smeraldo, calcedoni e alcune varietà richiedono modelli specifici e cernita selettiva del grezzo.",
+      "facts": [
+        "Le pegmatiti possono ospitare tasche con cristalli di berillo, tormalina, topazio e quarzo, ma la presenza della roccia non garantisce qualità gemma.",
+        "Lo smeraldo può formarsi in sistemi metasomatici diversi, incluse vene carbonatiche in black shale e contatti fra pegmatiti e rocce ricche in cromo o vanadio.",
+        "Ametista e quarzi possono provenire da vene idrotermali, geodi vulcaniche e cavità; calcedonio, agata e onice da noduli e riempimenti microcristallini.",
+        "Il recupero privilegia apertura selettiva delle tasche, estrazione manuale dei cristalli, raccolta di geodi o lavaggio di sedimenti secondari.",
+        "Citrino e prasiolite commerciali possono derivare da trattamento di altro quarzo; trattamento e estrazione sono fasi distinte."
+      ],
+      "checklist": [
+        "Definire specie, varietà, roccia ospite, struttura e natura primaria o secondaria del deposito.",
+        "Proteggere cristalli e geodi da sovrafrantumazione, urti e perdita della tracciabilità del lotto.",
+        "Registrare pulizia, stabilizzazione, impregnazione, calore, irraggiamento o tintura come operazioni successive.",
+        "Per claim di origine separare osservazioni geologiche, documenti di filiera e conclusione di laboratorio."
+      ],
+      "warnings": [
+        "Pegmatite, geode o colore non dimostrano automaticamente identità, qualità o origine geografica.",
+        "Aurum non offre istruzioni per gallerie, brillamento, acidi o accesso a cavità instabili.",
+        "Onice, topazio imperiale, Paraíba e prasiolite richiedono terminologia e disclosure prudenti."
+      ],
+      "materials": [
+        {"slug": "smeraldo", "name": "Smeraldo", "classification": "Naturale", "aliases": ["smeraldo naturale"], "occurrence": "Sistemi magmatico, sedimentario o metamorfico-metasomatici, inclusi black shale e contatti pegmatite-scisto.", "extraction": "Pozzi, trincee, gallerie o cielo aperto con estrazione selettiva delle vene e della roccia mineralizzata fragile.", "primaryProcessing": "Lavaggio e cernita manuale del grezzo, classificazione per colore, trasparenza e fratture mantenendo separato il lotto.", "caveat": "Il modello colombiano non vale per ogni deposito e colore o inclusioni non provano da soli origine e trattamento."},
+        {"slug": "acquamarina", "name": "Acquamarina", "classification": "Naturale", "aliases": ["berillo acquamarina"], "occurrence": "Soprattutto tasche di pegmatiti granitiche e più raramente depositi secondari derivati dall'alterazione.", "extraction": "Cave, pozzi o gallerie con apertura selettiva delle tasche e recupero manuale dei cristalli per ridurre rotture.", "primaryProcessing": "Pulizia, cernita e classificazione del grezzo per colore, trasparenza, dimensione e integrità del cristallo.", "caveat": "Il colore azzurro non prova origine o assenza di trattamento termico e la pegmatite può essere non gemmifera."},
+        {"slug": "morganite", "name": "Morganite", "classification": "Naturale", "aliases": ["berillo rosa"], "occurrence": "Berillo rosa in tasche e zone albitiche di pegmatiti granitiche, talvolta in accumuli secondari.", "extraction": "Apertura selettiva di cave, pozzi o gallerie pegmatitiche e recupero manuale dei cristalli dalle tasche.", "primaryProcessing": "Pulizia e classificazione del grezzo per tonalità, trasparenza, dimensione, inclusioni e fratture visibili.", "caveat": "La tonalità può essere modificata da trattamento e non identifica da sola una località o una specifica pegmatite."},
+        {"slug": "eliodoro", "name": "Eliodoro", "classification": "Naturale", "aliases": ["berillo giallo"], "occurrence": "Berillo giallo in pegmatiti granitiche e cavità associate, con possibile recupero da sedimenti secondari.", "extraction": "Estrazione selettiva delle tasche pegmatitiche in cava o sotterraneo e raccolta manuale dei cristalli integri.", "primaryProcessing": "Pulizia, selezione cromatica e classificazione per trasparenza, dimensione e qualità del cristallo grezzo.", "caveat": "Eliodoro è una varietà di berillo e colore o nome commerciale non provano origine o assenza di trattamento."},
+        {"slug": "goshenite", "name": "Goshenite", "classification": "Naturale", "aliases": ["berillo incolore"], "occurrence": "Berillo incolore soprattutto in pegmatiti granitiche e relative tasche o accumuli secondari alterati.", "extraction": "Recupero selettivo in cava, pozzo o galleria aprendo le tasche e proteggendo i cristalli dalle fratture.", "primaryProcessing": "Pulizia e classificazione del grezzo incolore per trasparenza, dimensione, fratture e inclusioni osservabili.", "caveat": "L'assenza di colore non distingue automaticamente goshenite, topazio, quarzo, vetro e altri materiali incolori."},
+        {"slug": "ametista", "name": "Ametista", "classification": "Naturale", "aliases": ["quarzo ametista"], "occurrence": "Vene idrotermali, geodi e cavità vulcaniche e depositi secondari prodotti dall'alterazione della roccia.", "extraction": "Cave o lavori sotterranei con apertura selettiva di vene e geodi, oppure raccolta autorizzata di materiale alterato.", "primaryProcessing": "Apertura controllata dei geodi, lavaggio e classificazione dei cristalli per colore, zonatura e integrità.", "caveat": "Ametista può essere riscaldata per produrre altri colori; il trattamento deve restare distinto dall'origine mineraria."},
+        {"slug": "citrino", "name": "Citrino", "classification": "Naturale", "aliases": ["quarzo citrino"], "occurrence": "Quarzo giallo naturale raro in vene e pegmatiti; molto materiale commerciale deriva da altro quarzo trattato.", "extraction": "Recupero da vene, cavità o pegmatiti mediante cava o lavori selettivi analoghi agli altri quarzi naturali.", "primaryProcessing": "Pulizia, cernita e verifica gemmologica del colore prima di classificazione e disclosure di eventuale trattamento.", "caveat": "Non presentare come estratto già giallo il citrino ottenuto riscaldando ametista o quarzo fumé."},
+        {"slug": "quarzo-ialino", "name": "Quarzo ialino", "classification": "Naturale", "aliases": ["cristallo di rocca"], "occurrence": "Pegmatiti, vene idrotermali e cavità in numerose rocce, oltre a depositi secondari di cristalli resistenti.", "extraction": "Cava, pozzo o galleria con apertura di vene e tasche oppure raccolta autorizzata da materiale alterato.", "primaryProcessing": "Pulizia, separazione del cristallo, classificazione per trasparenza, dimensione, abito e integrità superficiale.", "caveat": "L'abbondanza geologica non garantisce qualità ottica e il quarzo incolore può essere confuso con vetro o sintetici."},
+        {"slug": "quarzo-fume", "name": "Quarzo fumé", "classification": "Naturale", "aliases": ["quarzo affumicato"], "occurrence": "Cristalli in pegmatiti, vene e cavità dove irraggiamento naturale e difetti strutturali producono il colore.", "extraction": "Recupero selettivo da tasche e vene in cava o sotterraneo, oppure da depositi alterati autorizzati.", "primaryProcessing": "Pulizia e classificazione del grezzo per intensità cromatica, trasparenza, zonatura, fratture e dimensione.", "caveat": "Il colore può essere intensificato artificialmente e non dimostra da solo esposizione naturale o provenienza."},
+        {"slug": "quarzo-rosa", "name": "Quarzo rosa", "classification": "Naturale", "aliases": ["rosa quartz"], "occurrence": "Masse e cristalli in pegmatiti granitiche, talvolta recuperati anche da blocchi e depositi alterati.", "extraction": "Cava e selezione di masse o tasche pegmatitiche, con estrazione di blocchi e cristalli evitando contaminazione del lotto.", "primaryProcessing": "Lavaggio, segagione o cernita del grezzo e classificazione per colore, traslucenza, fratture e fenomeni ottici.", "caveat": "Cristalli e quarzo rosa massivo possono avere cause di colore diverse e non vanno equiparati senza analisi."},
+        {"slug": "prasiolite", "name": "Prasiolite", "classification": "Naturale", "aliases": ["quarzo verde"], "occurrence": "Quarzo verde naturale molto raro; la maggior parte del mercato deriva da ametista o quarzo trattato dopo l'estrazione.", "extraction": "Quando naturale segue vene o cavità quarzifere; il materiale trattato viene prima estratto come altro quarzo.", "primaryProcessing": "Pulizia e verifica del materiale di partenza, seguite da classificazione e disclosure completa dell'eventuale trattamento.", "caveat": "Non descrivere ogni prasiolite come quarzo verde estratto in natura: l'origine del colore va verificata e dichiarata."},
+        {"slug": "calcedonio", "name": "Calcedonio", "classification": "Naturale", "aliases": ["quarzo microcristallino"], "occurrence": "Riempimenti microcristallini di cavità, vene e noduli in rocce vulcaniche o sedimentarie e depositi secondari.", "extraction": "Cava, raccolta autorizzata di noduli e blocchi o recupero da sedimenti e materiale alterato del deposito.", "primaryProcessing": "Lavaggio, segagione preliminare e cernita per colore, tessitura, omogeneità, fratture e dimensione utile.", "caveat": "Tintura, impregnazione e nomi varietali commerciali devono essere distinti dalla normale estrazione del calcedonio."},
+        {"slug": "agata", "name": "Agata", "classification": "Naturale", "aliases": ["calcedonio bandato"], "occurrence": "Noduli e geodi di calcedonio bandato in rocce vulcaniche o sedimentarie e accumuli secondari derivati.", "extraction": "Cava o raccolta autorizzata di noduli e geodi, seguita da lavaggio e selezione senza distruggere la struttura interna.", "primaryProcessing": "Taglio esplorativo limitato, pulizia e classificazione per bande, colore, dimensione, fratture e completezza del nodulo.", "caveat": "Molte agate sono tinte o trattate; bande e colore non dimostrano automaticamente uno stato naturale non modificato."},
+        {"slug": "onice", "name": "Onice", "classification": "Naturale", "aliases": ["onyx"], "occurrence": "Calcedonio con bande parallele in cavità e noduli; il nome commerciale viene usato anche per materiali differenti.", "extraction": "Recupero di noduli e masse da cava o depositi secondari autorizzati con metodi analoghi ad agata e calcedonio.", "primaryProcessing": "Lavaggio, segagione e classificazione della struttura a bande prima di verificare tinture o materiali sostitutivi.", "caveat": "Il vero onice è calcedonio a bande parallele; agata tinta e calcite bandata non devono essere dichiarate onice senza qualifica."},
+        {"slug": "topazio", "name": "Topazio", "classification": "Naturale", "aliases": ["topazio naturale"], "occurrence": "Pegmatiti, greisen, vene idrotermali e cavità riolitiche, con possibili concentrazioni in placer secondari.", "extraction": "Apertura selettiva delle tasche hard-rock oppure recupero da sedimenti con lavaggio e cernita del minerale resistente.", "primaryProcessing": "Pulizia e classificazione del grezzo per colore, trasparenza, sfaldatura, fratture, dimensione e orientazione.", "caveat": "Sfaldatura perfetta rende fragile il grezzo e colore o nome commerciale non dimostrano trattamento o origine."},
+        {"slug": "topazio-imperiale", "name": "Topazio imperiale", "classification": "Naturale", "aliases": ["imperial topaz"], "occurrence": "Topazio di tonalità selezionate in sistemi idrotermali e metasomatici, celebre l'area di Ouro Preto in Brasile.", "extraction": "Coltivazione selettiva di vene e corpi alterati con recupero manuale del grezzo fragile in cava o sotterraneo.", "primaryProcessing": "Pulizia e classificazione per colore, trasparenza, sfaldatura e integrità con registrazione della provenienza del lotto.", "caveat": "Imperiale è un descrittore commerciale non delimitato universalmente e non prova automaticamente origine brasiliana."},
+        {"slug": "tormalina", "name": "Tormalina", "classification": "Naturale", "aliases": ["tourmaline"], "occurrence": "Pegmatiti granitiche e anche sistemi metamorfici o idrotermali, con possibili accumuli secondari.", "extraction": "Apertura selettiva di tasche hard-rock in cava o sotterraneo oppure lavaggio e sorting di depositi secondari.", "primaryProcessing": "Pulizia e classificazione del grezzo per colore, zonatura, trasparenza, abito, fratture e dimensione.", "caveat": "Tormalina comprende specie e varietà diverse; colore e deposito non identificano da soli composizione e nome commerciale."},
+        {"slug": "rubellite", "name": "Rubellite", "classification": "Naturale", "aliases": ["tormalina rubellite"], "occurrence": "Tormalina rosa-rossa soprattutto in tasche di pegmatiti granitiche e in limitati depositi secondari.", "extraction": "Recupero selettivo delle tasche pegmatitiche o da sedimenti derivati con protezione dei cristalli spesso fratturati.", "primaryProcessing": "Pulizia e classificazione per tonalità, saturazione, trasparenza, inclusioni, fratture e dimensione del grezzo.", "caveat": "Rubellite è un termine varietale legato al colore e non prova specie, origine geografica o assenza di trattamento."},
+        {"slug": "indicolite", "name": "Indicolite", "classification": "Naturale", "aliases": ["tormalina indicolite"], "occurrence": "Tormalina blu in pegmatiti granitiche e più raramente in contesti metamorfici o depositi secondari.", "extraction": "Apertura selettiva delle tasche o recupero da ghiaie derivate con lavaggio e cernita manuale del grezzo.", "primaryProcessing": "Pulizia e classificazione per blu, pleocroismo, trasparenza, fratture e dimensione mantenendo separati i lotti.", "caveat": "Indicolite è una designazione varietale; il blu non basta per separarla da altre tormaline o dichiararne l'origine."},
+        {"slug": "tormalina-paraiba", "name": "Tormalina Paraíba", "classification": "Naturale", "aliases": ["tormalina cuprifera", "paraiba"], "occurrence": "Tormalina cuprifera in pegmatiti e depositi eluviali o alluvionali derivati in più regioni produttive.", "extraction": "Scavo selettivo delle pegmatiti o trattamento autorizzato di sedimenti secondari con lavaggio e sorting del grezzo.", "primaryProcessing": "Pulizia, cernita e analisi della composizione e del colore prima di ogni claim varietale o geografico.", "caveat": "Identità cuprifera Paraíba e origine geografica sono conclusioni distinte che richiedono analisi e terminologia corretta."}
+      ],
+      "sources": [
+        {"title": "GIA — Gem Granitic Pegmatites", "url": "https://www.gia.edu/gems-gemology/summer-2025-colored-stones-unearthed", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "GIA — Geology of Corundum and Emerald Gem Deposits", "url": "https://www.gia.edu/gems-gemology/winter-2019-geology-of-corundum-and-emerald-gem-deposits", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "USGS — Geologic Environment of Natural Gemstones", "url": "https://pubs.usgs.gov/gip/gemstones/environment.html", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-gemme-varie-zircone-tanzanite-opali",
+      "title": "Estrazione di zircone, tanzanite, peridoto, opali e feldspati",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione zircone", "estrazione tanzanite", "Merelani", "estrazione peridoto", "estrazione opale", "opale di fuoco", "pietra di luna", "labradorite", "placer zircone"],
+      "summary": "Zircone, tanzanite, peridoto, opali e feldspati appartengono a sistemi molto diversi: placer di minerali pesanti, corpi metamorfici, rocce mantellari, livelli sedimentari, cavità vulcaniche e cave di rocce feldspatiche.",
+      "facts": [
+        "Lo zircone gemma viene spesso recuperato da placer; la tanzanite commerciale proviene dall'area di Merelani in Tanzania e da estrazione sotterranea selettiva.",
+        "Il peridoto deriva da olivina mantellare in peridotiti o xenoliti basaltici e può concentrarsi in materiale alterato o alluvionale.",
+        "Gli opali possono formarsi in sedimenti o cavità vulcaniche e richiedono scavo selettivo di strati, noduli o vene fragili.",
+        "Pietra di luna e labradorite sono feldspati recuperati da pegmatiti, graniti, contesti metamorfici, anortositi o depositi secondari.",
+        "Fenomeno ottico, colore e località commerciale non sostituiscono l'identificazione mineralogica e la documentazione della provenienza."
+      ],
+      "checklist": [
+        "Definire il modello specifico del materiale, senza applicare un metodo unico a tutte le pietre.",
+        "Usare estrazione e movimentazione selettive per preservare noduli, cristalli e superfici ottiche fragili.",
+        "Documentare lotto, località, pulizia, stabilizzazione, calore, impregnazione o altri trattamenti successivi.",
+        "Separare nome varietale, fenomeno ottico, origine geografica e qualità commerciale."
+      ],
+      "warnings": [
+        "Tanzanite riscaldata, opale stabilizzato o feldspato con fenomeno ottico restano casi da dichiarare e verificare separatamente.",
+        "Non entrare in gallerie, pozzi o fronti di cava senza autorizzazione, progetto e gestione professionale della sicurezza.",
+        "Il materiale meteoritico non è una normale fonte commerciale del peridoto."
+      ],
+      "materials": [
+        {"slug": "zircone-naturale", "name": "Zircone naturale", "classification": "Naturale", "aliases": ["zircone"], "occurrence": "Minerale accessorio di rocce ignee e metamorfiche, spesso riconcentrato in placer di minerali pesanti.", "extraction": "Recupero hard-rock limitato o più spesso scavo autorizzato di sedimenti con lavaggio, gravità e cernita.", "primaryProcessing": "Separazione dei minerali pesanti, pulizia e classificazione per colore, trasparenza, usura e integrità del grezzo.", "caveat": "Zircone naturale e zirconia cubica sono materiali diversi; il nome non va abbreviato in modo ambiguo."},
+        {"slug": "tanzanite", "name": "Tanzanite", "classification": "Naturale", "aliases": ["zoisite tanzanite"], "occurrence": "Zoisite blu-viola in rocce metamorfico-metasomatiche dell'area di Merelani, Tanzania, fonte commerciale riconosciuta.", "extraction": "Coltivazione sotterranea selettiva di zone e vene mineralizzate con controllo geotecnico, ventilazione e sicurezza.", "primaryProcessing": "Pulizia e cernita del grezzo per colore, pleocroismo, dimensione e fratture prima del frequente riscaldamento dichiarato.", "caveat": "Il trattamento termico è successivo all'estrazione e tanzanite è un nome varietale collegato a una provenienza specifica."},
+        {"slug": "peridoto", "name": "Peridoto", "classification": "Naturale", "aliases": ["olivina gemma"], "occurrence": "Olivina mantellare in peridotiti o xenoliti basaltici e in depositi alterati o alluvionali derivati.", "extraction": "Cave e piccoli pit nelle rocce ospiti oppure recupero autorizzato da materiale alterato e sedimenti secondari.", "primaryProcessing": "Lavaggio e cernita del grezzo per colore, trasparenza, dimensione, fratture e inclusioni caratteristiche.", "caveat": "Il peridoto meteoritico è eccezionale e non rappresenta la normale origine del materiale commerciale."},
+        {"slug": "opale-prezioso", "name": "Opale prezioso", "classification": "Naturale", "aliases": ["opale con gioco di colore"], "occurrence": "Precipitazioni di silice in successioni sedimentarie o cavità vulcaniche, come depositi australiani ed etiopi.", "extraction": "Pozzi, gallerie o scavo selettivo di livelli, vene e noduli fragili con minimo impatto sul materiale ospite.", "primaryProcessing": "Pulizia prudente, stabilizzazione dell'umidità e cernita per gioco di colore, corpo, fratture e stabilità.", "caveat": "Origine sedimentaria o vulcanica influenza caratteristiche e stabilità ma non determina automaticamente qualità o valore."},
+        {"slug": "opale-di-fuoco", "name": "Opale di fuoco", "classification": "Naturale", "aliases": ["fire opal"], "occurrence": "Opale giallo, arancio o rosso soprattutto in cavità e fratture di rocce vulcaniche, celebre il Messico.", "extraction": "Scavo hard-rock selettivo delle vene e cavità opalifere con recupero manuale del materiale fragile.", "primaryProcessing": "Pulizia, asciugatura controllata e classificazione per colore del corpo, trasparenza, gioco di colore e fratture.", "caveat": "Fuoco descrive il colore del corpo e può sovrapporsi a prezioso; non dimostra origine messicana o gioco di colore."},
+        {"slug": "pietra-di-luna", "name": "Pietra di luna", "classification": "Naturale", "aliases": ["moonstone"], "occurrence": "Feldspati o intercrescite feldspatiche in pegmatiti, graniti, rocce metamorfiche e depositi secondari.", "extraction": "Estrazione hard-rock selettiva o recupero da placer con lavaggio e cernita dei ciottoli o cristalli feldspatici.", "primaryProcessing": "Pulizia e orientamento del grezzo per valutare adularescenza, integrità, trasparenza e direzione del taglio.", "caveat": "Pietra di luna è un nome gemmologico legato al fenomeno ottico e non identifica una sola composizione o località."},
+        {"slug": "labradorite", "name": "Labradorite", "classification": "Naturale", "aliases": ["feldspato labradorite"], "occurrence": "Plagioclasio in rocce mafiche e anortositi, presente come cristalli o masse idonee alla lavorazione ornamentale.", "extraction": "Cava e selezione di blocchi o porzioni della roccia che conservano cristalli e orientazione utile alla labradorescenza.", "primaryProcessing": "Segagione esplorativa, orientamento e classificazione per fenomeno ottico, colore, fratture e resa del blocco.", "caveat": "La labradorescenza dipende dall'orientazione e non prova da sola identità, origine o qualità dell'intero blocco."}
+      ],
+      "sources": [
+        {"title": "GIA — Gems Formed in Magmatic Rocks", "url": "https://www.gia.edu/gems-gemology/winter-2022-colored-stones-unearthed", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "GIA — Gems Recovered from Sedimentary Rocks", "url": "https://www.gia.edu/gems-gemology/winter-2023-colored-stones-unearthed", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "GIA — Ethiopian opal and emerald mining", "url": "https://www.gia.edu/gems-gemology/spring-2019-land-of-origins-gemological-expedition-ethiopia", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "estrazione-gemme-ornamentali-giade-turchese-lapislazzuli",
+      "title": "Estrazione di giade, turchese, lapislazzuli e malachite",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione giadeite", "estrazione nefrite", "estrazione giada", "estrazione turchese", "estrazione lapislazzuli", "estrazione malachite", "blocchi ornamentali", "massi alluvionali"],
+      "summary": "Giadeite, nefrite, turchese, lapislazzuli e malachite vengono estratti come vene, lenti, blocchi o masse in contesti di subduzione, metasomatismo, alterazione supergenica, skarn e giacimenti di rame, con forte attenzione alla resa interna del grezzo.",
+      "facts": [
+        "Giadeite e nefrite hanno mineralogia e genesi diverse e possono essere estratte in roccia o recuperate come grandi massi secondari.",
+        "Il turchese è un minerale secondario in fratture di rocce alterate, spesso collegato a sistemi cupriferi e fosfatici.",
+        "Il lapislazzuli è una roccia a lazurite in carbonati metamorfosati e skarn, non un singolo cristallo minerale.",
+        "La malachite si forma nelle zone ossidate dei giacimenti di rame ed è spesso un sottoprodotto della miniera cuprifera.",
+        "Per materiali massivi la valutazione del blocco, fratture, alterazioni e resa al taglio è distinta dal semplice peso estratto."
+      ],
+      "checklist": [
+        "Identificare specie o roccia, deposito primario o secondario e titolo autorizzativo del sito.",
+        "Documentare blocco e lotto prima di taglio, lavaggio, impregnazione, stabilizzazione o tintura.",
+        "Usare estrazione selettiva e movimentazione che limitino fratture e perdita di materiale utile.",
+        "Verificare origine e trattamento con laboratorio quando incidono sul valore o sul claim commerciale."
+      ],
+      "warnings": [
+        "Il nome giada non distingue giadeite e nefrite e lapislazzuli è una roccia, non una singola specie minerale.",
+        "Stabilizzazione, tintura, impregnazione e ricostituzione devono essere dichiarate separatamente dall'estrazione.",
+        "La raccolta di massi fluviali e l'accesso a cave richiedono proprietà, permessi e controlli ambientali."
+      ],
+      "materials": [
+        {"slug": "giadeite", "name": "Giadeite", "classification": "Naturale", "aliases": ["giada giadeite"], "occurrence": "Vene e pod ad alta pressione e bassa temperatura entro serpentiniti di zone di subduzione e massi secondari.", "extraction": "Hard-rock selettivo della roccia primaria oppure recupero autorizzato di grandi massi alluvionali e colluviali.", "primaryProcessing": "Lavaggio, ispezione del blocco e taglio esplorativo controllato per stimare colore, tessitura, fratture e resa.", "caveat": "Il rivestimento esterno del masso non mostra con certezza la qualità interna e giada non significa sempre giadeite."},
+        {"slug": "nefrite", "name": "Nefrite", "classification": "Naturale", "aliases": ["giada nefrite"], "occurrence": "Lenti metasomatiche prodotte da fluidi in dolomie o serpentiniti e massi fluviali o glaciali secondari.", "extraction": "Cava selettiva delle lenti primarie oppure recupero autorizzato di massi da depositi fluviali e glaciali.", "primaryProcessing": "Lavaggio, esame della crosta e segagione controllata per classificare compattezza, colore, tessitura e fratture.", "caveat": "Nefrite e giadeite sono materiali diversi; colore e tenacità apparente non sostituiscono l'identificazione."},
+        {"slug": "turchese", "name": "Turchese", "classification": "Naturale", "aliases": ["turquoise"], "occurrence": "Minerale secondario in fratture di rocce alterate, spesso in sistemi cupriferi con disponibilità di fosforo.", "extraction": "Trincee, piccoli open pit o lavori sotterranei selettivi seguendo vene e noduli fragili nella zona ossidata.", "primaryProcessing": "Pulizia a secco o controllata, cernita per colore, matrice, durezza e fratture prima di stabilizzazione dichiarata.", "caveat": "Molto turchese è stabilizzato, impregnato, tinto o ricostituito e il colore non prova provenienza geografica."},
+        {"slug": "lapislazzuli", "name": "Lapislazzuli", "classification": "Naturale", "aliases": ["lapis lazuli"], "occurrence": "Roccia a lazurite in calcari o dolomie metamorfosati e skarn, presente in vene, lenti e blocchi.", "extraction": "Coltivazione selettiva in cava o galleria delle vene e dei blocchi, con controllo della stabilità del fronte.", "primaryProcessing": "Selezione e segagione preliminare dei blocchi per lazurite, calcite, pirite, colore, fratture e resa ornamentale.", "caveat": "È una roccia composta e non una singola specie; tintura e impregnazione devono essere verificate e dichiarate."},
+        {"slug": "malachite", "name": "Malachite", "classification": "Naturale", "aliases": ["malachite naturale"], "occurrence": "Minerale secondario nelle zone ossidate di giacimenti di rame, in croste, masse, stalattiti e vene.", "extraction": "Spesso recuperata come sottoprodotto di miniere cuprifere a cielo aperto o sotterranee con selezione delle masse ornamentali.", "primaryProcessing": "Lavaggio, selezione e segagione controllata per bande, compattezza, cavità, fratture e resa del materiale.", "caveat": "Polveri e minerali di rame richiedono igiene industriale; aspetto bandato non prova origine o assenza di ricostituzione."}
+      ],
+      "sources": [
+        {"title": "GIA — Gems Formed in Metamorphic Rocks", "url": "https://www.gia.edu/gems-gemology/summer-2023-colored-stones-unearthed0", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "GIA — Turquoise geology and surface mining", "url": "https://www.gia.edu/gems-gemology/winter-2025-mona-lisa-turquoise-from-arkansas", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "USGS — Geologic Environment of Natural Gemstones", "url": "https://pubs.usgs.gov/gip/gemstones/environment.html", "authority": "U.S. Geological Survey", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "perle-naturali-coltivate-raccolta-filiera",
+      "title": "Perle naturali e coltivate: raccolta, perlicoltura, qualità e tracciabilità",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione perle", "raccolta perle", "perla naturale", "perla coltivata", "perlicoltura", "allevamento perle", "acqua dolce", "acqua salata", "nacre", "ostrica perlifera"],
+      "summary": "Le perle non provengono da miniere: quelle naturali sono raccolte da molluschi selvatici secondo regole applicabili, mentre quelle coltivate nascono in acquacoltura con intervento umano, cura del mollusco, raccolta e classificazione.",
+      "facts": [
+        "La perla naturale si forma senza intervento umano; la perla coltivata è prodotta biologicamente dal mollusco dopo intervento e allevamento e non è un'imitazione.",
+        "La coltivazione può essere con o senza nucleo e richiede ambiente idoneo, salute dei molluschi, qualità dell'acqua, monitoraggio e tecnici formati.",
+        "Non esiste un tempo universale di coltura: specie, ambiente, dimensione, obiettivo e spessore della nacre modificano il ciclo.",
+        "Lustro, superficie, forma, dimensione, colore, orient, struttura della nacre e uniformità sono fattori distinti di classificazione.",
+        "Naturalità, coltivazione, tipo di mollusco e trattamenti possono richiedere imaging radiografico e analisi di laboratorio.",
+        "Specie, area, stock, mortalità, lotto, trattamenti e documenti commerciali formano la base della tracciabilità."
+      ],
+      "checklist": [
+        "Distinguere naturale, coltivata, composita e imitazione, acqua marina o dolce e mollusco produttore se noto.",
+        "Per la filiera registrare specie, area o farm, lotto, durata, raccolta, trattamenti, fattura e referto.",
+        "Verificare qualità dell'acqua, biosicurezza, mortalità, autorizzazioni acquicole e sicurezza dei lavoratori.",
+        "Usare laboratorio, spesso con radiografia, quando il valore dipende dall'origine naturale.",
+        "Verificare CITES e regole UE sulla specie produttrice prima del commercio internazionale."
+      ],
+      "warnings": [
+        "Aurum descrive la nucleazione soltanto in termini concettuali e non fornisce istruzioni chirurgiche, anestesia o dosaggi.",
+        "Aspetto, forma o prova del dente non distinguono in modo conclusivo perla naturale, coltivata e imitazione.",
+        "Coltivato non significa sintetico e non è sinonimo di trattamento successivo."
+      ],
+      "materials": [
+        {"slug": "perla-naturale", "name": "Perla naturale", "classification": "Organica", "aliases": ["perle naturali"], "occurrence": "Biomineralizzazione spontanea nel sacco perlifero di molluschi selvatici marini o d'acqua dolce senza intervento umano.", "extraction": "Pesca o raccolta regolamentata dei molluschi e recupero della perla nel rispetto di specie, area, stagione e titoli.", "primaryProcessing": "Lavaggio, classificazione e documentazione del lotto, seguiti da analisi radiografica quando naturalità e valore lo richiedono.", "caveat": "Non è estrazione mineraria e naturalità, specie e origine non si provano dal solo aspetto esterno."},
+        {"slug": "perla-coltivata", "name": "Perla coltivata", "classification": "Coltivata", "aliases": ["perle coltivate", "perla d'acqua dolce", "perla d'acqua salata"], "occurrence": "Prodotto biogenico di molluschi allevati in ambiente marino o d'acqua dolce dopo intervento umano controllato.", "extraction": "Acquacoltura con allevamento, intervento di tecnici, crescita monitorata e raccolta finale; non proviene da una miniera.", "primaryProcessing": "Lavaggio e classificazione per tipo, lustro, superficie, forma, colore, dimensione e struttura della nacre.", "caveat": "È una vera perla biologica ma deve essere sempre qualificata come coltivata e separata da naturale e imitazione."}
+      ],
+      "sources": [
+        {"title": "CIBJO — Pearl Book 2024", "url": "https://cibjo.org/wp-content/uploads/2024/11/2024-Pearl-Book-Nov-3.pdf", "authority": "World Jewellery Confederation — CIBJO", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "FAO — Pearl Oyster Farming and Pearl Culture", "url": "https://www.fao.org/4/AB726E/AB726E00.htm", "authority": "Food and Agriculture Organization of the United Nations", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "GIA — Pearl Description", "url": "https://www.gia.edu/pearl-description", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "materiali-organici-corallo-ambra-provenienza",
+      "title": "Corallo e ambra: raccolta, estrazione, ambiente e provenienza",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["estrazione corallo", "raccolta corallo", "pesca corallo", "corallo CITES", "estrazione ambra", "miniera ambra", "raccolta ambra", "copale", "ambra pressata"],
+      "summary": "Corallo e ambra richiedono filiere diverse: il corallo è scheletro biogenico raccolto o pescato con regole specie-specifiche, mentre l'ambra è resina fossile recuperata da sedimenti, cave, miniere o raccolta costiera autorizzata.",
+      "facts": [
+        "Il corallo non è un minerale: specie, area, metodo di raccolta, licenza o quota, lotto e stato CITES devono essere verificati.",
+        "Legalità e sostenibilità del corallo non sono sinonimi e la disciplina CITES varia per specie e può cambiare.",
+        "L'ambra può trovarsi in depositi primari o secondari ed essere recuperata a cielo aperto, in limitati lavori sotterranei o da spiagge e sedimenti autorizzati.",
+        "Ambra, copale, ambra pressata, composita e imitazione sono categorie differenti; trattamenti e pressatura devono essere dichiarati.",
+        "Claim geografici come Baltica o Dominicana richiedono filiera documentale e, nei casi importanti, analisi professionale.",
+        "Raccolta indiscriminata, scavi illegali, rimozione del suolo, torbidità ed erosione sono rischi ambientali e autorizzativi."
+      ],
+      "checklist": [
+        "Per il corallo verificare specie scientifica, area, data, licenza o quota, metodo, lotto e database CITES corrente.",
+        "Per l'ambra verificare deposito, titolo autorizzativo, metodo, fornitore, lotto, trattamento e restrizioni del Paese d'origine.",
+        "Distinguere naturale, pressato, composito, ricostituito e imitazione nelle fatture e nelle descrizioni.",
+        "Sospendere claim o transazioni internazionali se specie, origine o documenti non sono verificabili."
+      ],
+      "warnings": [
+        "Non generalizzare che tutto il corallo sia CITES o che una specie sia sempre libera: serve verifica live per specie e Paese.",
+        "Inclusioni nell'ambra e colore del corallo non provano da soli autenticità o provenienza.",
+        "Aurum non fornisce indicazioni per raccolta illegale, dragaggio, getti idraulici o accesso non autorizzato."
+      ],
+      "materials": [
+        {"slug": "corallo", "name": "Corallo", "classification": "Organica", "aliases": ["corallo prezioso", "coralli"], "occurrence": "Scheletro biogenico di organismi marini in popolazioni e habitat la cui disciplina dipende dalla specie e dall'area.", "extraction": "Raccolta o pesca selettiva regolamentata, non estrazione mineraria, nel rispetto di licenze, quote e aree protette.", "primaryProcessing": "Pulizia, separazione per specie e lotto, taglio iniziale e registrazione di area, peso, trattamenti e documenti.", "caveat": "La voce corallo è troppo ampia senza specie; CITES e norme locali devono essere verificate al momento della transazione."},
+        {"slug": "ambra", "name": "Ambra", "classification": "Organica", "aliases": ["ambra fossile"], "occurrence": "Resina fossile in sedimenti primari e secondari, livelli geologici, spiagge e bassi fondali di aree produttive.", "extraction": "Cave e miniere autorizzate o raccolta regolamentata da sedimenti e spiagge senza scavi o sistemi idraulici illegali.", "primaryProcessing": "Lavaggio, separazione per densità, asciugatura e classificazione per colore, trasparenza, fratture e inclusioni.", "caveat": "Ambra, copale, pressata e imitazione non sono sinonimi; inclusioni e colore non provano origine o autenticità."}
+      ],
+      "sources": [
+        {"title": "CIBJO — Industry Standards Resources", "url": "https://cibjo.org/industry-standards-resources/", "authority": "World Jewellery Confederation — CIBJO", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "CITES — Species checklist", "url": "https://checklist.cites.org/", "authority": "Convention on International Trade in Endangered Species", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "Polish Geological Institute — Amber deposits and exploitation", "url": "https://www.pgi.gov.pl/en/1263-surowce/resources/rock/14078-amber.html", "authority": "Polish Geological Institute", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    },
+    {
+      "id": "materiali-non-estratti-sintetici-trattati-assemblati-simulanti",
+      "title": "Materiali non estratti: sintetici, trattati, assemblati, vetri e simulanti",
+      "category": "Estrazione e approvvigionamento responsabile",
+      "keywords": ["non estratto", "diamante sintetico HPHT", "diamante sintetico CVD", "rubino sintetico", "zaffiro sintetico", "spinello sintetico", "smeraldo sintetico", "opale sintetico", "moissanite", "zirconia cubica", "vetro", "doppiette triplette", "perla imitazione"],
+      "summary": "Sintetici, simulanti, imitazioni e assemblati sono prodotti o costruiti e non vengono estratti come la gemma naturale; un materiale trattato richiede invece di determinare prima la natura del substrato e poi descrivere l'intervento successivo.",
+      "facts": [
+        "Un sintetico ha sostanzialmente composizione e struttura del corrispondente naturale ma cresce in laboratorio; un simulante imita l'aspetto con materiale diverso.",
+        "HPHT, CVD, crescita da fondente, idrotermale, flame fusion e altri processi sono produzioni industriali e non metodi minerari.",
+        "Un materiale trattato può avere substrato naturale o sintetico: il termine trattato non descrive da solo la sua origine.",
+        "Doppiette e triplette combinano strati che possono avere origini differenti e richiedono disclosure di ogni componente.",
+        "Vetro, zirconia cubica e perle d'imitazione sono fabbricati; l'origine mineraria delle materie prime non trasforma il prodotto in gemma naturale estratta.",
+        "La rara moissanite naturale non rappresenta la normale fonte della moissanite gemmologica commerciale, generalmente prodotta in laboratorio."
+      ],
+      "checklist": [
+        "Classificare il bene come naturale, sintetico, trattato, simulante, imitazione, composito o assemblato.",
+        "Per i trattati identificare il substrato prima di descrivere il processo successivo.",
+        "Per assemblati registrare separatamente strati, adesivi, rivestimenti e materiale di supporto.",
+        "Usare terminologia CIBJO e referto di laboratorio quando la distinzione influenza valore o vendita.",
+        "Non associare una miniera o un Paese estrattivo a un prodotto fabbricato senza una reale catena delle materie prime dichiarata come tale."
+      ],
+      "warnings": [
+        "Non usare estratto, naturale o autentico per nascondere crescita artificiale, imitazione, trattamento o assemblaggio.",
+        "Aurum non fornisce parametri di produzione HPHT, CVD, idrotermale, flux o flame fusion.",
+        "Il nome del materiale imitato non può sostituire la denominazione corretta del prodotto."
+      ],
+      "materials": [
+        {"slug": "diamante-sintetico-hpht", "name": "Diamante sintetico HPHT", "classification": "Sintetica", "aliases": ["diamante HPHT", "lab grown HPHT"], "occurrence": "Cresciuto industrialmente su seme in apparecchiature ad alta pressione e temperatura; non ha un giacimento minerario.", "extraction": "Non viene estratto: è prodotto in laboratorio o impianto specializzato mediante crescita cristallina controllata.", "primaryProcessing": "Separazione dal mezzo di crescita, pulizia, eventuali lavorazioni dichiarate, taglio e classificazione gemmologica.", "caveat": "È diamante sintetico e non simulante, ma deve essere sempre dichiarato laboratory-grown o sintetico."},
+        {"slug": "diamante-sintetico-cvd", "name": "Diamante sintetico CVD", "classification": "Sintetica", "aliases": ["diamante CVD", "lab grown CVD"], "occurrence": "Cresciuto industrialmente su substrato mediante deposizione da fase gassosa; non proviene da kimberlite o miniera.", "extraction": "Non viene estratto: è fabbricato in reattori specializzati mediante crescita controllata su seme di diamante.", "primaryProcessing": "Rimozione dal substrato, pulizia, eventuale trattamento post-crescita dichiarato, taglio e analisi gemmologica.", "caveat": "La parola diamante descrive il materiale, ma CVD e laboratory-grown devono essere comunicati chiaramente."},
+        {"slug": "diamante-trattato", "name": "Diamante trattato", "classification": "Trattata", "aliases": ["diamante migliorato"], "occurrence": "Trattato descrive uno stadio successivo: il substrato può essere diamante naturale estratto o materiale cresciuto in laboratorio.", "extraction": "Il trattamento non è estrazione; occorre determinare separatamente se il diamante di partenza è naturale o sintetico.", "primaryProcessing": "Identificazione del substrato e rilevazione del trattamento con strumenti adeguati prima della disclosure commerciale.", "caveat": "Non attribuire automaticamente origine naturale a un diamante soltanto perché è classificato come trattato."},
+        {"slug": "moissanite", "name": "Moissanite", "classification": "Simulante", "aliases": ["moissanite sintetica"], "occurrence": "Il carburo di silicio naturale è eccezionalmente raro; la moissanite gemmologica commerciale è normalmente prodotta.", "extraction": "Non si estrae come normale gemma commerciale: il prodotto da gioielleria è fabbricato con crescita cristallina industriale.", "primaryProcessing": "Taglio, lucidatura e classificazione del materiale prodotto, seguiti da identificazione rispetto al diamante.", "caveat": "Non presentare la rarissima moissanite naturale come fonte ordinaria del prodotto commerciale o come diamante."},
+        {"slug": "zirconia-cubica", "name": "Zirconia cubica - CZ", "classification": "Imitazione", "aliases": ["CZ", "cubic zirconia"], "occurrence": "Materiale artificiale stabilizzato e prodotto industrialmente; non esiste una miniera di zirconia cubica gemmologica.", "extraction": "Non viene estratta come gemma: è fabbricata mediante processo industriale e usata come imitazione del diamante.", "primaryProcessing": "Crescita o solidificazione industriale, taglio, lucidatura e corretta denominazione commerciale come zirconia cubica.", "caveat": "Zirconia cubica e zircone naturale sono materiali completamente diversi e non vanno confusi nella descrizione."},
+        {"slug": "vetro-pasta-vitrea", "name": "Vetro/pasta vitrea", "classification": "Imitazione", "aliases": ["vetro", "pasta vitrea"], "occurrence": "Prodotto amorfo fabbricato da materie prime fuse; non è una gemma naturale estratta da un giacimento.", "extraction": "Non viene estratto come vetro gemmologico: le materie prime sono trasformate industrialmente in materiale artificiale.", "primaryProcessing": "Formatura, raffreddamento, eventuale colorazione, taglio e lucidatura con disclosure come vetro o pasta vitrea.", "caveat": "L'origine mineraria di sabbia o additivi non rende il vetro una pietra naturale o estratta."},
+        {"slug": "doppiette-triplette", "name": "Doppiette e triplette", "classification": "Assemblata", "aliases": ["doppietta", "tripletta"], "occurrence": "Prodotti compositi costruiti unendo due o tre strati naturali, sintetici, organici, vetrosi o di supporto.", "extraction": "Non vengono estratti come unità: l'origine va ricostruita separatamente per ogni componente dell'assemblaggio.", "primaryProcessing": "Preparazione degli strati, adesione o montaggio, finitura e disclosure completa dei componenti e dei trattamenti.", "caveat": "Il solo strato superiore naturale non autorizza a descrivere l'intero prodotto come gemma naturale massiva."},
+        {"slug": "rubino-sintetico", "name": "Rubino sintetico", "classification": "Sintetica", "aliases": ["rubino di laboratorio"], "occurrence": "Corindone rosso cresciuto artificialmente con processi industriali; non proviene da marmo, basalto o placer.", "extraction": "Non viene estratto: è prodotto per crescita cristallina controllata in laboratorio o impianto specializzato.", "primaryProcessing": "Rimozione del grezzo sintetico, eventuale ricottura dichiarata, taglio e identificazione rispetto al naturale.", "caveat": "Ha composizione del corindone ma deve essere qualificato come sintetico e non associato a una miniera."},
+        {"slug": "zaffiro-sintetico", "name": "Zaffiro sintetico", "classification": "Sintetica", "aliases": ["zaffiro di laboratorio"], "occurrence": "Corindone di colore prodotto per crescita artificiale; non ha deposito metamorfico, magmatico o alluvionale.", "extraction": "Non viene estratto: è fabbricato mediante crescita cristallina industriale con composizione controllata.", "primaryProcessing": "Preparazione del grezzo sintetico, eventuale trattamento dichiarato, taglio e analisi per separarlo dal naturale.", "caveat": "La composizione di corindone non consente di omettere la qualificazione sintetico o laboratory-grown."},
+        {"slug": "spinello-sintetico", "name": "Spinello sintetico", "classification": "Sintetica", "aliases": ["spinello di laboratorio"], "occurrence": "Materiale cristallino prodotto industrialmente e non recuperato da marmi, rocce metamorfiche o ghiaie.", "extraction": "Non viene estratto: nasce da crescita artificiale e può essere formulato per imitare più gemme naturali.", "primaryProcessing": "Preparazione, taglio, lucidatura e identificazione gemmologica con denominazione esplicita di spinello sintetico.", "caveat": "Può imitare zaffiro, acquamarina e altre pietre; colore e aspetto non determinano il materiale imitato."},
+        {"slug": "smeraldo-sintetico", "name": "Smeraldo sintetico", "classification": "Sintetica", "aliases": ["smeraldo di laboratorio"], "occurrence": "Berillo verde cresciuto artificialmente, per esempio da fondente o in sistemi idrotermali industriali.", "extraction": "Non viene estratto: è prodotto in laboratorio e non proviene da vene colombiane o contatti pegmatitici.", "primaryProcessing": "Recupero dal mezzo di crescita, pulizia, taglio e identificazione di caratteristiche di crescita e residui.", "caveat": "Ha un equivalente naturale ma deve essere sempre qualificato come sintetico e non associato a una miniera."},
+        {"slug": "opale-sintetico", "name": "Opale sintetico", "classification": "Sintetica", "aliases": ["opale di laboratorio"], "occurrence": "Struttura opalina prodotta artificialmente mediante organizzazione controllata di silice o materiali analoghi.", "extraction": "Non viene estratto: è fabbricato e non proviene da livelli sedimentari o cavità vulcaniche naturali.", "primaryProcessing": "Essiccazione o consolidamento industriale, taglio, lucidatura e identificazione rispetto a naturale e imitazione.", "caveat": "Sintetico, imitazione e opale naturale trattato sono categorie differenti e richiedono disclosure distinta."},
+        {"slug": "perla-imitazione", "name": "Perla di imitazione", "classification": "Imitazione", "aliases": ["perla finta", "perle imitate"], "occurrence": "Oggetto artificiale di vetro, plastica, conchiglia o composito rivestito per imitare l'aspetto di una perla.", "extraction": "Non viene estratta né coltivata: è fabbricata industrialmente applicando rivestimenti o finiture a un supporto.", "primaryProcessing": "Produzione del nucleo, rivestimento, finitura e classificazione con denominazione esplicita di imitazione di perla.", "caveat": "Non è una perla naturale o coltivata e la parola perla deve essere accompagnata chiaramente da imitazione."}
+      ],
+      "sources": [
+        {"title": "GIA — Laboratory Growth of Gem Materials", "url": "https://www.gia.edu/gems-gemology/summer-2024-colored-stones-unearthed0", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "CIBJO — Industry Standards Resources", "url": "https://cibjo.org/industry-standards-resources/", "authority": "World Jewellery Confederation — CIBJO", "verifiedAt": "3 agosto 2026", "status": "verificata"},
+        {"title": "GIA — How GIA Identifies Colored Stones", "url": "https://www.gia.edu/gem-lab-how-gia-identifies-colored-stone", "authority": "Gemological Institute of America", "verifiedAt": "3 agosto 2026", "status": "verificata"}
+      ]
+    }
+  ]
+}

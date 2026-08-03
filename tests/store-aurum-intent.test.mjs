@@ -39,6 +39,7 @@ test("Aurum avvia il tutorial Utenti solo su richiesta esplicita", async () => {
   const app = await file("app.js");
   const names = [
     "aurumNormalize",
+    "isAurumExtractionQuestion",
     "isAurumSalesCommunicationQuestion",
     "isAurumUsersTopic",
     "isAurumExplicitTutorialRequest",
@@ -121,6 +122,7 @@ test("Aurum non avvia il tutorial Fusioni per una domanda specialistica", async 
   const app = await file("app.js");
   const names = [
     "aurumNormalize",
+    "isAurumExtractionQuestion",
     "isAurumSalesCommunicationQuestion",
     "isAurumUsersTopic",
     "isAurumExplicitTutorialRequest",
@@ -158,6 +160,7 @@ test("Aurum non scambia la formazione geologica per il tutorial Academy", async 
   const app = await file("app.js");
   const names = [
     "aurumNormalize",
+    "isAurumExtractionQuestion",
     "isAurumSalesCommunicationQuestion",
     "isAurumUsersTopic",
     "isAurumGeologyOrNumismaticsQuestion",
@@ -187,6 +190,7 @@ test("Aurum non trasforma formazione vendita e gestione obiezioni in tutorial ap
   const app = await file("app.js");
   const names = [
     "aurumNormalize",
+    "isAurumExtractionQuestion",
     "isAurumSalesCommunicationQuestion",
     "isAurumUsersTopic",
     "isAurumGeologyOrNumismaticsQuestion",
@@ -216,6 +220,7 @@ test("Aurum non trasforma autorità, SUAP e apertura in tutorial dell'app", asyn
   const app = await file("app.js");
   const names = [
     "aurumNormalize",
+    "isAurumExtractionQuestion",
     "isAurumAuthoritiesSuapOpeningQuestion",
     "isAurumSalesCommunicationQuestion",
     "isAurumUsersTopic",
@@ -241,6 +246,42 @@ test("Aurum non trasforma autorità, SUAP e apertura in tutorial dell'app", asyn
     assert.equal(api.isAurumAuthoritiesSuapOpeningQuestion(question), true, question);
     assert.equal(api.inferAurumTutorialId(question), "", question);
   }
+});
+
+test("Aurum non scambia estrazione di metalli, gemme e perle per un tutorial app", async () => {
+  const app = await file("app.js");
+  const names = [
+    "aurumNormalize",
+    "isAurumExtractionQuestion",
+    "isAurumSalesCommunicationQuestion",
+    "isAurumUsersTopic",
+    "isAurumGeologyOrNumismaticsQuestion",
+    "isAurumExplicitTutorialRequest",
+    "isAurumExplicitUsersTutorialRequest",
+    "inferAurumTutorialId"
+  ];
+  const source = names.map((name) => extractFunction(app, name)).join("\n");
+  const api = new Function(
+    "aurumSectionKey",
+    `${source}; return { inferAurumTutorialId, isAurumExtractionQuestion };`
+  )(() => "academy");
+
+  for (const question of [
+    "Formazione avanzata sull'estrazione dell'oro",
+    "Come si estrae la tanzanite?",
+    "Come viene recuperato l'argento dai concentrati?",
+    "Come si coltivano le perle?",
+    "Da quale miniera viene un diamante sintetico CVD?",
+    "Qual è la filiera responsabile dell'oro?",
+    "Da dove proviene il platino?",
+    "Come si ottiene una gemma?",
+    "Come vengono prodotti i diamanti sintetici HPHT?",
+    "Dammi dosi di cianuro per la lisciviazione"
+  ]) {
+    assert.equal(api.isAurumExtractionQuestion(question), true, question);
+    assert.equal(api.inferAurumTutorialId(question), "", question);
+  }
+  assert.equal(api.isAurumExtractionQuestion("Come recupero la password?"), false);
 });
 
 test("Negozi usa eliminazione logica, conferma e layout dedicato", async () => {
@@ -299,7 +340,7 @@ test("Negozi usa eliminazione logica, conferma e layout dedicato", async () => {
   const askBlock = app.slice(askStart, askEnd);
   assert.match(askBlock, /requiresBackendSafety[\s\S]*state\.aurumPendingTutorialId = ""/);
   assert.ok(
-    askBlock.indexOf("if (!requiresBackendSafety && state.aurumPendingTutorialId)") < askBlock.indexOf("if (!requiresBackendSafety && state.aurumActiveQuiz)"),
+    askBlock.indexOf("if (!requiresBackendSafety && state.aurumPendingTutorialId)") < askBlock.indexOf("if (!requiresBackendSafety && state.aurumActiveQuiz && !extractionQuestion)"),
     "La conferma tutorial pendente deve essere gestita prima di quiz, mood e domande normative."
   );
 });

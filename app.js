@@ -220,7 +220,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260803-aurum-autorita-suap-18";
+const OROACTIVE_CLIENT_BUILD_ID = "20260803-aurum-estrazione-19";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
@@ -9786,6 +9786,24 @@ function isAurumFoundryQuestion(question = "") {
   return !isAurumExplicitTutorialRequest(question);
 }
 
+function isAurumExtractionQuestion(question = "") {
+  const normalized = aurumNormalize(question);
+  if (!normalized) return false;
+  const specialistMarker = /\b(?:ciclo minerario|esplorazione mineraria|sviluppo minerario|chiusura mineraria|risors[a-z]* minerar[a-z]*|riserv[a-z]* minerar[a-z]*|miniera|miniere|beneficiament[a-z]*|recupero metallurgico|flottazion[a-z]*|bilancio di massa|metal accounting|assay|qaqc|tailings|sterili minerari|rifiuti estrattivi|gistm|asm|asgm|estrazione artigianale|perlicoltura|origine mineraria|catena di custodia mineraria)\b/.test(normalized);
+  const extractionMarker = /\b(?:estr[a-z]*|miniera|miniere|coltivazione mineraria|cava|cave|grezzo minerario)\b/.test(normalized);
+  const materialMarker = /\b(?:oro|argento|platino|palladio|pge|pgm|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|rubino|zaffir[a-z]*|spinello|granat[a-z]*|rodolite|tsavorite|demantoide|alessandrite|crisoberillo|smeraldo|acquamarina|morganite|eliodoro|goshenite|tormalina|rubellite|indicolite|paraiba|topazio|quarzo|ametista|citrino|prasiolite|calcedonio|agata|onice|zircone|tanzanite|peridoto|opale|pietra di luna|labradorite|giada|giadeite|nefrite|turchese|lapislazzuli|lapis lazuli|malachite|moissanite|zirconia cubica)\b/.test(normalized);
+  const organicCollection = /\b(?:raccogl[a-z]*|raccol[a-z]*|coltiv[a-z]*|allev[a-z]*|acquacoltura|pesca|provenienza)\b.*\b(?:perla|perle|corallo|ambra)\b/.test(normalized)
+    || /\b(?:perla|perle|corallo|ambra)\b.*\b(?:raccogl[a-z]*|raccol[a-z]*|coltiv[a-z]*|allev[a-z]*|acquacoltura|pesca|provenienza)\b/.test(normalized);
+  const nonExtractedMaterial = /\b(?:sintetic[a-z]*|hpht|cvd|simulant[a-z]*|imitazion[a-z]*|doppiett[a-z]*|triplett[a-z]*|assemblat[a-z]*|trattat[a-z]*)\b/.test(normalized)
+    && /\b(?:estrazion[a-z]*|estrarre|miniera|miniere|proviene|origine|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*|cresciut[a-z]*)\b/.test(normalized);
+  const recoveryMarker = /\b(?:recuper[a-z]*|concentrat[a-z]*)\b.*\b(?:oro|argento|platino|palladio|pge|pgm|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|miner[a-z]*|metall[a-z]*|grezzo|feed|tailings|impiant[a-z]*)\b/.test(normalized)
+    || /\b(?:oro|argento|platino|palladio|pge|pgm|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|miner[a-z]*|metall[a-z]*|grezzo|feed|tailings|impiant[a-z]*)\b.*\b(?:recuper[a-z]*|concentrat[a-z]*)\b/.test(normalized);
+  const sourcingMarker = /\b(?:approvvigion[a-z]*|filiera|provenienza|proviene|origine|ottien[a-z]*|ottenere|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*)\b.*\b(?:oro|argento|platino|palladio|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|perla|perle|corallo|ambra)\b/.test(normalized)
+    || /\b(?:oro|argento|platino|palladio|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|perla|perle|corallo|ambra)\b.*\b(?:approvvigion[a-z]*|filiera|provenienza|proviene|origine|ottien[a-z]*|ottenere|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*)\b/.test(normalized);
+  const hazardousExtractionMarker = /\b(?:lisciviazion[a-z]*|cianurazion[a-z]*|cianuro|mercurio|amalgam[a-z]*|brillament[a-z]*|esplosiv[a-z]*)\b/.test(normalized);
+  return specialistMarker || organicCollection || nonExtractedMaterial || recoveryMarker || sourcingMarker || hazardousExtractionMarker || (extractionMarker && materialMarker);
+}
+
 function isAurumSalesCommunicationQuestion(question = "") {
   const normalized = aurumNormalize(question);
   if (!normalized) return false;
@@ -10067,7 +10085,7 @@ function explainAurumField(fieldKey = "") {
 
 function inferAurumTutorialId(question = "") {
   const normalized = aurumNormalize(question);
-  if (isAurumSalesCommunicationQuestion(question)) return "";
+  if (isAurumSalesCommunicationQuestion(question) || isAurumExtractionQuestion(question)) return "";
   if (/(copia cliente|stampa cliente|stampare.*cliente|pdf cliente)/.test(normalized)) return "tutorial_stampa_copia_cliente";
   if (/(copia aziendale|stampa aziendale|stampare.*aziendale|pdf aziendale)/.test(normalized)) return "tutorial_stampa_copia_aziendale";
   if (/(elenco|archivio|lista atti|atti creati)/.test(normalized)) return "tutorial_elenco_atti";
@@ -11504,11 +11522,13 @@ function aurumContextPayload(question) {
   const professionalGoldQuestion = isAurumProfessionalGoldQuestion(question);
   const foundryQuestion = isAurumFoundryQuestion(question);
   const authoritiesSuapQuestion = isAurumAuthoritiesSuapOpeningQuestion(question);
+  const extractionQuestion = isAurumExtractionQuestion(question);
   const salesQuestion = isAurumSalesCommunicationQuestion(question)
     && !accountingQuestion
     && !professionalGoldQuestion
     && !foundryQuestion
-    && !authoritiesSuapQuestion;
+    && !authoritiesSuapQuestion
+    && !extractionQuestion;
   const normativeQuestion = authoritiesSuapQuestion || (!salesQuestion && isAurumNormativeQuestion(question)) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
   const wantsCurrentWebVerification = normativeQuestion
     || /(aggiornat|attuale|vigente|ultima|ultimo|novit|oggi|web|internet|cerca|verifica)/i.test(String(question || ""));
@@ -11543,6 +11563,7 @@ function aurumContextPayload(question) {
       },
       tutorialRequested: Boolean(tutorialId),
       tutorialId,
+      extractionQuestion,
       priceExplanationContext: isPriceExplanation ? state.aurumPriceContext : null,
       normativeContext: normativeQuestion ? {
         documenti: [
@@ -11591,6 +11612,7 @@ async function askAurum(event) {
   renderAurumMessages();
 
   const requiresBackendSafety = requiresAurumBackendSafety(question);
+  const extractionQuestion = isAurumExtractionQuestion(question);
   if (requiresBackendSafety) {
     state.aurumActiveQuiz = null;
     state.aurumPendingTutorialId = "";
@@ -11606,7 +11628,7 @@ async function askAurum(event) {
     state.aurumPendingTutorialId = "";
   }
 
-  if (!requiresBackendSafety && state.aurumActiveQuiz) {
+  if (!requiresBackendSafety && state.aurumActiveQuiz && !extractionQuestion) {
     evaluateAurumQuizAnswer(question);
     return;
   }
@@ -11619,7 +11641,8 @@ async function askAurum(event) {
     && !accountingQuestion
     && !professionalGoldQuestion
     && !foundryQuestion
-    && !authoritiesSuapQuestion;
+    && !authoritiesSuapQuestion
+    && !extractionQuestion;
   const normativeQuestion = authoritiesSuapQuestion || (!salesQuestion && isAurumNormativeQuestion(question)) || accountingQuestion || professionalGoldQuestion || foundryQuestion;
 
   if (!requiresBackendSafety && /(quiz|curiosita|curiosità|domanda compro oro|mettimi alla prova)/i.test(question)) {
@@ -11632,7 +11655,7 @@ async function askAurum(event) {
     return;
   }
 
-  if (!requiresBackendSafety && !normativeQuestion && !salesQuestion && handleAurumTutorRequest(question)) {
+  if (!requiresBackendSafety && !normativeQuestion && !salesQuestion && !extractionQuestion && handleAurumTutorRequest(question)) {
     return;
   }
 
@@ -11696,7 +11719,7 @@ function renderKnowledgeStatus() {
       <span>Ricerca: ${status.pgvector ? "pgvector attivo" : "fallback full-text attivo"}</span>
       <span>${status.fallback_full_text ? "Full-text PostgreSQL: attivo" : `Embeddings: ${status.embeddings ? "presenti" : "non presenti"}`}</span>
       <span>${status.sector_knowledge_loaded ? `Base settoriale Aurum ${escapeHtml(status.sector_knowledge_version || "")}: ${Number(status.sector_topics || 0)} argomenti verificati` : "Base settoriale Aurum non caricata"}</span>
-      <span>${status.sector_knowledge_verified_at ? `Fonti verificate: ${escapeHtml(status.sector_knowledge_verified_at)}` : ""}</span>
+      <span>${status.sector_knowledge_verified_at ? `Release base settoriale: ${escapeHtml(status.sector_knowledge_verified_at)}` : ""}</span>
       <span>${status.gemological_knowledge_loaded ? `Laboratorio Gemmologico: ${Number(status.gemological_materials || 0)} pietre e ${Number(status.gemological_tools || 0)} strumenti` : "Conoscenza gemmologica non caricata"}</span>
       <span>${status.accounting_knowledge_loaded ? `Commercialista e fiscalità compro oro: ${Number(status.accounting_topics || 0)} moduli verificati il ${escapeHtml(status.accounting_knowledge_verified_at || "")}` : "Conoscenza contabile e fiscale non caricata"}</span>
       <span>${status.professional_gold_knowledge_loaded ? `Operatori professionali in oro: ${Number(status.professional_gold_topics || 0)} moduli verificati il ${escapeHtml(status.professional_gold_knowledge_verified_at || "")}` : "Conoscenza OPO non caricata"}</span>
@@ -11705,6 +11728,7 @@ function renderKnowledgeStatus() {
       <span>${status.authorities_suap_knowledge_loaded ? `Autorità, controlli, SUAP e apertura: ${Number(status.authorities_suap_topics || 0)} moduli verificati il ${escapeHtml(status.authorities_suap_knowledge_verified_at || "")}` : "Conoscenza autorità, controlli e apertura non caricata"}</span>
       <span>${status.sales_knowledge_loaded ? `Vendita consulenziale etica: ${Number(status.sales_topics || 0)} moduli verificati il ${escapeHtml(status.sales_knowledge_verified_at || "")}` : "Conoscenza vendita consulenziale non caricata"}</span>
       <span>${status.geology_knowledge_loaded ? `Geologia dei preziosi: ${Number(status.geology_topics || 0)} moduli verificati il ${escapeHtml(status.geology_knowledge_verified_at || "")}` : "Conoscenza geologica non caricata"}</span>
+      <span>${status.extraction_knowledge_loaded ? `Estrazione e approvvigionamento responsabile: ${Number(status.extraction_topics || 0)} moduli, ${Number(status.extraction_materials_covered || 0)} materiali verificati il ${escapeHtml(status.extraction_knowledge_verified_at || "")}` : "Conoscenza estrattiva non caricata"}</span>
       <span>${status.gold_coin_catalog_loaded ? `Numismatica: ${Number(status.gold_coin_catalog_count || 0)} schede Elenco Monete e ${Number(status.numismatic_topics || 0)} moduli storico-metodologici` : "Catalogo numismatico Aurum non caricato"}</span>
       <span>${status.sale_deed_knowledge_loaded ? `Guida Atto di Vendita: ${Number(status.sale_deed_fields || 0)} campi (${Number(status.sale_deed_fields_implemented || 0)} implementati, ${Number(status.sale_deed_known_gaps || 0)} gap noti)` : "Guida Atto di Vendita non caricata"}</span>
       <span>${status.sale_deed_knowledge_verified_at ? `Guida atto verificata: ${escapeHtml(status.sale_deed_knowledge_verified_at)}` : ""}</span>

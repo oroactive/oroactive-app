@@ -29,7 +29,7 @@ const expectedTopicIds = [
 ];
 
 test("Aurum carica il nucleo specialistico autorità, controlli, SUAP e apertura", () => {
-  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.03-autorita-suap-apertura");
+  assert.equal(AURUM_SECTOR_KNOWLEDGE.knowledgeVersion, "2026.08.03-estrazione-preziosi-gemme");
   assert.equal(AURUM_SECTOR_KNOWLEDGE.verifiedAt, "3 agosto 2026");
   const topics = new Map(AURUM_SECTOR_KNOWLEDGE.topics.map((topic) => [topic.id, topic]));
   expectedTopicIds.forEach((id) => {

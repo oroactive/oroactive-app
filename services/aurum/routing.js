@@ -32,6 +32,13 @@ export function hasStrongComproOroSectorIntent(question = "", sectorMatches = []
     || /\b(?:fusione|affinazione|saggio|campionamento|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b.*\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b/.test(normalized)
     || /\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b.*\b(?:fusione|affinazione|saggio|campionamento|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b/.test(normalized);
   if (!requestsAppTutorial && hasFoundrySpecialistMarker && sectorScore >= 24) return true;
+  const hasExtractionSpecialistMarker = /\b(?:estr[a-z]*|miniera|miniere|beneficiament[a-z]*|recuper[a-z]*|concentrat[a-z]*|flottazion[a-z]*|bilancio di massa|metal accounting|assay|qaqc|tailings|sterili|gistm|asm|asgm|perlicoltura|origine mineraria)\b/.test(normalized)
+    || /\b(?:raccogl[a-z]*|raccol[a-z]*|coltiv[a-z]*|allev[a-z]*|pesca)\b.*\b(?:perla|perle|corallo|ambra)\b/.test(normalized)
+    || /\b(?:perla|perle|corallo|ambra)\b.*\b(?:raccogl[a-z]*|raccol[a-z]*|coltiv[a-z]*|allev[a-z]*|pesca)\b/.test(normalized)
+    || /\b(?:approvvigion[a-z]*|filiera|provenienza|proviene|origine|ottien[a-z]*|ottenere|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*)\b.*\b(?:oro|argento|platino|palladio|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|perla|perle|corallo|ambra)\b/.test(normalized)
+    || /\b(?:oro|argento|platino|palladio|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|perla|perle|corallo|ambra)\b.*\b(?:approvvigion[a-z]*|filiera|provenienza|proviene|origine|ottien[a-z]*|ottenere|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*)\b/.test(normalized)
+    || /\b(?:lisciviazion[a-z]*|cianurazion[a-z]*|cianuro|mercurio|amalgam[a-z]*|brillament[a-z]*|esplosiv[a-z]*)\b/.test(normalized);
+  if (hasExtractionSpecialistMarker && sectorScore >= 24) return true;
   const hasGeologyOrNumismaticMarker = /\b(?:geologia|geologico|giaciment[a-z]*|mineralizz[a-z]*|placer|alluvional[a-z]*|orogenic[a-z]*|epitermal[a-z]*|vms|sedex|kimberlit[a-z]*|lamproit[a-z]*|mantello|pge|bushveld|cromitite|numismatic[a-z]*|monet[a-z]* aure[a-z]*|ritrovament[a-z]* di monet[a-z]*|tesor[a-z]* monetal[a-z]*|ripostigli[a-z]*|hoard|dinasti[a-z]* tudor)\b/.test(normalized);
   if (hasGeologyOrNumismaticMarker && sectorScore >= 24) return true;
   const hasConsultativeSalesMarker = /\b(?:vendita consulenziale|persuasion[a-z]*|obiezion[a-z]*|gestisc[a-z]*.{0,30}obiezion[a-z]*|negoziazion[a-z]*|closing|chiusura consensuale|prova sociale|falsa urgenza|dark pattern|client[a-z]* vulnerabil[a-z]*|role ?play.{0,30}vendit[a-z]*|formazione avanzata.{0,30}vendit[a-z]*)\b/.test(normalized)

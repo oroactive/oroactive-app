@@ -113,7 +113,7 @@ test("le domande di fonderia usano il percorso specialistico sicuro", () => {
 test("la vendita consulenziale usa conoscenza dedicata e un gate anti-coercizione", () => {
   assert.match(appSource, /function isAurumSalesCommunicationQuestion/);
   assert.match(appSource, /salesQuestion \? "sales_consultation"/);
-  assert.match(appSource, /!normativeQuestion && !salesQuestion && handleAurumTutorRequest/);
+  assert.match(appSource, /!normativeQuestion && !salesQuestion && !extractionQuestion && handleAurumTutorRequest/);
   assert.match(appSource, /blockMemoryBySafety/);
   assert.match(serverSource, /function isCustomerSalesCommunicationQuestion/);
   assert.match(serverSource, /classifySalesCommunicationSafety\(domanda\)/);

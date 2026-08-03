@@ -123,9 +123,9 @@ test("la sicurezza backend prevale sempre su quiz, umore e tutorial locali", () 
   assert.ok(askBlock);
   assert.match(askBlock, /const requiresBackendSafety = requiresAurumBackendSafety\(question\)/);
   assert.match(askBlock, /if \(requiresBackendSafety\) \{[\s\S]*?state\.aurumActiveQuiz = null/);
-  assert.match(askBlock, /if \(!requiresBackendSafety && state\.aurumActiveQuiz\)/);
+  assert.match(askBlock, /if \(!requiresBackendSafety && state\.aurumActiveQuiz && !extractionQuestion\)/);
   assert.match(askBlock, /!requiresBackendSafety && handleAurumMoodReply\(question\)/);
-  assert.match(askBlock, /!requiresBackendSafety && !normativeQuestion && !salesQuestion && handleAurumTutorRequest\(question\)/);
+  assert.match(askBlock, /!requiresBackendSafety && !normativeQuestion && !salesQuestion && !extractionQuestion && handleAurumTutorRequest\(question\)/);
 });
 
 test("il client non propone il salvataggio di salute, crisi o categorie particolari", () => {

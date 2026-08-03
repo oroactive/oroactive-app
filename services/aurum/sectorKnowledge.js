@@ -7,7 +7,8 @@ const knowledgeFilePaths = [
   path.resolve(__dirname, "../../assets/aurum-knowledge/sector/compro-oro-knowledge.json"),
   path.resolve(__dirname, "../../assets/aurum-knowledge/sector/geology-numismatics-knowledge.json"),
   path.resolve(__dirname, "../../assets/aurum-knowledge/sector/sales-communication-knowledge.json"),
-  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/authorities-suap-opening-knowledge.json")
+  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/authorities-suap-opening-knowledge.json"),
+  path.resolve(__dirname, "../../assets/aurum-knowledge/sector/extraction-gems-knowledge.json")
 ];
 
 function loadKnowledge() {
@@ -28,6 +29,14 @@ function loadKnowledge() {
     ids.add(topic.id);
     if (!topic.title || !topic.category || !topic.summary) throw new Error(`Topic Aurum incompleto: ${topic.id}`);
     if (!Array.isArray(topic.sources) || !topic.sources.length) throw new Error(`Topic Aurum senza fonti: ${topic.id}`);
+    if (topic.materials !== undefined && !Array.isArray(topic.materials)) {
+      throw new Error(`Profili materiali Aurum non validi: ${topic.id}`);
+    }
+    for (const material of topic.materials || []) {
+      if (!material?.slug || !material?.name || !material?.classification || !material?.occurrence || !material?.extraction || !material?.primaryProcessing || !material?.caveat) {
+        throw new Error(`Profilo estrattivo Aurum incompleto nel topic ${topic.id}: ${material?.slug || "senza-slug"}`);
+      }
+    }
     for (const source of topic.sources) {
       if (!source?.title || !source?.url || !/^https:\/\//i.test(source.url)) {
         throw new Error(`Fonte Aurum non valida nel topic ${topic.id}`);
@@ -87,6 +96,18 @@ const queryAliases = new Map([
   ["preposto", ["sede operativa", "variazione oam", "questura", "conto dedicato"]],
   ["refurtiva", ["carabinieri", "polizia giudiziaria", "ricettazione", "provenienza preziosi"]],
   ["nspv", ["nucleo speciale polizia valutaria", "uif", "sos", "guardia di finanza"]],
+  ["estrazione", ["miniera", "coltivazione mineraria", "recupero", "beneficiamento", "grezzo"]],
+  ["estrarre", ["estrazione", "miniera", "recupero", "grezzo"]],
+  ["estratto", ["estrazione", "miniera", "origine mineraria", "grezzo"]],
+  ["miniera", ["estrazione", "giacimento", "coltivazione", "recupero minerario"]],
+  ["miniere", ["estrazione", "giacimenti", "coltivazione", "recupero minerario"]],
+  ["beneficiamento", ["comminuzione", "concentrazione", "recupero metallurgico", "minerale"]],
+  ["assay", ["analisi", "campionamento", "qaqc", "tenore"]],
+  ["qaqc", ["campionamento", "blank", "materiale di riferimento", "duplicati", "assay"]],
+  ["tailings", ["sterili", "residui minerari", "acque", "chiusura miniera"]],
+  ["asm", ["estrazione artigianale", "piccola scala", "due diligence", "origine mineraria"]],
+  ["perlicoltura", ["perla coltivata", "allevamento molluschi", "raccolta perle", "acquacoltura"]],
+  ["grezzo", ["rough", "estrazione", "cernita", "lotto", "tracciabilita"]],
   ["privacy", ["gdpr", "dati personali", "sicurezza"]],
   ["acido", ["pietra di paragone", "corrosivo", "sds"]],
   ["bilancia", ["metrologia", "pesatura", "verificazione"]],
@@ -207,13 +228,24 @@ function sectorTokenSet(value = "") {
 const topicSearchIndex = AURUM_SECTOR_KNOWLEDGE.topics.map((topic) => {
   const title = normalizeSectorKnowledgeText(topic.title);
   const category = normalizeSectorKnowledgeText(topic.category);
-  const keywordPhrases = (topic.keywords || []).map(normalizeSectorKnowledgeText).filter(Boolean);
+  const materialPhrases = (topic.materials || []).flatMap((material) => [
+    material.name,
+    String(material.slug || "").replace(/-/g, " "),
+    ...(material.aliases || [])
+  ]).map(normalizeSectorKnowledgeText).filter(Boolean);
+  const keywordPhrases = [...(topic.keywords || []).map(normalizeSectorKnowledgeText), ...materialPhrases].filter(Boolean);
   const keywords = keywordPhrases.join(" ");
   const body = normalizeSectorKnowledgeText([
     topic.summary,
     ...(topic.facts || []),
     ...(topic.checklist || []),
-    ...(topic.warnings || [])
+    ...(topic.warnings || []),
+    ...(topic.materials || []).flatMap((material) => [
+      material.occurrence,
+      material.extraction,
+      material.primaryProcessing,
+      material.caveat
+    ])
   ].join(" "));
   return {
     topic,
@@ -244,7 +276,87 @@ function wholePhraseIncludes(text = "", phrase = "") {
   return Boolean(phrase) && ` ${text} `.includes(` ${phrase} `);
 }
 
+function hasExtractionKnowledgeIntent(normalizedQuery = "") {
+  const specialistMarker = /\b(?:estr[a-z]*|miniera|miniere|beneficiament[a-z]*|recupero metallurgico|flottazion[a-z]*|bilancio di massa|metal accounting|assay|qaqc|tailings|sterili minerari|rifiuti estrattivi|gistm|asm|asgm|estrazione artigianale|perlicoltura|origine mineraria|catena di custodia mineraria)\b/.test(normalizedQuery);
+  const recoveryMarker = /\b(?:recuper[a-z]*|concentrat[a-z]*)\b.*\b(?:oro|argento|platino|palladio|pge|pgm|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|miner[a-z]*|metall[a-z]*|grezzo|feed|tailings|impiant[a-z]*)\b/.test(normalizedQuery)
+    || /\b(?:oro|argento|platino|palladio|pge|pgm|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|miner[a-z]*|metall[a-z]*|grezzo|feed|tailings|impiant[a-z]*)\b.*\b(?:recuper[a-z]*|concentrat[a-z]*)\b/.test(normalizedQuery);
+  const sourcingMarker = /\b(?:approvvigion[a-z]*|filiera|provenienza|proviene|origine|ottien[a-z]*|ottenere|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*)\b.*\b(?:oro|argento|platino|palladio|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|perla|perle|corallo|ambra)\b/.test(normalizedQuery)
+    || /\b(?:oro|argento|platino|palladio|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|perla|perle|corallo|ambra)\b.*\b(?:approvvigion[a-z]*|filiera|provenienza|proviene|origine|ottien[a-z]*|ottenere|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*)\b/.test(normalizedQuery);
+  const hazardousExtractionMarker = /\b(?:lisciviazion[a-z]*|cianurazion[a-z]*|cianuro|mercurio|amalgam[a-z]*|brillament[a-z]*|esplosiv[a-z]*)\b/.test(normalizedQuery);
+  return specialistMarker || recoveryMarker || sourcingMarker || hazardousExtractionMarker
+    || /\b(?:raccogl[a-z]*|raccol[a-z]*|coltiv[a-z]*|allev[a-z]*|acquacoltura|pesca)\b.*\b(?:perla|perle|corallo|ambra)\b/.test(normalizedQuery)
+    || /\b(?:perla|perle|corallo|ambra)\b.*\b(?:raccogl[a-z]*|raccol[a-z]*|coltiv[a-z]*|allev[a-z]*|acquacoltura|pesca)\b/.test(normalizedQuery);
+}
+
 const topicIntentBoosts = [
+  {
+    pattern: /\b(?:estr[a-z]*|ottien[a-z]*|ottenere|produc[a-z]*|provien[a-z]*|provenienza|origine)\b.*\b(?:gemm[a-z]*|pietr[a-z]* prezios[a-z]*)\b|\b(?:gemm[a-z]*|pietr[a-z]* prezios[a-z]*)\b.*\b(?:estr[a-z]*|ottien[a-z]*|ottenere|produc[a-z]*|provien[a-z]*|provenienza|origine)\b/,
+    boosts: { "estrazione-ciclo-minerario-esplorazione-risorse": 760 }
+  },
+  {
+    pattern: /\b(?:esplorazion[a-z]*|sviluppo|progett[a-z]*)\b.*\b(?:miniera|miniere|risorsa|riserva)\b|\b(?:risorsa|riserva)\b.*\b(?:mineraria|miniera|prefattibilita|fattibilita)\b/,
+    boosts: { "estrazione-ciclo-minerario-esplorazione-risorse": 920 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|beneficiament[a-z]*|recuper[a-z]*|process[a-z]*|miniera|miniere)\b.*\boro\b|\boro\b.*\b(?:estr[a-z]*|beneficiament[a-z]*|recuper[a-z]*|miniera|miniere|free milling|refrattari[a-z]*)\b|\b(?:cianuro|mercurio)\b.*\b(?:oro|estr[a-z]*)\b/,
+    boosts: { "estrazione-oro-beneficiamento-recupero": 880 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|recuper[a-z]*|concentrat[a-z]*|sottoprodott[a-z]*|miniera|miniere)\b.*\bargento\b|\bargento\b.*\b(?:estr[a-z]*|recuper[a-z]*|concentrat[a-z]*|piombo|zinco|miniera|miniere)\b/,
+    boosts: { "estrazione-argento-sottoprodotto-concentrati": 900 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|recuper[a-z]*|concentr[a-z]*|flottazion[a-z]*|miniera|miniere|provien[a-z]*|provenienza|origine|ottien[a-z]*|ottenere)\b.*\b(?:platino|palladio|pge|pgm)\b|\b(?:platino|palladio|pge|pgm)\b.*\b(?:estr[a-z]*|recuper[a-z]*|concentr[a-z]*|flottazion[a-z]*|miniera|miniere|provien[a-z]*|provenienza|origine|ottien[a-z]*|ottenere)\b/,
+    boosts: { "estrazione-platino-pge-concentrazione": 920 }
+  },
+  {
+    pattern: /\b(?:qaqc|qa qc|assay|blank|crm|materiale di riferimento|duplicat[a-z]*)\b.*\b(?:miniera|minerari[a-z]*|campionament[a-z]*|tenore|laboratorio)\b|\b(?:campionament[a-z]*|testwork)\b.*\b(?:qaqc|assay|miniera|geometallurg[a-z]*)\b/,
+    boosts: { "estrazione-campionamento-assay-qaqc": 980 }
+  },
+  {
+    pattern: /\b(?:recupero metallurgico|bilancio di massa|metal accounting|mine to mill|riconciliazion[a-z]*|inventario di circuito)\b/,
+    boosts: { "estrazione-recuperi-bilancio-massa": 970 }
+  },
+  {
+    pattern: /\b(?:tailings|sterili|drenaggio acido|rifiuti estrattivi|gistm|chiusura)\b.*\b(?:miniera|miniere|minerar[a-z]*|acque|impianto)\b|\b(?:miniera|miniere|minerar[a-z]*)\b.*\b(?:tailings|sterili|acque|sicurezza|hse|chiusura)\b/,
+    boosts: { "estrazione-hse-acque-tailings-chiusura": 1_000 }
+  },
+  {
+    pattern: /\b(?:asm|asgm|estrazione artigianale|origine mineraria|oro responsabile|due diligence)\b.*\b(?:tracciabilit[a-z]*|catena di custodia|oro|gemm[a-z]*|mineral[a-z]*)\b|\b(?:tracciabilit[a-z]*|catena di custodia)\b.*\b(?:miniera|origine mineraria|asm|estrazione)\b/,
+    boosts: { "estrazione-responsabile-asm-tracciabilita": 1_020 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|recuper[a-z]*|miniera|miniere|recovery)\b.*\bdiamant[a-z]*\b|\bdiamant[a-z]*\b.*\b(?:estr[a-z]*|recuper[a-z]*|miniera|miniere|kimberlit[a-z]*|alluvional[a-z]*|marin[a-z]*|dms)\b/,
+    boosts: { "estrazione-diamanti-primari-secondari-recovery": 1_050 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|miniera|miniere|giaciment[a-z]*|placer)\b.*\b(?:rubino|zaffir[a-z]*|spinello|granat[a-z]*|almandino|piropo|rodolite|tsavorite|demantoide|alessandrite|crisoberillo)\b|\b(?:rubino|zaffir[a-z]*|spinello|granat[a-z]*|almandino|piropo|rodolite|tsavorite|demantoide|alessandrite|crisoberillo)\b.*\b(?:estr[a-z]*|miniera|miniere|giaciment[a-z]*|placer)\b/,
+    boosts: { "estrazione-gemme-corindoni-spinelli-granati": 1_000 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|miniera|miniere|giaciment[a-z]*|pegmatit[a-z]*)\b.*\b(?:smeraldo|acquamarina|morganite|eliodoro|goshenite|ametista|citrino|quarzo|prasiolite|calcedonio|agata|onice|topazio|tormalina|rubellite|indicolite|paraiba)\b|\b(?:smeraldo|acquamarina|morganite|eliodoro|goshenite|ametista|citrino|quarzo|prasiolite|calcedonio|agata|onice|topazio|tormalina|rubellite|indicolite|paraiba)\b.*\b(?:estr[a-z]*|miniera|miniere|giaciment[a-z]*|pegmatit[a-z]*)\b/,
+    boosts: { "estrazione-gemme-berilli-pegmatiti-quarzi": 1_000 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|miniera|miniere|giaciment[a-z]*|recuper[a-z]*)\b.*\b(?:zircone|tanzanite|peridoto|opale|pietra di luna|labradorite)\b|\b(?:zircone|tanzanite|peridoto|opale|pietra di luna|labradorite)\b.*\b(?:estr[a-z]*|miniera|miniere|giaciment[a-z]*|recuper[a-z]*)\b/,
+    boosts: { "estrazione-gemme-varie-zircone-tanzanite-opali": 1_000 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|miniera|miniere|cava|recuper[a-z]*)\b.*\b(?:giadeite|nefrite|giada|turchese|lapislazzuli|lapis lazuli|malachite)\b|\b(?:giadeite|nefrite|giada|turchese|lapislazzuli|lapis lazuli|malachite)\b.*\b(?:estr[a-z]*|miniera|miniere|cava|recuper[a-z]*)\b/,
+    boosts: { "estrazione-gemme-ornamentali-giade-turchese-lapislazzuli": 1_000 }
+  },
+  {
+    pattern: /\b(?:perla|perle|perlicoltura|ostric[a-z]* perlifera|mollusc[a-z]*)\b.*\b(?:estr[a-z]*|raccogl[a-z]*|raccolta|coltiv[a-z]*|allev[a-z]*|acquacoltura|natural[a-z]*)\b|\b(?:raccogl[a-z]*|raccolta|coltiv[a-z]*|allev[a-z]*)\b.*\bperle?\b/,
+    boosts: { "perle-naturali-coltivate-raccolta-filiera": 1_050 }
+  },
+  {
+    pattern: /\b(?:corallo|ambra)\b.*\b(?:estr[a-z]*|raccogl[a-z]*|raccolta|pesca|miniera|cava|cites|provenienza)\b|\b(?:estr[a-z]*|raccogl[a-z]*|raccolta|pesca|miniera|cava)\b.*\b(?:corallo|ambra)\b/,
+    boosts: { "materiali-organici-corallo-ambra-provenienza": 1_050 }
+  },
+  {
+    pattern: /\b(?:estr[a-z]*|miniera|miniere|giaciment[a-z]*|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*|cresciut[a-z]*|ottien[a-z]*)\b.*\b(?:sintetic[a-z]*|trattat[a-z]*|hpht|cvd|zirconia cubica|moissanite|vetro|pasta vitrea|doppiett[a-z]*|triplett[a-z]*|imitazion[a-z]*)\b|\b(?:sintetic[a-z]*|trattat[a-z]*|hpht|cvd|zirconia cubica|moissanite|doppiett[a-z]*|triplett[a-z]*|perla di imitazione)\b.*\b(?:estr[a-z]*|miniera|miniere|proviene|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*|cresciut[a-z]*|ottien[a-z]*)\b/,
+    boosts: { "materiali-non-estratti-sintetici-trattati-assemblati-simulanti": 1_100 }
+  },
   {
     pattern: /\b(?:quali?|chi|mappa|riparto|divid[a-z]*)\b.*\b(?:autorit[a-z]*|forze dell ordine|guardia di finanza|polizia|carabinieri)\b.*\b(?:compro oro|controll[a-z]*|competenz[a-z]*)\b|\b(?:autorit[a-z]*|forze dell ordine)\b.*\b(?:competenz[a-z]*|controll[a-z]*)\b.*\bcompro oro\b/,
     boosts: { "autorita-controlli-compro-oro-mappa-competenze": 800 }
@@ -516,6 +628,9 @@ const topicIntentBoosts = [
 ];
 
 function topicScore(entry, normalizedQuery, originalTerms, aliasTerms) {
+  if (entry.topic.category === "Estrazione e approvvigionamento responsabile" && !hasExtractionKnowledgeIntent(normalizedQuery)) {
+    return { score: 0, anchored: false };
+  }
   let score = 0;
   let anchored = false;
   let originalCoverage = 0;
@@ -602,18 +717,50 @@ export function sectorKnowledgeSources(matches = [], limit = 8) {
   return [...unique.values()].slice(0, Math.max(1, Math.min(12, Number(limit || 8))));
 }
 
-export function formatSectorKnowledgeContext(matches = []) {
+function matchingTopicMaterials(question = "", topic = {}) {
+  const normalized = normalizeSectorKnowledgeText(question);
+  if (!normalized) return [];
+  const queryTokenSet = sectorTokenSet(normalized);
+  return (topic.materials || []).filter((material) => [
+    material.name,
+    String(material.slug || "").replace(/-/g, " "),
+    ...(material.aliases || [])
+  ].map(normalizeSectorKnowledgeText).filter(Boolean).some((phrase) => {
+    if (wholePhraseIncludes(normalized, phrase)) return true;
+    const phraseTokens = sectorTokenSet(phrase);
+    return phraseTokens.size > 0 && [...phraseTokens].every((token) => queryTokenSet.has(token));
+  }));
+}
+
+function formatMaterialProfiles(materials = []) {
+  return materials.map((material) => [
+    `Profilo materiale richiesto: ${material.name} (${material.classification})`,
+    `Origine o giacimento: ${material.occurrence}`,
+    `Estrazione, raccolta o produzione: ${material.extraction}`,
+    `Prima lavorazione: ${material.primaryProcessing}`,
+    `Cautela: ${material.caveat}`
+  ].join("\n")).join("\n");
+}
+
+function topicVerificationLabel(topic = {}) {
+  const dates = [...new Set((topic.sources || []).map((source) => String(source.verifiedAt || "").trim()).filter(Boolean))];
+  return dates.length ? dates.join(", ") : AURUM_SECTOR_KNOWLEDGE.verifiedAt;
+}
+
+export function formatSectorKnowledgeContext(matches = [], question = "") {
   return matches.map(({ topic, score }, index) => {
     const sources = (topic.sources || []).map((source) => `${source.title} — ${source.url}`).join(" | ");
+    const materialProfiles = formatMaterialProfiles(matchingTopicMaterials(question, topic));
     return [
       `[Conoscenza settoriale ${index + 1}; id=${topic.id}; categoria=${topic.category}; punteggio=${score}]`,
       `Titolo: ${topic.title}`,
       `Sintesi: ${topic.summary}`,
+      materialProfiles,
       `Dati verificati: ${(topic.facts || []).join(" | ")}`,
       `Procedura: ${(topic.checklist || []).join(" | ")}`,
       `Limiti e avvertenze: ${(topic.warnings || []).join(" | ")}`,
       `Fonti: ${sources}`,
-      `Verificato il: ${AURUM_SECTOR_KNOWLEDGE.verifiedAt}`
+      `Fonti del topic verificate il: ${topicVerificationLabel(topic)}`
     ].filter(Boolean).join("\n");
   }).join("\n\n---\n\n");
 }
@@ -630,18 +777,20 @@ export function buildSectorKnowledgeAnswer(question = "", matches = searchSector
   const facts = (primary.facts || []).slice(0, 8);
   const checklist = (primary.checklist || []).slice(0, 6);
   const warnings = (primary.warnings || []).slice(0, 4);
+  const materialProfiles = matchingTopicMaterials(question, primary);
   const sources = sectorKnowledgeSources([primaryMatch], 8);
   const lines = [
     primary.title,
     "",
     primary.summary
   ];
+  if (materialProfiles.length) lines.push("", formatMaterialProfiles(materialProfiles));
   if (facts.length) lines.push("", "Dati verificati:", ...facts.map((fact) => `• ${fact}`));
   if (checklist.length) lines.push("", "Come operare:", ...checklist.map((step, index) => `${index + 1}. ${step}`));
   if (warnings.length) lines.push("", "Attenzione:", ...warnings.map((warning) => `• ${warning}`));
   lines.push(
     "",
-    `Fonti verificate il ${AURUM_SECTOR_KNOWLEDGE.verifiedAt}:`,
+    `Fonti verificate il ${topicVerificationLabel(primary)}:`,
     ...sources.map((source, index) => `${index + 1}. ${source.title} — ${source.url}`),
     "",
     primary.category === "Normativa e compliance"
@@ -654,6 +803,8 @@ export function buildSectorKnowledgeAnswer(question = "", matches = searchSector
             ? "Informazione professionale generale: fusione, saggio e affinazione richiedono impianto idoneo, personale formato e condizioni contrattuali verificate; non eseguire lavorazioni industriali in negozio."
             : primary.category === "Geologia dei preziosi"
               ? "Informazione geologica generale: presenza, mineralizzazione, risorsa e riserva non sono sinonimi. Provenienza, tenore e valore richiedono campionamento rappresentativo, analisi professionali e interpretazione di un geologo o laboratorio qualificato."
+              : primary.category === "Estrazione e approvvigionamento responsabile"
+                ? "Informazione professionale generale: estrazione, raccolta e trattamento richiedono titoli autorizzativi, progetto sito-specifico, personale formato, sicurezza, tutela ambientale e tracciabilità. Aurum non fornisce ricette, dosi o parametri per reagenti, esplosivi o impianti pericolosi."
               : primary.category === "Numismatica e storia"
                 ? "Informazione storico-numismatica generale: verifica sempre anno, zecca, variante, autenticità e stato di conservazione del singolo esemplare; il racconto storico non costituisce una stima economica."
                 : primary.category === "Vendita consulenziale e comunicazione"

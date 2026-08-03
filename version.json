@@ -3,11 +3,11 @@
   "app": "OroActive",
   "commit": "unknown",
   "shortCommit": "unknown",
-  "buildNumber": "20260803-aurum-autorita-suap-18",
-  "buildTime": "2026-08-03T07:20:35.000Z",
+  "buildNumber": "20260803-aurum-estrazione-19",
+  "buildTime": "2026-08-03T08:30:34.000Z",
   "branch": "main",
   "environment": "development",
-  "assetBuildId": "20260803-aurum-autorita-suap-18",
+  "assetBuildId": "20260803-aurum-estrazione-19",
   "catalogCount": 197,
   "aurumGemMaterials": 61,
   "aurumGemTools": 21,
@@ -17,7 +17,9 @@
   "aurumNumismaticTopics": 3,
   "aurumSalesTopics": 12,
   "aurumSalesMode": "ethical-consultative",
-  "aurumSectorTopics": 96,
+  "aurumSectorTopics": 112,
   "aurumAuthoritiesSuapTopics": 11,
-  "aurumSectorKnowledgeVersion": "2026.08.03-autorita-suap-apertura"
+  "aurumExtractionTopics": 16,
+  "aurumExtractionMaterials": 61,
+  "aurumSectorKnowledgeVersion": "2026.08.03-estrazione-preziosi-gemme"
 }

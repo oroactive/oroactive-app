@@ -8710,6 +8710,16 @@ const trustedAssistantSourceDomains = [
   "oecd.org",
   "commission.europa.eu",
   "ahrq.gov",
+  "cim.org",
+  "cyanidecode.org",
+  "minamataconvention.org",
+  "ilo.org",
+  "unep.org",
+  "ec.europa.eu",
+  "kimberleyprocess.com",
+  "fao.org",
+  "cites.org",
+  "pgi.gov.pl",
   "pubmed.ncbi.nlm.nih.gov"
 ];
 
@@ -8826,6 +8836,24 @@ function isFoundryQuestion(question = "") {
     || /\b(?:oro|argento|metall[a-z]*|lega|leghe|lotto|compro oro|lombardia)\b.*\b(?:fusione|affinazione|campionamento|saggio|trattenuta|resa|separ[a-z]*|purific[a-z]*)\b/.test(normalized);
 }
 
+function isExtractionQuestion(question = "") {
+  const normalized = normalizeAssistantIntentText(question);
+  if (!normalized) return false;
+  const specialistMarker = /\b(?:ciclo minerario|esplorazione mineraria|sviluppo minerario|chiusura mineraria|risors[a-z]* minerar[a-z]*|riserv[a-z]* minerar[a-z]*|miniera|miniere|beneficiament[a-z]*|recupero metallurgico|flottazion[a-z]*|bilancio di massa|metal accounting|assay|qaqc|tailings|sterili minerari|rifiuti estrattivi|gistm|asm|asgm|estrazione artigianale|perlicoltura|origine mineraria|catena di custodia mineraria)\b/.test(normalized);
+  const extractionMarker = /\b(?:estr[a-z]*|miniera|miniere|coltivazione mineraria|cava|cave|grezzo minerario)\b/.test(normalized);
+  const materialMarker = /\b(?:oro|argento|platino|palladio|pge|pgm|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|rubino|zaffir[a-z]*|spinello|granat[a-z]*|rodolite|tsavorite|demantoide|alessandrite|crisoberillo|smeraldo|acquamarina|morganite|eliodoro|goshenite|tormalina|rubellite|indicolite|paraiba|topazio|quarzo|ametista|citrino|prasiolite|calcedonio|agata|onice|zircone|tanzanite|peridoto|opale|pietra di luna|labradorite|giada|giadeite|nefrite|turchese|lapislazzuli|lapis lazuli|malachite|moissanite|zirconia cubica)\b/.test(normalized);
+  const organicCollection = /\b(?:raccogl[a-z]*|raccol[a-z]*|coltiv[a-z]*|allev[a-z]*|acquacoltura|pesca|provenienza)\b.*\b(?:perla|perle|corallo|ambra)\b/.test(normalized)
+    || /\b(?:perla|perle|corallo|ambra)\b.*\b(?:raccogl[a-z]*|raccol[a-z]*|coltiv[a-z]*|allev[a-z]*|acquacoltura|pesca|provenienza)\b/.test(normalized);
+  const nonExtractedMaterial = /\b(?:sintetic[a-z]*|hpht|cvd|simulant[a-z]*|imitazion[a-z]*|doppiett[a-z]*|triplett[a-z]*|assemblat[a-z]*|trattat[a-z]*)\b/.test(normalized)
+    && /\b(?:estrazion[a-z]*|estrarre|miniera|miniere|proviene|origine|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*|cresciut[a-z]*)\b/.test(normalized);
+  const recoveryMarker = /\b(?:recuper[a-z]*|concentrat[a-z]*)\b.*\b(?:oro|argento|platino|palladio|pge|pgm|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|miner[a-z]*|metall[a-z]*|grezzo|feed|tailings|impiant[a-z]*)\b/.test(normalized)
+    || /\b(?:oro|argento|platino|palladio|pge|pgm|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|miner[a-z]*|metall[a-z]*|grezzo|feed|tailings|impiant[a-z]*)\b.*\b(?:recuper[a-z]*|concentrat[a-z]*)\b/.test(normalized);
+  const sourcingMarker = /\b(?:approvvigion[a-z]*|filiera|provenienza|proviene|origine|ottien[a-z]*|ottenere|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*)\b.*\b(?:oro|argento|platino|palladio|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|perla|perle|corallo|ambra)\b/.test(normalized)
+    || /\b(?:oro|argento|platino|palladio|diamant[a-z]*|gemm[a-z]*|pietr[a-z]*|perla|perle|corallo|ambra)\b.*\b(?:approvvigion[a-z]*|filiera|provenienza|proviene|origine|ottien[a-z]*|ottenere|produc[a-z]*|prodott[a-z]*|fabbric[a-z]*)\b/.test(normalized);
+  const hazardousExtractionMarker = /\b(?:lisciviazion[a-z]*|cianurazion[a-z]*|cianuro|mercurio|amalgam[a-z]*|brillament[a-z]*|esplosiv[a-z]*)\b/.test(normalized);
+  return specialistMarker || organicCollection || nonExtractedMaterial || recoveryMarker || sourcingMarker || hazardousExtractionMarker || (extractionMarker && materialMarker);
+}
+
 function isCustomerSalesCommunicationQuestion(question = "") {
   return classifySalesCommunicationSafety(question).level !== "none";
 }
@@ -8937,11 +8965,13 @@ async function askOroActiveAssistant(question = "", options = {}) {
   const professionalGoldQuestion = isProfessionalGoldQuestion(domanda);
   const foundryQuestion = isFoundryQuestion(domanda);
   const authoritiesSuapQuestion = isAuthoritiesSuapOpeningQuestion(domanda);
+  const extractionQuestion = isExtractionQuestion(domanda);
   const salesQuestion = (mode === "sales_consultation" || isCustomerSalesCommunicationQuestion(domanda))
     && !isAccountingQuestion
     && !professionalGoldQuestion
     && !foundryQuestion
-    && !authoritiesSuapQuestion;
+    && !authoritiesSuapQuestion
+    && !extractionQuestion;
   const responseSafety = salesQuestion ? salesSafety : coachingSafety;
   const isNormativeQuestion = authoritiesSuapQuestion
     || mode === "normativa_operativa"
@@ -9042,7 +9072,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     : sectorMatchesCandidate;
   const sectorAnswer = buildSectorKnowledgeAnswer(domanda, sectorMatches);
   const sectorSources = sectorKnowledgeSources(sectorMatches.slice(0, 3), 10);
-  const sectorContext = formatSectorKnowledgeContext(sectorMatches);
+  const sectorContext = formatSectorKnowledgeContext(sectorMatches, domanda);
   const hasSectorContext = sectorMatches.length > 0;
   const chunks = limitAssistantContext(await searchAiChunks(domanda));
   const hasBookContext = chunks.some((chunk) => !["note", "academy"].includes(chunk.metadata?.sourceType));
@@ -9099,9 +9129,13 @@ async function askOroActiveAssistant(question = "", options = {}) {
           ? "Modalita fonderia-raffinazione: rispondi prima al quesito specifico e poi presenta controlli, documenti e condizioni contrattuali. Distingui sempre fusione, omogeneizzazione, campionamento, saggio e affinazione; separa calo, resa pagabile, tariffa, ritenzione di metallo e spread sul fixing. Spiega che non esiste una percentuale universale trattenuta dalla fonderia. Per impianti e servizi indica data della verifica e differenzia impianto produttivo, sede commerciale e intermediario. Descrivi soltanto principi, attrezzature e materiali per categorie: non fornire ricette operative, quantità, temperature, concentrazioni o sequenze di reagenti pericolosi."
           : "Modalita normativa: la domanda riguarda norme, legge compro oro o antiriciclaggio. Prima rispondi alla domanda precisa, poi spiega cosa significa operativamente per OroActive. Distingui sempre OCO, OPO, obbligo legale e procedura interna."} Riferimenti locali disponibili:\n${JSON.stringify(normativeContext).slice(0, 3000)}\nRisposta deterministica verificata:\n${buildComproOroNormativeAnswer(domanda)}`
     : "";
+  const extractionText = extractionQuestion
+    ? "Modalita estrazione-mineraria-gemme-perle: rispondi prima sul materiale o sul processo richiesto e distingui geologia del giacimento, estrazione o raccolta, beneficiamento e prima lavorazione, recupero metallurgico e raffinazione. Distingui materiali minerari naturali, perle coltivate o naturali e altri materiali organici, da sintetici, simulanti, trattati e assemblati che non vengono estratti come tali. Per oro, argento, platino e PGE includi quando pertinente campionamento, assay, QA/QC, recupero e bilancio di massa. Per diamanti e gemme tratta selettività, conservazione del grezzo, recovery e tracciabilità senza promettere origine da una sola caratteristica. Per perle, corallo e ambra usa raccolta, acquacoltura o provenienza corretta e segnala i vincoli specie-specifici. Includi HSE, acque, sterili, tailings, chiusura, permessi e approvvigionamento responsabile. Non fornire ricette, dosi, temperature, concentrazioni, parametri impiantistici o sequenze operative per mercurio, cianuro, acidi, esplosivi, HPHT, CVD o altri processi pericolosi; limita la risposta a principi professionali e controlli. Non estendere il Kimberley Process oltre i diamanti grezzi e non presentare CITES come divieto generale per ogni corallo o ambra."
+    : "";
   const safePriceExplanationText = redactAssistantPersonalData(priceExplanationText, 10000);
   const safeSalesText = redactAssistantPersonalData(salesText, 10000);
   const safeNormativeText = redactAssistantPersonalData(normativeText, 10000);
+  const safeExtractionText = redactAssistantPersonalData(extractionText, 10000);
   const context = chunks.map((chunk, index) => (
     `[Fonte ${index + 1}: ${sanitizeAssistantUntrustedContext(aiChunkSourceLabel(chunk), 160)} - ${sanitizeAssistantUntrustedContext(chunk.titolo || "Knowledge base", 240)}, chunk ${chunk.chunk_index}]\n${sanitizeAssistantUntrustedContext(chunk.content, 5000)}`
   )).join("\n\n---\n\n");
@@ -9339,7 +9373,7 @@ async function askOroActiveAssistant(question = "", options = {}) {
     const client = openai;
     const result = await client.responses.create({
       model: openaiModel,
-      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Prima di rispondere devi capire l'intento reale della domanda: normativa, procedura, vendita consulenziale, geologia dei preziosi, numismatica, campo dell'app, prezzo, corso o supporto generale. Rispondi alla domanda dell'utente, non al campo visibile sullo schermo, salvo quando l'utente chiede esplicitamente "questo campo" o "spiegami il campo". Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}${isNormativeQuestion ? " Quando la domanda riguarda legge, normativa, decreti, antiriciclaggio o compro oro, rispondi prima con il riferimento normativo corretto e poi con gli effetti pratici per l'operatore. Non trasformare una domanda normativa in una spiegazione di un campo app." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, monete auree, gestione negozio, procedure operative e formazione operatori.`}
+      input: `${String(options.interface || "").includes("aurum") ? `Sei Aurum, assistente operativo intelligente di OroActive. Prima di rispondere devi capire l'intento reale della domanda: normativa, procedura, vendita consulenziale, geologia dei preziosi, estrazione e approvvigionamento responsabile, numismatica, campo dell'app, prezzo, corso o supporto generale. Rispondi alla domanda dell'utente, non al campo visibile sullo schermo, salvo quando l'utente chiede esplicitamente "questo campo" o "spiegami il campo". Aiuti gli utenti a usare l'app in modo preciso, pratico e sicuro. Devi comprendere la sezione in cui si trova l'utente, spiegare campi, pulsanti e procedure con passaggi chiari. Quando serve, genera tutorial passo-passo con titolo attività, obiettivo, prerequisiti, passaggi numerati, controlli, errori da evitare e cosa fare alla fine. Non dare risposte generiche. Non inventare funzioni o pulsanti non presenti nel contesto. Se non conosci una funzione, dillo e suggerisci di chiedere al founder. Se la richiesta riguarda dati sensibili dei clienti, mantieni privacy e limita il contesto. Adatta il livello della risposta al ruolo dell'utente.${mode === "price_explanation" ? " Quando spieghi un prezzo nella sezione Quotazione devi essere preciso, pratico e comprensibile. Devi spiegare il calcolo partendo dal prezzo puro di borsa, convertendolo in €/g, applicando la purezza della caratura o del titolo, poi sottraendo costi, fonderia, spread, buffer e margine target. Devi distinguere valore teorico, massimo pagabile, prezzo consigliato e miglior prezzo di mercato sostenibile. Devi spiegare anche perché la previsione indica rialzo, ribasso o lateralità, citando trend, medie mobili, volatilità e storico dati se disponibili. Se ci sono competitor, cita media, miglior competitor, fonte, evidence text disponibile, stato delle regole di estrazione guidata e motivo per cui non superare il massimo pagabile. Se una fonte non viene letta, spiega in modo operativo se mancano regole, URL leggibile, anchor, selettore, regex o prova testuale. Non promettere prezzi certi e non dare consulenza finanziaria." : ""}${isNormativeQuestion ? " Quando la domanda riguarda legge, normativa, decreti, antiriciclaggio o compro oro, rispondi prima con il riferimento normativo corretto e poi con gli effetti pratici per l'operatore. Non trasformare una domanda normativa in una spiegazione di un campo app." : ""}` : `Sei l'Assistente IA OroActive, esperto di compro oro, oro, argento, platino, diamanti, gemme, estrazione e approvvigionamento responsabile, monete auree, gestione negozio, procedure operative e formazione operatori.`}
 Rispondi sempre in italiano, in modo chiaro, pratico, professionale.
 Quando operi in coaching dichiara con chiarezza di essere un sistema IA, non un coach umano certificato e non un terapeuta. Ascolta e riformula prima di proporre soluzioni, chiedi quale esito sarebbe utile e poni una sola domanda aperta alla volta.
 Mantieni sempre autonomia e libertà decisionale dell'utente: non diagnosticare, non prescrivere, non promettere risultati, non esercitare pressione, non fare valutazioni occulte e non usare le confidenze per persuadere o profilare.
@@ -9375,6 +9409,9 @@ ${safeSalesText || "Nessun contesto vendita consulenziale specifico."}
 
 CONTESTO NORMATIVO AURUM:
 ${safeNormativeText || "Nessun contesto normativo specifico."}
+
+CONTESTO ESTRAZIONE, GEMME E PERLE AURUM:
+${safeExtractionText || "Nessuna modalità estrattiva specifica."}
 
 BASE SETTORIALE AURUM VERIFICATA:
 ${sectorContext || "Nessun argomento settoriale sufficientemente pertinente."}
@@ -9631,6 +9668,8 @@ async function aiAssistantStatus() {
   const foundryTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => foundryTopicIds.has(topic.id));
   const authoritiesSuapTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => authoritiesSuapTopicIds.has(topic.id));
   const geologyTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Geologia dei preziosi");
+  const extractionTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Estrazione e approvvigionamento responsabile");
+  const extractionMaterials = new Set(extractionTopics.flatMap((topic) => (topic.materials || []).map((material) => material.slug)));
   const numismaticTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Numismatica e storia");
   const salesCommunicationTopics = AURUM_SECTOR_KNOWLEDGE.topics.filter((topic) => topic.category === "Vendita consulenziale e comunicazione");
 
@@ -9666,6 +9705,10 @@ async function aiAssistantStatus() {
     geology_knowledge_loaded: geologyTopics.length === 5,
     geology_topics: geologyTopics.length,
     geology_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
+    extraction_knowledge_loaded: extractionTopics.length === 16 && extractionMaterials.size === 61,
+    extraction_topics: extractionTopics.length,
+    extraction_materials_covered: extractionMaterials.size,
+    extraction_knowledge_verified_at: AURUM_SECTOR_KNOWLEDGE.verifiedAt,
     numismatic_knowledge_loaded: numismaticTopics.length === 3 && AURUM_GOLD_COIN_CATALOG.coins.length === 197,
     numismatic_topics: numismaticTopics.length,
     gold_coin_catalog_loaded: AURUM_GOLD_COIN_CATALOG.coins.length === 197,
