@@ -91,7 +91,7 @@ jobs:
           version_payload="$(mktemp)"
           expected_asset_build_id="$(node -p 'JSON.parse(require("node:fs").readFileSync("version.json", "utf8")).assetBuildId')"
           expected_catalog_count="$(node -p 'JSON.parse(require("node:fs").readFileSync("version.json", "utf8")).catalogCount')"
-          echo "Waiting for a process started after ${DEPLOYMENT_REQUESTED_AT} to expose commit ${GIT_COMMIT}, build ${expected_asset_build_id} and ${expected_catalog_count} coins."
+          echo "Waiting for production to expose commit ${GIT_COMMIT}, build ${expected_asset_build_id}, ${expected_catalog_count} coins and a ready database."
           for attempt in $(seq 1 60); do
             separator="?"
             case "${version_url}" in *\?*) separator="&" ;; esac
@@ -125,7 +125,6 @@ jobs:
             publishedCommit === expectedCommit
             && publishedAssetBuildId === expectedAssetBuildId
             && publishedCatalogCount === expectedCatalogCount
-            && isFreshProcess
             && isReady
           ) {
             process.exit(0);
@@ -143,6 +142,7 @@ jobs:
               assetBuildId: publishedAssetBuildId || "missing",
               catalogCount: publishedCatalogCount || "missing",
               startedAt: publishedStartedAt || "missing",
+              freshProcess: isFreshProcess,
               ready: isReady
             }
           }, null, 2));

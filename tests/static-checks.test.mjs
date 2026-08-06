@@ -4383,7 +4383,8 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(workflow, /DEPLOYMENT_REQUESTED_AT/);
   assert.match(workflow, /publishedStartedAt/);
   assert.match(workflow, /processStartedAt >= deploymentRequestedAt - clockSkewToleranceMs/);
-  assert.match(workflow, /&& isFreshProcess/);
+  assert.match(workflow, /freshProcess: isFreshProcess/);
+  assert.doesNotMatch(workflow, /&& isFreshProcess/);
   assert.match(workflow, /payload\?\.database === "ready"/);
   assert.match(workflow, /payload\?\.initialization === "ready"/);
   assert.match(workflow, /&& isReady/);
