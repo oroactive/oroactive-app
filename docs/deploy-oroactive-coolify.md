@@ -8,7 +8,7 @@ Impostare in GitHub, nella repository, questi Secrets:
 
 - `COOLIFY_WEBHOOK`: webhook di deploy fornito da Coolify.
 - `COOLIFY_TOKEN`: token usato dal webhook Coolify.
-- `OROACTIVE_HEALTH_URL`: URL pubblico da verificare dopo il deploy, normalmente `https://app.oroactive.it/version.json`.
+- `OROACTIVE_HEALTH_URL`: URL pubblico della risorsa da verificare dopo il deploy, normalmente `https://app.oroactive.it/api/health`.
 - `OROACTIVE_EXPECTED_BRANCH`: ramo autorizzato al deploy, normalmente `main`.
 
 ## Build metadata in Coolify
@@ -43,8 +43,8 @@ In Coolify, nelle impostazioni avanzate della risorsa, abilita `Include Source C
 3. Controlla la sintassi di `app.js` e `server.js`.
 4. Esegue i test.
 5. Chiama il webhook Coolify usando solo i Secrets e impone `force=true`, così ogni commit ricostruisce l'immagine senza riusare la cache di una release precedente.
-6. Attende che il dominio pubblico esponga in `/version.json`, `/api/version` o `/api/health` lo stesso commit appena inviato.
-7. Verifica anche che `assetBuildId` coincida con il frontend creato e che `catalogCount` coincida con il catalogo atteso.
+6. Attende che `/api/health` esponga lo stesso commit appena inviato da un processo appena avviato.
+7. Verifica anche che database e inizializzazione siano pronti, che `assetBuildId` coincida con il frontend creato e che `catalogCount` coincida con il catalogo atteso.
 8. Termina con successo solo quando la produzione sta servendo commit, frontend e catalogo corretti.
 
 Se Coolify accetta il webhook ma il dominio continua a mostrare un commit vecchio, GitHub Actions fallisce. In quel caso il deploy non e completato, anche se la chiamata webhook ha restituito esito positivo.
@@ -60,13 +60,13 @@ Controllare nella stessa risorsa Coolify che serve `app.oroactive.it`:
 
 Non usare il webhook della risorsa `oroactive-site`: quella risorsa pubblica il sito `oroactive.it`, non il gestionale `app.oroactive.it`.
 
-La pagina `https://app.oroactive.it/version.json` deve infine mostrare lo stesso commit di GitHub, l'`assetBuildId` corrente e `catalogCount` pari al numero atteso dalla release. Un valore vecchio indica che il dominio sta ancora puntando a un container precedente.
+L'endpoint `https://app.oroactive.it/api/health` deve infine mostrare lo stesso commit di GitHub, l'`assetBuildId` corrente, `catalogCount` pari al numero atteso e gli stati `database` e `initialization` su `ready`. Un valore vecchio o non pronto indica che il dominio sta ancora puntando a un container precedente o che l'avvio non è concluso correttamente.
 
 ## PWA e iPad
 
 Il server invia `no-store` per HTML, manifest, service worker, `version.json` e API. Gli asset in `/assets/` e `/icons/` possono invece usare cache lunga.
 
-Il service worker usa una cache versionata, attiva subito la nuova versione e rimuove le cache OroActive precedenti. La navigazione resta network-first per evitare che l'iPad carichi una vecchia `index.html`.
+Il service worker usa una cache versionata e prepara la nuova versione senza attivarla mentre esistono dati non salvati. L'attivazione avviene dopo conferma dell'utente o quando il flusso è pulito; solo allora vengono rimosse le cache OroActive precedenti. La navigazione resta network-first per evitare che l'iPad carichi una vecchia `index.html`.
 
 Prima di caricare il codice principale, `index.html` confronta il proprio identificativo con `assetBuildId` del server. Se non coincidono, rimuove service worker e Cache Storage obsoleti e riapre la pagina con un URL univoco. Questo recupero conserva i dati applicativi e impedisce che una vecchia shell PWA continui a caricare asset superati dopo un deploy corretto.
 

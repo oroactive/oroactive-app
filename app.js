@@ -16,6 +16,7 @@ const state = {
   serverVersion: null,
   updateAvailable: false,
   serviceWorkerReloading: false,
+  serviceWorkerActivationAuthorized: false,
   appUpdateAutoReloading: false,
   actsCache: new Map(),
   archivePage: 1,
@@ -129,6 +130,7 @@ const state = {
   coinCatalogSearch: "",
   coinCatalogCountry: "",
   coinCatalogPurity: "",
+  coinCatalogVisibleCount: 24,
   coinSelectedId: "sterlina-oro-sovrana",
   coinIdentification: null,
   aurumBlocksConfig: null,
@@ -207,6 +209,8 @@ const state = {
   appUpdateBannerDismissed: false,
   appUpdateTimer: null,
   appUpdateLastCheckedAt: null,
+  appUpdateCheckPromise: null,
+  appVersionCheckerStarted: false,
   tutorial: {
     active: false,
     source: "",
@@ -220,8 +224,9 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260803-aurum-estrazione-19";
+const OROACTIVE_CLIENT_BUILD_ID = "20260806-hardening-performance-20";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
+const COIN_CATALOG_PAGE_SIZE = 24;
 
 const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy", "Firma operatore"];
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
@@ -262,17 +267,18 @@ const PRIVACY_POLICY_FALLBACK = {
 };
 const ENABLE_AURUM_MASCOT = true;
 const OROACTIVE_SPLASH_SESSION_KEY = "oroactive_splash_seen";
-const OROACTIVE_SPLASH_MIN_MS = 5000;
-const OROACTIVE_SPLASH_BRIEF_MS = 5000;
-const OROACTIVE_SPLASH_READY_MS = 180;
-const OROACTIVE_SPLASH_EXIT_MS = 430;
+const OROACTIVE_SPLASH_MIN_MS = 300;
+const OROACTIVE_SPLASH_BRIEF_MS = 120;
+const OROACTIVE_SPLASH_READY_MS = 60;
+const OROACTIVE_SPLASH_EXIT_MS = 140;
 const SESSION_RESTORE_TIMEOUT_MS = 8000;
 const BOOT_SPLASH_MAX_MS = 2000;
 const PERMISSIONS_BOOT_TIMEOUT_MS = 5000;
 const STORE_BOOT_TIMEOUT_MS = 5000;
 const NON_CRITICAL_MODULE_TIMEOUT_MS = 4000;
 const OROACTIVE_AUTH_DAY_KEY = "oroactive-auth-day";
-const OROACTIVE_UPDATE_INTERVAL_MS = 30000;
+const OROACTIVE_UPDATE_INTERVAL_MS = 900000;
+const OROACTIVE_UPDATE_RESUME_MIN_AGE_MS = 900000;
 const AURUM_SETTINGS_KEY = "oroactive-aurum-settings";
 const AURUM_FLOATING_POSITION_KEY = "aurum_floating_position";
 const AURUM_AVOID_EVENT = "aurum:avoid-elements-updated";
@@ -5444,7 +5450,7 @@ const apiBase = oroactiveConfig.apiBase || `${API_BASE_URL}/api`;
 const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const ACT_CACHE_TTL = 30000;
-const APP_VERSION_CHECK_INTERVAL_MS = 30000;
+const APP_VERSION_CHECK_INTERVAL_MS = 900000;
 const API_RETRY_ATTEMPTS = 3;
 const NOTIFICATION_POLL_INTERVAL_MS = 60000;
 const QUALITY_FLAG_POINTS = 1;
@@ -5594,7 +5600,8 @@ function registerServiceWorker() {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" }).then((registration) => {
       if (registration.waiting) {
-        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+        state.updateAvailable = true;
+        showAppUpdateBanner("Aggiornamento pronto. Salva il lavoro e scegli Aggiorna ora.");
       }
       registration.addEventListener("updatefound", () => {
         const worker = registration.installing;
@@ -5602,8 +5609,11 @@ function registerServiceWorker() {
         worker.addEventListener("statechange", () => {
           if (worker.state === "installed" && navigator.serviceWorker.controller) {
             state.updateAvailable = true;
-            worker.postMessage({ type: "SKIP_WAITING" });
-            showAppUpdateBanner("Aggiornamento pronto. Ricarica OroActive quando hai terminato l'operazione in corso.");
+            if (state.serviceWorkerActivationAuthorized && !syncDirtyState()) {
+              worker.postMessage({ type: "SKIP_WAITING" });
+            } else {
+              showAppUpdateBanner("Aggiornamento pronto. Salva il lavoro e scegli Aggiorna ora.");
+            }
           }
         });
       });
@@ -5613,6 +5623,11 @@ function registerServiceWorker() {
     });
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (state.serviceWorkerReloading) return;
+      if (!state.serviceWorkerActivationAuthorized || syncDirtyState()) {
+        state.updateAvailable = true;
+        showAppUpdateBanner("Aggiornamento pronto. Salva il lavoro e scegli Aggiorna ora.");
+        return;
+      }
       state.serviceWorkerReloading = true;
       window.location.reload();
     });
@@ -5659,8 +5674,9 @@ function appVersionKey(version = {}) {
   return [data.commit, data.buildNumber, data.buildTime, data.assetBuildId].join("|");
 }
 
-async function fetchAppVersion(path = "/api/version") {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+async function fetchAppVersion(path = "/version.json") {
+  const target = /^https?:\/\//i.test(path) ? path : `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  const response = await fetch(target, {
     cache: "no-store",
     headers: { Accept: "application/json", "Cache-Control": "no-cache" }
   });
@@ -5668,22 +5684,8 @@ async function fetchAppVersion(path = "/api/version") {
   return normalizeAppVersion(await response.json());
 }
 
-async function fetchLatestClientBuildId() {
-  const response = await fetch(`/app.js?v=${Date.now()}`, {
-    cache: "no-store",
-    headers: {
-      Accept: "application/javascript,text/javascript,*/*",
-      "Cache-Control": "no-cache"
-    }
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const source = await response.text();
-  const match = source.match(/const\s+OROACTIVE_CLIENT_BUILD_ID\s*=\s*"([^"]+)"/);
-  return match ? match[1] : "";
-}
-
 async function fetchClientVersion() {
-  const clientAssetVersion = {
+  return normalizeAppVersion({
     app: "OroActive",
     commit: OROACTIVE_CLIENT_BUILD_ID,
     shortCommit: OROACTIVE_CLIENT_BUILD_ID,
@@ -5693,13 +5695,7 @@ async function fetchClientVersion() {
     environment: "browser",
     assetBuildId: OROACTIVE_CLIENT_BUILD_ID,
     catalogCount: GOLD_COIN_CATALOG.length
-  };
-  try {
-    const version = await fetchAppVersion("/version.json");
-    return normalizeAppVersion({ ...version, ...clientAssetVersion });
-  } catch {
-    return normalizeAppVersion(clientAssetVersion);
-  }
+  });
 }
 
 async function ensureClientVersion() {
@@ -5744,7 +5740,13 @@ function isGoldCoinCatalogCurrent() {
 
 async function refreshStaleClientBuild(reason = "Aggiornamento app richiesto.") {
   if (state.appUpdateAutoReloading) return;
+  if (syncDirtyState()) {
+    state.appUpdateBannerDismissed = false;
+    showAppUpdateBanner("Aggiornamento disponibile. Salva la pratica prima di aggiornare.");
+    return;
+  }
   state.appUpdateAutoReloading = true;
+  state.serviceWorkerActivationAuthorized = true;
   showToast(`${reason}. Ricarico l'app aggiornata...`, "info");
   try {
     const registration = await navigator.serviceWorker?.getRegistration?.();
@@ -5757,7 +5759,16 @@ async function refreshStaleClientBuild(reason = "Aggiornamento app richiesto.") 
   } catch (error) {
     console.warn("Aggiornamento automatico app non completato", error);
   }
-  window.setTimeout(() => window.location.reload(), 600);
+  window.setTimeout(() => {
+    if (syncDirtyState()) {
+      state.appUpdateAutoReloading = false;
+      state.serviceWorkerActivationAuthorized = false;
+      state.appUpdateBannerDismissed = false;
+      showAppUpdateBanner("Aggiornamento pronto. Salva la pratica prima di ricaricare.");
+      return;
+    }
+    window.location.reload();
+  }, 600);
 }
 
 async function performAppUpdateReload() {
@@ -5766,6 +5777,7 @@ async function performAppUpdateReload() {
     showToast("Aggiornamento disponibile. Salva la pratica prima di aggiornare.", "warning");
     return false;
   }
+  state.serviceWorkerActivationAuthorized = true;
   if ("serviceWorker" in navigator) {
     const registrations = await navigator.serviceWorker.getRegistrations();
     for (const registration of registrations) {
@@ -5774,6 +5786,12 @@ async function performAppUpdateReload() {
     }
   }
   await clearOldOroactiveCaches();
+  if (syncDirtyState()) {
+    state.serviceWorkerActivationAuthorized = false;
+    state.appUpdateBannerDismissed = false;
+    showAppUpdateBanner("Aggiornamento pronto. Salva la pratica prima di ricaricare.");
+    return false;
+  }
   window.location.reload();
   return true;
 }
@@ -5837,13 +5855,11 @@ function versionDetailRow(label, value) {
 
 async function openAppVersionPreview() {
   if (!isFounder() || !previewModal || !previewBody || !previewTitle) return;
-  const [client, server, debug, latestClientBuildId] = await Promise.all([
+  const [client, server, debug] = await Promise.all([
     ensureClientVersion().catch(() => null),
-    fetchAppVersion("/api/version").catch(() => null),
-    appUpdateDebugInfo(),
-    fetchLatestClientBuildId().catch(() => "")
+    state.serverVersion ? Promise.resolve(state.serverVersion) : fetchAppVersion("/version.json").catch(() => null),
+    appUpdateDebugInfo()
   ]);
-  if (server && latestClientBuildId) server.assetBuildId = latestClientBuildId;
   if (server) state.serverVersion = server;
   const updated = Boolean(client && server && appVersionKey(client) === appVersionKey(server) && isGoldCoinCatalogCurrent());
   const status = client && server ? (updated ? "App aggiornata" : "Nuova versione disponibile") : "Impossibile verificare";
@@ -5854,7 +5870,7 @@ async function openAppVersionPreview() {
         ${versionDetailRow("Versione client", client?.buildNumber)}
         ${versionDetailRow("Versione server", server?.buildNumber)}
         ${versionDetailRow("Build app caricata", debug.clientBuildId)}
-        ${versionDetailRow("Build app disponibile", latestClientBuildId || server?.assetBuildId)}
+        ${versionDetailRow("Build app disponibile", server?.assetBuildId)}
         ${versionDetailRow("Catalogo monete", `${debug.catalogCoinCount}/${debug.expectedCatalogCoinCount}`)}
         ${versionDetailRow("Catalogo server", server?.catalogCount ? `${server.catalogCount} monete` : "non dichiarato")}
         ${versionDetailRow("Commit client", client?.shortCommit || client?.commit)}
@@ -5879,35 +5895,54 @@ async function openAppVersionPreview() {
   previewModal.hidden = false;
 }
 
+async function runAppUpdateCheck() {
+  const client = await ensureClientVersion();
+  const server = await fetchAppVersion("/version.json");
+  state.serverVersion = server;
+  state.appUpdateLastCheckedAt = new Date().toISOString();
+  if (!server.ok) return false;
+  const clientBuildStale = Boolean(server.assetBuildId && server.assetBuildId !== OROACTIVE_CLIENT_BUILD_ID);
+  const catalogStale = !isGoldCoinCatalogCurrent();
+  const serverCatalogStale = Boolean(server.catalogCount && server.catalogCount < EXPECTED_GOLD_COIN_CATALOG_COUNT);
+  const changed = clientBuildStale
+    || catalogStale
+    || serverCatalogStale
+    || Boolean(server.assetBuildId && appVersionKey(server) !== appVersionKey(client));
+  state.appUpdateAvailable = changed;
+  if (changed) {
+    const reason = catalogStale ? "Catalogo monete non aggiornato" : "Nuova versione OroActive disponibile";
+    state.appUpdateBannerDismissed = false;
+    showAppUpdateBanner(reason);
+  } else {
+    hideAppUpdateBanner();
+  }
+  return changed;
+}
+
+function appUpdateCheckIsFresh() {
+  const checkedAt = Date.parse(state.appUpdateLastCheckedAt || "");
+  return Number.isFinite(checkedAt) && Date.now() - checkedAt < OROACTIVE_UPDATE_RESUME_MIN_AGE_MS;
+}
+
 async function checkForAppUpdate(options = {}) {
+  const showResult = Boolean(options.showResult || options.manual);
   try {
-    const showResult = Boolean(options.showResult || options.manual);
-    const client = await ensureClientVersion();
-    const [server, latestClientBuildId] = await Promise.all([
-      fetchAppVersion("/api/version"),
-      fetchLatestClientBuildId().catch(() => "")
-    ]);
-    if (latestClientBuildId) server.assetBuildId = latestClientBuildId;
-    state.serverVersion = server;
-    state.appUpdateLastCheckedAt = new Date().toISOString();
-    if (!server.ok) return false;
-    const clientBuildStale = Boolean(latestClientBuildId && latestClientBuildId !== OROACTIVE_CLIENT_BUILD_ID);
-    const catalogStale = !isGoldCoinCatalogCurrent();
-    const serverCatalogStale = Boolean(server.catalogCount && server.catalogCount < EXPECTED_GOLD_COIN_CATALOG_COUNT);
-    const changed = clientBuildStale
-      || catalogStale
-      || serverCatalogStale
-      || Boolean(latestClientBuildId && appVersionKey(server) !== appVersionKey(client));
-    state.appUpdateAvailable = changed;
-    if (changed) {
-      const reason = catalogStale ? "Catalogo monete non aggiornato" : "Nuova versione OroActive disponibile";
-      state.appUpdateBannerDismissed = false;
-      showAppUpdateBanner(reason);
-      if (options.autoReload && !syncDirtyState() && !document.hidden) {
-        window.setTimeout(() => void refreshStaleClientBuild(reason), 900);
-      }
-    } else {
-      hideAppUpdateBanner();
+    if (!options.manual && !state.appUpdateCheckPromise && appUpdateCheckIsFresh()) {
+      return Boolean(state.appUpdateAvailable);
+    }
+    if (!state.appUpdateCheckPromise) {
+      const checkPromise = (async () => {
+        try {
+          return await runAppUpdateCheck();
+        } finally {
+          if (state.appUpdateCheckPromise === checkPromise) state.appUpdateCheckPromise = null;
+        }
+      })();
+      state.appUpdateCheckPromise = checkPromise;
+    }
+    const changed = await state.appUpdateCheckPromise;
+    if (changed && options.autoReload && !syncDirtyState() && !document.hidden) {
+      window.setTimeout(() => void refreshStaleClientBuild("Nuova versione OroActive disponibile"), 900);
     }
     if (showResult) {
       showToast(changed ? "Nuova versione OroActive disponibile." : "App aggiornata.", changed ? "warning" : "success");
@@ -5915,7 +5950,7 @@ async function checkForAppUpdate(options = {}) {
     }
     return changed;
   } catch {
-    if (options.showResult || options.manual) {
+    if (showResult) {
       showToast("Impossibile verificare l'aggiornamento app.", "error");
       await openAppVersionPreview();
     }
@@ -5924,14 +5959,12 @@ async function checkForAppUpdate(options = {}) {
 }
 
 function startAppVersionChecker() {
+  if (state.appVersionCheckerStarted) return;
+  state.appVersionCheckerStarted = true;
   ensureClientVersion().catch(() => null);
   checkForAppUpdate({ autoReload: true }).catch(() => null);
   window.clearInterval(state.appUpdateTimer);
   state.appUpdateTimer = window.setInterval(() => checkForAppUpdate({ autoReload: true }), OROACTIVE_UPDATE_INTERVAL_MS);
-  window.addEventListener("focus", () => checkForAppUpdate({ autoReload: true }));
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) checkForAppUpdate({ autoReload: true });
-  });
 }
 
 function renderAppVersionUi() {
@@ -6276,20 +6309,36 @@ function sanitizeForSave(value) {
   return value;
 }
 
+function resolveApiRequestAttempts(path = "", options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const retrySafeMethod = ["GET", "HEAD", "OPTIONS"].includes(method);
+  if (options.retry === false) return 1;
+  if (options.retries !== undefined) {
+    const explicitAttempts = Number(options.retries);
+    return Number.isFinite(explicitAttempts) ? Math.max(1, Math.floor(explicitAttempts)) : 1;
+  }
+  if (options.retry === true) return API_RETRY_ATTEMPTS;
+  return retrySafeMethod ? API_RETRY_ATTEMPTS : 1;
+}
+
 async function apiRequest(path, options = {}) {
   const headers = { "Content-Type": "application/json", "Cache-Control": "no-cache", ...(options.headers || {}) };
   if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
-  const attempts = Math.max(1, Number(options.retries ?? API_RETRY_ATTEMPTS));
+  const attempts = resolveApiRequestAttempts(path, options);
+  const { retries, retry, timeoutMs, ...fetchOptions } = options;
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), options.timeoutMs || 18000);
+    const abortFromCaller = () => controller.abort(options.signal?.reason);
+    if (options.signal?.aborted) abortFromCaller();
+    else options.signal?.addEventListener?.("abort", abortFromCaller, { once: true });
+    const timeout = window.setTimeout(() => controller.abort(), timeoutMs || 18000);
     try {
       const response = await fetch(`${apiBase}${path}`, {
+        ...fetchOptions,
         headers,
         cache: "no-store",
-        ...options,
-        signal: options.signal || controller.signal
+        signal: controller.signal
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -6314,6 +6363,7 @@ async function apiRequest(path, options = {}) {
       return response.status === 204 ? null : response.json();
     } catch (error) {
       lastError = error;
+      if (options.signal?.aborted) throw error;
       if (attempt < attempts && shouldRetryApi(error, error.status)) {
         await wait(350 * attempt);
         continue;
@@ -6324,6 +6374,7 @@ async function apiRequest(path, options = {}) {
       throw error;
     } finally {
       window.clearTimeout(timeout);
+      options.signal?.removeEventListener?.("abort", abortFromCaller);
     }
   }
   throw lastError || serverConnectionError();
@@ -8362,14 +8413,137 @@ function base64UrlToBytes(value) {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
-function randomChallenge() {
-  const challenge = new Uint8Array(32);
-  crypto.getRandomValues(challenge);
-  return challenge;
-}
-
 function webAuthnAvailable() {
   return window.PublicKeyCredential && navigator.credentials && window.isSecureContext;
+}
+
+function decodeCredentialDescriptors(descriptors = []) {
+  return descriptors.map((descriptor) => ({
+    ...descriptor,
+    id: base64UrlToBytes(descriptor.id)
+  }));
+}
+
+function decodeWebAuthnCreationOptions(options = {}) {
+  return {
+    ...options,
+    challenge: base64UrlToBytes(options.challenge),
+    user: {
+      ...options.user,
+      id: base64UrlToBytes(options.user.id)
+    },
+    excludeCredentials: decodeCredentialDescriptors(options.excludeCredentials || [])
+  };
+}
+
+function decodeWebAuthnRequestOptions(options = {}) {
+  const decoded = {
+    ...options,
+    challenge: base64UrlToBytes(options.challenge)
+  };
+  if (Array.isArray(options.allowCredentials)) {
+    decoded.allowCredentials = decodeCredentialDescriptors(options.allowCredentials);
+  }
+  return decoded;
+}
+
+function serializeWebAuthnRegistration(credential) {
+  const registrationResponse = credential?.response;
+  if (!credential?.rawId || !registrationResponse?.clientDataJSON || !registrationResponse?.attestationObject) {
+    throw new Error("Risposta di registrazione Face ID incompleta. Aggiorna Safari e riprova.");
+  }
+  const credentialId = bytesToBase64Url(credential.rawId);
+  return {
+    id: credentialId,
+    rawId: credentialId,
+    type: credential.type,
+    authenticatorAttachment: credential.authenticatorAttachment || undefined,
+    clientExtensionResults: credential.getClientExtensionResults?.() || {},
+    response: {
+      clientDataJSON: bytesToBase64Url(registrationResponse.clientDataJSON),
+      attestationObject: bytesToBase64Url(registrationResponse.attestationObject),
+      transports: registrationResponse.getTransports?.() || []
+    }
+  };
+}
+
+function serializeWebAuthnAssertion(credential) {
+  const assertionResponse = credential?.response;
+  if (!credential?.rawId || !assertionResponse?.clientDataJSON || !assertionResponse?.authenticatorData || !assertionResponse?.signature) {
+    throw new Error("Risposta Face ID incompleta. Riprova.");
+  }
+  const credentialId = bytesToBase64Url(credential.rawId);
+  const response = {
+    clientDataJSON: bytesToBase64Url(assertionResponse.clientDataJSON),
+    authenticatorData: bytesToBase64Url(assertionResponse.authenticatorData),
+    signature: bytesToBase64Url(assertionResponse.signature)
+  };
+  if (assertionResponse.userHandle) response.userHandle = bytesToBase64Url(assertionResponse.userHandle);
+  return {
+    id: credentialId,
+    rawId: credentialId,
+    type: credential.type,
+    authenticatorAttachment: credential.authenticatorAttachment || undefined,
+    clientExtensionResults: credential.getClientExtensionResults?.() || {},
+    response
+  };
+}
+
+function faceIdErrorMessage(error, fallback) {
+  if (error?.name === "NotAllowedError") return "Operazione Face ID annullata o scaduta.";
+  if (error?.name === "InvalidStateError") return "Face ID risulta già registrato su questo dispositivo.";
+  return cleanUserMessage(error?.message, fallback);
+}
+
+function requestCurrentPasswordForFaceId() {
+  return new Promise((resolve) => {
+    document.getElementById("faceIdPasswordConfirmation")?.remove();
+    const overlay = document.createElement("div");
+    overlay.id = "faceIdPasswordConfirmation";
+    overlay.className = "preview-modal";
+    overlay.innerHTML = `
+      <div class="preview-dialog" role="dialog" aria-modal="true" aria-labelledby="faceIdPasswordTitle" style="max-width:520px;height:auto;max-height:calc(100dvh - 48px);margin:max(24px, env(safe-area-inset-top)) auto;">
+        <div class="preview-topbar">
+          <h2 id="faceIdPasswordTitle">Conferma la tua identità</h2>
+          <button class="ghost-button" type="button" data-faceid-password-cancel aria-label="Annulla registrazione Face ID">Annulla</button>
+        </div>
+        <div class="preview-body">
+          <form class="settings-list" data-faceid-password-form>
+            <p>Inserisci la password corrente prima di registrare Face ID su questo dispositivo.</p>
+            <label>Password corrente
+              <input name="currentPassword" type="password" autocomplete="current-password" maxlength="512" required>
+            </label>
+            <button class="primary-button" type="submit">Continua</button>
+          </form>
+        </div>
+      </div>`;
+
+    const passwordInput = overlay.querySelector('input[name="currentPassword"]');
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      document.removeEventListener("keydown", handleEscape);
+      if (passwordInput) passwordInput.value = "";
+      overlay.remove();
+      resolve(value);
+    };
+    const handleEscape = (event) => {
+      if (event.key === "Escape") finish(null);
+    };
+    overlay.querySelector("[data-faceid-password-cancel]")?.addEventListener("click", () => finish(null));
+    overlay.querySelector("[data-faceid-password-form]")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const password = String(passwordInput?.value || "");
+      if (password) finish(password);
+    });
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) finish(null);
+    });
+    document.addEventListener("keydown", handleEscape);
+    document.body.appendChild(overlay);
+    window.setTimeout(() => passwordInput?.focus(), 0);
+  });
 }
 
 async function registerFaceId() {
@@ -8380,38 +8554,42 @@ async function registerFaceId() {
   }
 
   try {
-    const userId = new TextEncoder().encode(String(state.currentUser.id || displayUsername(state.currentUser)));
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        challenge: randomChallenge(),
-        rp: { name: "OroActive Gestionale" },
-        user: {
-          id: userId,
-          name: displayUsername(state.currentUser),
-          displayName: displayUsername(state.currentUser)
-        },
-        pubKeyCredParams: [
-          { type: "public-key", alg: -7 },
-          { type: "public-key", alg: -257 }
-        ],
-        authenticatorSelection: {
-          userVerification: "required",
-          residentKey: "preferred"
-        },
-        timeout: 60000
-      }
-    });
-    const credentialId = bytesToBase64Url(credential.rawId);
-    const data = await apiRequest("/auth/faceid/register", {
+    const currentPassword = await requestCurrentPasswordForFaceId();
+    if (!currentPassword) return;
+    const optionsData = await apiRequest("/auth/webauthn/register/options", {
       method: "POST",
-      body: JSON.stringify({ credentialId })
+      retries: 0,
+      timeoutMs: 10000,
+      body: JSON.stringify({ password: currentPassword })
     });
-    state.currentUser = data.user;
+    const credential = await navigator.credentials.create({
+      publicKey: decodeWebAuthnCreationOptions(optionsData.options)
+    });
+    if (!credential) throw new Error("Registrazione Face ID non completata.");
+    const registrationData = await apiRequest("/auth/webauthn/register/verify", {
+      method: "POST",
+      retries: 0,
+      timeoutMs: 10000,
+      body: JSON.stringify({ credential: serializeWebAuthnRegistration(credential) })
+    });
+    showToast("Conferma Face ID una seconda volta per attivare l'accesso sicuro.");
+    const proof = await navigator.credentials.get({
+      publicKey: decodeWebAuthnRequestOptions(registrationData.proofOptions)
+    });
+    if (!proof) throw new Error("Conferma Face ID non completata.");
+    const activationData = await apiRequest("/auth/webauthn/register/activate", {
+      method: "POST",
+      retries: 0,
+      timeoutMs: 10000,
+      body: JSON.stringify({ credential: serializeWebAuthnAssertion(proof) })
+    });
+    state.currentUser = { ...state.currentUser, ...(activationData.user || {}), hasFaceId: true };
     await saveDeviceStorage("oroactive-faceid-username", displayUsername(state.currentUser));
-    await saveDeviceStorage("oroactive-faceid-credential", credentialId);
-    showToast("Face ID registrato su questo dispositivo.");
+    await saveDeviceStorage("oroactive-faceid-credential", "");
+    renderProfileCard();
+    showToast("Face ID registrato e verificato in modo sicuro.");
   } catch (error) {
-    showToast(error.message || "Registrazione Face ID non completata.");
+    showToast(faceIdErrorMessage(error, "Registrazione Face ID non completata."));
   }
 }
 
@@ -8420,30 +8598,26 @@ async function loginWithFaceId() {
     loginMessage.textContent = "Face ID richiede HTTPS e un dispositivo compatibile.";
     return;
   }
-  const username = document.getElementById("loginUsername").value.trim() || await loadDeviceStorage("oroactive-faceid-username") || "";
-  const storedCredential = await loadDeviceStorage("oroactive-faceid-credential") || "";
-  if (!username || !storedCredential) {
-    loginMessage.textContent = "Prima accedi con password e registra il Face ID su questo dispositivo.";
-    return;
-  }
 
+  if (state.loggingIn) return;
+  state.loggingIn = true;
+  if (faceIdLoginButton) faceIdLoginButton.disabled = true;
+  loginMessage.textContent = "Conferma Face ID sul dispositivo…";
   try {
-    const credential = await navigator.credentials.get({
-      publicKey: {
-        challenge: randomChallenge(),
-        allowCredentials: [{
-          id: base64UrlToBytes(storedCredential),
-          type: "public-key"
-        }],
-        userVerification: "required",
-        timeout: 60000
-      }
-    });
-    const credentialId = bytesToBase64Url(credential.rawId);
-    const data = await apiRequest("/auth/faceid/login", {
+    const optionsData = await apiRequest("/auth/webauthn/login/options", {
       method: "POST",
-      body: JSON.stringify({ username, credentialId }),
-      timeoutMs: 8000
+      retries: 0,
+      timeoutMs: 10000
+    });
+    const credential = await navigator.credentials.get({
+      publicKey: decodeWebAuthnRequestOptions(optionsData.options)
+    });
+    if (!credential) throw new Error("Accesso Face ID non completato.");
+    const data = await apiRequest("/auth/webauthn/login/verify", {
+      method: "POST",
+      retries: 0,
+      body: JSON.stringify({ credential: serializeWebAuthnAssertion(credential) }),
+      timeoutMs: 10000
     });
     const token = data?.token || data?.session;
     if (!data?.user || !token) {
@@ -8460,16 +8634,21 @@ async function loginWithFaceId() {
       reportFrontendFailure("faceid session storage", storageError);
       state.authToken = token;
     });
-    await saveDeviceStorage("oroactive-faceid-username", username);
-    await saveDeviceStorage("oroactive-faceid-credential", credentialId);
+    await saveDeviceStorage("oroactive-faceid-username", displayUsername(state.currentUser));
+    await saveDeviceStorage("oroactive-faceid-credential", "");
+    loginMessage.textContent = "";
     await bootAuthenticatedApp("faceid");
     schedulePostLoginMenuGuard("faceid");
+    loginForm.reset();
   } catch (error) {
     loginMessage.textContent = error.status === 401
-      ? "Credenziali non valide"
+      ? "Face ID non riconosciuto. Accedi con password e registralo nuovamente."
       : error.isConnectionError
         ? "Connessione al server OroActive non riuscita"
-        : error.message || "Accesso Face ID non riuscito.";
+        : faceIdErrorMessage(error, "Accesso Face ID non riuscito.");
+  } finally {
+    state.loggingIn = false;
+    if (faceIdLoginButton) faceIdLoginButton.disabled = false;
   }
 }
 
@@ -10325,6 +10504,24 @@ function saveAurumSettings(settings = {}) {
   updateAurumMascotVisibility();
 }
 
+function isAurumResponsiveDock() {
+  return window.matchMedia?.("(max-width: 1100px)")?.matches ?? window.innerWidth <= 1100;
+}
+
+function syncAurumResponsiveDock() {
+  if (!aurumMascotRoot) return false;
+  const docked = isAurumResponsiveDock();
+  aurumMascotRoot.classList.toggle("aurum-responsive-docked", docked);
+  if (docked) {
+    aurumMascotRoot.classList.remove("aurum-positioned", "aurum-roaming");
+    aurumMascotRoot.style.removeProperty("--aurum-left");
+    aurumMascotRoot.style.removeProperty("--aurum-top");
+    aurumMascotRoot.style.setProperty("--aurum-x", "0px");
+    aurumMascotRoot.style.setProperty("--aurum-y", "0px");
+  }
+  return docked;
+}
+
 function safeViewportInset(name = "right") {
   const value = getComputedStyle(document.documentElement).getPropertyValue(`env(safe-area-inset-${name})`);
   const parsed = parseFloat(value);
@@ -10397,6 +10594,7 @@ function applyAurumPosition(position, options = {}) {
 
 function restoreAurumFloatingPosition() {
   if (!aurumMascotRoot || aurumMascotRoot.hidden) return;
+  if (syncAurumResponsiveDock()) return;
   const saved = loadAurumFloatingPosition();
   const position = saved ? clampAurumPosition(saved) : defaultAurumPosition();
   applyAurumPosition(position, { save: false });
@@ -10512,6 +10710,11 @@ function scheduleAurumAvoidance() {
 function updateAurumAvoidance() {
   state.aurumAvoidFrame = null;
   if (!aurumMascotRoot || aurumMascotRoot.hidden || !shouldShowAurumMascot()) return;
+  if (syncAurumResponsiveDock()) {
+    state.aurumAvoidActive = false;
+    aurumMascotRoot.classList.remove("aurum-avoid-active", "aurum-compact");
+    return;
+  }
   const avoidRects = visibleAurumAvoidRects();
   const avoidActive = avoidRects.length > 0;
   const compact = avoidActive && Boolean(document.getElementById("practice")?.classList.contains("active-screen"));
@@ -10635,6 +10838,7 @@ function handleAurumPointerDown(event) {
   const headerHandle = event.target.closest?.(".aurum-chat-header");
   const mascotHandle = event.target.closest?.("#aurumMascotButton");
   if (!headerHandle && !mascotHandle) return;
+  if (mascotHandle && isAurumResponsiveDock()) return;
   if (headerHandle && event.target.closest("button, input, textarea, select")) return;
   if (event.button !== undefined && event.button !== 0) return;
   const element = headerHandle ? aurumChatPanel : aurumMascotRoot;
@@ -10769,6 +10973,7 @@ function updateAurumMovement() {
   const settings = loadAurumSettings();
   const canRoam = shouldShowAurumMascot()
     && settings.movement
+    && !isAurumResponsiveDock()
     && mainMenuScreen
     && !mainMenuScreen.hidden
     && (!aurumChatPanel || aurumChatPanel.hidden)
@@ -10926,6 +11131,10 @@ function closeAurumChat() {
 
 function showAurumTip(text = "") {
   if (!shouldShowAurumMascot() || !aurumTipBubble || !aurumTipText || !text && aurumChatPanel && !aurumChatPanel.hidden) return;
+  if (isAurumResponsiveDock()) {
+    hideAurumTip();
+    return;
+  }
   if (state.aurumAvoidActive && aurumChatPanel?.hidden) {
     hideAurumTip();
     return;
@@ -16046,6 +16255,29 @@ function gemLabMediaAttributes(media = {}) {
   return `src="${escapeHtml(source)}"${srcset ? ` srcset="${srcset}" sizes="(max-width: 720px) 92vw, 640px"` : ""}`;
 }
 
+function gemLabHdMediaAttributes(media = {}) {
+  const source = media.url || media.large_url || media.medium_url || media.thumbnail_url || "";
+  return `src="${escapeHtml(source)}"`;
+}
+
+function gemLabCardImageAttributes(material = {}, media = {}) {
+  const slug = String(material.slug || "").trim();
+  const fallback = media.thumbnail_url || media.medium_url || media.large_url || media.url || "";
+  if (!slug) return `src="${escapeHtml(fallback)}"`;
+  const thumbnail = `/assets/academy/gems/thumbnails/${encodeURIComponent(slug)}-preview.webp`;
+  return `src="${escapeHtml(thumbnail)}" data-thumbnail-fallback="${escapeHtml(fallback)}"`;
+}
+
+function handleThumbnailFallback(event) {
+  const image = event.target;
+  if (!image?.matches?.("img[data-thumbnail-fallback]")) return;
+  const fallback = String(image.dataset.thumbnailFallback || "").trim();
+  image.removeAttribute("data-thumbnail-fallback");
+  image.removeAttribute("srcset");
+  image.removeAttribute("sizes");
+  if (fallback && image.src !== new URL(fallback, window.location.href).href) image.src = fallback;
+}
+
 function gemLabSearchText(material = {}) {
   return [
     material.name,
@@ -16138,7 +16370,7 @@ function renderGemLabCard(material = {}) {
     >
       <div class="gem-lab-card-media">
         ${media
-          ? `<img class="gem-lab-card-preview" ${gemLabMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}" loading="lazy" decoding="async">`
+          ? `<img class="gem-lab-card-preview" ${gemLabCardImageAttributes(material, media)} alt="${escapeHtml(media.title || material.name)}" loading="lazy" decoding="async">`
           : gemLabPlaceholder(material, "Anteprima singola in preparazione")}
       </div>
       <div class="gem-lab-card-body">
@@ -16686,7 +16918,7 @@ function renderGemLabDetail(material = {}) {
         <button class="ghost-button" type="button" data-gem-back>Indietro al catalogo</button>
         <div class="gem-lab-detail-media">
           ${cover
-            ? `<img ${gemLabMediaAttributes(cover)} alt="${escapeHtml(cover.title || material.name)}">`
+            ? `<img ${gemLabHdMediaAttributes(cover)} alt="${escapeHtml(cover.title || material.name)}" decoding="async">`
             : gemLabPlaceholder(material)}
         </div>
         <div>
@@ -16725,7 +16957,7 @@ function renderGemLabZoom(material = {}) {
   return `
     <div class="gem-lab-zoom" role="dialog" aria-modal="true" aria-label="Visualizzazione immagine ingrandita" data-gem-zoom-backdrop>
       <button class="gem-lab-zoom-close" type="button" data-gem-zoom-close aria-label="Chiudi immagine">×</button>
-      <img ${gemLabMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}">
+      <img ${gemLabHdMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}" decoding="async">
       <div>
         <strong>${escapeHtml(media.title || material.name || "Media gemmologico")}</strong>
         <span>${escapeHtml(media.observation_notes || media.caption || "Osservazione documentata")}</span>
@@ -17194,6 +17426,14 @@ function coinWeightRangeLabel(coins = []) {
   return `${formatCoinNumber(min, 3)}-${formatCoinNumber(max, 3)} g`;
 }
 
+function coinThumbnailUrl(coin = {}, side = "front", imageUrl = "") {
+  const cleanSource = String(imageUrl || "").split(/[?#]/, 1)[0];
+  const fileName = cleanSource.split("/").pop() || "";
+  const sourceSlug = fileName.replace(/\.[^.]+$/, "");
+  const thumbnailSlug = sourceSlug || `${String(coin.id || "moneta")}-${side}`;
+  return `/assets/coins/thumbnails/${encodeURIComponent(thumbnailSlug)}.webp`;
+}
+
 function coinFaceMarkup(coin = {}, side = "front", options = {}) {
   const imageUrl = options.usePhoto === false ? "" : coin.bookImages?.[side];
   const visual = coin.visual || {};
@@ -17201,10 +17441,12 @@ function coinFaceMarkup(coin = {}, side = "front", options = {}) {
   const text = side === "back" ? visual.backText : visual.frontText;
   const label = side === "back" ? "Retro" : "Fronte";
   if (imageUrl) {
+    const thumbnailUrl = options.thumbnail ? coinThumbnailUrl(coin, side, imageUrl) : imageUrl;
+    const fallbackAttribute = options.thumbnail ? ` data-thumbnail-fallback="${escapeHtml(imageUrl)}"` : "";
     return `
       <figure class="coin-photo-frame" aria-label="${escapeHtml(label)} ${escapeHtml(coin.name || "moneta")}">
         <span class="coin-photo-image">
-          <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(`${label} ${coin.name || "moneta d'oro"}`)}" loading="lazy" decoding="async">
+          <img src="${escapeHtml(thumbnailUrl)}"${fallbackAttribute} alt="${escapeHtml(`${label} ${coin.name || "moneta d'oro"}`)}" loading="lazy" decoding="async">
         </span>
         <figcaption>${escapeHtml(label)}</figcaption>
       </figure>
@@ -17222,8 +17464,8 @@ function coinFaceMarkup(coin = {}, side = "front", options = {}) {
 function coinMiniFacesMarkup(coin = {}) {
   return `
     <div class="coin-mini-media">
-      ${coinFaceMarkup(coin, "front")}
-      ${coinFaceMarkup(coin, "back")}
+      ${coinFaceMarkup(coin, "front", { thumbnail: true })}
+      ${coinFaceMarkup(coin, "back", { thumbnail: true })}
     </div>
   `;
 }
@@ -17401,8 +17643,18 @@ function renderCoinEncyclopedia() {
   const visibleCoins = coinCatalogFiltered();
   renderCoinOverview(visibleCoins);
   if (coinCatalogGrid) {
+    const visibleCount = Math.min(
+      visibleCoins.length,
+      Math.max(COIN_CATALOG_PAGE_SIZE, Number(state.coinCatalogVisibleCount || COIN_CATALOG_PAGE_SIZE))
+    );
+    const pagedCoins = visibleCoins.slice(0, visibleCount);
+    const remaining = Math.max(0, visibleCoins.length - pagedCoins.length);
     coinCatalogGrid.innerHTML = visibleCoins.length
-      ? groupedCoinsByCountry(visibleCoins).map(coinCountryGroupMarkup).join("")
+      ? `${groupedCoinsByCountry(pagedCoins).map(coinCountryGroupMarkup).join("")}
+        <div class="coin-catalog-pagination" role="status">
+          <span>Mostrate ${pagedCoins.length} di ${visibleCoins.length} monete</span>
+          ${remaining ? `<button class="ghost-button" type="button" data-load-more-coins>Mostra altre ${Math.min(COIN_CATALOG_PAGE_SIZE, remaining)}</button>` : ""}
+        </div>`
       : '<div class="empty-state">Nessuna moneta trovata. Modifica ricerca o filtri.</div>';
   }
   if (!visibleCoins.some((coin) => coin.id === state.coinSelectedId) && visibleCoins[0]) {
@@ -17424,6 +17676,7 @@ function resetCoinSearch() {
   state.coinCatalogSearch = "";
   state.coinCatalogCountry = "";
   state.coinCatalogPurity = "";
+  state.coinCatalogVisibleCount = COIN_CATALOG_PAGE_SIZE;
   state.coinIdentification = null;
   if (coinSearchInput) coinSearchInput.value = "";
   if (coinCountryFilter) coinCountryFilter.value = "";
@@ -25480,16 +25733,20 @@ document.addEventListener("click", (event) => {
     return;
   }
 });
+document.addEventListener("error", handleThumbnailFallback, true);
 coinSearchInput?.addEventListener("input", () => {
   state.coinCatalogSearch = coinSearchInput.value || "";
+  state.coinCatalogVisibleCount = COIN_CATALOG_PAGE_SIZE;
   scheduleCoinEncyclopediaRender();
 });
 coinCountryFilter?.addEventListener("change", () => {
   state.coinCatalogCountry = coinCountryFilter.value || "";
+  state.coinCatalogVisibleCount = COIN_CATALOG_PAGE_SIZE;
   renderCoinEncyclopedia();
 });
 coinPurityFilter?.addEventListener("change", () => {
   state.coinCatalogPurity = coinPurityFilter.value || "";
+  state.coinCatalogVisibleCount = COIN_CATALOG_PAGE_SIZE;
   renderCoinEncyclopedia();
 });
 coinResetSearch?.addEventListener("click", resetCoinSearch);
@@ -25499,6 +25756,12 @@ coinCameraInput?.addEventListener("change", (event) => {
 });
 [coinCatalogGrid, coinIdentificationResults].forEach((container) => {
   container?.addEventListener("click", (event) => {
+    const loadMore = event.target.closest("[data-load-more-coins]");
+    if (loadMore) {
+      state.coinCatalogVisibleCount = Number(state.coinCatalogVisibleCount || COIN_CATALOG_PAGE_SIZE) + COIN_CATALOG_PAGE_SIZE;
+      renderCoinEncyclopedia();
+      return;
+    }
     const button = event.target.closest("[data-open-coin]");
     if (!button) return;
     const id = button.dataset.openCoin;

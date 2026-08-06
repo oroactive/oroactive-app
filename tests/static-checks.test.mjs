@@ -169,14 +169,18 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260803-aurum-estrazione-19"/);
-  assert.match(sw, /const CACHE_NAME = `oroactive-cache-\$\{BUILD_ID\}`/);
+  assert.match(sw, /const BUILD_ID = "20260806-hardening-performance-20"/);
+  assert.match(sw, /const SHELL_CACHE_NAME = `oroactive-shell-\$\{BUILD_ID\}`/);
+  assert.match(sw, /const IMAGE_CACHE_NAME = `oroactive-images-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /self\.clients\.claim\(\)/);
   assert.match(sw, /keys\.filter\(shouldDeleteCache\)/);
   assert.match(sw, /request\.mode === "navigate"/);
   assert.match(sw, /HASHED_ASSET_PATTERN/);
-  assert.match(sw, /NEVER_CACHE_PATHS = \[[\s\S]*"\/index\.html"/);
+  assert.match(sw, /NEVER_CACHE_PATHS = \[[\s\S]*"\/version\.json"/);
+  assert.match(sw, /SHELL_ASSETS/);
+  assert.match(sw, /networkFirstNavigation/);
+  assert.match(sw, /cacheFirstAssetImage/);
   assert.doesNotMatch(sw, /cache\.addAll|STATIC_ASSETS/);
   assert.match(server, /async function getBuildMetadata/);
   assert.match(server, /app\.get\("\/api\/version"/);
@@ -184,12 +188,17 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(server, /function setNoStoreHeaders/);
   assert.match(server, /function staticCacheHeaders/);
   assert.match(server, /isHashedStaticPath/);
-  assert.match(server, /express\.static\(__dirname, \{[\s\S]*extensions: \["html"\],[\s\S]*setHeaders: staticCacheHeaders/);
+  assert.doesNotMatch(server, /express\.static\(__dirname/);
+  assert.match(server, /publicRootStaticFiles = new Set/);
+  assert.match(server, /app\.use\("\/assets\/coins", express\.static/);
+  assert.match(server, /isBlockedPath \|\| path\.posix\.extname\(requestPath\)/);
   assert.match(app, /window\.__OROACTIVE_DIRTY_STATE__ = false/);
   assert.match(app, /window\.__OROACTIVE_VERSION__ = null/);
-  assert.match(app, /const OROACTIVE_UPDATE_INTERVAL_MS = 30000/);
+  assert.match(app, /const OROACTIVE_UPDATE_INTERVAL_MS = 900000/);
   assert.match(app, /serviceWorker\.register\("\/service-worker\.js", \{ updateViaCache: "none" \}\)/);
-  assert.match(app, /registration\.waiting\.postMessage\(\{ type: "SKIP_WAITING" \}\)/);
+  assert.match(app, /serviceWorkerActivationAuthorized/);
+  assert.match(app, /if \(!state\.serviceWorkerActivationAuthorized \|\| syncDirtyState\(\)\)/);
+  assert.doesNotMatch(sw, /precacheShell\(\)\.then\(\(\) => self\.skipWaiting\(\)\)/);
   assert.match(app, /worker\.postMessage\(\{ type: "SKIP_WAITING" \}\)/);
   assert.match(app, /async function checkForAppUpdate/);
   assert.match(app, /Nuova versione OroActive disponibile/);
@@ -197,19 +206,19 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /meta name="oroactive-build-id" content="20260803-aurum-estrazione-19"/);
+  assert.match(index, /meta name="oroactive-build-id" content="20260806-hardening-performance-20"/);
   assert.match(index, /async function verifyBootBuild/);
   assert.match(index, /async function resetStalePwa/);
-  assert.match(index, /\/version\.json\?boot=\$\{Date\.now\(\)\}/);
+  assert.match(index, /fetch\("\/version\.json", \{/);
   assert.match(index, /navigator\.serviceWorker\.getRegistrations/);
   assert.match(index, /registration\.unregister/);
   assert.match(index, /window\.caches\.delete/);
   assert.match(index, /serverBuildId !== htmlBuildId/);
-  assert.match(index, /app\.js\?v=20260803-aurum-estrazione-19/);
-  assert.match(index, /shared\/aurum-policy\.js\?v=20260803-aurum-estrazione-19/);
-  assert.match(index, /styles\.css\?v=20260803-aurum-estrazione-19/);
+  assert.match(index, /app\.js\?v=20260806-hardening-performance-20/);
+  assert.match(index, /shared\/aurum-policy\.js\?v=20260806-hardening-performance-20/);
+  assert.match(index, /styles\.css\?v=20260806-hardening-performance-20/);
   assert.match(version, /"ok": true/);
-  assert.match(version, /"assetBuildId": "20260803-aurum-estrazione-19"/);
+  assert.match(version, /"assetBuildId": "20260806-hardening-performance-20"/);
   assert.match(version, /"catalogCount": 197/);
   assert.match(version, /"aurumSalesTopics": 12/);
   assert.match(version, /"aurumSalesMode": "ethical-consultative"/);
@@ -242,8 +251,8 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 
   assert.match(app, /const OROACTIVE_SPLASH_SESSION_KEY = "oroactive_splash_seen"/);
-  assert.match(app, /const OROACTIVE_SPLASH_MIN_MS = 5000/);
-  assert.match(app, /const OROACTIVE_SPLASH_BRIEF_MS = 5000/);
+  assert.match(app, /const OROACTIVE_SPLASH_MIN_MS = 300/);
+  assert.match(app, /const OROACTIVE_SPLASH_BRIEF_MS = 120/);
   assert.match(app, /const SESSION_RESTORE_TIMEOUT_MS = 8000/);
   assert.match(app, /const BOOT_SPLASH_MAX_MS = 2000/);
   assert.match(app, /const OROACTIVE_AUTH_DAY_KEY = "oroactive-auth-day"/);
@@ -268,7 +277,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -1289,7 +1298,8 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(app, /\.sort\(coinCatalogSortComparator\)/);
   assert.match(app, /function groupedCoinsByCountry/);
   assert.match(app, /function groupedCoinsByCategory/);
-  assert.match(app, /groupedCoinsByCountry\(visibleCoins\)\.map\(coinCountryGroupMarkup\)/);
+  assert.match(app, /groupedCoinsByCountry\(pagedCoins\)\.map\(coinCountryGroupMarkup\)/);
+  assert.match(app, /data-load-more-coins/);
   assert.match(app, /coinCatalogCategoryRank\(a\) - coinCatalogCategoryRank\(b\)/);
   assert.match(app, /coinWeightRangeLabel\(categoryGroup\.coins\)/);
   assert.match(styles, /\.coin-category-group/);
@@ -1656,7 +1666,7 @@ test("Elenco Monete è una sottosezione Formazione con riconoscimento foto backe
   assert.match(styles, /\.coin-photo-frame/);
   assert.match(styles, /\.coin-photo-image/);
   assert.match(app, /<span class="coin-photo-image">/);
-  assert.match(app, /function coinMiniFacesMarkup\(coin = \{\}\) \{[\s\S]*coinFaceMarkup\(coin, "front"\)[\s\S]*coinFaceMarkup\(coin, "back"\)/);
+  assert.match(app, /function coinMiniFacesMarkup\(coin = \{\}\) \{[\s\S]*coinFaceMarkup\(coin, "front", \{ thumbnail: true \}\)[\s\S]*coinFaceMarkup\(coin, "back", \{ thumbnail: true \}\)/);
   assert.doesNotMatch(app.slice(app.indexOf("function coinMiniFacesMarkup"), app.indexOf("function coinSpecListMarkup")), /usePhoto: false/);
   assert.match(styles, /\.coin-country-group/);
   assert.match(styles, /\.coin-country-heading/);
@@ -1938,6 +1948,8 @@ test("tutte le monete del catalogo hanno foto fronte retro presenti", async () =
       const relativePath = imagePath.replace(/^\//, "");
       referencedImages.add(relativePath);
       await access(new URL(relativePath, root));
+      const thumbnailName = relativePath.split("/").pop().replace(/\.[^.]+$/, ".webp");
+      await access(new URL(`assets/coins/thumbnails/${thumbnailName}`, root));
     }
   }
 
@@ -3472,7 +3484,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -3531,7 +3543,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -3583,7 +3595,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -3670,9 +3682,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function safeRouteErrorMessage/);
   assert.doesNotMatch(errorBlock, /payload\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260803-aurum-estrazione-19/);
-  assert.match(index, /styles\.css\?v=20260803-aurum-estrazione-19/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(index, /app\.js\?v=20260806-hardening-performance-20/);
+  assert.match(index, /styles\.css\?v=20260806-hardening-performance-20/);
+  assert.match(worker, /20260806-hardening-performance-20/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3718,8 +3730,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260803-aurum-estrazione-19/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(index, /styles\.css\?v=20260806-hardening-performance-20/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3875,7 +3887,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3979,7 +3991,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -4030,9 +4042,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260803-aurum-estrazione-19/);
-  assert.match(index, /styles\.css\?v=20260803-aurum-estrazione-19/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(index, /app\.js\?v=20260806-hardening-performance-20/);
+  assert.match(index, /styles\.css\?v=20260806-hardening-performance-20/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -4089,9 +4101,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260803-aurum-estrazione-19/);
-  assert.match(index, /styles\.css\?v=20260803-aurum-estrazione-19/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(index, /app\.js\?v=20260806-hardening-performance-20/);
+  assert.match(index, /styles\.css\?v=20260806-hardening-performance-20/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -4169,7 +4181,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -4286,7 +4298,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -4330,7 +4342,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260803-aurum-estrazione-19/);
+  assert.match(worker, /20260806-hardening-performance-20/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
@@ -4361,12 +4373,20 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(workflow, /curl --fail[\s\S]*force_rebuild_webhook/);
   assert.match(workflow, /Coolify force rebuild request accepted/);
   assert.match(workflow, /Verify production version/);
-  assert.match(workflow, /OROACTIVE_HEALTH_URL:-https:\/\/app\.oroactive\.it\/version\.json/);
+  assert.match(workflow, /OROACTIVE_HEALTH_URL:-https:\/\/app\.oroactive\.it/);
+  assert.match(workflow, /url\.pathname = "\/api\/health"/);
   assert.match(workflow, /seq 1 60/);
   assert.match(workflow, /publishedCommit = payload\?\.commit \|\| payload\?\.version\?\.commit \|\| ""/);
   assert.match(workflow, /publishedAssetBuildId = payload\?\.assetBuildId \|\| payload\?\.version\?\.assetBuildId \|\| ""/);
   assert.match(workflow, /publishedCatalogCount = Number\(payload\?\.catalogCount \|\| payload\?\.version\?\.catalogCount \|\| 0\)/);
   assert.match(workflow, /publishedCatalogCount === expectedCatalogCount/);
+  assert.match(workflow, /DEPLOYMENT_REQUESTED_AT/);
+  assert.match(workflow, /publishedStartedAt/);
+  assert.match(workflow, /processStartedAt >= deploymentRequestedAt - clockSkewToleranceMs/);
+  assert.match(workflow, /&& isFreshProcess/);
+  assert.match(workflow, /payload\?\.database === "ready"/);
+  assert.match(workflow, /payload\?\.initialization === "ready"/);
+  assert.match(workflow, /&& isReady/);
   assert.match(workflow, /deploy-check=\$\{GITHUB_RUN_ID\}-\$\{attempt\}/);
   assert.match(workflow, /COOLIFY_WEBHOOK targets the app\.oroactive\.it production resource/);
   assert.doesNotMatch(workflow, /deployment\/|coolify\./);
@@ -4396,6 +4416,7 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(server, /buildNumber[\s\S]*git-\$\{commitShort\}/);
   assert.match(server, /app\.get\("\/api\/version"/);
   assert.match(server, /ok: true[\s\S]*app: version\.app[\s\S]*commit: version\.commit[\s\S]*buildNumber: version\.buildNumber/);
+  assert.match(server, /started_at: runtimeStatus\.startedAt/);
   assert.match(server, /assetBuildId: version\.assetBuildId/);
   assert.match(server, /catalogCount: version\.catalogCount/);
   assert.match(server, /app\.get\("\/api\/health"[\s\S]*version/);
@@ -4413,11 +4434,11 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(worker, /clients\.claim/);
   assert.match(worker, /cache: "no-store"/);
   assert.match(worker, /request\.mode === "navigate"/);
-  assert.match(worker, /NEVER_CACHE_PATHS[\s\S]*"\/index\.html"/);
+  assert.match(worker, /NEVER_CACHE_PATHS[\s\S]*"\/version\.json"/);
   assert.doesNotMatch(worker, /STATIC_ASSETS|cache\.addAll/);
 
   assert.match(app, /async function checkForAppUpdate/);
-  assert.match(app, /const APP_VERSION_CHECK_INTERVAL_MS = 30000/);
+  assert.match(app, /const APP_VERSION_CHECK_INTERVAL_MS = 900000/);
   assert.match(app, /function normalizeAppVersion/);
   assert.match(app, /fetchAppVersion/);
   assert.match(app, /\/version/);
@@ -4447,9 +4468,9 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.doesNotMatch(styles, /\.app-footer-build/);
   assert.match(docs, /Deploy OroActive su Coolify/);
   assert.match(docs, /OROACTIVE_HEALTH_URL/);
-  assert.match(docs, /https:\/\/app\.oroactive\.it\/version\.json/);
+  assert.match(docs, /https:\/\/app\.oroactive\.it\/api\/health/);
   assert.match(docs, /Include Source Commit in Build/);
-  assert.match(docs, /dominio pubblico esponga[\s\S]*lo stesso commit appena inviato/);
+  assert.match(docs, /\/api\/health[\s\S]*stesso commit appena inviato/);
   assert.match(docs, /Coolify accetta il webhook ma il dominio continua a mostrare un commit vecchio/);
   assert.doesNotMatch(docs, /commit esposto da \/api\/health.*unknown/);
   assert.doesNotMatch(docs, /Bearer\s+[A-Za-z0-9]/);

@@ -8,8 +8,10 @@ Imposta nella app Coolify:
 NODE_ENV=production
 PORT=3000
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
-JWT_SECRET=UNA_CHIAVE_LUNGA_CASUALE
+JWT_SECRET=UNA_CHIAVE_LUNGA_CASUALE_DI_ALMENO_32_CARATTERI
 JWT_EXPIRES_IN=7d
+WEBAUTHN_RP_ID=app.oroactive.it
+WEBAUTHN_ORIGINS=https://app.oroactive.it
 AURUM_MEMORY_ENCRYPTION_KEY=UNA_CHIAVE_AURUM_LUNGA_CASUALE_STABILE_MINIMO_32_BYTE
 AURUM_MEMORY_ENCRYPTION_KEY_PREVIOUS=
 BULLIONVAULT_MARKET_URL=https://www.bullionvault.com/view_market_xml.do
@@ -24,6 +26,8 @@ ADMIN_NEGOZIO=Tutti
 ```
 
 `AURUM_MEMORY_ENCRYPTION_KEY` cifra le memorie personali di Aurum. Genera una chiave casuale di almeno 32 byte, configurala come secret esclusivamente nel backend di Coolify e conservala in un gestore di segreti sicuro. La chiave deve rimanere stabile tra riavvii e deploy. Se deve essere ruotata, inserisci temporaneamente il valore precedente in `AURUM_MEMORY_ENCRYPTION_KEY_PREVIOUS` finché le memorie esistenti non sono state aggiornate; non inserire mai queste chiavi nel repository, nei log o nel frontend.
+
+`WEBAUTHN_RP_ID` e `WEBAUTHN_ORIGINS` vincolano Face ID/passkey al dominio di produzione. Non aggiungere domini di terze parti. Dopo questo aggiornamento le precedenti registrazioni Face ID non firmate vengono disattivate e ciascun utente deve registrare nuovamente Face ID dopo un accesso con password.
 
 Per generare un valore adatto, esegui localmente `openssl rand -base64 48` e copia il risultato direttamente nel secret Coolify.
 
@@ -49,13 +53,15 @@ DATABASE_SSL=true
 
 La risorsa di produzione deve usare il ramo `main`, il dominio `https://app.oroactive.it` e il deploy automatico. Il Secret GitHub `COOLIFY_WEBHOOK` deve contenere il webhook generato dalla stessa risorsa Coolify che serve questo dominio. Non usare il webhook della risorsa `oroactive-site`, dedicata al sito `oroactive.it`.
 
-Dopo ogni deploy, `https://app.oroactive.it/version.json` deve riportare:
+Dopo ogni deploy, `https://app.oroactive.it/api/health` deve riportare:
 
 - lo stesso `commit` presente su GitHub `main`;
 - l'`assetBuildId` della release appena costruita;
 - il `catalogCount` atteso.
+- un processo con `started_at` successivo alla richiesta di deploy.
+- database e inizializzazione applicativa nello stato `ready`.
 
-Il workflow GitHub considera il deploy riuscito solo quando tutti e tre i valori coincidono. Se Coolify accetta il webhook ma il dominio espone ancora un commit vecchio, la risorsa o il webhook non sono collegati alla produzione corretta.
+Il workflow GitHub considera il deploy riuscito solo quando tutti i valori coincidono e il processo è stato realmente riavviato. Se Coolify accetta il webhook ma il dominio espone ancora un processo o un commit vecchio, la risorsa o il webhook non sono collegati alla produzione corretta.
 
 Alla prima partenza il server crea automaticamente la tabella `atti_vendita`.
 La tabella usa i campi principali richiesti: `id`, `cliente_nome`, `cliente_cognome`, `codice_fiscale`, `telefono`, `peso_oro`, `quotazione`, `totale`, `data_atto`. Le informazioni complete del gestionale vengono salvate anche nel campo `payload`.

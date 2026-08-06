@@ -1,4 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE IF NOT EXISTS atti_vendita (
   id BIGSERIAL PRIMARY KEY,
@@ -75,6 +76,84 @@ ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS suspended_by BIGINT;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS resumed_at TIMESTAMPTZ;
 ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS resumed_by BIGINT;
+ALTER TABLE atti_vendita ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT '';
+
+-- Indice di ricerca composto esclusivamente da metadati operativi. Allegati,
+-- firme e immagini base64 nel payload non devono mai essere scanditi.
+CREATE OR REPLACE FUNCTION oroactive_refresh_atto_search_text()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.search_text := LOWER(CONCAT_WS(' ',
+    NEW.practice_number,
+    NEW.cliente_nome,
+    NEW.cliente_cognome,
+    NEW.codice_fiscale,
+    NEW.telefono,
+    NEW.store,
+    NEW.store_code,
+    NEW.payment_method,
+    NEW.data_atto::text,
+    NEW.totale::text,
+    NEW.peso_oro::text,
+    NEW.act_year::text,
+    NEW.act_number::text,
+    NEW.codice_negozio,
+    NEW.numero_atto_negozio::text
+  ));
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS atti_vendita_search_text_trigger ON atti_vendita;
+CREATE TRIGGER atti_vendita_search_text_trigger
+BEFORE INSERT OR UPDATE OF
+  practice_number, cliente_nome, cliente_cognome, codice_fiscale, telefono,
+  store, store_code, payment_method, data_atto, totale, peso_oro,
+  act_year, act_number, codice_negozio, numero_atto_negozio
+ON atti_vendita
+FOR EACH ROW
+EXECUTE FUNCTION oroactive_refresh_atto_search_text();
+
+UPDATE atti_vendita
+SET search_text = LOWER(CONCAT_WS(' ',
+  practice_number,
+  cliente_nome,
+  cliente_cognome,
+  codice_fiscale,
+  telefono,
+  store,
+  store_code,
+  payment_method,
+  data_atto::text,
+  totale::text,
+  peso_oro::text,
+  act_year::text,
+  act_number::text,
+  codice_negozio,
+  numero_atto_negozio::text
+))
+WHERE search_text IS DISTINCT FROM LOWER(CONCAT_WS(' ',
+  practice_number,
+  cliente_nome,
+  cliente_cognome,
+  codice_fiscale,
+  telefono,
+  store,
+  store_code,
+  payment_method,
+  data_atto::text,
+  totale::text,
+  peso_oro::text,
+  act_year::text,
+  act_number::text,
+  codice_negozio,
+  numero_atto_negozio::text
+));
+
+CREATE INDEX IF NOT EXISTS atti_vendita_search_text_trgm_idx
+  ON atti_vendita USING GIN (search_text gin_trgm_ops);
 
 UPDATE atti_vendita
 SET completed_at = COALESCE(completed_at, updated_at, created_at, NOW())
@@ -364,6 +443,45 @@ CREATE UNIQUE INDEX IF NOT EXISTS utenti_username_unique
 CREATE INDEX IF NOT EXISTS utenti_negozio_id_idx
   ON utenti (negozio_id);
 
+-- Le vecchie registrazioni memorizzavano soltanto l'ID pubblico della credenziale
+-- e non permettevano di verificare challenge e firma. Il marker viene mantenuto
+-- esclusivamente per le nuove passkey WebAuthn verificate dal server.
+UPDATE utenti
+SET face_id_credential = NULL,
+    updated_at = NOW()
+WHERE face_id_credential IS NOT NULL
+  AND face_id_credential <> 'webauthn';
+
+CREATE TABLE IF NOT EXISTS webauthn_credentials (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES utenti(id) ON DELETE CASCADE,
+  credential_id TEXT NOT NULL UNIQUE,
+  public_key_cose TEXT NOT NULL,
+  sign_count BIGINT NOT NULL DEFAULT 0 CHECK (sign_count >= 0),
+  transports JSONB NOT NULL DEFAULT '[]'::jsonb,
+  device_type TEXT NOT NULL CHECK (device_type IN ('singleDevice', 'multiDevice')),
+  backed_up BOOLEAN NOT NULL DEFAULT FALSE,
+  active BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  activated_at TIMESTAMPTZ,
+  last_used_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS webauthn_credentials_user_active_idx
+  ON webauthn_credentials (user_id, active, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS webauthn_challenges (
+  challenge TEXT PRIMARY KEY,
+  user_id BIGINT REFERENCES utenti(id) ON DELETE CASCADE,
+  ceremony TEXT NOT NULL CHECK (ceremony IN ('registration', 'activation', 'authentication')),
+  credential_id TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS webauthn_challenges_expiry_idx
+  ON webauthn_challenges (expires_at);
+
 CREATE TABLE IF NOT EXISTS backup_jobs (
   id BIGSERIAL PRIMARY KEY,
   tipo TEXT DEFAULT 'giornaliero',
@@ -528,8 +646,15 @@ ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_id TEXT;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_label TEXT;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS before_data JSONB DEFAULT NULL;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS after_data JSONB DEFAULT NULL;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS method TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS route TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS status_code INTEGER;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS duration_ms INTEGER;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address TEXT;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS device_info TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS audit_logs_user_created_idx
   ON audit_logs (user_id, created_at DESC);
@@ -543,6 +668,14 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs(entity_type)
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_id ON audit_logs(entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_store_id ON audit_logs(store_id);
+CREATE INDEX IF NOT EXISTS audit_logs_action_created_idx
+  ON audit_logs (action, created_at DESC);
+CREATE INDEX IF NOT EXISTS audit_logs_error_created_idx
+  ON audit_logs (created_at DESC)
+  WHERE status_code >= 400;
+CREATE INDEX IF NOT EXISTS audit_logs_polling_retention_idx
+  ON audit_logs (created_at)
+  WHERE action = 'api_request' AND method IN ('GET', 'HEAD', 'OPTIONS');
 
 CREATE TABLE IF NOT EXISTS notifications (
   id BIGSERIAL PRIMARY KEY,

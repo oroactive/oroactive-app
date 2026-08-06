@@ -68,6 +68,9 @@ jobs:
             process.stdout.write(webhook.href);
           ' "${COOLIFY_WEBHOOK}")"
 
+          deployment_requested_at="$(node -p 'new Date().toISOString()')"
+          echo "DEPLOYMENT_REQUESTED_AT=${deployment_requested_at}" >> "${GITHUB_ENV}"
+
           curl --fail --silent --show-error --request POST "${force_rebuild_webhook}" \
             --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
             --header "Content-Type: application/json" \
@@ -76,16 +79,19 @@ jobs:
 
       - name: Verify production version
         run: |
-          version_url="${OROACTIVE_HEALTH_URL:-https://app.oroactive.it/version.json}"
-          case "${version_url}" in
-            */api/version|*/api/health|*/version.json) ;;
-            *) version_url="${version_url%/}/version.json" ;;
-          esac
+          configured_url="${OROACTIVE_HEALTH_URL:-https://app.oroactive.it}"
+          version_url="$(node -e '
+            const url = new URL(process.argv[1]);
+            url.pathname = "/api/health";
+            url.search = "";
+            url.hash = "";
+            process.stdout.write(url.href);
+          ' "${configured_url}")"
 
           version_payload="$(mktemp)"
           expected_asset_build_id="$(node -p 'JSON.parse(require("node:fs").readFileSync("version.json", "utf8")).assetBuildId')"
           expected_catalog_count="$(node -p 'JSON.parse(require("node:fs").readFileSync("version.json", "utf8")).catalogCount')"
-          echo "Waiting for ${version_url} to expose commit ${GIT_COMMIT}, build ${expected_asset_build_id} and ${expected_catalog_count} coins."
+          echo "Waiting for a process started after ${DEPLOYMENT_REQUESTED_AT} to expose commit ${GIT_COMMIT}, build ${expected_asset_build_id} and ${expected_catalog_count} coins."
           for attempt in $(seq 1 60); do
             separator="?"
             case "${version_url}" in *\?*) separator="&" ;; esac
@@ -94,21 +100,33 @@ jobs:
               --header "Cache-Control: no-cache" \
               --header "Pragma: no-cache" \
               "${request_url}" -o "${version_payload}"; then
-              if node - "${GIT_COMMIT}" "${expected_asset_build_id}" "${expected_catalog_count}" "${version_payload}" <<'NODE'
+              if node - "${GIT_COMMIT}" "${expected_asset_build_id}" "${expected_catalog_count}" "${DEPLOYMENT_REQUESTED_AT}" "${version_payload}" <<'NODE'
           const fs = require("node:fs");
           const expectedCommit = process.argv[2];
           const expectedAssetBuildId = process.argv[3];
           const expectedCatalogCount = Number(process.argv[4]);
-          const payloadPath = process.argv[5];
+          const deploymentRequestedAt = Date.parse(process.argv[5]);
+          const payloadPath = process.argv[6];
           const payload = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
           const publishedCommit = payload?.commit || payload?.version?.commit || "";
           const publishedAssetBuildId = payload?.assetBuildId || payload?.version?.assetBuildId || "";
           const publishedCatalogCount = Number(payload?.catalogCount || payload?.version?.catalogCount || 0);
+          const publishedStartedAt = payload?.started_at || payload?.version?.started_at || "";
+          const processStartedAt = Date.parse(publishedStartedAt);
+          const clockSkewToleranceMs = 30_000;
+          const isFreshProcess = Number.isFinite(processStartedAt)
+            && Number.isFinite(deploymentRequestedAt)
+            && processStartedAt >= deploymentRequestedAt - clockSkewToleranceMs;
+          const isReady = payload?.ok === true
+            && payload?.database === "ready"
+            && payload?.initialization === "ready";
 
           if (
             publishedCommit === expectedCommit
             && publishedAssetBuildId === expectedAssetBuildId
             && publishedCatalogCount === expectedCatalogCount
+            && isFreshProcess
+            && isReady
           ) {
             process.exit(0);
           }
@@ -117,12 +135,15 @@ jobs:
             expected: {
               commit: expectedCommit,
               assetBuildId: expectedAssetBuildId,
-              catalogCount: expectedCatalogCount
+              catalogCount: expectedCatalogCount,
+              processStartedAfter: new Date(deploymentRequestedAt).toISOString()
             },
             published: {
               commit: publishedCommit || "missing",
               assetBuildId: publishedAssetBuildId || "missing",
-              catalogCount: publishedCatalogCount || "missing"
+              catalogCount: publishedCatalogCount || "missing",
+              startedAt: publishedStartedAt || "missing",
+              ready: isReady
             }
           }, null, 2));
           process.exit(1);

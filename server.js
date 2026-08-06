@@ -110,6 +110,7 @@ import {
   sanitizeAssistantContextObject,
   sanitizeAssistantUntrustedContext
 } from "./services/aurum/privacy.js";
+import { createWebAuthnStore } from "./services/auth/webauthnStore.js";
 
 dotenv.config();
 
@@ -123,26 +124,27 @@ const CASH_PAYMENT_LIMIT = 500;
 const ACT_LIST_LIMIT = 50;
 const isProduction = process.env.NODE_ENV === "production";
 const runtimeStatus = {
-  databaseReady: false,
+  databaseReachable: false,
   databaseError: "",
+  initializationComplete: false,
+  initializationError: "",
   startedAt: new Date().toISOString()
 };
 const versionFilePath = path.join(__dirname, "version.json");
 let buildMetadataCache = null;
 let buildMetadataCacheAt = 0;
 const missingJwtSecretMessage = "JWT_SECRET obbligatorio: configura una chiave lunga e casuale nelle variabili ambiente.";
-const jwtSecret = process.env.JWT_SECRET || (isProduction
-  ? crypto.createHash("sha256").update(`oroactive:${process.env.DATABASE_URL || "database"}:${process.env.ADMIN_USERNAME || "Elite"}`).digest("hex")
-  : "oroactive-dev-jwt-secret-change-me");
+const configuredJwtSecret = String(process.env.JWT_SECRET || "").trim();
+if (isProduction && configuredJwtSecret.length < 32) {
+  throw new Error(`${missingJwtSecretMessage} Lunghezza minima: 32 caratteri.`);
+}
+const jwtSecret = configuredJwtSecret || "oroactive-dev-jwt-secret-change-me";
 const aurumMemoryEncryptionSecret = process.env.AURUM_MEMORY_ENCRYPTION_KEY || jwtSecret;
 const aurumMemoryDecryptionSecrets = [...new Set([
   aurumMemoryEncryptionSecret,
   jwtSecret,
   process.env.AURUM_MEMORY_ENCRYPTION_KEY_PREVIOUS
 ].filter(Boolean))];
-if (!process.env.JWT_SECRET && isProduction) {
-  console.error(`${missingJwtSecretMessage} Uso fallback temporaneo per evitare blocco avvio.`);
-}
 if (!process.env.AURUM_MEMORY_ENCRYPTION_KEY && isProduction) {
   console.warn("AURUM_MEMORY_ENCRYPTION_KEY non configurata: la memoria Aurum usa temporaneamente la chiave JWT. Configurare una chiave dedicata e stabile.");
 }
@@ -615,12 +617,69 @@ const defaultPrivacyPolicyContent = {
   ]
 };
 
+const databasePoolMax = Math.min(Math.max(Number(process.env.DATABASE_POOL_MAX || 15), 2), 50);
+const databaseConnectionTimeoutMs = Math.min(Math.max(Number(process.env.DATABASE_CONNECTION_TIMEOUT_MS || 5000), 1000), 30000);
+const databaseQueryTimeoutMs = Math.min(Math.max(Number(process.env.DATABASE_QUERY_TIMEOUT_MS || 45000), 5000), 120000);
+const databaseMigrationTimeoutMs = Math.min(Math.max(Number(process.env.DATABASE_MIGRATION_TIMEOUT_MS || 600000), 60000), 1800000);
+const databaseIdleTimeoutMs = Math.min(Math.max(Number(process.env.DATABASE_IDLE_TIMEOUT_MS || 30000), 5000), 300000);
+const healthCheckTimeoutMs = Math.min(Math.max(Number(process.env.HEALTH_CHECK_TIMEOUT_MS || 2500), 500), 10000);
+const openaiTimeoutMs = Math.min(Math.max(Number(process.env.OPENAI_TIMEOUT_MS || 60000), 10000), 120000);
+const openaiMaxRetries = Math.min(Math.max(Number(process.env.OPENAI_MAX_RETRIES || 1), 0), 3);
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined
+  ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+  max: databasePoolMax,
+  idleTimeoutMillis: databaseIdleTimeoutMs,
+  connectionTimeoutMillis: databaseConnectionTimeoutMs,
+  query_timeout: databaseQueryTimeoutMs,
+  statement_timeout: databaseQueryTimeoutMs,
+  application_name: "oroactive-gestionale"
 });
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const webAuthnRpId = String(process.env.WEBAUTHN_RP_ID || (isProduction ? "app.oroactive.it" : "localhost"))
+  .trim()
+  .toLowerCase();
+const configuredWebAuthnOrigins = String(process.env.WEBAUTHN_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const webAuthnOrigins = configuredWebAuthnOrigins.length
+  ? configuredWebAuthnOrigins
+  : isProduction
+    ? ["https://app.oroactive.it"]
+    : ["http://localhost:3000", "http://localhost:4173"];
+const webAuthnStore = createWebAuthnStore({ pool, rpId: webAuthnRpId, origins: webAuthnOrigins });
+
+pool.on("error", (error) => {
+  runtimeStatus.databaseReachable = false;
+  runtimeStatus.databaseError = error?.message || "Connessione database non disponibile";
+  console.error("DATABASE POOL ERROR", error);
+});
+
+async function withDatabaseTransaction(work) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("DATABASE ROLLBACK ERROR", rollbackError);
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: openaiTimeoutMs, maxRetries: openaiMaxRetries })
+  : null;
 const aiCompetitorQuoteExtractor = createAiCompetitorQuoteExtractor({
   openai,
   model: competitorAiExtractionModel,
@@ -834,6 +893,40 @@ const defaultAurumShieldSettings = {
 };
 
 const app = express();
+app.disable("x-powered-by");
+// Coolify inoltra le richieste dalla rete privata del container. Fidarsi soltanto
+// di proxy loopback/link-local/private evita che un client pubblico falsifichi X-Forwarded-For.
+app.set("trust proxy", process.env.TRUST_PROXY || "loopback, linklocal, uniquelocal");
+
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  // Compatibilità transitoria: index.html e la pagina reset-cache contengono script/style inline.
+  // Le altre sorgenti restano limitate all'app e allo script pubblico del grafico BullionVault.
+  "script-src 'self' 'unsafe-inline' https://www.bullionvault.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://www.bullionvault.com",
+  "frame-src 'self' data: blob:",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "upgrade-insecure-requests"
+].join("; ");
+
+app.use((_request, response, next) => {
+  response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Content-Security-Policy", contentSecurityPolicy);
+  response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.setHeader("Permissions-Policy", "camera=(self), geolocation=(self), microphone=(), payment=(), usb=(), browsing-topics=()");
+  next();
+});
+
 const allowedCorsOrigins = new Set([
   "https://app.oroactive.it",
   "http://localhost",
@@ -856,10 +949,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 app.use(compression({ threshold: 1024 }));
-app.use(express.json({ limit: jsonBodyLimit }));
 const apiRateBuckets = new Map();
-const apiRateBucketTtlMs = 2 * 60_000;
-const apiRateBucketCleanupIntervalMs = 5 * 60_000;
+const apiRateBucketMaxEntries = Math.min(Math.max(Number(process.env.RATE_LIMIT_MAX_BUCKETS || 10000), 1000), 50000);
+const apiRateBucketCleanupIntervalMs = 60_000;
 let apiRateBucketLastCleanup = Date.now();
 const lastSeenTouchIntervalSeconds = Math.max(15, Number(process.env.LAST_SEEN_TOUCH_INTERVAL_SECONDS || 60));
 
@@ -943,24 +1035,60 @@ app.use((request, response, next) => {
   next();
 });
 
+function requestRateLimitClass(request) {
+  const pathname = String(request.path || "").toLowerCase().replace(/\/+$/, "") || "/";
+  if (["/api/login", "/api/auth/login"].includes(pathname)) {
+    return { name: "password-login", limit: 60, windowMs: 5 * 60_000 };
+  }
+  if (pathname === "/api/auth/webauthn/login/options") {
+    return { name: "passkey-options", limit: 120, windowMs: 5 * 60_000 };
+  }
+  if (["/api/auth/faceid/login", "/api/auth/webauthn/login/verify"].includes(pathname)) {
+    return { name: "passkey-verify", limit: 120, windowMs: 5 * 60_000 };
+  }
+  const expensiveAiRequest = request.method !== "GET" && (
+    /^\/api\/ai\/(?:leggi-documento|controlla-atto|assistente|upload-book|reindex)(?:\/|$)/.test(pathname)
+    || /^\/api\/training\/gold-coins\/identify(?:\/|$)/.test(pathname)
+    || /^\/api\/quotazioni\/competitors\/(?:ai-extract\/run|sources\/[^/]+\/extraction-ai-assisted)(?:\/|$)/.test(pathname)
+  );
+  if (expensiveAiRequest) return { name: "ai", limit: 30, windowMs: 60_000 };
+  return { name: "api", limit: 360, windowMs: 60_000 };
+}
+
+function cleanupRateLimitBuckets(now = Date.now()) {
+  if (now - apiRateBucketLastCleanup < apiRateBucketCleanupIntervalMs && apiRateBuckets.size < apiRateBucketMaxEntries) return;
+  apiRateBucketLastCleanup = now;
+  for (const [bucketKey, bucketValue] of apiRateBuckets) {
+    if (now > bucketValue.resetAt) apiRateBuckets.delete(bucketKey);
+  }
+  while (apiRateBuckets.size >= apiRateBucketMaxEntries) {
+    const oldestKey = apiRateBuckets.keys().next().value;
+    if (oldestKey === undefined) break;
+    apiRateBuckets.delete(oldestKey);
+  }
+}
+
 function apiRateLimit(request, response, next) {
   if (!request.path.startsWith("/api")) return next();
-  const key = `${request.ip || request.socket.remoteAddress || "local"}:${request.headers.authorization || "anon"}`;
   const now = Date.now();
-  if (now - apiRateBucketLastCleanup > apiRateBucketCleanupIntervalMs) {
-    apiRateBucketLastCleanup = now;
-    for (const [bucketKey, bucketValue] of apiRateBuckets) {
-      if (now > bucketValue.resetAt + apiRateBucketTtlMs) apiRateBuckets.delete(bucketKey);
-    }
-  }
-  const bucket = apiRateBuckets.get(key) || { count: 0, resetAt: now + 60_000 };
-  if (now > bucket.resetAt) {
-    bucket.count = 0;
-    bucket.resetAt = now + 60_000;
+  cleanupRateLimitBuckets(now);
+  const rateClass = requestRateLimitClass(request);
+  const clientIp = String(request.ip || request.socket.remoteAddress || "local").slice(0, 128);
+  // La chiave non dipende dall'Authorization header: cambiare un token non crea un nuovo bucket.
+  const key = `${rateClass.name}:${clientIp}`;
+  let bucket = apiRateBuckets.get(key);
+  if (!bucket || now >= bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + rateClass.windowMs };
   }
   bucket.count += 1;
+  // Reinserire mantiene l'ordine LRU usato dal limite massimo della mappa.
+  apiRateBuckets.delete(key);
   apiRateBuckets.set(key, bucket);
-  if (bucket.count > 360) {
+  response.setHeader("RateLimit-Limit", String(rateClass.limit));
+  response.setHeader("RateLimit-Remaining", String(Math.max(0, rateClass.limit - bucket.count)));
+  response.setHeader("RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
+  if (bucket.count > rateClass.limit) {
+    response.setHeader("Retry-After", String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
     return response.status(429).json({ error: "Troppe richieste: attendere qualche secondo." });
   }
   next();
@@ -973,6 +1101,9 @@ function auditApiRequest(request, response, next) {
     const method = request.method;
     const route = request.originalUrl.split("?")[0];
     if (route.includes("/auth/me")) return;
+    // Le letture e i polling riusciti non hanno valore di audit e moltiplicavano
+    // le INSERT. Restano registrati errori e richieste che modificano stato.
+    if (["GET", "HEAD", "OPTIONS"].includes(method) && response.statusCode < 400) return;
     void writeAuditLog({
       req: request,
       user: request.user,
@@ -991,6 +1122,8 @@ function auditApiRequest(request, response, next) {
 }
 
 app.use(apiRateLimit);
+// Il limite anti-abuso deve scattare prima di leggere corpi JSON anche molto grandi.
+app.use(express.json({ limit: jsonBodyLimit }));
 
 function storeCodeFromName(storeName) {
   return {
@@ -6686,6 +6819,34 @@ function requireOpenAiClient() {
   return openai;
 }
 
+function createRequestAbortContext(request, response) {
+  const controller = new AbortController();
+  const abort = () => {
+    if (!controller.signal.aborted) controller.abort(new Error("Richiesta client interrotta"));
+  };
+  const abortOnClosedResponse = () => {
+    if (!response.writableEnded) abort();
+  };
+  request.once("aborted", abort);
+  response.once("close", abortOnClosedResponse);
+  return {
+    signal: controller.signal,
+    cleanup() {
+      request.off("aborted", abort);
+      response.off("close", abortOnClosedResponse);
+    }
+  };
+}
+
+async function withRequestAbortSignal(request, response, work) {
+  const context = createRequestAbortContext(request, response);
+  try {
+    return await work(context.signal);
+  } finally {
+    context.cleanup();
+  }
+}
+
 function sqlIdentifier(name) {
   if (!/^[a-z_][a-z0-9_]*$/i.test(String(name || ""))) {
     throw new Error("Identificatore SQL non valido");
@@ -7053,7 +7214,7 @@ function documentAiToClientFields(result = {}) {
   };
 }
 
-async function readDocumentWithOpenAi(frontImage, backImage) {
+async function readDocumentWithOpenAi(frontImage, backImage, options = {}) {
   const client = requireOpenAiClient();
   const front = validImageDataUrl(frontImage);
   const back = validImageDataUrl(backImage);
@@ -7090,7 +7251,7 @@ La confidence deve essere: alto, medio, basso oppure stringa vuota.`
         schema: documentAiSchema
       }
     }
-  });
+  }, options.signal ? { signal: options.signal } : undefined);
   return parseOpenAiJson(result);
 }
 
@@ -7126,7 +7287,7 @@ function normalizeCoinCatalogForAi(inputCatalog = []) {
   return synchronizedCatalog.map((coin) => clientById.get(coin.id) || coin);
 }
 
-async function identifyGoldCoinWithOpenAi({ image = "", catalog = [] } = {}) {
+async function identifyGoldCoinWithOpenAi({ image = "", catalog = [], signal = null } = {}) {
   const imageDataUrl = validImageDataUrl(image);
   if (!imageDataUrl) {
     const error = new Error("Foto moneta non valida.");
@@ -7172,7 +7333,7 @@ ${JSON.stringify(referenceCatalog)}`
         schema: goldCoinIdentificationSchema
       }
     }
-  });
+  }, signal ? { signal } : undefined);
   const parsed = parseOpenAiJson(result);
   const matches = (Array.isArray(parsed.matches) ? parsed.matches : [])
     .filter((match) => allowedIds.has(String(match.id || "")))
@@ -7193,7 +7354,7 @@ ${JSON.stringify(referenceCatalog)}`
   };
 }
 
-async function checkActWithOpenAi(act) {
+async function checkActWithOpenAi(act, options = {}) {
   const client = requireOpenAiClient();
   const compactAct = compactActPayload(act || {});
   const result = await client.responses.create({
@@ -7212,7 +7373,7 @@ ${JSON.stringify(compactAct)}`,
         schema: actCheckAiSchema
       }
     }
-  });
+  }, options.signal ? { signal: options.signal } : undefined);
   return parseOpenAiJson(result);
 }
 
@@ -9450,7 +9611,7 @@ ${redactedQuestion}`,
           schema: assistantAiSchema
         }
       }
-    });
+    }, options.signal ? { signal: options.signal } : undefined);
 
     const parsed = parseOpenAiJson(result);
     const parsedAnswer = parsed.risposta || "";
@@ -9798,7 +9959,27 @@ function amlMessage(ok) {
     : "Attenzione: questo cliente ha raggiunto o supererebbe il limite di 500€ in contanti negli ultimi 7 giorni. Per rispettare le norme antiriciclaggio, utilizzare un metodo di pagamento tracciabile.";
 }
 
-async function cashAntiMoneyLaunderingCheck(input = {}) {
+function cashTransactionLockKeys(act = {}, existing = null) {
+  const keys = new Set();
+  const addIdentity = (fiscalCode, clientId) => {
+    const normalizedFiscalCode = normalizeFiscalCode(fiscalCode || "");
+    if (normalizedFiscalCode) keys.add(`cash-limit:cf:${normalizedFiscalCode}`);
+    else if (clientId) keys.add(`cash-limit:client:${clientId}`);
+  };
+  addIdentity(act.codiceFiscale || act.fiscalCode, act.clienteId || act.cliente_id || null);
+  if (existing) addIdentity(existing.codice_fiscale, existing.cliente_id || null);
+  return [...keys].sort();
+}
+
+async function lockCashTransactionIdentity(db, act = {}, existing = null) {
+  // Serializza anche l'upsert anagrafico per lo stesso cliente; per i pagamenti
+  // in contanti lo stesso lock protegge inoltre il calcolo AML dei sette giorni.
+  for (const key of cashTransactionLockKeys(act, existing)) {
+    await db.query("SELECT pg_advisory_xact_lock(hashtext($1::text))", [key]);
+  }
+}
+
+async function cashAntiMoneyLaunderingCheck(input = {}, db = pool) {
   const fiscalCode = normalizeFiscalCode(input.codice_fiscale || input.fiscalCode || "");
   const clientId = input.cliente_id || input.clienteId || "";
   const currentAmount = numberFrom(input.importo_corrente ?? input.amount ?? input.totale ?? 0);
@@ -9832,7 +10013,7 @@ async function cashAntiMoneyLaunderingCheck(input = {}) {
     values.push(String(actId));
     where.push(`id::text <> $${values.length}::text`);
   }
-  const result = await pool.query(
+  const result = await db.query(
     `SELECT COALESCE(SUM(totale), 0)::numeric AS total
      FROM ${actsTable}
      WHERE ${where.join(" AND ")}`,
@@ -9855,9 +10036,9 @@ async function cashAntiMoneyLaunderingCheck(input = {}) {
   };
 }
 
-async function saveAmlAlert({ check, act = {}, user = null, attoId = null }) {
+async function saveAmlAlert({ check, act = {}, user = null, attoId = null, db = pool }) {
   if (!check || Number(check.totale_previsto || 0) < 500) return;
-  await pool.query(
+  await db.query(
     `INSERT INTO antiriciclaggio_alerts
       (cliente_id, codice_fiscale, atto_id, totale_ultimi_7_giorni, importo_corrente, totale_previsto, superamento, user_id)
      VALUES ($1::bigint,$2::text,$3::bigint,$4::numeric,$5::numeric,$6::numeric,$7::numeric,$8::bigint)`,
@@ -9874,41 +10055,46 @@ async function saveAmlAlert({ check, act = {}, user = null, attoId = null }) {
   );
 }
 
-async function saveDocumentIntegrityLog(act = {}, attoId = null, user = null) {
+async function saveDocumentIntegrityLog(act = {}, attoId = null, user = null, options = {}) {
   const legal = act.payload?.legalSignature || act.legalSignature || null;
   if (!legal?.documentHashSha256 || !attoId) return null;
-  const result = await pool.query(
-    `INSERT INTO document_integrity_logs
-      (atto_id, practice_number, hash_sha256, timestamp_firma, geolocation, operator_id, payload)
-     VALUES ($1::bigint,$2::text,$3::text,$4::timestamptz,$5::jsonb,$6::bigint,$7::jsonb)
-     RETURNING *`,
-    [
-      attoId,
-      act.practiceNumber || act.payload?.practiceNumber || "",
-      legal.documentHashSha256,
-      legal.timestamp || new Date().toISOString(),
-      sanitizeForPostgres(legal.location || {}),
-      legal.operatorId || user?.id || null,
-      sanitizeForPostgres(legal)
-    ]
-  ).catch((error) => {
+  const db = options.db || pool;
+  try {
+    const result = await db.query(
+      `INSERT INTO document_integrity_logs
+        (atto_id, practice_number, hash_sha256, timestamp_firma, geolocation, operator_id, payload)
+       VALUES ($1::bigint,$2::text,$3::text,$4::timestamptz,$5::jsonb,$6::bigint,$7::jsonb)
+       RETURNING *`,
+      [
+        attoId,
+        act.practiceNumber || act.payload?.practiceNumber || "",
+        legal.documentHashSha256,
+        legal.timestamp || new Date().toISOString(),
+        sanitizeForPostgres(legal.location || {}),
+        legal.operatorId || user?.id || null,
+        sanitizeForPostgres(legal)
+      ]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    if (options.strict) throw error;
     console.error("DOCUMENT INTEGRITY LOG ERROR", error);
-    return { rows: [] };
-  });
-  return result.rows[0] || null;
+    return null;
+  }
 }
 
 async function enforceCashAntiMoneyLaundering(act, user, existing = null, options = {}) {
   if (!isCashPaymentMethod(act.paymentMethod)) return null;
+  const db = options.db || pool;
   const check = await cashAntiMoneyLaunderingCheck({
     codice_fiscale: act.codiceFiscale,
     cliente_id: existing?.cliente_id || act.clienteId || null,
     data_atto: act.dataAtto,
     importo_corrente: act.totale,
     atto_id: existing?.id || act.id || null
-  });
+  }, db);
   if (!isDraftLikeStatus(act.status) && (existing?.id || act.id)) {
-    await saveAmlAlert({ check, act, user, attoId: existing?.id || act.id || null });
+    await saveAmlAlert({ check, act, user, attoId: existing?.id || act.id || null, db });
   }
   if (!isDraftLikeStatus(act.status) && !check.ok && !options.allowApproved) {
     const error = new Error(check.messaggio);
@@ -10166,14 +10352,62 @@ function writePrivacyPolicyPdf(response, policy) {
   doc.end();
 }
 
+async function cleanupLegacyPollingAuditLogs() {
+  const retentionDays = Math.min(Math.max(Number(process.env.AUDIT_POLLING_RETENTION_DAYS || 30), 7), 365);
+  // Pulizia limitata per avvio: elimina solo il vecchio rumore di polling riuscito,
+  // preservando errori, mutazioni e tutti gli eventi operativi espliciti.
+  return pool.query({
+    text: `WITH expired AS (
+             SELECT ctid
+             FROM audit_logs
+             WHERE action = 'api_request'
+               AND method IN ('GET', 'HEAD', 'OPTIONS')
+               AND COALESCE(status_code, 200) < 400
+               AND created_at < NOW() - ($1::integer * INTERVAL '1 day')
+             ORDER BY created_at ASC
+             LIMIT 10000
+           )
+           DELETE FROM audit_logs
+           WHERE ctid IN (SELECT ctid FROM expired)`,
+    values: [retentionDays],
+    query_timeout: Math.min(databaseQueryTimeoutMs, 10000)
+  });
+}
+
+async function runDatabaseMigration(sql, label) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('statement_timeout', $1::text, TRUE)", [String(databaseMigrationTimeoutMs)]);
+    await client.query({
+      text: sql,
+      query_timeout: databaseMigrationTimeoutMs + 5000
+    });
+    await client.query("COMMIT");
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error(`ROLLBACK MIGRAZIONE ${label} NON RIUSCITO`, rollbackError);
+    }
+    error.message = `${label}: ${error.message || error}`;
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function initDatabase() {
   const schema = await fs.readFile(path.join(__dirname, "schema.sql"), "utf8");
-  await pool.query(schema);
+  await runDatabaseMigration(schema, "Migrazione schema principale");
+  await cleanupLegacyPollingAuditLogs().catch((error) => {
+    console.warn("Pulizia audit polling non completata:", error.message || error);
+  });
   const gemologicalEncyclopediaMigration = await fs.readFile(
     path.join(__dirname, "migrations", "20260727_gemological_encyclopedia.sql"),
     "utf8"
   );
-  await pool.query(gemologicalEncyclopediaMigration);
+  await runDatabaseMigration(gemologicalEncyclopediaMigration, "Migrazione laboratorio gemmologico");
   await setupAiVectorStorage();
   await seedAurumBundledKnowledgeDocuments();
   await bootstrapStores();
@@ -11101,21 +11335,9 @@ function buildActsQuery({ store, field, q, fusionEligible, includeDrafts, includ
       where.push(`LOWER(${column}) LIKE $${values.length}::text`);
     }
   } else if (q) {
-    values.push(`%${String(q).toLowerCase()}%`);
+    values.push(`%${String(q).trim().toLowerCase().slice(0, 128)}%`);
     const parameter = `$${values.length}::text`;
-    where.push(`(
-      LOWER(COALESCE(practice_number, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(cliente_nome, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(cliente_cognome, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(codice_fiscale, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(telefono, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(store, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(payment_method, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(data_atto::text, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(totale::text, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(peso_oro::text, '')) LIKE ${parameter}
-      OR LOWER(COALESCE(payload::text, '')) LIKE ${parameter}
-    )`);
+    where.push(`search_text LIKE ${parameter}`);
   }
 
   if (fusionEligible === "true") {
@@ -11225,8 +11447,9 @@ async function enrichActStore(act, user) {
   return act;
 }
 
-async function findExisting(identifier) {
-  const result = await pool.query(`SELECT * FROM ${actsTable} WHERE id::text = $1::text OR practice_number = $1::text LIMIT 1`, [
+async function findExisting(identifier, db = pool, options = {}) {
+  const lockClause = options.forUpdate ? " FOR UPDATE" : "";
+  const result = await db.query(`SELECT *, xmin::text AS row_version FROM ${actsTable} WHERE id::text = $1::text OR practice_number = $1::text LIMIT 1${lockClause}`, [
     String(identifier ?? "")
   ]);
   return result.rowCount ? result.rows[0] : null;
@@ -11271,7 +11494,14 @@ function completedActEditError() {
   return error;
 }
 
-async function upsertClientFromAct(act) {
+function concurrentActEditError() {
+  const error = new Error("L'atto è stato aggiornato da un altro utente. Ricarica la scheda prima di salvare nuovamente.");
+  error.status = 409;
+  error.code = "ACT_CONCURRENT_UPDATE";
+  return error;
+}
+
+async function upsertClientFromAct(act, db = pool) {
   const fiscalCode = normalizeFiscalCode(act.codiceFiscale || act.fiscalCode);
   if (!fiscalCode) return null;
   const payload = {
@@ -11329,9 +11559,9 @@ async function upsertClientFromAct(act) {
     nullIfEmpty(act.payload?.accountHolder || act.intestatario_conto || act.accountHolder),
     sanitizeForPostgres(payload)
   ];
-  const existing = await pool.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1", [fiscalCode]);
+  const existing = await db.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1 FOR UPDATE", [fiscalCode]);
   const result = existing.rowCount
-    ? await pool.query(
+    ? await db.query(
       `UPDATE clienti SET
         nome = COALESCE(NULLIF($2::text, ''), nome),
         cognome = COALESCE(NULLIF($3::text, ''), cognome),
@@ -11352,7 +11582,7 @@ async function upsertClientFromAct(act) {
        RETURNING *`,
       [...values, existing.rows[0].id]
     )
-    : await pool.query(
+    : await db.query(
       `INSERT INTO clienti
         (codice_fiscale, nome, cognome, telefono, email, iban, negozio_id, indirizzo, provincia, documento_tipo, documento_numero, metodo_pagamento, intestatario_conto, payload)
        VALUES ($1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::bigint, $8::text, $9::text, $10::text, $11::text, $12::text, $13::text, $14::jsonb)
@@ -18832,17 +19062,18 @@ async function listCourses(user = {}) {
   await seedAcademyQualificationSystem().catch((error) => {
     console.warn("Sistema qualifiche OroActive Academy non inizializzato:", error.message);
   });
-  const faculties = await pool.query("SELECT * FROM academy_faculties WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
-  const categories = await pool.query("SELECT * FROM course_categories WHERE active = TRUE ORDER BY sort_order ASC, name ASC");
-  const sections = await pool.query(
-    `SELECT s.*, c.name AS category_name
-     FROM course_sections s
-     LEFT JOIN course_categories c ON c.id = s.category_id
-     WHERE s.active = TRUE
-     ORDER BY c.sort_order ASC, s.sort_order ASC, s.title ASC`
-  );
-  const courses = await pool.query(
-    `SELECT c.*, cat.name AS category_name, sec.title AS section_title, faculty.name AS faculty_name,
+  const [faculties, categories, sections, courses] = await Promise.all([
+    pool.query("SELECT * FROM academy_faculties WHERE active = TRUE ORDER BY sort_order ASC, name ASC"),
+    pool.query("SELECT * FROM course_categories WHERE active = TRUE ORDER BY sort_order ASC, name ASC"),
+    pool.query(
+      `SELECT s.*, c.name AS category_name
+       FROM course_sections s
+       LEFT JOIN course_categories c ON c.id = s.category_id
+       WHERE s.active = TRUE
+       ORDER BY c.sort_order ASC, s.sort_order ASC, s.title ASC`
+    ),
+    pool.query(
+      `SELECT c.*, cat.name AS category_name, sec.title AS section_title, faculty.name AS faculty_name,
             COALESCE(mat.file_url, '') AS material_url,
             COALESCE(mat.title, '') AS material_title,
             mat.id AS material_id,
@@ -18883,9 +19114,10 @@ async function listCourses(user = {}) {
      LEFT JOIN user_course_progress progress ON progress.course_id = c.id AND progress.user_id = $1::bigint
      LEFT JOIN academy_user_notes notes ON notes.course_id = c.id AND notes.user_id = $1::bigint
      WHERE ($2::text = 'founder' OR c.active = TRUE)
-     ORDER BY cat.sort_order ASC, c.order_index ASC, c.created_at DESC`,
-    [userId, role]
-  );
+       ORDER BY cat.sort_order ASC, c.order_index ASC, c.created_at DESC`,
+      [userId, role]
+    )
+  ]);
   const courseRows = courses.rows;
   const courseIds = courseRows.map((course) => Number(course.id)).filter(Number.isFinite);
   const quizByCourse = new Map();
@@ -20451,14 +20683,45 @@ async function getAcademyCourse(courseId, user = {}) {
     throw error;
   }
   await assertAcademyCoursePrerequisites(course, user);
-  const modules = await listAcademyModules(courseId);
-  for (const module of modules) {
-    module.lessons = await listAcademyLessons(module.id);
-    for (const lesson of module.lessons) {
-      lesson.materials = await listAcademyMaterials(lesson.id);
-    }
+  const [modules, lessonResult, materialResult] = await Promise.all([
+    listAcademyModules(courseId),
+    pool.query(
+      `SELECT * FROM academy_lessons
+       WHERE course_id = $1::bigint AND active = TRUE
+       ORDER BY academy_module_id ASC, sort_order ASC, id ASC`,
+      [courseId]
+    ),
+    pool.query(
+      `SELECT material.*
+       FROM academy_materials material
+       INNER JOIN academy_lessons lesson ON lesson.id = material.academy_lesson_id
+       WHERE lesson.course_id = $1::bigint
+       ORDER BY material.academy_lesson_id ASC, material.sort_order ASC, material.id ASC`,
+      [courseId]
+    )
+  ]);
+  const materialsByLesson = new Map();
+  for (const material of materialResult.rows) {
+    const key = String(material.academy_lesson_id || "");
+    if (!materialsByLesson.has(key)) materialsByLesson.set(key, []);
+    materialsByLesson.get(key).push(material);
   }
-  return { ...course, modules };
+  const lessonsByModule = new Map();
+  for (const lesson of lessonResult.rows) {
+    const key = String(lesson.academy_module_id || "");
+    if (!lessonsByModule.has(key)) lessonsByModule.set(key, []);
+    lessonsByModule.get(key).push({
+      ...lesson,
+      materials: materialsByLesson.get(String(lesson.id)) || []
+    });
+  }
+  return {
+    ...course,
+    modules: modules.map((module) => ({
+      ...module,
+      lessons: lessonsByModule.get(String(module.id)) || []
+    }))
+  };
 }
 
 async function createAcademyCourse(input = {}, user = {}) {
@@ -22514,7 +22777,6 @@ async function saveAct(input, user, req = null) {
       }
     };
   }
-  const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing, { allowApproved: Boolean(approvalCheck.approved) });
   if (["completed", "archived_completed"].includes(statusCode)) {
     await assertQualityAllowsFinalSave({ draft_data: { ...act.payload, status: statusCode } }, user, { allowApproved: Boolean(approvalCheck.approved) });
   }
@@ -22522,7 +22784,13 @@ async function saveAct(input, user, req = null) {
   const archivedAt = ["archived_incomplete", "archived_completed"].includes(statusCode) ? nowIso : null;
   const suspendedAt = statusCode === "suspended" ? nowIso : null;
   const suspendedBy = statusCode === "suspended" ? user?.id || null : null;
-  const result = await pool.query(
+  const { result, finalRow } = await withDatabaseTransaction(async (db) => {
+    await lockCashTransactionIdentity(db, act, existing);
+    const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing, {
+      allowApproved: Boolean(approvalCheck.approved),
+      db
+    });
+    const result = await db.query(
     `INSERT INTO ${actsTable} (
       cliente_nome, cliente_cognome, codice_fiscale, telefono,
       peso_oro, quotazione, totale, data_atto,
@@ -22572,7 +22840,26 @@ async function saveAct(input, user, req = null) {
       null,
       null
     ]
-  );
+    );
+    await saveDocumentIntegrityLog(act, result.rows[0].id, user, { db, strict: true });
+    if (!isDraftLikeStatus(act.status)) {
+      await saveAmlAlert({ check: amlCheck, act, user, attoId: result.rows[0].id, db });
+    }
+    const client = await upsertClientFromAct({ ...act, payload: act.payload }, db);
+    let transactionFinalRow = result.rows[0];
+    if (client?.id) {
+      const withClient = await db.query(
+      `UPDATE ${actsTable}
+       SET cliente_id = $2::bigint,
+           iban = COALESCE(NULLIF($3::text, ''), iban)
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [result.rows[0].id, client.id, client.iban || act.iban || ""]
+      );
+      transactionFinalRow = withClient.rows[0] || transactionFinalRow;
+    }
+    return { result, finalRow: transactionFinalRow };
+  });
   void logUserActivity({
     userId: user?.id,
     actorId: user?.id,
@@ -22588,21 +22875,6 @@ async function saveAct(input, user, req = null) {
     description: `Atto ${act.practiceNumber} salvato`,
     metadata: { practiceNumber: act.practiceNumber, status: statusCode, store: act.store }
   });
-  await saveDocumentIntegrityLog(act, result.rows[0].id, user);
-  if (!isDraftLikeStatus(act.status)) await saveAmlAlert({ check: amlCheck, act, user, attoId: result.rows[0].id });
-  const client = await upsertClientFromAct({ ...act, payload: act.payload });
-  let finalRow = result.rows[0];
-  if (client?.id) {
-    const withClient = await pool.query(
-      `UPDATE ${actsTable}
-       SET cliente_id = $2::bigint,
-           iban = COALESCE(NULLIF($3::text, ''), iban)
-       WHERE id = $1::bigint
-       RETURNING *`,
-      [result.rows[0].id, client.id, client.iban || act.iban || ""]
-    );
-    finalRow = withClient.rows[0] || finalRow;
-  }
   const finalAct = rowToAct(finalRow, { full: false });
   const shield = await persistAurumShieldForAct(finalRow, user).catch((error) => {
     console.error("AURUM SHIELD SAVE ERROR", error);
@@ -22775,10 +23047,19 @@ async function updateAct(identifier, input, user, req = null) {
     nullIfEmpty(suspension.reason),
     sanitizeForPostgres(suspension.reasons)
   ];
-  await enforceCashAntiMoneyLaundering(act, user, existing, { allowApproved: Boolean(approvalCheck.approved) });
-  let result;
-  try {
-    result = await pool.query(
+  const { result, finalRow } = await withDatabaseTransaction(async (db) => {
+    const lockedExisting = await findExisting(existing.id, db, { forUpdate: true });
+    if (!lockedExisting) return { result: { rowCount: 0, rows: [] }, finalRow: null };
+    if (!canAccessAct(lockedExisting, user) || !canEditAct(lockedExisting, user)) throw completedActEditError();
+    if (String(lockedExisting.row_version || "") !== String(existing.row_version || "")) {
+      throw concurrentActEditError();
+    }
+    await lockCashTransactionIdentity(db, act, lockedExisting);
+    await enforceCashAntiMoneyLaundering(act, user, lockedExisting, {
+      allowApproved: Boolean(approvalCheck.approved),
+      db
+    });
+    const result = await db.query(
       `UPDATE ${actsTable} SET
         cliente_nome = $2::text,
         cliente_cognome = $3::text,
@@ -22853,11 +23134,24 @@ async function updateAct(identifier, input, user, req = null) {
        RETURNING *`,
       updateValues
     );
-  } catch (err) {
-    console.error("UPDATE ATTO ERROR", err);
-    throw err;
-  }
-  if (!result.rowCount) return null;
+    if (!result.rowCount) return { result, finalRow: null };
+    await saveDocumentIntegrityLog(act, result.rows[0].id, user, { db, strict: true });
+    const client = await upsertClientFromAct({ ...act, payload: act.payload }, db);
+    let transactionFinalRow = result.rows[0];
+    if (client?.id) {
+      const withClient = await db.query(
+        `UPDATE ${actsTable}
+         SET cliente_id = $2::bigint,
+             iban = COALESCE(NULLIF($3::text, ''), iban)
+         WHERE id = $1::bigint
+         RETURNING *`,
+        [result.rows[0].id, client.id, client.iban || act.iban || ""]
+      );
+      transactionFinalRow = withClient.rows[0] || transactionFinalRow;
+    }
+    return { result, finalRow: transactionFinalRow };
+  });
+  if (!result.rowCount || !finalRow) return null;
   void logUserActivity({
     userId: user?.id,
     actorId: user?.id,
@@ -22873,20 +23167,6 @@ async function updateAct(identifier, input, user, req = null) {
     description: `Atto ${act.practiceNumber} aggiornato`,
     metadata: { practiceNumber: act.practiceNumber, status: normalizedStatus, store: act.store }
   });
-  await saveDocumentIntegrityLog(act, result.rows[0].id, user);
-  const client = await upsertClientFromAct({ ...act, payload: act.payload });
-  let finalRow = result.rows[0];
-  if (client?.id) {
-    const withClient = await pool.query(
-      `UPDATE ${actsTable}
-       SET cliente_id = $2::bigint,
-           iban = COALESCE(NULLIF($3::text, ''), iban)
-       WHERE id = $1::bigint
-       RETURNING *`,
-      [result.rows[0].id, client.id, client.iban || act.iban || ""]
-    );
-    finalRow = withClient.rows[0] || finalRow;
-  }
   const finalAct = rowToAct(finalRow, { full: false });
   const shield = await persistAurumShieldForAct(finalRow, user).catch((error) => {
     console.error("AURUM SHIELD UPDATE ERROR", error);
@@ -23757,37 +24037,8 @@ async function loginUser(identifier, password, req = null) {
   };
 }
 
-async function registerFaceId(user, credentialId) {
-  const credential = String(credentialId || "").trim();
-  if (!credential) {
-    const error = new Error("Credenziale Face ID non valida");
-    error.status = 400;
-    throw error;
-  }
-  const result = await pool.query(
-    `UPDATE utenti SET face_id_credential = $2, updated_at = NOW() WHERE id = $1
-     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen`,
-    [user.id, credential]
-  );
-  return publicUser(result.rows[0]);
-}
-
-async function loginWithFaceId(identifier, credentialId, req = null) {
-  const result = await pool.query(
-    "SELECT * FROM utenti WHERE LOWER(username) = LOWER($1) AND face_id_credential = $2",
-    [identifier || "", String(credentialId || "")]
-  );
-  const user = result.rows[0];
-  if (!user) {
-    const error = new Error("Face ID non registrato per questo utente");
-    error.status = 401;
-    throw error;
-  }
-  if (user.attivo === false) {
-    const error = new Error("Utente non attivo");
-    error.status = 403;
-    throw error;
-  }
+async function loginWithWebAuthn(credential, req = null) {
+  const user = await webAuthnStore.verifyAuthentication(credential);
   await touchUserLastSeen(user, { force: true });
   const safeUser = publicUser(user);
   void logUserActivity({
@@ -23796,7 +24047,7 @@ async function loginWithFaceId(identifier, credentialId, req = null) {
     activityType: "login",
     entityType: "sessione",
     entityId: user.id,
-    description: "Login Face ID effettuato"
+    description: "Login passkey Face ID effettuato"
   });
   void writeAuditLog({
     req,
@@ -23806,7 +24057,7 @@ async function loginWithFaceId(identifier, credentialId, req = null) {
     entityId: user.id,
     entityLabel: auditUserName(user),
     afterData: safeUser,
-    metadata: { login_method: "face_id" }
+    metadata: { login_method: "webauthn" }
   });
   const token = signUserToken(safeUser);
   return {
@@ -23826,14 +24077,79 @@ async function userFromAuthorizationHeader(header = "") {
   return findUserById(decoded.sub);
 }
 
-app.get("/api/health", async (_request, response) => {
+async function checkDatabaseReadiness() {
+  let timeoutId;
+  let timedOut = false;
+  const connectionPromise = pool.connect();
+  try {
+    const client = await Promise.race([
+      connectionPromise,
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          timedOut = true;
+          const error = new Error("Database health check timeout");
+          error.code = "HEALTH_CHECK_TIMEOUT";
+          reject(error);
+        }, healthCheckTimeoutMs);
+      })
+    ]);
+    try {
+      await client.query({ text: "SELECT 1 AS ready", query_timeout: healthCheckTimeoutMs });
+      runtimeStatus.databaseReachable = true;
+      runtimeStatus.databaseError = "";
+      return true;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    runtimeStatus.databaseReachable = false;
+    runtimeStatus.databaseError = error?.message || "Database non disponibile";
+    if (timedOut) {
+      void connectionPromise.then((client) => client.release(true)).catch(() => {});
+    }
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+app.get("/api/live", async (_request, response) => {
   const version = await getBuildMetadata();
   response.json({
     ok: true,
     service: "oroactive-gestionale",
-    status: runtimeStatus.databaseReady ? "healthy" : "starting",
-    database: runtimeStatus.databaseReady ? "ready" : "initializing_or_unavailable",
-    database_error: runtimeStatus.databaseError || null,
+    status: "alive",
+    started_at: runtimeStatus.startedAt,
+    checked_at: new Date().toISOString(),
+    version
+  });
+});
+
+app.get("/api/health", async (_request, response) => {
+  const version = await getBuildMetadata();
+  const databaseReachable = await checkDatabaseReadiness();
+  const initializationReady = runtimeStatus.initializationComplete && !runtimeStatus.initializationError;
+  const databaseReady = databaseReachable && initializationReady;
+  const status = databaseReady
+    ? "healthy"
+    : runtimeStatus.initializationError
+      ? "initialization_failed"
+      : databaseReachable
+        ? "initializing"
+        : "unavailable";
+  response.status(databaseReady ? 200 : 503).json({
+    ok: databaseReady,
+    service: "oroactive-gestionale",
+    status,
+    database: databaseReady ? "ready" : databaseReachable ? "reachable" : "unavailable",
+    initialization: initializationReady ? "ready" : runtimeStatus.initializationError ? "failed" : "in_progress",
+    database_error: databaseReady
+      ? null
+      : runtimeStatus.initializationError
+        ? "Inizializzazione database non completata"
+        : databaseReachable
+          ? "Inizializzazione database in corso"
+          : "Database non disponibile o non risponde entro il tempo previsto",
     started_at: runtimeStatus.startedAt,
     checked_at: new Date().toISOString(),
     version
@@ -23854,7 +24170,8 @@ app.get("/api/version", async (_request, response) => {
     environment: version.environment,
     packageVersion: version.packageVersion,
     assetBuildId: version.assetBuildId,
-    catalogCount: version.catalogCount
+    catalogCount: version.catalogCount,
+    started_at: runtimeStatus.startedAt
   });
 });
 
@@ -23872,7 +24189,8 @@ app.get("/version.json", async (_request, response) => {
     environment: version.environment,
     packageVersion: version.packageVersion,
     assetBuildId: version.assetBuildId,
-    catalogCount: version.catalogCount
+    catalogCount: version.catalogCount,
+    started_at: runtimeStatus.startedAt
   });
 });
 
@@ -23906,19 +24224,34 @@ app.post("/api/login", async (request, response, next) => {
   }
 });
 
-app.post("/api/auth/faceid/login", async (request, response, next) => {
+app.post("/api/auth/webauthn/login/options", async (_request, response, next) => {
   try {
-    response.json(await loginWithFaceId(request.body.username, request.body.credentialId, request));
+    response.json({ options: await webAuthnStore.authenticationOptions() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/webauthn/login/verify", async (request, response, next) => {
+  try {
+    response.json(await loginWithWebAuthn(request.body?.credential, request));
   } catch (error) {
     void writeAuditLog({
       req: request,
       action: "login_failed",
       entityType: "sessione",
-      entityLabel: request.body?.username || "",
-      metadata: { reason: error.message, status: error.status || 500, login_method: "face_id" }
+      entityLabel: "Passkey Face ID",
+      metadata: { reason: error.message, status: error.status || 500, login_method: "webauthn" }
     });
     next(error);
   }
+});
+
+app.post("/api/auth/faceid/login", (_request, response) => {
+  response.status(410).json({
+    ok: false,
+    error: "La precedente registrazione Face ID non è più valida. Accedi con password e registra nuovamente Face ID."
+  });
 });
 
 app.post("/api/auth/logout", async (request, response) => {
@@ -26831,10 +27164,11 @@ app.post("/api/giacenza/trasferimenti", requireOperationalQualification("STOCK_M
 
 app.post("/api/ai/leggi-documento", async (request, response, next) => {
   try {
-    const raw = await readDocumentWithOpenAi(
+    const raw = await withRequestAbortSignal(request, response, (signal) => readDocumentWithOpenAi(
       request.body.immagine_fronte || request.body.frontImage || request.body.front,
-      request.body.immagine_retro || request.body.backImage || request.body.back
-    );
+      request.body.immagine_retro || request.body.backImage || request.body.back,
+      { signal }
+    ));
     response.json(raw);
   } catch (error) {
     if (!error.status) error.status = 502;
@@ -26845,7 +27179,9 @@ app.post("/api/ai/leggi-documento", async (request, response, next) => {
 
 app.post("/api/ai/controlla-atto", async (request, response, next) => {
   try {
-    response.json(await checkActWithOpenAi(request.body.atto || request.body.act || request.body));
+    response.json(await withRequestAbortSignal(request, response, (signal) => (
+      checkActWithOpenAi(request.body.atto || request.body.act || request.body, { signal })
+    )));
   } catch (error) {
     if (!error.status) error.status = 502;
     if (!error.message) error.message = "Aurum Shield e Controllo Qualità non disponibili.";
@@ -26856,14 +27192,15 @@ app.post("/api/ai/controlla-atto", async (request, response, next) => {
 app.post("/api/ai/assistente", async (request, response, next) => {
   try {
     const question = request.body.domanda || request.body.message || request.body.question || "";
-    const answer = await askOroActiveAssistant(question, {
+    const answer = await withRequestAbortSignal(request, response, (signal) => askOroActiveAssistant(question, {
       mode: request.body.mode,
       section: request.body.section || "",
       context: sanitizeForPostgres(request.body.context || {}),
       interface: request.body.interface || "",
       allowWeb: request.body.allowWeb === true,
-      user: request.user
-    });
+      user: request.user,
+      signal
+    }));
     void writeAuditLog({
       req: request,
       user: request.user,
@@ -26895,10 +27232,11 @@ app.get("/api/ai/status", async (_request, response, next) => {
 
 app.post("/api/training/gold-coins/identify", async (request, response, next) => {
   try {
-    const result = await identifyGoldCoinWithOpenAi({
+    const result = await withRequestAbortSignal(request, response, (signal) => identifyGoldCoinWithOpenAi({
       image: request.body.image || request.body.photo || request.body.dataUrl || "",
-      catalog: request.body.catalog || []
-    });
+      catalog: request.body.catalog || [],
+      signal
+    }));
     void writeAuditLog({
       req: request,
       user: request.user,
@@ -27186,12 +27524,46 @@ app.delete("/api/aurum/support-requests/:id", async (request, response, next) =>
   }
 });
 
-app.post("/api/auth/faceid/register", async (request, response, next) => {
+app.post("/api/auth/webauthn/register/options", async (request, response, next) => {
   try {
-    response.json({ user: await registerFaceId(request.user, request.body.credentialId) });
+    response.json({ options: await webAuthnStore.registrationOptions(request.user, request.body?.password) });
   } catch (error) {
     next(error);
   }
+});
+
+app.post("/api/auth/webauthn/register/verify", async (request, response, next) => {
+  try {
+    response.json(await webAuthnStore.verifyRegistration(request.user, request.body?.credential));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/webauthn/register/activate", async (request, response, next) => {
+  try {
+    await webAuthnStore.activateRegistration(request.user, request.body?.credential);
+    const updatedUser = publicUser(await findUserById(request.user.id));
+    void writeAuditLog({
+      req: request,
+      user: updatedUser,
+      action: "webauthn_registered",
+      entityType: "utente",
+      entityId: updatedUser.id,
+      entityLabel: auditUserName(updatedUser),
+      metadata: { login_method: "webauthn", user_verification: "required", critical: true }
+    });
+    response.json({ ok: true, user: updatedUser });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/faceid/register", (_request, response) => {
+  response.status(410).json({
+    ok: false,
+    error: "La registrazione Face ID precedente è stata sostituita dalla passkey sicura."
+  });
 });
 
 app.get(["/api/utenti", "/api/users"], async (_request, response, next) => {
@@ -28980,6 +29352,11 @@ app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) =
   }
 });
 
+app.use("/api", (_request, response) => {
+  setNoStoreHeaders(response);
+  response.status(404).json({ ok: false, error: "Endpoint API non trovato" });
+});
+
 app.get("/reset-cache", async (_request, response) => {
   const metadata = await getBuildMetadata();
   const target = `/?v=${encodeURIComponent(metadata.buildNumber || Date.now())}&cache-reset=1`;
@@ -29015,16 +29392,65 @@ app.get("/reset-cache", async (_request, response) => {
 </html>`);
 });
 
-app.get("/service-worker.js", (request, response, next) => {
-  setNoStoreHeaders(response);
-  next();
+const publicRootStaticFiles = new Set([
+  "app.js",
+  "frontend-config.js",
+  "manifest.json",
+  "manifest.webmanifest",
+  "oroactive-logo.png",
+  "service-worker.js",
+  "styles.css"
+]);
+const blockedStaticPathPrefixes = [
+  "/.git",
+  "/.github",
+  "/docs",
+  "/migrations",
+  "/node_modules",
+  "/private_uploads",
+  "/scripts",
+  "/services",
+  "/tests",
+  "/work"
+];
+
+function sendPublicStaticFile(request, response, next) {
+  const filename = path.basename(request.path || "");
+  if (!publicRootStaticFiles.has(filename) || request.path !== `/${filename}`) return next();
+  staticCacheHeaders(response, filename);
+  response.sendFile(path.join(__dirname, filename));
+}
+
+app.get("/service-worker.js", sendPublicStaticFile);
+for (const filename of publicRootStaticFiles) {
+  if (filename === "service-worker.js") continue;
+  app.get(`/${filename}`, sendPublicStaticFile);
+}
+
+const secureStaticOptions = {
+  dotfiles: "deny",
+  fallthrough: true,
+  index: false,
+  redirect: false,
+  setHeaders: staticCacheHeaders
+};
+app.use("/icons", express.static(path.join(__dirname, "icons"), secureStaticOptions));
+app.use("/assets/coins", express.static(path.join(__dirname, "assets", "coins"), secureStaticOptions));
+app.use("/assets/academy/gems", express.static(path.join(__dirname, "assets", "academy", "gems"), secureStaticOptions));
+app.get("/shared/aurum-policy.js", (request, response) => {
+  staticCacheHeaders(response, request.path);
+  response.sendFile(path.join(__dirname, "shared", "aurum-policy.js"));
 });
 
-app.use(express.static(__dirname, {
-  extensions: ["html"],
-  setHeaders: staticCacheHeaders
-}));
-app.get("*", (_request, response) => {
+app.get("*", (request, response) => {
+  const requestPath = String(request.path || "/");
+  const lowerPath = requestPath.toLowerCase();
+  const isBlockedPath = blockedStaticPathPrefixes.some((prefix) => lowerPath === prefix || lowerPath.startsWith(`${prefix}/`));
+  // Un file statico mancante o un percorso interno non deve mai ricevere index.html.
+  if (isBlockedPath || path.posix.extname(requestPath)) {
+    setNoStoreHeaders(response);
+    return response.status(404).json({ ok: false, error: "Risorsa non trovata" });
+  }
   setNoStoreHeaders(response);
   response.sendFile(path.join(__dirname, "index.html"));
 });
@@ -29107,7 +29533,8 @@ function safeRouteErrorMessage(request) {
 }
 
 function publicErrorMessage(error, request) {
-  const isDatabaseError = Boolean(error.code || error.severity || error.routine);
+  const isDatabaseError = /^[0-9A-Z]{5}$/.test(String(error.code || ""))
+    || Boolean(error.severity || error.routine);
   if (isDatabaseError) return friendlyDatabaseError(error, request);
   const message = String(error.message || "").trim();
   if (!message || looksTechnicalErrorMessage(message)) return safeRouteErrorMessage(request);
@@ -29135,8 +29562,10 @@ app.listen(port, () => {
 
 initDatabase()
   .then(() => {
-    runtimeStatus.databaseReady = true;
+    runtimeStatus.databaseReachable = true;
     runtimeStatus.databaseError = "";
+    runtimeStatus.initializationComplete = true;
+    runtimeStatus.initializationError = "";
     scheduleBackups();
     startCompetitorAutoSync();
     startOroExpressHourlySync();
@@ -29150,10 +29579,11 @@ initDatabase()
     startCompetitorAiAutoExtraction();
   })
   .catch((error) => {
-    runtimeStatus.databaseReady = false;
+    runtimeStatus.initializationComplete = false;
+    runtimeStatus.initializationError = error?.message || "Errore inizializzazione database";
     runtimeStatus.databaseError = error?.message || "Errore inizializzazione database";
     console.error("Errore inizializzazione database", error);
-    if (process.env.REQUIRE_DATABASE_ON_START === "true") {
+    if (process.env.REQUIRE_DATABASE_ON_START === "true" || (isProduction && process.env.REQUIRE_DATABASE_ON_START !== "false")) {
       process.exit(1);
     }
   });

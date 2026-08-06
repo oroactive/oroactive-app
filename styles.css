@@ -1815,6 +1815,10 @@ body.main-menu-active .splash-screen {
   will-change: left, top;
 }
 
+.aurum-mascot-root.aurum-roaming:not(.aurum-panel-open) {
+  transform: translate3d(var(--aurum-x, 0px), var(--aurum-y, 0px), 0);
+}
+
 .aurum-mascot-root.aurum-panel-open {
   transition: none;
 }
@@ -2957,6 +2961,20 @@ body.main-menu-active .splash-screen {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.coin-catalog-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 215, 0, 0.18);
+  border-radius: 14px;
+  background: rgba(10, 7, 5, 0.42);
+  color: rgba(255, 248, 239, 0.78);
+  font-weight: 850;
 }
 
 .coin-country-group {
@@ -14083,5 +14101,49 @@ input.document-expired {
 
   .gem-quiz-result {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Dock Aurum: sui tablet e telefoni una corsia dedicata evita sovrapposizioni con le CTA. */
+@media (max-width: 1100px) {
+  .main-menu-control-shell,
+  .workspace {
+    box-sizing: border-box;
+    padding-right: max(92px, calc(env(safe-area-inset-right) + 92px));
+  }
+
+  .aurum-mascot-root.aurum-responsive-docked {
+    left: auto !important;
+    top: calc(50dvh - 34px) !important;
+    right: max(10px, calc(env(safe-area-inset-right) + 10px)) !important;
+    bottom: auto !important;
+    transform: none !important;
+  }
+
+  .aurum-mascot-root.aurum-responsive-docked:not(.aurum-panel-open) .aurum-mascot-button {
+    width: 68px;
+    height: 68px;
+    padding: 6px;
+  }
+
+  .aurum-mascot-root.aurum-responsive-docked .aurum-tip {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .main-menu-control-shell,
+  .workspace {
+    padding-right: max(72px, calc(env(safe-area-inset-right) + 72px));
+  }
+
+  .aurum-mascot-root.aurum-responsive-docked {
+    top: calc(50dvh - 28px) !important;
+    right: max(8px, calc(env(safe-area-inset-right) + 8px)) !important;
+  }
+
+  .aurum-mascot-root.aurum-responsive-docked:not(.aurum-panel-open) .aurum-mascot-button {
+    width: 56px;
+    height: 56px;
   }
 }

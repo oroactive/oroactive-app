@@ -282,7 +282,12 @@ test("ogni materiale ha una preview PNG realmente scontornata ad alta risoluzion
   for (const material of GEM_CATALOG_SEED) {
     assert.ok(cutoutSlugs.has(material.slug), `${material.slug}: non selezionato dalla card`);
     const preview = new URL(`../assets/academy/gems/cutouts/${material.slug}-preview.png`, import.meta.url);
+    const thumbnail = new URL(`../assets/academy/gems/thumbnails/${material.slug}-preview.webp`, import.meta.url);
     assert.ok(existsSync(preview), `${material.slug}: scontorno assente`);
+    assert.ok(existsSync(thumbnail), `${material.slug}: thumbnail WebP assente`);
+    const webp = readFileSync(thumbnail);
+    assert.equal(webp.subarray(0, 4).toString("ascii"), "RIFF", `${material.slug}: thumbnail WebP non valida`);
+    assert.equal(webp.subarray(8, 12).toString("ascii"), "WEBP", `${material.slug}: thumbnail WebP non valida`);
     const png = readFileSync(preview);
     assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${material.slug}: PNG non valido`);
     const alpha = pngAlphaStats(png);
@@ -532,7 +537,7 @@ test("nessuna immagine si apre automaticamente quando la scheda usa lo stato nul
   const createRenderer = new Function(
     "state",
     "gemLabApprovedMedia",
-    "gemLabMediaAttributes",
+    "gemLabHdMediaAttributes",
     "escapeHtml",
     `${source}; return renderGemLabZoom;`
   );
@@ -594,7 +599,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260803-aurum-estrazione-19";
+  const expected = "20260806-hardening-performance-20";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);
