@@ -599,7 +599,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260806-hardening-performance-20";
+  const expected = "20260807-quotes-reliability-21";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);

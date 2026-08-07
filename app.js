@@ -224,7 +224,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260806-hardening-performance-20";
+const OROACTIVE_CLIENT_BUILD_ID = "20260807-quotes-reliability-21";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -20620,27 +20620,51 @@ function setFieldIfDetected(selector, value, confidence = "basso") {
   return true;
 }
 
-function loadScriptOnce(src, id) {
+function loadScriptOnce(src, id, timeoutMs = 12000) {
   return new Promise((resolve, reject) => {
-    const existing = document.getElementById(id);
+    let existing = document.getElementById(id);
     if (existing) {
       if (existing.dataset.loaded === "true" || window.Tesseract?.recognize || window.BullionVaultChart) {
         resolve();
         return;
       }
-      existing.addEventListener("load", resolve, { once: true });
-      return;
+      if (existing.dataset.failed === "true") {
+        existing.remove();
+        existing = null;
+      }
     }
-    const script = document.createElement("script");
-    script.id = id;
-    script.src = src;
-    script.async = true;
-    script.onload = () => {
+    const script = existing || document.createElement("script");
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timeout);
+      script.removeEventListener("load", handleLoad);
+      script.removeEventListener("error", handleError);
+    };
+    const handleLoad = () => {
+      if (settled) return;
+      settled = true;
       script.dataset.loaded = "true";
+      delete script.dataset.failed;
+      cleanup();
       resolve();
     };
-    script.onerror = reject;
-    document.head.appendChild(script);
+    const handleError = () => {
+      if (settled) return;
+      settled = true;
+      script.dataset.failed = "true";
+      cleanup();
+      script.remove();
+      reject(new Error(`Script non disponibile: ${src}`));
+    };
+    const timeout = setTimeout(handleError, timeoutMs);
+    script.addEventListener("load", handleLoad, { once: true });
+    script.addEventListener("error", handleError, { once: true });
+    if (!existing) {
+      script.id = id;
+      script.src = src;
+      script.async = true;
+      document.head.appendChild(script);
+    }
   });
 }
 
@@ -21566,7 +21590,8 @@ function formatEuro(value) {
 function formatBullionPrice(value) {
   return new Intl.NumberFormat("it-IT", {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
+    useGrouping: "always"
   }).format(value || 0);
 }
 
@@ -21594,19 +21619,32 @@ function renderQuoteDashboard() {
   const metals = ["Oro", "Argento", "Platino"];
   const rows = metals.map((metal) => {
     const quote = state.bullionVaultPrices[metal];
+    const timestamp = quote?.fetchedAt ? formatDateTime(quote.fetchedAt) : "";
     return `
-      <article>
+      <article class="${quote?.stale ? "quote-stale" : ""}">
         <span>${escapeHtml(metal)}</span>
         <strong>${quote ? `${formatBullionPrice(quote.value)} EUR/kg` : "Dato non inserito"}</strong>
+        ${quote ? `<small>${quote.stale ? "Ultimo dato disponibile" : "Indicativo BullionVault"}${timestamp ? ` · ${escapeHtml(timestamp)}` : ""}</small>` : ""}
       </article>
     `;
   });
   quoteDashboard.innerHTML = rows.join("");
 }
 
+async function waitForBullionVaultChartRender(timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (bullionVaultChart?.querySelector(".highcharts-container svg, svg.highcharts-root")) return true;
+    await wait(200);
+  }
+  return false;
+}
+
 async function initBullionVaultChart() {
   if (!bullionVaultChart || state.bullionChartLoaded) return;
   try {
+    bullionVaultChart.setAttribute("aria-busy", "true");
+    if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = true;
     await loadScriptOnce("https://www.bullionvault.com/chart/bullionvaultchart.js?v=1", "bullionvault-chart-script");
     if (typeof window.BullionVaultChart !== "function") throw new Error("Widget non disponibile");
     bullionVaultChart.innerHTML = "";
@@ -21623,9 +21661,14 @@ async function initBullionVaultChart() {
       switchChartType: false,
       exportButton: false
     }, "bullionVaultChart");
+    if (!(await waitForBullionVaultChartRender())) throw new Error("Grafico BullionVault non renderizzato");
     state.bullionChartLoaded = true;
+    bullionVaultChart.removeAttribute("aria-busy");
     if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = true;
   } catch {
+    state.bullionChartLoaded = false;
+    bullionVaultChart.innerHTML = "";
+    bullionVaultChart.removeAttribute("aria-busy");
     if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = false;
   }
 }
@@ -21633,13 +21676,47 @@ async function initBullionVaultChart() {
 async function refreshBullionVaultPrices(options = {}) {
   try {
     const data = await apiRequest("/bullionvault/prices");
-    state.bullionVaultPrices = Object.fromEntries((data.prices || []).map((quote) => [quote.metal, quote]));
+    const nextPrices = { ...(state.bullionVaultPrices || {}) };
+    (data.prices || []).forEach((quote) => {
+      nextPrices[quote.metal] = { ...quote, stale: false };
+    });
+    (data.unavailable_metals || []).forEach((metal) => {
+      if (nextPrices[metal]) nextPrices[metal] = { ...nextPrices[metal], stale: true };
+    });
+    state.bullionVaultPrices = nextPrices;
     applyBullionVaultPrices();
-    renderQuoteDashboard();
-    if (options.notify) showToast("Quotazioni BullionVault aggiornate.");
+    if (options.notify) showToast(data.partial ? "Quotazioni aggiornate solo in parte: alcuni metalli mostrano l'ultimo dato disponibile." : "Quotazioni BullionVault aggiornate.", data.partial ? "warning" : "success");
+    return { ok: true, partial: Boolean(data.partial), data };
   } catch {
+    state.bullionVaultPrices = Object.fromEntries(Object.entries(state.bullionVaultPrices || {}).map(([metal, quote]) => [metal, { ...quote, stale: true }]));
     renderQuoteDashboard();
     if (options.notify) showToast("Quotazioni BullionVault non disponibili. Puoi inserire il dato manualmente.");
+    return { ok: false, partial: false, data: null };
+  }
+}
+
+async function refreshQuoteDashboardData() {
+  const liveResult = await refreshBullionVaultPrices();
+  let syncWarning = "";
+  if (["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo))) {
+    try {
+      const syncData = await apiRequest("/quotazioni/metals/sync-bullionvault", {
+        method: "POST",
+        body: JSON.stringify({ metals: ["gold", "silver"] })
+      });
+      syncWarning = syncData.warning || "";
+    } catch (error) {
+      syncWarning = cleanUserMessage(error?.message, "Storico oro e argento non sincronizzato.");
+    }
+  }
+  await loadGoldPredictionPanel({ silent: true });
+  if (!state.bullionChartLoaded) void initBullionVaultChart();
+  if (!liveResult.ok) {
+    showToast("Quotazioni live non disponibili; i valori precedenti sono indicati come non aggiornati.", "error");
+  } else if (liveResult.partial || syncWarning) {
+    showToast(syncWarning || "Aggiornamento parziale: alcuni metalli mostrano l'ultimo dato disponibile.", "warning");
+  } else {
+    showToast("Quotazioni e analisi aggiornate.", "success");
   }
 }
 
@@ -21677,7 +21754,8 @@ function formatMetalPerKg(value, currency = "EUR") {
     style: "currency",
     currency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
+    useGrouping: "always"
   }).format(amount)}/kg`;
 }
 
@@ -23745,14 +23823,10 @@ async function loadGoldPredictionPanel(options = {}) {
     const statusData = await apiRequest("/quotazioni/metals/status");
     const currency = encodeURIComponent(statusData.settings?.currency || "EUR");
     const scenario = state.buybackScenario || "standard";
-    const [historyData, latestData, policyData, buybackData, competitorData, prontoGoldQuotesData, competitorSourcesData, competitorSyncData, competitorMarketData, competitorAiStatusData, competitorAiQuotesData, competitorExtractionRulesData] = await Promise.all([
+    const [historyData, policyData, buybackData, competitorData, prontoGoldQuotesData, competitorSourcesData, competitorSyncData, competitorMarketData, competitorAiStatusData, competitorAiQuotesData, competitorExtractionRulesData] = await Promise.all([
       apiRequest(`/quotazioni/metals/history?metals=gold,silver&days=30&currency=${currency}`),
-      apiRequest(`/quotazioni/metals/predictions/latest?metals=gold,silver&currency=${currency}`),
       apiRequest("/quotazioni/buyback-policy"),
-      apiRequest("/quotazioni/buyback-calculate", {
-        method: "POST",
-        body: JSON.stringify({ metals: ["gold", "silver"], currency: decodeURIComponent(currency), horizons: ["today", "24h", "7d", "30d"], scenario })
-      }),
+      apiRequest(`/quotazioni/buyback-preview?metals=gold,silver&currency=${currency}&horizons=today,24h,7d,30d&scenario=${encodeURIComponent(scenario)}`),
       apiRequest(`/quotazioni/competitors/quotes?days=30&limit=500&quote_type=customer_buyback&currency=${currency}`).catch(() => ({ quotes: [], stats: {} })),
       apiRequest(`/quotazioni/competitors/quotes?competitor_name=${encodeURIComponent("Pronto Gold")}&days=30&limit=80&quote_type=customer_buyback&currency=${currency}`).catch(() => ({ quotes: [] })),
       apiRequest("/quotazioni/competitors/sources").catch(() => ({ sources: [] })),
@@ -23769,8 +23843,12 @@ async function loadGoldPredictionPanel(options = {}) {
     };
     state.metalPredictionHistory = historyData.history || {};
     state.goldPredictionHistory = state.metalPredictionHistory.gold || [];
-    state.metalPredictionLatest = latestData.predictions || {};
-    state.goldPredictionLatest = buybackData.predictions || Object.values(state.metalPredictionLatest).flat();
+    state.goldPredictionLatest = buybackData.predictions || [];
+    state.metalPredictionLatest = state.goldPredictionLatest.reduce((accumulator, prediction) => {
+      accumulator[prediction.metal] = accumulator[prediction.metal] || [];
+      accumulator[prediction.metal].push(prediction);
+      return accumulator;
+    }, {});
     state.buybackPolicy = policyData.policy || null;
     state.buybackCalculations = buybackData.calculations || [];
     const quoteMap = new Map();
@@ -26029,10 +26107,8 @@ suspendedPracticesList?.addEventListener("click", (event) => {
   if (approval) withButtonBusy(approval, "Invio...", () => requestSuspendedPracticeApproval(approval.dataset.approvalSuspended));
   if (remove) withButtonBusy(remove, "Elimino...", () => deleteSuspendedPractice(remove.dataset.deleteSuspended));
 });
-document.getElementById("refreshQuoteDashboard")?.addEventListener("click", () => {
-  refreshBullionVaultPrices({ notify: true });
-  initBullionVaultChart();
-  loadGoldPredictionPanel({ silent: true });
+document.getElementById("refreshQuoteDashboard")?.addEventListener("click", (event) => {
+  withButtonBusy(event.currentTarget, "Aggiorno...", refreshQuoteDashboardData);
 });
 syncGoldHistoryButton?.addEventListener("click", () => withButtonBusy(syncGoldHistoryButton, "Sincronizzo...", syncGoldHistory));
 runGoldPredictionButton?.addEventListener("click", () => withButtonBusy(runGoldPredictionButton, "Calcolo...", runGoldPrediction));

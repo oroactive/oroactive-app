@@ -32,6 +32,8 @@ test("backend applica confini statici, header di sicurezza e limiti bounded sepa
   assert.match(serverSource, /Strict-Transport-Security/);
   assert.match(serverSource, /X-Content-Type-Options/);
   assert.match(serverSource, /frame-ancestors 'none'/);
+  assert.match(serverSource, /"style-src 'self' 'unsafe-inline' https:\/\/www\.bullionvault\.com"/);
+  assert.match(serverSource, /"connect-src 'self' https:\/\/www\.bullionvault\.com https:\/\/chart-data\.bullionvault\.com wss:\/\/chart-data\.bullionvault\.com"/);
   assert.match(serverSource, /Referrer-Policy/);
   assert.match(serverSource, /Permissions-Policy/);
   assert.ok(rateLimitBlock.includes('.replace(/\\/+$/, "")'));
@@ -187,6 +189,8 @@ test("runtime serve solo risorse pubbliche, restituisce 404 ai file interni e 50
     assert.equal(home.headers.get("x-content-type-options"), "nosniff");
     assert.equal(home.headers.get("x-frame-options"), "DENY");
     assert.match(home.headers.get("content-security-policy") || "", /frame-ancestors 'none'/);
+    assert.match(home.headers.get("content-security-policy") || "", /style-src[^;]*https:\/\/www\.bullionvault\.com/);
+    assert.match(home.headers.get("content-security-policy") || "", /connect-src[^;]*https:\/\/chart-data\.bullionvault\.com[^;]*wss:\/\/chart-data\.bullionvault\.com/);
     assert.match(home.headers.get("strict-transport-security") || "", /max-age=31536000/);
 
     const installedAppHome = await fetch(`${baseUrl}/index.html`);

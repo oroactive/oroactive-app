@@ -26,6 +26,7 @@ import { createOroExpressExtractor } from "./services/competitors/extractors/oro
 import { createOroInEuroExtractor } from "./services/competitors/extractors/oroInEuroExtractor.js";
 import { createProntoGoldExtractor } from "./services/competitors/extractors/prontoGoldExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
+import { analyzeMetalPredictionHistory } from "./services/marketData/metalPredictionReadiness.js";
 import {
   GOLD_MASTER_BADGE_NAME,
   GOLD_MASTER_CERTIFICATION_NAME,
@@ -279,9 +280,12 @@ const metalPriceProviderPrimary = String(process.env.METAL_PRICE_PROVIDER_PRIMAR
 const metalPriceProviderFallback = String(process.env.METAL_PRICE_PROVIDER_FALLBACK || "manual").toLowerCase();
 const goldPriceProvider = metalPriceProviderPrimary;
 const goldPriceBaseCurrency = String(process.env.METAL_PRICE_CURRENCY || process.env.GOLD_PRICE_BASE_CURRENCY || "EUR").toUpperCase();
-const metalPriceCacheMinutes = Math.max(5, Number(process.env.METAL_PRICE_CACHE_MINUTES || process.env.GOLD_PRICE_UPDATE_INTERVAL_MINUTES || 15));
+const metalPriceCacheMinutes = Math.max(5, Number(process.env.METAL_PRICE_CACHE_MINUTES || process.env.GOLD_PRICE_UPDATE_INTERVAL_MINUTES || 15) || 15);
 const metalPriceSyncDays = Math.min(Math.max(Number(process.env.METAL_PRICE_SYNC_DAYS || 90), 10), 365);
 const goldPriceUpdateIntervalMinutes = metalPriceCacheMinutes;
+const metalPriceAutoSyncEnabled = String(process.env.METAL_PRICE_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
+const metalPriceAutoSyncOnStartup = String(process.env.METAL_PRICE_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
+const metalPriceAutoSyncIntervalMinutes = Math.max(5, Number(process.env.METAL_PRICE_AUTO_SYNC_INTERVAL_MINUTES || metalPriceCacheMinutes) || metalPriceCacheMinutes);
 const competitorAutoSyncEnabled = String(process.env.COMPETITOR_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const competitorAutoSyncIntervalMinutes = Math.max(15, Number(process.env.COMPETITOR_AUTO_SYNC_INTERVAL_MINUTES || 180));
 const competitorAutoSyncOnStartup = String(process.env.COMPETITOR_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
@@ -363,6 +367,15 @@ const competitorAiUsePlaywright = String(process.env.AI_COMPETITOR_USE_PLAYWRIGH
 const competitorAiUserAgent = process.env.AI_COMPETITOR_USER_AGENT || competitorAutoSyncUserAgent;
 const competitorAiExtractionModel = process.env.AI_COMPETITOR_EXTRACTION_MODEL || process.env.COMPETITOR_AI_EXTRACTION_MODEL || openaiModel;
 const competitorAiMaxTextChars = Math.min(Math.max(Number(process.env.COMPETITOR_AI_MAX_TEXT_CHARS || 12000), 3000), 24000);
+const metalPriceAutoSyncState = {
+  enabled: metalPriceAutoSyncEnabled,
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "idle",
+  lastError: ""
+};
 const competitorAutoSyncState = {
   enabled: competitorAutoSyncEnabled,
   running: false,
@@ -903,10 +916,10 @@ const contentSecurityPolicy = [
   // Compatibilità transitoria: index.html e la pagina reset-cache contengono script/style inline.
   // Le altre sorgenti restano limitate all'app e allo script pubblico del grafico BullionVault.
   "script-src 'self' 'unsafe-inline' https://www.bullionvault.com",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://www.bullionvault.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://www.bullionvault.com",
+  "connect-src 'self' https://www.bullionvault.com https://chart-data.bullionvault.com wss://chart-data.bullionvault.com",
   "frame-src 'self' data: blob:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
@@ -2170,13 +2183,22 @@ async function queryMetalPriceHistory({ metal = "gold", currency = "EUR", days =
   const safeDays = Math.min(Math.max(Number(days || 90), 1), 365);
   const safeLimit = Math.min(Math.max(Number(limit || 365), 1), 365);
   const result = await pool.query(
-    `SELECT *
-       FROM metal_price_history
-      WHERE metal = $1::text
-        AND currency = $2::text
-        AND created_at >= NOW() - ($3::int * INTERVAL '1 day')
-      ORDER BY created_at ASC
-      LIMIT $4::int`,
+    `WITH daily_history AS (
+       SELECT DISTINCT ON ((created_at AT TIME ZONE 'UTC')::date) *
+         FROM metal_price_history
+        WHERE metal = $1::text
+          AND currency = $2::text
+          AND created_at >= NOW() - ($3::int * INTERVAL '1 day')
+        ORDER BY (created_at AT TIME ZONE 'UTC')::date DESC, created_at DESC, id DESC
+     ), recent_history AS (
+       SELECT *
+         FROM daily_history
+        ORDER BY created_at DESC, id DESC
+        LIMIT $4::int
+     )
+     SELECT *
+       FROM recent_history
+      ORDER BY created_at ASC, id ASC`,
     [normalizedMetal, normalizedCurrency, safeDays, safeLimit]
   );
   return result.rows.map(publicMetalPriceHistory);
@@ -2380,7 +2402,7 @@ async function syncGoldPriceHistory(user = {}, req = null) {
   return syncMetalPriceHistory("gold", user, req);
 }
 
-async function syncBullionVaultMetalHistory(user = {}, req = null, input = {}) {
+async function syncBullionVaultMetalHistory(user = {}, req = null, input = {}, options = {}) {
   const currency = normalizePredictionCurrency(input.currency || "EUR");
   const metals = (Array.isArray(input.metals) && input.metals.length ? input.metals : ["gold", "silver"])
     .map(normalizePredictionMetal)
@@ -2403,7 +2425,7 @@ async function syncBullionVaultMetalHistory(user = {}, req = null, input = {}) {
         provider_timestamp: quote.fetchedAt,
         raw_payload: quote.rawPayload || { buy: quote.buy, sell: quote.sell, security_id: quote.securityId }
       });
-      void writeAuditLog({
+      if (options.audit !== false) void writeAuditLog({
         req,
         user,
         action: "gold_price_sync",
@@ -2435,6 +2457,38 @@ async function syncBullionVaultMetalHistory(user = {}, req = null, input = {}) {
     results,
     warning: results.map((result) => result.warning).filter(Boolean).join(" ")
   };
+}
+
+async function runMetalPriceAutoSync() {
+  if (!metalPriceAutoSyncEnabled || metalPriceAutoSyncState.running) return;
+  metalPriceAutoSyncState.running = true;
+  metalPriceAutoSyncState.lastRunAt = new Date().toISOString();
+  metalPriceAutoSyncState.lastStatus = "running";
+  metalPriceAutoSyncState.lastError = "";
+  try {
+    const result = await syncBullionVaultMetalHistory({}, null, { metals: ["gold", "silver"], currency: "EUR" }, { audit: false });
+    const degraded = !result.ok || result.results.some((item) => item.mode !== "live");
+    metalPriceAutoSyncState.lastStatus = degraded ? "partial" : "success";
+    metalPriceAutoSyncState.lastError = result.warning || "";
+  } catch (error) {
+    metalPriceAutoSyncState.lastStatus = "failed";
+    metalPriceAutoSyncState.lastError = error.message || "Sincronizzazione automatica metalli non riuscita";
+    console.error("METAL PRICE AUTO SYNC ERROR", error.message || error);
+  } finally {
+    metalPriceAutoSyncState.running = false;
+    metalPriceAutoSyncState.nextRunAt = new Date(Date.now() + metalPriceAutoSyncIntervalMinutes * 60 * 1000).toISOString();
+  }
+}
+
+function startMetalPriceAutoSync() {
+  if (!metalPriceAutoSyncEnabled || metalPriceAutoSyncState.timer) return;
+  metalPriceAutoSyncState.nextRunAt = new Date(Date.now() + metalPriceAutoSyncIntervalMinutes * 60 * 1000).toISOString();
+  if (metalPriceAutoSyncOnStartup) {
+    const startupTimer = setTimeout(() => void runMetalPriceAutoSync(), 1000);
+    startupTimer.unref?.();
+  }
+  metalPriceAutoSyncState.timer = setInterval(() => void runMetalPriceAutoSync(), metalPriceAutoSyncIntervalMinutes * 60 * 1000);
+  metalPriceAutoSyncState.timer.unref?.();
 }
 
 function average(values = []) {
@@ -2656,6 +2710,36 @@ async function latestMetalPredictions({ metal = "gold", currency = "EUR", limit 
   return result.rows.map(publicGoldPrediction).sort((a, b) => (order[a.horizon] ?? 9) - (order[b.horizon] ?? 9));
 }
 
+function metalPredictionHistoryReadiness(history = [], options = {}) {
+  return analyzeMetalPredictionHistory(history.map(publicMetalPriceHistory), options);
+}
+
+function buildSpotOnlyPrediction(price = {}, options = {}) {
+  const current = Number(price.price_per_gram || 0);
+  const horizon = normalizePredictionHorizon(options.horizon || "today");
+  return {
+    metal: normalizePredictionMetal(options.metal || price.metal || "gold"),
+    currency: normalizePredictionCurrency(options.currency || price.currency || "EUR"),
+    horizon,
+    prediction_horizon: horizon,
+    current_price_per_gram: current,
+    predicted_price_per_gram: current,
+    predicted_low_per_gram: current,
+    predicted_high_per_gram: current,
+    trend: "non disponibile",
+    volatility: "media",
+    confidence: "insufficiente",
+    model_name: "spot-only",
+    features: {
+      data_points: Number(options.dataPoints || 1),
+      daily_points: Number(options.dailyPoints || 1),
+      spot_only: true,
+      stale_data: false
+    },
+    explanation: "Prezzo spot corrente disponibile. Trend e previsione non calcolati perché lo storico non ha ancora copertura temporale sufficiente."
+  };
+}
+
 async function predictionHistoryForRequest({ metal = "gold", currency = "EUR", days = 90 } = {}) {
   const settings = await loadGoldPredictionSettings();
   let history = await queryMetalPriceHistory({ metal, currency, days, limit: 365 });
@@ -2663,29 +2747,37 @@ async function predictionHistoryForRequest({ metal = "gold", currency = "EUR", d
     const latest = await latestMetalPriceHistory(metal, currency);
     if (latest) history = [latest];
   }
-  if (history.length >= 10) return { history, demo: false, warning: "" };
-  if (history.length > 0) {
+  if (history.length) {
+    const readiness = metalPredictionHistoryReadiness(history);
     return {
-      history,
+      history: readiness.history,
+      usable: readiness.sufficient,
+      spot: readiness.spot,
       demo: false,
-      warning: `Storico insufficiente: servono almeno 10 rilevazioni per calcolare una previsione base. Rilevazioni disponibili: ${history.length}.`
+      warning: readiness.warning,
+      readiness
     };
   }
   if (settings.demo_mode) {
+    const demoHistory = demoMetalHistory(metal, days, currency);
     return {
-      history: demoMetalHistory(metal, days, currency),
+      history: demoHistory,
+      usable: true,
+      spot: demoHistory.at(-1) || null,
       demo: true,
       warning: "Modalità demo attiva: dati dimostrativi, non usare come prezzo operativo."
     };
   }
   return {
     history: [],
+    usable: false,
+    spot: null,
     demo: false,
     warning: "Storico non disponibile: configurare fonte dati o sincronizzare manualmente."
   };
 }
 
-async function runGoldPredictions(input = {}, user = {}, req = null) {
+async function runGoldPredictions(input = {}, user = {}, req = null, options = {}) {
   const settings = await loadGoldPredictionSettings();
   const metal = normalizePredictionMetal(input.metal || "gold");
   const currency = normalizePredictionCurrency(input.currency || settings.currency || goldPriceBaseCurrency);
@@ -2694,20 +2786,30 @@ async function runGoldPredictions(input = {}, user = {}, req = null) {
     .filter((value, index, array) => array.indexOf(value) === index);
   const days = Math.min(Math.max(Number(settings.history_days || 90), 10), 365);
   const historyBundle = await predictionHistoryForRequest({ metal, currency, days });
+  const persist = options.persist !== false;
   const predictions = [];
-  if (historyBundle.history.length) {
-    for (const horizon of horizons) {
-      const prediction = calculateGoldPrediction(historyBundle.history, {
+  for (const horizon of horizons) {
+    const prediction = historyBundle.usable
+      ? calculateGoldPrediction(historyBundle.history, {
         metal,
         currency,
         horizon,
         model: settings.model || "ensemble",
         demo: historyBundle.demo || settings.demo_mode
-      });
-      predictions.push(await insertGoldPrediction(prediction));
-    }
+      })
+      : historyBundle.spot
+        ? buildSpotOnlyPrediction(historyBundle.spot, {
+          metal,
+          currency,
+          horizon,
+          dataPoints: historyBundle.readiness?.raw_points,
+          dailyPoints: historyBundle.readiness?.daily_points
+        })
+        : null;
+    if (!prediction) continue;
+    predictions.push(persist && historyBundle.usable ? await insertGoldPrediction(prediction) : prediction);
   }
-  void writeAuditLog({
+  if (persist) void writeAuditLog({
     req,
     user,
     action: "gold_prediction_run",
@@ -2726,7 +2828,7 @@ async function runGoldPredictions(input = {}, user = {}, req = null) {
   };
 }
 
-async function runMetalPredictions(input = {}, user = {}, req = null) {
+async function runMetalPredictions(input = {}, user = {}, req = null, options = {}) {
   const settings = await loadGoldPredictionSettings();
   const metals = (Array.isArray(input.metals) && input.metals.length ? input.metals : [input.metal || "gold", "silver"])
     .map(normalizePredictionMetal)
@@ -2736,24 +2838,35 @@ async function runMetalPredictions(input = {}, user = {}, req = null) {
     .map(normalizePredictionHorizon)
     .filter((value, index, array) => array.indexOf(value) === index);
   const days = Math.min(Math.max(Number(settings.history_days || 90), 10), 365);
+  const persist = options.persist !== false;
   const predictions = [];
   const warnings = [];
   for (const metal of metals) {
     const historyBundle = await predictionHistoryForRequest({ metal, currency, days });
     if (historyBundle.warning) warnings.push(`${metal}: ${historyBundle.warning}`);
-    if (!historyBundle.history.length) continue;
     for (const horizon of horizons) {
-      const prediction = calculateGoldPrediction(historyBundle.history, {
+      const prediction = historyBundle.usable
+        ? calculateGoldPrediction(historyBundle.history, {
         metal,
         currency,
         horizon,
         model: settings.model || "ensemble",
         demo: historyBundle.demo || settings.demo_mode
-      });
-      predictions.push(await insertMetalPrediction(prediction));
+        })
+        : historyBundle.spot
+          ? buildSpotOnlyPrediction(historyBundle.spot, {
+            metal,
+            currency,
+            horizon,
+            dataPoints: historyBundle.readiness?.raw_points,
+            dailyPoints: historyBundle.readiness?.daily_points
+          })
+          : null;
+      if (!prediction) continue;
+      predictions.push(persist && historyBundle.usable ? await insertMetalPrediction(prediction) : prediction);
     }
   }
-  void writeAuditLog({
+  if (persist) void writeAuditLog({
     req,
     user,
     action: "gold_prediction_run",
@@ -6575,7 +6688,7 @@ async function insertBuybackCalculation(row = {}) {
   return { ...row, id: result.rows[0]?.id || null, created_at: result.rows[0]?.created_at || null };
 }
 
-async function calculateMetalBuyback(input = {}, user = {}, req = null) {
+async function calculateMetalBuyback(input = {}, user = {}, req = null, options = {}) {
   const settings = await loadBuybackPolicySettings();
   const predictionSettings = await loadGoldPredictionSettings();
   const metals = (Array.isArray(input.metals) && input.metals.length ? input.metals : ["gold", "silver"])
@@ -6586,7 +6699,8 @@ async function calculateMetalBuyback(input = {}, user = {}, req = null) {
     .map(normalizePredictionHorizon)
     .filter((value, index, array) => array.indexOf(value) === index);
   const scenario = normalizeBuybackScenario(input.scenario || settings.default_scenario);
-  const predictionBundle = await runMetalPredictions({ metals, currency, horizons }, user, req);
+  const persist = options.persist !== false;
+  const predictionBundle = await runMetalPredictions({ metals, currency, horizons }, user, req, { persist });
   const predictionsByKey = new Map((predictionBundle.predictions || []).map((prediction) => [`${prediction.metal}:${prediction.horizon}`, prediction]));
   const competitorStats = await competitorQuoteStats({
     metals,
@@ -6600,6 +6714,10 @@ async function calculateMetalBuyback(input = {}, user = {}, req = null) {
       const prediction = predictionsByKey.get(`${policy.metal}:${horizon}`);
       if (!prediction) continue;
       const row = calculateBuybackRow(policy, prediction, scenario, enrichedSettings);
+      if (!persist) {
+        calculations.push(row);
+        continue;
+      }
       try {
         calculations.push(await insertBuybackCalculation(row));
       } catch {
@@ -27659,12 +27777,10 @@ app.get(["/api/atti/search", "/api/acts/search"], async (request, response, next
 
 app.get("/api/bullionvault/prices", async (_request, response, next) => {
   try {
-    const results = await Promise.allSettled(
-      Object.entries(bullionVaultMarkets).map(([metal, market]) => fetchBullionVaultPrice(metal, market))
-    );
-    const prices = results
-      .filter((result) => result.status === "fulfilled")
-      .map((result) => result.value);
+    const markets = Object.entries(bullionVaultMarkets);
+    const results = await Promise.allSettled(markets.map(([metal, market]) => fetchBullionVaultPrice(metal, market)));
+    const prices = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+    const unavailableMetals = results.flatMap((result, index) => result.status === "rejected" ? [markets[index][0]] : []);
 
     if (!prices.length) {
       return response.status(502).json({ error: "Quotazioni BullionVault momentaneamente non disponibili" });
@@ -27672,7 +27788,11 @@ app.get("/api/bullionvault/prices", async (_request, response, next) => {
 
     response.json({
       provider: "BullionVault",
-      note: "Prezzo medio tra miglior acquisto e miglior vendita espresso in EUR al kg.",
+      ok: unavailableMetals.length === 0,
+      partial: unavailableMetals.length > 0,
+      unavailable_metals: unavailableMetals,
+      fetched_at: prices.map((price) => price.fetchedAt).filter(Boolean).sort().at(-1) || new Date().toISOString(),
+      note: "Prezzo indicativo medio tra miglior acquisto e miglior vendita espresso in EUR al kg.",
       prices
     });
   } catch (error) {
@@ -27860,7 +27980,7 @@ app.get("/api/quotazioni/metals/history", async (request, response, next) => {
           warnings.push(`${metal}: storico non disponibile. Configura fonte dati o sincronizza BullionVault.`);
         }
       } else if (rows.length < 10) {
-        warnings.push(`${metal}: storico insufficiente: servono almeno 10 rilevazioni, disponibili ${rows.length}.`);
+        warnings.push(`${metal}: storico insufficiente: servono almeno 10 giornate distinte, disponibili ${rows.length}.`);
       }
       history[metal] = rows;
     }
@@ -27941,6 +28061,20 @@ app.put("/api/quotazioni/buyback-policy", requireFounder, async (request, respon
 app.post("/api/quotazioni/buyback-calculate", async (request, response, next) => {
   try {
     response.json(await calculateMetalBuyback(request.body || {}, request.user, request));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quotazioni/buyback-preview", async (request, response, next) => {
+  try {
+    const input = {
+      metals: String(request.query.metals || "gold,silver").split(","),
+      currency: request.query.currency || goldPriceBaseCurrency,
+      horizons: String(request.query.horizons || "today,24h,7d,30d").split(","),
+      scenario: request.query.scenario || "standard"
+    };
+    response.json(await calculateMetalBuyback(input, request.user, request, { persist: false }));
   } catch (error) {
     next(error);
   }
@@ -29568,6 +29702,7 @@ initDatabase()
     runtimeStatus.initializationComplete = true;
     runtimeStatus.initializationError = "";
     scheduleBackups();
+    startMetalPriceAutoSync();
     startCompetitorAutoSync();
     startOroExpressHourlySync();
     startOroDOroHourlySync();
