@@ -2,7 +2,7 @@
   "name": "OroActive Gestionale",
   "short_name": "OroActive",
   "description": "Software gestionale OroActive per atti di vendita.",
-  "start_url": "/index.html",
+  "start_url": "/",
   "scope": "/",
   "id": "/oroactive-gestionale",
   "display": "standalone",

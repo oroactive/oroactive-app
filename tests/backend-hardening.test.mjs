@@ -45,6 +45,16 @@ test("backend applica confini statici, header di sicurezza e limiti bounded sepa
   assert.ok(serverSource.indexOf("app.use(apiRateLimit)") < serverSource.indexOf("app.use(express.json"));
 });
 
+test("la PWA apre la home canonica e conserva la compatibilità con index.html", async () => {
+  const [manifest, webmanifest] = await Promise.all([
+    readFile(path.join(repoRoot, "manifest.json"), "utf8").then(JSON.parse),
+    readFile(path.join(repoRoot, "manifest.webmanifest"), "utf8").then(JSON.parse)
+  ]);
+  assert.equal(manifest.start_url, "/");
+  assert.equal(webmanifest.start_url, "/");
+  assert.match(serverSource, /publicRootStaticFiles = new Set\(\[[\s\S]*"index\.html"/);
+});
+
 test("readiness interroga davvero il database e OpenAI ha timeout, retry e abort client", () => {
   const healthBlock = sourceBlock("async function checkDatabaseReadiness", "app.get(\"/api/version\"");
   assert.match(healthBlock, /SELECT 1 AS ready/);
@@ -179,9 +189,19 @@ test("runtime serve solo risorse pubbliche, restituisce 404 ai file interni e 50
     assert.match(home.headers.get("content-security-policy") || "", /frame-ancestors 'none'/);
     assert.match(home.headers.get("strict-transport-security") || "", /max-age=31536000/);
 
+    const installedAppHome = await fetch(`${baseUrl}/index.html`);
+    assert.equal(installedAppHome.status, 200);
+    assert.match(installedAppHome.headers.get("content-type") || "", /text\/html/);
+    assert.match(await installedAppHome.text(), /<html[^>]*lang="it"/i);
+    assert.match(installedAppHome.headers.get("cache-control") || "", /no-store/);
+
+    const installedAppHomeWithQuery = await fetch(`${baseUrl}/index.html?source=installed-pwa`);
+    assert.equal(installedAppHomeWithQuery.status, 200);
+    assert.match(installedAppHomeWithQuery.headers.get("content-type") || "", /text\/html/);
+
     const icon = await fetch(`${baseUrl}/icons/icon-192.png`);
     assert.equal(icon.status, 200);
-    for (const pathname of ["/server.js", "/schema.sql", "/package.json", "/private_uploads/customer.pdf", "/assets/academy/courses/corso-base-oro-oroactive.pdf", "/missing.js"]) {
+    for (const pathname of ["/server.js", "/schema.sql", "/package.json", "/private_uploads/customer.pdf", "/assets/academy/courses/corso-base-oro-oroactive.pdf", "/missing.js", "/missing.html"]) {
       const response = await fetch(`${baseUrl}${pathname}`);
       assert.equal(response.status, 404, `${pathname} deve essere bloccato`);
       assert.match(response.headers.get("content-type") || "", /application\/json/);
