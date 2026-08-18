@@ -4359,7 +4359,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
 });
 
 test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", async () => {
-  const [workflow, server, app, index, styles, worker, dockerfile, metadataScript, docs, pwaBoot] = await Promise.all([
+  const [workflow, server, app, index, styles, worker, dockerfile, metadataScript, deployTargetScript, docs, pwaBoot] = await Promise.all([
     file(".github/workflows/deploy-coolify.yml"),
     file("server.js"),
     file("app.js"),
@@ -4368,6 +4368,7 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
     file("service-worker.js"),
     file("Dockerfile"),
     file("scripts/write-version-metadata.mjs"),
+    file("scripts/coolify-deploy-target.mjs"),
     file("docs/deploy-oroactive-coolify.md"),
     file("pwa-boot.js")
   ]);
@@ -4379,9 +4380,16 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /force_rebuild_webhook/);
-  assert.match(workflow, /searchParams\.set\("force", "true"\)/);
+  assert.match(workflow, /coolify-deploy-target\.mjs url/);
+  assert.match(workflow, /coolify-deploy-target\.mjs validate/);
   assert.match(workflow, /curl --fail[\s\S]*force_rebuild_webhook/);
+  assert.match(workflow, /--output "\$\{deploy_response\}"/);
   assert.match(workflow, /Coolify force rebuild request accepted/);
+  assert.match(deployTargetScript, /OROACTIVE_PRODUCTION_RESOURCE_UUID = "heyeitdqcuq3gxk36zrt2lkc"/);
+  assert.match(deployTargetScript, /searchParams\.set\("uuid", OROACTIVE_PRODUCTION_RESOURCE_UUID\)/);
+  assert.match(deployTargetScript, /searchParams\.set\("force", "true"\)/);
+  assert.match(deployTargetScript, /deployment\.resource_uuid/);
+  assert.match(deployTargetScript, /deployment\.deployment_uuid/);
   assert.match(workflow, /Verify production version/);
   assert.match(workflow, /OROACTIVE_HEALTH_URL:-https:\/\/app\.oroactive\.it/);
   assert.match(workflow, /url\.pathname = "\/api\/health"/);

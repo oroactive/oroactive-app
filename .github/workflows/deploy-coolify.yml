@@ -62,11 +62,8 @@ jobs:
             exit 1
           fi
 
-          force_rebuild_webhook="$(node -e '
-            const webhook = new URL(process.argv[1]);
-            webhook.searchParams.set("force", "true");
-            process.stdout.write(webhook.href);
-          ' "${COOLIFY_WEBHOOK}")"
+          force_rebuild_webhook="$(node scripts/coolify-deploy-target.mjs url "${COOLIFY_WEBHOOK}")"
+          deploy_response="$(mktemp)"
 
           deployment_requested_at="$(node -p 'new Date().toISOString()')"
           echo "DEPLOYMENT_REQUESTED_AT=${deployment_requested_at}" >> "${GITHUB_ENV}"
@@ -74,7 +71,9 @@ jobs:
           curl --fail --silent --show-error --request POST "${force_rebuild_webhook}" \
             --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
             --header "Content-Type: application/json" \
-            --data "{\"commit\":\"${GIT_COMMIT}\",\"branch\":\"${GITHUB_REF_NAME}\",\"buildNumber\":\"${BUILD_NUMBER}\"}"
+            --data "{\"commit\":\"${GIT_COMMIT}\",\"branch\":\"${GITHUB_REF_NAME}\",\"buildNumber\":\"${BUILD_NUMBER}\"}" \
+            --output "${deploy_response}"
+          node scripts/coolify-deploy-target.mjs validate "${deploy_response}"
           echo "Coolify force rebuild request accepted."
 
       - name: Verify production version
