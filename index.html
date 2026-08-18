@@ -10,59 +10,15 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="OroActive">
   <meta name="format-detection" content="telephone=no">
-  <meta name="oroactive-build-id" content="20260807-quotes-reliability-21">
+  <meta name="oroactive-build-id" content="20260818-security-reliability-22">
   <title>OroActive Gestionale</title>
-  <script>
-    (() => {
-      const htmlBuildId = document.querySelector('meta[name="oroactive-build-id"]')?.content || "";
-      const recoveryKey = "oroactive-recovery-build";
-      window.__OROACTIVE_BOOT_BUILD_ID__ = htmlBuildId;
-
-      async function resetStalePwa(serverBuildId) {
-        if (!serverBuildId || sessionStorage.getItem(recoveryKey) === serverBuildId) return;
-        sessionStorage.setItem(recoveryKey, serverBuildId);
-        if ("serviceWorker" in navigator) {
-          const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);
-          await Promise.all(registrations.map((registration) => registration.unregister().catch(() => false)));
-        }
-        if ("caches" in window) {
-          const keys = await window.caches.keys().catch(() => []);
-          await Promise.all(keys.map((key) => window.caches.delete(key).catch(() => false)));
-        }
-        const url = new URL(window.location.href);
-        url.searchParams.set("app-build", serverBuildId);
-        url.searchParams.set("cache-reset", serverBuildId);
-        window.location.replace(url.toString());
-      }
-
-      async function verifyBootBuild() {
-        try {
-          const response = await fetch("/version.json", {
-            cache: "no-store",
-            headers: { Accept: "application/json", "Cache-Control": "no-cache" }
-          });
-          if (!response.ok) return;
-          const version = await response.json();
-          const serverBuildId = String(version.assetBuildId || "").trim();
-          if (serverBuildId && htmlBuildId && serverBuildId !== htmlBuildId) {
-            await resetStalePwa(serverBuildId);
-          } else if (serverBuildId === htmlBuildId) {
-            sessionStorage.removeItem(recoveryKey);
-          }
-        } catch {
-          // L'app continua ad avviarsi anche se la verifica versione non e raggiungibile.
-        }
-      }
-
-      void verifyBootBuild();
-    })();
-  </script>
-  <link rel="manifest" href="manifest.json?v=20260807-quotes-reliability-21">
+  <script src="pwa-boot.js?v=20260818-security-reliability-22"></script>
+  <link rel="manifest" href="manifest.json?v=20260818-security-reliability-22">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
-  <link rel="stylesheet" href="styles.css?v=20260807-quotes-reliability-21">
-  <script src="frontend-config.js?v=20260807-quotes-reliability-21"></script>
+  <link rel="stylesheet" href="styles.css?v=20260818-security-reliability-22">
+  <script src="frontend-config.js?v=20260818-security-reliability-22"></script>
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-label="Login OroActive">
@@ -747,11 +703,8 @@
         </div>
         <form class="settings-list suspended-practice-filters" id="suspendedPracticeFilters">
           <label>Negozio
-            <select name="store">
+            <select name="store" id="suspendedStoreFilter">
               <option value="Tutti">Tutti</option>
-              <option value="Busto Arsizio">Busto Arsizio</option>
-              <option value="Cassano Magnago">Cassano Magnago</option>
-              <option value="Legnano">Legnano</option>
             </select>
           </label>
           <label>Operatore
@@ -1206,7 +1159,7 @@
             <h2>Backup</h2>
             <p class="muted">Crea, verifica e scarica backup completi di OroActive.</p>
           </div>
-          <button class="primary-button" type="button" id="runBackupNow">Crea nuovo backup</button>
+          <button class="primary-button founder-only" type="button" id="runBackupNow">Crea nuovo backup</button>
         </div>
         <div class="archive-table users-table" id="backupsList" aria-live="polite"></div>
       </section>
@@ -1809,7 +1762,7 @@
             <label>Nome utente <input id="userUsername" autocomplete="username"></label>
             <label id="userEmailLabel" class="founder-email-only" hidden>Email <input id="userEmail" type="email" autocomplete="email"></label>
             <label>Telefono <input id="userPhone" type="tel" autocomplete="tel"></label>
-            <label>Password <input id="userPassword" type="password" autocomplete="new-password" placeholder="Minimo 8 caratteri" required></label>
+            <label>Password <input id="userPassword" type="password" autocomplete="new-password" placeholder="Minimo 8 caratteri" minlength="8" required></label>
             <label>Ruolo
               <select id="userRole">
                 <option value="founder">Founder</option>
@@ -1986,7 +1939,7 @@
   </div>
   <datalist id="citySuggestions"></datalist>
   <datalist id="provinceSuggestions"></datalist>
-  <script src="shared/aurum-policy.js?v=20260807-quotes-reliability-21"></script>
-  <script src="app.js?v=20260807-quotes-reliability-21"></script>
+  <script src="shared/aurum-policy.js?v=20260818-security-reliability-22"></script>
+  <script src="app.js?v=20260818-security-reliability-22"></script>
 </body>
 </html>

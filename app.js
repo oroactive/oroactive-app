@@ -46,6 +46,8 @@ const state = {
   guidedQualityLoading: false,
   bullionVaultPrices: {},
   goldPredictionStatus: null,
+  goldPredictionAvailable: false,
+  goldPredictionLastSuccessfulAt: null,
   goldPredictionHistory: [],
   goldPredictionLatest: [],
   goldPredictionSettings: null,
@@ -202,6 +204,9 @@ const state = {
   bullionChartLoaded: false,
   pendingSync: [],
   syncingPending: false,
+  sessionGeneration: 0,
+  sessionAbortController: null,
+  expiringSession: false,
   sessionTimeoutTimer: null,
   clientVersion: null,
   serverVersion: null,
@@ -224,7 +229,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260807-quotes-reliability-21";
+const OROACTIVE_CLIENT_BUILD_ID = "20260818-security-reliability-22";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -5597,6 +5602,7 @@ function isAppleTouchDevice() {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  let hadController = Boolean(navigator.serviceWorker.controller);
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" }).then((registration) => {
       if (registration.waiting) {
@@ -5622,6 +5628,12 @@ function registerServiceWorker() {
       // La PWA resta utilizzabile anche senza service worker.
     });
     navigator.serviceWorker.addEventListener("controllerchange", () => {
+      // On a first install clients.claim() assigns the initial controller: it
+      // is not an update and must not show a misleading update banner.
+      if (!hadController) {
+        hadController = true;
+        return;
+      }
       if (state.serviceWorkerReloading) return;
       if (!state.serviceWorkerActivationAuthorized || syncDirtyState()) {
         state.updateAvailable = true;
@@ -5641,13 +5653,8 @@ async function refreshApp(options = {}) {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(registrations.map((registration) => registration.update().catch(() => null)));
     }
-    if (window.caches?.keys) {
-      const keys = await window.caches.keys();
-      const staticCacheKeys = keys.filter((key) => /oroactive|static|asset|pwa/i.test(key));
-      await Promise.all(staticCacheKeys.map((key) => window.caches.delete(key).catch(() => false)));
-    }
   } catch {
-    // Anche se l'aggiornamento cache fallisce, il reload mantiene la sessione e ricarica l'app.
+    // Anche se il controllo aggiornamento fallisce, il reload mantiene la sessione.
   } finally {
     window.location.reload();
   }
@@ -5726,14 +5733,6 @@ function syncDirtyState() {
   return window.__OROACTIVE_DIRTY_STATE__;
 }
 
-async function clearOldOroactiveCaches() {
-  if (!window.caches?.keys) return [];
-  const keys = await window.caches.keys();
-  const oldKeys = keys.filter((key) => /^oroactive-|^static-|^asset-|^pwa-/i.test(key));
-  await Promise.all(oldKeys.map((key) => window.caches.delete(key).catch(() => false)));
-  return oldKeys;
-}
-
 function isGoldCoinCatalogCurrent() {
   return Array.isArray(GOLD_COIN_CATALOG) && GOLD_COIN_CATALOG.length >= EXPECTED_GOLD_COIN_CATALOG_COUNT;
 }
@@ -5755,7 +5754,6 @@ async function refreshStaleClientBuild(reason = "Aggiornamento app richiesto.") 
       const waitingWorker = registration.waiting || registration.installing;
       waitingWorker?.postMessage?.({ type: "SKIP_WAITING" });
     }
-    await clearOldOroactiveCaches();
   } catch (error) {
     console.warn("Aggiornamento automatico app non completato", error);
   }
@@ -5785,7 +5783,6 @@ async function performAppUpdateReload() {
       await registration.update().catch(() => null);
     }
   }
-  await clearOldOroactiveCaches();
   if (syncDirtyState()) {
     state.serviceWorkerActivationAuthorized = false;
     state.appUpdateBannerDismissed = false;
@@ -6089,9 +6086,25 @@ function resetSessionTimeout() {
   if (!state.authToken) return;
   window.clearTimeout(state.sessionTimeoutTimer);
   state.sessionTimeoutTimer = window.setTimeout(() => {
-    showToast("Sessione scaduta per inattività. Effettua nuovamente l'accesso.", "warning");
-    showLogin();
+    void expireSessionForInactivity();
   }, 30 * 60 * 1000);
+}
+
+async function expireSessionForInactivity() {
+  if (state.expiringSession) return;
+  state.expiringSession = true;
+  try {
+    const practiceStarted = document.getElementById("practice")?.classList.contains("active-screen") && !isPracticeFormEmpty();
+    if (practiceStarted) {
+      showToast("Sessione in scadenza: salvo la pratica come bozza...", "warning");
+      await archiveCurrentPractice("Bozza", { skipReset: true, skipQualityCheck: true }).catch(() => false);
+    }
+    await apiRequest("/auth/logout", { method: "POST", retries: 0, timeoutMs: 10000 }).catch(() => null);
+  } finally {
+    state.expiringSession = false;
+    showLogin();
+    showToast("Sessione scaduta per inattività. Effettua nuovamente l'accesso.", "warning");
+  }
 }
 
 function queryString(params = {}) {
@@ -6233,7 +6246,12 @@ function shouldReturnToLoginOnUnauthorized(path = "") {
   if (isLoginRequestPath(path)) return false;
   if (path === "/auth/me") return true;
   if (isAuthenticatedTransitionProtected()) return false;
-  return !state.currentUser;
+  return true;
+}
+
+function isSessionFatalApiError(status = 0, body = {}) {
+  if (status === 401) return true;
+  return status === 403 && ["USER_INACTIVE", "STORE_INACTIVE"].includes(String(body?.code || ""));
 }
 
 function serverConnectionError() {
@@ -6321,7 +6339,22 @@ function resolveApiRequestAttempts(path = "", options = {}) {
   return retrySafeMethod ? API_RETRY_ATTEMPTS : 1;
 }
 
+function rotateSessionGeneration() {
+  state.sessionAbortController?.abort();
+  state.sessionGeneration += 1;
+  state.sessionAbortController = new AbortController();
+  return state.sessionGeneration;
+}
+
+function sessionSupersededError() {
+  const error = new Error("Sessione sostituita da un nuovo accesso.");
+  error.name = "SessionSupersededError";
+  error.isSessionSuperseded = true;
+  return error;
+}
+
 async function apiRequest(path, options = {}) {
+  const requestGeneration = state.sessionGeneration;
   const headers = { "Content-Type": "application/json", "Cache-Control": "no-cache", ...(options.headers || {}) };
   if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
   const attempts = resolveApiRequestAttempts(path, options);
@@ -6329,9 +6362,13 @@ async function apiRequest(path, options = {}) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const controller = new AbortController();
+    const sessionSignal = state.sessionAbortController?.signal;
     const abortFromCaller = () => controller.abort(options.signal?.reason);
+    const abortFromSession = () => controller.abort(sessionSignal?.reason);
     if (options.signal?.aborted) abortFromCaller();
     else options.signal?.addEventListener?.("abort", abortFromCaller, { once: true });
+    if (sessionSignal?.aborted) abortFromSession();
+    else sessionSignal?.addEventListener?.("abort", abortFromSession, { once: true });
     const timeout = window.setTimeout(() => controller.abort(), timeoutMs || 18000);
     try {
       const response = await fetch(`${apiBase}${path}`, {
@@ -6340,9 +6377,12 @@ async function apiRequest(path, options = {}) {
         cache: "no-store",
         signal: controller.signal
       });
+      if (requestGeneration !== state.sessionGeneration) throw sessionSupersededError();
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         if (response.status === 401 && shouldReturnToLoginOnUnauthorized(path)) {
+          showLogin();
+        } else if (isSessionFatalApiError(response.status, body) && !isAuthenticatedTransitionProtected()) {
           showLogin();
         } else if (response.status === 401) {
           console.warn("[OroActive Auth] Unauthorized background request ignored during authenticated transition", {
@@ -6360,9 +6400,13 @@ async function apiRequest(path, options = {}) {
         }
         throw error;
       }
-      return response.status === 204 ? null : response.json();
+      const payload = response.status === 204 ? null : await response.json();
+      if (requestGeneration !== state.sessionGeneration) throw sessionSupersededError();
+      return payload;
     } catch (error) {
       lastError = error;
+      if (error?.isSessionSuperseded) throw error;
+      if (requestGeneration !== state.sessionGeneration) throw sessionSupersededError();
       if (options.signal?.aborted) throw error;
       if (attempt < attempts && shouldRetryApi(error, error.status)) {
         await wait(350 * attempt);
@@ -6375,6 +6419,7 @@ async function apiRequest(path, options = {}) {
     } finally {
       window.clearTimeout(timeout);
       options.signal?.removeEventListener?.("abort", abortFromCaller);
+      sessionSignal?.removeEventListener?.("abort", abortFromSession);
     }
   }
   throw lastError || serverConnectionError();
@@ -6416,7 +6461,8 @@ async function loadSavedActs(options = {}) {
     state.actsCache.set(cacheKey, { time: Date.now(), acts });
     if (store && !q) {
       for (let index = demoActs.length - 1; index >= 0; index -= 1) {
-        if (demoActs[index].store === store) demoActs.splice(index, 1);
+        const cachedAct = demoActs[index];
+        if (cachedAct.id && (store === "Tutti" || selectedStoreMatchesAct(store, cachedAct))) demoActs.splice(index, 1);
       }
     }
     mergeActsIntoCache(acts);
@@ -6500,27 +6546,103 @@ async function syncActsFromServer() {
   }
 }
 
+const PENDING_SYNC_LEGACY_KEY = "oroactive-pending-sync";
+const PENDING_SYNC_QUARANTINE_KEY = "oroactive-pending-sync-quarantine";
+
+function pendingSyncStorageKey(user = state.currentUser) {
+  const userId = String(user?.id || "").trim();
+  return userId ? `oroactive-pending-sync:user:${userId}` : "";
+}
+
+function pendingSyncOwnerContext(act = {}, user = state.currentUser) {
+  return {
+    owner_user_id: String(user?.id || ""),
+    owner_store_id: String(act?.negozioId || act?.negozio_id || user?.negozio_id || "")
+  };
+}
+
+function pendingSyncBelongsToCurrentUser(item = {}) {
+  const currentUserId = String(state.currentUser?.id || "");
+  if (!currentUserId || String(item.owner_user_id || "") !== currentUserId) return false;
+  if (userSeesAllStores(state.currentUser)) return true;
+  const currentStoreId = String(state.currentUser?.negozio_id || "");
+  return Boolean(currentStoreId) && String(item.owner_store_id || "") === currentStoreId;
+}
+
+async function quarantinePendingSyncItems(items = [], reason = "owner_mismatch") {
+  if (!items.length) return;
+  let existing = [];
+  try {
+    const raw = await loadDeviceStorage(PENDING_SYNC_QUARANTINE_KEY);
+    const parsed = JSON.parse(raw || "[]");
+    existing = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    existing = [];
+  }
+  const quarantinedAt = new Date().toISOString();
+  const next = [
+    ...items.map((item) => ({ ...item, quarantine_reason: reason, quarantined_at: quarantinedAt })),
+    ...existing
+  ].slice(0, 100);
+  await saveDeviceStorage(PENDING_SYNC_QUARANTINE_KEY, JSON.stringify(next));
+}
+
+async function migrateLegacyPendingSyncQueue() {
+  const legacyValue = await loadDeviceStorage(PENDING_SYNC_LEGACY_KEY);
+  if (!legacyValue) return;
+  let legacyItems = [];
+  try {
+    const parsed = JSON.parse(legacyValue);
+    legacyItems = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    legacyItems = [{ legacy_payload: legacyValue }];
+  }
+  await quarantinePendingSyncItems(legacyItems, "legacy_owner_unknown");
+  await saveDeviceStorage(PENDING_SYNC_LEGACY_KEY, "");
+}
+
 function persistPendingSync() {
-  const value = JSON.stringify(state.pendingSync.slice(0, 30));
-  saveDeviceStorage("oroactive-pending-sync", value).catch(() => {});
+  const key = pendingSyncStorageKey();
+  if (!key) return;
+  persistPendingSyncForKey(key, state.pendingSync);
+}
+
+function persistPendingSyncForKey(key, queue = []) {
+  if (!key) return Promise.resolve();
+  const value = JSON.stringify(queue.slice(0, 30));
+  return saveDeviceStorage(key, value).catch(() => {});
 }
 
 async function loadPendingSyncQueue() {
-  const value = await loadDeviceStorage("oroactive-pending-sync") || "[]";
+  state.pendingSync = [];
+  const key = pendingSyncStorageKey();
+  if (!key) return;
+  await migrateLegacyPendingSyncQueue();
+  const value = await loadDeviceStorage(key) || "[]";
   try {
-    state.pendingSync = JSON.parse(value);
+    const parsed = JSON.parse(value);
+    const queue = Array.isArray(parsed) ? parsed : [];
+    const rejected = queue.filter((item) => !pendingSyncBelongsToCurrentUser(item));
+    state.pendingSync = queue.filter(pendingSyncBelongsToCurrentUser).slice(0, 30);
+    if (rejected.length) await quarantinePendingSyncItems(rejected);
+    persistPendingSync();
   } catch {
     state.pendingSync = [];
   }
 }
 
 function queuePendingActSave(act, method, identifier) {
+  const owner = pendingSyncOwnerContext(act);
+  if (!owner.owner_user_id || (!userSeesAllStores(state.currentUser) && !owner.owner_store_id)) {
+    throw new Error("Impossibile accodare la pratica senza utente e sede verificati.");
+  }
   const pending = {
     id: `pending-${Date.now()}`,
     method,
     identifier,
     act: sanitizeForSave(act),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    ...owner
   };
   state.pendingSync = state.pendingSync.filter((item) => item.identifier !== identifier && item.act?.practiceNumber !== act.practiceNumber);
   state.pendingSync.unshift(pending);
@@ -6530,10 +6652,23 @@ function queuePendingActSave(act, method, identifier) {
 
 async function flushPendingSync() {
   if (state.syncingPending || !state.authToken || !state.pendingSync.length || !navigator.onLine) return;
+  const syncGeneration = state.sessionGeneration;
+  const syncStorageKey = pendingSyncStorageKey();
+  const queue = [...state.pendingSync];
   state.syncingPending = true;
   try {
     const remaining = [];
-    for (const item of state.pendingSync) {
+    const rejected = [];
+    for (let index = 0; index < queue.length; index += 1) {
+      const item = queue[index];
+      if (syncGeneration !== state.sessionGeneration) {
+        remaining.push(...queue.slice(index));
+        break;
+      }
+      if (!pendingSyncBelongsToCurrentUser(item)) {
+        rejected.push(item);
+        continue;
+      }
       try {
         const identifier = item.act.id || item.identifier || item.act.practiceNumber;
         const path = item.method === "PUT" ? `/atti/${encodeURIComponent(identifier)}` : "/atti";
@@ -6548,10 +6683,12 @@ async function flushPendingSync() {
         remaining.push(item);
       }
     }
-  state.pendingSync = remaining;
-  persistPendingSync();
+    if (rejected.length) await quarantinePendingSyncItems(rejected);
+    await persistPendingSyncForKey(syncStorageKey, remaining);
+    if (syncGeneration !== state.sessionGeneration) return;
+    state.pendingSync = remaining;
   } finally {
-    state.syncingPending = false;
+    if (syncGeneration === state.sessionGeneration) state.syncingPending = false;
   }
 }
 
@@ -6574,7 +6711,7 @@ async function saveActRecord(act, method = "POST") {
       body: JSON.stringify(payload)
     });
   } catch (error) {
-    if (!navigator.onLine || /Connessione lenta|Failed to fetch|NetworkError/i.test(error.message || "")) {
+    if (!error?.isSessionSuperseded && (error?.isConnectionError || !navigator.onLine || /Connessione lenta|Failed to fetch|NetworkError/i.test(error.message || ""))) {
       saved = queuePendingActSave(act, method, identifier);
       showToast("Connessione lenta: atto salvato temporaneamente e sincronizzato appena possibile.", "warning");
     } else {
@@ -6652,8 +6789,99 @@ async function withButtonBusy(button, busyText, task) {
   }
 }
 
+function resetAuthenticatedSessionData() {
+  rotateSessionGeneration();
+  window.currentUser = null;
+  window.clearTimeout(state.sessionTimeoutTimer);
+  window.clearTimeout(state.clientLookupTimer);
+  window.clearTimeout(state.crmSearchTimer);
+  window.clearTimeout(state.amlCashCheckTimer);
+  window.clearTimeout(state.aurumShieldTimer);
+  window.clearTimeout(state.guidedQualityTimer);
+
+  state.captureFiles.forEach(revokeCaptureUrl);
+  Object.entries(state).forEach(([key, value]) => {
+    if (Array.isArray(value)) state[key] = [];
+    else if (value instanceof Map || value instanceof Set) value.clear();
+  });
+  state.signatures = normalizeSignatureArray([], false);
+  state.loadedSignatureImages = SIGNATURE_LABELS.map(() => "");
+  state.pendingSync = [];
+  state.syncingPending = false;
+  state.step = 0;
+  state.attachments = 0;
+  state.cededItems = 1;
+  state.editingPracticeNumber = null;
+  state.editingActId = null;
+  state.editingOriginalStatus = "";
+  state.editingApprovalStatus = "";
+  state.editingApprovalRequestId = null;
+  state.editingDirty = false;
+  state.suppressDirtyTracking = false;
+  state.captureGroup = null;
+  state.fiscalCodeEditedManually = false;
+  state.lastActCaptureAttachments = [];
+  state.dashboard = null;
+  state.founderReport = null;
+  state.storeHealthDetail = null;
+  state.privacyAcceptance = null;
+  state.privacyPolicy = null;
+  state.aurumShield = null;
+  state.guidedQualityCheck = null;
+  state.amlCashCheck = null;
+  state.buybackSimulationContext = null;
+  state.activeTrainingSession = null;
+  state.activeTrainingData = null;
+  state.academyLearningPath = null;
+  state.academyFounderDashboard = null;
+  state.gamingOverview = null;
+  state.goldPredictionSettings = null;
+  state.buybackPolicy = null;
+  state.competitorStats = {};
+  state.metalPredictionHistory = {};
+  state.metalPredictionLatest = {};
+  state.tutorial = { active: false, source: "", id: "", index: 0, steps: [], pendingFirstRun: false };
+  demoActs.splice(0, demoActs.length);
+  window.__OROACTIVE_DIRTY_STATE__ = false;
+
+  appShell?.querySelectorAll("input, textarea").forEach((field) => {
+    if (field.type === "checkbox" || field.type === "radio") field.checked = false;
+    else field.value = "";
+  });
+  appShell?.querySelectorAll("select").forEach((select) => {
+    select.selectedIndex = 0;
+  });
+  document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
+    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+  });
+
+  const cededItemsTable = document.getElementById("cededItemsTable");
+  if (cededItemsTable) {
+    cededItemsTable.querySelectorAll(".ceded-item-row").forEach((row) => row.remove());
+    cededItemsTable.insertAdjacentHTML("beforeend", defaultCededItemRow());
+  }
+
+  [
+    "archiveGroups", "fusionGroups", "usersList", "crmList", "approvalsList",
+    "suspendedPracticesList", "notificationsList", "notificationDropdownList",
+    "auditTrailList", "dashboardGrid", "dashboardPanels", "storeHealthList",
+    "storesList", "backupsList", "antifraudList", "aurumShieldAlertsList",
+    "userMessagesList", "aurumSupportRequestsList", "aurumMemoriesList",
+    "aurumMyMemoriesList", "knowledgeNotesList", "aiFeedbackList",
+    "preciousCaptureGrid", "paymentCaptureGrid", "guidedQualityList"
+  ].forEach((id) => document.getElementById(id)?.replaceChildren());
+  if (previewBody) previewBody.replaceChildren();
+  if (printPacket) printPacket.replaceChildren();
+  if (previewModal) previewModal.hidden = true;
+  document.querySelectorAll(".modal, dialog").forEach((modal) => {
+    modal.hidden = true;
+    if (typeof modal.close === "function" && modal.open) modal.close();
+  });
+}
+
 function showLogin(options = {}) {
   const { keepSplash = false } = options;
+  resetAuthenticatedSessionData();
   clearStoredAuthToken();
   resetAurumSessionState();
   state.currentUser = null;
@@ -7196,7 +7424,14 @@ async function lookupExistingClient(fiscalCode) {
   if (!/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/.test(code)) return;
   try {
     showLoading("Ricerca cliente...");
-    const result = await apiRequest(`/clienti/codice-fiscale/${encodeURIComponent(code)}`, { timeoutMs: 9000 });
+    const selectedStoreCode = fieldValue("#storeCode");
+    const selectedStore = (state.stores || []).find((store) =>
+      String(store.id) === String(selectedStoreCode)
+      || String(store.codice || "").toUpperCase() === String(selectedStoreCode || "").toUpperCase()
+    );
+    const storeReference = selectedStore?.id || selectedStoreCode;
+    const storeQuery = storeReference ? `?negozio_id=${encodeURIComponent(storeReference)}` : "";
+    const result = await apiRequest(`/clienti/codice-fiscale/${encodeURIComponent(code)}${storeQuery}`, { timeoutMs: 9000 });
     if (result?.found && result.cliente) {
       applyExistingClient(result.cliente);
       showToast("Cliente già presente. Dati caricati automaticamente.");
@@ -7893,6 +8128,7 @@ function applyRolePermissions() {
   const storeCode = document.getElementById("storeCode");
   const archiveStore = document.getElementById("archiveStoreFilter");
   const fusionStore = document.getElementById("fusionStoreFilter");
+  const suspendedStore = document.getElementById("suspendedStoreFilter");
   if (!userSeesAllStores()) {
     const code = currentUserStoreCode();
     if (storeCode) {
@@ -7900,12 +8136,16 @@ function applyRolePermissions() {
       storeCode.disabled = true;
     }
     if (archiveStore) {
-      archiveStore.value = state.currentUser.negozio;
+      archiveStore.value = String(state.currentUser.negozio_id || "");
       archiveStore.disabled = true;
     }
     if (fusionStore) {
-      fusionStore.value = state.currentUser.negozio;
+      fusionStore.value = String(state.currentUser.negozio_id || "");
       fusionStore.disabled = true;
+    }
+    if (suspendedStore) {
+      suspendedStore.value = String(state.currentUser.negozio_id || "");
+      suspendedStore.disabled = true;
     }
   } else {
     if (storeCode) storeCode.disabled = false;
@@ -7916,6 +8156,7 @@ function applyRolePermissions() {
       }
     }
     if (fusionStore) fusionStore.disabled = false;
+    if (suspendedStore) suspendedStore.disabled = false;
   }
 
   if (loggedUserName && state.currentUser) {
@@ -8187,9 +8428,15 @@ function showBootRecoveryNotice(message) {
 }
 
 function startBootWatchdog() {
+  const watchdogGeneration = state.sessionGeneration;
   window.setTimeout(() => {
+    if (watchdogGeneration !== state.sessionGeneration) return;
     const mainMenuScreen = document.getElementById("mainMenuScreen");
-    const hasUser = Boolean(window.currentUser || state.currentUser);
+    const hasUser = Boolean(
+      state.authToken
+      && state.currentUser
+      && window.currentUser === state.currentUser
+    );
 
     if (hasUser && (!mainMenuScreen || mainMenuScreen.hidden)) {
       console.warn("[OroActive Boot] main menu hidden after auth. Forcing recovery.");
@@ -8287,6 +8534,7 @@ async function restoreSession(options = {}) {
   setSplashStatus("Caricamento profilo");
   try {
     const data = await apiRequest("/auth/me", { timeoutMs: keepSplash ? BOOT_SPLASH_MAX_MS : SESSION_RESTORE_TIMEOUT_MS, retries: 1 });
+    resetAuthenticatedSessionData();
     resetAurumSessionState();
     state.currentUser = normalizeAuthenticatedUserPayload(data, "session");
     console.info("[OroActive Auth] session restore success", { role: state.currentUser.ruolo });
@@ -8362,6 +8610,7 @@ async function handleLogin(event) {
     if (!data?.user || !token) {
       throw new Error("Accesso non completato: risposta del server non valida.");
     }
+    resetAuthenticatedSessionData();
     resetAurumSessionState();
     state.currentUser = normalizeAuthenticatedUserPayload(data, "login");
     state.authToken = token;
@@ -8623,6 +8872,7 @@ async function loginWithFaceId() {
     if (!data?.user || !token) {
       throw new Error("Accesso Face ID non completato: risposta del server non valida.");
     }
+    resetAuthenticatedSessionData();
     resetAurumSessionState();
     state.currentUser = normalizeAuthenticatedUserPayload(data, "faceid");
     state.authToken = token;
@@ -9592,7 +9842,9 @@ function configureUserFormPermissions() {
       option.hidden = option.value === "Tutti" || option.textContent === "Tutti";
     });
     storeSelect.disabled = false;
-    if (storeSelect.value === "Tutti") storeSelect.value = "Busto Arsizio";
+    if (storeSelect.value === "Tutti") {
+      storeSelect.value = [...storeSelect.options].find((option) => option.value !== "Tutti")?.value || "";
+    }
   }
 }
 
@@ -9719,15 +9971,19 @@ async function saveUser(event) {
     cognome: document.getElementById("userSurname").value.trim(),
     username: document.getElementById("userUsername").value.trim(),
     ruolo: role,
-    negozio: document.getElementById("userStore").value,
     telefono: document.getElementById("userPhone")?.value.trim(),
     note: document.getElementById("userNotes")?.value.trim(),
     attivo: document.getElementById("userActive")?.value !== "false"
   };
+  if (!["founder", "supervisore"].includes(role)) payload.negozio_id = document.getElementById("userStore").value;
   if (role === "founder") {
     payload.email = document.getElementById("userEmail")?.value.trim();
   }
   const password = document.getElementById("userPassword").value;
+  if (password && password.length < 8) {
+    showToast("La password deve contenere almeno 8 caratteri.", "error");
+    return;
+  }
   if (password) payload.password = password;
 
   try {
@@ -9779,7 +10035,7 @@ function editUser(id) {
   const userActive = document.getElementById("userActive");
   if (userActive) userActive.value = user.attivo === false ? "false" : "true";
   document.getElementById("userRole").value = normalizeRole(user.ruolo);
-  document.getElementById("userStore").value = userSeesAllStores(user) ? "Tutti" : user.negozio || "Busto Arsizio";
+  document.getElementById("userStore").value = userSeesAllStores(user) ? "Tutti" : String(user.negozio_id || "");
   const password = document.getElementById("userPassword");
   password.value = "";
   password.required = false;
@@ -13554,7 +13810,9 @@ function suspendedPracticeApprovalMarkup(practice = {}) {
 function canDeleteSuspendedPracticeUi(practice = {}) {
   const role = normalizeRole(state.currentUser?.ruolo);
   if (role === "founder") return true;
-  return role === "responsabile" && (practice.store === state.currentUser?.negozio || practice.negozio === state.currentUser?.negozio);
+  return role === "responsabile"
+    && Boolean(practice.negozioId || practice.negozio_id)
+    && String(practice.negozioId || practice.negozio_id) === String(state.currentUser?.negozio_id || "");
 }
 
 function renderSuspendedPractices() {
@@ -14410,7 +14668,7 @@ function renderBackups() {
           <button type="button" data-verify-backup="${escapeHtml(String(backup.id))}">Verifica</button>
           ${isFounder() ? `<button type="button" data-test-restore-backup="${escapeHtml(String(backup.id))}">Test restore</button>` : ""}
           ${isFounder() && backup.download_disponibile ? `<button type="button" data-download-backup="${escapeHtml(String(backup.id))}">Download</button>` : ""}
-          ${isFounder() ? `<button class="danger-button" type="button" data-delete-backup="${escapeHtml(String(backup.id))}">Elimina</button>` : ""}
+          ${isFounder() && !["running", "pending"].includes(String(backup.status || "").toLowerCase()) ? `<button class="danger-button" type="button" data-delete-backup="${escapeHtml(String(backup.id))}">Elimina</button>` : ""}
         </div>
       </div>
     `).join("")}
@@ -14468,7 +14726,7 @@ async function viewBackup(id) {
 
 async function deleteBackup(id) {
   if (!isFounder() || !id) return;
-  if (!window.confirm("Vuoi eliminare questo backup dall'elenco operativo? Il file fisico resta protetto sul server.")) return;
+  if (!window.confirm("Eliminazione definitiva: archivio e cartella del backup verranno rimossi dal server e non saranno recuperabili. Vuoi continuare?")) return;
   await apiRequest(`/backups/${encodeURIComponent(id)}`, { method: "DELETE" });
   await loadBackups();
   showToast("Backup eliminato correttamente", "success");
@@ -14486,7 +14744,7 @@ async function loadBackups() {
 }
 
 async function runBackupNow() {
-  if (!canManageBackupsUi()) return;
+  if (!isFounder()) return;
   try {
     showLoading("Backup in corso...");
     const data = await apiRequest("/backups/create", { method: "POST", body: JSON.stringify({}), timeoutMs: 1200000 });
@@ -14598,29 +14856,34 @@ async function loadStores() {
 
 function populateStoreSelectors() {
   const stores = state.stores.length ? state.stores : [
-    { nome: "Busto Arsizio", codice: "BUSTO" },
-    { nome: "Cassano Magnago", codice: "CASSANO" },
-    { nome: "Legnano", codice: "LEGNANO" }
+    { id: "BUSTO", nome: "Busto Arsizio", codice: "BUSTO" },
+    { id: "CASSANO", nome: "Cassano Magnago", codice: "CASSANO" },
+    { id: "LEGNANO", nome: "Legnano", codice: "LEGNANO" }
   ];
   const currentValues = {
     userStore: document.getElementById("userStore")?.value,
     archive: document.getElementById("archiveStoreFilter")?.value,
     fusion: document.getElementById("fusionStoreFilter")?.value,
+    suspended: document.getElementById("suspendedStoreFilter")?.value,
     storeCode: document.getElementById("storeCode")?.value
   };
   const userStore = document.getElementById("userStore");
   if (userStore) {
-    userStore.innerHTML = '<option>Tutti</option>' + stores.map((store) => `<option>${escapeHtml(store.nome)}</option>`).join("");
+    userStore.innerHTML = '<option value="Tutti">Tutti</option>' + stores.map((store) => `<option value="${escapeHtml(String(store.id))}">${escapeHtml(store.nome)} — ${escapeHtml(store.codice || "")}</option>`).join("");
     if (currentValues.userStore && [...userStore.options].some((option) => option.value === currentValues.userStore)) {
       userStore.value = currentValues.userStore;
     }
   }
-  ["archiveStoreFilter", "fusionStoreFilter"].forEach((id) => {
+  ["archiveStoreFilter", "fusionStoreFilter", "suspendedStoreFilter"].forEach((id) => {
     const select = document.getElementById(id);
     if (!select) return;
-    const includeAll = id === "archiveStoreFilter" || id === "fusionStoreFilter";
-    select.innerHTML = `${includeAll ? "<option>Tutti</option>" : ""}${stores.map((store) => `<option>${escapeHtml(store.nome)}</option>`).join("")}`;
-    const previous = id === "archiveStoreFilter" ? currentValues.archive : currentValues.fusion;
+    const includeAll = true;
+    select.innerHTML = `${includeAll ? '<option value="Tutti">Tutti</option>' : ""}${stores.map((store) => `<option value="${escapeHtml(String(store.id))}">${escapeHtml(store.nome)} — ${escapeHtml(store.codice || "")}</option>`).join("")}`;
+    const previous = id === "archiveStoreFilter"
+      ? currentValues.archive
+      : id === "fusionStoreFilter"
+        ? currentValues.fusion
+        : currentValues.suspended;
     if (previous && [...select.options].some((option) => option.value === previous)) select.value = previous;
   });
   const storeCodeSelect = document.getElementById("storeCode");
@@ -19167,8 +19430,10 @@ async function openCrmClient(id) {
       <div class="crm-trust-pack-list">
         ${(detail.trust_packs || []).map((pack) => `
           <div class="crm-trust-pack-row">
-            <span><strong>${escapeHtml(pack.trust_pack_code || "Trust Pack")}</strong><small>${escapeHtml(pack.practice_number || "")} · ${escapeHtml(formatDateTime(pack.generated_at || ""))} · ${escapeHtml(pack.delivery_status || "generated")}</small></span>
-            <button type="button" data-download-trust-pack="${escapeHtml(String(pack.id))}">Download</button>
+            <span><strong>${escapeHtml(pack.trust_pack_code || "Trust Pack")}</strong><small>${escapeHtml(pack.practice_number || "")} · ${escapeHtml(formatDateTime(pack.generated_at || ""))} · ${pack.stale ? "Da rigenerare" : escapeHtml(pack.delivery_status || "generated")}</small></span>
+            ${pack.stale
+              ? `<button type="button" data-generate-trust-pack="${escapeHtml(String(pack.sale_deed_id || pack.practice_number || ""))}" data-regenerate-trust-pack="true">Rigenera</button>`
+              : `<button type="button" data-download-trust-pack="${escapeHtml(String(pack.id))}">Download</button>`}
           </div>
         `).join("") || "<p>Nessun Customer Trust Pack generato.</p>"}
       </div>
@@ -19813,6 +20078,14 @@ function customerTrustPackButtonsMarkup(act = {}, trustPack = null) {
   const identifier = escapeHtml(String(act.id || act.practiceNumber || ""));
   if (trustPack?.id) {
     const id = escapeHtml(String(trustPack.id));
+    if (trustPack.stale) {
+      return `
+        <div class="trust-pack-actions">
+          <button class="primary-button" type="button" data-generate-trust-pack="${identifier}" data-regenerate-trust-pack="true">Rigenera Trust Pack</button>
+        </div>
+        <small class="trust-pack-code">La pratica è cambiata: il documento precedente non è più utilizzabile.</small>
+      `;
+    }
     return `
       <div class="trust-pack-actions">
         <button class="primary-button" type="button" data-download-trust-pack="${id}">Scarica Trust Pack</button>
@@ -19983,7 +20256,28 @@ function archiveShowsSuspended() {
 }
 
 function selectedFusionStore() {
-  return document.getElementById("fusionStoreFilter")?.value || "Busto Arsizio";
+  return document.getElementById("fusionStoreFilter")?.value || "Tutti";
+}
+
+function selectedStoreMatchesAct(selectedStore, act = {}) {
+  if (!selectedStore || selectedStore === "Tutti") return true;
+  const selectedValue = String(selectedStore);
+  const actStoreId = act.negozioId || act.negozio_id || null;
+  const store = (state.stores || []).find((item) =>
+    [item.id, item.codice, item.code, item.nome, item.name]
+      .filter((value) => value !== undefined && value !== null)
+      .some((value) => String(value) === selectedValue)
+  );
+  const selectedId = store?.id || (/^\d+$/.test(selectedValue) ? selectedValue : null);
+  if (actStoreId) return Boolean(selectedId) && String(actStoreId) === String(selectedId);
+  if (selectedId && store) {
+    return String(act.storeCode || act.store_code || "") === String(store.codice || store.code || "")
+      || String(act.store || "") === String(store.nome || store.name || "");
+  }
+  return !selectedId && (
+    String(act.storeCode || act.store_code || "") === selectedValue
+    || String(act.store || "") === selectedValue
+  );
 }
 
 async function loadArchiveScreenData(options = {}) {
@@ -20011,7 +20305,7 @@ function archiveVisibleActs() {
   const keyword = document.getElementById("searchKeyword")?.value.trim().toLowerCase() || "";
   if (state.searchActive && keyword) return state.lastSearchResults;
   return demoActs.filter((act) => {
-    const storeMatches = selectedStore === "Tutti" || act.store === selectedStore;
+    const storeMatches = selectedStoreMatchesAct(selectedStore, act);
     const keywordMatches = !keyword || archiveSearchValue(act, field).includes(keyword);
     const status = workflowStatusCode(act.status);
     const suspendedStatus = ["suspended", "pending_approval"].includes(status);
@@ -20144,7 +20438,7 @@ function buildArchiveDayExport(store, date, acts) {
 function exportArchiveDay(date) {
   const selectedStore = document.getElementById("archiveStoreFilter")?.value || "";
   const dayActs = demoActs
-    .filter((act) => act.store === selectedStore && act.date === date)
+    .filter((act) => selectedStoreMatchesAct(selectedStore, act) && act.date === date)
     .sort((first, second) => first.practiceNumber.localeCompare(second.practiceNumber));
 
   if (!dayActs.length) {
@@ -20152,7 +20446,8 @@ function exportArchiveDay(date) {
     return;
   }
 
-  printPacket.innerHTML = buildArchiveDayExport(selectedStore, date, dayActs);
+  const selectedLabel = document.getElementById("archiveStoreFilter")?.selectedOptions?.[0]?.textContent || selectedStore;
+  printPacket.innerHTML = buildArchiveDayExport(selectedLabel, date, dayActs);
   window.print();
 }
 
@@ -20177,7 +20472,7 @@ async function exportDailySearchPdf() {
     await requestPdf("/pdf/acts", {
       title: "Esportazione PDF giornaliera",
       subtitle: `${storeLabel} - ${dates[0]}`,
-      acts: dayActs
+      atti: dayActs.map((act) => act.id || act.practiceNumber).filter(Boolean)
     }, `OroActive-PDF-giornaliero-${dates[0]}.pdf`);
   } catch (error) {
     showToast(error.message || "PDF giornaliero non generato.");
@@ -20205,7 +20500,7 @@ async function exportMonthlySearchPdf() {
     await requestPdf("/pdf/acts", {
       title: "Esportazione PDF mensile",
       subtitle: `${storeLabel} - ${months[0]}`,
-      acts: monthActs
+      atti: monthActs.map((act) => act.id || act.practiceNumber).filter(Boolean)
     }, `OroActive-PDF-mensile-${months[0]}.pdf`);
   } catch (error) {
     showToast(error.message || "PDF mensile non generato.");
@@ -20213,11 +20508,21 @@ async function exportMonthlySearchPdf() {
 }
 
 function storeCodeFromName(storeName) {
-  return {
+  const value = String(storeName || "").trim();
+  const knownCode = {
     "Busto Arsizio": "BUSTO",
     "Cassano Magnago": "CASSANO",
     Legnano: "LEGNANO"
-  }[storeName] || "BUSTO";
+  }[value];
+  if (knownCode) return knownCode;
+  const store = (state.stores || []).find((item) =>
+    [item.id, item.nome, item.name, item.codice, item.code]
+      .filter((candidate) => candidate !== undefined && candidate !== null)
+      .some((candidate) => String(candidate).trim().toLowerCase() === value.toLowerCase())
+  );
+  if (store?.codice || store?.code) return String(store.codice || store.code).trim().toUpperCase();
+  const safeCode = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+  return safeCode || "SEDE";
 }
 
 function buildArchivedActFallback(act) {
@@ -20917,24 +21222,6 @@ function actNumberValue(practiceNumber = "") {
   return match ? Number(match[1]) : 0;
 }
 
-function nextFusionDdtNumber(store) {
-  const numbers = demoActs
-    .filter((act) => act.store === store && act.fusion?.ddtNumber)
-    .map((act) => Number(act.fusion.ddtNumber))
-    .filter(Number.isFinite);
-  return numbers.length ? Math.max(...numbers) + 1 : 1;
-}
-
-function ddtNumberForFusionBatch(store, date) {
-  const existing = demoActs.find((act) => (
-    act.store === store
-    && act.fusion?.fused
-    && act.fusion?.date === date
-    && act.fusion?.ddtNumber
-  ));
-  return existing ? existing.fusion.ddtNumber : nextFusionDdtNumber(store);
-}
-
 function materialLotsForAct(act) {
   return actMaterials(act).map((material) => {
     const titles = [...new Set((act.items || [])
@@ -21014,7 +21301,7 @@ function fusionDdtHtml(store, date, acts) {
   const orderedActs = [...acts].sort((first, second) => actNumberValue(first.practiceNumber) - actNumberValue(second.practiceNumber));
   const firstAct = orderedActs[0]?.practiceNumber || "";
   const lastAct = orderedActs.at(-1)?.practiceNumber || "";
-  const ddtNumber = orderedActs[0]?.fusion?.ddtNumber || ddtNumberForFusionBatch(store, date);
+  const ddtNumber = orderedActs[0]?.fusion?.ddtNumber || "N/D";
   const lots = Object.values(fusionLotTotals(orderedActs));
   const totalsByMetal = materialTotalMap(orderedActs);
   const overallWeight = lots.reduce((sum, lot) => sum + lot.weight, 0);
@@ -21087,13 +21374,18 @@ function fusionDdtHtml(store, date, acts) {
   `;
 }
 
-function printFusionDdt(store, date) {
-  const acts = demoActs.filter((act) => act.store === store && act.fusion?.fused && act.fusion?.date === date);
+function printFusionDdt(storeId, storeLabel, date, ddtNumber) {
+  const acts = demoActs.filter((act) => (
+    selectedStoreMatchesAct(storeId, act)
+    && act.fusion?.fused
+    && act.fusion?.date === date
+    && String(act.fusion?.ddtNumber || "N/D") === String(ddtNumber || "N/D")
+  ));
   if (!acts.length) {
     showToast("Nessun atto fuso presente per creare il DDT.");
     return;
   }
-  printPacket.innerHTML = fusionDdtHtml(store, date, acts);
+  printPacket.innerHTML = fusionDdtHtml(storeLabel, date, acts);
   window.print();
 }
 
@@ -21106,34 +21398,32 @@ async function confirmActFusion(practiceNumber) {
 
   const today = localDateKey();
   const legalDate = addDays(act.date, 10);
+  if (!act.date || legalDate > today) {
+    showToast(`L'atto ${practiceNumber} non può essere fuso prima del ${legalDate}.`, "error");
+    return;
+  }
   const confirmed = window.confirm(
-    `L'atto ${practiceNumber} risulta fondibile secondo i termini di legge dal ${legalDate}. Puoi decidere se procedere comunque con la fusione oppure attendere i termini di legge. Vuoi confermare lo scarico dalla giacenza e mandarlo in fusione?`
+    `L'atto ${practiceNumber} è fondibile dal ${legalDate}. Vuoi confermare lo scarico dalla giacenza e mandarlo in fusione?`
   );
   if (!confirmed) return;
 
-  const updatedAct = {
-    ...act,
-    fusion: {
-      ...(act.fusion || {}),
-      fused: true,
-      date: today,
-      time: new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }),
-      legalFusionDate: legalDate,
-      ddtNumber: ddtNumberForFusionBatch(act.store, today),
-      fusedBy: displayUserFullName(state.currentUser)
-    }
-  };
-
   try {
-    await saveActRecord(updatedAct, "PUT");
-    await syncActsFromServer();
+    showLoading("Creazione lotto fusione...");
+    await apiRequest("/fusioni/lotti", {
+      method: "POST",
+      body: JSON.stringify({ atti: [practiceNumber], negozio_id: act.negozioId || act.negozio_id, data_invio: today })
+    });
+    await loadFusionScreenData({ force: true, silent: true });
+    renderFusionGroups();
     showToast(`Atto ${practiceNumber} scaricato dalla giacenza e inserito nella fusione del giorno.`);
-  } catch {
-    showToast("Fusione non salvata: controlla la connessione al database.");
+  } catch (error) {
+    showToast(error.message || "Fusione non salvata: controlla la connessione al database.", "error");
+  } finally {
+    hideLoading();
   }
 }
 
-async function confirmSelectedFusion(store) {
+async function confirmSelectedFusion(storeId, storeLabel) {
   const selected = [...document.querySelectorAll(`[data-select-fusion-act]:checked`)]
     .map((input) => input.dataset.selectFusionAct)
     .filter(Boolean);
@@ -21142,33 +21432,28 @@ async function confirmSelectedFusion(store) {
     showToast("Seleziona almeno un atto da mandare in fusione.");
     return;
   }
-  const acts = unique.map((practiceNumber) => demoActs.find((act) => act.practiceNumber === practiceNumber)).filter(Boolean);
+  const acts = unique
+    .map((practiceNumber) => demoActs.find((act) => act.practiceNumber === practiceNumber))
+    .filter((act) => act && selectedStoreMatchesAct(storeId, act));
+  if (acts.length !== unique.length) {
+    showToast("Seleziona atti appartenenti a una sola sede.", "error");
+    return;
+  }
+  const today = localDateKey();
+  const notReady = acts.find((act) => !act.date || addDays(act.date, 10) > today);
+  if (notReady) {
+    showToast(`L'atto ${notReady.practiceNumber} non può essere fuso prima del ${addDays(notReady.date, 10)}.`, "error");
+    return;
+  }
   const summary = fusionSummaryText(acts);
-  const proceed = window.confirm(`Vuoi creare un lotto fusione per ${acts.length} atti di ${store}? ${summary}`);
+  const proceed = window.confirm(`Vuoi creare un lotto fusione per ${acts.length} atti di ${storeLabel}? ${summary}`);
   if (!proceed) return;
   try {
     showLoading("Creazione lotto fusione...");
-    const today = localDateKey();
-    const ddtNumber = ddtNumberForFusionBatch(store, today);
-    const lot = await apiRequest("/fusioni/lotti", {
+    await apiRequest("/fusioni/lotti", {
       method: "POST",
-      body: JSON.stringify({ atti: unique, negozio: store, data_invio: today })
-    }).catch(() => null);
-    for (const act of acts) {
-      const updatedAct = {
-        ...act,
-        fusion: {
-          ...(act.fusion || {}),
-          fused: true,
-          date: today,
-          ddtNumber,
-          lotId: lot?.lotto_code || fusionDdtCode(store, today, ddtNumber),
-          refinery: act.fusion?.refinery || "",
-          theoreticalValue: materialLotsForAct(act).reduce((total, lot) => total + Number(lot.weight || 0) * Number(act.quotazione || 0) / 1000 * titlePurity(lot.metal, lot.title), 0)
-        }
-      };
-      await saveActRecord(updatedAct, "PUT");
-    }
+      body: JSON.stringify({ atti: unique, negozio_id: storeId, data_invio: today })
+    });
     await loadFusionScreenData({ force: true, silent: true });
     renderFusionGroups();
     showToast("Lotto fusione creato e giacenza aggiornata.", "success");
@@ -21185,9 +21470,11 @@ function fusionActRows(acts, options = {}) {
   return `
     <div class="archive-table fusion-table">
       <div class="table-row head"><span>Atto</span><span>Cliente</span><span>Data acquisto</span><span>Fondibile dal</span><span>Materiale</span><span>Azioni</span></div>
-      ${acts.flatMap((act) => materialLotsForAct(act).map((material) => `
+      ${acts.flatMap((act) => materialLotsForAct(act).map((material) => {
+        const readyForFusion = Boolean(options.ready || act.fusionDate <= today);
+        return `
         <div class="table-row">
-          <span>${isActFused(act) ? "" : `<input type="checkbox" data-select-fusion-act="${escapeHtml(act.practiceNumber)}" aria-label="Seleziona ${escapeHtml(act.practiceNumber)}"> `}${escapeHtml(act.practiceNumber)}</span>
+          <span>${isActFused(act) || !readyForFusion ? "" : `<input type="checkbox" data-select-fusion-act="${escapeHtml(act.practiceNumber)}" data-fusion-store-id="${escapeHtml(String(options.storeId || act.negozioId || act.negozio_id || ""))}" aria-label="Seleziona ${escapeHtml(act.practiceNumber)}"> `}${escapeHtml(act.practiceNumber)}</span>
           <strong>${escapeHtml(act.name)} ${escapeHtml(act.surname)}</strong>
           <span>${escapeHtml(act.date)}</span>
           <em class="${(options.ready || act.fusionDate <= today) ? "done" : ""}">${escapeHtml(act.fusionDate || addDays(act.date, 10))}</em>
@@ -21195,7 +21482,9 @@ function fusionActRows(acts, options = {}) {
           <div class="row-actions">
             <button type="button" data-open-act="${escapeHtml(act.practiceNumber)}">Apri</button>
             ${canModifyAct(act) ? `<button type="button" data-edit-act="${escapeHtml(act.practiceNumber)}">Modifica</button>` : ""}
-            ${isActFused(act) ? "" : `<button class="warning-button" type="button" data-fuse-act="${escapeHtml(act.practiceNumber)}">Fondi</button>`}
+            ${isActFused(act) ? "" : readyForFusion
+              ? `<button class="warning-button" type="button" data-fuse-act="${escapeHtml(act.practiceNumber)}">Fondi</button>`
+              : `<span class="request-pending">Disponibile dal ${escapeHtml(act.fusionDate || addDays(act.date, 10))}</span>`}
             ${canDeleteActDirectly(act) ? `<button class="danger-button" type="button" data-delete-act="${escapeHtml(act.practiceNumber)}">Elimina atto</button>` : ""}
             ${canRequestActDeletion(act) ? (
               act.deletionRequest?.status === "pending"
@@ -21204,7 +21493,8 @@ function fusionActRows(acts, options = {}) {
             ) : ""}
           </div>
         </div>
-      `)).join("")}
+      `;
+      })).join("")}
     </div>
   `;
 }
@@ -21263,17 +21553,28 @@ function renderFusionGroups() {
   }
 
   const grouped = acts.reduce((groups, act) => {
-    groups[act.store] ||= [];
-    groups[act.store].push(act);
+    const key = String(act.negozioId || act.negozio_id || act.storeCode || act.store || "");
+    groups[key] ||= [];
+    groups[key].push(act);
     return groups;
   }, {});
 
-  const stores = ["Busto Arsizio", "Cassano Magnago", "Legnano"];
+  const storesByKey = new Map(
+    state.stores.map((store) => [String(store.id), { key: String(store.id), label: store.nome }])
+  );
+  acts.forEach((act) => {
+    const key = String(act.negozioId || act.negozio_id || act.storeCode || act.store || "");
+    if (!storesByKey.has(key)) {
+      storesByKey.set(key, { key, label: act.store || act.storeCode || "Sede storica" });
+    }
+  });
+  const stores = [...storesByKey.values()];
   container.innerHTML = stores
-    .filter((store) => selectedStore === "Tutti" || store === selectedStore)
-    .filter((store) => grouped[store]?.length)
+    .filter((store) => selectedStore === "Tutti" || store.key === String(selectedStore))
+    .filter((store) => grouped[store.key]?.length)
     .map((store) => {
-      const storeActs = grouped[store];
+      const storeActs = grouped[store.key];
+      const storeLabel = store.label;
       const stockActs = storeActs.filter((act) => !isActFused(act));
       const fusedActs = storeActs.filter(isActFused);
       const storeTotals = materialTotalMap(stockActs);
@@ -21283,10 +21584,12 @@ function renderFusionGroups() {
         const fusionCompare = String(first.fusionDate || "").localeCompare(String(second.fusionDate || ""));
         return fusionCompare || String(second.date || "").localeCompare(String(first.date || ""));
       });
-      const fusedByDay = fusedActs.reduce((days, act) => {
+      const fusedByBatch = fusedActs.reduce((days, act) => {
         const date = act.fusion?.date || localDateKey();
-        days[date] ||= [];
-        days[date].push(act);
+        const ddtNumber = String(act.fusion?.ddtNumber || act.fusion?.lotId || "N/D");
+        const key = `${date}|${ddtNumber}`;
+        days[key] ||= [];
+        days[key].push(act);
         return days;
       }, {});
 
@@ -21294,7 +21597,7 @@ function renderFusionGroups() {
         <section class="fusion-store">
           <div class="fusion-store-heading">
             <div>
-              <h3>${escapeHtml(store)}</h3>
+          <h3>${escapeHtml(storeLabel)}</h3>
               <p>Giacenza complessiva per negozio, con atti ordinati per data di fusione.</p>
             </div>
             <div class="fusion-store-totals">
@@ -21309,29 +21612,33 @@ function renderFusionGroups() {
             </div>
             ${stockByTitleMarkup(stockActs)}
             <div class="fusion-batch-actions">
-              <button class="primary-button" type="button" data-fuse-selected-store="${escapeHtml(store)}">Crea lotto fusione da selezionati</button>
+              <button class="primary-button" type="button" data-fuse-selected-store-id="${escapeHtml(store.key)}" data-fuse-selected-store-label="${escapeHtml(storeLabel)}">Crea lotto fusione da selezionati</button>
               <span>Seleziona piu atti per generare un lotto unico separato per materiale e caratura.</span>
             </div>
-            ${fusionActRows(orderedStoreActs)}
+            ${fusionActRows(orderedStoreActs, { storeId: store.key })}
           </div>
           <div class="fusion-history">
             <div class="fusion-material-heading">
               <h4>Fusioni confermate</h4>
               <span>${escapeHtml(fusedActs.length)} atti fusi</span>
             </div>
-            ${Object.entries(fusedByDay).sort(([a], [b]) => b.localeCompare(a)).map(([date, dayActs]) => `
-              <section class="fusion-day-summary">
-                <div class="fusion-day-heading">
-                  <div>
-                    <h5>Fusione del ${escapeHtml(date)}</h5>
-                    <span>DDT ${escapeHtml(fusionDdtCode(store, date, dayActs[0]?.fusion?.ddtNumber || ddtNumberForFusionBatch(store, date)))}</span>
+            ${Object.entries(fusedByBatch).sort(([a], [b]) => b.localeCompare(a)).map(([, batchActs]) => {
+              const fusionDate = batchActs[0]?.fusion?.date || localDateKey();
+              const ddtNumber = batchActs[0]?.fusion?.ddtNumber || "N/D";
+              return `
+                <section class="fusion-day-summary">
+                  <div class="fusion-day-heading">
+                    <div>
+                      <h5>Fusione del ${escapeHtml(fusionDate)}</h5>
+                      <span>DDT ${escapeHtml(fusionDdtCode(storeLabel, fusionDate, ddtNumber))}</span>
+                    </div>
+                    <button class="primary-button" type="button" data-fusion-ddt-store-id="${escapeHtml(store.key)}" data-fusion-ddt-store-label="${escapeHtml(storeLabel)}" data-fusion-ddt-date="${escapeHtml(fusionDate)}" data-fusion-ddt-number="${escapeHtml(String(ddtNumber))}">Prepara PDF DDT Fusione</button>
                   </div>
-                  <button class="primary-button" type="button" data-fusion-ddt-store="${escapeHtml(store)}" data-fusion-ddt-date="${escapeHtml(date)}">Prepara PDF DDT Fusione</button>
-                </div>
-                <p>${escapeHtml(fusionSummaryText(dayActs))}</p>
-                ${fusionActRows(dayActs, { ready: true })}
-              </section>
-            `).join("") || '<div class="empty-state">Nessuna fusione confermata per questo negozio.</div>'}
+                  <p>${escapeHtml(fusionSummaryText(batchActs))}</p>
+                  ${fusionActRows(batchActs, { ready: true, storeId: store.key })}
+                </section>
+              `;
+            }).join("") || '<div class="empty-state">Nessuna fusione confermata per questo negozio.</div>'}
           </div>
         </section>
       `;
@@ -21446,6 +21753,17 @@ function renderAmlCashAlert() {
   const over = data.ok === false;
   box.hidden = false;
   box.classList.toggle("blocking", over);
+  if (data.details_redacted) {
+    box.innerHTML = `
+      <strong>${over ? "Limite contanti superato" : "Controllo contanti ultimi 7 giorni"}</strong>
+      <span>Importo atto corrente: ${escapeHtml(formatEuro(Number(data.importo_corrente || 0)))}</span>
+      <span>Soglia applicata: ${escapeHtml(formatEuro(Number(data.limite || 500)))}</span>
+      <em>${over
+        ? "Il controllo complessivo segnala che è necessario utilizzare Bonifico o Assegno. Gli importi di eventuali operazioni di altre sedi restano riservati."
+        : "Controllo superato. Gli eventuali importi registrati presso altre sedi restano riservati."}</em>
+    `;
+    return;
+  }
   box.innerHTML = `
     <strong>${over ? "Limite contanti superato" : "Controllo contanti ultimi 7 giorni"}</strong>
     <span>Contanti ricevuti ultimi 7 giorni: ${escapeHtml(formatEuro(Number(data.totale_ultimi_7_giorni || 0)))}</span>
@@ -21631,13 +21949,23 @@ function renderQuoteDashboard() {
   quoteDashboard.innerHTML = rows.join("");
 }
 
-async function waitForBullionVaultChartRender(timeoutMs = 10000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (bullionVaultChart?.querySelector(".highcharts-container svg, svg.highcharts-root")) return true;
-    await wait(200);
-  }
-  return false;
+function waitForBullionVaultChartRender(frame, timeoutMs = 12000) {
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => finish(false), timeoutMs);
+    const onMessage = (event) => {
+      if (event.source !== frame.contentWindow || event.data?.type !== "OROACTIVE_BULLIONVAULT_WIDGET") return;
+      finish(event.data.status === "ready");
+    };
+    const onError = () => finish(false);
+    function finish(rendered) {
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+      frame.removeEventListener("error", onError);
+      resolve(rendered);
+    }
+    window.addEventListener("message", onMessage);
+    frame.addEventListener("error", onError, { once: true });
+  });
 }
 
 async function initBullionVaultChart() {
@@ -21645,23 +21973,14 @@ async function initBullionVaultChart() {
   try {
     bullionVaultChart.setAttribute("aria-busy", "true");
     if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = true;
-    await loadScriptOnce("https://www.bullionvault.com/chart/bullionvaultchart.js?v=1", "bullionvault-chart-script");
-    if (typeof window.BullionVaultChart !== "function") throw new Error("Widget non disponibile");
     bullionVaultChart.innerHTML = "";
-    new window.BullionVaultChart({
-      bullion: "gold",
-      currency: "EUR",
-      timeframe: "1w",
-      chartType: "line",
-      containerDefinedSize: true,
-      displayLatestPriceLine: true,
-      switchBullion: true,
-      switchCurrency: true,
-      switchTimeframe: true,
-      switchChartType: false,
-      exportButton: false
-    }, "bullionVaultChart");
-    if (!(await waitForBullionVaultChartRender())) throw new Error("Grafico BullionVault non renderizzato");
+    const frame = document.createElement("iframe");
+    frame.title = "Grafico indicativo BullionVault";
+    frame.src = `/bullionvault-widget.html?build=${encodeURIComponent(window.__OROACTIVE_BOOT_BUILD_ID__ || "current")}`;
+    frame.setAttribute("sandbox", "allow-scripts");
+    frame.setAttribute("referrerpolicy", "no-referrer");
+    bullionVaultChart.append(frame);
+    if (!(await waitForBullionVaultChartRender(frame))) throw new Error("Grafico BullionVault non renderizzato");
     state.bullionChartLoaded = true;
     bullionVaultChart.removeAttribute("aria-busy");
     if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = true;
@@ -21709,9 +22028,11 @@ async function refreshQuoteDashboardData() {
       syncWarning = cleanUserMessage(error?.message, "Storico oro e argento non sincronizzato.");
     }
   }
-  await loadGoldPredictionPanel({ silent: true });
+  const analysisResult = await loadGoldPredictionPanel({ silent: true });
   if (!state.bullionChartLoaded) void initBullionVaultChart();
-  if (!liveResult.ok) {
+  if (!analysisResult?.ok) {
+    showToast("Aggiornamento incompleto: l’analisi di mercato non è disponibile e i valori decisionali sono stati disabilitati.", "error");
+  } else if (!liveResult.ok) {
     showToast("Quotazioni live non disponibili; i valori precedenti sono indicati come non aggiornati.", "error");
   } else if (liveResult.partial || syncWarning) {
     showToast(syncWarning || "Aggiornamento parziale: alcuni metalli mostrano l'ultimo dato disponibile.", "warning");
@@ -23816,8 +24137,45 @@ function renderGoldPredictionPanel() {
   if (syncGoldHistoryButton) syncGoldHistoryButton.hidden = !["founder", "responsabile"].includes(normalizeRole(state.currentUser?.ruolo));
 }
 
+function setGoldPredictionAvailability(available, error = null) {
+  state.goldPredictionAvailable = Boolean(available);
+  const panel = document.getElementById("goldPredictionPanel");
+  panel?.classList.toggle("is-unavailable", !available);
+  if (runGoldPredictionButton) runGoldPredictionButton.disabled = !available;
+  if (askAurumGoldPredictionButton) askAurumGoldPredictionButton.disabled = !available;
+  if (buybackScenarioSelect) buybackScenarioSelect.disabled = !available;
+  buybackSimulatorForm?.querySelectorAll("input, select, button").forEach((element) => {
+    element.disabled = !available;
+  });
+  if (available) return;
+
+  const lastSuccessful = state.goldPredictionLastSuccessfulAt
+    ? ` Ultimo caricamento completo: ${formatDateTime(state.goldPredictionLastSuccessfulAt)}.`
+    : " Nessun caricamento completo disponibile in questa sessione.";
+  const message = cleanUserMessage(error?.message, "Analisi metalli non disponibile al momento.");
+  state.goldPredictionLatest = [];
+  state.metalPredictionLatest = {};
+  state.goldPredictionHistory = [];
+  state.metalPredictionHistory = {};
+  state.buybackCalculations = [];
+  state.competitorQuotes = [];
+  state.competitorStats = {};
+  state.competitorMarketSummary = null;
+  state.buybackSimulationContext = null;
+  if (goldPredictionStatus) {
+    goldPredictionStatus.innerHTML = `<strong>Analisi non disponibile: dati decisionali disabilitati.</strong><span>${escapeHtml(message + lastSuccessful)}</span>`;
+  }
+  if (goldPredictionCards) goldPredictionCards.innerHTML = '<div class="empty-state">Valori rimossi perché non è stato possibile verificarne l’aggiornamento.</div>';
+  if (goldPredictionList) goldPredictionList.innerHTML = '<div class="empty-state">Previsioni temporaneamente non disponibili.</div>';
+  if (goldPredictionKaratTable) goldPredictionKaratTable.innerHTML = '<div class="empty-state">Prezzi massimi pagabili non utilizzabili finché l’analisi non viene aggiornata.</div>';
+  if (goldPredictionChart) goldPredictionChart.innerHTML = '<div class="empty-state">Grafico non disponibile.</div>';
+  if (goldPredictionExplanation) goldPredictionExplanation.innerHTML = '<p class="gold-prediction-disclaimer">Aggiorna nuovamente le quotazioni prima di prendere decisioni economiche.</p>';
+  if (competitorQuotesList) competitorQuotesList.innerHTML = '<div class="empty-state">Confronto competitor non verificato e temporaneamente disabilitato.</div>';
+  if (buybackSimulatorOutput) buybackSimulatorOutput.innerHTML = '<div class="empty-state">Simulatore disabilitato fino al prossimo aggiornamento completo.</div>';
+}
+
 async function loadGoldPredictionPanel(options = {}) {
-  if (!goldPredictionStatus) return;
+  if (!goldPredictionStatus) return { ok: false, error: new Error("Pannello analisi non disponibile") };
   if (!options.silent) goldPredictionStatus.textContent = "Caricamento Analisi di mercato...";
   try {
     const statusData = await apiRequest("/quotazioni/metals/status");
@@ -23896,9 +24254,13 @@ async function loadGoldPredictionPanel(options = {}) {
       const settingsData = await apiRequest("/quotazioni/gold-prediction/settings").catch(() => null);
       if (settingsData?.settings) state.goldPredictionSettings = settingsData.settings;
     }
+    state.goldPredictionLastSuccessfulAt = new Date().toISOString();
+    setGoldPredictionAvailability(true);
     renderGoldPredictionPanel();
+    return { ok: true };
   } catch (error) {
-    goldPredictionStatus.innerHTML = `<span>${escapeHtml(cleanUserMessage(error?.message, "Analisi metalli non disponibile al momento."))}</span>`;
+    setGoldPredictionAvailability(false, error);
+    return { ok: false, error };
   }
 }
 
@@ -23908,10 +24270,15 @@ async function syncGoldHistory() {
     body: JSON.stringify({ metals: ["gold", "silver"] })
   });
   showToast(data.warning || "Storico BullionVault oro e argento aggiornato.", data.warning ? "warning" : "success");
-  await loadGoldPredictionPanel({ silent: true });
+  const analysisResult = await loadGoldPredictionPanel({ silent: true });
+  if (!analysisResult?.ok) showToast("Lo storico è stato sincronizzato, ma l’analisi completa non è disponibile.", "error");
 }
 
 async function runGoldPrediction() {
+  if (!state.goldPredictionAvailable) {
+    showToast("Aggiorna prima l’analisi di mercato: i dati correnti non sono verificati.", "warning");
+    return;
+  }
   const currency = state.goldPredictionSettings?.currency || state.goldPredictionStatus?.settings?.currency || "EUR";
   const scenario = buybackScenarioSelect?.value || state.buybackScenario || "standard";
   state.buybackScenario = scenario;
@@ -23981,6 +24348,10 @@ async function saveGoldPredictionSettings(event) {
 function renderBuybackSimulation(event) {
   event?.preventDefault();
   if (!buybackSimulatorForm || !buybackSimulatorOutput) return;
+  if (!state.goldPredictionAvailable) {
+    buybackSimulatorOutput.innerHTML = '<div class="empty-state">Aggiorna l’analisi di mercato prima di usare il simulatore.</div>';
+    return null;
+  }
   const formData = new FormData(buybackSimulatorForm);
   const metal = String(formData.get("metal") || "gold");
   const purityCode = String(formData.get("purity_code") || "18kt");
@@ -25272,10 +25643,12 @@ async function printCompanyCopy() {
   }
   renderPaymentCaptureCard();
   try {
+    const act = currentActSnapshot(state.editingPracticeNumber ? "Archiviata" : "Archiviata");
     await requestPdf("/pdf/act", {
       title: "Copia aziendale interna",
-      act: currentActSnapshot(state.editingPracticeNumber ? "Archiviata" : "Archiviata")
-    }, `OroActive-${fieldValue("#practiceNumber") || "atto"}-copia-aziendale.pdf`);
+      atto: act.id || act.practiceNumber,
+      scope: "company"
+    }, `OroActive-${act.practiceNumber || "atto"}-copia-aziendale.pdf`);
   } catch (error) {
     showToast(error.message || "PDF copia aziendale non generato.");
   }
@@ -25324,7 +25697,7 @@ async function showCustomerCopyOptions() {
 async function handleCustomerCopyAction(action) {
   const act = currentActSnapshot("Archiviata");
   if (action === "download") {
-    await requestPdf("/pdf/act", { title: `Copia cliente ${act.practiceNumber}`, scope: "customer", act }, `copia-cliente-${act.practiceNumber || "oroactive"}.pdf`);
+    await requestPdf("/pdf/act", { title: `Copia cliente ${act.practiceNumber}`, scope: "customer", atto: act.id || act.practiceNumber }, `copia-cliente-${act.practiceNumber || "oroactive"}.pdf`);
     return;
   }
   if (action === "email") {
@@ -26765,9 +27138,9 @@ document.getElementById("archiveGroups")?.addEventListener("click", (event) => {
 });
 
 document.getElementById("fusionGroups")?.addEventListener("click", (event) => {
-  const fuseSelectedButton = event.target.closest("[data-fuse-selected-store]");
+  const fuseSelectedButton = event.target.closest("[data-fuse-selected-store-id]");
   if (fuseSelectedButton) {
-    confirmSelectedFusion(fuseSelectedButton.dataset.fuseSelectedStore);
+    confirmSelectedFusion(fuseSelectedButton.dataset.fuseSelectedStoreId, fuseSelectedButton.dataset.fuseSelectedStoreLabel);
     return;
   }
   const requestDeleteButton = event.target.closest("[data-request-delete-act]");
@@ -26780,9 +27153,9 @@ document.getElementById("fusionGroups")?.addEventListener("click", (event) => {
     approveDeleteAct(approveDeleteButton.dataset.approveDeleteAct);
     return;
   }
-  const ddtButton = event.target.closest("[data-fusion-ddt-store]");
+  const ddtButton = event.target.closest("[data-fusion-ddt-store-id]");
   if (ddtButton) {
-    printFusionDdt(ddtButton.dataset.fusionDdtStore, ddtButton.dataset.fusionDdtDate);
+    printFusionDdt(ddtButton.dataset.fusionDdtStoreId, ddtButton.dataset.fusionDdtStoreLabel, ddtButton.dataset.fusionDdtDate, ddtButton.dataset.fusionDdtNumber);
     return;
   }
   const fuseButton = event.target.closest("[data-fuse-act]");
@@ -26856,7 +27229,7 @@ previewBody?.addEventListener("click", async (event) => {
     try {
       await requestPdf(
         "/pdf/act",
-        { title: `${scope === "customer" ? "Copia cliente" : "Copia aziendale"} ${act.practiceNumber}`, scope, act },
+        { title: `${scope === "customer" ? "Copia cliente" : "Copia aziendale"} ${act.practiceNumber}`, scope, atto: act.id || act.practiceNumber },
         `${scope === "customer" ? "copia-cliente" : "copia-aziendale"}-${act.practiceNumber || "oroactive"}.pdf`
       );
     } catch (error) {
@@ -27021,6 +27394,7 @@ document.addEventListener("change", async (event) => {
   if (!card || !key) return;
   const file = event.target.files?.[0];
   if (file) {
+    const captureGeneration = state.sessionGeneration;
     markPracticeDirty();
     const previous = state.captureFiles.get(key);
     revokeCaptureUrl(previous);
@@ -27029,6 +27403,10 @@ document.addEventListener("change", async (event) => {
       dataUrl = await fileToDataUrl(file);
     } catch {
       showToast("Foto caricata, ma anteprima PDF non disponibile.");
+    }
+    if (captureGeneration !== state.sessionGeneration) {
+      event.target.value = "";
+      return;
     }
     state.captureFiles.set(key, {
       name: file.name || "Foto allegata",

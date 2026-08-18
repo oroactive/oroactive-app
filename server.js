@@ -1,6 +1,7 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
@@ -112,6 +113,16 @@ import {
   sanitizeAssistantUntrustedContext
 } from "./services/aurum/privacy.js";
 import { createWebAuthnStore } from "./services/auth/webauthnStore.js";
+import {
+  academyMutationAccessAllowed,
+  lockAcademyMutationUsers
+} from "./services/academy/mutationAccess.js";
+import {
+  prepareAtomicTrustPackPdf,
+  verifyTrustPackPdf,
+  verifyTrustPackPdfBuffer
+} from "./services/customerTrustPack/atomicPdf.js";
+import { safeExternalFetch } from "./services/security/safeExternalFetch.js";
 
 dotenv.config();
 
@@ -129,16 +140,43 @@ const runtimeStatus = {
   databaseError: "",
   initializationComplete: false,
   initializationError: "",
+  uploadStorageReady: false,
+  backupStorageReady: false,
   startedAt: new Date().toISOString()
 };
 const versionFilePath = path.join(__dirname, "version.json");
 let buildMetadataCache = null;
 let buildMetadataCacheAt = 0;
 const missingJwtSecretMessage = "JWT_SECRET obbligatorio: configura una chiave lunga e casuale nelle variabili ambiente.";
-const configuredJwtSecret = String(process.env.JWT_SECRET || "").trim();
-if (isProduction && configuredJwtSecret.length < 32) {
-  throw new Error(`${missingJwtSecretMessage} Lunghezza minima: 32 caratteri.`);
+
+function looksLikeSecretPlaceholder(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return true;
+  if (["password", "postgres", "admin", "secret", "changeme", "change-me", "12345678", "123456789"].includes(normalized)) return true;
+  return /(inserisci|placeholder|example|replace.?me|change.?me|your[_-]?(?:secret|password)|oroactive-dev|secret-change-me)/i.test(normalized);
 }
+
+function assertProductionSecret(name, value, minimumLength) {
+  if (!isProduction) return;
+  const secret = String(value || "").trim();
+  if (secret.length < minimumLength || looksLikeSecretPlaceholder(secret)) {
+    throw new Error(`${name} non configurata in modo sicuro: usa un valore casuale di almeno ${minimumLength} caratteri.`);
+  }
+}
+
+function configuredDatabasePassword() {
+  const direct = String(process.env.POSTGRES_PASSWORD || "").trim();
+  if (direct) return direct;
+  try {
+    return decodeURIComponent(new URL(String(process.env.DATABASE_URL || "")).password || "");
+  } catch {
+    return "";
+  }
+}
+
+const configuredJwtSecret = String(process.env.JWT_SECRET || "").trim();
+assertProductionSecret("JWT_SECRET", configuredJwtSecret, 32);
+assertProductionSecret("POSTGRES_PASSWORD", configuredDatabasePassword(), 12);
 const jwtSecret = configuredJwtSecret || "oroactive-dev-jwt-secret-change-me";
 const aurumMemoryEncryptionSecret = process.env.AURUM_MEMORY_ENCRYPTION_KEY || jwtSecret;
 const aurumMemoryDecryptionSecrets = [...new Set([
@@ -273,6 +311,13 @@ async function getBuildMetadata() {
 }
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "7d";
 const jsonBodyLimit = process.env.JSON_BODY_LIMIT || "50mb";
+const PUBLIC_JSON_BODY_LIMIT = process.env.PUBLIC_JSON_BODY_LIMIT || "256kb";
+const PROTECTED_JSON_BODY_LIMIT = process.env.PROTECTED_JSON_BODY_LIMIT || "1mb";
+const PDF_BULK_MAX_ACTS = Math.min(Math.max(Number(process.env.PDF_BULK_MAX_ACTS || 50) || 50, 1), 100);
+const PDF_EXPORT_MAX_PAYLOAD_BYTES = Math.min(
+  Math.max(Number(process.env.PDF_EXPORT_MAX_PAYLOAD_BYTES || 64 * 1024 * 1024) || 64 * 1024 * 1024, 8 * 1024 * 1024),
+  128 * 1024 * 1024
+);
 const openaiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const openaiEmbeddingModel = process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
 const bullionVaultMarketUrl = process.env.BULLIONVAULT_MARKET_URL || "https://www.bullionvault.com/view_market_xml.do";
@@ -296,21 +341,21 @@ const oroExpressAutoSyncEnabled = String(process.env.ORO_EXPRESS_AUTO_SYNC_ENABL
 const oroExpressAutoSyncOnStartup = String(process.env.ORO_EXPRESS_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const oroExpressSyncIntervalMinutes = Math.max(60, Number(process.env.ORO_EXPRESS_SYNC_INTERVAL_MINUTES || 60));
 const oroExpressUrl = process.env.ORO_EXPRESS_URL || "https://www.oro-express.it";
-const oroExpressUsePlaywright = String(process.env.ORO_EXPRESS_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const oroExpressUsePlaywright = false;
 const oroExpressTimeoutMs = Math.min(Math.max(Number(process.env.ORO_EXPRESS_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const oroExpressSilverUsedMapping = String(process.env.ORO_EXPRESS_SILVER_USED_MAPPING || "generic").toLowerCase();
 const oroDOroAutoSyncEnabled = String(process.env.ORO_DORO_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const oroDOroAutoSyncOnStartup = String(process.env.ORO_DORO_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const oroDOroSyncIntervalMinutes = Math.max(60, Number(process.env.ORO_DORO_SYNC_INTERVAL_MINUTES || 60));
 const oroDOroUrl = process.env.ORO_DORO_URL || "https://www.comproorodoro.it";
-const oroDOroUsePlaywright = String(process.env.ORO_DORO_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const oroDOroUsePlaywright = false;
 const oroDOroUseAiFallback = String(process.env.ORO_DORO_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const oroDOroTimeoutMs = Math.min(Math.max(Number(process.env.ORO_DORO_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const amicoOroAutoSyncEnabled = String(process.env.AMICO_ORO_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const amicoOroAutoSyncOnStartup = String(process.env.AMICO_ORO_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const amicoOroSyncIntervalMinutes = Math.max(60, Number(process.env.AMICO_ORO_SYNC_INTERVAL_MINUTES || 60));
 const amicoOroUrl = process.env.AMICO_ORO_URL || "https://www.amico-oro.it";
-const amicoOroUsePlaywright = String(process.env.AMICO_ORO_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const amicoOroUsePlaywright = false;
 const amicoOroUseAiVisionFallback = String(process.env.AMICO_ORO_USE_AI_VISION_FALLBACK || "true").toLowerCase() !== "false";
 const amicoOroTimeoutMs = Math.min(Math.max(Number(process.env.AMICO_ORO_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const prontoGoldAutoSyncEnabled = String(process.env.PRONTO_GOLD_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
@@ -318,7 +363,7 @@ const prontoGoldAutoSyncOnStartup = String(process.env.PRONTO_GOLD_AUTO_SYNC_ON_
 const prontoGoldSyncIntervalMinutes = Math.max(60, Number(process.env.PRONTO_GOLD_SYNC_INTERVAL_MINUTES || 60));
 const prontoGoldUrl = process.env.PRONTO_GOLD_URL || "https://www.prontogold.com";
 const prontoGoldQuoteUrl = process.env.PRONTO_GOLD_QUOTE_URL || "https://www.prontogold.com/quotazioni";
-const prontoGoldUsePlaywright = String(process.env.PRONTO_GOLD_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const prontoGoldUsePlaywright = false;
 const prontoGoldUseAiFallback = String(process.env.PRONTO_GOLD_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const prontoGoldTimeoutMs = Math.min(Math.max(Number(process.env.PRONTO_GOLD_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const bancoPreziosiAutoSyncEnabled = String(process.env.BANCO_PREZIOSI_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
@@ -326,35 +371,35 @@ const bancoPreziosiAutoSyncOnStartup = String(process.env.BANCO_PREZIOSI_AUTO_SY
 const bancoPreziosiSyncIntervalMinutes = Math.max(60, Number(process.env.BANCO_PREZIOSI_SYNC_INTERVAL_MINUTES || 60));
 const bancoPreziosiUrl = process.env.BANCO_PREZIOSI_URL || "https://www.bancopreziosimilano.it";
 const bancoPreziosiQuoteUrl = process.env.BANCO_PREZIOSI_QUOTE_URL || "https://www.bancopreziosimilano.it/quotazioni";
-const bancoPreziosiUsePlaywright = String(process.env.BANCO_PREZIOSI_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const bancoPreziosiUsePlaywright = false;
 const bancoPreziosiUseAiFallback = String(process.env.BANCO_PREZIOSI_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const bancoPreziosiTimeoutMs = Math.min(Math.max(Number(process.env.BANCO_PREZIOSI_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const bordinAutoSyncEnabled = String(process.env.BORDIN_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const bordinAutoSyncOnStartup = String(process.env.BORDIN_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const bordinSyncIntervalMinutes = Math.max(60, Number(process.env.BORDIN_SYNC_INTERVAL_MINUTES || 60));
 const bordinUrl = process.env.BORDIN_URL || "https://oroemetallipreziosi.com";
-const bordinUsePlaywright = String(process.env.BORDIN_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const bordinUsePlaywright = false;
 const bordinUseAiFallback = String(process.env.BORDIN_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const bordinTimeoutMs = Math.min(Math.max(Number(process.env.BORDIN_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const goldStandardAutoSyncEnabled = String(process.env.GOLD_STANDARD_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const goldStandardAutoSyncOnStartup = String(process.env.GOLD_STANDARD_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const goldStandardSyncIntervalMinutes = Math.max(60, Number(process.env.GOLD_STANDARD_SYNC_INTERVAL_MINUTES || 60));
 const goldStandardUrl = process.env.GOLD_STANDARD_URL || "https://www.goldstandard.gold";
-const goldStandardUsePlaywright = String(process.env.GOLD_STANDARD_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const goldStandardUsePlaywright = false;
 const goldStandardUseAiFallback = String(process.env.GOLD_STANDARD_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const goldStandardTimeoutMs = Math.min(Math.max(Number(process.env.GOLD_STANDARD_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const oroInEuroAutoSyncEnabled = String(process.env.ORO_IN_EURO_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const oroInEuroAutoSyncOnStartup = String(process.env.ORO_IN_EURO_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const oroInEuroSyncIntervalMinutes = Math.max(60, Number(process.env.ORO_IN_EURO_SYNC_INTERVAL_MINUTES || 60));
 const oroInEuroUrl = process.env.ORO_IN_EURO_URL || "https://www.quotazioneritirooro.it";
-const oroInEuroUsePlaywright = String(process.env.ORO_IN_EURO_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const oroInEuroUsePlaywright = false;
 const oroInEuroUseAiFallback = String(process.env.ORO_IN_EURO_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const oroInEuroTimeoutMs = Math.min(Math.max(Number(process.env.ORO_IN_EURO_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const gruppoOro24kAutoSyncEnabled = String(process.env.GRUPPO_ORO_24K_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const gruppoOro24kAutoSyncOnStartup = String(process.env.GRUPPO_ORO_24K_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const gruppoOro24kSyncIntervalMinutes = Math.max(60, Number(process.env.GRUPPO_ORO_24K_SYNC_INTERVAL_MINUTES || 60));
 const gruppoOro24kUrl = process.env.GRUPPO_ORO_24K_URL || "https://www.comprooromilano.org";
-const gruppoOro24kUsePlaywright = String(process.env.GRUPPO_ORO_24K_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const gruppoOro24kUsePlaywright = false;
 const gruppoOro24kUseAiFallback = String(process.env.GRUPPO_ORO_24K_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const gruppoOro24kTimeoutMs = Math.min(Math.max(Number(process.env.GRUPPO_ORO_24K_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);
 const competitorAiExtractionEnabled = String(process.env.AI_COMPETITOR_EXTRACTION_ENABLED || process.env.COMPETITOR_AI_AUTO_EXTRACTION_ENABLED || "true").toLowerCase() !== "false";
@@ -363,7 +408,7 @@ const competitorAiExtractionIntervalMinutes = Math.max(60, Number(process.env.AI
 const competitorAiExtractionOnStartup = String(process.env.COMPETITOR_AI_EXTRACTION_ON_STARTUP || "false").toLowerCase() === "true";
 const competitorAiMaxPagesPerSource = Math.min(Math.max(Number(process.env.AI_COMPETITOR_EXTRACTION_MAX_PAGES_PER_SOURCE || process.env.COMPETITOR_AI_MAX_PAGES_PER_SOURCE || 8), 1), 8);
 const competitorAiExtractionTimeoutMs = Math.min(Math.max(Number(process.env.AI_COMPETITOR_EXTRACTION_TIMEOUT_MS || 15000), 3000), 60000);
-const competitorAiUsePlaywright = String(process.env.AI_COMPETITOR_USE_PLAYWRIGHT || "true").toLowerCase() !== "false";
+const competitorAiUsePlaywright = false;
 const competitorAiUserAgent = process.env.AI_COMPETITOR_USER_AGENT || competitorAutoSyncUserAgent;
 const competitorAiExtractionModel = process.env.AI_COMPETITOR_EXTRACTION_MODEL || process.env.COMPETITOR_AI_EXTRACTION_MODEL || openaiModel;
 const competitorAiMaxTextChars = Math.min(Math.max(Number(process.env.COMPETITOR_AI_MAX_TEXT_CHARS || 12000), 3000), 24000);
@@ -483,15 +528,30 @@ const bullionVaultEnabled = String(process.env.BULLIONVAULT_ENABLED || "true").t
 const alphaVantageApiKey = process.env.ALPHA_VANTAGE_API_KEY || "";
 const customMetalApiUrl = process.env.CUSTOM_METAL_API_URL || "";
 const backupDirectory = process.env.BACKUP_DIR || "/data/oroactive/backups";
-const academyUploadDirectory = process.env.ACADEMY_UPLOAD_DIR || path.join(__dirname, "private_uploads", "academy");
+const configuredBackupMinimumFreeBytes = Number(process.env.BACKUP_MIN_FREE_BYTES || 1024 * 1024 * 1024);
+const backupMinimumFreeBytes = Number.isFinite(configuredBackupMinimumFreeBytes) && configuredBackupMinimumFreeBytes > 0
+  ? Math.max(configuredBackupMinimumFreeBytes, 256 * 1024 * 1024)
+  : 1024 * 1024 * 1024;
+const configuredBackupMaxTotalBytes = Number(process.env.BACKUP_MAX_TOTAL_BYTES || 20 * 1024 * 1024 * 1024);
+const backupMaxTotalBytes = Number.isFinite(configuredBackupMaxTotalBytes) && configuredBackupMaxTotalBytes > 0
+  ? Math.max(configuredBackupMaxTotalBytes, backupMinimumFreeBytes)
+  : 20 * 1024 * 1024 * 1024;
+const backupMaxCompletedCount = Math.min(Math.max(Number(process.env.BACKUP_MAX_COMPLETED_COUNT || 30) || 30, 3), 365);
+const backupSourceScanMaxFiles = Math.min(Math.max(Number(process.env.BACKUP_SOURCE_SCAN_MAX_FILES || 100000) || 100000, 1000), 1000000);
+const privateUploadDirectory = process.env.PRIVATE_UPLOAD_DIR || path.join(__dirname, "private_uploads");
+const academyUploadDirectory = process.env.ACADEMY_UPLOAD_DIR || path.join(privateUploadDirectory, "academy");
 const goldMasterSlideDirectory = academyUploadDirectory;
-const trustPackDirectory = process.env.CUSTOMER_TRUST_PACK_DIR || path.join(__dirname, "private_uploads", "customer-trust-packs");
+const trustPackDirectory = process.env.CUSTOMER_TRUST_PACK_DIR || path.join(privateUploadDirectory, "customer-trust-packs");
+const requirePersistentUploadStorage = isProduction && String(process.env.REQUIRE_PERSISTENT_UPLOAD_STORAGE || "true").toLowerCase() !== "false";
+const requirePersistentBackupStorage = isProduction && String(process.env.REQUIRE_PERSISTENT_BACKUP_STORAGE || "true").toLowerCase() !== "false";
 const oroactiveSiteUrl = process.env.OROACTIVE_SITE_URL || "https://www.oroactive.it";
 const privacyPolicyVersion = "v1.1";
 const privacyPolicyUpdatedAt = "2026-07-30";
 const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const pgRestorePath = process.env.PG_RESTORE_PATH || "pg_restore";
 const backupIntervalMs = 24 * 60 * 60 * 1000;
+const BACKUP_CREATION_ADVISORY_LOCK = 1329745221;
+let manualBackupCreationInProgress = false;
 const TROY_OUNCE_GRAMS = 31.1034768;
 const backupFolders = ["atti", "documenti", "preziosi", "contabili", "pdf", "firme", "utenti", "giacenza", "fusioni", "knowledge-base", "formazione", "antifrode", "crm"];
 const backupFileSources = [
@@ -504,9 +564,69 @@ const backupFileSources = [
   { source: "preziosi", target: "photos/preziosi", section: "foto preziosi" },
   { source: "contabili", target: "receipts/contabili", section: "contabili" },
   { source: "storage", target: "files/storage", section: "storage" },
-  { source: "private_uploads/academy", target: "academy/uploads", section: "academy uploads" },
+  { source: privateUploadDirectory, target: "private_uploads", section: "Academy e Customer Trust Pack" },
   { source: "knowledge-base", target: "ai/knowledge-base", section: "AI knowledge base" }
 ];
+
+function resolveBackupSourcePath(source) {
+  return path.isAbsolute(source) ? path.resolve(source) : path.resolve(__dirname, source);
+}
+
+function decodeMountInfoPath(value = "") {
+  return String(value).replace(/\\([0-7]{3})/g, (_match, octal) => String.fromCharCode(Number.parseInt(octal, 8)));
+}
+
+async function assertPersistentWritableStorage({ directory, required, label, codePrefix }) {
+  const target = path.resolve(directory);
+  await fs.mkdir(target, { recursive: true, mode: 0o750 });
+  if (required) {
+    let mountInfo;
+    try {
+      mountInfo = await fs.readFile("/proc/self/mountinfo", "utf8");
+    } catch {
+      const error = new Error(`${label} non verificabile nel container di produzione.`);
+      error.code = `${codePrefix}_UNVERIFIED`;
+      throw error;
+    }
+    const mounted = mountInfo.split("\n").some((line) => {
+      const separator = line.indexOf(" - ");
+      if (separator < 0) return false;
+      const fields = line.slice(0, separator).split(" ");
+      return fields.length > 4 && path.resolve(decodeMountInfoPath(fields[4])) === target;
+    });
+    if (!mounted) {
+      const error = new Error(`${label} obbligatorio non montato su ${target}.`);
+      error.code = `${codePrefix}_NOT_MOUNTED`;
+      throw error;
+    }
+  }
+  const probePath = path.join(target, `.oroactive-storage-check-${process.pid}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`);
+  try {
+    await fs.writeFile(probePath, "ok", { flag: "wx", mode: 0o600 });
+  } finally {
+    await fs.rm(probePath, { force: true }).catch(() => {});
+  }
+}
+
+async function assertPersistentUploadStorage() {
+  await assertPersistentWritableStorage({
+    directory: privateUploadDirectory,
+    required: requirePersistentUploadStorage,
+    label: "Storage persistente documenti",
+    codePrefix: "PRIVATE_UPLOAD_STORAGE"
+  });
+  runtimeStatus.uploadStorageReady = true;
+}
+
+async function assertPersistentBackupStorage() {
+  await assertPersistentWritableStorage({
+    directory: backupDirectory,
+    required: requirePersistentBackupStorage,
+    label: "Storage persistente backup",
+    codePrefix: "BACKUP_STORAGE"
+  });
+  runtimeStatus.backupStorageReady = true;
+}
 const bullionVaultMarkets = {
   Oro: { securityId: "AUXZU", source: "Zurigo" },
   Argento: { securityId: "AGXZU", source: "Zurigo" },
@@ -913,13 +1033,13 @@ app.set("trust proxy", process.env.TRUST_PROXY || "loopback, linklocal, uniquelo
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  // Compatibilità transitoria: index.html e la pagina reset-cache contengono script/style inline.
-  // Le altre sorgenti restano limitate all'app e allo script pubblico del grafico BullionVault.
-  "script-src 'self' 'unsafe-inline' https://www.bullionvault.com",
-  "style-src 'self' 'unsafe-inline' https://www.bullionvault.com",
+  "script-src 'self'",
+  "script-src-attr 'none'",
+  "style-src 'self'",
+  "style-src-attr 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://www.bullionvault.com https://chart-data.bullionvault.com wss://chart-data.bullionvault.com",
+  "connect-src 'self'",
   "frame-src 'self' data: blob:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
@@ -1059,12 +1179,25 @@ function requestRateLimitClass(request) {
   if (["/api/auth/faceid/login", "/api/auth/webauthn/login/verify"].includes(pathname)) {
     return { name: "passkey-verify", limit: 120, windowMs: 5 * 60_000 };
   }
+  if (isLargeProtectedApiRequest(request)) return { name: "large-body", limit: 8, windowMs: 60_000 };
   const expensiveAiRequest = request.method !== "GET" && (
     /^\/api\/ai\/(?:leggi-documento|controlla-atto|assistente|upload-book|reindex)(?:\/|$)/.test(pathname)
     || /^\/api\/training\/gold-coins\/identify(?:\/|$)/.test(pathname)
     || /^\/api\/quotazioni\/competitors\/(?:ai-extract\/run|sources\/[^/]+\/extraction-ai-assisted)(?:\/|$)/.test(pathname)
   );
   if (expensiveAiRequest) return { name: "ai", limit: 30, windowMs: 60_000 };
+  if (request.method === "POST" && pathname === "/api/backups/create") {
+    return { name: "backup-create", limit: 2, windowMs: 60 * 60_000 };
+  }
+  if (request.method === "POST" && /^\/api\/backups\/[^/]+\/(?:verify|test-restore)$/.test(pathname)) {
+    return { name: "backup-maintenance", limit: 6, windowMs: 60 * 60_000 };
+  }
+  if (request.method !== "GET" && /^\/api\/(?:utenti|users)(?:\/|$)/.test(pathname)) {
+    return { name: "user-mutation", limit: 30, windowMs: 60_000 };
+  }
+  if (request.method === "POST" && pathname === "/api/pdf/acts") {
+    return { name: "pdf-bulk-export", limit: 3, windowMs: 60_000 };
+  }
   return { name: "api", limit: 360, windowMs: 60_000 };
 }
 
@@ -1134,9 +1267,86 @@ function auditApiRequest(request, response, next) {
   next();
 }
 
+function requireApplicationReady(request, response, next) {
+  if (!request.path.startsWith("/api")) return next();
+  if (["/api/live", "/api/health", "/api/version"].includes(request.path)) return next();
+  if (runtimeStatus.initializationComplete && !runtimeStatus.initializationError) return next();
+  setNoStoreHeaders(response);
+  return response.status(503).json({
+    ok: false,
+    error: "OroActive sta completando l'avvio. Riprova tra pochi secondi.",
+    code: "SERVICE_NOT_READY"
+  });
+}
+
+app.use(requireApplicationReady);
 app.use(apiRateLimit);
-// Il limite anti-abuso deve scattare prima di leggere corpi JSON anche molto grandi.
-app.use(express.json({ limit: jsonBodyLimit }));
+// Le rotte pubbliche accettano soltanto payload piccoli. Per tutte le altre API
+// l'identità viene verificata prima di allocare memoria per eventuali allegati.
+const publicJsonParser = express.json({ limit: PUBLIC_JSON_BODY_LIMIT });
+const protectedJsonParser = express.json({ limit: PROTECTED_JSON_BODY_LIMIT });
+const protectedLargeJsonParser = express.json({ limit: jsonBodyLimit });
+const protectedLargeBodyMaxInFlight = Math.min(Math.max(Number(process.env.LARGE_BODY_MAX_IN_FLIGHT || 2) || 2, 1), 4);
+let protectedLargeBodiesInFlight = 0;
+const publicApiRequests = new Set([
+  "GET /api/live",
+  "GET /api/health",
+  "GET /api/version",
+  "POST /api/auth/login",
+  "POST /api/login",
+  "POST /api/auth/webauthn/login/options",
+  "POST /api/auth/webauthn/login/verify",
+  "POST /api/auth/faceid/login",
+  "POST /api/auth/logout"
+]);
+
+function isPublicApiRequest(request) {
+  return publicApiRequests.has(`${request.method.toUpperCase()} ${request.path}`);
+}
+
+function isLargeProtectedApiRequest(request) {
+  if (!["POST", "PUT", "PATCH"].includes(String(request.method || "").toUpperCase())) return false;
+  const pathname = String(request.path || "").toLowerCase().replace(/\/+$/, "") || "/";
+  return [
+    /^\/api\/(?:atti|acts)(?:\/[^/]+)?$/,
+    /^\/api\/ai\/(?:leggi-documento|controlla-atto|upload-book)$/,
+    /^\/api\/training\/gold-coins\/identify$/,
+    /^\/api\/academy\/(?:courses|lessons|materials)(?:\/[^/]+)?$/,
+    /^\/api\/corsi(?:\/[^/]+)?$/,
+    /^\/api\/training\/courses(?:\/[^/]+)?$/
+  ].some((pattern) => pattern.test(pathname));
+}
+
+function parseProtectedLargeJson(request, response, next) {
+  if (protectedLargeBodiesInFlight >= protectedLargeBodyMaxInFlight) {
+    response.setHeader("Retry-After", "5");
+    return response.status(429).json({ error: "Caricamenti già in corso: riprova tra pochi secondi." });
+  }
+  protectedLargeBodiesInFlight += 1;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    protectedLargeBodiesInFlight = Math.max(0, protectedLargeBodiesInFlight - 1);
+  };
+  response.once("finish", release);
+  response.once("close", release);
+  return protectedLargeJsonParser(request, response, (error) => {
+    if (error) release();
+    next(error);
+  });
+}
+
+app.use((request, response, next) => {
+  if (!request.path.startsWith("/api") || isPublicApiRequest(request)) {
+    return publicJsonParser(request, response, next);
+  }
+  return authenticate(request, response, (error) => {
+    if (error) return next(error);
+    if (isLargeProtectedApiRequest(request)) return parseProtectedLargeJson(request, response, next);
+    return protectedJsonParser(request, response, next);
+  });
+});
 
 function storeCodeFromName(storeName) {
   return {
@@ -1233,8 +1443,8 @@ function managedRolesForActor(actor) {
 }
 
 function usersSameStore(actor = {}, target = {}) {
-  if (actor.negozio_id && target.negozio_id) return String(actor.negozio_id) === String(target.negozio_id);
-  return String(actor.negozio || "") === String(target.negozio || "");
+  if (!actor.negozio_id || !target.negozio_id) return false;
+  return String(actor.negozio_id) === String(target.negozio_id);
 }
 
 function minimalPublicUser(row) {
@@ -1654,7 +1864,7 @@ function addAuditVisibilityWhere(user, conditions, values, alias = "al") {
     const clauses = [`${alias}.user_id = $${values.push(user?.id || null)}::bigint`];
     const storeClauses = [];
     if (user?.negozio_id) storeClauses.push(`${alias}.store_id = $${values.push(user.negozio_id)}::bigint`);
-    if (user?.negozio) storeClauses.push(`${alias}.store_name = $${values.push(user.negozio)}::text`);
+    if (user?.negozio) storeClauses.push(`(${alias}.store_id IS NULL AND ${alias}.store_name = $${values.push(user.negozio)}::text)`);
     if (storeClauses.length) {
       clauses.push(`(COALESCE(${alias}.user_role, '') = ANY($${roleParam}::text[]) AND (${storeClauses.join(" OR ")}))`);
     }
@@ -1788,7 +1998,8 @@ function signUserToken(user) {
     {
       sub: String(user.id),
       ruolo: normalizeRole(user.ruolo),
-      negozio: user.negozio
+      negozio: user.negozio,
+      sv: Number(user.session_version || 0)
     },
     jwtSecret,
     { expiresIn: jwtExpiresIn }
@@ -1797,7 +2008,7 @@ function signUserToken(user) {
 
 async function findUserById(id) {
   const result = await pool.query(
-    "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen FROM utenti WHERE id = $1::bigint",
+    "SELECT id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen, session_version FROM utenti WHERE id = $1::bigint",
     [id]
   );
   return result.rows[0] || null;
@@ -1826,25 +2037,35 @@ async function touchUserLastSeen(user, options = {}) {
 
 async function authenticate(request, response, next) {
   try {
+    if (request.user?.id) return next();
     const header = request.headers.authorization || "";
     const [, token] = header.match(/^Bearer\s+(.+)$/i) || [];
-    if (!token) return response.status(401).json({ error: "Accesso non autenticato" });
+    if (!token) return response.status(401).json({ ok: false, code: "AUTH_REQUIRED", error: "Accesso non autenticato" });
 
     const decoded = jwt.verify(token, jwtSecret);
     const user = await findUserById(decoded.sub);
-    if (!user) return response.status(401).json({ error: "Utente non trovato" });
-    if (user.attivo === false) return response.status(403).json({ ok: false, error: "Utente non attivo" });
+    if (!user) return response.status(401).json({ ok: false, code: "USER_NOT_FOUND", error: "Utente non trovato" });
+    if (user.attivo === false) return response.status(403).json({ ok: false, code: "USER_INACTIVE", error: "Utente non attivo" });
+    if (Number(decoded.sv || 0) !== Number(user.session_version || 0)) {
+      return response.status(401).json({ ok: false, code: "SESSION_REVOKED", error: "Sessione revocata: accedi nuovamente" });
+    }
+    await assertUserHasActiveStore(user);
     await touchUserLastSeen(user);
     request.user = user;
     next();
-  } catch {
+  } catch (error) {
     void writeAuditLog({
       req: request,
       action: "session_expired",
       entityType: "sessione",
       entityLabel: "Token non valido o scaduto"
     });
-    response.status(401).json({ error: "Sessione scaduta o non valida" });
+    const status = error?.status === 403 ? 403 : 401;
+    response.status(status).json({
+      ok: false,
+      code: status === 403 ? (error?.code || "STORE_INACTIVE") : "SESSION_INVALID",
+      error: status === 403 ? error.message : "Sessione scaduta o non valida"
+    });
   }
 }
 
@@ -1946,8 +2167,7 @@ async function fetchBullionVaultPrice(metal, market) {
     metal,
     market,
     currency: "EUR",
-    marketUrl: bullionVaultMarketUrl,
-    fetchImpl: fetch
+    marketUrl: bullionVaultMarketUrl
   });
 }
 
@@ -2251,7 +2471,12 @@ async function fetchAlphaVantageMetalPrice(metal = "gold", currency = "EUR") {
   url.searchParams.set("from_currency", normalizedMetal === "silver" ? "XAG" : "XAU");
   url.searchParams.set("to_currency", normalizePredictionCurrency(currency));
   url.searchParams.set("apikey", alphaVantageApiKey);
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const response = await safeExternalFetch(url, {
+    headers: { Accept: "application/json" },
+    timeoutMs: 10_000,
+    maxBytes: 1024 * 1024,
+    allowedHosts: ["alphavantage.co"]
+  });
   if (!response.ok) throw new Error(`Alpha Vantage HTTP ${response.status}`);
   const data = await response.json();
   const exchange = data?.["Realtime Currency Exchange Rate"] || {};
@@ -2278,7 +2503,11 @@ async function fetchCustomMetalPrice(metal = "gold", currency = "EUR") {
   const url = new URL(customMetalApiUrl);
   url.searchParams.set("metal", normalizedMetal);
   url.searchParams.set("currency", normalizePredictionCurrency(currency));
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const response = await safeExternalFetch(url, {
+    headers: { Accept: "application/json" },
+    timeoutMs: 10_000,
+    maxBytes: 1024 * 1024
+  });
   if (!response.ok) throw new Error(`Custom metal API HTTP ${response.status}`);
   const data = await response.json();
   const pricePerGram = Number(data.price_per_gram || data.pricePerGram || (Number(data.price_per_kg || data.pricePerKg || 0) / 1000));
@@ -4703,24 +4932,19 @@ function normalizeCompetitorQuote(rawQuote = {}, source = {}) {
 }
 
 async function fetchCompetitorPage(url = "") {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), competitorAutoSyncTimeoutMs);
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
-        "User-Agent": competitorAutoSyncUserAgent
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return {
-      contentType: response.headers.get("content-type") || "",
-      body: await response.text()
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const response = await safeExternalFetch(url, {
+    timeoutMs: competitorAutoSyncTimeoutMs,
+    maxBytes: 5 * 1024 * 1024,
+    headers: {
+      Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
+      "User-Agent": competitorAutoSyncUserAgent
+    }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return {
+    contentType: response.headers.get("content-type") || "",
+    body: await response.text()
+  };
 }
 
 async function extractCompetitorQuotes(source = {}) {
@@ -9027,7 +9251,10 @@ async function webSearchFallback(question = "") {
       url.searchParams.set("q", query);
       url.searchParams.set("count", "5");
       url.searchParams.set("country", "IT");
-      const response = await fetch(url, {
+      const response = await safeExternalFetch(url, {
+        timeoutMs: 10_000,
+        maxBytes: 1024 * 1024,
+        allowedHosts: ["api.search.brave.com"],
         headers: {
           "Accept": "application/json",
           "X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY
@@ -9046,7 +9273,11 @@ async function webSearchFallback(question = "") {
     if (process.env.WEB_SEARCH_ENDPOINT) {
       const url = new URL(process.env.WEB_SEARCH_ENDPOINT);
       url.searchParams.set("q", query);
-      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      const response = await safeExternalFetch(url, {
+        headers: { "Accept": "application/json" },
+        timeoutMs: 10_000,
+        maxBytes: 1024 * 1024
+      });
       if (!response.ok) throw new Error(`Web search HTTP ${response.status}`);
       const payload = await response.json();
       const rawResults = Array.isArray(payload.results) ? payload.results : Array.isArray(payload.items) ? payload.items : [];
@@ -10214,9 +10445,10 @@ async function enforceCashAntiMoneyLaundering(act, user, existing = null, option
   if (!isDraftLikeStatus(act.status) && (existing?.id || act.id)) {
     await saveAmlAlert({ check, act, user, attoId: existing?.id || act.id || null, db });
   }
-  if (!isDraftLikeStatus(act.status) && !check.ok && !options.allowApproved) {
+  if (!isDraftLikeStatus(act.status) && !check.ok) {
     const error = new Error(check.messaggio);
     error.status = 400;
+    error.code = "CASH_LIMIT_HARD_BLOCK";
     error.details = check;
     throw error;
   }
@@ -10253,7 +10485,10 @@ function rowToAct(row, options = {}) {
   return {
     ...payload,
     id: row.id,
+    clientId: row.cliente_id || payload.clientId || payload.cliente_id || null,
     practiceNumber: row.practice_number || payload.practiceNumber,
+    negozioId: row.negozio_id || payload.negozio_id || null,
+    storeCode: row.store_code || row.codice_negozio || payload.storeCode || payload.codice_negozio || "",
     store: row.store || payload.store || "",
     date: payload.date || dateText(row.data_atto),
     name: row.cliente_nome || payload.name || "",
@@ -10516,6 +10751,8 @@ async function runDatabaseMigration(sql, label) {
 }
 
 async function initDatabase() {
+  await assertPersistentUploadStorage();
+  await assertPersistentBackupStorage();
   const schema = await fs.readFile(path.join(__dirname, "schema.sql"), "utf8");
   await runDatabaseMigration(schema, "Migrazione schema principale");
   await cleanupLegacyPollingAuditLogs().catch((error) => {
@@ -10613,10 +10850,12 @@ async function sha256File(filePath) {
   });
 }
 
-async function directoryStats(root) {
+async function directoryStats(root, options = {}) {
   const stats = { files: 0, bytes: 0 };
+  const maxFiles = Number(options.maxFiles || Number.MAX_SAFE_INTEGER);
+  const maxBytes = Number(options.maxBytes || Number.MAX_SAFE_INTEGER);
   async function walk(current) {
-    const entries = await fs.readdir(current, { withFileTypes: true }).catch(() => []);
+    const entries = await fs.readdir(current, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
@@ -10625,11 +10864,49 @@ async function directoryStats(root) {
         const fileStats = await fs.stat(fullPath);
         stats.files += 1;
         stats.bytes += fileStats.size;
+        if (stats.files > maxFiles || stats.bytes > maxBytes) {
+          const error = new Error("Le sorgenti del backup superano i limiti di scansione configurati.");
+          error.status = 507;
+          error.code = "BACKUP_SOURCE_LIMIT_EXCEEDED";
+          throw error;
+        }
+      } else if (entry.isSymbolicLink()) {
+        const error = new Error("Le sorgenti del backup contengono un collegamento simbolico non consentito.");
+        error.status = 400;
+        error.code = "BACKUP_SOURCE_UNSAFE";
+        throw error;
       }
     }
   }
   await walk(root);
   return stats;
+}
+
+async function backupSourceStats() {
+  const totals = { files: 0, bytes: 0 };
+  for (const item of backupFileSources) {
+    const sourcePath = resolveBackupSourcePath(item.source);
+    const resolvedSource = path.resolve(sourcePath);
+    if (resolvedSource === path.resolve(backupDirectory) || resolvedSource.startsWith(`${path.resolve(backupDirectory)}${path.sep}`)) continue;
+    try {
+      await fs.access(sourcePath);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    const remainingFiles = Math.max(1, backupSourceScanMaxFiles - totals.files);
+    const remainingBytes = Math.max(1, backupMaxTotalBytes - totals.bytes);
+    const sourceStats = await directoryStats(sourcePath, { maxFiles: remainingFiles, maxBytes: remainingBytes });
+    totals.files += sourceStats.files;
+    totals.bytes += sourceStats.bytes;
+    if (totals.files > backupSourceScanMaxFiles || totals.bytes > backupMaxTotalBytes) {
+      const error = new Error("Le sorgenti del backup superano la quota massima configurata.");
+      error.status = 507;
+      error.code = "BACKUP_SOURCE_LIMIT_EXCEEDED";
+      throw error;
+    }
+  }
+  return totals;
 }
 
 async function addBackupLog(backupId, level, message, metadata = {}) {
@@ -10664,10 +10941,11 @@ async function createPostgresBackup(outputPath, backupId = null) {
 async function copyBackupFileSources(targetDir, backupId) {
   const skipped = [];
   for (const item of backupFileSources) {
-    const sourcePath = path.join(__dirname, item.source);
+    const sourcePath = resolveBackupSourcePath(item.source);
     const targetPath = path.join(targetDir, item.target);
     const resolvedSource = path.resolve(sourcePath);
-    if (path.resolve(backupDirectory) && resolvedSource.startsWith(path.resolve(backupDirectory))) continue;
+    const resolvedBackupDirectory = path.resolve(backupDirectory);
+    if (resolvedSource === resolvedBackupDirectory || resolvedSource.startsWith(`${resolvedBackupDirectory}${path.sep}`)) continue;
     try {
       await fs.access(sourcePath);
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
@@ -10770,39 +11048,201 @@ async function backupDetail(id, user = {}) {
   });
 }
 
-async function createManualBackup(user = {}) {
+function backupCreationConflict(message = "Un backup è già in corso. Attendere il completamento prima di riprovare.") {
+  const error = new Error(message);
+  error.status = 409;
+  error.code = "BACKUP_ALREADY_RUNNING";
+  return error;
+}
+
+async function recoverInterruptedBackupRows(db) {
+  const interrupted = await db.query(
+    `SELECT id, metadata
+     FROM backups
+     WHERE status = 'running'
+       AND deleted_at IS NULL
+     ORDER BY created_at ASC
+     LIMIT 100`
+  );
+  for (const row of interrupted.rows) {
+    const candidates = [row.metadata?.archive_path, row.metadata?.backup_dir]
+      .filter(Boolean)
+      .map((candidate) => {
+        try {
+          return authorizedBackupPath(candidate);
+        } catch {
+          return null;
+        }
+      })
+      .filter((candidate, index, items) => candidate && items.indexOf(candidate) === index);
+    await db.query(
+      `UPDATE backups
+       SET status = 'failed',
+           error_message = 'Backup interrotto da un precedente arresto del servizio',
+           metadata = COALESCE(metadata, '{}'::jsonb)
+             || jsonb_build_object(
+               'interrupted_recovered_at', NOW(),
+               'cleanup_pending', $2::jsonb
+             )
+       WHERE id = $1::uuid
+         AND status = 'running'`,
+      [row.id, sanitizeForPostgres(candidates)]
+    );
+    let cleanupComplete = true;
+    for (const candidate of candidates) {
+      await fs.rm(candidate, { recursive: true, force: true }).catch(() => {
+        cleanupComplete = false;
+      });
+    }
+    if (cleanupComplete) {
+      await db.query(
+        `UPDATE backups
+         SET metadata = (COALESCE(metadata, '{}'::jsonb) - 'cleanup_pending')
+           || jsonb_build_object('backup_dir', NULL, 'archive_path', NULL)
+         WHERE id = $1::uuid`,
+        [row.id]
+      ).catch(() => {});
+    }
+  }
+}
+
+async function acquireBackupCreationLock() {
+  if (manualBackupCreationInProgress) throw backupCreationConflict();
+  const lockClient = await pool.connect();
+  let locked = false;
+  try {
+    const result = await lockClient.query(
+      "SELECT pg_try_advisory_lock($1::integer) AS locked",
+      [BACKUP_CREATION_ADVISORY_LOCK]
+    );
+    locked = result.rows[0]?.locked === true;
+    if (!locked) throw backupCreationConflict();
+    manualBackupCreationInProgress = true;
+    // Se il lock è libero, eventuali righe ancora running provengono da un
+    // processo terminato prima di poter registrare il fallimento.
+    await recoverInterruptedBackupRows(lockClient);
+    let released = false;
+    return async () => {
+      if (released) return;
+      released = true;
+      manualBackupCreationInProgress = false;
+      if (locked) {
+        await lockClient.query("SELECT pg_advisory_unlock($1::integer)", [BACKUP_CREATION_ADVISORY_LOCK]).catch(() => {});
+      }
+      lockClient.release();
+    };
+  } catch (error) {
+    manualBackupCreationInProgress = false;
+    if (locked) {
+      await lockClient.query("SELECT pg_advisory_unlock($1::integer)", [BACKUP_CREATION_ADVISORY_LOCK]).catch(() => {});
+    }
+    lockClient.release();
+    throw error;
+  }
+}
+
+async function assertBackupStorageCapacity() {
+  await fs.mkdir(backupDirectory, { recursive: true });
+  const [filesystem, databaseSizeResult, sourceStats, retainedResult] = await Promise.all([
+    fs.statfs(backupDirectory),
+    pool.query("SELECT pg_database_size(current_database())::bigint AS bytes"),
+    backupSourceStats(),
+    pool.query(
+      `SELECT COALESCE(SUM(file_size), 0)::bigint AS bytes,
+              COUNT(*)::integer AS count
+       FROM backups
+       WHERE status = 'completed'
+         AND deleted_at IS NULL`
+    )
+  ]);
+  const freeBytes = Number(filesystem.bavail) * Number(filesystem.bsize);
+  const databaseBytes = Number(databaseSizeResult.rows[0]?.bytes || 0);
+  const sourceBytes = Number(sourceStats.bytes || 0);
+  const estimatedStagingBytes = databaseBytes + sourceBytes;
+  // Durante la compressione convivono staging e archivio: riserviamo due
+  // volte il payload stimato, più un margine operativo fisso.
+  const requiredBytes = Math.max(backupMinimumFreeBytes, (estimatedStagingBytes * 2) + (256 * 1024 * 1024));
+  if (!Number.isFinite(freeBytes) || freeBytes < requiredBytes) {
+    const error = new Error("Spazio libero insufficiente per creare il backup in sicurezza.");
+    error.status = 507;
+    error.code = "BACKUP_STORAGE_INSUFFICIENT";
+    error.details = { free_bytes: freeBytes, required_bytes: requiredBytes };
+    throw error;
+  }
+  const retainedBytes = Number(retainedResult.rows[0]?.bytes || 0);
+  const retainedCount = Number(retainedResult.rows[0]?.count || 0);
+  if (retainedCount >= backupMaxCompletedCount || retainedBytes + estimatedStagingBytes > backupMaxTotalBytes) {
+    const error = new Error("Quota backup raggiunta: eliminare in modo esplicito uno o più archivi precedenti prima di crearne un altro.");
+    error.status = 507;
+    error.code = "BACKUP_RETENTION_LIMIT";
+    error.details = {
+      retained_bytes: retainedBytes,
+      estimated_archive_bytes: estimatedStagingBytes,
+      max_total_bytes: backupMaxTotalBytes,
+      retained_count: retainedCount,
+      max_completed_count: backupMaxCompletedCount
+    };
+    throw error;
+  }
+  return {
+    freeBytes,
+    requiredBytes,
+    databaseBytes,
+    sourceBytes,
+    sourceFiles: sourceStats.files,
+    retainedBytes,
+    retainedCount
+  };
+}
+
+async function createManualBackupUnlocked(user = {}, storageCapacity = {}) {
   const now = new Date();
   const code = backupCode(now);
   const backupDirName = `backup_${backupTimestamp(now)}_${code}`;
   const backupDir = path.join(backupDirectory, backupDirName);
   const archivePath = path.join(backupDirectory, `backup_${code}.tar.gz`);
-  await fs.mkdir(backupDir, { recursive: true });
   const dbInfo = databaseInfoFromUrl();
-  const created = await pool.query(
-    `INSERT INTO backups
-      (backup_code, backup_type, status, created_by, created_by_role, store_id, metadata)
-     VALUES ($1::text, 'manual_full', 'running', $2::bigint, $3::text, $4::bigint, $5::jsonb)
-     RETURNING *`,
-    [
-      code,
-      user.id || null,
-      normalizeRole(user.ruolo),
-      user.negozio_id || null,
-      sanitizeForPostgres({ backup_dir: backupDir, archive_path: archivePath, database: dbInfo ? { host: dbInfo.host, database: dbInfo.database } : null })
-    ]
-  );
-  const backupId = created.rows[0].id;
-  await addBackupLog(backupId, "info", "Backup manuale avviato", { backup_code: code });
+  let backupId = null;
 
   try {
+    await fs.mkdir(backupDir, { recursive: false, mode: 0o700 });
+    const created = await pool.query(
+      `INSERT INTO backups
+        (backup_code, backup_type, status, created_by, created_by_role, store_id, metadata)
+       VALUES ($1::text, 'manual_full', 'running', $2::bigint, $3::text, $4::bigint, $5::jsonb)
+       RETURNING *`,
+      [
+        code,
+        user.id || null,
+        normalizeRole(user.ruolo),
+        user.negozio_id || null,
+        sanitizeForPostgres({
+          backup_dir: backupDir,
+          archive_path: archivePath,
+          database: dbInfo ? { host: dbInfo.host, database: dbInfo.database } : null,
+          storage_capacity: {
+            free_bytes: storageCapacity.freeBytes || null,
+            required_bytes: storageCapacity.requiredBytes || null,
+            database_bytes: storageCapacity.databaseBytes || null,
+            source_bytes: storageCapacity.sourceBytes || null,
+            source_files: storageCapacity.sourceFiles || 0,
+            retained_bytes: storageCapacity.retainedBytes || 0,
+            retained_count: storageCapacity.retainedCount || 0
+          }
+        })
+      ]
+    );
+    backupId = created.rows[0].id;
+    await addBackupLog(backupId, "info", "Backup manuale avviato", { backup_code: code });
     const databaseDumpPath = path.join(backupDir, "database.dump");
     await createPostgresBackup(databaseDumpPath, backupId);
+    const databaseDumpChecksum = await sha256File(databaseDumpPath);
     const skippedFolders = await copyBackupFileSources(backupDir, backupId);
     await fs.mkdir(path.join(backupDir, "logs"), { recursive: true });
     const contentStats = await directoryStats(backupDir);
     const payloadChecksum = crypto
       .createHash("sha256")
-      .update(JSON.stringify({ code, files: contentStats.files, bytes: contentStats.bytes }))
+      .update(JSON.stringify({ code, files: contentStats.files, bytes: contentStats.bytes, database_dump_checksum_sha256: databaseDumpChecksum }))
       .digest("hex");
     const manifest = {
       backup_code: code,
@@ -10810,6 +11250,8 @@ async function createManualBackup(user = {}) {
       created_by: user.id || null,
       created_by_role: normalizeRole(user.ruolo),
       database_dump_file: "database.dump",
+      database_dump_checksum_sha256: databaseDumpChecksum,
+      archive_file: path.basename(archivePath),
       included_sections: [
         "database PostgreSQL",
         "atti di vendita",
@@ -10826,7 +11268,8 @@ async function createManualBackup(user = {}) {
         "utenti",
         "audit log",
         "giacenza",
-        "fusioni"
+        "fusioni",
+        "Customer Trust Pack"
       ],
       skipped_folders: skippedFolders,
       number_of_files: contentStats.files,
@@ -10836,11 +11279,9 @@ async function createManualBackup(user = {}) {
       database_name: dbInfo?.database || "",
       restore_instructions: "Usare pg_restore su un database vuoto o staging: pg_restore --no-owner --no-privileges --dbname=<database_staging> database.dump"
     };
-    const manifestPath = await writeVerifiableManifest(backupDir, manifest);
+    await writeVerifiableManifest(backupDir, manifest);
     const archiveStats = await createTarGz(backupDir, archivePath);
     const archiveChecksum = await sha256File(archivePath);
-    const updatedManifest = { ...manifest, archive_file: path.basename(archivePath), archive_checksum_sha256: archiveChecksum };
-    await writeVerifiableManifest(backupDir, updatedManifest);
     await addBackupLog(backupId, "info", "Archivio compresso creato", { archive: path.basename(archivePath), size: archiveStats.size });
     const updated = await pool.query(
       `UPDATE backups
@@ -10860,17 +11301,49 @@ async function createManualBackup(user = {}) {
         sanitizeForPostgres({
           backup_dir: backupDir,
           archive_path: archivePath,
-          manifest_path: manifestPath,
-          database_dump_path: databaseDumpPath,
-          manifest: updatedManifest
+          manifest_path: null,
+          database_dump_path: null,
+          staging_removed: false,
+          cleanup_pending: [backupDir],
+          manifest
         })
       ]
     );
+    let completedRow = updated.rows[0];
+    try {
+      await fs.rm(backupDir, { recursive: true, force: true });
+      const cleaned = await pool.query(
+        `UPDATE backups
+         SET metadata = (COALESCE(metadata, '{}'::jsonb) - 'cleanup_pending')
+           || jsonb_build_object('backup_dir', NULL, 'staging_removed', TRUE)
+         WHERE id = $1::uuid
+           AND status = 'completed'
+         RETURNING *`,
+        [backupId]
+      );
+      completedRow = cleaned.rows[0] || completedRow;
+    } catch (cleanupError) {
+      await addBackupLog(backupId, "warning", "Archivio valido; pulizia staging rinviata al processo automatico", {
+        error: String(cleanupError?.message || cleanupError).slice(0, 300)
+      });
+    }
     await addBackupLog(backupId, "info", "Backup creato correttamente", { checksum_sha256: archiveChecksum });
-    return publicBackup(updated.rows[0]);
+    return publicBackup(completedRow);
   } catch (error) {
     const message = error.message || "Backup non riuscito";
-    await addBackupLog(backupId, "error", message);
+    if (backupId) await addBackupLog(backupId, "error", message);
+    const cleanupTargets = [archivePath, backupDir];
+    const cleanupResults = await Promise.allSettled([
+      fs.rm(archivePath, { force: true }),
+      fs.rm(backupDir, { recursive: true, force: true })
+    ]);
+    const cleanupPending = cleanupResults
+      .map((result, index) => result.status === "rejected" ? cleanupTargets[index] : null)
+      .filter(Boolean);
+    const cleanupErrors = cleanupResults
+      .filter((result) => result.status === "rejected")
+      .map((result) => String(result.reason?.message || result.reason || "cleanup fallito").slice(0, 300));
+    if (!backupId) throw error;
     const failed = await pool.query(
       `UPDATE backups
        SET status = 'failed',
@@ -10878,9 +11351,29 @@ async function createManualBackup(user = {}) {
            metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
        WHERE id = $1::uuid
        RETURNING *`,
-      [backupId, message, sanitizeForPostgres({ backup_dir: backupDir, archive_path: archivePath })]
+      [
+        backupId,
+        message,
+        sanitizeForPostgres({
+          backup_dir: null,
+          archive_path: null,
+          partial_artifacts_removed: cleanupErrors.length === 0,
+          partial_artifact_cleanup_errors: cleanupErrors,
+          cleanup_pending: cleanupPending
+        })
+      ]
     );
     return publicBackup(failed.rows[0]);
+  }
+}
+
+async function createManualBackup(user = {}) {
+  const releaseLock = await acquireBackupCreationLock();
+  try {
+    const storageCapacity = await assertBackupStorageCapacity();
+    return await createManualBackupUnlocked(user, storageCapacity);
+  } finally {
+    await releaseLock();
   }
 }
 
@@ -10892,44 +11385,107 @@ async function archiveEntries(archivePath) {
   return stdout.split(/\r?\n/).filter(Boolean);
 }
 
-async function loadBackupManifest(backup) {
-  const manifestPath = backup.metadata?.manifest_path;
-  if (manifestPath) {
-    const resolved = path.resolve(manifestPath);
-    const relative = path.relative(path.resolve(backupDirectory), resolved);
-    if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
-      return JSON.parse(await fs.readFile(resolved, "utf8"));
+function authorizedBackupPath(candidate, options = {}) {
+  const resolved = path.resolve(String(candidate || ""));
+  const root = path.resolve(backupDirectory);
+  const relative = path.relative(root, resolved);
+  if (!candidate || !relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(options.message || "Percorso backup non autorizzato.");
+  }
+  return resolved;
+}
+
+function validateArchiveEntryName(entry = "") {
+  const normalized = String(entry || "").replace(/\\/g, "/");
+  if (!normalized || normalized.includes("\0") || normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized)) {
+    throw new Error("Archivio backup con percorso non valido.");
+  }
+  if (normalized.split("/").some((part) => part === "..")) throw new Error("Archivio backup con attraversamento di percorso.");
+  return normalized;
+}
+
+async function findExtractedBackupFiles(root) {
+  const found = { manifests: [], dumps: [], files: 0, bytes: 0 };
+  async function walk(current) {
+    const entries = await fs.readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      const stats = await fs.lstat(fullPath);
+      if (stats.isSymbolicLink() || (!stats.isFile() && !stats.isDirectory())) throw new Error("Archivio backup contiene collegamenti o file speciali.");
+      if (stats.isDirectory()) {
+        await walk(fullPath);
+      } else {
+        found.files += 1;
+        found.bytes += stats.size;
+        if (found.files > 20_000 || found.bytes > 20 * 1024 * 1024 * 1024) throw new Error("Archivio backup oltre i limiti di sicurezza.");
+        if (entry.name === "manifest.json") found.manifests.push(fullPath);
+        if (entry.name === "database.dump") found.dumps.push(fullPath);
+      }
     }
   }
-  return backup.metadata?.manifest || null;
+  await walk(root);
+  return found;
+}
+
+async function extractVerifiedBackupArchive(backup) {
+  if (backup.status !== "completed") throw new Error("Backup non completato.");
+  const archivePath = authorizedBackupPath(backup.file_path);
+  const stats = await fs.stat(archivePath);
+  if (!stats.isFile() || !stats.size) throw new Error("Archivio backup vuoto o non valido.");
+  if (Number(backup.file_size || 0) && Number(backup.file_size) !== stats.size) throw new Error("Dimensione archivio non corrispondente.");
+  const checksum = await sha256File(archivePath);
+  if (!backup.checksum_sha256 || checksum !== backup.checksum_sha256) throw new Error("Checksum non corrispondente");
+
+  const entries = await archiveEntries(archivePath);
+  if (!entries.length || entries.length > 20_000) throw new Error("Numero file dell'archivio non valido.");
+  entries.forEach(validateArchiveEntryName);
+  const { stdout: verbose } = await execFileAsync("tar", ["-tvzf", archivePath], {
+    timeout: 2 * 60 * 1000,
+    maxBuffer: 10 * 1024 * 1024
+  });
+  for (const line of verbose.split(/\r?\n/).filter(Boolean)) {
+    if (/^[lhbcp]/i.test(line)) throw new Error("Archivio backup contiene link o file speciali.");
+  }
+
+  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "oroactive-backup-"));
+  await fs.chmod(temporaryDirectory, 0o700);
+  try {
+    await execFileAsync("tar", ["-xzf", archivePath, "-C", temporaryDirectory, "--no-same-owner", "--no-same-permissions"], {
+      timeout: 15 * 60 * 1000,
+      maxBuffer: 1024 * 1024
+    });
+    const extractedFiles = await findExtractedBackupFiles(temporaryDirectory);
+    if (extractedFiles.manifests.length !== 1 || extractedFiles.dumps.length !== 1) {
+      throw new Error("L'archivio deve contenere un solo manifest.json e un solo database.dump.");
+    }
+    const manifest = JSON.parse(await fs.readFile(extractedFiles.manifests[0], "utf8"));
+    if (!manifest?.backup_code || String(manifest.backup_code) !== String(backup.backup_code)) throw new Error("manifest.json non corrisponde al backup selezionato.");
+    const dumpStats = await fs.stat(extractedFiles.dumps[0]);
+    if (!dumpStats.size) throw new Error("database.dump vuoto.");
+    if (manifest.database_dump_checksum_sha256) {
+      const dumpChecksum = await sha256File(extractedFiles.dumps[0]);
+      if (dumpChecksum !== manifest.database_dump_checksum_sha256) throw new Error("Checksum database.dump non corrispondente.");
+    }
+    return {
+      archivePath,
+      checksum,
+      manifest,
+      databaseDumpPath: extractedFiles.dumps[0],
+      temporaryDirectory,
+      cleanup: () => fs.rm(temporaryDirectory, { recursive: true, force: true })
+    };
+  } catch (error) {
+    await fs.rm(temporaryDirectory, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 async function verifyBackup(id, user = {}) {
   const backup = await backupDetail(id, user);
   if (!backup) return null;
+  let extracted = null;
   try {
-    if (backup.status !== "completed") throw new Error("Backup non completato.");
-    if (!backup.file_path) throw new Error("File backup non disponibile.");
-    const resolved = path.resolve(backup.file_path);
-    const relative = path.relative(path.resolve(backupDirectory), resolved);
-    if (!resolved || relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Percorso backup non autorizzato.");
-    const stats = await fs.stat(resolved);
-    if (!stats.size) throw new Error("Archivio backup vuoto.");
-    const checksum = await sha256File(resolved);
-    if (checksum !== backup.checksum_sha256) throw new Error("Checksum non corrispondente");
-    const manifest = await loadBackupManifest(backup);
-    if (!manifest?.backup_code) throw new Error("manifest.json non valido o mancante.");
-    const entries = await archiveEntries(resolved);
-    if (!entries.some((entry) => entry.endsWith("/database.dump"))) throw new Error("database.dump mancante nell'archivio.");
-    if (!entries.some((entry) => entry.endsWith("/manifest.json"))) throw new Error("manifest.json mancante nell'archivio.");
-    const dumpPath = backup.metadata?.database_dump_path;
-    if (dumpPath) {
-      const resolvedDump = path.resolve(dumpPath);
-      const dumpRelative = path.relative(path.resolve(backupDirectory), resolvedDump);
-      if (dumpRelative.startsWith("..") || path.isAbsolute(dumpRelative)) throw new Error("Percorso database.dump non autorizzato.");
-      const dumpStats = await fs.stat(resolvedDump);
-      if (!dumpStats.size) throw new Error("database.dump vuoto.");
-    }
+    extracted = await extractVerifiedBackupArchive(backup);
     await pool.query(
       `UPDATE backups
        SET verification_status = 'verified',
@@ -10938,7 +11494,7 @@ async function verifyBackup(id, user = {}) {
        WHERE id = $1::uuid`,
       [id]
     );
-    await addBackupLog(id, "info", "Verifica integrita completata", { checksum_sha256: checksum });
+    await addBackupLog(id, "info", "Verifica integrita completata sull'archivio scaricabile", { checksum_sha256: extracted.checksum });
     return backupDetail(id, user);
   } catch (error) {
     const message = error.message || "Verifica backup non riuscita.";
@@ -10951,6 +11507,8 @@ async function verifyBackup(id, user = {}) {
     );
     await addBackupLog(id, "error", message);
     return backupDetail(id, user);
+  } finally {
+    if (extracted) await extracted.cleanup().catch(() => {});
   }
 }
 
@@ -10972,12 +11530,12 @@ async function testRestoreBackup(id, user = {}) {
   const codePart = String(backup.backup_code || id).toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 34);
   const testDatabaseName = `restore_test_${codePart}_${crypto.randomBytes(2).toString("hex")}`.slice(0, 60);
   let maintenanceClient = null;
+  let restoredClient = null;
+  let extracted = null;
   let status = "failed";
   let resultMessage = "";
   try {
-    if (backup.status !== "completed") throw new Error("Backup non completato.");
-    if (!backup.metadata?.database_dump_path) throw new Error("database.dump non disponibile per il test restore.");
-    await fs.access(backup.metadata.database_dump_path);
+    extracted = await extractVerifiedBackupArchive(backup);
     const env = postgresToolEnv(testDatabaseName);
     if (!env) throw new Error("DATABASE_URL non configurato.");
     maintenanceClient = await createMaintenanceClient();
@@ -10985,7 +11543,7 @@ async function testRestoreBackup(id, user = {}) {
     if (!testDatabaseName || testDatabaseName === productionDb) throw new Error("Database di test non sicuro.");
     await maintenanceClient.query(`CREATE DATABASE ${quoteIdentifier(testDatabaseName)}`);
     try {
-      await execFileAsync(pgRestorePath, ["--no-owner", "--no-privileges", "--dbname", testDatabaseName, backup.metadata.database_dump_path], {
+      await execFileAsync(pgRestorePath, ["--no-owner", "--no-privileges", "--dbname", testDatabaseName, extracted.databaseDumpPath], {
         env,
         timeout: 20 * 60 * 1000,
         maxBuffer: 1024 * 1024
@@ -10994,7 +11552,7 @@ async function testRestoreBackup(id, user = {}) {
       if (isMissingExecutable(error)) throw new Error(backupToolUnavailableMessage("pg_restore"));
       throw new Error(`Test restore fallito: ${String(error?.stderr || error?.message || "pg_restore non riuscito").slice(0, 500)}`);
     }
-    const restoredClient = new Client({
+    restoredClient = new Client({
       connectionString: (() => {
         const parsed = new URL(process.env.DATABASE_URL);
         parsed.pathname = `/${testDatabaseName}`;
@@ -11003,7 +11561,7 @@ async function testRestoreBackup(id, user = {}) {
       ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined
     });
     await restoredClient.connect();
-    const tables = ["utenti", "atti_vendita", "clienti", "audit_logs", "academy_courses", "ai_knowledge_notes", "giacenza_movimenti", "fusioni"];
+    const tables = ["utenti", "atti_vendita", "clienti", "audit_logs", "backups", "fusion_lots"];
     const tableResult = await restoredClient.query(
       `SELECT table_name
        FROM information_schema.tables
@@ -11011,15 +11569,22 @@ async function testRestoreBackup(id, user = {}) {
          AND table_name = ANY($1::text[])`,
       [tables]
     );
+    const presentTables = new Set(tableResult.rows.map((row) => row.table_name));
+    const missingTables = tables.filter((table) => !presentTables.has(table));
+    if (!missingTables.length) {
+      for (const table of tables) await restoredClient.query(`SELECT 1 FROM ${quoteIdentifier(table)} LIMIT 1`);
+    }
     await restoredClient.end();
-    status = tableResult.rowCount >= 3 ? "passed" : "failed";
+    restoredClient = null;
+    status = missingTables.length ? "failed" : "passed";
     resultMessage = status === "passed"
-      ? "Test restore completato con successo"
-      : "Test restore fallito: tabelle essenziali non trovate";
+      ? "Test restore completato con successo: tutte le tabelle essenziali sono presenti e leggibili"
+      : `Test restore fallito: tabelle essenziali mancanti (${missingTables.join(", ")})`;
   } catch (error) {
     status = "failed";
     resultMessage = error.message || "Test restore fallito: controllare log";
   } finally {
+    if (restoredClient) await restoredClient.end().catch(() => {});
     if (maintenanceClient) {
       await maintenanceClient.query(
         `SELECT pg_terminate_backend(pid)
@@ -11031,6 +11596,7 @@ async function testRestoreBackup(id, user = {}) {
       await maintenanceClient.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(testDatabaseName)}`).catch(() => {});
       await maintenanceClient.end().catch(() => {});
     }
+    if (extracted) await extracted.cleanup().catch(() => {});
   }
   await pool.query(
     `INSERT INTO backup_restore_tests (backup_id, status, tested_by, test_database_name, result_message, metadata)
@@ -11052,41 +11618,189 @@ async function testRestoreBackup(id, user = {}) {
 async function deleteBackup(id, user = {}) {
   const backup = await backupDetail(id, user);
   if (!backup) return false;
-  const result = await pool.query(
-    `UPDATE backups
-     SET status = 'deleted',
-         deleted_at = NOW()
-     WHERE id = $1::uuid
-     RETURNING id`,
-    [id]
+  if (["running", "pending"].includes(backupStatusLabel(backup.status))) {
+    const error = new Error("Un backup in corso non può essere eliminato.");
+    error.status = 409;
+    throw error;
+  }
+
+  const db = await pool.connect();
+  let cleanupPending = [];
+  let deleted = false;
+  try {
+    await db.query("BEGIN");
+    const locked = await db.query(
+      "SELECT * FROM backups WHERE id = $1::uuid AND deleted_at IS NULL FOR UPDATE",
+      [id]
+    );
+    if (!locked.rowCount) {
+      await db.query("ROLLBACK");
+      return false;
+    }
+    if (["running", "pending"].includes(backupStatusLabel(locked.rows[0].status))) {
+      const error = new Error("Un backup in corso non può essere eliminato.");
+      error.status = 409;
+      throw error;
+    }
+    const candidates = [locked.rows[0].file_path, locked.rows[0].metadata?.backup_dir]
+      .filter(Boolean)
+      .map((candidate) => authorizedBackupPath(candidate))
+      .filter((candidate, index, items) => items.indexOf(candidate) === index);
+    cleanupPending = candidates;
+    const result = await db.query(
+      `UPDATE backups
+       SET status = 'deleted',
+           deleted_at = NOW(),
+           file_path = NULL,
+           file_size = 0,
+           metadata = (COALESCE(metadata, '{}'::jsonb) - 'archive_path' - 'backup_dir' - 'manifest_path' - 'database_dump_path')
+             || jsonb_build_object('cleanup_pending', $2::jsonb)
+       WHERE id = $1::uuid
+       RETURNING id`,
+      [id, sanitizeForPostgres(cleanupPending)]
+    );
+    await db.query("COMMIT");
+    deleted = result.rowCount > 0;
+  } catch (error) {
+    await db.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    db.release();
+  }
+  if (!deleted) return false;
+  const cleanupErrors = [];
+  for (const candidate of cleanupPending) {
+    await fs.rm(candidate, { recursive: true, force: true }).catch((error) => cleanupErrors.push(error));
+  }
+  if (!cleanupErrors.length) {
+    await pool.query("UPDATE backups SET metadata = COALESCE(metadata, '{}'::jsonb) - 'cleanup_pending' WHERE id = $1::uuid", [id])
+      .catch((error) => cleanupErrors.push(error));
+  }
+  await addBackupLog(
+    id,
+    cleanupErrors.length ? "warning" : "info",
+    cleanupErrors.length ? "Backup eliminato; pulizia disco da completare automaticamente" : "Backup eliminato definitivamente dal disco e archiviato nel registro",
+    { deleted_by: user.id || null, cleanup_pending: cleanupErrors.length }
   );
-  if (result.rowCount) await addBackupLog(id, "info", "Backup eliminato logicamente", { deleted_by: user.id || null });
-  return result.rowCount > 0;
+  return true;
+}
+
+async function cleanupPendingBackupArtifacts() {
+  const result = await pool.query(
+    `SELECT id, status, metadata->'cleanup_pending' AS cleanup_pending
+     FROM backups
+     WHERE status <> 'running'
+       AND jsonb_typeof(metadata->'cleanup_pending') = 'array'
+     LIMIT 100`
+  );
+  for (const row of result.rows) {
+    const pending = Array.isArray(row.cleanup_pending) ? row.cleanup_pending.filter(Boolean) : [];
+    let completed = true;
+    for (const candidate of pending) {
+      try {
+        await fs.rm(authorizedBackupPath(candidate), { recursive: true, force: true });
+      } catch {
+        completed = false;
+      }
+    }
+    if (completed) {
+      await pool.query(
+        `UPDATE backups
+         SET metadata = (COALESCE(metadata, '{}'::jsonb) - 'cleanup_pending')
+           || jsonb_build_object('backup_dir', NULL, 'staging_removed', CASE WHEN status = 'completed' THEN TRUE ELSE COALESCE((metadata->>'staging_removed')::boolean, FALSE) END)
+         WHERE id = $1::uuid`,
+        [row.id]
+      );
+    }
+  }
+}
+
+async function cleanupUntrackedBackupArtifacts(minAgeMs = 60 * 60 * 1000) {
+  await fs.mkdir(backupDirectory, { recursive: true });
+  const result = await pool.query("SELECT file_path, metadata FROM backups");
+  const referenced = new Set();
+  for (const row of result.rows) {
+    [row.file_path, row.metadata?.archive_path, row.metadata?.backup_dir, ...(Array.isArray(row.metadata?.cleanup_pending) ? row.metadata.cleanup_pending : [])]
+      .filter(Boolean)
+      .forEach((candidate) => {
+        try {
+          referenced.add(authorizedBackupPath(candidate));
+        } catch {
+          // Un percorso esterno non viene mai usato né cancellato.
+        }
+      });
+  }
+  const entries = (await fs.readdir(backupDirectory, { withFileTypes: true })).slice(0, 2000);
+  const now = Date.now();
+  for (const entry of entries) {
+    const ownedArchive = entry.isFile() && /^backup_OA-\d{14}-[A-F0-9]{6}\.tar\.gz$/.test(entry.name);
+    const ownedStaging = entry.isDirectory() && /^backup_\d{4}_\d{2}_\d{2}_\d{2}_\d{2}_\d{2}_OA-\d{14}-[A-F0-9]{6}$/.test(entry.name);
+    if (!ownedArchive && !ownedStaging) continue;
+    const candidate = authorizedBackupPath(path.join(backupDirectory, entry.name));
+    if (referenced.has(candidate)) continue;
+    const stats = await fs.stat(candidate).catch(() => null);
+    if (!stats || now - stats.mtimeMs < minAgeMs) continue;
+    await fs.rm(candidate, { recursive: true, force: true });
+  }
 }
 
 function scheduleBackups() {
   console.log("Backup automatici disabilitati: i backup partono solo dal pulsante manuale autorizzato.");
+  void cleanupPendingBackupArtifacts().catch((error) => console.error("BACKUP CLEANUP ERROR", error.message || error));
+  void cleanupUntrackedBackupArtifacts().catch((error) => console.error("BACKUP ORPHAN CLEANUP ERROR", error.message || error));
+  const cleanupTimer = setInterval(() => {
+    void cleanupPendingBackupArtifacts().catch((error) => console.error("BACKUP CLEANUP ERROR", error.message || error));
+    void cleanupUntrackedBackupArtifacts().catch((error) => console.error("BACKUP ORPHAN CLEANUP ERROR", error.message || error));
+  }, 60 * 60 * 1000);
+  cleanupTimer.unref?.();
 }
 
 async function bootstrapStores() {
   for (const store of defaultStores) {
+    const existing = await pool.query(
+      `SELECT id, nome, codice
+       FROM negozi
+       WHERE deleted_at IS NULL
+         AND (codice = $1::text OR LOWER(TRIM(nome)) = LOWER(TRIM($2::text)))
+       ORDER BY (codice = $1::text) DESC, id
+       LIMIT 2`,
+      [store.codice, store.nome]
+    );
+    const byCode = existing.rows.find((row) => row.codice === store.codice);
+    const conflictingName = existing.rows.find((row) => row.codice !== store.codice && String(row.nome).trim().toLowerCase() === store.nome.toLowerCase());
+    if (byCode) {
+      await pool.query(
+        `UPDATE negozi
+         SET citta = COALESCE(citta, $2::text), provincia = COALESCE(provincia, $3::text)
+         WHERE id = $1::bigint`,
+        [byCode.id, store.citta, store.provincia]
+      );
+      continue;
+    }
+    if (conflictingName) {
+      console.warn(`STORE BOOTSTRAP SKIP: il nome “${store.nome}” è già associato al codice ${conflictingName.codice}.`);
+      continue;
+    }
     await pool.query(
       `INSERT INTO negozi (nome, codice, citta, provincia, attivo)
        VALUES ($1, $2, $3, $4, TRUE)
-       ON CONFLICT (codice) DO UPDATE
-       SET nome = EXCLUDED.nome,
-           citta = COALESCE(negozi.citta, EXCLUDED.citta),
-           provincia = COALESCE(negozi.provincia, EXCLUDED.provincia)`,
+       ON CONFLICT DO NOTHING`,
       [store.nome, store.codice, store.citta, store.provincia]
     );
   }
   await pool.query(`
+    WITH unique_names AS (
+      SELECT LOWER(TRIM(nome)) AS normalized_name, MIN(id) AS id
+      FROM negozi
+      WHERE deleted_at IS NULL
+      GROUP BY LOWER(TRIM(nome))
+      HAVING COUNT(*) = 1
+    )
     UPDATE utenti u
-    SET negozio_id = n.id
-    FROM negozi n
+    SET negozio_id = unique_names.id
+    FROM unique_names
     WHERE u.negozio_id IS NULL
-      AND u.negozio = n.nome
-      AND n.deleted_at IS NULL
+      AND LOWER(TRIM(u.negozio)) = unique_names.normalized_name
   `);
   await pool.query(`
     UPDATE atti_vendita a
@@ -11096,44 +11810,78 @@ async function bootstrapStores() {
         operatore_id = COALESCE(a.operatore_id, CASE WHEN (a.payload->>'operatorId') ~ '^[0-9]+$' THEN (a.payload->>'operatorId')::bigint ELSE NULL END)
     FROM negozi n
     WHERE a.negozio_id IS NULL
-      AND (a.store = n.nome OR a.store_code = n.codice)
+      AND COALESCE(NULLIF(a.codice_negozio, ''), a.store_code) = n.codice
       AND n.deleted_at IS NULL
+  `);
+  await pool.query(`
+    WITH unique_names AS (
+      SELECT LOWER(TRIM(nome)) AS normalized_name, MIN(id) AS id
+      FROM negozi
+      WHERE deleted_at IS NULL
+      GROUP BY LOWER(TRIM(nome))
+      HAVING COUNT(*) = 1
+    )
+    UPDATE atti_vendita a
+    SET negozio_id = unique_names.id
+    FROM unique_names
+    WHERE a.negozio_id IS NULL
+      AND LOWER(TRIM(a.store)) = unique_names.normalized_name
+  `);
+  await pool.query(`
+    UPDATE utenti u
+    SET negozio = n.nome
+    FROM negozi n
+    WHERE u.negozio_id = n.id
+      AND n.deleted_at IS NULL
+      AND u.negozio IS DISTINCT FROM n.nome
   `);
 }
 
 async function bootstrapAdminUser() {
   const username = process.env.ADMIN_USERNAME || "Elite";
   const email = process.env.ADMIN_EMAIL || "elite@oroactive.it";
-  const existing = await pool.query(
-    "SELECT id FROM utenti WHERE LOWER(username) = LOWER($1::text) OR LOWER(email) = LOWER($2::text) LIMIT 1",
-    [username, email]
-  );
-  const password = process.env.ADMIN_PASSWORD || (isProduction ? "" : "oroactive-dev-admin-password");
-  if (!password) {
-    const message = "ADMIN_PASSWORD obbligatoria: configura la password Founder nelle variabili ambiente.";
-    if (existing.rowCount) {
-      console.error(`${message} Founder già presente: mantengo credenziali esistenti.`);
+  await withDatabaseTransaction(async (client) => {
+    await client.query("SELECT pg_advisory_xact_lock($1::bigint)", [5836211139081]);
+
+    const founders = await client.query(
+      `SELECT id, username, email, attivo
+       FROM utenti
+       WHERE LOWER(TRIM(ruolo)) = 'founder'
+       ORDER BY id
+       FOR UPDATE`
+    );
+    if (founders.rowCount) {
       return;
     }
-    console.error(`${message} Founder non creato automaticamente.`);
-    return;
-  }
-  const passwordHash = await bcrypt.hash(password, 12);
 
-  if (existing.rowCount) {
-    await pool.query(
-      `UPDATE utenti SET
-        nome = $2,
-        cognome = $3,
-        username = $4,
-        email = LOWER($5),
-        password_hash = $6,
-        ruolo = 'founder',
-        negozio = $7,
-        updated_at = NOW()
-       WHERE id = $1`,
+    const configuredIdentity = await client.query(
+      `SELECT id, ruolo, attivo
+       FROM utenti
+       WHERE LOWER(username) = LOWER($1::text)
+          OR LOWER(email) = LOWER($2::text)
+       ORDER BY id
+       LIMIT 2
+       FOR UPDATE`,
+      [username, email]
+    );
+    if (configuredIdentity.rowCount > 1) {
+      throw new Error("Identità Founder ambigua: username ed email appartengono a utenti diversi.");
+    }
+    if (configuredIdentity.rowCount) {
+      throw new Error("Identità Founder configurata già assegnata a un utente non Founder.");
+    }
+
+    const password = process.env.ADMIN_PASSWORD || (isProduction ? "" : "oroactive-dev-admin-password");
+    if (!password) {
+      throw new Error("ADMIN_PASSWORD obbligatoria per creare il primo account Founder.");
+    }
+    assertProductionSecret("ADMIN_PASSWORD", password, 8);
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await client.query(
+      `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
+       VALUES ($1, $2, $3, LOWER($4), $5, 'founder', $6)`,
       [
-        existing.rows[0].id,
         process.env.ADMIN_NOME || "Elite",
         process.env.ADMIN_COGNOME || "Founder",
         username,
@@ -11142,39 +11890,44 @@ async function bootstrapAdminUser() {
         "Tutti"
       ]
     );
-    return;
-  }
-
-  await pool.query(
-    `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio)
-     VALUES ($1, $2, $3, LOWER($4), $5, 'founder', $6)`,
-    [
-      process.env.ADMIN_NOME || "Elite",
-      process.env.ADMIN_COGNOME || "Founder",
-      username,
-      email,
-      passwordHash,
-      "Tutti"
-    ]
-  );
+  });
 }
 
-async function storeByCodeOrName(value = "") {
+async function storeByCodeOrName(value = "", db = pool) {
   const text = String(value || "").trim();
   if (!text || text === "Tutti") return null;
-  const result = await pool.query(
-    "SELECT * FROM negozi WHERE deleted_at IS NULL AND (codice = $1 OR nome = $1) ORDER BY id LIMIT 1",
+  if (/^\d+$/.test(text)) {
+    const byId = await db.query("SELECT * FROM negozi WHERE id = $1::bigint AND deleted_at IS NULL AND COALESCE(attivo, TRUE) = TRUE LIMIT 1", [text]);
+    return byId.rows[0] || null;
+  }
+  const result = await db.query(
+    "SELECT * FROM negozi WHERE deleted_at IS NULL AND COALESCE(attivo, TRUE) = TRUE AND (codice = $1 OR LOWER(TRIM(nome)) = LOWER(TRIM($1))) ORDER BY id LIMIT 2",
     [text]
   );
+  if (result.rowCount > 1) {
+    const error = new Error("Nome negozio ambiguo: seleziona la sede tramite il suo identificativo.");
+    error.status = 409;
+    throw error;
+  }
   return result.rows[0] || null;
 }
 
-async function storeForUser(user = {}) {
-  if (user.negozio_id) {
-    const result = await pool.query("SELECT * FROM negozi WHERE id = $1 AND deleted_at IS NULL LIMIT 1", [user.negozio_id]);
-    if (result.rows[0]) return result.rows[0];
+async function storeForUser(user = {}, db = pool) {
+  if (!user.negozio_id) return null;
+  const result = await db.query("SELECT * FROM negozi WHERE id = $1::bigint AND deleted_at IS NULL AND COALESCE(attivo, TRUE) = TRUE LIMIT 1", [user.negozio_id]);
+  return result.rows[0] || null;
+}
+
+async function assertUserHasActiveStore(user = {}) {
+  if (roleSeesAllStores(user.ruolo)) return null;
+  const store = await storeForUser(user);
+  if (!store) {
+    const error = new Error("Negozio non attivo o non assegnato");
+    error.status = 403;
+    error.code = "STORE_INACTIVE";
+    throw error;
   }
-  return storeByCodeOrName(user.negozio);
+  return store;
 }
 
 function canManageStores(user = {}) {
@@ -11201,40 +11954,27 @@ async function createStore(input = {}, user = {}) {
     throw error;
   }
   const nome = String(input.nome || input.name || "").trim();
-  const codice = String(input.codice || input.code || storeCodeFromName(nome)).trim().toUpperCase();
+  const codice = String(input.codice || input.code || "").trim().toUpperCase();
   if (!nome || !codice) {
     const error = new Error("Nome negozio e codice negozio sono obbligatori.");
     error.status = 400;
     throw error;
   }
-  const result = await pool.query(
-    `INSERT INTO negozi (nome, codice, indirizzo, citta, provincia, telefono, email, responsabile_id, attivo)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, TRUE))
-     ON CONFLICT (codice) DO UPDATE
-     SET nome = EXCLUDED.nome,
-         indirizzo = EXCLUDED.indirizzo,
-         citta = EXCLUDED.citta,
-         provincia = EXCLUDED.provincia,
-         telefono = EXCLUDED.telefono,
-         email = EXCLUDED.email,
-         responsabile_id = EXCLUDED.responsabile_id,
-         attivo = EXCLUDED.attivo,
-         deleted_at = NULL,
-         deleted_by = NULL
-     RETURNING *`,
-    [
-      nome,
-      codice,
-      input.indirizzo || "",
-      input.citta || "",
-      input.provincia || "",
-      input.telefono || "",
-      input.email || "",
-      input.responsabile_id || null,
-      input.attivo !== false
-    ]
-  );
-  return result.rows[0];
+  try {
+    const result = await pool.query(
+      `INSERT INTO negozi (nome, codice, indirizzo, citta, provincia, telefono, email, responsabile_id, attivo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,COALESCE($9, TRUE))
+       RETURNING *`,
+      [nome, codice, input.indirizzo || "", input.citta || "", input.provincia || "", input.telefono || "", input.email || "", input.responsabile_id || null, input.attivo !== false]
+    );
+    return result.rows[0];
+  } catch (error) {
+    if (error?.code === "23505") {
+      error.status = 409;
+      error.message = "Esiste già un negozio con lo stesso nome o codice.";
+    }
+    throw error;
+  }
 }
 
 async function updateStore(id, input = {}, user = {}) {
@@ -11243,34 +11983,100 @@ async function updateStore(id, input = {}, user = {}) {
     error.status = 403;
     throw error;
   }
-  const result = await pool.query(
-    `UPDATE negozi
-     SET nome = COALESCE(NULLIF($2, ''), nome),
-         codice = COALESCE(NULLIF($3, ''), codice),
-         indirizzo = COALESCE($4, indirizzo),
-         citta = COALESCE($5, citta),
-         provincia = COALESCE($6, provincia),
-         telefono = COALESCE($7, telefono),
-         email = COALESCE($8, email),
-         responsabile_id = COALESCE($9, responsabile_id),
-         attivo = COALESCE($10, attivo)
-     WHERE id = $1
-       AND deleted_at IS NULL
-     RETURNING *`,
-    [
-      id,
-      String(input.nome || input.name || "").trim(),
-      String(input.codice || input.code || "").trim().toUpperCase(),
-      input.indirizzo ?? null,
-      input.citta ?? null,
-      input.provincia ?? null,
-      input.telefono ?? null,
-      input.email ?? null,
-      input.responsabile_id || null,
-      typeof input.attivo === "boolean" ? input.attivo : null
-    ]
-  );
-  return result.rows[0] || null;
+  const db = await pool.connect();
+  try {
+    await db.query("BEGIN");
+    const currentResult = await db.query("SELECT * FROM negozi WHERE id = $1::bigint AND deleted_at IS NULL FOR UPDATE", [id]);
+    const current = currentResult.rows[0];
+    if (!current) {
+      await db.query("ROLLBACK");
+      return null;
+    }
+    const nextName = String(input.nome || input.name || current.nome).trim();
+    const nextCode = String(input.codice || input.code || current.codice).trim().toUpperCase();
+    if (!nextName || !nextCode) {
+      const error = new Error("Nome negozio e codice negozio sono obbligatori.");
+      error.status = 400;
+      throw error;
+    }
+    if (nextCode !== current.codice) {
+      const acts = await db.query("SELECT 1 FROM atti_vendita WHERE negozio_id = $1::bigint LIMIT 1", [id]);
+      if (acts.rowCount) {
+        const error = new Error("Il codice di una sede con atti registrati non può essere modificato.");
+        error.status = 409;
+        throw error;
+      }
+    }
+    if (current.attivo !== false && input.attivo === false) {
+      const [users, practices, approvals, fusionLots] = await Promise.all([
+        db.query("SELECT COUNT(*)::int AS count FROM utenti WHERE COALESCE(attivo, TRUE) = TRUE AND negozio_id = $1::bigint", [id]),
+        db.query(
+          `SELECT COUNT(*)::int AS count FROM atti_vendita a
+           WHERE a.negozio_id = $1::bigint AND a.deleted_at IS NULL AND NOT (${realCompletedStatusSql("a")})`,
+          [id]
+        ),
+        db.query("SELECT COUNT(*)::int AS count FROM approval_requests WHERE store_id = $1::bigint AND COALESCE(status, 'pending') ILIKE 'pending'", [id]),
+        db.query(
+          `SELECT COUNT(*)::int AS count FROM fusion_lots
+           WHERE negozio_id = $1::bigint
+             AND COALESCE(stato, '') NOT ILIKE 'conclus%'
+             AND COALESCE(stato, '') NOT ILIKE 'completed'`,
+          [id]
+        )
+      ]);
+      const conflicts = [];
+      if (Number(users.rows[0]?.count || 0)) conflicts.push(`${users.rows[0].count} utenti attivi`);
+      if (Number(practices.rows[0]?.count || 0)) conflicts.push(`${practices.rows[0].count} pratiche aperte`);
+      if (Number(approvals.rows[0]?.count || 0)) conflicts.push(`${approvals.rows[0].count} autorizzazioni pendenti`);
+      if (Number(fusionLots.rows[0]?.count || 0)) conflicts.push(`${fusionLots.rows[0].count} lotti fusione aperti`);
+      if (conflicts.length) {
+        const error = new Error(`Impossibile disattivare la sede: ${conflicts.join(", ")}. Riassegna o completa le attività prima di riprovare.`);
+        error.status = 409;
+        throw error;
+      }
+    }
+    const result = await db.query(
+      `UPDATE negozi
+       SET nome = $2::text,
+           codice = $3::text,
+           indirizzo = COALESCE($4, indirizzo), citta = COALESCE($5, citta),
+           provincia = COALESCE($6, provincia), telefono = COALESCE($7, telefono),
+           email = COALESCE($8, email), responsabile_id = COALESCE($9, responsabile_id),
+           attivo = COALESCE($10, attivo)
+       WHERE id = $1::bigint RETURNING *`,
+      [id, nextName, nextCode, input.indirizzo ?? null, input.citta ?? null, input.provincia ?? null, input.telefono ?? null, input.email ?? null, input.responsabile_id || null, typeof input.attivo === "boolean" ? input.attivo : null]
+    );
+    await db.query(
+      `UPDATE utenti
+       SET negozio = $2::text,
+           session_version = CASE WHEN $3::boolean THEN COALESCE(session_version, 0) + 1 ELSE session_version END,
+           updated_at = NOW()
+       WHERE negozio_id = $1::bigint`,
+      [id, nextName, current.attivo !== result.rows[0]?.attivo]
+    );
+    await db.query("UPDATE fusion_lots SET negozio = $2::text, updated_at = NOW() WHERE negozio_id = $1::bigint", [id, nextName]);
+    await db.query(
+      `UPDATE atti_vendita
+       SET store = $2::text,
+           store_code = $3::text,
+           codice_negozio = $3::text,
+           updated_at = NOW()
+       WHERE negozio_id = $1::bigint
+         AND COALESCE(status, '') IN ('draft', 'bozza', 'incomplete', 'archived_incomplete')`,
+      [id, nextName, nextCode]
+    );
+    await db.query("COMMIT");
+    return result.rows[0] || null;
+  } catch (error) {
+    await db.query("ROLLBACK").catch(() => {});
+    if (error?.code === "23505") {
+      error.status = 409;
+      error.message = "Esiste già un negozio con lo stesso nome o codice.";
+    }
+    throw error;
+  } finally {
+    db.release();
+  }
 }
 
 async function deleteStore(id, user = {}) {
@@ -11394,12 +12200,67 @@ async function deleteStore(id, user = {}) {
   }
 }
 
-async function visibleStoreWhere(user = {}, values = [], alias = "a") {
-  if (roleSeesAllStores(user.ruolo)) return "";
-  const store = await storeForUser(user);
+async function visibleStoreWhere(user = {}, values = [], alias = "a", db = pool, storeOverride = null) {
+  if (roleSeesAllStores(user.ruolo) && !storeOverride) return "";
+  const store = storeOverride || await storeForUser(user, db);
   if (!store) return " AND 1 = 0";
   values.push(store.id, store.nome);
-  return ` AND (${alias}.negozio_id = $${values.length - 1}::bigint OR ${alias}.store = $${values.length}::text)`;
+  return ` AND (${alias}.negozio_id = $${values.length - 1}::bigint OR (${alias}.negozio_id IS NULL AND ${alias}.store = $${values.length}::text))`;
+}
+
+async function visibleClientWhere(user = {}, values = [], alias = "c", db = pool, storeOverride = null) {
+  if (roleSeesAllStores(user.ruolo) && !storeOverride) return "";
+  const store = storeOverride || await storeForUser(user, db);
+  if (!store) return " AND 1 = 0";
+  values.push(store.id, store.nome);
+  const storeIdParameter = `$${values.length - 1}`;
+  const storeNameParameter = `$${values.length}`;
+  return ` AND (
+    ${alias}.negozio_id = ${storeIdParameter}::bigint
+    OR (
+      ${alias}.negozio_id IS NULL
+      AND EXISTS (
+        SELECT 1
+        FROM ${actsTable} client_scope_act
+        WHERE UPPER(client_scope_act.codice_fiscale) = UPPER(${alias}.codice_fiscale)
+          AND client_scope_act.deleted_at IS NULL
+          AND (
+            client_scope_act.negozio_id = ${storeIdParameter}::bigint
+            OR (
+              client_scope_act.negozio_id IS NULL
+              AND client_scope_act.store = ${storeNameParameter}::text
+            )
+          )
+      )
+    )
+  )`;
+}
+
+async function lookupStoreForActor(user = {}, selector = "", db = pool) {
+  const requested = String(selector || "").trim();
+  if (roleSeesAllStores(user.ruolo)) {
+    if (!requested) return null;
+    const store = await storeByCodeOrName(requested, db);
+    if (store) return store;
+    const error = new Error("Negozio non valido");
+    error.status = 400;
+    throw error;
+  }
+
+  const actorStore = await storeForUser(user, db);
+  if (!actorStore) {
+    const error = new Error("Negozio non attivo o non assegnato");
+    error.status = 403;
+    throw error;
+  }
+  if (!requested) return actorStore;
+  const selectedStore = await storeByCodeOrName(requested, db);
+  if (!selectedStore || String(selectedStore.id) !== String(actorStore.id)) {
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
+  }
+  return actorStore;
 }
 
 function buildActsQuery({ store, field, q, fusionEligible, includeDrafts, includeSuspended } = {}, user = null) {
@@ -11428,10 +12289,17 @@ function buildActsQuery({ store, field, q, fusionEligible, includeDrafts, includ
       AND NOT (suspended_at IS NOT NULL AND resumed_at IS NULL)`);
   }
 
-  const effectiveStore = roleSeesAllStores(user?.ruolo) ? store : user?.negozio;
-  if (effectiveStore && effectiveStore !== "Tutti") {
-    values.push(effectiveStore);
-    where.push(`store = $${values.length}::text`);
+  if (!roleSeesAllStores(user?.ruolo)) {
+    if (!user?.negozio_id) {
+      where.push("1 = 0");
+    } else {
+      values.push(user.negozio_id, user.negozio || "");
+      where.push(`(negozio_id = $${values.length - 1}::bigint OR (negozio_id IS NULL AND store = $${values.length}::text))`);
+    }
+  } else if (store && store !== "Tutti") {
+    values.push(store);
+    if (/^\d+$/.test(String(store))) where.push(`negozio_id = $${values.length}::bigint`);
+    else where.push(`(store = $${values.length}::text OR COALESCE(NULLIF(store_code, ''), codice_negozio) = $${values.length}::text)`);
   }
 
   if (q && field) {
@@ -11530,14 +12398,21 @@ async function nextActNumber(storeCode, year) {
   return Number(result.rows[0].next_number);
 }
 
-function enforceActStore(input, user) {
+async function enforceActStore(input, user) {
   if (!user || roleSeesAllStores(user.ruolo)) return input;
-  const storeCode = storeCodeFromName(user.negozio);
-  const practiceNumber = String(input.practiceNumber || "").replace(/^OA-[^-]+-/, `OA-${storeCode}-`);
+  const store = await storeForUser(user);
+  if (!store) {
+    const error = new Error("Negozio non attivo o non assegnato");
+    error.status = 403;
+    throw error;
+  }
+  const practiceNumber = String(input.practiceNumber || "").replace(/^OA-[^-]+-/, `OA-${store.codice}-`);
   return {
     ...input,
-    store: user.negozio,
-    storeCode,
+    store: store.nome,
+    storeCode: store.codice,
+    negozioId: store.id,
+    negozio_id: store.id,
     practiceNumber
   };
 }
@@ -11579,7 +12454,10 @@ async function getAct(identifier) {
 }
 
 function canAccessAct(row, user) {
-  return roleSeesAllStores(user?.ruolo) || row?.store === user?.negozio;
+  if (roleSeesAllStores(user?.ruolo)) return true;
+  if (!user?.negozio_id) return false;
+  if (row?.negozio_id) return String(row.negozio_id) === String(user.negozio_id);
+  return Boolean(row?.store && user?.negozio && String(row.store) === String(user.negozio));
 }
 
 function canReviewActs(user) {
@@ -11622,6 +12500,12 @@ function concurrentActEditError() {
 async function upsertClientFromAct(act, db = pool) {
   const fiscalCode = normalizeFiscalCode(act.codiceFiscale || act.fiscalCode);
   if (!fiscalCode) return null;
+  let storeId = nullIfEmpty(act.negozioId || act.negozio_id || act.payload?.negozio_id);
+  if (!storeId) {
+    const storeReference = act.storeCode || act.codiceNegozio || act.codice_negozio || act.store || "";
+    const resolvedStore = storeReference ? await storeByCodeOrName(storeReference, db) : null;
+    storeId = resolvedStore?.id || null;
+  }
   const payload = {
     name: act.clienteNome || act.name || "",
     surname: act.clienteCognome || act.surname || "",
@@ -11668,7 +12552,7 @@ async function upsertClientFromAct(act, db = pool) {
     nullIfEmpty(act.telefono || act.phone),
     nullIfEmpty(act.payload?.email || act.email),
     nullIfEmpty(act.iban || act.payload?.iban),
-    nullIfEmpty(act.negozioId || act.negozio_id || act.payload?.negozio_id),
+    storeId,
     nullIfEmpty(payload.address),
     nullIfEmpty(payload.residenceProvince),
     nullIfEmpty(payload.documentType),
@@ -11677,7 +12561,10 @@ async function upsertClientFromAct(act, db = pool) {
     nullIfEmpty(act.payload?.accountHolder || act.intestatario_conto || act.accountHolder),
     sanitizeForPostgres(payload)
   ];
-  const existing = await db.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1 FOR UPDATE", [fiscalCode]);
+  const existing = await db.query(
+    "SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text AND negozio_id IS NOT DISTINCT FROM $2::bigint LIMIT 1 FOR UPDATE",
+    [fiscalCode, storeId]
+  );
   const result = existing.rowCount
     ? await db.query(
       `UPDATE clienti SET
@@ -11710,22 +12597,99 @@ async function upsertClientFromAct(act, db = pool) {
   return result.rows[0] || null;
 }
 
-async function getClientByFiscalCode(fiscalCode) {
+async function singleCompletedActStoreForFiscalCode(fiscalCode, db = pool) {
+  const result = await db.query(
+    `SELECT a.negozio_id,
+            MAX(a.store) AS store,
+            MAX(a.updated_at) AS latest_update
+     FROM ${actsTable} a
+     WHERE UPPER(a.codice_fiscale) = $1::text
+       AND ${realCompletedStatusSql("a")}
+     GROUP BY COALESCE('id:' || a.negozio_id::text, 'name:' || LOWER(TRIM(COALESCE(a.store, '')))), a.negozio_id
+     ORDER BY latest_update DESC NULLS LAST
+     LIMIT 2`,
+    [fiscalCode]
+  );
+  if (result.rowCount > 1) return { ambiguous: true, store: null };
+  const identity = result.rows[0];
+  if (!identity) return { ambiguous: false, store: null };
+  if (identity.negozio_id) {
+    const storeResult = await db.query("SELECT id, nome, codice FROM negozi WHERE id = $1::bigint LIMIT 1", [identity.negozio_id]);
+    return {
+      ambiguous: false,
+      store: storeResult.rows[0] || { id: identity.negozio_id, nome: identity.store || "", codice: "" }
+    };
+  }
+  return {
+    ambiguous: false,
+    store: identity.store ? { id: null, nome: identity.store, codice: "" } : null
+  };
+}
+
+async function getClientByFiscalCode(fiscalCode, user = {}, storeSelector = "") {
   const normalized = normalizeFiscalCode(fiscalCode);
   if (!normalized) return null;
-  const latestActResult = await pool.query(
-    `SELECT * FROM ${actsTable}
-     WHERE UPPER(codice_fiscale) = $1::text
-       AND ${realCompletedStatusSql()}
-     ORDER BY updated_at DESC, id DESC
-     LIMIT 1`,
-    [normalized]
-  );
+  const requestedStore = await lookupStoreForActor(user, storeSelector);
+  const allStoresWithoutSelector = roleSeesAllStores(user.ruolo) && !requestedStore;
+  let effectiveStore = requestedStore;
+  let result;
+
+  if (allStoresWithoutSelector) {
+    const candidates = await pool.query(
+      `SELECT id, negozio_id
+       FROM clienti
+       WHERE UPPER(codice_fiscale) = $1::text
+       ORDER BY updated_at DESC NULLS LAST, id DESC
+       LIMIT 2`,
+      [normalized]
+    );
+    if (candidates.rowCount > 1) return null;
+    const candidate = candidates.rows[0] || null;
+    if (candidate?.negozio_id) {
+      const storeResult = await pool.query("SELECT id, nome, codice FROM negozi WHERE id = $1::bigint LIMIT 1", [candidate.negozio_id]);
+      effectiveStore = storeResult.rows[0] || null;
+    } else {
+      const actIdentity = await singleCompletedActStoreForFiscalCode(normalized);
+      if (actIdentity.ambiguous) return null;
+      effectiveStore = actIdentity.store;
+    }
+    result = candidate
+      ? await pool.query("SELECT c.* FROM clienti c WHERE c.id = $1::bigint LIMIT 1", [candidate.id])
+      : { rowCount: 0, rows: [] };
+  } else {
+    const clientValues = [normalized];
+    const clientWhere = await visibleClientWhere(user, clientValues, "c", pool, requestedStore);
+    result = await pool.query(
+      `SELECT c.* FROM clienti c
+       WHERE UPPER(c.codice_fiscale) = $1::text
+         ${clientWhere}
+       LIMIT 1`,
+      clientValues
+    );
+  }
+
+  if (!result.rowCount && !allStoresWithoutSelector) {
+    const existingClient = await pool.query(
+      "SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1",
+      [normalized]
+    );
+    if (existingClient.rowCount) return null;
+  }
+
+  const latestActValues = [normalized];
+  const latestActWhere = await visibleStoreWhere(user, latestActValues, "a", pool, effectiveStore);
+  const latestActResult = allStoresWithoutSelector && !effectiveStore
+    ? { rowCount: 0, rows: [] }
+    : await pool.query(
+      `SELECT a.* FROM ${actsTable} a
+       WHERE UPPER(a.codice_fiscale) = $1::text
+         AND ${realCompletedStatusSql("a")}
+         ${latestActWhere}
+       ORDER BY a.updated_at DESC, a.id DESC
+       LIMIT 1`,
+      latestActValues
+    );
   const latestAct = latestActResult.rowCount ? rowToAct(latestActResult.rows[0]) : null;
-  const result = await pool.query(
-    "SELECT * FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1",
-    [normalized]
-  );
   if (result.rowCount) {
     const row = result.rows[0];
     const savedAttachments = Array.isArray(row.payload?.fiscalDocumentAttachments) ? row.payload.fiscalDocumentAttachments : [];
@@ -12016,7 +12980,7 @@ function storeHealthStatus(score = 0) {
 
 function storeHealthStoreCondition(alias = "a", values = [], store = {}) {
   values.push(store.id, store.nome);
-  return `(${alias}.negozio_id = $${values.length - 1}::bigint OR ${alias}.store = $${values.length}::text)`;
+  return `(${alias}.negozio_id = $${values.length - 1}::bigint OR (${alias}.negozio_id IS NULL AND ${alias}.store = $${values.length}::text))`;
 }
 
 function storeHealthStoreIdCondition(alias = "x", values = [], store = {}) {
@@ -12194,14 +13158,14 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
        FROM fusion_lots
        WHERE created_at >= $3::date
          AND created_at < ($4::date + INTERVAL '1 day')
-         AND (negozio_id = $1::bigint OR negozio = $2::text)`,
+         AND (negozio_id = $1::bigint OR (negozio_id IS NULL AND negozio = $2::text))`,
       [store.id, store.nome, range.date_from, range.date_to]
     ),
     reportQuery(
       `SELECT COUNT(*)::int AS active_operators
        FROM utenti
        WHERE COALESCE(attivo, TRUE) = TRUE
-         AND (negozio_id = $1::bigint OR negozio = $2::text)`,
+         AND (negozio_id = $1::bigint OR (negozio_id IS NULL AND negozio = $2::text))`,
       [store.id, store.nome]
     ),
     reportQuery(
@@ -12209,7 +13173,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
        FROM audit_logs
        WHERE created_at >= $3::date
          AND created_at < ($4::date + INTERVAL '1 day')
-         AND (store_id = $1::bigint OR store_name = $2::text)
+         AND (store_id = $1::bigint OR (store_id IS NULL AND store_name = $2::text))
        GROUP BY action`,
       [store.id, store.nome, range.date_from, range.date_to]
     ),
@@ -12232,7 +13196,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
        LEFT JOIN academy_certificates cert ON cert.user_id = u.id
        LEFT JOIN academy_badges badge ON badge.user_id = u.id
        WHERE COALESCE(u.attivo, TRUE) = TRUE
-         AND (u.negozio_id = $1::bigint OR u.negozio = $2::text)`,
+         AND (u.negozio_id = $1::bigint OR (u.negozio_id IS NULL AND u.negozio = $2::text))`,
       [store.id, store.nome]
     )
   ]);
@@ -13352,6 +14316,13 @@ async function scanAntifraud(user = {}) {
     error.status = 403;
     throw error;
   }
+  // Several detection rules intentionally correlate activity across the whole
+  // network. A store manager must never trigger those global reads/writes.
+  if (!roleSeesAllStores(user.ruolo)) {
+    const error = new Error("La scansione antifrode di rete è riservata a Founder e Supervisore");
+    error.status = 403;
+    throw error;
+  }
   const values = [];
   const storeWhere = await visibleStoreWhere(user, values, "a");
   const actsResult = await pool.query(
@@ -13545,16 +14516,43 @@ async function updateAntifraudAlert(id, input = {}, user = {}) {
     error.status = 403;
     throw error;
   }
-  const result = await pool.query(
-    `UPDATE antifrode_alerts
-     SET stato = COALESCE(NULLIF($2, ''), stato),
-         reviewed_by = $3,
-         reviewed_at = NOW()
-     WHERE id = $1
-     RETURNING *`,
-    [id, input.stato || input.status || "", user.id]
-  );
-  return result.rows[0] || null;
+  return withDatabaseTransaction(async (db) => {
+    const existing = await db.query(
+      `SELECT af.*,
+              a.id AS access_act_id,
+              a.negozio_id AS access_store_id,
+              a.store AS access_store_name,
+              a.deleted_at AS access_act_deleted_at,
+              a.status AS access_act_status
+       FROM antifrode_alerts af
+       LEFT JOIN ${actsTable} a ON a.id = af.atto_id
+       WHERE af.id = $1::bigint
+       FOR UPDATE OF af`,
+      [id]
+    );
+    if (!existing.rowCount) return null;
+    const alert = existing.rows[0];
+    if (!roleSeesAllStores(user.ruolo)) {
+      const accessibleAct = alert.atto_id && alert.access_act_id && !alert.access_act_deleted_at
+        && normalizeWorkflowStatus(alert.access_act_status) !== "deleted"
+        && canAccessAct({ negozio_id: alert.access_store_id, store: alert.access_store_name }, user);
+      if (!accessibleAct) {
+        const error = new Error("Non autorizzato per la sede dell'alert");
+        error.status = 403;
+        throw error;
+      }
+    }
+    const result = await db.query(
+      `UPDATE antifrode_alerts
+       SET stato = COALESCE(NULLIF($2, ''), stato),
+           reviewed_by = $3,
+           reviewed_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [id, input.stato || input.status || "", user.id]
+    );
+    return result.rows[0] || null;
+  });
 }
 
 function aurumShieldRiskLevel(score = 0) {
@@ -13709,7 +14707,27 @@ async function aurumShieldContext(act = {}, settings = {}) {
   const windowDays = Number(settings.cash_window_days || 7);
 
   if (fiscalCode) {
-    const client = await pool.query("SELECT id FROM clienti WHERE UPPER(codice_fiscale) = $1::text LIMIT 1", [fiscalCode]);
+    const storeId = act.negozioId || act.negozio_id || act.storeId || act.store_id || null;
+    const client = await pool.query(
+      `SELECT c.id
+       FROM clienti c
+       WHERE UPPER(c.codice_fiscale) = $1::text
+         AND (
+           ($2::bigint IS NOT NULL AND c.negozio_id = $2::bigint)
+           OR (
+             $2::bigint IS NULL
+             AND c.negozio_id IS NULL
+             AND EXISTS (
+               SELECT 1 FROM ${actsTable} legacy_act
+               WHERE UPPER(legacy_act.codice_fiscale) = UPPER(c.codice_fiscale)
+                 AND legacy_act.negozio_id IS NULL
+                 AND legacy_act.store = $3::text
+             )
+           )
+         )
+       LIMIT 1`,
+      [fiscalCode, storeId, act.store || ""]
+    );
     if (client.rows[0]?.id) context.client_id = client.rows[0].id;
     const history = await pool.query(
       `SELECT COUNT(*)::int AS count,
@@ -14537,7 +15555,7 @@ async function addSuspendedPracticeVisibilityWhere(user = {}, where = [], values
     where.push("LOWER(COALESCE(u.ruolo, '')) <> 'founder'");
     return;
   }
-  if (role === "responsabile" || role === "commesso") {
+  if (["responsabile", "commesso", "aiuto_commesso"].includes(role)) {
     const store = await storeForUser(user);
     if (!store) {
       where.push("1 = 0");
@@ -14547,15 +15565,14 @@ async function addSuspendedPracticeVisibilityWhere(user = {}, where = [], values
     const storeIdParam = `$${values.length - 1}::bigint`;
     const storeNameParam = `$${values.length}::text`;
     if (role === "responsabile") {
-      where.push(`(a.negozio_id = ${storeIdParam} OR a.store = ${storeNameParam})`);
+      where.push(`(a.negozio_id = ${storeIdParam} OR (a.negozio_id IS NULL AND a.store = ${storeNameParam}))`);
       return;
     }
     values.push(user.id || null);
-    where.push(`((a.negozio_id = ${storeIdParam} OR a.store = ${storeNameParam}) OR a.operatore_id = $${values.length}::bigint)`);
+    where.push(`(a.negozio_id = ${storeIdParam} OR (a.negozio_id IS NULL AND a.store = ${storeNameParam})) AND a.operatore_id = $${values.length}::bigint`);
     return;
   }
-  values.push(user.id || null);
-  where.push(`a.operatore_id = $${values.length}::bigint`);
+  where.push("1 = 0");
 }
 
 function suspendedPracticeSelectSql() {
@@ -14617,8 +15634,13 @@ async function listSuspendedPractices(query = {}, user = {}) {
 
   const store = String(query.store || query.negozio || "").trim();
   if (store && store !== "Tutti") {
-    values.push(store);
-    where.push(`a.store = $${values.length}::text`);
+    const selectedStore = await storeByCodeOrName(store);
+    if (!selectedStore) {
+      where.push("1 = 0");
+    } else {
+      values.push(selectedStore.id, selectedStore.nome);
+      where.push(`(a.negozio_id = $${values.length - 1}::bigint OR (a.negozio_id IS NULL AND a.store = $${values.length}::text))`);
+    }
   }
   const operatorId = query.operator_id || query.operatore_id || "";
   if (operatorId) {
@@ -14796,52 +15818,51 @@ async function notifySuspendedPractice(row = {}, user = {}, action = "created", 
 }
 
 async function suspendPractice(id, input = {}, user = {}, req = null) {
-  const row = await findExisting(id);
-  if (!row) return null;
-  if (!canAccessAct(row, user) || !canEditAct(row, user)) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
-  const quality = input.quality_check || input.qualityCheck || await validateQualityChecklist({
-    sale_deed_id: row.id,
-    draft_data: input.draft_data || input.draftData || rowToAct(row)
-  }, user).catch(() => null);
-  const shield = input.aurum_shield || input.aurumShield || quality?.aurum_shield || await calculateAurumShieldRisk({
-    sale_deed_id: row.id,
-    draft_data: input.draft_data || input.draftData || rowToAct(row)
-  }, user).catch(() => null);
-  const suspension = suspensionDataFromInput(input, quality, shield);
+  const transaction = await withDatabaseTransaction(async (db) => {
+    const row = await findExisting(id, db, { forUpdate: true });
+    if (!row) return null;
+    if (!canAccessAct(row, user) || !canEditAct(row, user)) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const decisionAct = rowToAct(row);
+    const quality = await validateQualityChecklist({ draft_data: decisionAct }, user).catch(() => null);
+    const shield = quality?.aurum_shield || await calculateAurumShieldRisk({ draft_data: decisionAct }, user).catch(() => null);
+    const suspension = suspensionDataFromInput(input, quality, shield);
+    const result = await db.query(
+      `UPDATE ${actsTable}
+       SET status = 'suspended',
+           suspended_reason = $2::text,
+           suspended_reasons = $3::jsonb,
+           suspended_at = COALESCE(suspended_at, NOW()),
+           suspended_by = COALESCE(suspended_by, $4::bigint),
+           resumed_at = NULL,
+           resumed_by = NULL,
+           payload = COALESCE(payload, '{}'::jsonb) || $5::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [
+        row.id,
+        suspension.reason,
+        sanitizeForPostgres(suspension.reasons),
+        user?.id || null,
+        sanitizeForPostgres({
+          suspendedReason: suspension.reason,
+          suspendedReasons: suspension.reasons,
+          suspendedAt: new Date().toISOString(),
+          suspendedBy: user?.id || null,
+          qualityCheck: quality || undefined,
+          aurumShield: shield || undefined
+        })
+      ]
+    );
+    return { row, updated: result.rows[0], quality, shield, suspension };
+  });
+  if (!transaction) return null;
+  const { row, updated, quality, shield, suspension } = transaction;
   const beforeAct = rowToAct(row, { full: false });
-  const result = await pool.query(
-    `UPDATE ${actsTable}
-     SET status = 'suspended',
-         suspended_reason = $2::text,
-         suspended_reasons = $3::jsonb,
-         suspended_at = COALESCE(suspended_at, NOW()),
-         suspended_by = COALESCE(suspended_by, $4::bigint),
-         resumed_at = NULL,
-         resumed_by = NULL,
-         payload = COALESCE(payload, '{}'::jsonb) || $5::jsonb,
-         updated_at = NOW()
-     WHERE id = $1::bigint
-     RETURNING *`,
-    [
-      row.id,
-      suspension.reason,
-      sanitizeForPostgres(suspension.reasons),
-      user?.id || null,
-      sanitizeForPostgres({
-        suspendedReason: suspension.reason,
-        suspendedReasons: suspension.reasons,
-        suspendedAt: new Date().toISOString(),
-        suspendedBy: user?.id || null,
-        qualityCheck: quality || undefined,
-        aurumShield: shield || undefined
-      })
-    ]
-  );
-  const updated = result.rows[0];
   const finalAct = rowToAct(updated, { full: false });
   await writeSuspendedPracticeLog({
     saleDeedId: updated.id,
@@ -14875,33 +15896,37 @@ async function suspendPractice(id, input = {}, user = {}, req = null) {
 }
 
 async function resumeSuspendedPractice(id, input = {}, user = {}, req = null) {
-  const row = await findExisting(id);
-  if (!row) return null;
-  if (!canAccessAct(row, user) || !canEditAct(row, user)) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
-  const beforeAct = rowToAct(row, { full: false });
   const nextStatus = normalizeWorkflowStatus(input.status || "draft");
   const safeStatus = ["completed", "archived_completed", "deleted"].includes(nextStatus) ? "draft" : nextStatus;
-  const result = await pool.query(
-    `UPDATE ${actsTable}
-     SET status = $2::text,
-         resumed_at = COALESCE(resumed_at, NOW()),
-         resumed_by = COALESCE(resumed_by, $3::bigint),
-         payload = COALESCE(payload, '{}'::jsonb) || $4::jsonb,
-         updated_at = NOW()
-     WHERE id = $1::bigint
-     RETURNING *`,
-    [
-      row.id,
-      safeStatus,
-      user?.id || null,
-      sanitizeForPostgres({ resumedAt: new Date().toISOString(), resumedBy: user?.id || null, status: safeStatus })
-    ]
-  );
-  const updated = result.rows[0];
+  const transaction = await withDatabaseTransaction(async (db) => {
+    const row = await findExisting(id, db, { forUpdate: true });
+    if (!row) return null;
+    if (!canAccessAct(row, user) || !canEditAct(row, user)) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const result = await db.query(
+      `UPDATE ${actsTable}
+       SET status = $2::text,
+           resumed_at = COALESCE(resumed_at, NOW()),
+           resumed_by = COALESCE(resumed_by, $3::bigint),
+           payload = COALESCE(payload, '{}'::jsonb) || $4::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [
+        row.id,
+        safeStatus,
+        user?.id || null,
+        sanitizeForPostgres({ resumedAt: new Date().toISOString(), resumedBy: user?.id || null, status: safeStatus })
+      ]
+    );
+    return { row, updated: result.rows[0] };
+  });
+  if (!transaction) return null;
+  const { row, updated } = transaction;
+  const beforeAct = rowToAct(row, { full: false });
   const finalAct = rowToAct(updated, { full: false });
   await writeSuspendedPracticeLog({
     saleDeedId: updated.id,
@@ -14953,7 +15978,10 @@ async function resolveSuspendedPractice(id, input = {}, user = {}, req = null) {
       aurum_shield: shield
     };
   }
-  const approvedRequest = await findApprovedApprovalForAct(row.id);
+  const approvedRequest = await findApprovedApprovalForAct(
+    row.id,
+    approvalDecisionFingerprint({ ...rowToAct(row), ...(draftData || {}) })
+  );
   const practice = await resumeSuspendedPractice(row.id, { status: approvedRequest ? "approval_approved" : "draft", reason: "Controlli risolti." }, user, req);
   await writeSuspendedPracticeLog({
     saleDeedId: row.id,
@@ -14977,7 +16005,7 @@ async function deleteSuspendedPractice(id, user = {}, req = null) {
   const row = await findExisting(id);
   if (!row) return false;
   const role = normalizeRole(user.ruolo);
-  const sameStore = row.store === user.negozio;
+  const sameStore = canAccessAct(row, user);
   if (!(role === "founder" || (role === "responsabile" && sameStore))) {
     const error = new Error("Non autorizzato");
     error.status = 403;
@@ -15020,6 +16048,12 @@ function approvalStatusLabel(status = "pending") {
 }
 
 function approvalRequestRowToPublic(row = {}) {
+  const hasJoinedActIdentity = Object.prototype.hasOwnProperty.call(row, "sale_deed_row_id");
+  const storeMismatch = Boolean(
+    row.sale_deed_id
+    && hasJoinedActIdentity
+    && (!row.sale_deed_row_id || (row.store_id != null && String(row.store_id) !== String(row.negozio_id ?? "")))
+  );
   return {
     id: row.id,
     sale_deed_id: row.sale_deed_id,
@@ -15027,7 +16061,8 @@ function approvalRequestRowToPublic(row = {}) {
     practiceNumber: row.practice_number || "",
     clientName: [row.cliente_nome, row.cliente_cognome].filter(Boolean).join(" ") || "",
     store: row.store || row.store_name || "",
-    store_id: row.store_id || row.negozio_id || null,
+    store_id: hasJoinedActIdentity && row.sale_deed_row_id ? row.negozio_id || null : row.store_id || null,
+    store_mismatch: storeMismatch,
     requested_by: row.requested_by,
     requestedByName: [row.requester_nome, row.requester_cognome].filter(Boolean).join(" ") || row.requester_username || "",
     requested_by_role: row.requested_by_role || "",
@@ -15050,7 +16085,7 @@ function approvalRequestRowToPublic(row = {}) {
 }
 
 function approvalRequestSelectSql() {
-  return `ar.*, a.practice_number, a.cliente_nome, a.cliente_cognome, a.store, a.negozio_id,
+  return `ar.*, a.id AS sale_deed_row_id, a.practice_number, a.cliente_nome, a.cliente_cognome, a.store, a.negozio_id,
           requester.username AS requester_username, requester.nome AS requester_nome, requester.cognome AS requester_cognome,
           reviewer.username AS reviewer_username, reviewer.nome AS reviewer_nome, reviewer.cognome AS reviewer_cognome`;
 }
@@ -15065,6 +16100,7 @@ function approvalRequestJoinSql() {
 async function addApprovalVisibilityWhere(user = {}, where = [], values = [], alias = "ar") {
   const role = normalizeRole(user.ruolo);
   if (role === "founder") return;
+  where.push(`NOT (${alias}.sale_deed_id IS NOT NULL AND (a.id IS NULL OR (${alias}.store_id IS NOT NULL AND ${alias}.store_id IS DISTINCT FROM a.negozio_id)))`);
   if (role === "supervisore") {
     where.push("LOWER(COALESCE(requester.ruolo, '')) <> 'founder'");
     return;
@@ -15075,8 +16111,8 @@ async function addApprovalVisibilityWhere(user = {}, where = [], values = [], al
       where.push("1 = 0");
       return;
     }
-    values.push(store.id, store.nome);
-    where.push(`(${alias}.store_id = $${values.length - 1}::bigint OR a.negozio_id = $${values.length - 1}::bigint OR a.store = $${values.length}::text)`);
+    values.push(store.id);
+    where.push(`((a.id IS NOT NULL AND a.negozio_id = $${values.length}::bigint) OR (${alias}.sale_deed_id IS NULL AND ${alias}.store_id = $${values.length}::bigint))`);
     where.push("LOWER(COALESCE(requester.ruolo, '')) IN ('commesso', 'aiuto_commesso')");
     return;
   }
@@ -15088,13 +16124,15 @@ async function canApproveApprovalRequest(row = {}, user = {}) {
   const role = normalizeRole(user.ruolo);
   const requesterRole = normalizeRole(row.requested_by_role || row.requester_role || "");
   if (role === "founder") return true;
+  if (row.sale_deed_id && (!row.sale_deed_row_id || (row.store_id != null && String(row.store_id) !== String(row.negozio_id ?? "")))) return false;
   if (role === "supervisore") return requesterRole !== "founder";
   if (role !== "responsabile") return false;
   if (!["commesso", "aiuto_commesso"].includes(requesterRole)) return false;
   const store = await storeForUser(user);
   if (!store) return false;
-  return String(row.store_id || row.negozio_id || "") === String(store.id)
-    || String(row.store || "") === String(store.nome);
+  const rowStoreId = row.sale_deed_id ? row.negozio_id || null : row.store_id || null;
+  if (rowStoreId) return String(rowStoreId) === String(store.id);
+  return Boolean(row.store && String(row.store) === String(store.nome));
 }
 
 function notificationRoles(targetRole = "") {
@@ -15152,7 +16190,7 @@ async function notificationRecipientIds({ userId = null, targetRole = null, stor
   const where = ["COALESCE(attivo, TRUE) = TRUE", `LOWER(COALESCE(ruolo, '')) = ANY($1::text[])`];
   if (storeId && !finalRoles.includes("founder")) {
     values.push(storeId);
-    where.push(`(negozio_id = $${values.length}::bigint OR negozio = (SELECT nome FROM negozi WHERE id = $${values.length}::bigint LIMIT 1))`);
+    where.push(`negozio_id = $${values.length}::bigint`);
   }
   const result = await pool.query(
     `SELECT id FROM utenti WHERE ${where.join(" AND ")} ORDER BY id ASC LIMIT 200`,
@@ -15250,19 +16288,33 @@ async function createInternalNotification(input = {}) {
 }
 
 function addNotificationVisibilityWhere(user = {}, where = [], values = [], alias = "n") {
-  const role = normalizeRole(user?.ruolo);
+  const rawRole = String(user?.ruolo || "").trim().toLowerCase().replace(/\s+/g, "_");
+  const role = [
+    "founder",
+    "supervisore",
+    "responsabile",
+    "admin",
+    "commesso",
+    "commessa",
+    "operatore",
+    "utente",
+    "user",
+    "aiuto_commesso",
+    "aiuto_commessa"
+  ].includes(rawRole) ? normalizeRole(rawRole) : "";
   const clauses = [];
   values.push(user?.id || null);
   clauses.push(`${alias}.user_id = $${values.length}::bigint`);
-  values.push(role);
-  clauses.push(`(${alias}.user_id IS NULL AND LOWER(COALESCE(${alias}.target_role, '')) = $${values.length}::text)`);
   if (role === "founder") {
-    clauses.push(`LOWER(COALESCE(${alias}.target_role, '')) = 'founder'`);
-    clauses.push(`${alias}.severity = 'critical'`);
-  }
-  if (role === "responsabile" && user?.negozio_id) {
+    clauses.push(`(${alias}.user_id IS NULL AND (LOWER(COALESCE(${alias}.target_role, '')) = 'founder' OR ${alias}.severity = 'critical'))`);
+  } else if (role === "supervisore") {
+    clauses.push(`(${alias}.user_id IS NULL AND LOWER(COALESCE(${alias}.target_role, '')) = 'supervisore')`);
+  } else if (["responsabile", "commesso", "aiuto_commesso"].includes(role) && /^[1-9]\d*$/.test(String(user?.negozio_id || "").trim())) {
     values.push(user.negozio_id);
-    clauses.push(`(${alias}.user_id IS NULL AND LOWER(COALESCE(${alias}.target_role, '')) = 'responsabile' AND ${alias}.store_id = $${values.length}::bigint)`);
+    const storeIdParam = values.length;
+    values.push(role);
+    const roleParam = values.length;
+    clauses.push(`(${alias}.user_id IS NULL AND ${alias}.store_id = $${storeIdParam}::bigint AND LOWER(COALESCE(${alias}.target_role, '')) = $${roleParam}::text)`);
   }
   where.push(`(${clauses.join(" OR ")})`);
   where.push(`(${alias}.expires_at IS NULL OR ${alias}.expires_at > NOW())`);
@@ -15405,9 +16457,136 @@ function approvalReasonsFromQualityShield({ quality = null, shield = null, amlCh
   });
 }
 
-async function findApprovedApprovalForAct(saleDeedId) {
+function approvalFingerprintText(value = "") {
+  return String(value ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function approvalFingerprintNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Number(number.toFixed(6)) : 0;
+}
+
+function approvalFingerprintDigest(value) {
+  if (value === undefined || value === null || value === "") return "";
+  if (Buffer.isBuffer(value)) return crypto.createHash("sha256").update(value).digest("hex");
+  const text = String(value);
+  const dataUrl = text.match(/^data:([^;,]*)(;base64)?,([\s\S]*)$/i);
+  if (!dataUrl) return crypto.createHash("sha256").update(text).digest("hex");
+  try {
+    const bytes = dataUrl[2]
+      ? Buffer.from(dataUrl[3].replace(/\s+/g, ""), "base64")
+      : Buffer.from(decodeURIComponent(dataUrl[3]), "utf8");
+    return crypto.createHash("sha256").update(bytes).digest("hex");
+  } catch {
+    return crypto.createHash("sha256").update(text).digest("hex");
+  }
+}
+
+function approvalFingerprintAttachment(item = {}) {
+  const content = item.dataUrl ?? item.data_url ?? item.content ?? item.data ?? "";
+  return {
+    key: approvalFingerprintText(item.key || item.captureKey || item.type),
+    name: approvalFingerprintText(item.name || item.fileName || item.filename),
+    mime: approvalFingerprintText(item.type || item.mimeType || item.mime_type),
+    size: approvalFingerprintNumber(item.size),
+    digest: approvalFingerprintDigest(content)
+  };
+}
+
+function approvalDecisionSnapshot(input = {}) {
+  const payload = input.payload && typeof input.payload === "object" ? input.payload : {};
+  const firstValue = (...keys) => {
+    for (const key of keys) {
+      if (input[key] !== undefined && input[key] !== null) return input[key];
+      if (payload[key] !== undefined && payload[key] !== null) return payload[key];
+    }
+    return "";
+  };
+  const normalizeMaterial = (item = {}) => ({
+    metal: approvalFingerprintText(item.metal || item.material || item.type),
+    title: approvalFingerprintText(item.title || item.titolo || item.karat || item.caratura || item.purity),
+    description: approvalFingerprintText(item.description || item.descrizione || item.name),
+    weight: approvalFingerprintNumber(item.weight ?? item.peso ?? item.grams ?? item.grammi),
+    quantity: approvalFingerprintNumber(item.quantity ?? item.quantita ?? 1),
+    quote: approvalFingerprintNumber(item.quote ?? item.quotazione ?? item.price),
+    amount: approvalFingerprintNumber(item.amount ?? item.totale ?? item.value)
+  });
+  const materials = (Array.isArray(firstValue("materials")) ? firstValue("materials") : [])
+    .map(normalizeMaterial)
+    .sort((first, second) => JSON.stringify(first).localeCompare(JSON.stringify(second)));
+  const items = (Array.isArray(firstValue("items")) ? firstValue("items") : [])
+    .map(normalizeMaterial)
+    .sort((first, second) => JSON.stringify(first).localeCompare(JSON.stringify(second)));
+  const attachments = Array.isArray(firstValue("captureAttachments")) ? firstValue("captureAttachments") : [];
+  const signatureFlags = Array.isArray(firstValue("signatures")) ? firstValue("signatures") : [];
+  const signatureImages = Array.isArray(firstValue("signatureImages")) ? firstValue("signatureImages") : [];
+  const storeId = firstValue("negozioId", "negozio_id", "storeId", "store_id");
+  return {
+    fiscal_code: normalizeFiscalCode(firstValue("fiscalCode", "codiceFiscale", "codice_fiscale")),
+    client_name: approvalFingerprintText(firstValue("name", "clienteNome", "cliente_nome")),
+    client_surname: approvalFingerprintText(firstValue("surname", "clienteCognome", "cliente_cognome")),
+    birth_date: approvalFingerprintText(firstValue("birthDate", "nascita", "data_nascita")),
+    birth_place: approvalFingerprintText(firstValue("birthPlace", "luogo", "luogo_nascita")),
+    birth_province: approvalFingerprintText(firstValue("birthProvince", "provinciaNascita", "provincia_nascita")),
+    citizenship: approvalFingerprintText(firstValue("citizenship", "cittadinanza")),
+    sex: approvalFingerprintText(firstValue("sex", "sesso")),
+    address: approvalFingerprintText(firstValue("address", "indirizzo", "residenza")),
+    residence_province: approvalFingerprintText(firstValue("residenceProvince", "provinciaResidenza", "provincia_residenza")),
+    phone: approvalFingerprintText(firstValue("phone", "telefono")),
+    email: approvalFingerprintText(firstValue("email")),
+    profession: approvalFingerprintText(firstValue("profession", "professione")),
+    document_type: approvalFingerprintText(firstValue("documentType", "tipoDocumento", "documento_tipo")),
+    document_number: approvalFingerprintText(firstValue("documentNumber", "numeroDocumento", "documento_numero")),
+    document_issue_date: approvalFingerprintText(firstValue("documentIssueDate", "dataRilascioDocumento", "data_rilascio_documento")),
+    document_expiry: approvalFingerprintText(firstValue("documentExpiry", "scadenzaDocumento")),
+    amount: approvalFingerprintNumber(firstValue("amount", "totale")),
+    weight: approvalFingerprintNumber(firstValue("weight", "pesoOro", "peso_oro")),
+    quote: approvalFingerprintNumber(firstValue("quote", "quotazione")),
+    materials,
+    items,
+    material_amounts: (Array.isArray(firstValue("materialAmounts")) ? firstValue("materialAmounts") : [])
+      .map((item = {}) => ({
+        metal: approvalFingerprintText(item.metal || item.material),
+        amount: approvalFingerprintNumber(item.amount ?? item.value)
+      }))
+      .sort((first, second) => JSON.stringify(first).localeCompare(JSON.stringify(second))),
+    payment_method: approvalFingerprintText(firstValue("paymentMethod", "metodo_pagamento", "payment_method")),
+    iban: String(firstValue("iban") || "").replace(/\s+/g, "").toUpperCase(),
+    account_holder: approvalFingerprintText(firstValue("accountHolder", "intestatarioConto", "intestatario_conto")),
+    act_date: approvalFingerprintText(firstValue("date", "dataAtto", "data_atto")),
+    store_id: storeId ? String(storeId) : "",
+    store_code: approvalFingerprintText(firstValue("storeCode", "codiceNegozio", "codice_negozio", "store_code")),
+    store_name: storeId ? "" : approvalFingerprintText(firstValue("store")),
+    operator_id: String(firstValue("operatorId", "operatoreId", "operatore_id") || ""),
+    operator_notes: approvalFingerprintText(firstValue("operatorNotes", "noteOperatore", "operator_notes")),
+    privacy_acknowledged: Boolean(firstValue("customerPrivacyAcknowledged", "privacyAcknowledged")),
+    attachments: attachments
+      .map(approvalFingerprintAttachment)
+      .sort((first, second) => JSON.stringify(first).localeCompare(JSON.stringify(second))),
+    capture_slots: (Array.isArray(firstValue("captures")) ? firstValue("captures") : [])
+      .map(approvalFingerprintText)
+      .filter(Boolean)
+      .sort(),
+    signature_flags: signatureFlags.map(Boolean),
+    signature_digests: signatureImages.map((image) => approvalFingerprintDigest(image)),
+    legal_document_hash: approvalFingerprintText(firstValue("legalSignature")?.documentHashSha256 || payload.legalSignature?.documentHashSha256 || "")
+  };
+}
+
+function approvalDecisionFingerprint(input = {}) {
+  return crypto.createHash("sha256").update(JSON.stringify(approvalDecisionSnapshot(input))).digest("hex");
+}
+
+function approvalFingerprintMatches(savedFingerprint = "", currentFingerprint = "") {
+  const saved = String(savedFingerprint || "").trim().toLowerCase();
+  const current = String(currentFingerprint || "").trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(saved) || !/^[a-f0-9]{64}$/.test(current)) return false;
+  return crypto.timingSafeEqual(Buffer.from(saved, "hex"), Buffer.from(current, "hex"));
+}
+
+async function findApprovedApprovalForAct(saleDeedId, decisionFingerprint = "", db = pool) {
   if (!saleDeedId) return null;
-  const result = await pool.query(
+  const result = await db.query(
     `SELECT ${approvalRequestSelectSql()}
      ${approvalRequestJoinSql()}
      WHERE ar.sale_deed_id = $1::bigint
@@ -15416,7 +16595,18 @@ async function findApprovedApprovalForAct(saleDeedId) {
      LIMIT 1`,
     [saleDeedId]
   );
-  return result.rows[0] || null;
+  const approval = result.rows[0] || null;
+  if (!approval) return null;
+  if (approvalFingerprintMatches(approval.decision_fingerprint, decisionFingerprint)) return approval;
+  await db.query(
+    `UPDATE approval_requests
+     SET status = 'cancelled',
+         reviewer_note = COALESCE(NULLIF(reviewer_note, ''), 'Autorizzazione scaduta dopo una modifica sostanziale della pratica.'),
+         updated_at = NOW()
+     WHERE id = $1::bigint AND status = 'approved'`,
+    [approval.id]
+  );
+  return null;
 }
 
 async function assertApprovalAllowsFinalSave({ saleDeedId = null, draftData = {}, user = {}, req = null } = {}) {
@@ -15432,10 +16622,22 @@ async function assertApprovalAllowsFinalSave({ saleDeedId = null, draftData = {}
       atto_id: saleDeedId || draftData.id || null
     }).catch(() => null)
     : null;
+  if (amlCheck?.ok === false) {
+    const error = new Error(`${amlCheck.messaggio} Il limite contanti è inderogabile: selezionare un pagamento tracciabile.`);
+    error.status = 400;
+    error.code = "CASH_LIMIT_HARD_BLOCK";
+    error.details = amlCheck;
+    throw error;
+  }
   const reasons = approvalReasonsFromQualityShield({ quality, shield, amlCheck });
   const needsApproval = reasons.length > 0;
   if (!needsApproval) return { approved: false, request: null, quality, shield, amlCheck, reasons: [] };
-  const approvedRequest = await findApprovedApprovalForAct(saleDeedId);
+  const currentRow = saleDeedId ? await findExisting(saleDeedId) : null;
+  const decisionFingerprint = approvalDecisionFingerprint({
+    ...(currentRow ? rowToAct(currentRow) : {}),
+    ...(draftData || {})
+  });
+  const approvedRequest = await findApprovedApprovalForAct(saleDeedId, decisionFingerprint);
   if (approvedRequest) return { approved: true, request: approvedRequest, quality, shield, amlCheck, reasons };
   if (["commesso", "aiuto_commesso"].includes(role)) {
     void writeAuditLog({
@@ -15537,75 +16739,150 @@ async function getApprovalRequest(id, user = {}) {
 
 async function createApprovalRequest(input = {}, user = {}, req = null) {
   const saleDeedId = input.sale_deed_id || input.saleDeedId || input.atto_id || input.id || "";
-  const row = saleDeedId ? await findExisting(saleDeedId) : null;
-  if (!row) {
+  const initialRow = saleDeedId ? await findExisting(saleDeedId) : null;
+  if (!initialRow) {
     const error = new Error("Atto non trovato");
     error.status = 404;
     throw error;
   }
-  if (!canAccessAct(row, user) || !canEditAct(row, user)) {
+  if (!canAccessAct(initialRow, user) || !canEditAct(initialRow, user)) {
     const error = new Error("Non autorizzato");
     error.status = 403;
     throw error;
   }
-  const existing = await pool.query(
-    `SELECT ${approvalRequestSelectSql()}
-     ${approvalRequestJoinSql()}
-     WHERE ar.sale_deed_id = $1::bigint
-       AND ar.status = 'pending'
-     ORDER BY ar.created_at DESC
-     LIMIT 1`,
-    [row.id]
-  );
-  if (existing.rows[0]) return approvalRequestRowToPublic(existing.rows[0]);
-  const reasons = Array.isArray(input.reasons) ? input.reasons : [];
-  const shield = input.aurum_shield || input.aurumShield || {};
-  const quality = input.quality_check || input.qualityCheck || {};
-  const riskScore = Number(input.risk_score ?? shield.score ?? 0);
-  const riskLevel = String(input.risk_level || shield.risk_level || "").toLowerCase();
-  const store = row.negozio_id ? null : await storeByCodeOrName(row.store);
-  const result = await pool.query(
-    `INSERT INTO approval_requests
-      (sale_deed_id, requested_by, requested_by_role, requested_to_role, store_id, status,
-       risk_score, risk_level, reasons, quality_check, aurum_shield, requester_note, updated_at)
-     VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::bigint,'pending',
-       $6::integer,$7::text,$8::jsonb,$9::jsonb,$10::jsonb,$11::text,NOW())
-     RETURNING *`,
-    [
-      row.id,
-      user.id,
-      normalizeRole(user.ruolo),
-      "responsabile_founder",
-      row.negozio_id || store?.id || null,
-      riskScore,
-      riskLevel,
-      sanitizeForPostgres(reasons),
-      sanitizeForPostgres(quality),
-      sanitizeForPostgres(shield),
-      input.requester_note || input.requesterNote || ""
-    ]
-  );
-  const approval = result.rows[0];
-  await pool.query(
-    `UPDATE ${actsTable}
-     SET status = 'pending_approval',
-         approval_status = 'pending',
-         approval_request_id = $2::bigint,
-         approval_required_at = COALESCE(approval_required_at, NOW()),
-         payload = COALESCE(payload, '{}'::jsonb) || $3::jsonb,
-         updated_at = NOW()
-     WHERE id = $1::bigint`,
-    [
-      row.id,
-      approval.id,
-      sanitizeForPostgres({
-        approvalStatus: "pending",
-        approvalRequestId: approval.id,
-        approvalRequestedAt: new Date().toISOString(),
-        approvalReasons: reasons
-      })
-    ]
-  );
+  const transaction = await withDatabaseTransaction(async (db) => {
+    const row = await findExisting(initialRow.id, db, { forUpdate: true });
+    if (!row) {
+      const error = new Error("Atto non trovato");
+      error.status = 404;
+      throw error;
+    }
+    if (!canAccessAct(row, user) || !canEditAct(row, user)) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const decisionAct = rowToAct(row);
+    const decisionFingerprint = approvalDecisionFingerprint(decisionAct);
+    const quality = await validateQualityChecklist({ draft_data: decisionAct }, user);
+    const shield = quality.aurum_shield || await calculateAurumShieldRisk({ draft_data: decisionAct }, user);
+    const amlCheck = isCashPaymentMethod(decisionAct.paymentMethod)
+      ? await cashAntiMoneyLaunderingCheck({
+        codice_fiscale: decisionAct.fiscalCode,
+        cliente_id: decisionAct.clientId,
+        data_atto: decisionAct.date,
+        importo_corrente: decisionAct.amount,
+        atto_id: row.id
+      }, db)
+      : null;
+    if (amlCheck?.ok === false) {
+      const error = new Error(`${amlCheck.messaggio} Il limite contanti è inderogabile: correggere il metodo di pagamento prima di chiedere un'autorizzazione.`);
+      error.status = 400;
+      error.code = "CASH_LIMIT_HARD_BLOCK";
+      error.details = amlCheck;
+      throw error;
+    }
+    const reasons = approvalReasonsFromQualityShield({ quality, shield, amlCheck });
+    const riskScore = Number(shield?.score || 0);
+    const riskLevel = String(shield?.risk_level || "non_disponibile").toLowerCase();
+    if (!reasons.length) {
+      const error = new Error("La pratica non presenta condizioni che richiedono un'autorizzazione.");
+      error.status = 409;
+      error.code = "APPROVAL_NOT_REQUIRED";
+      throw error;
+    }
+    const existing = await db.query(
+      `SELECT ${approvalRequestSelectSql()}
+       ${approvalRequestJoinSql()}
+       WHERE ar.sale_deed_id = $1::bigint
+         AND ar.status = 'pending'
+       ORDER BY ar.created_at DESC
+       LIMIT 1
+       FOR UPDATE OF ar`,
+      [row.id]
+    );
+    if (existing.rows[0] && approvalFingerprintMatches(existing.rows[0].decision_fingerprint, decisionFingerprint)) {
+      const refreshed = await db.query(
+        `UPDATE approval_requests
+         SET risk_score = $2::integer,
+             risk_level = $3::text,
+             reasons = $4::jsonb,
+             quality_check = $5::jsonb,
+             aurum_shield = $6::jsonb,
+             requester_note = $7::text,
+             updated_at = NOW()
+         WHERE id = $1::bigint AND status = 'pending'
+         RETURNING *`,
+        [
+          existing.rows[0].id,
+          riskScore,
+          riskLevel,
+          sanitizeForPostgres(reasons),
+          sanitizeForPostgres(quality),
+          sanitizeForPostgres(shield),
+          input.requester_note || input.requesterNote || ""
+        ]
+      );
+      return { approval: refreshed.rows[0], row, store: null, existing: true, riskScore, riskLevel };
+    }
+    if (existing.rows[0]) {
+      await db.query(
+        `UPDATE approval_requests
+         SET status = 'cancelled',
+             reviewer_note = COALESCE(NULLIF(reviewer_note, ''), 'Richiesta sostituita dopo una modifica sostanziale della pratica.'),
+             updated_at = NOW()
+         WHERE id = $1::bigint AND status = 'pending'`,
+        [existing.rows[0].id]
+      );
+    }
+    const store = row.negozio_id ? null : await storeByCodeOrName(row.store, db);
+    const inserted = await db.query(
+      `INSERT INTO approval_requests
+        (sale_deed_id, requested_by, requested_by_role, requested_to_role, store_id, status,
+         risk_score, risk_level, reasons, quality_check, aurum_shield, requester_note, decision_fingerprint, updated_at)
+       VALUES ($1::bigint,$2::bigint,$3::text,$4::text,$5::bigint,'pending',
+         $6::integer,$7::text,$8::jsonb,$9::jsonb,$10::jsonb,$11::text,$12::text,NOW())
+       RETURNING *`,
+      [
+        row.id,
+        user.id,
+        normalizeRole(user.ruolo),
+        "responsabile_founder",
+        row.negozio_id || store?.id || null,
+        riskScore,
+        riskLevel,
+        sanitizeForPostgres(reasons),
+        sanitizeForPostgres(quality),
+        sanitizeForPostgres(shield),
+        input.requester_note || input.requesterNote || "",
+        decisionFingerprint
+      ]
+    );
+    const approval = inserted.rows[0];
+    await db.query(
+      `UPDATE ${actsTable}
+       SET status = 'pending_approval',
+           approval_status = 'pending',
+           approval_request_id = $2::bigint,
+           approval_required_at = COALESCE(approval_required_at, NOW()),
+           payload = COALESCE(payload, '{}'::jsonb) || $3::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint`,
+      [
+        row.id,
+        approval.id,
+        sanitizeForPostgres({
+          approvalStatus: "pending",
+          approvalRequestId: approval.id,
+          approvalRequestedAt: new Date().toISOString(),
+          approvalReasons: reasons
+        })
+      ]
+    );
+    return { approval, row, store, existing: false, riskScore, riskLevel };
+  });
+  const { approval, row, store, riskScore, riskLevel } = transaction;
+  if (transaction.existing) return approvalRequestRowToPublic(approval);
   void createNotification({
     targetRole: "responsabile",
     storeId: row.negozio_id || store?.id || null,
@@ -15649,103 +16926,164 @@ async function createApprovalRequest(input = {}, user = {}, req = null) {
 }
 
 async function reviewApprovalRequest(id, input = {}, user = {}, req = null, targetStatus = "approved") {
-  const result = await pool.query(
-    `SELECT ${approvalRequestSelectSql()}, requester.ruolo AS requester_role
-     ${approvalRequestJoinSql()}
-     WHERE ar.id = $1::bigint
-     LIMIT 1`,
-    [id]
-  );
-  const row = result.rows[0];
-  if (!row) return null;
   const isCancel = targetStatus === "cancelled";
-  const canCancel = isCancel && (String(row.requested_by) === String(user.id) || await canApproveApprovalRequest(row, user));
-  if (!canCancel && !(await canApproveApprovalRequest(row, user))) {
-    void writeAuditLog({
-      req,
-      user,
-      action: "approval_unauthorized_attempt",
-      entityType: "approval_request",
-      entityId: id,
-      entityLabel: row.practice_number || "",
-      metadata: { attempted_status: targetStatus, critical: true }
-    });
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
   const note = String(input.reviewer_note || input.reviewerNote || input.note || "").trim();
   if (targetStatus === "rejected" && !note) {
     const error = new Error("Nota obbligatoria per rifiutare l'autorizzazione.");
     error.status = 400;
     throw error;
   }
-  const reviewed = await pool.query(
-    `UPDATE approval_requests
-     SET status = $2::text,
-         reviewer_note = $3::text,
-         reviewed_by = CASE WHEN $2::text = 'cancelled' THEN reviewed_by ELSE $4::bigint END,
-         reviewed_at = CASE WHEN $2::text = 'cancelled' THEN reviewed_at ELSE NOW() END,
-         updated_at = NOW()
-     WHERE id = $1::bigint
-     RETURNING *`,
-    [id, targetStatus, note, user.id || null]
-  );
-  const statusForAct = {
-    approved: "suspended",
-    rejected: "suspended",
-    cancelled: "draft"
-  }[targetStatus] || "pending_approval";
-  await pool.query(
-    `UPDATE ${actsTable}
-     SET status = $2::text,
-         approval_status = $3::text,
-         suspended_reason = CASE
-           WHEN $2::text = 'suspended' THEN COALESCE(suspended_reason, $5::text)
-           ELSE suspended_reason
-         END,
-         suspended_reasons = CASE
-           WHEN $2::text = 'suspended' THEN COALESCE(NULLIF($6::jsonb, '[]'::jsonb), suspended_reasons, '[]'::jsonb)
-           ELSE suspended_reasons
-         END,
-         suspended_at = CASE
-           WHEN $2::text = 'suspended' THEN COALESCE(suspended_at, NOW())
-           ELSE suspended_at
-         END,
-         suspended_by = CASE
-           WHEN $2::text = 'suspended' THEN COALESCE(suspended_by, $7::bigint)
-           ELSE suspended_by
-         END,
-         resumed_at = CASE
-           WHEN $2::text = 'draft' AND suspended_at IS NOT NULL THEN COALESCE(resumed_at, NOW())
-           ELSE resumed_at
-         END,
-         resumed_by = CASE
-           WHEN $2::text = 'draft' AND suspended_at IS NOT NULL THEN COALESCE(resumed_by, $7::bigint)
-           ELSE resumed_by
-         END,
-         payload = COALESCE(payload, '{}'::jsonb) || $4::jsonb,
-         updated_at = NOW()
-     WHERE id = $1::bigint`,
-    [
-      row.sale_deed_id,
-      statusForAct,
-      targetStatus,
-      sanitizeForPostgres({
-        approvalStatus: targetStatus,
-        approvalRequestId: row.id,
-        approvalReviewedAt: targetStatus === "cancelled" ? null : new Date().toISOString(),
-        approvalReviewerNote: note
-      }),
-      targetStatus === "approved"
-        ? "Autorizzazione approvata: pratica da completare."
-        : targetStatus === "rejected"
-          ? "Autorizzazione rifiutata: pratica da correggere."
-          : "",
-      sanitizeForPostgres(row.reasons || []),
-      user.id || null
-    ]
-  );
+  let row = null;
+  let reviewed = null;
+  let staleApproval = false;
+  const transactionFound = await withDatabaseTransaction(async (db) => {
+    const result = await db.query(
+      `SELECT ${approvalRequestSelectSql()}, requester.ruolo AS requester_role
+       ${approvalRequestJoinSql()}
+       WHERE ar.id = $1::bigint
+       LIMIT 1
+       FOR UPDATE OF ar`,
+      [id]
+    );
+    row = result.rows[0] || null;
+    if (!row) return false;
+    if (row.status !== "pending") {
+      const error = new Error("La richiesta è già stata esaminata e non può essere modificata.");
+      error.status = 409;
+      throw error;
+    }
+    const integrityMismatch = Boolean(
+      row.sale_deed_id
+      && (!row.sale_deed_row_id || (row.store_id != null && String(row.store_id) !== String(row.negozio_id ?? "")))
+    );
+    if (integrityMismatch && !isCancel) {
+      const error = new Error("La richiesta ha una sede non coerente con l'atto: riconcilia i dati oppure annulla la richiesta.");
+      error.status = 409;
+      throw error;
+    }
+    const canCancel = isCancel && (String(row.requested_by) === String(user.id) || await canApproveApprovalRequest(row, user));
+    if (!canCancel && !(await canApproveApprovalRequest(row, user))) {
+      void writeAuditLog({
+        req,
+        user,
+        action: "approval_unauthorized_attempt",
+        entityType: "approval_request",
+        entityId: id,
+        entityLabel: row.practice_number || "",
+        metadata: { attempted_status: targetStatus, critical: true }
+      });
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    if (targetStatus === "approved") {
+      const approvalAct = row.sale_deed_id ? await findExisting(row.sale_deed_id, db, { forUpdate: true }) : null;
+      const currentFingerprint = approvalAct ? approvalDecisionFingerprint(rowToAct(approvalAct)) : "";
+      if (!approvalAct || !approvalFingerprintMatches(row.decision_fingerprint, currentFingerprint)) {
+        const staleResult = await db.query(
+          `UPDATE approval_requests
+           SET status = 'cancelled',
+               reviewer_note = COALESCE(NULLIF(reviewer_note, ''), 'Richiesta scaduta dopo una modifica sostanziale della pratica.'),
+               updated_at = NOW()
+           WHERE id = $1::bigint AND status = 'pending'
+           RETURNING *`,
+          [id]
+        );
+        reviewed = staleResult.rows[0] || row;
+        staleApproval = true;
+        return true;
+      }
+      const approvalActData = rowToAct(approvalAct);
+      if (isCashPaymentMethod(approvalActData.paymentMethod)) {
+        const currentAmlCheck = await cashAntiMoneyLaunderingCheck({
+          codice_fiscale: approvalActData.fiscalCode,
+          cliente_id: approvalActData.clientId || approvalAct.cliente_id,
+          data_atto: approvalActData.date,
+          importo_corrente: approvalActData.amount,
+          atto_id: approvalAct.id
+        }, db);
+        if (!currentAmlCheck.ok) {
+          const error = new Error(`${currentAmlCheck.messaggio} Il limite contanti è inderogabile: la pratica deve usare un pagamento tracciabile.`);
+          error.status = 409;
+          error.code = "CASH_LIMIT_HARD_BLOCK";
+          error.details = currentAmlCheck;
+          throw error;
+        }
+      }
+    }
+    const reviewedResult = await db.query(
+      `UPDATE approval_requests
+       SET status = $2::text,
+           reviewer_note = $3::text,
+           reviewed_by = CASE WHEN $2::text = 'cancelled' THEN reviewed_by ELSE $4::bigint END,
+           reviewed_at = CASE WHEN $2::text = 'cancelled' THEN reviewed_at ELSE NOW() END,
+           updated_at = NOW()
+       WHERE id = $1::bigint AND status = 'pending'
+       RETURNING *`,
+      [id, targetStatus, note, user.id || null]
+    );
+    if (!reviewedResult.rowCount) {
+      const error = new Error("La richiesta è già stata esaminata.");
+      error.status = 409;
+      throw error;
+    }
+    reviewed = reviewedResult.rows[0];
+    const statusForAct = {
+      approved: "suspended",
+      rejected: "suspended",
+      cancelled: "draft"
+    }[targetStatus] || "pending_approval";
+    await db.query(
+      `UPDATE ${actsTable}
+       SET status = $2::text,
+           approval_status = $3::text,
+           suspended_reason = CASE WHEN $2::text = 'suspended' THEN COALESCE(suspended_reason, $5::text) ELSE suspended_reason END,
+           suspended_reasons = CASE WHEN $2::text = 'suspended' THEN COALESCE(NULLIF($6::jsonb, '[]'::jsonb), suspended_reasons, '[]'::jsonb) ELSE suspended_reasons END,
+           suspended_at = CASE WHEN $2::text = 'suspended' THEN COALESCE(suspended_at, NOW()) ELSE suspended_at END,
+           suspended_by = CASE WHEN $2::text = 'suspended' THEN COALESCE(suspended_by, $7::bigint) ELSE suspended_by END,
+           resumed_at = CASE WHEN $2::text = 'draft' AND suspended_at IS NOT NULL THEN COALESCE(resumed_at, NOW()) ELSE resumed_at END,
+           resumed_by = CASE WHEN $2::text = 'draft' AND suspended_at IS NOT NULL THEN COALESCE(resumed_by, $7::bigint) ELSE resumed_by END,
+           payload = COALESCE(payload, '{}'::jsonb) || $4::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint`,
+      [
+        row.sale_deed_id,
+        statusForAct,
+        targetStatus,
+        sanitizeForPostgres({
+          approvalStatus: targetStatus,
+          approvalRequestId: row.id,
+          approvalReviewedAt: targetStatus === "cancelled" ? null : new Date().toISOString(),
+          approvalReviewerNote: note
+        }),
+        targetStatus === "approved"
+          ? "Autorizzazione approvata: pratica da completare."
+          : targetStatus === "rejected"
+            ? "Autorizzazione rifiutata: pratica da correggere."
+            : "",
+        sanitizeForPostgres(row.reasons || []),
+        user.id || null
+      ]
+    );
+    return true;
+  });
+  if (!transactionFound) return null;
+  if (staleApproval) {
+    void writeAuditLog({
+      req,
+      user,
+      action: "approval_cancelled_stale",
+      entityType: "approval_request",
+      entityId: id,
+      entityLabel: row.practice_number || "",
+      metadata: { sale_deed_id: row.sale_deed_id, critical: true }
+    });
+    const error = new Error("La pratica è cambiata dopo la richiesta: serve una nuova autorizzazione.");
+    error.status = 409;
+    error.code = "APPROVAL_REQUIRED";
+    error.approval_required = true;
+    throw error;
+  }
   void createNotification({
     user_id: row.requested_by,
     title: targetStatus === "approved" ? "Autorizzazione approvata" : targetStatus === "rejected" ? "Autorizzazione rifiutata" : "Autorizzazione annullata",
@@ -15773,10 +17111,10 @@ async function reviewApprovalRequest(id, input = {}, user = {}, req = null, targ
     entityId: id,
     entityLabel: row.practice_number || "",
     beforeData: approvalRequestRowToPublic(row),
-    afterData: approvalRequestRowToPublic({ ...row, ...reviewed.rows[0], reviewed_by: user.id }),
+    afterData: approvalRequestRowToPublic({ ...row, ...reviewed, reviewed_by: user.id }),
     metadata: { sale_deed_id: row.sale_deed_id, status: targetStatus, critical: true }
   });
-  return approvalRequestRowToPublic({ ...row, ...reviewed.rows[0], reviewed_by: user.id });
+  return approvalRequestRowToPublic({ ...row, ...reviewed, reviewed_by: user.id });
 }
 
 async function rowWithAurumShield(id) {
@@ -15819,25 +17157,22 @@ async function getAurumShieldForSaleDeed(identifier, user = {}) {
 }
 
 async function getAurumShieldForClient(id, user = {}) {
-  const clientResult = await pool.query("SELECT * FROM clienti WHERE id = $1::bigint", [id]);
+  const clientValues = [id];
+  const clientWhere = await visibleClientWhere(user, clientValues, "c");
+  const clientResult = await pool.query(
+    `SELECT c.id FROM clienti c
+     WHERE c.id = $1::bigint
+       ${clientWhere}
+     LIMIT 1`,
+    clientValues
+  );
   const client = clientResult.rows[0];
-  if (!client) return null;
-  if (!roleSeesAllStores(user.ruolo)) {
-    const store = await storeForUser(user);
-    const access = await pool.query(
-      `SELECT 1
-       FROM clienti c
-       LEFT JOIN ${actsTable} a ON UPPER(a.codice_fiscale) = UPPER(c.codice_fiscale)
-       WHERE c.id = $1::bigint
-         AND (c.negozio_id = $2::bigint OR a.negozio_id = $2::bigint OR a.store = $3::text)
-       LIMIT 1`,
-      [id, store?.id || null, store?.nome || ""]
-    );
-    if (!access.rowCount) {
-      const error = new Error("Non autorizzato");
-      error.status = 403;
-      throw error;
-    }
+  if (!client) {
+    const existing = await pool.query("SELECT 1 FROM clienti WHERE id = $1::bigint LIMIT 1", [id]);
+    if (!existing.rowCount) return null;
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
   }
   const values = [id];
   const storeWhere = await visibleStoreWhere(user, values, "a");
@@ -15924,16 +17259,43 @@ async function reviewAurumShieldAlert(id, input = {}, user = {}) {
     "false_positive": "false_positive"
   };
   const status = statusMap[String(input.status || input.stato || "in_review").toLowerCase()] || "in_review";
-  const result = await pool.query(
-    `UPDATE aurum_shield_alerts
-     SET status = $2::text,
-         reviewed_by = $3::bigint,
-         reviewed_at = NOW()
-     WHERE id = $1::bigint
-     RETURNING *`,
-    [id, status, user.id || null]
-  );
-  return result.rows[0] || null;
+  return withDatabaseTransaction(async (db) => {
+    const existing = await db.query(
+      `SELECT al.*,
+              a.id AS access_act_id,
+              a.negozio_id AS access_store_id,
+              a.store AS access_store_name,
+              a.deleted_at AS access_act_deleted_at,
+              a.status AS access_act_status
+       FROM aurum_shield_alerts al
+       LEFT JOIN ${actsTable} a ON a.id = al.sale_deed_id
+       WHERE al.id = $1::bigint
+       FOR UPDATE OF al`,
+      [id]
+    );
+    if (!existing.rowCount) return null;
+    const alert = existing.rows[0];
+    if (!roleSeesAllStores(user.ruolo)) {
+      const accessibleAct = alert.sale_deed_id && alert.access_act_id && !alert.access_act_deleted_at
+        && normalizeWorkflowStatus(alert.access_act_status) !== "deleted"
+        && canAccessAct({ negozio_id: alert.access_store_id, store: alert.access_store_name }, user);
+      if (!accessibleAct) {
+        const error = new Error("Non autorizzato per la sede dell'alert");
+        error.status = 403;
+        throw error;
+      }
+    }
+    const result = await db.query(
+      `UPDATE aurum_shield_alerts
+       SET status = $2::text,
+           reviewed_by = $3::bigint,
+           reviewed_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [id, status, user.id || null]
+    );
+    return result.rows[0] || null;
+  });
 }
 
 async function dashboardAurumShieldStats(user = {}) {
@@ -17172,8 +18534,7 @@ async function listAurumBlocksLeaderboard(query = {}, user = {}) {
       const storeIdParam = values.length;
       where.push(`COALESCE(s.store_id, u.negozio_id) = $${storeIdParam}::bigint`);
     } else {
-      values.push(user.negozio || "");
-      where.push(`COALESCE(u.negozio, '') = $${values.length}::text`);
+      where.push("1 = 0");
     }
   } else if (query.store_id) {
     values.push(query.store_id);
@@ -21163,7 +22524,7 @@ async function canViewAcademyUser(userId, actor = {}) {
   if (["founder", "supervisore"].includes(role)) return true;
   if (role !== "responsabile") return false;
   const target = await findUserRawById(userId);
-  return target && String(target.negozio_id || target.negozio || "") === String(actor.negozio_id || actor.negozio || "");
+  return Boolean(target && usersSameStore(actor, target));
 }
 
 async function getAcademyProgressForUser(userId, actor = {}) {
@@ -21263,24 +22624,42 @@ async function completeAcademyLesson(input = {}, user = {}) {
 }
 
 async function updateAcademyProgress(id, input = {}, user = {}) {
-  const progress = (await pool.query("SELECT * FROM academy_user_progress WHERE id = $1::bigint LIMIT 1", [id])).rows[0];
-  if (!progress || !(await canViewAcademyUser(progress.user_id, user))) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
-  const result = await pool.query(
-    `UPDATE academy_user_progress
-     SET status = COALESCE(NULLIF($2::text, ''), status),
-         percentuale = COALESCE($3::numeric, percentuale),
-         last_access_at = NOW(),
-         completed_at = CASE WHEN COALESCE($3::numeric, percentuale) >= 100 THEN COALESCE(completed_at, NOW()) ELSE completed_at END,
-         updated_at = NOW()
-     WHERE id = $1::bigint
-     RETURNING *`,
-    [id, input.status || input.stato || "", input.percentuale ?? input.progress ?? null]
-  );
-  return result.rows[0] || null;
+  return withDatabaseTransaction(async (db) => {
+    const candidate = (await db.query(
+      "SELECT user_id FROM academy_user_progress WHERE id = $1::bigint LIMIT 1",
+      [id]
+    )).rows[0];
+    if (!candidate) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const lockedUsers = await lockAcademyMutationUsers(db, {
+      actorId: user.id,
+      targetUserId: candidate.user_id
+    });
+    const progress = (await db.query(
+      "SELECT * FROM academy_user_progress WHERE id = $1::bigint AND user_id = $2::bigint LIMIT 1 FOR UPDATE",
+      [id, candidate.user_id]
+    )).rows[0];
+    if (!progress || !academyMutationAccessAllowed(lockedUsers)) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const result = await db.query(
+      `UPDATE academy_user_progress
+       SET status = COALESCE(NULLIF($2::text, ''), status),
+           percentuale = COALESCE($3::numeric, percentuale),
+           last_access_at = NOW(),
+           completed_at = CASE WHEN COALESCE($3::numeric, percentuale) >= 100 THEN COALESCE(completed_at, NOW()) ELSE completed_at END,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [id, input.status || input.stato || "", input.percentuale ?? input.progress ?? null]
+    );
+    return result.rows[0] || null;
+  });
 }
 
 async function getAcademyLessonNote(lessonId, user = {}) {
@@ -21354,8 +22733,8 @@ function deterministicAcademyCourseCode(prefix = "OA", course = {}, userId = nul
   return `${prefix}-${String(seed).replace(/[^A-Z0-9-]/gi, "-").toUpperCase()}-${userId || "USER"}`;
 }
 
-async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examType = "online", score = null, payload = {} } = {}) {
-  const course = (await pool.query(
+async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examType = "online", score = null, payload = {} } = {}, db = pool) {
+  const course = (await db.query(
     `SELECT c.*, cat.name AS category_name
      FROM courses c
      LEFT JOIN course_categories cat ON cat.id = c.category_id
@@ -21369,7 +22748,7 @@ async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examTy
     throw error;
   }
 
-  await pool.query(
+  await db.query(
     `INSERT INTO user_course_progress
       (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
      VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
@@ -21377,7 +22756,7 @@ async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examTy
      DO UPDATE SET percentuale = 100, status = 'certificato', last_access_at = NOW(), completed_at = NOW(), updated_at = NOW()`,
     [courseId, userId]
   );
-  await pool.query(
+  await db.query(
     `INSERT INTO academy_user_progress
       (course_id, user_id, percentuale, status, started_at, last_access_at, completed_at)
      VALUES ($1::bigint, $2::bigint, 100, 'certificato', NOW(), NOW(), NOW())
@@ -21398,7 +22777,7 @@ async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examTy
     ...(payload.metadata || {})
   });
 
-  await pool.query(
+  await db.query(
     `INSERT INTO course_certificates (course_id, user_id, certificate_code, issued_by)
      VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint)
      ON CONFLICT (certificate_code)
@@ -21408,7 +22787,7 @@ async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examTy
                    revoked_at = NULL`,
     [courseId, userId, certificateCode, issuedBy || null]
   );
-  const certificate = (await pool.query(
+  const certificate = (await db.query(
     `INSERT INTO academy_certificates (course_id, user_id, certificate_code, issued_by, metadata)
      VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint, $5::jsonb)
      ON CONFLICT (certificate_code)
@@ -21419,7 +22798,7 @@ async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examTy
     [courseId, userId, certificateCode, issuedBy || null, certificateMetadata]
   )).rows[0];
 
-  await pool.query(
+  await db.query(
     `INSERT INTO course_badges (course_id, user_id, badge_name, badge_code, assigned_by)
      VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
      ON CONFLICT (badge_code)
@@ -21428,7 +22807,7 @@ async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examTy
                    assigned_by = COALESCE(EXCLUDED.assigned_by, course_badges.assigned_by)`,
     [courseId, userId, badgeName, badgeCode, issuedBy || null]
   );
-  const badge = (await pool.query(
+  const badge = (await db.query(
     `INSERT INTO academy_badges (course_id, user_id, badge_name, badge_code, assigned_by)
      VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
      ON CONFLICT (badge_code)
@@ -21439,7 +22818,7 @@ async function awardAcademyCourseCompletion({ courseId, userId, issuedBy, examTy
     [courseId, userId, badgeName, badgeCode, issuedBy || null]
   )).rows[0];
 
-  await recalculateAcademyOperatorLevel(userId);
+  await recalculateAcademyOperatorLevel(userId, db);
   if (oroactiveCourseSeedCode(course) === OROACTIVE_OPERATIVE_COURSE_CODE) {
     void createNotification({
       userId,
@@ -21638,41 +23017,42 @@ async function evaluateCourseExam(input = {}, user = {}) {
   if (Array.isArray(input.answers)) {
     return evaluateCourseFinalQuiz(input, user);
   }
-  if (!canEvaluateCourses(user)) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
   const targetUserId = input.user_id || user.id;
-  if (normalizeRole(user.ruolo) === "responsabile" && !(await canViewAcademyUser(targetUserId, user))) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
   const courseId = input.course_id || input.courseId;
   const examType = String(input.exam_type || "presenza").toLowerCase() === "live" ? "live" : "presenza";
   const esito = String(input.esito || "non_svolto").toLowerCase() === "superato" ? "superato" : String(input.esito || "non_svolto").toLowerCase() === "non_superato" ? "non_superato" : "non_svolto";
-  const exam = await pool.query(
-    `INSERT INTO course_exam_sessions (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
-     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint, NOW(), $6::text)
-     RETURNING *`,
-    [courseId, targetUserId, examType, esito, user.id, String(input.note || "")]
-  );
-  await pool.query(
-    `INSERT INTO academy_exam_results (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
-     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint, NOW(), $6::text)`,
-    [courseId, targetUserId, examType, esito, user.id, String(input.note || "")]
-  );
-  if (esito === "superato") {
-    await awardAcademyCourseCompletion({
-      courseId,
-      userId: targetUserId,
-      issuedBy: user.id,
-      examType,
-      payload: { awarded_from: "manual_exam_evaluation" }
+  return withDatabaseTransaction(async (db) => {
+    const lockedUsers = await lockAcademyMutationUsers(db, {
+      actorId: user.id,
+      targetUserId
     });
-  }
-  return exam.rows[0];
+    if (!academyMutationAccessAllowed(lockedUsers, { evaluatorOnly: true })) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const exam = await db.query(
+      `INSERT INTO course_exam_sessions (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint, NOW(), $6::text)
+       RETURNING *`,
+      [courseId, targetUserId, examType, esito, user.id, String(input.note || "")]
+    );
+    await db.query(
+      `INSERT INTO academy_exam_results (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint, NOW(), $6::text)`,
+      [courseId, targetUserId, examType, esito, user.id, String(input.note || "")]
+    );
+    if (esito === "superato") {
+      await awardAcademyCourseCompletion({
+        courseId,
+        userId: targetUserId,
+        issuedBy: user.id,
+        examType,
+        payload: { awarded_from: "manual_exam_evaluation" }
+      }, db);
+    }
+    return exam.rows[0];
+  });
 }
 
 async function listAcademyExams(query = {}, user = {}) {
@@ -21685,8 +23065,7 @@ async function listAcademyExams(query = {}, user = {}) {
   } else if (role === "responsabile") {
     values.push(user.negozio_id || null);
     const storeParam = `$${values.length}::bigint`;
-    values.push(user.negozio || "");
-    where.push(`(u.negozio_id = ${storeParam} OR u.negozio = $${values.length}::text)`);
+    where.push(`u.negozio_id = ${storeParam}`);
   } else if (query.user_id) {
     values.push(query.user_id);
     where.push(`e.user_id = $${values.length}::bigint`);
@@ -21725,8 +23104,7 @@ async function listAcademyCertificates(query = {}, user = {}) {
   } else if (role === "responsabile") {
     values.push(user.negozio_id || null);
     const storeParam = `$${values.length}::bigint`;
-    values.push(user.negozio || "");
-    where.push(`(u.negozio_id = ${storeParam} OR u.negozio = $${values.length}::text)`);
+    where.push(`u.negozio_id = ${storeParam}`);
   } else if (query.user_id) {
     values.push(query.user_id);
     where.push(`cert.user_id = $${values.length}::bigint`);
@@ -21745,33 +23123,53 @@ async function listAcademyCertificates(query = {}, user = {}) {
 }
 
 async function generateAcademyCertificate(input = {}, user = {}) {
-  if (!canEvaluateCourses(user)) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
   const courseId = input.course_id || input.courseId;
   const targetUserId = input.user_id || input.userId || user.id;
-  if (normalizeRole(user.ruolo) === "responsabile" && !(await canViewAcademyUser(targetUserId, user))) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
   const code = input.certificate_code || courseCode("CERT-OA");
-  const result = await pool.query(
-    `INSERT INTO academy_certificates (course_id, user_id, certificate_code, issued_by, metadata)
-     VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint, $5::jsonb)
-     ON CONFLICT (certificate_code) DO UPDATE SET status = 'valido'
-     RETURNING *`,
-    [courseId, targetUserId, code, user.id, sanitizeForPostgres(input.metadata || {})]
-  );
-  await pool.query(
-    `INSERT INTO course_certificates (course_id, user_id, certificate_code, issued_by)
-     VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint)
-     ON CONFLICT (certificate_code) DO NOTHING`,
-    [courseId, targetUserId, code, user.id]
-  );
-  return result.rows[0];
+  return withDatabaseTransaction(async (db) => {
+    const lockedUsers = await lockAcademyMutationUsers(db, {
+      actorId: user.id,
+      targetUserId
+    });
+    if (!academyMutationAccessAllowed(lockedUsers, { evaluatorOnly: true })) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const result = await db.query(
+      `INSERT INTO academy_certificates (course_id, user_id, certificate_code, issued_by, metadata)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint, $5::jsonb)
+       ON CONFLICT (certificate_code)
+       DO UPDATE SET status = 'valido'
+       WHERE academy_certificates.user_id = EXCLUDED.user_id
+         AND academy_certificates.course_id = EXCLUDED.course_id
+       RETURNING *`,
+      [courseId, targetUserId, code, user.id, sanitizeForPostgres(input.metadata || {})]
+    );
+    if (!result.rows[0]) {
+      const error = new Error("Codice certificato già assegnato a un altro corso o utente");
+      error.status = 409;
+      error.code = "ACADEMY_CERTIFICATE_CODE_CONFLICT";
+      throw error;
+    }
+    const courseCertificate = await db.query(
+      `INSERT INTO course_certificates (course_id, user_id, certificate_code, issued_by)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::bigint)
+       ON CONFLICT (certificate_code)
+       DO UPDATE SET status = 'valido'
+       WHERE course_certificates.user_id = EXCLUDED.user_id
+         AND course_certificates.course_id = EXCLUDED.course_id
+       RETURNING id`,
+      [courseId, targetUserId, code, user.id]
+    );
+    if (!courseCertificate.rows[0]) {
+      const error = new Error("Codice certificato già assegnato a un altro corso o utente");
+      error.status = 409;
+      error.code = "ACADEMY_CERTIFICATE_CODE_CONFLICT";
+      throw error;
+    }
+    return result.rows[0];
+  });
 }
 
 async function listAcademyBadges(query = {}, user = {}) {
@@ -21784,8 +23182,7 @@ async function listAcademyBadges(query = {}, user = {}) {
   } else if (role === "responsabile") {
     values.push(user.negozio_id || null);
     const storeParam = `$${values.length}::bigint`;
-    values.push(user.negozio || "");
-    where.push(`(u.negozio_id = ${storeParam} OR u.negozio = $${values.length}::text)`);
+    where.push(`u.negozio_id = ${storeParam}`);
   } else if (query.user_id) {
     values.push(query.user_id);
     where.push(`badge.user_id = $${values.length}::bigint`);
@@ -21803,26 +23200,27 @@ async function listAcademyBadges(query = {}, user = {}) {
 }
 
 async function assignAcademyBadge(input = {}, user = {}) {
-  if (!canEvaluateCourses(user)) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
   const targetUserId = input.user_id || input.userId;
-  if (normalizeRole(user.ruolo) === "responsabile" && !(await canViewAcademyUser(targetUserId, user))) {
-    const error = new Error("Non autorizzato");
-    error.status = 403;
-    throw error;
-  }
   const code = input.badge_code || courseCode("BADGE-OA");
-  const result = await pool.query(
-    `INSERT INTO academy_badges (course_id, user_id, badge_name, badge_code, assigned_by)
-     VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
-     RETURNING *`,
-    [input.course_id || input.courseId || null, targetUserId, input.badge_name || input.badgeName || "Badge OroActive Academy", code, user.id]
-  );
-  await recalculateAcademyOperatorLevel(targetUserId);
-  return result.rows[0];
+  return withDatabaseTransaction(async (db) => {
+    const lockedUsers = await lockAcademyMutationUsers(db, {
+      actorId: user.id,
+      targetUserId
+    });
+    if (!academyMutationAccessAllowed(lockedUsers, { evaluatorOnly: true })) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const result = await db.query(
+      `INSERT INTO academy_badges (course_id, user_id, badge_name, badge_code, assigned_by)
+       VALUES ($1::bigint, $2::bigint, $3::text, $4::text, $5::bigint)
+       RETURNING *`,
+      [input.course_id || input.courseId || null, targetUserId, input.badge_name || input.badgeName || "Badge OroActive Academy", code, user.id]
+    );
+    await recalculateAcademyOperatorLevel(targetUserId, db);
+    return result.rows[0];
+  });
 }
 
 async function revokeAcademyBadge(id, user = {}) {
@@ -21849,8 +23247,8 @@ function academyLevelFromCounts(certifiedCourses, badges, certificates) {
   return "Junior";
 }
 
-async function recalculateAcademyOperatorLevel(userId) {
-  const counts = await pool.query(
+async function recalculateAcademyOperatorLevel(userId, db = pool) {
+  const counts = await db.query(
     `SELECT
        (SELECT COUNT(*)::int FROM academy_user_progress WHERE user_id = $1::bigint AND status = 'certificato') AS certified_courses,
        (SELECT COUNT(*)::int FROM academy_badges WHERE user_id = $1::bigint AND status = 'valido') AS badges,
@@ -21859,7 +23257,7 @@ async function recalculateAcademyOperatorLevel(userId) {
   );
   const row = counts.rows[0] || {};
   const level = academyLevelFromCounts(row.certified_courses, row.badges, row.certificates);
-  const result = await pool.query(
+  const result = await db.query(
     `INSERT INTO academy_operator_levels
       (user_id, level_name, completed_courses, badges_count, certificates_count, updated_at)
      VALUES ($1::bigint, $2::text, $3::integer, $4::integer, $5::integer, NOW())
@@ -21888,7 +23286,10 @@ async function getCourseCertificate(id, user = {}) {
   const role = normalizeRole(user.ruolo);
   const values = [id];
   let where = "cert.id = $1::bigint";
-  if (!["founder", "responsabile"].includes(role)) {
+  if (role === "responsabile") {
+    values.push(user.negozio_id || null);
+    where += ` AND u.negozio_id = $${values.length}::bigint`;
+  } else if (!["founder", "supervisore"].includes(role)) {
     values.push(user.id);
     where += ` AND cert.user_id = $${values.length}::bigint`;
   }
@@ -21919,7 +23320,10 @@ async function getAcademyCertificateForPdf(id, user = {}) {
   const role = normalizeRole(user.ruolo);
   const values = [id];
   let where = "cert.id = $1::bigint";
-  if (!["founder", "responsabile"].includes(role)) {
+  if (role === "responsabile") {
+    values.push(user.negozio_id || null);
+    where += ` AND u.negozio_id = $${values.length}::bigint`;
+  } else if (!["founder", "supervisore"].includes(role)) {
     values.push(user.id);
     where += ` AND cert.user_id = $${values.length}::bigint`;
   }
@@ -22515,6 +23919,7 @@ async function listOperatorTrainingResults(user = {}, query = {}) {
 
 async function crmClients(user = {}, query = {}) {
   const values = [];
+  const clientWhere = await visibleClientWhere(user, values, "c");
   const storeWhere = await visibleStoreWhere(user, values, "a");
   let searchWhere = "";
   if (query.q) {
@@ -22538,11 +23943,12 @@ async function crmClients(user = {}, query = {}) {
             MAX(s.score) AS aurum_shield_max_score
      FROM clienti c
      LEFT JOIN ${actsTable} a ON UPPER(a.codice_fiscale) = UPPER(c.codice_fiscale)
+       AND a.negozio_id IS NOT DISTINCT FROM c.negozio_id
        AND a.deleted_at IS NULL
        AND COALESCE(a.status, '') NOT ILIKE 'deleted'
      LEFT JOIN aurum_shield_scores s ON s.sale_deed_id = a.id
      LEFT JOIN negozi n ON n.id = c.negozio_id
-     WHERE COALESCE(c.archiviato, FALSE) = FALSE ${storeWhere} ${searchWhere}
+     WHERE COALESCE(c.archiviato, FALSE) = FALSE ${clientWhere} ${storeWhere} ${searchWhere}
      GROUP BY c.id
      ORDER BY LOWER(COALESCE(c.cognome, '')) ASC, LOWER(COALESCE(c.nome, '')) ASC
      LIMIT 100`,
@@ -22564,31 +23970,36 @@ async function crmClients(user = {}, query = {}) {
 }
 
 async function crmClientDetail(id, user = {}) {
-  const clientResult = await pool.query("SELECT * FROM clienti WHERE id = $1", [id]);
+  const clientValues = [id];
+  const clientWhere = await visibleClientWhere(user, clientValues, "c");
+  const clientResult = await pool.query(
+    `SELECT c.* FROM clienti c
+     WHERE c.id = $1::bigint
+       ${clientWhere}
+     LIMIT 1`,
+    clientValues
+  );
   const client = clientResult.rows[0];
-  if (!client) return null;
-  if (!roleSeesAllStores(user.ruolo)) {
-    const store = await storeForUser(user);
-    const access = await pool.query(
-      `SELECT 1
-       FROM clienti c
-       LEFT JOIN ${actsTable} a ON UPPER(a.codice_fiscale) = UPPER(c.codice_fiscale)
-       WHERE c.id = $1::bigint
-         AND (c.negozio_id = $2::bigint OR a.negozio_id = $2::bigint OR a.store = $3::text)
-       LIMIT 1`,
-      [id, store?.id || null, store?.nome || ""]
-    );
-    if (!access.rowCount) {
-      const error = new Error("Non autorizzato");
-      error.status = 403;
-      throw error;
-    }
+  if (!client) {
+    const existing = await pool.query("SELECT 1 FROM clienti WHERE id = $1::bigint LIMIT 1", [id]);
+    if (!existing.rowCount) return null;
+    const error = new Error("Non autorizzato");
+    error.status = 403;
+    throw error;
   }
-  const values = [client.codice_fiscale || ""];
+  const values = [id, client.codice_fiscale || "", client.negozio_id || null];
   const storeWhere = await visibleStoreWhere(user, values, "a");
   const acts = await pool.query(
     `SELECT * FROM ${actsTable} a
-     WHERE UPPER(a.codice_fiscale) = UPPER($1) ${storeWhere}
+     WHERE (
+       a.cliente_id = $1::bigint
+       OR (
+         a.cliente_id IS NULL
+         AND UPPER(a.codice_fiscale) = UPPER($2::text)
+       )
+     )
+       AND a.negozio_id IS NOT DISTINCT FROM $3::bigint
+       ${storeWhere}
      ORDER BY a.data_atto DESC NULLS LAST`,
     values
   );
@@ -22610,12 +24021,26 @@ async function crmClientDetail(id, user = {}) {
 }
 
 async function addClientNote(id, input = {}, user = {}, req = null) {
-  const result = await pool.query(
-    `INSERT INTO client_notes (cliente_id, user_id, note)
-     VALUES ($1,$2,$3)
-     RETURNING *`,
-    [id, user.id, input.note || ""]
-  );
+  const note = input.note || "";
+  const result = await withDatabaseTransaction(async (db) => {
+    const values = [id, user.id, note];
+    const clientWhere = await visibleClientWhere(user, values, "c", db);
+    const inserted = await db.query(
+      `INSERT INTO client_notes (cliente_id, user_id, note)
+       SELECT c.id, $2::bigint, $3::text
+       FROM clienti c
+       WHERE c.id = $1::bigint
+         ${clientWhere}
+       RETURNING *`,
+      values
+    );
+    if (inserted.rowCount) return inserted.rows[0];
+
+    const existing = await db.query("SELECT 1 FROM clienti WHERE id = $1::bigint LIMIT 1", [id]);
+    const error = new Error(existing.rowCount ? "Non autorizzato" : "Cliente non trovato");
+    error.status = existing.rowCount ? 403 : 404;
+    throw error;
+  });
   void writeAuditLog({
     req,
     user,
@@ -22623,66 +24048,87 @@ async function addClientNote(id, input = {}, user = {}, req = null) {
     entityType: "cliente",
     entityId: id,
     entityLabel: `Cliente ${id}`,
-    afterData: { note: input.note || "" },
+    afterData: { note },
     metadata: { client_id: id }
   });
-  return result.rows[0];
+  return result;
+}
+
+async function lockVisibleCrmClient(id, user = {}, db = pool) {
+  const values = [id];
+  const clientWhere = await visibleClientWhere(user, values, "c", db);
+  const result = await db.query(
+    `SELECT c.* FROM clienti c
+     WHERE c.id = $1::bigint
+       ${clientWhere}
+     LIMIT 1
+     FOR UPDATE`,
+    values
+  );
+  if (result.rowCount) return result.rows[0];
+  const existing = await db.query("SELECT 1 FROM clienti WHERE id = $1::bigint LIMIT 1", [id]);
+  const error = new Error(existing.rowCount ? "Non autorizzato" : "Cliente non trovato");
+  error.status = existing.rowCount ? 403 : 404;
+  throw error;
 }
 
 async function updateCrmClient(id, input = {}, user = {}, req = null) {
-  const detail = await crmClientDetail(id, user);
-  if (!detail) return null;
-  const payload = {
-    ...(detail.client || {}),
-    birthDate: input.birthDate || input.data_nascita || detail.client.birthDate || "",
-    birthPlace: input.birthPlace || input.luogo_nascita || detail.client.birthPlace || "",
-    residenceProvince: input.province || input.provincia || detail.client.province || "",
-    address: input.address || input.indirizzo || detail.client.address || "",
-    documentType: input.documentType || input.documento_tipo || detail.client.documentType || "",
-    documentNumber: input.documentNumber || input.documento_numero || detail.client.documentNumber || "",
-    paymentMethod: input.paymentMethod || input.metodo_pagamento || detail.client.paymentMethod || "",
-    accountHolder: input.accountHolder || input.intestatario_conto || detail.client.accountHolder || ""
-  };
-  const result = await pool.query(
-    `UPDATE clienti
-     SET nome = COALESCE(NULLIF($2::text, ''), nome),
-         cognome = COALESCE(NULLIF($3::text, ''), cognome),
-         codice_fiscale = COALESCE(NULLIF(UPPER($4::text), ''), codice_fiscale),
-         telefono = COALESCE(NULLIF($5::text, ''), telefono),
-         email = COALESCE(NULLIF($6::text, ''), email),
-         iban = COALESCE(NULLIF($7::text, ''), iban),
-         indirizzo = COALESCE(NULLIF($8::text, ''), indirizzo),
-         provincia = COALESCE(NULLIF($9::text, ''), provincia),
-         documento_tipo = COALESCE(NULLIF($10::text, ''), documento_tipo),
-         documento_numero = COALESCE(NULLIF($11::text, ''), documento_numero),
-         metodo_pagamento = COALESCE(NULLIF($12::text, ''), metodo_pagamento),
-         intestatario_conto = COALESCE(NULLIF($13::text, ''), intestatario_conto),
-         livello_cliente = COALESCE(NULLIF($14::text, ''), livello_cliente),
-         note_interne = COALESCE($15::text, note_interne),
-         payload = COALESCE(payload, '{}'::jsonb) || $16::jsonb,
-         updated_at = NOW()
-     WHERE id = $1::bigint
-     RETURNING *`,
-    [
-      id,
-      input.name || input.nome || "",
-      input.surname || input.cognome || "",
-      input.fiscalCode || input.codice_fiscale || "",
-      input.phone || input.telefono || "",
-      input.email || "",
-      input.iban || "",
-      input.address || input.indirizzo || "",
-      input.province || input.provincia || "",
-      input.documentType || input.documento_tipo || "",
-      input.documentNumber || input.documento_numero || "",
-      input.paymentMethod || input.metodo_pagamento || "",
-      input.accountHolder || input.intestatario_conto || "",
-      input.level || input.livello_cliente || "",
-      input.notes || input.note_interne || "",
-      sanitizeForPostgres(payload)
-    ]
-  );
-  const updated = publicClient(result.rows[0]);
+  const transaction = await withDatabaseTransaction(async (db) => {
+    const locked = await lockVisibleCrmClient(id, user, db);
+    const before = publicClient(locked);
+    const payload = {
+      ...before,
+      birthDate: input.birthDate || input.data_nascita || before.birthDate || "",
+      birthPlace: input.birthPlace || input.luogo_nascita || before.birthPlace || "",
+      residenceProvince: input.province || input.provincia || before.province || "",
+      address: input.address || input.indirizzo || before.address || "",
+      documentType: input.documentType || input.documento_tipo || before.documentType || "",
+      documentNumber: input.documentNumber || input.documento_numero || before.documentNumber || "",
+      paymentMethod: input.paymentMethod || input.metodo_pagamento || before.paymentMethod || "",
+      accountHolder: input.accountHolder || input.intestatario_conto || before.accountHolder || ""
+    };
+    const result = await db.query(
+      `UPDATE clienti
+       SET nome = COALESCE(NULLIF($2::text, ''), nome),
+           cognome = COALESCE(NULLIF($3::text, ''), cognome),
+           codice_fiscale = COALESCE(NULLIF(UPPER($4::text), ''), codice_fiscale),
+           telefono = COALESCE(NULLIF($5::text, ''), telefono),
+           email = COALESCE(NULLIF($6::text, ''), email),
+           iban = COALESCE(NULLIF($7::text, ''), iban),
+           indirizzo = COALESCE(NULLIF($8::text, ''), indirizzo),
+           provincia = COALESCE(NULLIF($9::text, ''), provincia),
+           documento_tipo = COALESCE(NULLIF($10::text, ''), documento_tipo),
+           documento_numero = COALESCE(NULLIF($11::text, ''), documento_numero),
+           metodo_pagamento = COALESCE(NULLIF($12::text, ''), metodo_pagamento),
+           intestatario_conto = COALESCE(NULLIF($13::text, ''), intestatario_conto),
+           livello_cliente = COALESCE(NULLIF($14::text, ''), livello_cliente),
+           note_interne = COALESCE($15::text, note_interne),
+           payload = COALESCE(payload, '{}'::jsonb) || $16::jsonb,
+           updated_at = NOW()
+       WHERE id = $1::bigint
+       RETURNING *`,
+      [
+        id,
+        input.name || input.nome || "",
+        input.surname || input.cognome || "",
+        input.fiscalCode || input.codice_fiscale || "",
+        input.phone || input.telefono || "",
+        input.email || "",
+        input.iban || "",
+        input.address || input.indirizzo || "",
+        input.province || input.provincia || "",
+        input.documentType || input.documento_tipo || "",
+        input.documentNumber || input.documento_numero || "",
+        input.paymentMethod || input.metodo_pagamento || "",
+        input.accountHolder || input.intestatario_conto || "",
+        input.level || input.livello_cliente || "",
+        input.notes || input.note_interne || "",
+        sanitizeForPostgres(payload)
+      ]
+    );
+    return { before, updated: publicClient(result.rows[0]) };
+  });
+  const { before, updated } = transaction;
   void writeAuditLog({
     req,
     user,
@@ -22690,11 +24136,11 @@ async function updateCrmClient(id, input = {}, user = {}, req = null) {
     entityType: "cliente",
     entityId: id,
     entityLabel: [updated.name, updated.surname].filter(Boolean).join(" ") || `Cliente ${id}`,
-    beforeData: detail.client,
+    beforeData: before,
     afterData: updated,
-    metadata: { client_id: id, changed_fields: auditChangedFields(detail.client || {}, updated || {}) }
+    metadata: { client_id: id, changed_fields: auditChangedFields(before || {}, updated || {}) }
   });
-  if ((detail.client?.iban || "") !== (updated.iban || "") || (detail.client?.accountHolder || "") !== (updated.accountHolder || "")) {
+  if ((before.iban || "") !== (updated.iban || "") || (before.accountHolder || "") !== (updated.accountHolder || "")) {
     void writeAuditLog({
       req,
       user,
@@ -22702,7 +24148,7 @@ async function updateCrmClient(id, input = {}, user = {}, req = null) {
       entityType: "cliente",
       entityId: id,
       entityLabel: [updated.name, updated.surname].filter(Boolean).join(" ") || `Cliente ${id}`,
-      beforeData: { iban: detail.client?.iban || "", accountHolder: detail.client?.accountHolder || "" },
+      beforeData: { iban: before.iban || "", accountHolder: before.accountHolder || "" },
       afterData: { iban: updated.iban || "", accountHolder: updated.accountHolder || "" },
       metadata: { client_id: id, critical: true }
     });
@@ -22711,26 +24157,29 @@ async function updateCrmClient(id, input = {}, user = {}, req = null) {
 }
 
 async function archiveCrmClient(id, user = {}, req = null) {
-  const detail = await crmClientDetail(id, user);
-  if (!detail) return false;
-  const result = await pool.query(
-    "UPDATE clienti SET archiviato = TRUE, updated_at = NOW() WHERE id = $1::bigint RETURNING id",
-    [id]
-  );
-  if (result.rowCount) {
+  const transaction = await withDatabaseTransaction(async (db) => {
+    const locked = await lockVisibleCrmClient(id, user, db);
+    const before = publicClient(locked);
+    const result = await db.query(
+      "UPDATE clienti SET archiviato = TRUE, updated_at = NOW() WHERE id = $1::bigint RETURNING id",
+      [id]
+    );
+    return { before, archived: result.rowCount > 0 };
+  });
+  if (transaction.archived) {
     void writeAuditLog({
       req,
       user,
       action: "delete_crm_client",
       entityType: "cliente",
       entityId: id,
-      entityLabel: [detail.client?.name, detail.client?.surname].filter(Boolean).join(" ") || `Cliente ${id}`,
-      beforeData: detail.client,
+      entityLabel: [transaction.before?.name, transaction.before?.surname].filter(Boolean).join(" ") || `Cliente ${id}`,
+      beforeData: transaction.before,
       afterData: { archiviato: true },
       metadata: { client_id: id, critical: true }
     });
   }
-  return result.rowCount > 0;
+  return transaction.archived;
 }
 
 async function createInventoryTransfer(input = {}, user = {}) {
@@ -22843,7 +24292,7 @@ function stockSummaryFromActs(acts = []) {
 }
 
 async function saveAct(input, user, req = null) {
-  const protectedInput = enforceActStore(input, user);
+  const protectedInput = await enforceActStore(input, user);
   const existing = protectedInput.id
     ? await findExisting(protectedInput.id)
     : protectedInput.practiceNumber
@@ -23094,7 +24543,8 @@ async function updateAct(identifier, input, user, req = null) {
     throw error;
   }
   const beforeAct = rowToAct(existing, { full: false });
-  const act = await enrichActStore(normalizeAct(enforceActStore(input, user), existing), user);
+  const protectedInput = await enforceActStore(input, user);
+  const act = await enrichActStore(normalizeAct(protectedInput, existing), user);
   const normalizedStatus = normalizeWorkflowStatus(act.status);
   const suspension = normalizedStatus === "suspended" ? suspensionDataFromAct(act) : { reason: "", reasons: [] };
   if (normalizedStatus === "suspended") {
@@ -23171,6 +24621,19 @@ async function updateAct(identifier, input, user, req = null) {
     if (!canAccessAct(lockedExisting, user) || !canEditAct(lockedExisting, user)) throw completedActEditError();
     if (String(lockedExisting.row_version || "") !== String(existing.row_version || "")) {
       throw concurrentActEditError();
+    }
+    if (String(lockedExisting.negozio_id || "") !== String(act.negozioId || "")) {
+      const pendingApproval = await db.query(
+        `SELECT 1 FROM approval_requests
+         WHERE sale_deed_id = $1::bigint AND status = 'pending'
+         LIMIT 1 FOR UPDATE`,
+        [lockedExisting.id]
+      );
+      if (pendingApproval.rowCount) {
+        const error = new Error("La sede non può essere cambiata finché esiste una richiesta di autorizzazione pendente.");
+        error.status = 409;
+        throw error;
+      }
     }
     await lockCashTransactionIdentity(db, act, lockedExisting);
     await enforceCashAntiMoneyLaundering(act, user, lockedExisting, {
@@ -23456,31 +24919,32 @@ async function updateAct(identifier, input, user, req = null) {
 }
 
 async function deleteAct(identifier, user, req = null) {
-  const existing = await findExisting(identifier);
-  if (!existing) return false;
-  if (!canAccessAct(existing, user)) {
-    const error = new Error("Atto non accessibile per il negozio assegnato");
-    error.status = 403;
-    throw error;
-  }
-  if (!canReviewActs(user)) {
-    const error = new Error("Eliminazione riservata a Responsabile o Elite");
-    error.status = 403;
-    throw error;
-  }
-  const result = await pool.query(
-    `UPDATE ${actsTable}
-     SET status = 'deleted',
-         deleted_at = COALESCE(deleted_at, NOW()),
-         deleted_by = $2::bigint,
-         updated_at = NOW(),
-         payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('deletedBy', $2::bigint, 'deletedAt', NOW())
-     WHERE id = $1::bigint
-     RETURNING id`,
-    [existing.id, user?.id || null]
-  );
-  if (result.rowCount) {
-    await pool.query(
+  const transaction = await withDatabaseTransaction(async (db) => {
+    const existing = await findExisting(identifier, db, { forUpdate: true });
+    if (!existing) return null;
+    if (!canAccessAct(existing, user)) {
+      const error = new Error("Atto non accessibile per il negozio assegnato");
+      error.status = 403;
+      throw error;
+    }
+    if (!canReviewActs(user)) {
+      const error = new Error("Eliminazione riservata a Responsabile o Elite");
+      error.status = 403;
+      throw error;
+    }
+    const result = await db.query(
+      `UPDATE ${actsTable}
+       SET status = 'deleted',
+           deleted_at = COALESCE(deleted_at, NOW()),
+           deleted_by = $2::bigint,
+           updated_at = NOW(),
+           payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('deletedBy', $2::bigint, 'deletedAt', NOW())
+       WHERE id = $1::bigint
+       RETURNING id`,
+      [existing.id, user?.id || null]
+    );
+    if (!result.rowCount) return { existing, deleted: false };
+    await db.query(
       `UPDATE antifrode_alerts
        SET stato = 'atto_eliminato',
            reviewed_by = $2::bigint,
@@ -23488,10 +24952,8 @@ async function deleteAct(identifier, user, req = null) {
        WHERE atto_id = $1::bigint
          AND stato IN ('nuovo', 'in verifica')`,
       [existing.id, user?.id || null]
-    ).catch((error) => {
-      console.error("ANTIFRAUD DELETE SYNC ERROR", error);
-    });
-    await pool.query(
+    );
+    await db.query(
       `UPDATE aurum_shield_alerts
        SET status = 'atto_eliminato',
            reviewed_by = $2::bigint,
@@ -23499,9 +24961,12 @@ async function deleteAct(identifier, user, req = null) {
        WHERE sale_deed_id = $1::bigint
          AND status IN ('open', 'in_review', 'in verifica')`,
       [existing.id, user?.id || null]
-    ).catch((error) => {
-      console.error("AURUM SHIELD DELETE SYNC ERROR", error);
-    });
+    );
+    return { existing, deleted: true };
+  });
+  if (!transaction) return false;
+  const { existing, deleted } = transaction;
+  if (deleted) {
     void logUserActivity({
       userId: user?.id,
       actorId: user?.id,
@@ -23545,7 +25010,7 @@ async function deleteAct(identifier, user, req = null) {
     void createNotification({ ...notificationInput, targetRole: "founder" });
     void createNotification({ ...notificationInput, targetRole: "responsabile", storeId: existing.negozio_id || null });
   }
-  return result.rowCount > 0;
+  return deleted;
 }
 
 async function createUser(input, actor, req = null) {
@@ -23587,7 +25052,6 @@ async function createUser(input, actor, req = null) {
     throw error;
   }
   const actorRole = normalizeRole(actor?.ruolo);
-  const passwordHash = await bcrypt.hash(password, 12);
   const allowedRoles = managedRolesForActor(actor);
   if (!allowedRoles.includes(role)) {
     void writeAuditLog({
@@ -23612,7 +25076,7 @@ async function createUser(input, actor, req = null) {
     ? null
     : actorRole === "responsabile"
       ? actorStore
-      : await storeByCodeOrName(input.negozio || input.negozio_id || "Busto Arsizio");
+      : await storeByCodeOrName(input.negozio_id ?? input.negozio ?? "Busto Arsizio");
   if (!roleSeesAllStores(finalRole) && !store) {
     const error = new Error("Negozio assegnato non valido");
     error.status = 400;
@@ -23634,6 +25098,9 @@ async function createUser(input, actor, req = null) {
     error.status = 409;
     throw error;
   }
+  // L'hash è intenzionalmente dopo tutti i controlli economici e di
+  // autorizzazione: richieste vietate o duplicate non consumano CPU bcrypt.
+  const passwordHash = await bcrypt.hash(password, 12);
   const result = await pool.query(
     `INSERT INTO utenti (nome, cognome, username, email, password_hash, ruolo, negozio, negozio_id, telefono, note, attivo)
      VALUES ($1::text, $2::text, NULLIF($3::text, ''), LOWER($4::text), $5::text, $6::text, $7::text, $8::bigint, $9::text, $10::text, $11::boolean)
@@ -23704,9 +25171,7 @@ function assertCanManageTarget(actor, target, requestedRole = target?.ruolo) {
     throw error;
   }
   const allowedRoles = managedRolesForActor(actor);
-  const sameStore = !actor?.negozio_id
-    ? String(target?.negozio || "") === String(actor?.negozio || "")
-    : String(target?.negozio_id || "") === String(actor.negozio_id);
+  const sameStore = usersSameStore(actor, target);
   if (
     allowedRoles.includes(targetRole)
     && allowedRoles.includes(normalizeRole(requestedRole))
@@ -23728,15 +25193,31 @@ function canUseRequestedRoleForUpdate(actor, target, requestedRole) {
 }
 
 async function updateUser(id, input, actor, req = null) {
-  const target = await findUserRawById(id);
+  return withDatabaseTransaction(async (db) => {
+  const lockedUsers = await db.query(
+    `SELECT *
+     FROM utenti
+     WHERE id = $1::bigint OR id = $2::bigint
+     ORDER BY id
+     FOR UPDATE`,
+    [id, actor?.id || null]
+  );
+  const target = lockedUsers.rows.find((row) => String(row.id) === String(id));
   if (!target) return null;
+  const currentActor = lockedUsers.rows.find((row) => String(row.id) === String(actor?.id));
+  if (!currentActor || currentActor.attivo === false) {
+    const error = new Error("Sessione amministrativa non più valida");
+    error.status = 401;
+    error.code = "SESSION_REVOKED";
+    throw error;
+  }
   const beforeUser = publicUser(target);
   const targetIsFounder = normalizeRole(target.ruolo) === "founder";
   if (!targetIsFounder) {
     delete input.email;
   }
   const requestedRole = input.ruolo || input.role || target.ruolo;
-  assertCanManageTarget(actor, target, requestedRole);
+  assertCanManageTarget(currentActor, target, requestedRole);
   if ((input.nome !== undefined || input.name !== undefined) && !String(input.nome || input.name || "").trim()) {
     const error = new Error("Nome utente obbligatorio");
     error.status = 400;
@@ -23752,7 +25233,7 @@ async function updateUser(id, input, actor, req = null) {
     error.status = 400;
     throw error;
   }
-  if ((input.ruolo !== undefined || input.role !== undefined) && !canUseRequestedRoleForUpdate(actor, target, input.ruolo || input.role)) {
+  if ((input.ruolo !== undefined || input.role !== undefined) && !canUseRequestedRoleForUpdate(currentActor, target, input.ruolo || input.role)) {
     const error = new Error("Non autorizzato");
     error.status = 403;
     throw error;
@@ -23762,28 +25243,43 @@ async function updateUser(id, input, actor, req = null) {
     error.status = 400;
     throw error;
   }
+  if (input.password !== undefined) {
+    const password = String(input.password || "");
+    if (password.length > 0 && password.length < 8) {
+      const error = new Error("La password deve avere almeno 8 caratteri");
+      error.status = 400;
+      throw error;
+    }
+  }
   const fields = [];
   const values = [];
-  const allowed = ["nome", "cognome", "username", "email", "ruolo", "negozio", "telefono", "note", "attivo"];
+  const allowed = ["nome", "cognome", "username", "email", "ruolo", "telefono", "note", "attivo"];
   if (input.name !== undefined && input.nome === undefined) input.nome = input.name;
   if (input.surname !== undefined && input.cognome === undefined) input.cognome = input.surname;
   if (input.role !== undefined && input.ruolo === undefined) input.ruolo = input.role;
+  const assignmentTouched = input.negozio !== undefined || input.negozio_id !== undefined || input.ruolo !== undefined;
+  const finalRole = normalizeRole(input.ruolo || target.ruolo);
   let selectedStore = null;
-  if (input.negozio !== undefined || input.negozio_id !== undefined) {
-    selectedStore = normalizeRole(actor?.ruolo) === "responsabile"
-      ? await storeForUser(actor)
-      : await storeByCodeOrName(input.negozio_id || input.negozio);
-    const finalRole = normalizeRole(input.ruolo || target.ruolo);
-    if (!roleSeesAllStores(finalRole) && !selectedStore) {
+  if (assignmentTouched && !roleSeesAllStores(finalRole)) {
+    const requestedStore = input.negozio_id ?? input.negozio ?? target.negozio_id ?? target.negozio;
+    selectedStore = normalizeRole(currentActor?.ruolo) === "responsabile"
+      ? await storeForUser(currentActor, db)
+      : await storeByCodeOrName(requestedStore, db);
+    if (!selectedStore) {
       const error = new Error("Negozio assegnato non valido");
       error.status = 400;
       throw error;
     }
   }
+  const finalStoreId = roleSeesAllStores(finalRole) ? null : selectedStore?.id || target.negozio_id || null;
+  const assignmentChanged = assignmentTouched && (
+    normalizeRole(target.ruolo) !== finalRole
+    || String(target.negozio_id || "") !== String(finalStoreId || "")
+  );
   const nextEmail = input.email !== undefined ? String(input.email || "").trim() || target.email : target.email;
   const nextUsername = input.username !== undefined ? String(input.username || "").trim() : target.username;
   if (input.email !== undefined || input.username !== undefined) {
-    const duplicate = await pool.query(
+    const duplicate = await db.query(
       `SELECT id FROM utenti
        WHERE id <> $1::bigint
          AND (
@@ -23803,9 +25299,6 @@ async function updateUser(id, input, actor, req = null) {
     if (input[field] === undefined) return;
     let value = input[field];
     if (field === "ruolo") value = normalizeRole(value);
-    if (field === "negozio") {
-      value = roleSeesAllStores(input.ruolo || target.ruolo) ? "Tutti" : selectedStore?.nome || value;
-    }
     if (field === "email") value = String(value || "").trim() || target.email;
     if (field === "username" && !value) value = null;
     if (field === "attivo") {
@@ -23816,9 +25309,10 @@ async function updateUser(id, input, actor, req = null) {
     values.push(value === undefined ? null : value);
     fields.push(`${field} = ${field === "email" ? `LOWER($${values.length}::text)` : `$${values.length}::text`}`);
   });
-  if (input.negozio !== undefined || input.negozio_id !== undefined || input.ruolo !== undefined) {
-    const finalRole = normalizeRole(input.ruolo || target.ruolo);
-    values.push(roleSeesAllStores(finalRole) ? null : selectedStore?.id || target.negozio_id || null);
+  if (assignmentTouched) {
+    values.push(roleSeesAllStores(finalRole) ? "Tutti" : selectedStore.nome);
+    fields.push(`negozio = $${values.length}::text`);
+    values.push(finalStoreId);
     fields.push(`negozio_id = $${values.length}::bigint`);
   }
 
@@ -23826,13 +25320,16 @@ async function updateUser(id, input, actor, req = null) {
     values.push(await bcrypt.hash(String(input.password), 12));
     fields.push(`password_hash = $${values.length}::text`);
   }
+  if (input.password || input.attivo === false || input.attivo === "false" || assignmentChanged) {
+    fields.push("session_version = COALESCE(session_version, 0) + 1");
+  }
 
-  if (!fields.length) return findUserById(id);
+  if (!fields.length) return publicUser(target);
   fields.push("updated_at = NOW()");
   values.push(id);
-  const result = await pool.query(
+  const result = await db.query(
     `UPDATE utenti SET ${fields.join(", ")} WHERE id = $${values.length}::bigint
-     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen`,
+     RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen, session_version`,
     values
   );
   if (result.rowCount) {
@@ -23915,6 +25412,7 @@ async function updateUser(id, input, actor, req = null) {
     });
   }
   return result.rowCount ? publicUser(result.rows[0]) : null;
+  });
 }
 
 async function listUsers(options = {}) {
@@ -23947,9 +25445,9 @@ async function listUsersForActor(actor) {
        FROM utenti
        WHERE COALESCE(attivo, TRUE) = TRUE
          AND ruolo = ANY($1::text[])
-         AND (negozio_id = $2::bigint OR negozio = $3::text)
+         AND negozio_id = $2::bigint
        ORDER BY data_creazione DESC`,
-      [["commesso", "aiuto_commesso"], actor.negozio_id || null, actor.negozio || ""]
+      [["commesso", "aiuto_commesso"], actor.negozio_id || null]
     );
     return result.rows.map((row) => publicUserForActor(row, actor));
   }
@@ -23962,12 +25460,12 @@ async function listUsersForActor(actor) {
           id = $1::bigint
           OR (
             ruolo = ANY($2::text[])
-            AND (negozio_id = $3::bigint OR negozio = $4::text)
+            AND negozio_id = $3::bigint
             AND last_seen >= NOW() - INTERVAL '2 minutes'
           )
          )
        ORDER BY (id = $1::bigint) DESC, last_seen DESC NULLS LAST, data_creazione DESC`,
-      [actor.id, ["commesso", "aiuto_commesso"], actor.negozio_id || null, actor.negozio || ""]
+      [actor.id, ["commesso", "aiuto_commesso"], actor.negozio_id || null]
     );
     return result.rows.map((row) => publicUserForActor(row, actor));
   }
@@ -23999,21 +25497,38 @@ async function listUserActivitiesForActor(id, actor) {
     error.status = 403;
     throw error;
   }
+  const values = [id, String(id)];
+  const conditions = [
+    `(al.user_id = $1::bigint
+      OR (al.entity_type = 'utente' AND al.entity_id = $2::text)
+      OR (al.metadata->>'target_user_id') = $2::text)`
+  ];
+  addAuditVisibilityWhere(actor, conditions, values, "al");
   const result = await pool.query(
     `SELECT al.*
      FROM audit_logs al
-     WHERE al.user_id = $1::bigint
-        OR (al.entity_type = 'utente' AND al.entity_id = $2::text)
-        OR (al.metadata->>'target_user_id') = $2::text
+     WHERE ${conditions.join(" AND ")}
      ORDER BY al.created_at DESC, al.id DESC
      LIMIT 100`,
-    [id, String(id)]
+    values
   );
   return result.rows.map(publicAuditLog);
 }
 
 async function deleteUser(id, actor, req = null) {
-  const actorRole = normalizeRole(actor?.ruolo);
+  return withDatabaseTransaction(async (db) => {
+  const lockedUsers = await db.query(
+    `SELECT *
+     FROM utenti
+     WHERE id = $1::bigint
+        OR id = $2::bigint
+        OR (LOWER(COALESCE(ruolo, '')) = 'founder' AND COALESCE(attivo, TRUE) = TRUE)
+     ORDER BY id
+     FOR UPDATE`,
+    [id, actor?.id || null]
+  );
+  const currentActor = lockedUsers.rows.find((row) => String(row.id) === String(actor?.id));
+  const actorRole = normalizeRole(currentActor?.ruolo);
   if (actorRole !== "founder") {
     void writeAuditLog({
       req,
@@ -24033,10 +25548,10 @@ async function deleteUser(id, actor, req = null) {
     error.status = 400;
     throw error;
   }
-  const target = await findUserRawById(id);
+  const target = lockedUsers.rows.find((row) => String(row.id) === String(id));
   if (!target || target.attivo === false) return false;
   if (normalizeRole(target.ruolo) === "founder") {
-    const activeFounders = await pool.query(
+    const activeFounders = await db.query(
       "SELECT COUNT(*)::int AS total FROM utenti WHERE LOWER(COALESCE(ruolo, '')) = 'founder' AND COALESCE(attivo, TRUE) = TRUE"
     );
     if (Number(activeFounders.rows[0]?.total || 0) <= 1) {
@@ -24045,9 +25560,10 @@ async function deleteUser(id, actor, req = null) {
       throw error;
     }
   }
-  const result = await pool.query(
+  const result = await db.query(
     `UPDATE utenti
      SET attivo = FALSE,
+         session_version = COALESCE(session_version, 0) + 1,
          updated_at = NOW()
      WHERE id = $1::bigint
      RETURNING id, nome, cognome, username, email, telefono, note, attivo, ruolo, negozio, negozio_id, face_id_credential, data_creazione, updated_at, last_seen`,
@@ -24101,6 +25617,7 @@ async function deleteUser(id, actor, req = null) {
     });
   }
   return result.rowCount > 0;
+  });
 }
 
 async function loginUser(identifier, password, req = null) {
@@ -24124,6 +25641,7 @@ async function loginUser(identifier, password, req = null) {
     error.status = 403;
     throw error;
   }
+  await assertUserHasActiveStore(user);
   await touchUserLastSeen(user, { force: true });
   const safeUser = publicUser(user);
   void logUserActivity({
@@ -24144,7 +25662,7 @@ async function loginUser(identifier, password, req = null) {
     afterData: safeUser,
     metadata: { login_method: "password" }
   });
-  const token = signUserToken(safeUser);
+  const token = signUserToken(user);
   return {
     ok: true,
     token,
@@ -24157,6 +25675,12 @@ async function loginUser(identifier, password, req = null) {
 
 async function loginWithWebAuthn(credential, req = null) {
   const user = await webAuthnStore.verifyAuthentication(credential);
+  if (user.attivo === false) {
+    const error = new Error("Utente non attivo");
+    error.status = 403;
+    throw error;
+  }
+  await assertUserHasActiveStore(user);
   await touchUserLastSeen(user, { force: true });
   const safeUser = publicUser(user);
   void logUserActivity({
@@ -24177,7 +25701,7 @@ async function loginWithWebAuthn(credential, req = null) {
     afterData: safeUser,
     metadata: { login_method: "webauthn" }
   });
-  const token = signUserToken(safeUser);
+  const token = signUserToken(user);
   return {
     ok: true,
     token,
@@ -24192,7 +25716,10 @@ async function userFromAuthorizationHeader(header = "") {
   const [, token] = String(header || "").match(/^Bearer\s+(.+)$/i) || [];
   if (!token) return null;
   const decoded = jwt.verify(token, jwtSecret);
-  return findUserById(decoded.sub);
+  const user = await findUserById(decoded.sub);
+  if (!user || user.attivo === false || Number(decoded.sv || 0) !== Number(user.session_version || 0)) return null;
+  if (!roleSeesAllStores(user.ruolo) && !(await storeForUser(user))) return null;
+  return { ...user, session_token_version: Number(decoded.sv || 0) };
 }
 
 async function checkDatabaseReadiness() {
@@ -24261,6 +25788,8 @@ app.get("/api/health", async (_request, response) => {
     status,
     database: databaseReady ? "ready" : databaseReachable ? "reachable" : "unavailable",
     initialization: initializationReady ? "ready" : runtimeStatus.initializationError ? "failed" : "in_progress",
+    persistent_upload_storage: runtimeStatus.uploadStorageReady ? "ready" : "unavailable",
+    persistent_backup_storage: runtimeStatus.backupStorageReady ? "ready" : "unavailable",
     database_error: databaseReady
       ? null
       : runtimeStatus.initializationError
@@ -24376,6 +25905,16 @@ app.post("/api/auth/logout", async (request, response) => {
   try {
     const user = await userFromAuthorizationHeader(request.headers.authorization);
     if (user?.id) {
+      const revoked = await pool.query(
+        `UPDATE utenti
+         SET session_version = COALESCE(session_version, 0) + 1,
+             updated_at = NOW()
+         WHERE id = $1::bigint
+           AND COALESCE(session_version, 0) = $2::integer
+         RETURNING id`,
+        [user.id, user.session_token_version]
+      );
+      if (!revoked.rowCount) return response.json({ ok: true });
       void logUserActivity({
         userId: user.id,
         actorId: user.id,
@@ -24414,7 +25953,29 @@ app.use("/api", auditApiRequest);
 
 app.get("/api/antiriciclaggio/contanti-check", async (request, response, next) => {
   try {
-    response.json(await cashAntiMoneyLaunderingCheck(request.query));
+    const input = { ...request.query };
+    const actIdentifier = input.atto_id || input.actId || input.id || "";
+    if (actIdentifier) {
+      const row = await findExisting(actIdentifier);
+      if (!row || !canAccessAct(row, request.user)) {
+        return response.status(row ? 403 : 404).json({ error: row ? "Non autorizzato" : "Atto non trovato" });
+      }
+      input.codice_fiscale = row.codice_fiscale || input.codice_fiscale || "";
+      input.cliente_id = row.cliente_id || "";
+      input.atto_id = row.id;
+    } else {
+      delete input.cliente_id;
+    }
+    const check = await cashAntiMoneyLaunderingCheck(input);
+    if (roleSeesAllStores(request.user?.ruolo)) return response.json(check);
+    response.json({
+      ok: check.ok,
+      limite: check.limite,
+      importo_corrente: check.importo_corrente,
+      requires_tracked_payment: check.ok === false,
+      details_redacted: true,
+      messaggio: check.messaggio
+    });
   } catch (error) {
     next(error);
   }
@@ -24723,42 +26284,7 @@ app.get("/api/backups", requireBackupManager, async (request, response, next) =>
   }
 });
 
-app.post("/api/backups/create", requireBackupManager, async (request, response, next) => {
-  try {
-    const backup = await createManualBackup(request.user);
-    void writeAuditLog({
-      req: request,
-      user: request.user,
-      action: "create_backup",
-      entityType: "backup",
-      entityId: backup?.id,
-      entityLabel: backup?.backup_code || backup?.backupCode || "",
-      afterData: backup,
-      metadata: { backup_code: backup?.backup_code || backup?.backupCode || "", status: backup?.status }
-    });
-    void createNotification({
-      targetRole: "founder",
-      title: backup?.status === "failed" ? "Backup fallito" : "Backup creato",
-      message: backup?.status === "failed"
-        ? "Un backup OroActive non è stato completato correttamente."
-        : "Backup OroActive creato correttamente.",
-      type: backup?.status === "failed" ? "backup_failed" : "backup_created",
-      severity: backup?.status === "failed" ? "danger" : "success",
-      entityType: "backup",
-      entityId: backup?.id,
-      actionUrl: "#backups",
-      metadata: { backup_code: backup?.backup_code || backup?.backupCode || "", status: backup?.status },
-      createdBy: request.user?.id,
-      actor: request.user,
-      req: request
-    });
-    response.status(201).json({ backup });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/api/backups/run", requireBackupManager, async (request, response, next) => {
+app.post("/api/backups/create", requireFounder, async (request, response, next) => {
   try {
     const backup = await createManualBackup(request.user);
     void writeAuditLog({
@@ -26102,13 +27628,33 @@ app.post("/api/academy/practical-attempts/:attemptId/submit", async (request, re
 
 app.post("/api/academy/practical-attempts/:attemptId/review", async (request, response, next) => {
   try {
-    if (!["founder", "responsabile", "supervisore"].includes(normalizeRole(request.user.ruolo))) {
+    const role = normalizeRole(request.user.ruolo);
+    if (!["founder", "responsabile", "supervisore"].includes(role)) {
       return response.status(403).json({ error: "Non autorizzato" });
     }
     const score = Math.max(0, Math.min(100, Math.round(Number(request.body?.score || 0))));
     const approved = String(request.body?.status || "").toLowerCase() === "approved" || (request.body?.approved === true && score >= 80);
+    const values = [
+      request.params.attemptId,
+      request.user.id,
+      approved ? "approved" : "rejected",
+      score,
+      approved,
+      Boolean(request.body?.critical_failure),
+      String(request.body?.notes || "")
+    ];
+    let accessPredicate = "TRUE";
+    if (role === "responsabile") {
+      values.push(request.user.negozio_id || null);
+      accessPredicate = `EXISTS (
+        SELECT 1
+        FROM utenti target_user
+        WHERE target_user.id = pa.user_id
+          AND target_user.negozio_id = $${values.length}::bigint
+      )`;
+    }
     const attempt = (await pool.query(
-      `UPDATE academy_practical_attempts
+      `UPDATE academy_practical_attempts pa
        SET evaluator_id = $2::bigint,
            status = $3::text,
            total_score = $4::integer,
@@ -26116,17 +27662,10 @@ app.post("/api/academy/practical-attempts/:attemptId/review", async (request, re
            critical_failure = $6::boolean,
            evaluator_notes = $7::text,
            reviewed_at = NOW()
-       WHERE id = $1::bigint
-       RETURNING *`,
-      [
-        request.params.attemptId,
-        request.user.id,
-        approved ? "approved" : "rejected",
-        score,
-        approved,
-        Boolean(request.body?.critical_failure),
-        String(request.body?.notes || "")
-      ]
+       WHERE pa.id = $1::bigint
+         AND ${accessPredicate}
+       RETURNING pa.*`,
+      values
     )).rows[0];
     if (!attempt) return response.status(404).json({ error: "Tentativo prova pratica non trovato" });
     void writeAuditLog({
@@ -26145,17 +27684,26 @@ app.post("/api/academy/practical-attempts/:attemptId/review", async (request, re
 
 app.get("/api/academy/practical-assessments/pending-review", async (request, response, next) => {
   try {
-    if (!["founder", "responsabile", "supervisore"].includes(normalizeRole(request.user.ruolo))) {
+    const role = normalizeRole(request.user.ruolo);
+    if (!["founder", "responsabile", "supervisore"].includes(role)) {
       return response.status(403).json({ error: "Non autorizzato" });
+    }
+    const values = [];
+    let storePredicate = "TRUE";
+    if (role === "responsabile") {
+      values.push(request.user.negozio_id || null);
+      storePredicate = `u.negozio_id = $${values.length}::bigint`;
     }
     const result = await pool.query(
       `SELECT pa.*, aa.title AS assessment_title, c.title AS course_title, u.username, u.nome, u.cognome
        FROM academy_practical_attempts pa
        JOIN academy_practical_assessments aa ON aa.id = pa.assessment_id
        JOIN courses c ON c.id = aa.course_id
-       LEFT JOIN utenti u ON u.id = pa.user_id
+       JOIN utenti u ON u.id = pa.user_id
        WHERE pa.status IN ('submitted','under_review')
-       ORDER BY pa.submitted_at ASC NULLS LAST, pa.created_at ASC`
+         AND ${storePredicate}
+       ORDER BY pa.submitted_at ASC NULLS LAST, pa.created_at ASC`,
+      values
     );
     response.json({ ok: true, attempts: result.rows });
   } catch (error) {
@@ -26167,14 +27715,22 @@ app.get("/api/academy/practical-attempts/:attemptId", async (request, response, 
   try {
     const role = normalizeRole(request.user.ruolo);
     const values = [request.params.attemptId];
-    const ownerFilter = ["founder", "responsabile", "supervisore"].includes(role) ? "" : "AND pa.user_id = $2::bigint";
-    if (ownerFilter) values.push(request.user.id);
+    let accessPredicate = "TRUE";
+    if (role === "responsabile") {
+      values.push(request.user.negozio_id || null);
+      accessPredicate = `u.negozio_id = $${values.length}::bigint`;
+    } else if (!["founder", "supervisore"].includes(role)) {
+      values.push(request.user.id);
+      accessPredicate = `pa.user_id = $${values.length}::bigint`;
+    }
     const attempt = (await pool.query(
       `SELECT pa.*, aa.title AS assessment_title, aa.description AS assessment_description, c.title AS course_title
        FROM academy_practical_attempts pa
        JOIN academy_practical_assessments aa ON aa.id = pa.assessment_id
        JOIN courses c ON c.id = aa.course_id
-       WHERE pa.id = $1::bigint ${ownerFilter}
+       JOIN utenti u ON u.id = pa.user_id
+       WHERE pa.id = $1::bigint
+         AND ${accessPredicate}
        LIMIT 1`,
       values
     )).rows[0];
@@ -26318,12 +27874,24 @@ app.post("/api/academy/exam-attempts/:attemptId/submit", async (request, respons
 
 app.get("/api/academy/exam-attempts/:attemptId/result", async (request, response, next) => {
   try {
+    const role = normalizeRole(request.user.ruolo);
+    const values = [request.params.attemptId];
+    let accessPredicate = "TRUE";
+    if (role === "responsabile") {
+      values.push(request.user.negozio_id || null);
+      accessPredicate = `u.negozio_id = $${values.length}::bigint`;
+    } else if (!["founder", "supervisore"].includes(role)) {
+      values.push(request.user.id);
+      accessPredicate = `a.user_id = $${values.length}::bigint`;
+    }
     const attempt = (await pool.query(
-      `SELECT id, course_id, user_id, status, score, passed, started_at, submitted_at
-       FROM academy_exam_attempts
-       WHERE id = $1::bigint AND (user_id = $2::bigint OR $3::text IN ('founder','responsabile','supervisore'))
+      `SELECT a.id, a.course_id, a.user_id, a.status, a.score, a.passed, a.started_at, a.submitted_at
+       FROM academy_exam_attempts a
+       JOIN utenti u ON u.id = a.user_id
+       WHERE a.id = $1::bigint
+         AND ${accessPredicate}
        LIMIT 1`,
-      [request.params.attemptId, request.user.id, normalizeRole(request.user.ruolo)]
+      values
     )).rows[0];
     if (!attempt) return response.status(404).json({ error: "Risultato esame non trovato" });
     response.json({ ok: true, attempt });
@@ -27861,6 +29429,9 @@ app.post("/api/quotazioni/gold-history/sync", async (request, response, next) =>
 
 app.post("/api/quotazioni/gold-prediction/run", async (request, response, next) => {
   try {
+    if (!canSyncGoldPriceHistory(request.user)) {
+      return response.status(403).json({ ok: false, error: "Non autorizzato" });
+    }
     response.json(await runGoldPredictions(request.body || {}, request.user, request));
   } catch (error) {
     next(error);
@@ -28019,6 +29590,9 @@ app.post("/api/quotazioni/metals/sync-bullionvault", async (request, response, n
 
 app.post("/api/quotazioni/metals/predict", async (request, response, next) => {
   try {
+    if (!canSyncGoldPriceHistory(request.user)) {
+      return response.status(403).json({ ok: false, error: "Non autorizzato" });
+    }
     response.json(await runMetalPredictions(request.body || {}, request.user, request));
   } catch (error) {
     next(error);
@@ -28060,7 +29634,9 @@ app.put("/api/quotazioni/buyback-policy", requireFounder, async (request, respon
 
 app.post("/api/quotazioni/buyback-calculate", async (request, response, next) => {
   try {
-    response.json(await calculateMetalBuyback(request.body || {}, request.user, request));
+    response.json(await calculateMetalBuyback(request.body || {}, request.user, request, {
+      persist: canSyncGoldPriceHistory(request.user)
+    }));
   } catch (error) {
     next(error);
   }
@@ -28496,7 +30072,7 @@ app.post("/api/quotazioni/competitors/sync-configured", requireFounder, async (r
 
 app.get("/api/clienti/:codiceFiscale", async (request, response, next) => {
   try {
-    const client = await getClientByFiscalCode(request.params.codiceFiscale);
+    const client = await getClientByFiscalCode(request.params.codiceFiscale, request.user, request.query.negozio_id || "");
     if (!client) return response.status(404).json({ error: "Cliente non trovato" });
     response.json(publicClient(client));
   } catch (error) {
@@ -28506,7 +30082,7 @@ app.get("/api/clienti/:codiceFiscale", async (request, response, next) => {
 
 app.get("/api/clienti/codice-fiscale/:codiceFiscale", async (request, response, next) => {
   try {
-    const client = await getClientByFiscalCode(request.params.codiceFiscale);
+    const client = await getClientByFiscalCode(request.params.codiceFiscale, request.user, request.query.negozio_id || "");
     response.json(client ? publicClientLookup(client) : { found: false });
   } catch (error) {
     next(error);
@@ -28565,49 +30141,179 @@ app.post("/api/fusioni/lotti", requireOperationalQualification("FUSION_CREATE"),
     if (!["founder", "supervisore", "responsabile"].includes(normalizeRole(request.user?.ruolo))) {
       return response.status(403).json({ error: "Non autorizzato" });
     }
-    const identifiers = Array.isArray(request.body.atti) ? request.body.atti : String(request.body.atti || "").split(",");
-    const acts = [];
-    for (const identifier of identifiers.map((item) => String(item).trim()).filter(Boolean)) {
+    const identifiers = [...new Set(
+      (Array.isArray(request.body.atti) ? request.body.atti : String(request.body.atti || "").split(","))
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+    )];
+    if (!identifiers.length) return response.status(400).json({ error: "Nessun atto selezionato per il lotto fusione" });
+    const selectedRows = [];
+    for (const identifier of identifiers) {
       const row = await findExisting(identifier);
-      if (row && canAccessAct(row, request.user)) acts.push(rowToAct(row));
+      if (!row || !canAccessAct(row, request.user)) {
+        return response.status(400).json({ error: "Uno o più atti selezionati non sono disponibili o autorizzati." });
+      }
+      if (!selectedRows.some((selected) => String(selected.id) === String(row.id))) selectedRows.push(row);
     }
-    if (!acts.length) return response.status(400).json({ error: "Nessun atto selezionato per il lotto fusione" });
-    const store = acts[0].store || request.body.negozio || "";
-    const storeRow = await storeByCodeOrName(store);
-    const lots = acts.flatMap(materialLotsFromAct);
-    const pesoTotale = lots.reduce((total, lot) => total + Number(lot.weight || 0), 0);
-    const valoreTeorico = lots.reduce((total, lot) => total + Number(lot.weight || 0) * quoteForMetal(lot.act, lot.metal) / 1000 * titlePurity(lot.metal, lot.title), 0);
-    const lottoCode = `FUS-${storeCodeFromName(store)}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-5)}`;
-    const result = await pool.query(
-      `INSERT INTO fusion_lots
-        (lotto_code, negozio_id, negozio, raffineria, peso_totale, peso_netto, valore_teorico, stato, data_invio, payload, created_by)
-       VALUES ($1::text,$2::bigint,$3::text,$4::text,$5::numeric,$6::numeric,$7::numeric,$8::text,$9::date,$10::jsonb,$11::bigint)
-       RETURNING *`,
-      [
-        lottoCode,
-        storeRow?.id || null,
-        store,
-        request.body.raffineria || "",
-        pesoTotale,
-        numberFrom(request.body.peso_netto || request.body.pesoNetto || pesoTotale),
-        valoreTeorico,
-        request.body.stato || "aperto",
-        dateOrNull(request.body.data_invio || request.body.dataInvio) || new Date().toISOString().slice(0, 10),
-        sanitizeForPostgres({ atti: acts.map((act) => act.id), riepilogo: stockSummaryFromActs(acts) }),
-        request.user.id
-      ]
-    );
+    const actIds = selectedRows.map((row) => String(row.id));
+    const transactionResult = await withDatabaseTransaction(async (db) => {
+      const lockedResult = await db.query(
+        `SELECT * FROM ${actsTable}
+         WHERE id = ANY($1::bigint[])
+         ORDER BY id
+         FOR UPDATE`,
+        [actIds]
+      );
+      if (lockedResult.rowCount !== actIds.length) {
+        const error = new Error("Uno o più atti non sono più disponibili.");
+        error.status = 409;
+        throw error;
+      }
+      if (lockedResult.rows.some((row) => !canAccessAct(row, request.user))) {
+        const error = new Error("Uno o più atti non sono autorizzati per questa sede.");
+        error.status = 403;
+        throw error;
+      }
+      const acts = lockedResult.rows.map((row) => rowToAct(row));
+      if (lockedResult.rows.some((row) => !row.negozio_id) || new Set(lockedResult.rows.map((row) => String(row.negozio_id))).size !== 1) {
+        const error = new Error("Un lotto di fusione può contenere soltanto atti della stessa sede identificata.");
+        error.status = 409;
+        throw error;
+      }
+      if (lockedResult.rows.some((row) => !isCompletedAct(row))) {
+        const error = new Error("Possono essere inviati in fusione soltanto atti completati.");
+        error.status = 409;
+        throw error;
+      }
+      const legalHoldResult = await db.query(
+        `SELECT id, practice_number, data_atto, (data_atto + 10)::date AS fondibile_dal
+         FROM ${actsTable}
+         WHERE id = ANY($1::bigint[])
+           AND (data_atto IS NULL OR (data_atto + 10) > CURRENT_DATE)
+         ORDER BY data_atto NULLS FIRST, id
+         LIMIT 1`,
+        [actIds]
+      );
+      if (legalHoldResult.rowCount) {
+        const blocked = legalHoldResult.rows[0];
+        const availableDate = blocked.fondibile_dal
+          ? new Date(blocked.fondibile_dal).toISOString().slice(0, 10)
+          : "non determinata";
+        const error = new Error(`L'atto ${blocked.practice_number || blocked.id} non può essere alterato o alienato prima del ${availableDate}.`);
+        error.status = 409;
+        error.code = "FUSION_LEGAL_HOLD";
+        error.available_date = blocked.fondibile_dal || null;
+        throw error;
+      }
+      const existingLotCodes = [...new Set(acts.map((act) => act.fusion?.fused ? act.fusion?.lotId : "").filter(Boolean))];
+      if (acts.every((act) => act.fusion?.fused) && existingLotCodes.length === 1) {
+        const existingLot = await db.query("SELECT * FROM fusion_lots WHERE lotto_code = $1::text LIMIT 1", [existingLotCodes[0]]);
+        if (existingLot.rowCount) return { lot: existingLot.rows[0], store: null, acts, idempotent: true };
+      }
+      if (acts.some((act) => act.fusion?.fused)) {
+        const error = new Error("Uno o più atti risultano già inseriti in un lotto fusione.");
+        error.status = 409;
+        throw error;
+      }
+      const orphanConflict = await db.query(
+        `SELECT lotto_code
+         FROM fusion_lots fl
+         WHERE COALESCE(fl.stato, '') NOT ILIKE 'annullat%'
+           AND EXISTS (
+             SELECT 1
+             FROM jsonb_array_elements_text(COALESCE(fl.payload->'atti', '[]'::jsonb)) item
+             WHERE item.value = ANY($1::text[])
+           )
+         LIMIT 1
+         FOR UPDATE`,
+        [actIds]
+      );
+      if (orphanConflict.rowCount) {
+        const error = new Error(`Uno o più atti risultano già associati al lotto ${orphanConflict.rows[0].lotto_code}.`);
+        error.status = 409;
+        throw error;
+      }
+      const storeId = lockedResult.rows[0].negozio_id;
+      const storeResult = await db.query(
+        "SELECT * FROM negozi WHERE id = $1::bigint AND deleted_at IS NULL AND COALESCE(attivo, TRUE) = TRUE FOR UPDATE",
+        [storeId]
+      );
+      const storeRow = storeResult.rows[0];
+      if (!storeRow) {
+        const error = new Error("La sede del lotto non è attiva.");
+        error.status = 409;
+        throw error;
+      }
+      await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))", [`oroactive-fusion-ddt:${storeId}`]);
+      const nextDdtResult = await db.query(
+        `SELECT COALESCE(MAX(
+           CASE WHEN COALESCE(payload->'fusion'->>'ddtNumber', '') ~ '^[0-9]+$'
+             THEN (payload->'fusion'->>'ddtNumber')::integer ELSE 0 END
+         ), 0)::integer + 1 AS next_number
+         FROM ${actsTable}
+         WHERE negozio_id = $1::bigint`,
+        [storeId]
+      );
+      const ddtNumber = Number(nextDdtResult.rows[0]?.next_number || 1);
+      const sendDate = dateOrNull(request.body.data_invio || request.body.dataInvio) || new Date().toISOString().slice(0, 10);
+      const lottoCode = `FUS-${storeRow.codice}-${sendDate.replace(/-/g, "")}-${String(ddtNumber).padStart(4, "0")}`;
+      const lots = acts.flatMap(materialLotsFromAct);
+      const pesoTotale = lots.reduce((total, lot) => total + Number(lot.weight || 0), 0);
+      const valoreTeorico = lots.reduce((total, lot) => total + Number(lot.weight || 0) * quoteForMetal(lot.act, lot.metal) / 1000 * titlePurity(lot.metal, lot.title), 0);
+      const inserted = await db.query(
+        `INSERT INTO fusion_lots
+          (lotto_code, negozio_id, negozio, raffineria, peso_totale, peso_netto, valore_teorico, stato, data_invio, payload, created_by)
+         VALUES ($1::text,$2::bigint,$3::text,$4::text,$5::numeric,$6::numeric,$7::numeric,$8::text,$9::date,$10::jsonb,$11::bigint)
+         RETURNING *`,
+        [
+          lottoCode,
+          storeRow.id,
+          storeRow.nome,
+          request.body.raffineria || "",
+          pesoTotale,
+          numberFrom(request.body.peso_netto || request.body.pesoNetto || pesoTotale),
+          valoreTeorico,
+          request.body.stato || "aperto",
+          sendDate,
+          sanitizeForPostgres({ atti: acts.map((act) => act.id), riepilogo: stockSummaryFromActs(acts), ddt_number: ddtNumber }),
+          request.user.id
+        ]
+      );
+      for (const act of acts) {
+        const actTheoreticalValue = materialLotsFromAct(act)
+          .reduce((total, lot) => total + Number(lot.weight || 0) * quoteForMetal(act, lot.metal) / 1000 * titlePurity(lot.metal, lot.title), 0);
+        const fusion = {
+          ...(act.fusion || {}),
+          fused: true,
+          date: sendDate,
+          ddtNumber,
+          lotId: lottoCode,
+          refinery: request.body.raffineria || act.fusion?.refinery || "",
+          theoreticalValue: Number(actTheoreticalValue.toFixed(2)),
+          fusedBy: [request.user?.nome, request.user?.cognome].filter(Boolean).join(" ") || request.user?.username || "Operatore"
+        };
+        await db.query(
+          `UPDATE ${actsTable}
+           SET payload = jsonb_set(COALESCE(payload, '{}'::jsonb), '{fusion}', $2::jsonb, TRUE),
+               updated_at = NOW()
+           WHERE id = $1::bigint`,
+          [act.id, sanitizeForPostgres(fusion)]
+        );
+      }
+      return { lot: inserted.rows[0], store: storeRow, acts, idempotent: false };
+    });
+    const result = transactionResult.lot;
     void writeAuditLog({
       req: request,
       user: request.user,
       action: "create_fusion_lot",
       entityType: "lotto_fusione",
-      entityId: result.rows[0]?.id,
-      entityLabel: result.rows[0]?.lotto_code || lottoCode,
-      afterData: result.rows[0],
-      metadata: { store_id: storeRow?.id || null, store_name: store, acts_count: acts.length }
+      entityId: result?.id,
+      entityLabel: result?.lotto_code || "",
+      afterData: result,
+      metadata: { store_id: result?.negozio_id || null, store_name: result?.negozio || "", acts_count: transactionResult.acts.length, idempotent: transactionResult.idempotent }
     });
-    response.status(201).json(result.rows[0]);
+    response.status(transactionResult.idempotent ? 200 : 201).json({ ...result, idempotent: transactionResult.idempotent });
   } catch (error) {
     next(error);
   }
@@ -28896,10 +30602,106 @@ function buildPdfForActs(response, { title = "Atto di vendita OroActive", subtit
   doc.end();
 }
 
+function pdfActIdentifier(value) {
+  if (value && typeof value === "object") return value.id || value.practiceNumber || value.practice_number || "";
+  return value;
+}
+
+function requestedPdfActIdentifiers(body = {}, { multiple = false } = {}) {
+  const source = multiple
+    ? (body.atti ?? body.act_ids ?? body.practice_numbers ?? body.acts ?? [])
+    : [body.atto ?? body.act_id ?? body.practice_number ?? body.act ?? ""];
+  const values = Array.isArray(source) ? source : String(source || "").split(",");
+  return [...new Set(values.map(pdfActIdentifier).map((value) => String(value || "").trim()).filter(Boolean))];
+}
+
+async function authorizedPdfActs(identifiers = [], user = {}, { bulk = false } = {}) {
+  if (!identifiers.length) {
+    const error = new Error("Indica almeno un atto salvato da esportare.");
+    error.status = 400;
+    throw error;
+  }
+  const maximumActs = bulk ? PDF_BULK_MAX_ACTS : 1;
+  if (identifiers.length > maximumActs) {
+    const error = new Error(`Puoi esportare al massimo ${maximumActs} atti per volta.`);
+    error.status = 413;
+    throw error;
+  }
+  return withDatabaseTransaction(async (db) => {
+  const metadataResult = await db.query(
+    `SELECT id, practice_number, negozio_id, store, completed_at,
+            COALESCE(octet_length(payload::text), 0)::bigint AS payload_bytes
+     FROM ${actsTable}
+     WHERE (id::text = ANY($1::text[])
+        OR practice_number = ANY($1::text[]))
+       AND completed_at IS NOT NULL
+       AND ${realCompletedStatusSql()}
+     FOR SHARE`,
+    [identifiers]
+  );
+  const byId = new Map(metadataResult.rows.map((row) => [String(row.id), row]));
+  const byPractice = new Map(metadataResult.rows.map((row) => [String(row.practice_number || ""), row]));
+  const selectedMetadata = [];
+  const selectedIds = new Set();
+  for (const identifier of identifiers) {
+    const row = /^\d+$/.test(identifier)
+      ? (byId.get(identifier) || byPractice.get(identifier))
+      : (byPractice.get(identifier) || byId.get(identifier));
+    if (!row) {
+      const error = new Error("Uno o più atti richiesti non sono disponibili.");
+      error.status = 404;
+      throw error;
+    }
+    if (!canAccessAct(row, user)) {
+      const error = new Error("Uno o più atti richiesti non sono autorizzati per questa sede.");
+      error.status = 403;
+      throw error;
+    }
+    if (!selectedIds.has(String(row.id))) {
+      selectedIds.add(String(row.id));
+      selectedMetadata.push(row);
+    }
+  }
+  const totalPayloadBytes = selectedMetadata.reduce((total, row) => total + Number(row.payload_bytes || 0), 0);
+  if (!Number.isFinite(totalPayloadBytes) || totalPayloadBytes > PDF_EXPORT_MAX_PAYLOAD_BYTES) {
+    const error = new Error("L'esportazione richiesta supera il limite sicuro. Riduci il numero di atti e riprova.");
+    error.status = 413;
+    error.code = "PDF_EXPORT_TOO_LARGE";
+    throw error;
+  }
+  const result = await db.query(
+    `SELECT *, xmin::text AS row_version
+     FROM ${actsTable}
+     WHERE id = ANY($1::bigint[])`,
+    [selectedMetadata.map((row) => row.id)]
+  );
+  if (result.rowCount !== selectedMetadata.length) {
+    const error = new Error("Gli atti sono cambiati durante la preparazione del PDF. Riprova.");
+    error.status = 409;
+    error.code = "PDF_EXPORT_CONCURRENT_CHANGE";
+    throw error;
+  }
+  const fullRowsById = new Map(result.rows.map((row) => [String(row.id), row]));
+  return selectedMetadata.map((row) => rowToAct(fullRowsById.get(String(row.id))));
+  });
+}
+
+function pdfExportSubtitle(acts = []) {
+  const stores = [...new Set(acts.map((act) => String(act.store || "").trim()).filter(Boolean))];
+  const dates = [...new Set(acts.map((act) => String(act.date || "").slice(0, 10)).filter(Boolean))].sort();
+  const storeLabel = stores.length === 1 ? stores[0] : "Sedi autorizzate";
+  if (dates.length === 1) return `${storeLabel} - ${dates[0]}`;
+  const months = [...new Set(dates.map((date) => date.slice(0, 7)))];
+  if (months.length === 1) return `${storeLabel} - ${months[0]}`;
+  return `${storeLabel} - ${acts.length} atti autorizzati`;
+}
+
 app.post("/api/pdf/act", async (request, response, next) => {
   try {
-    const scope = request.body.scope || "company";
-    const act = request.body.act || {};
+    const scope = request.body.scope === "customer" ? "customer" : "company";
+    const identifiers = requestedPdfActIdentifiers(request.body);
+    const [act] = await authorizedPdfActs(identifiers, request.user);
+    const title = `${scope === "customer" ? "Copia cliente" : "Copia aziendale"} ${act.practiceNumber || "OroActive"}`;
     void logUserActivity({
       userId: request.user?.id,
       actorId: request.user?.id,
@@ -28924,10 +30726,10 @@ app.post("/api/pdf/act", async (request, response, next) => {
       action: "generate_pdf",
       entityType: "pdf",
       entityId: act.id || act.practiceNumber || null,
-      entityLabel: request.body.title || "Atto di vendita OroActive",
+      entityLabel: title,
       metadata: { practiceNumber: act.practiceNumber || "", scope }
     });
-    buildPdfForActs(response, { title: request.body.title || "Atto di vendita OroActive", scope: request.body.scope || "company", acts: [request.body.act || {}] });
+    buildPdfForActs(response, { title, scope, acts: [act] });
   } catch (error) {
     next(error);
   }
@@ -28935,10 +30737,25 @@ app.post("/api/pdf/act", async (request, response, next) => {
 
 app.post("/api/pdf/acts", async (request, response, next) => {
   try {
+    if (!canReviewActs(request.user)) {
+      const error = new Error("L'esportazione multipla è riservata ai ruoli di revisione.");
+      error.status = 403;
+      throw error;
+    }
+    const identifiers = requestedPdfActIdentifiers(request.body, { multiple: true });
+    const acts = await authorizedPdfActs(identifiers, request.user, { bulk: true });
+    void writeAuditLog({
+      req: request,
+      user: request.user,
+      action: "generate_pdf",
+      entityType: "pdf",
+      entityLabel: "Esportazione atti OroActive",
+      metadata: { acts_count: acts.length, act_ids: acts.map((act) => act.id) }
+    });
     buildPdfForActs(response, {
-      title: request.body.title || "Esportazione atti OroActive",
-      subtitle: request.body.subtitle || "",
-      acts: Array.isArray(request.body.acts) ? request.body.acts : []
+      title: "Esportazione atti OroActive",
+      subtitle: pdfExportSubtitle(acts),
+      acts
     });
   } catch (error) {
     next(error);
@@ -28969,6 +30786,7 @@ function customerTrustPackCodeForAct(act = {}, row = {}) {
 }
 
 function publicCustomerTrustPack(row = {}) {
+  const stale = customerTrustPackIsStale(row);
   return {
     id: row.id,
     trust_pack_code: row.trust_pack_code,
@@ -28984,29 +30802,59 @@ function publicCustomerTrustPack(row = {}) {
     generated_at: row.generated_at || null,
     delivered_at: row.delivered_at || null,
     metadata: row.metadata || {},
-    pdf_url: row.id ? `/api/customer-trust-pack/${row.id}/download` : ""
+    stale,
+    stale_reason: stale ? "act_changed" : "",
+    pdf_url: row.id && !stale ? `/api/customer-trust-pack/${row.id}/download` : ""
   };
 }
 
-async function customerTrustPackStoreForAct(row = {}) {
+async function customerTrustPackStoreForAct(row = {}, db = pool) {
   if (row.negozio_id) {
-    const result = await pool.query("SELECT * FROM negozi WHERE id = $1::bigint LIMIT 1", [row.negozio_id]);
+    const result = await db.query("SELECT * FROM negozi WHERE id = $1::bigint LIMIT 1", [row.negozio_id]);
     if (result.rows[0]) return result.rows[0];
   }
-  return storeByCodeOrName(row.store_code || row.codice_negozio || row.store);
+  return storeByCodeOrName(row.store_code || row.codice_negozio || row.store, db);
 }
 
-async function customerTrustPackClientForAct(row = {}, act = {}) {
-  const result = await pool.query(
-    `SELECT *
-     FROM clienti
-     WHERE ($1::bigint IS NOT NULL AND id = $1::bigint)
-        OR ($2::text <> '' AND UPPER(codice_fiscale) = UPPER($2::text))
-     ORDER BY id ASC
+async function customerTrustPackClientForAct(row = {}, act = {}, db = pool) {
+  const fiscalCode = normalizeFiscalCode(row.codice_fiscale || act.fiscalCode || "");
+  const values = [row.cliente_id || null, fiscalCode, row.negozio_id || null, row.store || act.store || ""];
+  const storeWhere = `AND (
+    ($3::bigint IS NOT NULL AND c.negozio_id = $3::bigint)
+    OR (
+      $3::bigint IS NULL
+      AND c.negozio_id IS NULL
+      AND EXISTS (
+        SELECT 1
+        FROM ${actsTable} legacy_act
+        WHERE UPPER(legacy_act.codice_fiscale) = UPPER(c.codice_fiscale)
+          AND legacy_act.negozio_id IS NULL
+          AND legacy_act.store = $4::text
+      )
+    )
+  )`;
+  if (values[0]) {
+    const linked = await db.query(
+      `SELECT c.*
+       FROM clienti c
+       WHERE c.id = $1::bigint
+         AND ($2::text = '' OR UPPER(c.codice_fiscale) = $2::text)
+         ${storeWhere}
+       LIMIT 1`,
+      values
+    );
+    if (linked.rowCount) return linked.rows[0];
+  }
+  if (!fiscalCode) return null;
+  const fallback = await db.query(
+    `SELECT c.*
+     FROM clienti c
+     WHERE UPPER(c.codice_fiscale) = $2::text
+       ${storeWhere}
      LIMIT 1`,
-    [row.cliente_id || null, row.codice_fiscale || act.fiscalCode || ""]
+    values
   );
-  return result.rows[0] || null;
+  return fallback.rows[0] || null;
 }
 
 function customerTrustPackEligibilityError() {
@@ -29015,8 +30863,32 @@ function customerTrustPackEligibilityError() {
   return error;
 }
 
-async function assertCustomerTrustPackEligible(saleDeedId, user = {}) {
-  const row = await findExisting(saleDeedId);
+function customerTrustPackVersionConflictError() {
+  const error = new Error("La pratica è cambiata durante la generazione. Ricarica i dati e riprova.");
+  error.status = 409;
+  error.code = "TRUST_PACK_ACT_VERSION_CONFLICT";
+  return error;
+}
+
+function customerTrustPackIsStale(row = {}) {
+  const generatedVersion = String(row.metadata?.act_row_version ?? "");
+  const currentVersion = String(row.act_row_version_current ?? row.row_version ?? "");
+  return !generatedVersion || !currentVersion || generatedVersion !== currentVersion;
+}
+
+function customerTrustPackStaleError() {
+  const error = new Error("La pratica è cambiata dopo la generazione del Customer Trust Pack. Rigeneralo prima di usarlo.");
+  error.status = 409;
+  error.code = "TRUST_PACK_STALE";
+  return error;
+}
+
+function assertCustomerTrustPackFresh(row = {}) {
+  if (customerTrustPackIsStale(row)) throw customerTrustPackStaleError();
+  return row;
+}
+
+function assertCustomerTrustPackRowEligible(row, user = {}) {
   if (!row) {
     const error = new Error("Atto non trovato");
     error.status = 404;
@@ -29036,6 +30908,11 @@ async function assertCustomerTrustPackEligible(saleDeedId, user = {}) {
   return row;
 }
 
+async function assertCustomerTrustPackEligible(saleDeedId, user = {}) {
+  const row = await findExisting(saleDeedId);
+  return assertCustomerTrustPackRowEligible(row, user);
+}
+
 async function customerTrustPackRowById(id, user = {}) {
   const result = await pool.query(
     `SELECT ctp.*,
@@ -29044,6 +30921,7 @@ async function customerTrustPackRowById(id, user = {}) {
             a.negozio_id AS act_store_id,
             a.deleted_at AS act_deleted_at,
             a.status AS act_status,
+            a.xmin::text AS act_row_version_current,
             a.cliente_nome,
             a.cliente_cognome,
             a.telefono AS act_phone,
@@ -29060,7 +30938,7 @@ async function customerTrustPackRowById(id, user = {}) {
   );
   const row = result.rows[0];
   if (!row || row.act_deleted_at) return null;
-  if (!canAccessAct({ store: row.store }, user)) {
+  if (!canAccessAct({ negozio_id: row.act_store_id || row.store_id || null, store: row.store }, user)) {
     const error = new Error("Non autorizzato");
     error.status = 403;
     throw error;
@@ -29081,7 +30959,9 @@ async function listCustomerTrustPacksForSaleDeed(saleDeedId, user = {}) {
     throw error;
   }
   const result = await pool.query(
-    `SELECT ctp.*, a.practice_number, a.cliente_nome, a.cliente_cognome, n.nome AS store_name
+    `SELECT ctp.*, a.practice_number, a.cliente_nome, a.cliente_cognome,
+            a.xmin::text AS act_row_version_current,
+            n.nome AS store_name
      FROM customer_trust_packs ctp
      JOIN ${actsTable} a ON a.id = ctp.sale_deed_id
      LEFT JOIN negozi n ON n.id = ctp.store_id
@@ -29097,7 +30977,9 @@ async function listCustomerTrustPacksForClient(clientId, user = {}) {
   const values = [clientId];
   const storeWhere = await visibleStoreWhere(user, values, "a");
   const result = await pool.query(
-    `SELECT ctp.*, a.practice_number, a.cliente_nome, a.cliente_cognome, a.store, n.nome AS store_name
+    `SELECT ctp.*, a.practice_number, a.cliente_nome, a.cliente_cognome, a.store,
+            a.xmin::text AS act_row_version_current,
+            n.nome AS store_name
      FROM customer_trust_packs ctp
      JOIN ${actsTable} a ON a.id = ctp.sale_deed_id
      LEFT JOIN negozi n ON n.id = ctp.store_id
@@ -29110,6 +30992,77 @@ async function listCustomerTrustPacksForClient(clientId, user = {}) {
     values
   );
   return result.rows.map(publicCustomerTrustPack);
+}
+
+async function withFreshCustomerTrustPack(id, user = {}, work = async ({ row }) => row) {
+  return withDatabaseTransaction(async (db) => {
+    const candidate = (await db.query(
+      `SELECT sale_deed_id
+       FROM customer_trust_packs
+       WHERE id::text = $1::text
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      [String(id || "")]
+    )).rows[0];
+    if (!candidate) return null;
+
+    await db.query("SELECT pg_advisory_xact_lock(hashtext($1::text))", [`customer-trust-pack:${candidate.sale_deed_id}`]);
+    const act = (await db.query(
+      `SELECT *, xmin::text AS row_version
+       FROM ${actsTable}
+       WHERE id = $1::bigint
+       FOR UPDATE`,
+      [candidate.sale_deed_id]
+    )).rows[0];
+    if (!act || act.deleted_at) return null;
+
+    const actor = (await db.query(
+      `SELECT id, ruolo, negozio_id, negozio, attivo
+       FROM utenti
+       WHERE id = $1::bigint
+       FOR UPDATE`,
+      [user.id || null]
+    )).rows[0];
+    if (!actor || actor.attivo === false) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+    const freshUser = { ...user, ...actor };
+    if (!canAccessAct(act, freshUser)) {
+      const error = new Error("Non autorizzato");
+      error.status = 403;
+      throw error;
+    }
+
+    const row = (await db.query(
+      `SELECT ctp.*,
+              a.practice_number,
+              a.store,
+              a.negozio_id AS act_store_id,
+              a.deleted_at AS act_deleted_at,
+              a.status AS act_status,
+              a.xmin::text AS act_row_version_current,
+              a.cliente_nome,
+              a.cliente_cognome,
+              a.telefono AS act_phone,
+              c.telefono AS client_phone,
+              n.nome AS store_name
+       FROM customer_trust_packs ctp
+       JOIN ${actsTable} a ON a.id = ctp.sale_deed_id
+       LEFT JOIN clienti c ON c.id = ctp.client_id
+       LEFT JOIN negozi n ON n.id = ctp.store_id
+       WHERE ctp.id::text = $1::text
+         AND ctp.sale_deed_id = $2::bigint
+         AND ctp.deleted_at IS NULL
+       LIMIT 1
+       FOR UPDATE OF ctp`,
+      [String(id || ""), candidate.sale_deed_id]
+    )).rows[0];
+    if (!row || row.act_deleted_at) return null;
+    assertCustomerTrustPackFresh(row);
+    return work({ db, row, act, user: freshUser });
+  });
 }
 
 function drawTrustPackText(doc, text, y, options = {}) {
@@ -29227,95 +31180,235 @@ async function writeCustomerTrustPackPdf({ act, row, store, client, trustPackCod
 
 async function generateCustomerTrustPack(input = {}, user = {}, req = null) {
   const saleDeedId = input.sale_deed_id || input.saleDeedId || input.id;
-  const row = await assertCustomerTrustPackEligible(saleDeedId, user);
-  const act = rowToAct(row);
-  const store = await customerTrustPackStoreForAct(row);
-  const client = await customerTrustPackClientForAct(row, act);
-  const trustPackCode = customerTrustPackCodeForAct(act, row);
-  const existing = await pool.query(
-    "SELECT * FROM customer_trust_packs WHERE trust_pack_code = $1::text AND deleted_at IS NULL LIMIT 1",
-    [trustPackCode]
+  const initialRow = await findExisting(saleDeedId);
+  if (!initialRow) {
+    const error = new Error("Atto non trovato");
+    error.status = 404;
+    throw error;
+  }
+  const expectedVersion = String(
+    input.act_row_version
+      ?? input.actRowVersion
+      ?? input.row_version
+      ?? input.rowVersion
+      ?? initialRow.row_version
+      ?? ""
   );
   const regenerate = input.regenerate === true;
-  if (existing.rowCount && !regenerate) {
-    return publicCustomerTrustPack({ ...existing.rows[0], practice_number: act.practiceNumber, cliente_nome: act.name, cliente_cognome: act.surname, store_name: store?.nome || act.store });
+  let publication = null;
+  let databaseCommitted = false;
+  let outcome = null;
+
+  try {
+    outcome = await withDatabaseTransaction(async (db) => {
+      await db.query("SET LOCAL lock_timeout = '30s'");
+      await db.query("SELECT pg_advisory_xact_lock(hashtext($1::text))", [`customer-trust-pack:${initialRow.id}`]);
+      const lockedResult = await db.query(
+        `SELECT *, xmin::text AS row_version
+         FROM ${actsTable}
+         WHERE id = $1::bigint
+         FOR UPDATE`,
+        [initialRow.id]
+      );
+      const row = lockedResult.rows[0] || null;
+      const actor = (await db.query(
+        `SELECT id, ruolo, negozio_id, negozio, attivo
+         FROM utenti
+         WHERE id = $1::bigint
+         FOR UPDATE`,
+        [user.id || null]
+      )).rows[0];
+      if (!actor || actor.attivo === false) {
+        const error = new Error("Non autorizzato");
+        error.status = 403;
+        throw error;
+      }
+      const freshUser = { ...user, ...actor };
+      assertCustomerTrustPackRowEligible(row, freshUser);
+      if (!expectedVersion || String(row.row_version || "") !== expectedVersion) {
+        throw customerTrustPackVersionConflictError();
+      }
+
+      const act = rowToAct(row);
+      const store = await customerTrustPackStoreForAct(row, db);
+      const client = await customerTrustPackClientForAct(row, act, db);
+      const trustPackCode = customerTrustPackCodeForAct(act, row);
+      const outputPath = customerTrustPackPath(trustPackCode);
+      const existingResult = await db.query(
+        `SELECT *
+         FROM customer_trust_packs
+         WHERE sale_deed_id = $1::bigint
+           AND deleted_at IS NULL
+         ORDER BY generated_at DESC, id DESC
+         LIMIT 1
+         FOR UPDATE`,
+        [row.id]
+      );
+      const existing = existingResult.rows[0] || null;
+      const existingVersion = String(existing?.metadata?.act_row_version || "");
+      if (existing && !regenerate && existingVersion === String(row.row_version)) {
+        const existingPdf = await verifyTrustPackPdf(existing.pdf_path || outputPath).catch(() => null);
+        if (existingPdf) {
+          return {
+            trustPack: publicCustomerTrustPack({
+              ...existing,
+              act_row_version_current: row.row_version,
+              practice_number: act.practiceNumber,
+              cliente_nome: act.name,
+              cliente_cognome: act.surname,
+              store_name: store?.nome || act.store
+            }),
+            auditAction: null,
+            row,
+            act,
+            store
+          };
+        }
+      }
+
+      publication = await prepareAtomicTrustPackPdf({
+        outputPath,
+        writePdf: (temporaryPath) => writeCustomerTrustPackPdf({
+          act,
+          row,
+          store,
+          client,
+          trustPackCode,
+          outputPath: temporaryPath
+        })
+      });
+      const metadata = sanitizeForPostgres({
+        included_sections: ["copia_cliente_pdf", "riepilogo_vendita", "dati_negozio", "faq_post_vendita", "contatti"],
+        privacy: "Dati interni, risk score, audit trail, margini e note operative esclusi dal Customer Trust Pack.",
+        items_count: Array.isArray(act.items) ? act.items.length : 0,
+        oroactive_site_url: oroactiveSiteUrl,
+        act_row_version: String(row.row_version),
+        pdf_sha256: publication.verification.sha256,
+        pdf_bytes: publication.verification.bytes
+      });
+      const values = [
+        trustPackCode,
+        row.id,
+        row.cliente_id || client?.id || null,
+        row.negozio_id || store?.id || null,
+        actor.id,
+        outputPath,
+        metadata
+      ];
+      const result = existing
+        ? await db.query(
+          `UPDATE customer_trust_packs
+           SET trust_pack_code = $1::text,
+               sale_deed_id = $2::bigint,
+               client_id = $3::bigint,
+               store_id = $4::bigint,
+               generated_by = $5::bigint,
+               pdf_path = $6::text,
+               delivery_status = 'generated',
+               delivered_via = NULL,
+               delivered_to = NULL,
+               delivered_at = NULL,
+               generated_at = NOW(),
+               metadata = $7::jsonb
+           WHERE id = $8::uuid
+             AND sale_deed_id = $2::bigint
+             AND deleted_at IS NULL
+           RETURNING *`,
+          [...values, existing.id]
+        )
+        : await db.query(
+          `INSERT INTO customer_trust_packs (
+            trust_pack_code, sale_deed_id, client_id, store_id, generated_by,
+            pdf_path, delivery_status, metadata
+          ) VALUES (
+            $1::text,$2::bigint,$3::bigint,$4::bigint,$5::bigint,
+            $6::text,'generated',$7::jsonb
+          )
+          ON CONFLICT (trust_pack_code)
+          DO UPDATE SET client_id = EXCLUDED.client_id,
+                        store_id = EXCLUDED.store_id,
+                        generated_by = EXCLUDED.generated_by,
+                        pdf_path = EXCLUDED.pdf_path,
+                        delivery_status = 'generated',
+                        delivered_via = NULL,
+                        delivered_to = NULL,
+                        delivered_at = NULL,
+                        generated_at = NOW(),
+                        metadata = EXCLUDED.metadata,
+                        deleted_at = NULL
+          WHERE customer_trust_packs.sale_deed_id = EXCLUDED.sale_deed_id
+          RETURNING *`,
+          values
+        );
+      if (!result.rows[0]) {
+        const error = new Error("Codice Customer Trust Pack già associato a un altro atto");
+        error.status = 409;
+        error.code = "TRUST_PACK_CODE_CONFLICT";
+        throw error;
+      }
+      return {
+        trustPack: publicCustomerTrustPack({
+          ...result.rows[0],
+          act_row_version_current: row.row_version,
+          practice_number: act.practiceNumber,
+          cliente_nome: act.name,
+          cliente_cognome: act.surname,
+          store_name: store?.nome || act.store
+        }),
+        auditAction: existing ? "customer_trust_pack_regenerated" : "customer_trust_pack_generated",
+        row,
+        act,
+        store
+      };
+    });
+    databaseCommitted = true;
+    if (publication) {
+      await publication.commit().catch((error) => {
+        console.warn("CUSTOMER TRUST PACK CLEANUP WARNING", error.message || error);
+      });
+    }
+  } catch (error) {
+    if (!databaseCommitted && publication) {
+      await publication.rollback().catch((rollbackError) => {
+        console.error("CUSTOMER TRUST PACK FILE ROLLBACK ERROR", rollbackError.message || rollbackError);
+      });
+    }
+    throw error;
+  } finally {
+    if (publication) {
+      await publication.cleanup().catch((cleanupError) => {
+        console.warn("CUSTOMER TRUST PACK TEMP CLEANUP WARNING", cleanupError.message || cleanupError);
+      });
+    }
   }
 
-  const outputPath = customerTrustPackPath(trustPackCode);
-  await writeCustomerTrustPackPdf({ act, row, store, client, trustPackCode, outputPath });
-  const metadata = sanitizeForPostgres({
-    included_sections: ["copia_cliente_pdf", "riepilogo_vendita", "dati_negozio", "faq_post_vendita", "contatti"],
-    privacy: "Dati interni, risk score, audit trail, margini e note operative esclusi dal Customer Trust Pack.",
-    items_count: Array.isArray(act.items) ? act.items.length : 0,
-    oroactive_site_url: oroactiveSiteUrl
-  });
-  const values = [
-    trustPackCode,
-    row.id,
-    row.cliente_id || client?.id || null,
-    row.negozio_id || store?.id || null,
-    user.id || null,
-    outputPath,
-    metadata
-  ];
-  const result = existing.rowCount
-    ? await pool.query(
-      `UPDATE customer_trust_packs
-       SET pdf_path = $1::text,
-           delivery_status = 'generated',
-           delivered_via = NULL,
-           delivered_to = NULL,
-           delivered_at = NULL,
-           generated_by = $2::bigint,
-           generated_at = NOW(),
-           metadata = $3::jsonb
-       WHERE id = $4::uuid
-       RETURNING *`,
-      [outputPath, user.id || null, metadata, existing.rows[0].id]
-    )
-    : await pool.query(
-      `INSERT INTO customer_trust_packs (
-        trust_pack_code, sale_deed_id, client_id, store_id, generated_by,
-        pdf_path, delivery_status, metadata
-      ) VALUES (
-        $1::text,$2::bigint,$3::bigint,$4::bigint,$5::bigint,
-        $6::text,'generated',$7::jsonb
-      )
-      RETURNING *`,
-      values
-    );
-  const trustPack = publicCustomerTrustPack({
-    ...result.rows[0],
-    practice_number: act.practiceNumber,
-    cliente_nome: act.name,
-    cliente_cognome: act.surname,
-    store_name: store?.nome || act.store
-  });
-  const auditAction = existing.rowCount ? "customer_trust_pack_regenerated" : "customer_trust_pack_generated";
-  void writeAuditLog({
-    req,
-    user,
-    action: auditAction,
-    entityType: "customer_trust_pack",
-    entityId: trustPack.id,
-    entityLabel: trustPack.trust_pack_code,
-    afterData: { trust_pack_code: trustPack.trust_pack_code, sale_deed_id: row.id, practice_number: act.practiceNumber },
-    metadata: { sale_deed_id: row.id, practice_number: act.practiceNumber, store_id: row.negozio_id || store?.id || null }
-  });
-  void createNotification({
-    targetRole: "founder",
-    title: "Customer Trust Pack generato",
-    message: `Trust Pack ${trustPack.trust_pack_code} generato per la pratica ${act.practiceNumber}.`,
-    type: "system",
-    severity: "success",
-    entityType: "customer_trust_pack",
-    entityId: trustPack.id,
-    actionUrl: `customer-trust-pack:${trustPack.id}`,
-    createdBy: user.id || null,
-    actor: user,
-    req,
-    metadata: { sale_deed_id: row.id, practice_number: act.practiceNumber }
-  });
+  const { trustPack, auditAction, row, act, store } = outcome;
+  if (auditAction) {
+    void writeAuditLog({
+      req,
+      user,
+      action: auditAction,
+      entityType: "customer_trust_pack",
+      entityId: trustPack.id,
+      entityLabel: trustPack.trust_pack_code,
+      afterData: { trust_pack_code: trustPack.trust_pack_code, sale_deed_id: row.id, practice_number: act.practiceNumber },
+      metadata: { sale_deed_id: row.id, practice_number: act.practiceNumber, store_id: row.negozio_id || store?.id || null, act_row_version: row.row_version }
+    });
+    void createNotification({
+      targetRole: "founder",
+      title: "Customer Trust Pack generato",
+      message: `Trust Pack ${trustPack.trust_pack_code} generato per la pratica ${act.practiceNumber}.`,
+      type: "system",
+      severity: "success",
+      entityType: "customer_trust_pack",
+      entityId: trustPack.id,
+      actionUrl: `customer-trust-pack:${trustPack.id}`,
+      createdBy: user.id || null,
+      actor: user,
+      req,
+      metadata: { sale_deed_id: row.id, practice_number: act.practiceNumber, act_row_version: row.row_version }
+    });
+  }
   return trustPack;
 }
 
@@ -29347,10 +31440,24 @@ app.get("/api/customer-trust-pack/client/:clientId", async (request, response, n
 
 app.get("/api/customer-trust-pack/:id/download", async (request, response, next) => {
   try {
-    const row = await customerTrustPackRowById(request.params.id, request.user);
-    if (!row) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
-    const stats = await fs.stat(row.pdf_path).catch(() => null);
-    if (!stats?.isFile()) return response.status(404).json({ error: "PDF Customer Trust Pack non disponibile" });
+    const download = await withFreshCustomerTrustPack(request.params.id, request.user, async ({ db, row }) => {
+      const contents = await fs.readFile(row.pdf_path).catch(() => null);
+      if (!contents) {
+        const error = new Error("PDF Customer Trust Pack non disponibile");
+        error.status = 404;
+        throw error;
+      }
+      const verification = verifyTrustPackPdfBuffer(contents);
+      const expectedHash = String(row.metadata?.pdf_sha256 || "");
+      if (expectedHash && verification.sha256 !== expectedHash) throw customerTrustPackStaleError();
+      await db.query(
+        "UPDATE customer_trust_packs SET delivery_status = 'downloaded', delivered_via = 'download', delivered_at = NOW() WHERE id = $1::uuid",
+        [row.id]
+      );
+      return { row, contents };
+    });
+    if (!download) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
+    const { row, contents } = download;
     void writeAuditLog({
       req: request,
       user: request.user,
@@ -29360,14 +31467,10 @@ app.get("/api/customer-trust-pack/:id/download", async (request, response, next)
       entityLabel: row.trust_pack_code,
       metadata: { sale_deed_id: row.sale_deed_id, practice_number: row.practice_number }
     });
-    await pool.query(
-      "UPDATE customer_trust_packs SET delivery_status = 'downloaded', delivered_via = 'download', delivered_at = NOW() WHERE id = $1::uuid",
-      [row.id]
-    );
     response.setHeader("Content-Type", "application/pdf");
-    response.setHeader("Content-Length", String(stats.size));
+    response.setHeader("Content-Length", String(contents.length));
     response.setHeader("Content-Disposition", `attachment; filename="${customerTrustPackFilename(row.trust_pack_code)}"`);
-    createReadStream(row.pdf_path).pipe(response);
+    response.send(contents);
   } catch (error) {
     next(error);
   }
@@ -29375,7 +31478,7 @@ app.get("/api/customer-trust-pack/:id/download", async (request, response, next)
 
 app.post("/api/customer-trust-pack/:id/send-email", async (request, response, next) => {
   try {
-    const row = await customerTrustPackRowById(request.params.id, request.user);
+    const row = await withFreshCustomerTrustPack(request.params.id, request.user);
     if (!row) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
     response.json({
       ok: false,
@@ -29389,19 +31492,22 @@ app.post("/api/customer-trust-pack/:id/send-email", async (request, response, ne
 
 app.post("/api/customer-trust-pack/:id/mark-whatsapp", async (request, response, next) => {
   try {
-    const row = await customerTrustPackRowById(request.params.id, request.user);
-    if (!row) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
-    const phone = String(request.body?.phone || row.client_phone || row.act_phone || "").replace(/[^\d+]/g, "");
-    const message = `Buongiorno, le inviamo il Customer Trust Pack OroActive relativo alla sua pratica n. ${row.practice_number}. Per qualsiasi chiarimento puo contattarci.`;
-    await pool.query(
-      `UPDATE customer_trust_packs
-       SET delivery_status = 'sent_whatsapp',
-           delivered_via = 'whatsapp',
-           delivered_to = NULLIF($2::text, ''),
-           delivered_at = NOW()
-       WHERE id = $1::uuid`,
-      [row.id, phone]
-    );
+    const result = await withFreshCustomerTrustPack(request.params.id, request.user, async ({ db, row }) => {
+      const phone = String(request.body?.phone || row.client_phone || row.act_phone || "").replace(/[^\d+]/g, "");
+      const message = `Buongiorno, le inviamo il Customer Trust Pack OroActive relativo alla sua pratica n. ${row.practice_number}. Per qualsiasi chiarimento puo contattarci.`;
+      await db.query(
+        `UPDATE customer_trust_packs
+         SET delivery_status = 'sent_whatsapp',
+             delivered_via = 'whatsapp',
+             delivered_to = NULLIF($2::text, ''),
+             delivered_at = NOW()
+         WHERE id = $1::uuid`,
+        [row.id, phone]
+      );
+      return { row, phone, message };
+    });
+    if (!result) return response.status(404).json({ error: "Customer Trust Pack non trovato" });
+    const { row, phone, message } = result;
     void writeAuditLog({
       req: request,
       user: request.user,
@@ -29488,12 +31594,13 @@ app.delete(["/api/atti/:id", "/api/acts/:id"], async (request, response, next) =
 
 app.use("/api", (_request, response) => {
   setNoStoreHeaders(response);
-  response.status(404).json({ ok: false, error: "Endpoint API non trovato" });
+  response.status(404).json({ ok: false, error: "Endpoint API non trovato", code: "API_NOT_FOUND" });
 });
 
 app.get("/reset-cache", async (_request, response) => {
   const metadata = await getBuildMetadata();
   const target = `/?v=${encodeURIComponent(metadata.buildNumber || Date.now())}&cache-reset=1`;
+  const resetBuild = String(metadata.buildNumber || Date.now()).replace(/[^a-zA-Z0-9_.-]/g, "");
   setClearSiteDataHeaders(response);
   response.type("html").send(`<!doctype html>
 <html lang="it">
@@ -29503,24 +31610,9 @@ app.get("/reset-cache", async (_request, response) => {
   <meta name="robots" content="noindex">
   <title>OroActive reset cache</title>
 </head>
-<body>
+<body data-build="${resetBuild}">
   <p>Reset aggiornamento OroActive in corso...</p>
-  <script>
-    (async () => {
-      try {
-        if ("serviceWorker" in navigator) {
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          await Promise.all(registrations.map((registration) => registration.unregister()));
-        }
-        if ("caches" in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map((key) => caches.delete(key)));
-        }
-      } finally {
-        window.location.replace(${JSON.stringify(target)});
-      }
-    })();
-  </script>
+  <script src="/pwa-reset.js"></script>
   <p><a href="${target}">Riapri OroActive</a></p>
 </body>
 </html>`);
@@ -29528,11 +31620,15 @@ app.get("/reset-cache", async (_request, response) => {
 
 const publicRootStaticFiles = new Set([
   "app.js",
+  "bullionvault-widget.css",
+  "bullionvault-widget.js",
   "frontend-config.js",
   "index.html",
   "manifest.json",
   "manifest.webmanifest",
   "oroactive-logo.png",
+  "pwa-boot.js",
+  "pwa-reset.js",
   "service-worker.js",
   "styles.css"
 ]);
@@ -29561,6 +31657,32 @@ for (const filename of publicRootStaticFiles) {
   if (filename === "service-worker.js") continue;
   app.get(`/${filename}`, sendPublicStaticFile);
 }
+
+app.get("/favicon.ico", (_request, response) => {
+  staticCacheHeaders(response, "/icons/icon-192.png");
+  response.type("image/png").sendFile(path.join(__dirname, "icons", "icon-192.png"));
+});
+
+app.get("/bullionvault-widget.html", (_request, response) => {
+  // The vendor widget runs in a sandboxed iframe with an isolated CSP. It can
+  // reach only its market endpoints and cannot read the parent app/session.
+  response.setHeader("X-Frame-Options", "SAMEORIGIN");
+  response.setHeader("Content-Security-Policy", [
+    "default-src 'none'",
+    "script-src 'self' https://www.bullionvault.com",
+    "script-src-attr 'none'",
+    "style-src 'self' https://www.bullionvault.com",
+    "style-src-attr 'unsafe-inline'",
+    "img-src data: https:",
+    "connect-src https://www.bullionvault.com https://chart-data.bullionvault.com wss://chart-data.bullionvault.com",
+    "frame-ancestors 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "object-src 'none'"
+  ].join("; "));
+  setNoStoreHeaders(response);
+  response.sendFile(path.join(__dirname, "bullionvault-widget.html"));
+});
 
 const secureStaticOptions = {
   dotfiles: "deny",
@@ -29676,10 +31798,23 @@ function publicErrorMessage(error, request) {
   return message.length > 500 ? `${message.slice(0, 497)}...` : message;
 }
 
+const publicErrorCodes = new Set([
+  "TRUST_PACK_STALE",
+  "TRUST_PACK_ACT_VERSION_CONFLICT",
+  "TRUST_PACK_CODE_CONFLICT"
+]);
+
+function publicErrorCode(error) {
+  const code = String(error?.code || "");
+  return publicErrorCodes.has(code) ? code : "";
+}
+
 app.use((error, request, response, _next) => {
   console.error(error);
   const message = publicErrorMessage(error, request);
   const payload = { ok: false, error: message };
+  const safeCode = publicErrorCode(error);
+  if (safeCode) payload.code = safeCode;
   const activeStoreConflict = error.code === "23503"
     && /oroactive_active_store_required/i.test(String(error.constraint || ""));
   if (error.approval_required) {
@@ -29691,9 +31826,12 @@ app.use((error, request, response, _next) => {
   response.status(error.status || (activeStoreConflict ? 409 : 500)).json(payload);
 });
 
-app.listen(port, () => {
+const httpServer = app.listen(port, () => {
   console.log(`OroActive gestionale in ascolto sulla porta ${port}`);
 });
+httpServer.requestTimeout = 120_000;
+httpServer.headersTimeout = 65_000;
+httpServer.keepAliveTimeout = 5_000;
 
 initDatabase()
   .then(() => {

@@ -1,3 +1,5 @@
+import { safeExternalFetch } from "../security/safeExternalFetch.js";
+
 const QUOTE_KEYWORDS = [
   "quotazione",
   "quotazioni",
@@ -17,6 +19,14 @@ const QUOTE_KEYWORDS = [
 const PRIVATE_URL_PATTERN = /(login|signin|account|area-riservata|admin|checkout|cart|captcha|privacy|cookie|terms|condizioni)/i;
 const ALLOWED_QUOTE_TYPES = new Set(["customer_buyback", "spot_price", "theoretical_price", "unknown"]);
 const ALLOWED_CONFIDENCE = new Set(["low", "medium", "high"]);
+const COMPETITOR_HTML_MAX_BYTES = 2 * 1024 * 1024;
+
+function allowedHostsForCompetitorUrl(value = "") {
+  const hostname = new URL(value).hostname.toLowerCase().replace(/\.$/, "");
+  if (!hostname) throw new Error("Dominio competitor non valido.");
+  const companion = hostname.startsWith("www.") ? hostname.slice(4) : `www.${hostname}`;
+  return [...new Set([hostname, companion])];
+}
 
 function clampText(value = "", maxChars = 12000) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxChars);
@@ -49,7 +59,7 @@ function sameOriginUrl(rawUrl = "", baseUrl = "") {
     const url = new URL(rawUrl, base);
     url.hash = "";
     if (url.origin !== base.origin) return null;
-    if (!/^https?:$/i.test(url.protocol)) return null;
+    if (url.protocol !== "https:") return null;
     if (PRIVATE_URL_PATTERN.test(url.pathname + url.search)) return null;
     return url.toString();
   } catch {
@@ -77,52 +87,30 @@ function quoteLinkScore(link = {}) {
 }
 
 export async function fetchCompetitorPage(url = "", options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-        "User-Agent": options.userAgent || "OroActiveBot/1.0"
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return {
-      url: response.url || url,
-      html: await response.text(),
-      contentType: response.headers.get("content-type") || "",
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function renderCompetitorPageWithPlaywright(url = "", options = {}) {
-  if (!options.usePlaywright) {
-    return { html: "", method: "disabled", error: "Playwright disattivato." };
-  }
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { html: "", method: "unavailable", error: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    await page.waitForLoadState("networkidle", { timeout: Math.min(Number(options.timeoutMs || 15000), 5000) }).catch(() => {});
-    return {
-      url: page.url(),
-      html: await page.content(),
-      contentType: "text/html",
-      method: "playwright"
-    };
-  } finally {
-    await browser.close().catch(() => {});
-  }
+  const allowedHosts = Array.isArray(options.allowedHosts) && options.allowedHosts.length
+    ? options.allowedHosts
+    : allowedHostsForCompetitorUrl(url);
+  const response = await safeExternalFetch(url, {
+    allowedHosts,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || COMPETITOR_HTML_MAX_BYTES), COMPETITOR_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+      "User-Agent": options.userAgent || "OroActiveBot/1.0"
+    }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return {
+    url: response.url || url,
+    html: await response.text(),
+    contentType: response.headers.get("content-type") || "",
+    method: "safe_external_fetch"
+  };
 }
 
 function htmlSnippet(html = "", maxChars = 5000) {
@@ -137,10 +125,16 @@ function htmlSnippet(html = "", maxChars = 5000) {
 export async function discoverRelevantQuotePages(source = {}, options = {}) {
   const homepage = source.website_url || source.websiteUrl || "";
   if (!homepage) return { pages: [], warnings: ["Sito competitor non configurato."], homepage: null };
+  let allowedHosts;
+  try {
+    allowedHosts = allowedHostsForCompetitorUrl(homepage);
+  } catch (error) {
+    return { pages: [], warnings: [`Sito competitor non valido: ${error.message}`], homepage: null };
+  }
   const warnings = [];
   let homePage;
   try {
-    homePage = await fetchCompetitorPage(homepage, options);
+    homePage = await fetchCompetitorPage(homepage, { ...options, allowedHosts });
   } catch (error) {
     return {
       pages: [{ url: homepage, reason: "homepage_non_leggibile", score: 0 }],
@@ -366,21 +360,26 @@ export function createAiCompetitorQuoteExtractor(options = {}) {
     maxPagesPerSource: Math.min(Math.max(Number(options.maxPagesPerSource || 8), 1), 8),
     timeoutMs: Number(options.timeoutMs || 15000),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: Boolean(options.usePlaywright),
+    maxBytes: Math.min(Number(options.maxBytes || COMPETITOR_HTML_MAX_BYTES), COMPETITOR_HTML_MAX_BYTES),
     maxTextChars: Number(options.maxTextChars || 12000),
     model: options.model || "gpt-4.1-mini",
     openai: options.openai || null,
-    logger: options.logger || console
+    logger: options.logger || console,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
-  async function fetchPageWithFallback(url = "") {
-    const fetched = await fetchCompetitorPage(url, config);
+  async function fetchPageWithFallback(url = "", source = {}) {
+    const homepage = source.website_url || source.websiteUrl || url;
+    const fetched = await fetchCompetitorPage(url, {
+      ...config,
+      allowedHosts: allowedHostsForCompetitorUrl(homepage)
+    });
     const text = extractReadableTextFromHtml(fetched.html);
     const hasQuoteSignal = QUOTE_KEYWORDS.some((keyword) => text.toLowerCase().includes(keyword));
     if (text.length >= 800 && hasQuoteSignal) return fetched;
-    const rendered = await renderCompetitorPageWithPlaywright(url, config);
-    if (rendered.html) return rendered;
-    return { ...fetched, render_warning: rendered.error || "" };
+    return { ...fetched, render_warning: "Contenuto dinamico non eseguito: rendering browser disabilitato per sicurezza." };
   }
 
   async function extractQuotesFromPage(source = {}, page = {}) {
@@ -392,7 +391,7 @@ export function createAiCompetitorQuoteExtractor(options = {}) {
       ai_response: {}
     };
     try {
-      const fetched = await fetchPageWithFallback(page.url);
+      const fetched = await fetchPageWithFallback(page.url, source);
       const pageText = clampText(extractReadableTextFromHtml(fetched.html), config.maxTextChars);
       if (!pageText) throw new Error("Pagina senza testo leggibile.");
       const ai = await extractQuotesWithAi({

@@ -1,16 +1,19 @@
-const BUILD_ID = "20260807-quotes-reliability-21";
+const BUILD_ID = "20260818-security-reliability-22";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;
 const ACTIVE_CACHE_NAMES = new Set([SHELL_CACHE_NAME, IMAGE_CACHE_NAME]);
 const LEGACY_CACHE_PREFIXES = ["oroactive-", "oroactive-cache-", "oroactive-static-", "oroactive-assets-", "static-", "asset-", "pwa-"];
-const SHELL_ASSETS = [
+const SHELL_CORE_ASSETS = [
   "/",
+  `/pwa-boot.js?v=${BUILD_ID}`,
   `/styles.css?v=${BUILD_ID}`,
   `/frontend-config.js?v=${BUILD_ID}`,
   `/shared/aurum-policy.js?v=${BUILD_ID}`,
   `/app.js?v=${BUILD_ID}`,
-  "/oroactive-logo.png",
+  "/oroactive-logo.png"
+];
+const SHELL_OPTIONAL_ASSETS = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon-180.png"
@@ -87,9 +90,15 @@ async function fetchNoStore(request) {
 
 async function precacheShell() {
   const cache = await caches.open(SHELL_CACHE_NAME);
-  await Promise.allSettled(SHELL_ASSETS.map(async (asset) => {
+  await Promise.all(SHELL_CORE_ASSETS.map(async (asset) => {
     const response = await fetch(asset, { cache: "reload" });
-    if (response.ok) await cache.put(asset, response);
+    if (!response.ok) throw new Error(`Shell asset non disponibile: ${asset}`);
+    await cache.put(asset, response);
+  }));
+  await Promise.allSettled(SHELL_OPTIONAL_ASSETS.map(async (asset) => {
+    const response = await fetch(asset, { cache: "reload" });
+    if (!response.ok) throw new Error(`Asset opzionale non disponibile: ${asset}`);
+    await cache.put(asset, response);
   }));
 }
 
@@ -97,6 +106,12 @@ async function networkFirstNavigation(request) {
   try {
     return await fetchNoStore(request);
   } catch {
+    if (new URL(request.url).pathname === "/bullionvault-widget.html") {
+      return new Response('<!doctype html><html lang="it"><meta charset="utf-8"><body style="margin:0;padding:24px;background:#111;color:#f5c58f;font:14px Arial">Grafico disponibile soltanto con connessione Internet.</body></html>', {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }
+      });
+    }
     const cache = await caches.open(SHELL_CACHE_NAME);
     const shell = await cache.match("/", { ignoreSearch: true });
     return shell || new Response(OFFLINE_FALLBACK, {

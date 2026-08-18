@@ -298,7 +298,9 @@ test("Negozi usa eliminazione logica, conferma e layout dedicato", async () => {
   assert.match(schema, /ALTER TABLE negozi ADD COLUMN IF NOT EXISTS deleted_by BIGINT/);
   assert.match(migration, /CREATE INDEX IF NOT EXISTS negozi_deleted_at_idx/);
   assert.match(schema, /CREATE OR REPLACE FUNCTION oroactive_require_active_store/);
-  assert.match(schema, /FOR KEY SHARE/);
+  assert.match(schema, /FOR SHARE/);
+  assert.doesNotMatch(schema, /FOR KEY SHARE/);
+  assert.match(migration, /COALESCE\(attivo, TRUE\) = TRUE[\s\S]{0,220}FOR SHARE/);
   assert.match(schema, /TG_TABLE_NAME = 'utenti'[\s\S]*to_jsonb\(NEW\)->>'attivo'/);
   assert.match(schema, /BEFORE INSERT OR UPDATE OF negozio_id, attivo ON utenti/);
   for (const trigger of [

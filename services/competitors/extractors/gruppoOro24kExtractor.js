@@ -1,7 +1,10 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const GRUPPO_ORO_24K_DEFAULT_URL = "https://www.comprooromilano.org";
 const GRUPPO_ORO_24K_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+const GRUPPO_ORO_24K_ALLOWED_HOSTS = ["comprooromilano.org"];
+const GRUPPO_ORO_24K_HTML_MAX_BYTES = 2 * 1024 * 1024;
 
 const GRUPPO_ORO_24K_DEFINITIONS = [
   {
@@ -263,62 +266,35 @@ export function extractGruppoOro24kQuotesFromText(text = "", options = {}) {
 }
 
 export async function fetchGruppoOro24kPage(url = GRUPPO_ORO_24K_DEFAULT_URL, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const headersFor = (userAgent) => ({
-      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-      "Accept-Language": "it-IT,it;q=0.9,en;q=0.6",
-      "User-Agent": userAgent
-    });
-    let response = await fetch(url, {
-      signal: controller.signal,
-      headers: headersFor(options.userAgent || "OroActiveBot/1.0")
-    });
-    if (response.status === 403 && (options.userAgent || "OroActiveBot/1.0") !== GRUPPO_ORO_24K_BROWSER_USER_AGENT) {
-      response = await fetch(url, {
-        signal: controller.signal,
-        headers: headersFor(GRUPPO_ORO_24K_BROWSER_USER_AGENT)
-      });
-    }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      url: response.url || url,
-      html,
-      text: extractReadableTextFromHtml(html),
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
+  const headersFor = (userAgent) => ({
+    Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+    "Accept-Language": "it-IT,it;q=0.9,en;q=0.6",
+    "User-Agent": userAgent
+  });
+  const request = (userAgent) => safeExternalFetch(url, {
+    allowedHosts: GRUPPO_ORO_24K_ALLOWED_HOSTS,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || GRUPPO_ORO_24K_HTML_MAX_BYTES), GRUPPO_ORO_24K_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: headersFor(userAgent)
+  });
+  const configuredUserAgent = options.userAgent || "OroActiveBot/1.0";
+  let response = await request(configuredUserAgent);
+  if (response.status === 403 && configuredUserAgent !== GRUPPO_ORO_24K_BROWSER_USER_AGENT) {
+    response = await request(GRUPPO_ORO_24K_BROWSER_USER_AGENT);
   }
-}
-
-async function renderGruppoOro24kPageWithPlaywright(url = GRUPPO_ORO_24K_DEFAULT_URL, options = {}) {
-  if (!options.usePlaywright) return { page: null, warning: "Playwright disattivato." };
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { page: null, warning: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    await page.waitForTimeout(900);
-    return {
-      page: {
-        url: page.url() || url,
-        html: "",
-        text: await page.evaluate(() => document.body?.innerText || ""),
-        method: "playwright"
-      },
-      warning: ""
-    };
-  } finally {
-    await browser.close().catch(() => {});
-  }
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  return {
+    url: response.url || url,
+    html,
+    text: extractReadableTextFromHtml(html),
+    method: "safe_external_fetch"
+  };
 }
 
 function requiredMissingDefinitions(quotes = []) {
@@ -403,12 +379,15 @@ export function createGruppoOro24kExtractor(options = {}) {
   const config = {
     url: options.url || GRUPPO_ORO_24K_DEFAULT_URL,
     timeoutMs: Number(options.timeoutMs || 15000),
+    maxBytes: Math.min(Number(options.maxBytes || GRUPPO_ORO_24K_HTML_MAX_BYTES), GRUPPO_ORO_24K_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: options.usePlaywright !== false,
     useAiFallback: Boolean(options.useAiFallback),
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000)
+    maxTextChars: Number(options.maxTextChars || 12000),
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
   async function extractGruppoOro24kQuotes(extractOptions = {}) {
@@ -425,21 +404,6 @@ export function createGruppoOro24kExtractor(options = {}) {
       ...runtime,
       sourceUrl: page.url || runtime.url
     })));
-
-    if (requiredMissingDefinitions(quotes).length && runtime.usePlaywright) {
-      const rendered = await renderGruppoOro24kPageWithPlaywright(runtime.url, runtime).catch((error) => ({
-        page: null,
-        warning: error.message || "Rendering Playwright Gruppo Oro 24K non riuscito."
-      }));
-      if (rendered.warning) warnings.push(rendered.warning);
-      if (rendered.page) {
-        pages.push(rendered.page);
-        quotes = dedupeGruppoOro24kQuotes(quotes.concat(extractGruppoOro24kQuotesFromText(rendered.page.text, {
-          ...runtime,
-          sourceUrl: rendered.page.url || runtime.url
-        })));
-      }
-    }
 
     if (requiredMissingDefinitions(quotes).length && runtime.useAiFallback) {
       const ai = await extractGruppoOro24kQuotesWithAi(pages, {

@@ -23,17 +23,24 @@ function sourceBlock(startMarker, endMarker) {
 
 test("backend applica confini statici, header di sicurezza e limiti bounded separati prima del parser", () => {
   const rateLimitBlock = sourceBlock("function requestRateLimitClass", "function auditApiRequest");
+  const mainCspBlock = sourceBlock("const contentSecurityPolicy", "app.use((_request, response, next)");
   assert.doesNotMatch(serverSource, /express\.static\(__dirname/);
   assert.match(serverSource, /publicRootStaticFiles = new Set/);
   assert.match(serverSource, /blockedStaticPathPrefixes = \[/);
   assert.match(serverSource, /"\/private_uploads"/);
   assert.match(serverSource, /isBlockedPath \|\| path\.posix\.extname\(requestPath\)/);
+  assert.match(serverSource, /app\.use\("\/api", \(_request, response\) =>/);
+  assert.match(serverSource, /code: "API_NOT_FOUND"/);
   assert.match(serverSource, /app\.disable\("x-powered-by"\)/);
   assert.match(serverSource, /Strict-Transport-Security/);
   assert.match(serverSource, /X-Content-Type-Options/);
   assert.match(serverSource, /frame-ancestors 'none'/);
-  assert.match(serverSource, /"style-src 'self' 'unsafe-inline' https:\/\/www\.bullionvault\.com"/);
-  assert.match(serverSource, /"connect-src 'self' https:\/\/www\.bullionvault\.com https:\/\/chart-data\.bullionvault\.com wss:\/\/chart-data\.bullionvault\.com"/);
+  assert.match(mainCspBlock, /"script-src 'self'"/);
+  assert.doesNotMatch(mainCspBlock, /bullionvault/i);
+  assert.match(serverSource, /"script-src-attr 'none'"/);
+  assert.match(mainCspBlock, /"style-src 'self'"/);
+  assert.match(serverSource, /"style-src-attr 'unsafe-inline'"/);
+  assert.match(mainCspBlock, /"connect-src 'self'"/);
   assert.match(serverSource, /Referrer-Policy/);
   assert.match(serverSource, /Permissions-Policy/);
   assert.ok(rateLimitBlock.includes('.replace(/\\/+$/, "")'));
@@ -41,10 +48,20 @@ test("backend applica confini statici, header di sicurezza e limiti bounded sepa
   assert.match(rateLimitBlock, /name: "passkey-options"/);
   assert.match(rateLimitBlock, /name: "passkey-verify"/);
   assert.match(rateLimitBlock, /name: "ai"/);
+  assert.match(rateLimitBlock, /name: "large-body", limit: 8/);
   assert.match(rateLimitBlock, /apiRateBucketMaxEntries/);
   assert.doesNotMatch(rateLimitBlock, /headers\.authorization|request\.headers\.authorization/);
   assert.match(serverSource, /app\.set\("trust proxy", process\.env\.TRUST_PROXY \|\| "loopback, linklocal, uniquelocal"\)/);
-  assert.ok(serverSource.indexOf("app.use(apiRateLimit)") < serverSource.indexOf("app.use(express.json"));
+  assert.ok(serverSource.indexOf("app.use(apiRateLimit)") < serverSource.indexOf("const publicJsonParser"));
+  assert.ok(serverSource.indexOf("app.use(requireApplicationReady)") < serverSource.indexOf("app.use(apiRateLimit)"));
+  assert.match(serverSource, /code: "SERVICE_NOT_READY"/);
+  assert.match(serverSource, /PUBLIC_JSON_BODY_LIMIT/);
+  assert.match(serverSource, /PROTECTED_JSON_BODY_LIMIT/);
+  assert.match(serverSource, /protectedJsonParser/);
+  assert.match(serverSource, /protectedLargeJsonParser/);
+  assert.match(serverSource, /function isLargeProtectedApiRequest/);
+  assert.match(serverSource, /function parseProtectedLargeJson/);
+  assert.match(serverSource, /protectedLargeBodyMaxInFlight/);
 });
 
 test("la PWA apre la home canonica e conserva la compatibilità con index.html", async () => {
@@ -189,9 +206,14 @@ test("runtime serve solo risorse pubbliche, restituisce 404 ai file interni e 50
     assert.equal(home.headers.get("x-content-type-options"), "nosniff");
     assert.equal(home.headers.get("x-frame-options"), "DENY");
     assert.match(home.headers.get("content-security-policy") || "", /frame-ancestors 'none'/);
-    assert.match(home.headers.get("content-security-policy") || "", /style-src[^;]*https:\/\/www\.bullionvault\.com/);
-    assert.match(home.headers.get("content-security-policy") || "", /connect-src[^;]*https:\/\/chart-data\.bullionvault\.com[^;]*wss:\/\/chart-data\.bullionvault\.com/);
+    assert.doesNotMatch(home.headers.get("content-security-policy") || "", /bullionvault/i);
     assert.match(home.headers.get("strict-transport-security") || "", /max-age=31536000/);
+
+    const isolatedWidget = await fetch(`${baseUrl}/bullionvault-widget.html`);
+    assert.equal(isolatedWidget.status, 200);
+    assert.equal(isolatedWidget.headers.get("x-frame-options"), "SAMEORIGIN");
+    assert.match(isolatedWidget.headers.get("content-security-policy") || "", /frame-ancestors 'self'/);
+    assert.match(isolatedWidget.headers.get("content-security-policy") || "", /connect-src[^;]*https:\/\/chart-data\.bullionvault\.com[^;]*wss:\/\/chart-data\.bullionvault\.com/);
 
     const installedAppHome = await fetch(`${baseUrl}/index.html`);
     assert.equal(installedAppHome.status, 200);
@@ -218,8 +240,9 @@ test("runtime serve solo risorse pubbliche, restituisce 404 ai file interni e 50
     assert.notEqual(healthPayload.initialization, "ready");
 
     const unknownApi = await fetch(`${baseUrl}/api/not-a-real-endpoint`);
-    assert.equal(unknownApi.status, 401);
+    assert.equal(unknownApi.status, 503);
     assert.match(unknownApi.headers.get("content-type") || "", /application\/json/);
+    assert.equal((await unknownApi.json()).code, "SERVICE_NOT_READY");
   } finally {
     if (child.exitCode === null) child.kill("SIGTERM");
     await Promise.race([

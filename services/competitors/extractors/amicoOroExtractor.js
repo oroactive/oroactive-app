@@ -1,6 +1,9 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const AMICO_ORO_DEFAULT_URL = "https://www.amico-oro.it";
+const AMICO_ORO_ALLOWED_HOSTS = ["amico-oro.it"];
+const AMICO_ORO_HTML_MAX_BYTES = 2 * 1024 * 1024;
 
 const AMICO_ORO_GOLD_DEFINITIONS = [
   { key: "gold_24kt", label: "24K al gr", karat: "24", metal: "gold", purity_code: "24kt", purity_value: 1 },
@@ -93,27 +96,28 @@ function amicoOroQuote(definition = {}, price = 0, sourceUrl = AMICO_ORO_DEFAULT
 }
 
 export async function fetchAmicoOroPage(url = AMICO_ORO_DEFAULT_URL, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-        "User-Agent": options.userAgent || "OroActiveBot/1.0"
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      url: response.url || url,
-      html,
-      text: extractReadableTextFromHtml(html),
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const response = await safeExternalFetch(url, {
+    allowedHosts: AMICO_ORO_ALLOWED_HOSTS,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || AMICO_ORO_HTML_MAX_BYTES), AMICO_ORO_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+      "User-Agent": options.userAgent || "OroActiveBot/1.0"
+    }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  return {
+    url: response.url || url,
+    html,
+    text: extractReadableTextFromHtml(html),
+    method: "safe_external_fetch"
+  };
 }
 
 function goldRegexForKarat(karat = "") {
@@ -155,30 +159,6 @@ export function extractAmicoOroQuotesFromText(text = "", options = {}) {
     }
   }
   return quotes;
-}
-
-async function renderAmicoOroPageWithPlaywright(url = AMICO_ORO_DEFAULT_URL, options = {}) {
-  if (!options.usePlaywright) return { quotes: [], warning: "Playwright disattivato." };
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { quotes: [], warning: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    await page.waitForTimeout(2500);
-    const rendered = await page.evaluate(() => document.body?.innerText || "");
-    return {
-      quotes: extractAmicoOroQuotesFromText(rendered, { ...options, sourceUrl: page.url() }),
-      text: rendered,
-      warning: ""
-    };
-  } finally {
-    await browser.close().catch(() => {});
-  }
 }
 
 async function extractAmicoOroQuotesWithAi(pageText = "", options = {}) {
@@ -260,12 +240,15 @@ export function createAmicoOroExtractor(options = {}) {
   const config = {
     url: options.url || AMICO_ORO_DEFAULT_URL,
     timeoutMs: Number(options.timeoutMs || 15000),
+    maxBytes: Math.min(Number(options.maxBytes || AMICO_ORO_HTML_MAX_BYTES), AMICO_ORO_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: options.usePlaywright !== false,
     useAiVisionFallback: Boolean(options.useAiVisionFallback),
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000)
+    maxTextChars: Number(options.maxTextChars || 12000),
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
   async function extractAmicoOroQuotes(extractOptions = {}) {
@@ -282,16 +265,6 @@ export function createAmicoOroExtractor(options = {}) {
       ...runtime,
       sourceUrl: page.url || runtime.url
     }) : [];
-
-    if (quotes.filter((quote) => quote.metal === "gold").length < AMICO_ORO_GOLD_DEFINITIONS.length) {
-      const rendered = await renderAmicoOroPageWithPlaywright(runtime.url, runtime).catch((error) => ({
-        quotes: [],
-        warning: error.message || "Rendering Playwright non riuscito."
-      }));
-      if (rendered.warning) warnings.push(rendered.warning);
-      if (rendered.quotes?.length > quotes.length) quotes = rendered.quotes;
-      if (!page?.text && rendered.text) page = { text: rendered.text, url: runtime.url };
-    }
 
     if (quotes.filter((quote) => quote.metal === "gold").length < AMICO_ORO_GOLD_DEFINITIONS.length && page?.text) {
       const ai = await extractAmicoOroQuotesWithAi(page.text, {

@@ -1,8 +1,11 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const PRONTO_GOLD_DEFAULT_URL = "https://www.prontogold.com";
 const PRONTO_GOLD_QUOTE_URL = "https://www.prontogold.com/quotazioni";
 const PRONTO_GOLD_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+const PRONTO_GOLD_ALLOWED_HOSTS = ["prontogold.com"];
+const PRONTO_GOLD_HTML_MAX_BYTES = 2 * 1024 * 1024;
 
 const PRONTO_GOLD_DEFINITIONS = [
   {
@@ -372,35 +375,35 @@ function dedupeProntoGoldQuotes(quotes = []) {
 }
 
 export async function fetchProntoGoldPage(url = PRONTO_GOLD_DEFAULT_URL, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const requestHeaders = (userAgent) => ({
-      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-      "Accept-Language": "it-IT,it;q=0.9,en;q=0.6",
-      "User-Agent": userAgent
-    });
-    let response = await fetch(url, {
-      signal: controller.signal,
-      headers: requestHeaders(options.userAgent || "OroActiveBot/1.0")
-    });
-    if ([403, 406, 429].includes(response.status) && (options.userAgent || "OroActiveBot/1.0") !== PRONTO_GOLD_BROWSER_USER_AGENT) {
-      response = await fetch(url, {
-        signal: controller.signal,
-        headers: requestHeaders(PRONTO_GOLD_BROWSER_USER_AGENT)
-      });
-    }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      url: response.url || url,
-      html,
-      text: extractReadableTextFromHtml(html),
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
+  const requestHeaders = (userAgent) => ({
+    Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+    "Accept-Language": "it-IT,it;q=0.9,en;q=0.6",
+    "User-Agent": userAgent
+  });
+  const request = (userAgent) => safeExternalFetch(url, {
+    allowedHosts: PRONTO_GOLD_ALLOWED_HOSTS,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || PRONTO_GOLD_HTML_MAX_BYTES), PRONTO_GOLD_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: requestHeaders(userAgent)
+  });
+  const configuredUserAgent = options.userAgent || "OroActiveBot/1.0";
+  let response = await request(configuredUserAgent);
+  if ([403, 406, 429].includes(response.status) && configuredUserAgent !== PRONTO_GOLD_BROWSER_USER_AGENT) {
+    response = await request(PRONTO_GOLD_BROWSER_USER_AGENT);
   }
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  return {
+    url: response.url || url,
+    html,
+    text: extractReadableTextFromHtml(html),
+    method: "safe_external_fetch"
+  };
 }
 
 function resolveProntoGoldUrl(href = "", baseUrl = PRONTO_GOLD_DEFAULT_URL) {
@@ -425,37 +428,6 @@ export function discoverProntoGoldQuoteUrls(html = "", baseUrl = PRONTO_GOLD_DEF
     if (resolved) urls.push(resolved);
   }
   return [...new Set(urls.map((url) => resolveProntoGoldUrl(url, baseUrl)).filter(Boolean))].slice(0, 8);
-}
-
-async function renderProntoGoldPageWithPlaywright(url = PRONTO_GOLD_QUOTE_URL, options = {}) {
-  if (!options.usePlaywright) return { page: null, warning: "Playwright disattivato." };
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { page: null, warning: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    const acceptButton = page.getByText(/accetto|accetta|ok|chiudi/i);
-    if (await acceptButton.count().catch(() => 0)) {
-      await acceptButton.first().click({ timeout: 1500 }).catch(() => {});
-    }
-    await page.waitForTimeout(1000);
-    return {
-      page: {
-        url: page.url() || url,
-        html: "",
-        text: await page.evaluate(() => document.body?.innerText || ""),
-        method: "playwright"
-      },
-      warning: ""
-    };
-  } finally {
-    await browser.close().catch(() => {});
-  }
 }
 
 function requiredMissingDefinitions(quotes = []) {
@@ -565,12 +537,15 @@ export function createProntoGoldExtractor(options = {}) {
     url: options.url || PRONTO_GOLD_DEFAULT_URL,
     quoteUrl: options.quoteUrl || PRONTO_GOLD_QUOTE_URL,
     timeoutMs: Number(options.timeoutMs || 15000),
+    maxBytes: Math.min(Number(options.maxBytes || PRONTO_GOLD_HTML_MAX_BYTES), PRONTO_GOLD_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: options.usePlaywright !== false,
     useAiFallback: Boolean(options.useAiFallback),
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000)
+    maxTextChars: Number(options.maxTextChars || 12000),
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
   async function extractProntoGoldQuotes(extractOptions = {}) {
@@ -603,21 +578,6 @@ export function createProntoGoldExtractor(options = {}) {
       ...runtime,
       sourceUrl: page.url || runtime.quoteUrl
     })));
-
-    if (requiredMissingDefinitions(quotes).length && runtime.usePlaywright) {
-      const rendered = await renderProntoGoldPageWithPlaywright(runtime.quoteUrl, runtime).catch((error) => ({
-        page: null,
-        warning: error.message || "Rendering Playwright Pronto Gold non riuscito."
-      }));
-      if (rendered.warning) warnings.push(rendered.warning);
-      if (rendered.page) {
-        pages.push(rendered.page);
-        quotes = dedupeProntoGoldQuotes(quotes.concat(extractProntoGoldQuotesFromText(rendered.page.text, {
-          ...runtime,
-          sourceUrl: rendered.page.url || runtime.quoteUrl
-        })));
-      }
-    }
 
     if (requiredMissingDefinitions(quotes).length && runtime.useAiFallback) {
       const ai = await extractProntoGoldQuotesWithAi(pages, {

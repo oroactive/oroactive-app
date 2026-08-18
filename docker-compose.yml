@@ -5,9 +5,9 @@ services:
       - "3000:3000"
     environment:
       PORT: 3000
-      DATABASE_URL: postgresql://oroactive_admin:${POSTGRES_PASSWORD:-INSERISCI_PASSWORD_DATABASE}@postgres:5432/oroactive_db
+      DATABASE_URL: postgresql://oroactive_admin:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obbligatoria}@postgres:5432/oroactive_db
       NODE_ENV: production
-      JWT_SECRET: ${JWT_SECRET:-INSERISCI_CHIAVE_LUNGA_CASUALE_MINIMO_32_CARATTERI}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET obbligatoria}
       JWT_EXPIRES_IN: 7d
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-app.oroactive.it}
       WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:-https://app.oroactive.it}
@@ -17,13 +17,19 @@ services:
       REQUIRE_DATABASE_ON_START: ${REQUIRE_DATABASE_ON_START:-true}
       ADMIN_USERNAME: Elite
       ADMIN_EMAIL: elite@oroactive.it
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-INSERISCI_PASSWORD_FOUNDER}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_NOME: Elite
       ADMIN_COGNOME: Founder
       ADMIN_NEGOZIO: Tutti
       BACKUP_DIR: /data/oroactive/backups
+      PRIVATE_UPLOAD_DIR: /app/private_uploads
+      REQUIRE_PERSISTENT_UPLOAD_STORAGE: "true"
+      REQUIRE_PERSISTENT_BACKUP_STORAGE: "true"
+      ACADEMY_UPLOAD_DIR: /app/private_uploads/academy
+      CUSTOMER_TRUST_PACK_DIR: /app/private_uploads/customer-trust-packs
     volumes:
       - oroactive-backups:/data/oroactive/backups
+      - oroactive-private-uploads:/app/private_uploads
     depends_on:
       - postgres
 
@@ -31,7 +37,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: oroactive_admin
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-INSERISCI_PASSWORD_DATABASE}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obbligatoria}
       POSTGRES_DB: oroactive_db
     volumes:
       - oroactive-postgres:/var/lib/postgresql/data
@@ -39,3 +45,4 @@ services:
 volumes:
   oroactive-postgres:
   oroactive-backups:
+  oroactive-private-uploads:

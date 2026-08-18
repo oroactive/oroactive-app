@@ -1,6 +1,10 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const ORO_EXPRESS_DEFAULT_URL = "https://www.oro-express.it";
+const ORO_EXPRESS_ALLOWED_HOSTS = ["oro-express.it"];
+const ORO_EXPRESS_HTML_MAX_BYTES = 2 * 1024 * 1024;
+const ORO_EXPRESS_JSON_MAX_BYTES = 256 * 1024;
 const ORO_EXPRESS_QUOTE_DEFINITIONS = [
   {
     key: "gold_pure",
@@ -111,27 +115,28 @@ function oroExpressQuote(definition, pricePerGram, sourceUrl, rawPayload = {}, o
 }
 
 export async function fetchOroExpressPage(url = ORO_EXPRESS_DEFAULT_URL, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-        "User-Agent": options.userAgent || "OroActiveBot/1.0"
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      url: response.url || url,
-      html,
-      text: extractReadableTextFromHtml(html),
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const response = await safeExternalFetch(url, {
+    allowedHosts: ORO_EXPRESS_ALLOWED_HOSTS,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || ORO_EXPRESS_HTML_MAX_BYTES), ORO_EXPRESS_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+      "User-Agent": options.userAgent || "OroActiveBot/1.0"
+    }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  return {
+    url: response.url || url,
+    html,
+    text: extractReadableTextFromHtml(html),
+    method: "safe_external_fetch"
+  };
 }
 
 async function fetchOroExpressJson(url = ORO_EXPRESS_DEFAULT_URL, definition = {}, options = {}) {
@@ -142,22 +147,23 @@ async function fetchOroExpressJson(url = ORO_EXPRESS_DEFAULT_URL, definition = {
   endpoint.searchParams.set("format", "raw");
   endpoint.searchParams.set("tipo", definition.tipo);
   endpoint.searchParams.set("id_negozio", "null");
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const response = await fetch(endpoint.toString(), {
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json,text/plain;q=0.9,*/*;q=0.5",
-        "User-Agent": options.userAgent || "OroActiveBot/1.0"
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const raw = await response.text();
-    return { endpoint: endpoint.toString(), raw, json: JSON.parse(raw) };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const response = await safeExternalFetch(endpoint.toString(), {
+    allowedHosts: ORO_EXPRESS_ALLOWED_HOSTS,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.jsonMaxBytes || ORO_EXPRESS_JSON_MAX_BYTES), ORO_EXPRESS_JSON_MAX_BYTES),
+    maxRedirects: 2,
+    allowedContentTypes: ["application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: {
+      Accept: "application/json,text/plain;q=0.9,*/*;q=0.5",
+      "User-Agent": options.userAgent || "OroActiveBot/1.0"
+    }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const raw = await response.text();
+  return { endpoint: endpoint.toString(), raw, json: JSON.parse(raw) };
 }
 
 function priceFromOroExpressWidgetJson(definition = {}, json = {}) {
@@ -211,45 +217,6 @@ async function extractOroExpressQuotesFromWidgetApi(url = ORO_EXPRESS_DEFAULT_UR
     }
   }
   return { quotes, errors };
-}
-
-async function renderOroExpressPageWithPlaywright(url = ORO_EXPRESS_DEFAULT_URL, options = {}) {
-  if (!options.usePlaywright) return { quotes: [], warning: "Playwright disattivato." };
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { quotes: [], warning: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    await page.waitForTimeout(3500);
-    const rendered = await page.evaluate(() => ({
-      text: document.body?.innerText || "",
-      values: {
-        gold_pure: document.querySelector(".oro-puro")?.innerText || "",
-        gold_used: document.querySelector(".oro-usato")?.innerText || "",
-        silver_pure: document.querySelector(".argento-puro")?.innerText || "",
-        silver_used: document.querySelector(".argento-usato")?.innerText || ""
-      }
-    }));
-    const silverUsedMapping = String(options.silverUsedMapping || "generic").toLowerCase();
-    const quotes = ORO_EXPRESS_QUOTE_DEFINITIONS
-      .map((baseDefinition) => {
-        const definition = normalizeOroExpressSilverUsed(baseDefinition, silverUsedMapping);
-        const price = parseItalianEuroPrice(rendered.values[baseDefinition.key]);
-        return price ? oroExpressQuote(definition, price, page.url(), {
-          source_method: "playwright_dom",
-          rendered_value: rendered.values[baseDefinition.key]
-        }, options) : null;
-      })
-      .filter(Boolean);
-    return { quotes, text: rendered.text, warning: "" };
-  } finally {
-    await browser.close().catch(() => {});
-  }
 }
 
 async function extractOroExpressQuotesWithAi(pageText = "", options = {}) {
@@ -319,12 +286,16 @@ export function createOroExpressExtractor(options = {}) {
   const config = {
     url: options.url || ORO_EXPRESS_DEFAULT_URL,
     timeoutMs: Number(options.timeoutMs || 15000),
+    maxBytes: Math.min(Number(options.maxBytes || ORO_EXPRESS_HTML_MAX_BYTES), ORO_EXPRESS_HTML_MAX_BYTES),
+    jsonMaxBytes: Math.min(Number(options.jsonMaxBytes || ORO_EXPRESS_JSON_MAX_BYTES), ORO_EXPRESS_JSON_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: options.usePlaywright !== false,
     silverUsedMapping: options.silverUsedMapping || "generic",
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000)
+    maxTextChars: Number(options.maxTextChars || 12000),
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
   async function extractOroExpressQuotes(extractOptions = {}) {
@@ -345,16 +316,6 @@ export function createOroExpressExtractor(options = {}) {
     const widget = await extractOroExpressQuotesFromWidgetApi(runtime.url, runtime);
     warnings.push(...widget.errors);
     let quotes = widget.quotes.length ? widget.quotes : textQuotes;
-
-    if (quotes.length < ORO_EXPRESS_QUOTE_DEFINITIONS.length) {
-      const rendered = await renderOroExpressPageWithPlaywright(runtime.url, runtime).catch((error) => ({
-        quotes: [],
-        warning: error.message || "Rendering Playwright non riuscito."
-      }));
-      if (rendered.warning) warnings.push(rendered.warning);
-      if (rendered.quotes?.length > quotes.length) quotes = rendered.quotes;
-      if (!page?.text && rendered.text) page = { text: rendered.text, url: runtime.url };
-    }
 
     if (quotes.length < ORO_EXPRESS_QUOTE_DEFINITIONS.length && page?.text) {
       const ai = await extractOroExpressQuotesWithAi(page.text, {

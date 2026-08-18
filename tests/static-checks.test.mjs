@@ -150,26 +150,29 @@ test("configurazione produzione non contiene password Founder reale", async () =
   assert.doesNotMatch(dockerCompose, /Snoopdoggydogg|cambia-questa-chiave-jwt-oroactive|oroactive_password/i);
   assert.doesNotMatch(deployCoolify, /Snoopdoggydogg/i);
   assert.match(envExample, /ADMIN_PASSWORD=INSERISCI_PASSWORD_FOUNDER/);
-  assert.match(dockerCompose, /ADMIN_PASSWORD: \$\{ADMIN_PASSWORD:-INSERISCI_PASSWORD_FOUNDER\}/);
+  assert.match(dockerCompose, /ADMIN_PASSWORD: \$\{ADMIN_PASSWORD:-\}/);
+  assert.match(dockerCompose, /JWT_SECRET: \$\{JWT_SECRET:\?JWT_SECRET obbligatoria\}/);
+  assert.match(dockerCompose, /POSTGRES_PASSWORD: \$\{POSTGRES_PASSWORD:\?POSTGRES_PASSWORD obbligatoria\}/);
   assert.match(deployCoolify, /ADMIN_PASSWORD=INSERISCI_PASSWORD_FOUNDER/);
   assert.match(server, /JWT_SECRET obbligatorio/);
   assert.match(server, /ADMIN_PASSWORD obbligatoria/);
 });
 
 test("PWA non cachea API e dati sensibili", async () => {
-  const [sw, app, server, index, version] = await Promise.all([
+  const [sw, app, server, index, version, pwaBoot] = await Promise.all([
     file("service-worker.js"),
     file("app.js"),
     file("server.js"),
     file("index.html"),
-    file("version.json")
+    file("version.json"),
+    file("pwa-boot.js")
   ]);
 
   assert.match(sw, /\/api\//);
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260807-quotes-reliability-21"/);
+  assert.match(sw, /const BUILD_ID = "20260818-security-reliability-22"/);
   assert.match(sw, /const SHELL_CACHE_NAME = `oroactive-shell-\$\{BUILD_ID\}`/);
   assert.match(sw, /const IMAGE_CACHE_NAME = `oroactive-images-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
@@ -178,7 +181,9 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /request\.mode === "navigate"/);
   assert.match(sw, /HASHED_ASSET_PATTERN/);
   assert.match(sw, /NEVER_CACHE_PATHS = \[[\s\S]*"\/version\.json"/);
-  assert.match(sw, /SHELL_ASSETS/);
+  assert.match(sw, /SHELL_CORE_ASSETS/);
+  assert.match(sw, /Promise\.all\(SHELL_CORE_ASSETS/);
+  assert.match(sw, /Promise\.allSettled\(SHELL_OPTIONAL_ASSETS/);
   assert.match(sw, /networkFirstNavigation/);
   assert.match(sw, /cacheFirstAssetImage/);
   assert.doesNotMatch(sw, /cache\.addAll|STATIC_ASSETS/);
@@ -206,19 +211,20 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /meta name="oroactive-build-id" content="20260807-quotes-reliability-21"/);
-  assert.match(index, /async function verifyBootBuild/);
-  assert.match(index, /async function resetStalePwa/);
-  assert.match(index, /fetch\("\/version\.json", \{/);
-  assert.match(index, /navigator\.serviceWorker\.getRegistrations/);
-  assert.match(index, /registration\.unregister/);
-  assert.match(index, /window\.caches\.delete/);
-  assert.match(index, /serverBuildId !== htmlBuildId/);
-  assert.match(index, /app\.js\?v=20260807-quotes-reliability-21/);
-  assert.match(index, /shared\/aurum-policy\.js\?v=20260807-quotes-reliability-21/);
-  assert.match(index, /styles\.css\?v=20260807-quotes-reliability-21/);
+  assert.match(index, /meta name="oroactive-build-id" content="20260818-security-reliability-22"/);
+  assert.match(index, /pwa-boot\.js\?v=20260818-security-reliability-22/);
+  assert.match(pwaBoot, /async function verifyBootBuild/);
+  assert.match(pwaBoot, /async function resetStalePwa/);
+  assert.match(pwaBoot, /fetch\("\/version\.json", \{/);
+  assert.match(pwaBoot, /navigator\.serviceWorker\.getRegistrations/);
+  assert.match(pwaBoot, /registration\.unregister/);
+  assert.match(pwaBoot, /window\.caches\.delete/);
+  assert.match(pwaBoot, /serverBuildId !== htmlBuildId/);
+  assert.match(index, /app\.js\?v=20260818-security-reliability-22/);
+  assert.match(index, /shared\/aurum-policy\.js\?v=20260818-security-reliability-22/);
+  assert.match(index, /styles\.css\?v=20260818-security-reliability-22/);
   assert.match(version, /"ok": true/);
-  assert.match(version, /"assetBuildId": "20260807-quotes-reliability-21"/);
+  assert.match(version, /"assetBuildId": "20260818-security-reliability-22"/);
   assert.match(version, /"catalogCount": 197/);
   assert.match(version, /"aurumSalesTopics": 12/);
   assert.match(version, /"aurumSalesMode": "ethical-consultative"/);
@@ -277,7 +283,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -2223,7 +2229,7 @@ test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () =>
   assert.match(migration, /CREATE TABLE IF NOT EXISTS backups/);
   assert.match(migration, /idx_backup_logs_backup_id/);
   assert.match(nixpacks, /postgresql_16/);
-  assert.match(dockerfile, /postgresql-client/);
+  assert.match(dockerfile, /postgresql16-client/);
 });
 
 test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
@@ -3485,7 +3491,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -3544,7 +3550,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -3596,7 +3602,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -3681,11 +3687,13 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(server, /function publicErrorMessage/);
   assert.match(server, /function looksTechnicalErrorMessage/);
   assert.match(server, /function safeRouteErrorMessage/);
-  assert.doesNotMatch(errorBlock, /payload\.code/);
+  assert.match(errorBlock, /const publicErrorCodes = new Set\(\[[\s\S]*"TRUST_PACK_STALE"[\s\S]*"TRUST_PACK_ACT_VERSION_CONFLICT"[\s\S]*"TRUST_PACK_CODE_CONFLICT"[\s\S]*\]\)/);
+  assert.match(errorBlock, /const safeCode = publicErrorCode\(error\);[\s\S]*if \(safeCode\) payload\.code = safeCode/);
+  assert.doesNotMatch(errorBlock, /payload\.code\s*=\s*error\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260807-quotes-reliability-21/);
-  assert.match(index, /styles\.css\?v=20260807-quotes-reliability-21/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(index, /app\.js\?v=20260818-security-reliability-22/);
+  assert.match(index, /styles\.css\?v=20260818-security-reliability-22/);
+  assert.match(worker, /20260818-security-reliability-22/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3731,8 +3739,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260807-quotes-reliability-21/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(index, /styles\.css\?v=20260818-security-reliability-22/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3888,7 +3896,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -3992,7 +4000,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -4023,7 +4031,7 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(server, /customer_trust_pack_sent_whatsapp/);
   assert.match(server, /customer_trust_pack_regenerated/);
   assert.match(server, /Content-Disposition/);
-  assert.match(server, /private_uploads", "customer-trust-packs"/);
+  assert.match(server, /const trustPackDirectory = process\.env\.CUSTOMER_TRUST_PACK_DIR \|\| path\.join\(privateUploadDirectory, "customer-trust-packs"\)/);
   const pdfStart = server.indexOf("async function writeCustomerTrustPackPdf");
   const pdfEnd = server.indexOf("async function generateCustomerTrustPack", pdfStart);
   const pdfBlock = server.slice(pdfStart, pdfEnd);
@@ -4043,9 +4051,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260807-quotes-reliability-21/);
-  assert.match(index, /styles\.css\?v=20260807-quotes-reliability-21/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(index, /app\.js\?v=20260818-security-reliability-22/);
+  assert.match(index, /styles\.css\?v=20260818-security-reliability-22/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -4102,9 +4110,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260807-quotes-reliability-21/);
-  assert.match(index, /styles\.css\?v=20260807-quotes-reliability-21/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(index, /app\.js\?v=20260818-security-reliability-22/);
+  assert.match(index, /styles\.css\?v=20260818-security-reliability-22/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -4182,7 +4190,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -4299,7 +4307,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -4343,7 +4351,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260807-quotes-reliability-21/);
+  assert.match(worker, /20260818-security-reliability-22/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
@@ -4351,7 +4359,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
 });
 
 test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", async () => {
-  const [workflow, server, app, index, styles, worker, dockerfile, metadataScript, docs] = await Promise.all([
+  const [workflow, server, app, index, styles, worker, dockerfile, metadataScript, docs, pwaBoot] = await Promise.all([
     file(".github/workflows/deploy-coolify.yml"),
     file("server.js"),
     file("app.js"),
@@ -4360,7 +4368,8 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
     file("service-worker.js"),
     file("Dockerfile"),
     file("scripts/write-version-metadata.mjs"),
-    file("docs/deploy-oroactive-coolify.md")
+    file("docs/deploy-oroactive-coolify.md"),
+    file("pwa-boot.js")
   ]);
 
   assert.match(workflow, /COOLIFY_WEBHOOK/);
@@ -4385,7 +4394,9 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(workflow, /publishedStartedAt/);
   assert.match(workflow, /processStartedAt >= deploymentRequestedAt - clockSkewToleranceMs/);
   assert.match(workflow, /freshProcess: isFreshProcess/);
-  assert.doesNotMatch(workflow, /&& isFreshProcess/);
+  assert.match(workflow, /&& isFreshProcess/);
+  assert.match(workflow, /payload\?\.persistent_upload_storage === "ready"/);
+  assert.match(workflow, /payload\?\.persistent_backup_storage === "ready"/);
   assert.match(workflow, /payload\?\.database === "ready"/);
   assert.match(workflow, /payload\?\.initialization === "ready"/);
   assert.match(workflow, /&& isReady/);
@@ -4396,7 +4407,7 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(dockerfile, /ARG GIT_COMMIT/);
   assert.match(dockerfile, /ARG SOURCE_COMMIT/);
   assert.match(dockerfile, /ARG SOURCE_BRANCH/);
-  assert.match(dockerfile, /postgresql-client git/);
+  assert.match(dockerfile, /postgresql16-client git/);
   assert.match(dockerfile, /OROACTIVE_GIT_COMMIT/);
   assert.match(dockerfile, /OROACTIVE_BUILD_TIME/);
   assert.match(dockerfile, /OROACTIVE_BUILD_NUMBER/);
@@ -4462,8 +4473,9 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(index, /data-user-check-update/);
   assert.match(index, /id="appUpdateBanner"/);
   assert.match(index, /Aggiorna ora/);
-  assert.match(index, /window\.__OROACTIVE_BOOT_BUILD_ID__/);
-  assert.match(index, /resetStalePwa/);
+  assert.match(index, /pwa-boot\.js\?v=20260818-security-reliability-22/);
+  assert.match(pwaBoot, /window\.__OROACTIVE_BOOT_BUILD_ID__/);
+  assert.match(pwaBoot, /resetStalePwa/);
   assert.doesNotMatch(index, /data-founder-footer-build|app-footer-build/);
   assert.match(styles, /\.app-update-banner/);
   assert.match(styles, /\.app-version-panel/);

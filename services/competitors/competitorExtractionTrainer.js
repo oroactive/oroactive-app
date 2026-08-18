@@ -1,6 +1,16 @@
 import { extractReadableTextFromHtml } from "./aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../security/safeExternalFetch.js";
 
 const VALID_CONFIDENCE = new Set(["low", "medium", "high"]);
+const TRAINER_HTML_MAX_BYTES = 2 * 1024 * 1024;
+
+function allowedHostsForSource(source = {}, fallbackUrl = "") {
+  const configuredUrl = source.website_url || source.websiteUrl || fallbackUrl;
+  const hostname = new URL(configuredUrl).hostname.toLowerCase().replace(/\.$/, "");
+  if (!hostname) throw new Error("Dominio competitor non valido.");
+  const companion = hostname.startsWith("www.") ? hostname.slice(4) : `www.${hostname}`;
+  return [...new Set([hostname, companion])];
+}
 
 function compactText(value = "") {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -253,7 +263,12 @@ function sourceSpecificQuoteForRule(rule = {}, sourceQuotes = []) {
 
 export function createCompetitorExtractionTrainer(options = {}) {
   const config = {
-    fetchPage: options.fetchPage,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || TRAINER_HTML_MAX_BYTES), TRAINER_HTML_MAX_BYTES),
+    userAgent: options.userAgent || "OroActiveBot/1.0",
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal,
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
     oroExpressExtractor: options.oroExpressExtractor || null,
@@ -267,9 +282,18 @@ export function createCompetitorExtractionTrainer(options = {}) {
     prontoGoldExtractor: options.prontoGoldExtractor || null
   };
 
-  async function fetchPublicPage(url = "") {
-    if (config.fetchPage) return config.fetchPage(url);
-    const response = await fetch(url, { headers: { "User-Agent": "OroActiveBot/1.0" } });
+  async function fetchPublicPage(url = "", source = {}) {
+    const response = await safeExternalFetch(url, {
+      allowedHosts: allowedHostsForSource(source, url),
+      timeoutMs: config.timeoutMs,
+      maxBytes: config.maxBytes,
+      maxRedirects: 3,
+      allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+      signal: config.signal,
+      fetchImpl: config.fetchImpl,
+      resolver: config.resolver,
+      headers: { "User-Agent": config.userAgent }
+    });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return { body: await response.text(), contentType: response.headers.get("content-type") || "" };
   }
@@ -387,7 +411,7 @@ export function createCompetitorExtractionTrainer(options = {}) {
       return { rule, status: "error", value: null, unit: rule.unit || "EUR/g", evidence_text: "", method: rule.extraction_method || "anchor_regex", confidence: "low", error: "URL pagina mancante" };
     }
     if (!pageCache.has(pageUrl)) {
-      pageCache.set(pageUrl, await fetchPublicPage(pageUrl));
+      pageCache.set(pageUrl, await fetchPublicPage(pageUrl, source));
     }
     const page = pageCache.get(pageUrl);
     const html = page.body || page.html || "";

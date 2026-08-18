@@ -1,7 +1,10 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const ORO_IN_EURO_DEFAULT_URL = "https://www.quotazioneritirooro.it";
 const ORO_IN_EURO_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+const ORO_IN_EURO_ALLOWED_HOSTS = ["quotazioneritirooro.it"];
+const ORO_IN_EURO_HTML_MAX_BYTES = 2 * 1024 * 1024;
 
 const ORO_IN_EURO_DEFINITIONS = [
   {
@@ -238,35 +241,35 @@ function dedupeOroInEuroQuotes(quotes = []) {
 }
 
 export async function fetchOroInEuroPage(url = ORO_IN_EURO_DEFAULT_URL, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const requestHeaders = (userAgent) => ({
-      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-      "Accept-Language": "it-IT,it;q=0.9,en;q=0.6",
-      "User-Agent": userAgent
-    });
-    let response = await fetch(url, {
-      signal: controller.signal,
-      headers: requestHeaders(options.userAgent || "OroActiveBot/1.0")
-    });
-    if (response.status === 403 && (options.userAgent || "OroActiveBot/1.0") !== ORO_IN_EURO_BROWSER_USER_AGENT) {
-      response = await fetch(url, {
-        signal: controller.signal,
-        headers: requestHeaders(ORO_IN_EURO_BROWSER_USER_AGENT)
-      });
-    }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      url: response.url || url,
-      html,
-      text: extractReadableTextFromHtml(html),
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
+  const requestHeaders = (userAgent) => ({
+    Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+    "Accept-Language": "it-IT,it;q=0.9,en;q=0.6",
+    "User-Agent": userAgent
+  });
+  const request = (userAgent) => safeExternalFetch(url, {
+    allowedHosts: ORO_IN_EURO_ALLOWED_HOSTS,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || ORO_IN_EURO_HTML_MAX_BYTES), ORO_IN_EURO_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: requestHeaders(userAgent)
+  });
+  const configuredUserAgent = options.userAgent || "OroActiveBot/1.0";
+  let response = await request(configuredUserAgent);
+  if (response.status === 403 && configuredUserAgent !== ORO_IN_EURO_BROWSER_USER_AGENT) {
+    response = await request(ORO_IN_EURO_BROWSER_USER_AGENT);
   }
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  return {
+    url: response.url || url,
+    html,
+    text: extractReadableTextFromHtml(html),
+    method: "safe_external_fetch"
+  };
 }
 
 function resolveOroInEuroUrl(href = "", baseUrl = ORO_IN_EURO_DEFAULT_URL) {
@@ -291,37 +294,6 @@ export function discoverOroInEuroQuoteUrls(html = "", baseUrl = ORO_IN_EURO_DEFA
     if (resolved) urls.push(resolved);
   }
   return [...new Set(urls.map((url) => resolveOroInEuroUrl(url, baseUrl)).filter(Boolean))].slice(0, 5);
-}
-
-async function renderOroInEuroPageWithPlaywright(url = ORO_IN_EURO_DEFAULT_URL, options = {}) {
-  if (!options.usePlaywright) return { page: null, warning: "Playwright disattivato." };
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { page: null, warning: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    const acceptButton = page.getByText(/accetto|accetta|ok/i);
-    if (await acceptButton.count().catch(() => 0)) {
-      await acceptButton.first().click({ timeout: 1500 }).catch(() => {});
-    }
-    await page.waitForTimeout(1200);
-    return {
-      page: {
-        url: page.url() || url,
-        html: "",
-        text: await page.evaluate(() => document.body?.innerText || ""),
-        method: "playwright"
-      },
-      warning: ""
-    };
-  } finally {
-    await browser.close().catch(() => {});
-  }
 }
 
 function requiredMissingDefinitions(quotes = []) {
@@ -412,12 +384,15 @@ export function createOroInEuroExtractor(options = {}) {
   const config = {
     url: options.url || ORO_IN_EURO_DEFAULT_URL,
     timeoutMs: Number(options.timeoutMs || 15000),
+    maxBytes: Math.min(Number(options.maxBytes || ORO_IN_EURO_HTML_MAX_BYTES), ORO_IN_EURO_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: options.usePlaywright !== false,
     useAiFallback: Boolean(options.useAiFallback),
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000)
+    maxTextChars: Number(options.maxTextChars || 12000),
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
   async function extractOroInEuroQuotes(extractOptions = {}) {
@@ -445,21 +420,6 @@ export function createOroInEuroExtractor(options = {}) {
       ...runtime,
       sourceUrl: page.url || runtime.url
     })));
-
-    if (requiredMissingDefinitions(quotes).length && runtime.usePlaywright) {
-      const rendered = await renderOroInEuroPageWithPlaywright(runtime.url, runtime).catch((error) => ({
-        page: null,
-        warning: error.message || "Rendering Playwright Oro in Euro non riuscito."
-      }));
-      if (rendered.warning) warnings.push(rendered.warning);
-      if (rendered.page) {
-        pages.push(rendered.page);
-        quotes = dedupeOroInEuroQuotes(quotes.concat(extractOroInEuroQuotesFromText(rendered.page.text, {
-          ...runtime,
-          sourceUrl: rendered.page.url || runtime.url
-        })));
-      }
-    }
 
     if (requiredMissingDefinitions(quotes).length && runtime.useAiFallback) {
       const ai = await extractOroInEuroQuotesWithAi(pages, {

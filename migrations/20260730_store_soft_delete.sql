@@ -22,7 +22,9 @@ BEGIN
   FROM negozi
   WHERE id = referenced_store_id
     AND deleted_at IS NULL
-  FOR KEY SHARE;
+    AND COALESCE(attivo, TRUE) = TRUE
+  -- Deve confliggere con il FOR UPDATE del gate di disattivazione/eliminazione.
+  FOR SHARE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION USING

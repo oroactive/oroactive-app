@@ -8,7 +8,7 @@ ARG SOURCE_BRANCH=unknown
 
 WORKDIR /app
 
-RUN apk add --no-cache postgresql-client git
+RUN apk add --no-cache postgresql16-client git
 
 COPY package*.json ./
 RUN npm ci --omit=dev
@@ -25,5 +25,8 @@ ENV SOURCE_COMMIT=$SOURCE_COMMIT
 ENV SOURCE_BRANCH=$SOURCE_BRANCH
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=5 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 
 CMD ["npm", "start"]

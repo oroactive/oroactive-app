@@ -1,6 +1,9 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const ORO_DORO_DEFAULT_URL = "https://www.comproorodoro.it";
+const ORO_DORO_ALLOWED_HOSTS = ["comproorodoro.it"];
+const ORO_DORO_HTML_MAX_BYTES = 2 * 1024 * 1024;
 
 const ORO_DORO_DEFINITIONS = [
   { key: "oro_doro_gold_24kt", label: "ORO 24kt", metal: "gold", purity_code: "24kt", purity_value: 1, token: "24" },
@@ -180,68 +183,28 @@ function dedupeOroDOroQuotes(quotes = []) {
 }
 
 export async function fetchOroDOroPage(url = ORO_DORO_DEFAULT_URL, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-        "User-Agent": options.userAgent || "OroActiveBot/1.0"
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      url: response.url || url,
-      html,
-      text: extractReadableTextFromHtml(html),
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function renderOroDOroPageWithPlaywright(url = ORO_DORO_DEFAULT_URL, options = {}) {
-  if (!options.usePlaywright) return { page: null, warning: "Playwright disattivato." };
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { page: null, warning: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    const acceptButton = page.getByText(/accetto|accetta|ok/i);
-    if (await acceptButton.count().catch(() => 0)) {
-      await acceptButton.first().click({ timeout: 1500 }).catch(() => {});
+  const response = await safeExternalFetch(url, {
+    allowedHosts: ORO_DORO_ALLOWED_HOSTS,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || ORO_DORO_HTML_MAX_BYTES), ORO_DORO_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+      "User-Agent": options.userAgent || "OroActiveBot/1.0"
     }
-    await page.waitForTimeout(1500);
-    const texts = [];
-    texts.push(await page.evaluate(() => document.body?.innerText || ""));
-    for (const label of ["ORO", "ARGENTO"]) {
-      const locator = page.getByText(label, { exact: true });
-      if (await locator.count().catch(() => 0)) {
-        await locator.first().click({ timeout: 1500 }).catch(() => {});
-        await page.waitForTimeout(700);
-        texts.push(await page.evaluate(() => document.body?.innerText || ""));
-      }
-    }
-    return {
-      page: {
-        url: page.url() || url,
-        html: "",
-        text: texts.join("\n\n---\n\n"),
-        method: "playwright"
-      },
-      warning: ""
-    };
-  } finally {
-    await browser.close().catch(() => {});
-  }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  return {
+    url: response.url || url,
+    html,
+    text: extractReadableTextFromHtml(html),
+    method: "safe_external_fetch"
+  };
 }
 
 function missingOroDOroDefinitions(quotes = []) {
@@ -338,12 +301,15 @@ export function createOroDOroExtractor(options = {}) {
   const config = {
     url: options.url || ORO_DORO_DEFAULT_URL,
     timeoutMs: Number(options.timeoutMs || 15000),
+    maxBytes: Math.min(Number(options.maxBytes || ORO_DORO_HTML_MAX_BYTES), ORO_DORO_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: options.usePlaywright !== false,
     useAiFallback: Boolean(options.useAiFallback),
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000)
+    maxTextChars: Number(options.maxTextChars || 12000),
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
   async function extractOroDOroQuotes(extractOptions = {}) {
@@ -361,21 +327,6 @@ export function createOroDOroExtractor(options = {}) {
       ...runtime,
       sourceUrl: page.url || runtime.url
     })));
-
-    if (missingOroDOroDefinitions(quotes).length && runtime.usePlaywright) {
-      const rendered = await renderOroDOroPageWithPlaywright(runtime.url, runtime).catch((error) => ({
-        page: null,
-        warning: error.message || "Rendering Playwright non riuscito."
-      }));
-      if (rendered.warning) warnings.push(rendered.warning);
-      if (rendered.page) {
-        pages.push(rendered.page);
-        quotes = dedupeOroDOroQuotes(quotes.concat(extractOroDOroQuotesFromText(rendered.page.text, {
-          ...runtime,
-          sourceUrl: rendered.page.url || runtime.url
-        })));
-      }
-    }
 
     if (missingOroDOroDefinitions(quotes).length && runtime.useAiFallback && pages.length) {
       const ai = await extractOroDOroQuotesWithAi(pages, {

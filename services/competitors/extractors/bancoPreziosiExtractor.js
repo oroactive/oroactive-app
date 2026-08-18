@@ -1,7 +1,10 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const BANCO_PREZIOSI_DEFAULT_URL = "https://www.bancopreziosimilano.it";
 const BANCO_PREZIOSI_DEFAULT_QUOTE_URL = "https://www.bancopreziosimilano.it/quotazioni";
+const BANCO_PREZIOSI_ALLOWED_HOSTS = ["bancopreziosimilano.it"];
+const BANCO_PREZIOSI_HTML_MAX_BYTES = 2 * 1024 * 1024;
 
 const BANCO_PREZIOSI_DEFINITIONS = [
   {
@@ -274,27 +277,28 @@ export function dedupeBancoPreziosiQuotes(quotes = [], warnings = []) {
 }
 
 export async function fetchBancoPreziosiPage(url = BANCO_PREZIOSI_DEFAULT_URL, options = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-        "User-Agent": options.userAgent || "OroActiveBot/1.0"
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      url: response.url || url,
-      html,
-      text: extractReadableTextFromHtml(html),
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const response = await safeExternalFetch(url, {
+    allowedHosts: BANCO_PREZIOSI_ALLOWED_HOSTS,
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || BANCO_PREZIOSI_HTML_MAX_BYTES), BANCO_PREZIOSI_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+      "User-Agent": options.userAgent || "OroActiveBot/1.0"
+    }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  return {
+    url: response.url || url,
+    html,
+    text: extractReadableTextFromHtml(html),
+    method: "safe_external_fetch"
+  };
 }
 
 function resolveBancoUrl(href = "", baseUrl = BANCO_PREZIOSI_DEFAULT_URL) {
@@ -319,38 +323,6 @@ export function discoverBancoPreziosiQuoteUrls(html = "", baseUrl = BANCO_PREZIO
     if (resolved) urls.unshift(resolved);
   }
   return [...new Set(urls.map((url) => resolveBancoUrl(url, baseUrl)).filter(Boolean))].slice(0, 5);
-}
-
-async function renderBancoPreziosiPageWithPlaywright(url = BANCO_PREZIOSI_DEFAULT_URL, options = {}) {
-  if (!options.usePlaywright) return { page: null, warning: "Playwright disattivato." };
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { page: null, warning: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    const acceptButton = page.getByText("ACCETTO", { exact: false });
-    if (await acceptButton.count().catch(() => 0)) {
-      await acceptButton.click({ timeout: 1500 }).catch(() => {});
-    }
-    await page.waitForTimeout(1500);
-    const rendered = await page.evaluate(() => document.body?.innerText || "");
-    return {
-      page: {
-        url: page.url() || url,
-        html: "",
-        text: rendered,
-        method: "playwright"
-      },
-      warning: ""
-    };
-  } finally {
-    await browser.close().catch(() => {});
-  }
 }
 
 async function extractBancoPreziosiQuotesWithAi(pageTexts = [], options = {}) {
@@ -443,12 +415,15 @@ export function createBancoPreziosiExtractor(options = {}) {
     url: options.url || BANCO_PREZIOSI_DEFAULT_URL,
     quoteUrl: options.quoteUrl || BANCO_PREZIOSI_DEFAULT_QUOTE_URL,
     timeoutMs: Number(options.timeoutMs || 15000),
+    maxBytes: Math.min(Number(options.maxBytes || BANCO_PREZIOSI_HTML_MAX_BYTES), BANCO_PREZIOSI_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: options.usePlaywright !== false,
     useAiFallback: Boolean(options.useAiFallback),
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000)
+    maxTextChars: Number(options.maxTextChars || 12000),
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
   async function extractBancoPreziosiQuotes(extractOptions = {}) {
@@ -476,23 +451,6 @@ export function createBancoPreziosiExtractor(options = {}) {
       ...runtime,
       sourceUrl: page.url || runtime.url
     })), warnings);
-
-    if (missingBancoDefinitions(quotes).length && runtime.usePlaywright) {
-      for (const url of [runtime.url, runtime.quoteUrl]) {
-        const rendered = await renderBancoPreziosiPageWithPlaywright(url, runtime).catch((error) => ({
-          page: null,
-          warning: error.message || "Rendering Playwright non riuscito."
-        }));
-        if (rendered.warning) warnings.push(rendered.warning);
-        if (!rendered.page) continue;
-        pages.push(rendered.page);
-        quotes = dedupeBancoPreziosiQuotes(quotes.concat(extractBancoPreziosiQuotesFromText(rendered.page.text, {
-          ...runtime,
-          sourceUrl: rendered.page.url || url
-        })), warnings);
-        if (!missingBancoDefinitions(quotes).length) break;
-      }
-    }
 
     if (missingBancoDefinitions(quotes).length && runtime.useAiFallback) {
       const ai = await extractBancoPreziosiQuotesWithAi(pages, {

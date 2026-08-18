@@ -1,4 +1,5 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
+import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const BORDIN_DEFAULT_URL = "https://oroemetallipreziosi.com";
 const BORDIN_ALLOWED_HOSTS = new Set([
@@ -7,6 +8,7 @@ const BORDIN_ALLOWED_HOSTS = new Set([
   "orometallipreziosi.com",
   "www.orometallipreziosi.com"
 ]);
+const BORDIN_HTML_MAX_BYTES = 2 * 1024 * 1024;
 
 const BORDIN_DEFINITIONS = [
   {
@@ -340,27 +342,28 @@ function dedupeBordinQuotes(quotes = []) {
 
 export async function fetchBordinPage(url = BORDIN_DEFAULT_URL, options = {}) {
   const targetUrl = canonicalBordinUrl(url);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 15000));
-  try {
-    const response = await fetch(targetUrl, {
-      signal: controller.signal,
-      headers: {
-        Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
-        "User-Agent": options.userAgent || "OroActiveBot/1.0"
-      }
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
-    return {
-      url: canonicalBordinUrl(response.url || targetUrl),
-      html,
-      text: extractReadableTextFromHtml(html),
-      method: "fetch"
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const response = await safeExternalFetch(targetUrl, {
+    allowedHosts: [...BORDIN_ALLOWED_HOSTS],
+    timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
+    maxBytes: Math.min(Number(options.maxBytes || BORDIN_HTML_MAX_BYTES), BORDIN_HTML_MAX_BYTES),
+    maxRedirects: 3,
+    allowedContentTypes: ["text/html", "application/xhtml+xml", "application/json", "text/plain"],
+    signal: options.signal,
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/json;q=0.8,*/*;q=0.6",
+      "User-Agent": options.userAgent || "OroActiveBot/1.0"
+    }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const html = await response.text();
+  return {
+    url: canonicalBordinUrl(response.url || targetUrl),
+    html,
+    text: extractReadableTextFromHtml(html),
+    method: "safe_external_fetch"
+  };
 }
 
 function resolveBordinUrl(href = "", baseUrl = BORDIN_DEFAULT_URL) {
@@ -385,38 +388,6 @@ export function discoverBordinQuoteUrls(html = "", baseUrl = BORDIN_DEFAULT_URL)
     if (resolved) urls.push(resolved);
   }
   return [...new Set(urls.map((url) => resolveBordinUrl(url, baseUrl)).filter(Boolean))].slice(0, 5);
-}
-
-async function renderBordinPageWithPlaywright(url = BORDIN_DEFAULT_URL, options = {}) {
-  if (!options.usePlaywright) return { page: null, warning: "Playwright disattivato." };
-  const targetUrl = canonicalBordinUrl(url);
-  let chromium;
-  try {
-    ({ chromium } = await import("playwright"));
-  } catch {
-    return { page: null, warning: "Playwright non disponibile, uso fetch HTML semplice." };
-  }
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ userAgent: options.userAgent || "OroActiveBot/1.0" });
-  try {
-    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: Number(options.timeoutMs || 15000) });
-    const acceptButton = page.getByText(/accetto|accetta|ok/i);
-    if (await acceptButton.count().catch(() => 0)) {
-      await acceptButton.first().click({ timeout: 1500 }).catch(() => {});
-    }
-    await page.waitForTimeout(1500);
-    return {
-      page: {
-        url: canonicalBordinUrl(page.url() || targetUrl),
-        html: "",
-        text: await page.evaluate(() => document.body?.innerText || ""),
-        method: "playwright"
-      },
-      warning: ""
-    };
-  } finally {
-    await browser.close().catch(() => {});
-  }
 }
 
 function requiredMissingDefinitions(quotes = []) {
@@ -515,12 +486,15 @@ export function createBordinExtractor(options = {}) {
   const config = {
     url: canonicalBordinUrl(options.url || BORDIN_DEFAULT_URL),
     timeoutMs: Number(options.timeoutMs || 15000),
+    maxBytes: Math.min(Number(options.maxBytes || BORDIN_HTML_MAX_BYTES), BORDIN_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    usePlaywright: options.usePlaywright !== false,
     useAiFallback: Boolean(options.useAiFallback),
     openai: options.openai || null,
     model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000)
+    maxTextChars: Number(options.maxTextChars || 12000),
+    fetchImpl: options.fetchImpl,
+    resolver: options.resolver,
+    signal: options.signal
   };
 
   async function extractBordinQuotes(extractOptions = {}) {
@@ -548,21 +522,6 @@ export function createBordinExtractor(options = {}) {
       ...runtime,
       sourceUrl: page.url || runtime.url
     })));
-
-    if (requiredMissingDefinitions(quotes).length && runtime.usePlaywright) {
-      const rendered = await renderBordinPageWithPlaywright(runtime.url, runtime).catch((error) => ({
-        page: null,
-        warning: error.message || "Rendering Playwright Bordin non riuscito."
-      }));
-      if (rendered.warning) warnings.push(rendered.warning);
-      if (rendered.page) {
-        pages.push(rendered.page);
-        quotes = dedupeBordinQuotes(quotes.concat(extractBordinQuotesFromText(rendered.page.text, {
-          ...runtime,
-          sourceUrl: rendered.page.url || runtime.url
-        })));
-      }
-    }
 
     if (requiredMissingDefinitions(quotes).length && runtime.useAiFallback) {
       const ai = await extractBordinQuotesWithAi(pages, {

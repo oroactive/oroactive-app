@@ -14,7 +14,7 @@ export async function fetchBullionVaultSpotPrice({
   market,
   currency = "EUR",
   marketUrl = "https://www.bullionvault.com/view_market_xml.do",
-  fetchImpl = fetch,
+  fetchImpl = safeExternalFetch,
   timeoutMs = 7000
 } = {}) {
   if (!market?.securityId) throw new Error("Mercato BullionVault non configurato");
@@ -29,7 +29,11 @@ export async function fetchBullionVaultSpotPrice({
   try {
     const response = await fetchImpl(url, {
       signal: controller.signal,
-      headers: { Accept: "application/xml,text/xml,*/*" }
+      headers: { Accept: "application/xml,text/xml,*/*" },
+      timeoutMs,
+      maxBytes: 2 * 1024 * 1024,
+      allowedHosts: ["bullionvault.com"],
+      allowedContentTypes: ["xml", "text/plain"]
     });
     if (!response.ok) throw new Error(`BullionVault HTTP ${response.status}`);
     const xml = await response.text();
@@ -56,3 +60,4 @@ export async function fetchBullionVaultSpotPrice({
     clearTimeout(timeout);
   }
 }
+import { safeExternalFetch } from "../security/safeExternalFetch.js";

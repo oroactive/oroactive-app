@@ -74,9 +74,12 @@ test("la PWA conserva solo shell e immagini statiche per build, mai API o dati",
 
   assert.match(sw, /SHELL_CACHE_NAME/);
   assert.match(sw, /IMAGE_CACHE_NAME/);
-  assert.match(sw, /SHELL_ASSETS/);
+  assert.match(sw, /SHELL_CORE_ASSETS/);
+  assert.match(sw, /SHELL_OPTIONAL_ASSETS/);
   assert.match(sw, /networkFirstNavigation/);
-  assert.match(sw, /const SHELL_ASSETS = \[\s*"\/"/);
+  assert.match(sw, /const SHELL_CORE_ASSETS = \[\s*"\/"/);
+  assert.match(sw, /Promise\.all\(SHELL_CORE_ASSETS/);
+  assert.match(sw, /Promise\.allSettled\(SHELL_OPTIONAL_ASSETS/);
   assert.match(sw, /cache\.match\("\/"/);
   assert.doesNotMatch(sw, /cache\.match\("\/index\.html"/);
   assert.match(sw, /cacheFirstAssetImage/);
@@ -92,6 +95,7 @@ test("la PWA conserva solo shell e immagini statiche per build, mai API o dati",
   assert.match(app, /if \(!state\.serviceWorkerActivationAuthorized \|\| syncDirtyState\(\)\)/);
   assert.match(app, /if \(syncDirtyState\(\)\) \{[\s\S]*Salva la pratica prima di aggiornare/);
   assert.match(app, /window\.setTimeout\(\(\) => \{[\s\S]*if \(syncDirtyState\(\)\)[\s\S]*window\.location\.reload\(\);[\s\S]*\}, 600\)/);
+  assert.doesNotMatch(app, /clearOldOroactiveCaches|staticCacheKeys\.map\(\(key\) => window\.caches\.delete/);
 });
 
 test("Elenco Monete monta 24 schede alla volta e usa thumbnail con fallback, lasciando il dettaglio HD", async () => {

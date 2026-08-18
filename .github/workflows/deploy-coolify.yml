@@ -119,13 +119,16 @@ jobs:
             && processStartedAt >= deploymentRequestedAt - clockSkewToleranceMs;
           const isReady = payload?.ok === true
             && payload?.database === "ready"
-            && payload?.initialization === "ready";
+            && payload?.initialization === "ready"
+            && payload?.persistent_upload_storage === "ready"
+            && payload?.persistent_backup_storage === "ready";
 
           if (
             publishedCommit === expectedCommit
             && publishedAssetBuildId === expectedAssetBuildId
             && publishedCatalogCount === expectedCatalogCount
             && isReady
+            && isFreshProcess
           ) {
             process.exit(0);
           }

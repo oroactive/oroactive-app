@@ -1271,6 +1271,7 @@ body.main-menu-active .splash-screen {
 }
 
 .login-privacy-links button {
+  min-height: 44px;
   border: 1px solid rgba(255, 106, 0, 0.36);
   border-radius: 999px;
   background: rgba(10, 10, 10, 0.58);
@@ -6289,6 +6290,14 @@ body.main-menu-active .app-shell {
   color: #ffbf66;
 }
 
+.gold-prediction-panel.is-unavailable {
+  border-color: rgba(211, 71, 71, 0.72);
+}
+
+.gold-prediction-panel.is-unavailable .gold-prediction-status {
+  background: rgba(128, 24, 24, 0.2);
+}
+
 .quote-chart-panel {
   display: grid;
   gap: 8px;
@@ -6300,6 +6309,14 @@ body.main-menu-active .app-shell {
   border-radius: 8px;
   background: #111;
   overflow: hidden;
+}
+
+.bullionvault-chart iframe {
+  display: block;
+  width: 100%;
+  min-height: 418px;
+  border: 0;
+  background: #111;
 }
 
 .bullionvault-chart[aria-busy="true"] {
