@@ -4359,7 +4359,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
 });
 
 test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", async () => {
-  const [workflow, server, app, index, styles, worker, dockerfile, metadataScript, deployTargetScript, docs, pwaBoot] = await Promise.all([
+  const [workflow, server, app, index, styles, worker, dockerfile, metadataScript, deployTargetScript, docs, rootDeployDocs, pwaBoot] = await Promise.all([
     file(".github/workflows/deploy-coolify.yml"),
     file("server.js"),
     file("app.js"),
@@ -4370,22 +4370,24 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
     file("scripts/write-version-metadata.mjs"),
     file("scripts/coolify-deploy-target.mjs"),
     file("docs/deploy-oroactive-coolify.md"),
+    file("DEPLOY-COOLIFY.md"),
     file("pwa-boot.js")
   ]);
 
-  assert.match(workflow, /COOLIFY_WEBHOOK/);
+  assert.doesNotMatch(workflow, /COOLIFY_WEBHOOK/);
   assert.match(workflow, /COOLIFY_TOKEN/);
   assert.match(workflow, /OROACTIVE_HEALTH_URL/);
   assert.match(workflow, /OROACTIVE_EXPECTED_BRANCH/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm test/);
-  assert.match(workflow, /force_rebuild_webhook/);
+  assert.match(workflow, /production_deploy_url/);
   assert.match(workflow, /coolify-deploy-target\.mjs url/);
   assert.match(workflow, /coolify-deploy-target\.mjs validate/);
-  assert.match(workflow, /curl --fail[\s\S]*force_rebuild_webhook/);
+  assert.match(workflow, /curl --fail[\s\S]*production_deploy_url/);
   assert.match(workflow, /--output "\$\{deploy_response\}"/);
   assert.match(workflow, /Coolify force rebuild request accepted/);
   assert.match(deployTargetScript, /OROACTIVE_PRODUCTION_RESOURCE_UUID = "heyeitdqcuq3gxk36zrt2lkc"/);
+  assert.match(deployTargetScript, /OROACTIVE_COOLIFY_DEPLOY_ENDPOINT = "https:\/\/app\.coolify\.io\/api\/v1\/deploy"/);
   assert.match(deployTargetScript, /searchParams\.set\("uuid", OROACTIVE_PRODUCTION_RESOURCE_UUID\)/);
   assert.match(deployTargetScript, /searchParams\.set\("force", "true"\)/);
   assert.match(deployTargetScript, /deployment\.resource_uuid/);
@@ -4409,7 +4411,7 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(workflow, /payload\?\.initialization === "ready"/);
   assert.match(workflow, /&& isReady/);
   assert.match(workflow, /deploy-check=\$\{GITHUB_RUN_ID\}-\$\{attempt\}/);
-  assert.match(workflow, /COOLIFY_WEBHOOK targets the app\.oroactive\.it production resource/);
+  assert.match(workflow, /accepted the OroActive production deploy/);
   assert.doesNotMatch(workflow, /deployment\/|coolify\./);
 
   assert.match(dockerfile, /ARG GIT_COMMIT/);
@@ -4493,7 +4495,10 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(docs, /https:\/\/app\.oroactive\.it\/api\/health/);
   assert.match(docs, /Include Source Commit in Build/);
   assert.match(docs, /\/api\/health[\s\S]*stesso commit appena inviato/);
-  assert.match(docs, /Coolify accetta il webhook ma il dominio continua a mostrare un commit vecchio/);
+  assert.doesNotMatch(`${docs}\n${rootDeployDocs}`, /COOLIFY_WEBHOOK|webhook/i);
+  assert.match(`${docs}\n${rootDeployDocs}`, /COOLIFY_TOKEN/);
+  assert.match(`${docs}\n${rootDeployDocs}`, /Manual deployments only|deploy automatico del Git provider disattivato/);
+  assert.match(`${docs}\n${rootDeployDocs}`, /Coolify accetta la richiesta API ma il dominio/);
   assert.doesNotMatch(docs, /commit esposto da \/api\/health.*unknown/);
   assert.doesNotMatch(docs, /Bearer\s+[A-Za-z0-9]/);
 });

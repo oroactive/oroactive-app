@@ -2,27 +2,17 @@ import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export const OROACTIVE_PRODUCTION_RESOURCE_UUID = "heyeitdqcuq3gxk36zrt2lkc";
+export const OROACTIVE_COOLIFY_DEPLOY_ENDPOINT = "https://app.coolify.io/api/v1/deploy";
 
 function normalizedText(value) {
   return String(value || "").trim();
 }
 
-export function buildProductionDeployWebhook(rawWebhook) {
-  const webhook = new URL(normalizedText(rawWebhook));
-  if (
-    webhook.origin !== "https://app.coolify.io"
-    || webhook.pathname !== "/api/v1/deploy"
-    || webhook.username
-    || webhook.password
-  ) {
-    throw new Error("COOLIFY_WEBHOOK non corrisponde all'endpoint deploy ufficiale di Coolify.");
-  }
-
-  webhook.search = "";
-  webhook.hash = "";
-  webhook.searchParams.set("uuid", OROACTIVE_PRODUCTION_RESOURCE_UUID);
-  webhook.searchParams.set("force", "true");
-  return webhook.href;
+export function buildProductionDeployUrl() {
+  const deployUrl = new URL(OROACTIVE_COOLIFY_DEPLOY_ENDPOINT);
+  deployUrl.searchParams.set("uuid", OROACTIVE_PRODUCTION_RESOURCE_UUID);
+  deployUrl.searchParams.set("force", "true");
+  return deployUrl.href;
 }
 
 export function validateProductionDeployResponse(rawResponse) {
@@ -49,7 +39,7 @@ export function validateProductionDeployResponse(rawResponse) {
 function runCli() {
   const [command, input] = process.argv.slice(2);
   if (command === "url") {
-    process.stdout.write(buildProductionDeployWebhook(input));
+    process.stdout.write(buildProductionDeployUrl());
     return;
   }
   if (command === "validate") {

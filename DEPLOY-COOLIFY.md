@@ -86,7 +86,7 @@ In produzione l'avvio viene rifiutato se uno dei due percorsi non è un mount
 reale e scrivibile; `/api/health` deve riportare sia
 `persistent_upload_storage: ready` sia `persistent_backup_storage: ready`.
 
-La risorsa di produzione deve usare il ramo `main`, il dominio `https://app.oroactive.it` e il deploy automatico. Il Secret GitHub `COOLIFY_WEBHOOK` deve contenere il webhook generato dalla stessa risorsa Coolify che serve questo dominio. Non usare il webhook della risorsa `oroactive-site`, dedicata al sito `oroactive.it`.
+La risorsa di produzione deve usare il ramo `main` e il dominio `https://app.oroactive.it`. In Coolify il deploy automatico del Git provider deve restare disattivato (`Manual deployments only`): il deploy parte esclusivamente dopo i test GitHub Actions tramite l'API ufficiale Coolify. Endpoint e UUID della sola risorsa OroActive di produzione sono vincolati in `scripts/coolify-deploy-target.mjs`; in GitHub e richiesto soltanto il Secret `COOLIFY_TOKEN`. La risorsa `oroactive-site`, dedicata al sito `oroactive.it`, non deve essere usata per il gestionale.
 
 Dopo ogni deploy, `https://app.oroactive.it/api/health` deve riportare:
 
@@ -97,7 +97,7 @@ Dopo ogni deploy, `https://app.oroactive.it/api/health` deve riportare:
 - database e inizializzazione applicativa nello stato `ready`.
 - entrambi gli storage persistenti nello stato `ready`.
 
-Il workflow GitHub considera il deploy riuscito solo quando tutti i valori coincidono e il processo è stato realmente riavviato. Se Coolify accetta il webhook ma il dominio espone ancora un processo o un commit vecchio, la risorsa o il webhook non sono collegati alla produzione corretta.
+Il workflow GitHub considera il deploy riuscito solo quando tutti i valori coincidono e il processo è stato realmente riavviato. Se Coolify accetta la richiesta API ma il dominio espone ancora un processo o un commit vecchio, la risorsa di deploy non è collegata correttamente alla produzione.
 
 Alla prima partenza il server crea automaticamente la tabella `atti_vendita`.
 La tabella usa i campi principali richiesti: `id`, `cliente_nome`, `cliente_cognome`, `codice_fiscale`, `telefono`, `peso_oro`, `quotazione`, `totale`, `data_atto`. Le informazioni complete del gestionale vengono salvate anche nel campo `payload`.

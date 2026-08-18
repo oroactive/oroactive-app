@@ -1,13 +1,12 @@
 # Deploy OroActive su Coolify
 
-Questa app si aggiorna tramite GitHub Actions e webhook Coolify. Nessun URL amministrativo, token o IP deve essere scritto nel codice.
+Questa app si aggiorna tramite GitHub Actions e l'API ufficiale di deploy Coolify. Il target pubblico è vincolato alla sola risorsa OroActive produzione; token, URL amministrativi e IP non devono essere scritti nel codice.
 
 ## Segreti GitHub richiesti
 
 Impostare in GitHub, nella repository, questi Secrets:
 
-- `COOLIFY_WEBHOOK`: webhook di deploy fornito da Coolify.
-- `COOLIFY_TOKEN`: token usato dal webhook Coolify.
+- `COOLIFY_TOKEN`: token Coolify con permesso di deploy sulla risorsa OroActive.
 - `OROACTIVE_HEALTH_URL`: URL pubblico della risorsa da verificare dopo il deploy, normalmente `https://app.oroactive.it/api/health`.
 - `OROACTIVE_EXPECTED_BRANCH`: ramo autorizzato al deploy, normalmente `main`.
 
@@ -42,23 +41,24 @@ In Coolify, nelle impostazioni avanzate della risorsa, abilita `Include Source C
 2. GitHub Actions installa le dipendenze.
 3. Controlla la sintassi di `app.js` e `server.js`.
 4. Esegue i test.
-5. Chiama il webhook Coolify usando solo i Secrets e impone `force=true`, così ogni commit ricostruisce l'immagine senza riusare la cache di una release precedente.
+5. Chiama l'endpoint ufficiale Coolify con il token segreto, forza il target OroActive produzione e impone `force=true`, così ogni commit ricostruisce l'immagine senza riusare la cache di una release precedente.
 6. Attende che `/api/health` esponga lo stesso commit appena inviato da un processo appena avviato.
 7. Verifica anche che database e inizializzazione siano pronti, che `assetBuildId` coincida con il frontend creato e che `catalogCount` coincida con il catalogo atteso.
 8. Termina con successo solo quando la produzione sta servendo commit, frontend e catalogo corretti.
 
-Se Coolify accetta il webhook ma il dominio continua a mostrare un commit vecchio, GitHub Actions fallisce. In quel caso il deploy non e completato, anche se la chiamata webhook ha restituito esito positivo.
+Se Coolify accetta la richiesta API ma il dominio continua a mostrare un commit vecchio, GitHub Actions fallisce. In quel caso il deploy non e completato, anche se la richiesta di deploy ha restituito esito positivo.
 
 Controllare nella stessa risorsa Coolify che serve `app.oroactive.it`:
 
 1. repository: `oroactive/oroactive-app`;
 2. ramo: `main`;
 3. dominio: `https://app.oroactive.it`;
-4. deploy automatico attivo;
-5. webhook copiato da questa stessa risorsa e salvato nel Secret GitHub `COOLIFY_WEBHOOK`;
-6. ricostruzione dell'immagine attiva sul nuovo commit, senza riuso di un'immagine appartenente a un commit precedente.
+4. deploy automatico del Git provider disattivato, per evitare un doppio deploy prima dei test GitHub Actions;
+5. target applicativo nel file `scripts/coolify-deploy-target.mjs` uguale alla risorsa produzione mostrata da Coolify;
+6. Secret GitHub `COOLIFY_TOKEN` valido per questa risorsa;
+7. ricostruzione dell'immagine attiva sul nuovo commit, senza riuso di un'immagine appartenente a un commit precedente.
 
-Non usare il webhook della risorsa `oroactive-site`: quella risorsa pubblica il sito `oroactive.it`, non il gestionale `app.oroactive.it`.
+Non usare la risorsa `oroactive-site`: quella risorsa pubblica il sito `oroactive.it`, non il gestionale `app.oroactive.it`.
 
 L'endpoint `https://app.oroactive.it/api/health` deve infine mostrare lo stesso commit di GitHub, l'`assetBuildId` corrente, `catalogCount` pari al numero atteso e gli stati `database` e `initialization` su `ready`. Un valore vecchio o non pronto indica che il dominio sta ancora puntando a un container precedente o che l'avvio non è concluso correttamente.
 

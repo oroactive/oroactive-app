@@ -2,16 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  OROACTIVE_COOLIFY_DEPLOY_ENDPOINT,
   OROACTIVE_PRODUCTION_RESOURCE_UUID,
-  buildProductionDeployWebhook,
+  buildProductionDeployUrl,
   validateProductionDeployResponse
 } from "../scripts/coolify-deploy-target.mjs";
 
-test("il deploy Coolify sostituisce sempre un UUID obsoleto con OroActive produzione", () => {
-  const url = new URL(buildProductionDeployWebhook(
-    "https://app.coolify.io/api/v1/deploy?uuid=tcmmkodrsz32vt341ja4z6ny&force=false&tag=legacy&pr=42&docker_tag=old#ignored"
-  ));
+test("il deploy Coolify usa soltanto endpoint e UUID OroActive produzione", () => {
+  const url = new URL(buildProductionDeployUrl());
 
+  assert.equal(url.origin + url.pathname, OROACTIVE_COOLIFY_DEPLOY_ENDPOINT);
   assert.equal(url.hostname, "app.coolify.io");
   assert.equal(url.pathname, "/api/v1/deploy");
   assert.equal(url.searchParams.get("uuid"), OROACTIVE_PRODUCTION_RESOURCE_UUID);
@@ -20,18 +20,18 @@ test("il deploy Coolify sostituisce sempre un UUID obsoleto con OroActive produz
   assert.equal(url.hash, "");
 });
 
-test("il deploy Coolify rifiuta endpoint non ufficiali", () => {
+test("la risposta Coolify rifiuta richieste vuote, multiple o malformate", () => {
   assert.throws(
-    () => buildProductionDeployWebhook("https://example.com/api/v1/deploy?uuid=legacy"),
-    /endpoint deploy ufficiale/
+    () => validateProductionDeployResponse({ deployments: [] }),
+    /singola richiesta/
   );
   assert.throws(
-    () => buildProductionDeployWebhook("http://app.coolify.io/api/v1/deploy?uuid=legacy"),
-    /endpoint deploy ufficiale/
+    () => validateProductionDeployResponse({ deployments: [{}, {}] }),
+    /singola richiesta/
   );
   assert.throws(
-    () => buildProductionDeployWebhook("https://app.coolify.io:444/api/v1/deploy?uuid=legacy"),
-    /endpoint deploy ufficiale/
+    () => validateProductionDeployResponse("non-json"),
+    /Unexpected token|JSON/
   );
 });
 

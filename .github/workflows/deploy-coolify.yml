@@ -15,7 +15,6 @@ jobs:
     name: Test and deploy
     runs-on: ubuntu-latest
     env:
-      COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
       OROACTIVE_HEALTH_URL: ${{ secrets.OROACTIVE_HEALTH_URL }}
       OROACTIVE_EXPECTED_BRANCH: ${{ secrets.OROACTIVE_EXPECTED_BRANCH }}
@@ -57,18 +56,18 @@ jobs:
 
       - name: Trigger Coolify deploy
         run: |
-          if [ -z "${COOLIFY_WEBHOOK}" ] || [ -z "${COOLIFY_TOKEN}" ]; then
-            echo "COOLIFY_WEBHOOK and COOLIFY_TOKEN secrets are required."
+          if [ -z "${COOLIFY_TOKEN}" ]; then
+            echo "COOLIFY_TOKEN secret is required."
             exit 1
           fi
 
-          force_rebuild_webhook="$(node scripts/coolify-deploy-target.mjs url "${COOLIFY_WEBHOOK}")"
+          production_deploy_url="$(node scripts/coolify-deploy-target.mjs url)"
           deploy_response="$(mktemp)"
 
           deployment_requested_at="$(node -p 'new Date().toISOString()')"
           echo "DEPLOYMENT_REQUESTED_AT=${deployment_requested_at}" >> "${GITHUB_ENV}"
 
-          curl --fail --silent --show-error --request POST "${force_rebuild_webhook}" \
+          curl --fail --silent --show-error --request POST "${production_deploy_url}" \
             --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
             --header "Content-Type: application/json" \
             --data "{\"commit\":\"${GIT_COMMIT}\",\"branch\":\"${GITHUB_REF_NAME}\",\"buildNumber\":\"${BUILD_NUMBER}\"}" \
@@ -160,7 +159,7 @@ jobs:
             sleep 10
           done
 
-          echo "::error::Coolify accepted the deploy webhook, but production did not expose commit ${GIT_COMMIT}. Check that COOLIFY_WEBHOOK targets the app.oroactive.it production resource and that Coolify pulls branch ${GITHUB_REF_NAME}."
+          echo "::error::Coolify accepted the OroActive production deploy, but app.oroactive.it did not expose commit ${GIT_COMMIT}. Check that Coolify pulls branch ${GITHUB_REF_NAME}."
           echo "Last production version payload:"
           cat "${version_payload}" || true
           exit 1
