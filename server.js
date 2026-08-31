@@ -2397,9 +2397,10 @@ function demoGoldHistory(days = 60, currency = "EUR", base = 68.4) {
   return demoMetalHistory("gold", days, currency, base);
 }
 
-async function queryMetalPriceHistory({ metal = "gold", currency = "EUR", days = 90, limit = 365 } = {}) {
+async function queryMetalPriceHistory({ metal = "gold", currency = "EUR", days = 90, limit = 365, source = "" } = {}) {
   const normalizedMetal = normalizePredictionMetal(metal);
   const normalizedCurrency = normalizePredictionCurrency(currency);
+  const normalizedSource = String(source || "").trim().toLowerCase().slice(0, 64);
   const safeDays = Math.min(Math.max(Number(days || 90), 1), 365);
   const safeLimit = Math.min(Math.max(Number(limit || 365), 1), 365);
   const result = await pool.query(
@@ -2409,6 +2410,7 @@ async function queryMetalPriceHistory({ metal = "gold", currency = "EUR", days =
         WHERE metal = $1::text
           AND currency = $2::text
           AND created_at >= NOW() - ($3::int * INTERVAL '1 day')
+          AND ($5::text = '' OR LOWER(source) = $5::text)
         ORDER BY (created_at AT TIME ZONE 'UTC')::date DESC, created_at DESC, id DESC
      ), recent_history AS (
        SELECT *
@@ -2419,7 +2421,7 @@ async function queryMetalPriceHistory({ metal = "gold", currency = "EUR", days =
      SELECT *
        FROM recent_history
       ORDER BY created_at ASC, id ASC`,
-    [normalizedMetal, normalizedCurrency, safeDays, safeLimit]
+    [normalizedMetal, normalizedCurrency, safeDays, safeLimit, normalizedSource]
   );
   return result.rows.map(publicMetalPriceHistory);
 }
@@ -29534,17 +29536,20 @@ app.get("/api/quotazioni/metals/history", async (request, response, next) => {
       .filter((metal, index, array) => ["gold", "silver"].includes(metal) && array.indexOf(metal) === index);
     const currency = normalizePredictionCurrency(request.query.currency || goldPriceBaseCurrency);
     const days = Math.min(Math.max(Number(request.query.days || 30), 1), 365);
+    const source = String(request.query.source || "").trim().toLowerCase().slice(0, 64);
     const history = {};
     const warnings = [];
     const settings = await loadGoldPredictionSettings();
     for (const metal of metals) {
-      let rows = await queryMetalPriceHistory({ metal, currency, days, limit: 365 });
+      let rows = await queryMetalPriceHistory({ metal, currency, days, limit: 365, source });
       if (!rows.length) {
-        const latest = await latestMetalPriceHistory(metal, currency);
+        const latest = source
+          ? (await queryMetalPriceHistory({ metal, currency, days: 365, limit: 1, source })).at(-1)
+          : await latestMetalPriceHistory(metal, currency);
         if (latest) {
           rows = [latest];
           warnings.push(`${metal}: nessuna rilevazione nel periodo, uso ultimo dato salvato.`);
-        } else if (settings.demo_mode) {
+        } else if (settings.demo_mode && !source) {
           rows = demoMetalHistory(metal, days, currency);
           warnings.push(`${metal}: modalità demo attiva.`);
         } else {
@@ -29555,7 +29560,7 @@ app.get("/api/quotazioni/metals/history", async (request, response, next) => {
       }
       history[metal] = rows;
     }
-    response.json({ ok: true, metals, currency, days, demo: Boolean(settings.demo_mode), warning: warnings.join(" "), history });
+    response.json({ ok: true, metals, currency, source: source || null, days, demo: Boolean(settings.demo_mode && !source), warning: warnings.join(" "), history });
   } catch (error) {
     next(error);
   }
@@ -31620,8 +31625,6 @@ app.get("/reset-cache", async (_request, response) => {
 
 const publicRootStaticFiles = new Set([
   "app.js",
-  "bullionvault-widget.css",
-  "bullionvault-widget.js",
   "frontend-config.js",
   "index.html",
   "manifest.json",
@@ -31661,27 +31664,6 @@ for (const filename of publicRootStaticFiles) {
 app.get("/favicon.ico", (_request, response) => {
   staticCacheHeaders(response, "/icons/icon-192.png");
   response.type("image/png").sendFile(path.join(__dirname, "icons", "icon-192.png"));
-});
-
-app.get("/bullionvault-widget.html", (_request, response) => {
-  // The vendor widget runs in a sandboxed iframe with an isolated CSP. It can
-  // reach only its market endpoints and cannot read the parent app/session.
-  response.setHeader("X-Frame-Options", "SAMEORIGIN");
-  response.setHeader("Content-Security-Policy", [
-    "default-src 'none'",
-    "script-src 'self' https://www.bullionvault.com",
-    "script-src-attr 'none'",
-    "style-src 'self' https://www.bullionvault.com",
-    "style-src-attr 'unsafe-inline'",
-    "img-src data: https:",
-    "connect-src https://www.bullionvault.com https://chart-data.bullionvault.com wss://chart-data.bullionvault.com",
-    "frame-ancestors 'self'",
-    "base-uri 'none'",
-    "form-action 'none'",
-    "object-src 'none'"
-  ].join("; "));
-  setNoStoreHeaders(response);
-  response.sendFile(path.join(__dirname, "bullionvault-widget.html"));
 });
 
 const secureStaticOptions = {

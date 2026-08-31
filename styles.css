@@ -6311,12 +6311,92 @@ body.main-menu-active .app-shell {
   overflow: hidden;
 }
 
-.bullionvault-chart iframe {
+.bullionvault-native-chart {
+  display: grid;
+  min-height: 418px;
+  grid-template-rows: auto 1fr auto;
+  color: #fff8ef;
+  background:
+    radial-gradient(circle at 70% 12%, rgba(255, 116, 0, 0.11), transparent 42%),
+    linear-gradient(180deg, #15110f 0%, #0d0c0b 100%);
+}
+
+.bullionvault-native-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 4px;
+}
+
+.bullionvault-native-header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.bullionvault-native-header span,
+.bullionvault-native-chart footer {
+  color: rgba(255, 248, 239, 0.68);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bullionvault-native-header strong {
+  color: #ff8a1f;
+  font-size: clamp(20px, 3vw, 30px);
+}
+
+.bullionvault-native-trend {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 7px 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bullionvault-native-trend.up { color: #69e3a5; }
+.bullionvault-native-trend.down { color: #ff8585; }
+.bullionvault-native-trend.flat { color: #ffd08a; }
+
+.bullionvault-native-svg {
   display: block;
   width: 100%;
-  min-height: 418px;
-  border: 0;
-  background: #111;
+  height: auto;
+  min-height: 300px;
+  overflow: visible;
+}
+
+.bullionvault-native-grid {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.bullionvault-native-axis,
+.bullionvault-native-date,
+.bullionvault-native-unit {
+  fill: rgba(255, 248, 239, 0.68);
+  font: 700 12px Arial, sans-serif;
+}
+
+.bullionvault-native-area { fill: url(#bullionVaultAreaGradient); }
+
+.bullionvault-native-line {
+  fill: none;
+  stroke: #ff8500;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 7px rgba(255, 133, 0, 0.48));
+}
+
+.bullionvault-native-point {
+  fill: #fff4df;
+  stroke: #ff8500;
+  stroke-width: 4;
+}
+
+.bullionvault-native-chart footer {
+  padding: 4px 22px 16px;
 }
 
 .bullionvault-chart[aria-busy="true"] {

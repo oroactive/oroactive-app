@@ -209,12 +209,6 @@ test("runtime serve solo risorse pubbliche, restituisce 404 ai file interni e 50
     assert.doesNotMatch(home.headers.get("content-security-policy") || "", /bullionvault/i);
     assert.match(home.headers.get("strict-transport-security") || "", /max-age=31536000/);
 
-    const isolatedWidget = await fetch(`${baseUrl}/bullionvault-widget.html`);
-    assert.equal(isolatedWidget.status, 200);
-    assert.equal(isolatedWidget.headers.get("x-frame-options"), "SAMEORIGIN");
-    assert.match(isolatedWidget.headers.get("content-security-policy") || "", /frame-ancestors 'self'/);
-    assert.match(isolatedWidget.headers.get("content-security-policy") || "", /connect-src[^;]*https:\/\/chart-data\.bullionvault\.com[^;]*wss:\/\/chart-data\.bullionvault\.com/);
-
     const installedAppHome = await fetch(`${baseUrl}/index.html`);
     assert.equal(installedAppHome.status, 200);
     assert.match(installedAppHome.headers.get("content-type") || "", /text\/html/);
@@ -227,7 +221,7 @@ test("runtime serve solo risorse pubbliche, restituisce 404 ai file interni e 50
 
     const icon = await fetch(`${baseUrl}/icons/icon-192.png`);
     assert.equal(icon.status, 200);
-    for (const pathname of ["/server.js", "/schema.sql", "/package.json", "/private_uploads/customer.pdf", "/assets/academy/courses/corso-base-oro-oroactive.pdf", "/missing.js", "/missing.html"]) {
+    for (const pathname of ["/server.js", "/schema.sql", "/package.json", "/private_uploads/customer.pdf", "/assets/academy/courses/corso-base-oro-oroactive.pdf", "/bullionvault-widget.html", "/bullionvault-widget.js", "/bullionvault-widget.css", "/missing.js", "/missing.html"]) {
       const response = await fetch(`${baseUrl}${pathname}`);
       assert.equal(response.status, 404, `${pathname} deve essere bloccato`);
       assert.match(response.headers.get("content-type") || "", /application\/json/);

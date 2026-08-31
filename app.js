@@ -229,7 +229,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260831-bullionvault-23";
+const OROACTIVE_CLIENT_BUILD_ID = "20260831-bullionvault-native-24";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -9026,8 +9026,8 @@ async function handleScreenDataLoad(id) {
   if (id === "quotazione") {
     renderQuoteDashboard();
     await refreshBullionVaultPrices();
-    initBullionVaultChart();
     await loadGoldPredictionPanel();
+    await initBullionVaultChart({ force: true, refreshHistory: true });
   }
   if (id === "backups") await loadBackups();
   if (id === "approvals") await loadApprovals();
@@ -21949,41 +21949,125 @@ function renderQuoteDashboard() {
   quoteDashboard.innerHTML = rows.join("");
 }
 
-function waitForBullionVaultChartRender(frame, timeoutMs = 12000) {
-  return new Promise((resolve) => {
-    const timeout = window.setTimeout(() => finish(false), timeoutMs);
-    const onMessage = (event) => {
-      if (event.source !== frame.contentWindow || event.data?.type !== "OROACTIVE_BULLIONVAULT_WIDGET") return;
-      finish(event.data.status === "ready");
-    };
-    const onError = () => finish(false);
-    function finish(rendered) {
-      window.clearTimeout(timeout);
-      window.removeEventListener("message", onMessage);
-      frame.removeEventListener("error", onError);
-      resolve(rendered);
-    }
-    window.addEventListener("message", onMessage);
-    frame.addEventListener("error", onError, { once: true });
+function bullionVaultNativeChartPoints(historyRows = [], spotQuote = null) {
+  const pointsByTimestamp = new Map();
+  (Array.isArray(historyRows) ? historyRows : []).forEach((row) => {
+    const source = String(row?.source || "").trim().toLowerCase();
+    const currency = String(row?.currency || "").trim().toUpperCase();
+    if (source !== "bullionvault" || currency !== "EUR") return;
+    const pricePerKg = Number(row?.price_per_kg || 0) || (Number(row?.price_per_gram || 0) * 1000);
+    const timestamp = new Date(row?.provider_timestamp || row?.created_at || 0).getTime();
+    if (!Number.isFinite(pricePerKg) || pricePerKg <= 0 || !Number.isFinite(timestamp) || timestamp <= 0) return;
+    pointsByTimestamp.set(timestamp, { timestamp, value: pricePerKg });
   });
+  const spotValue = Number(spotQuote?.value || 0);
+  const spotTimestamp = new Date(spotQuote?.fetchedAt || Date.now()).getTime();
+  const spotCurrency = String(spotQuote?.currency || "").trim().toUpperCase();
+  if (!spotQuote?.stale && spotCurrency === "EUR" && Number.isFinite(spotValue) && spotValue > 0 && Number.isFinite(spotTimestamp)) {
+    pointsByTimestamp.set(spotTimestamp, { timestamp: spotTimestamp, value: spotValue });
+  }
+  return [...pointsByTimestamp.values()]
+    .sort((first, second) => first.timestamp - second.timestamp)
+    .slice(-30);
 }
 
-async function initBullionVaultChart() {
-  if (!bullionVaultChart || state.bullionChartLoaded) return;
+function bullionVaultNativeDateLabel(timestamp) {
+  return new Intl.DateTimeFormat("it-IT", { day: "2-digit", month: "short" }).format(new Date(timestamp));
+}
+
+function renderBullionVaultNativeChart(historyRows = [], spotQuote = null) {
+  if (!bullionVaultChart) return false;
+  const points = bullionVaultNativeChartPoints(historyRows, spotQuote);
+  if (!points.length) return false;
+
+  const width = 920;
+  const height = 360;
+  const padding = { top: 54, right: 28, bottom: 54, left: 78 };
+  const values = points.map((point) => point.value);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const paddingValue = Math.max((rawMax - rawMin) * 0.12, rawMax * 0.0025, 1);
+  const min = rawMin - paddingValue;
+  const max = rawMax + paddingValue;
+  const range = Math.max(max - min, 1);
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const toX = (index) => points.length === 1
+    ? padding.left + (plotWidth / 2)
+    : padding.left + (index * (plotWidth / (points.length - 1)));
+  const toY = (value) => padding.top + ((max - value) / range) * plotHeight;
+  const gridLines = Array.from({ length: 5 }, (_, index) => {
+    const ratio = index / 4;
+    const value = max - (range * ratio);
+    const y = padding.top + (plotHeight * ratio);
+    return `
+      <line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" class="bullionvault-native-grid" />
+      <text x="${padding.left - 12}" y="${y + 4}" text-anchor="end" class="bullionvault-native-axis">${escapeHtml(formatBullionPrice(value))}</text>
+    `;
+  }).join("");
+  const linePoints = points.map((point, index) => `${toX(index)},${toY(point.value)}`).join(" ");
+  const lastPoint = points.at(-1);
+  const firstPoint = points[0];
+  const trend = lastPoint.value - firstPoint.value;
+  const trendClass = trend > 0 ? "up" : trend < 0 ? "down" : "flat";
+  const trendLabel = trend > 0 ? "in rialzo" : trend < 0 ? "in ribasso" : "stabile";
+  const pointMarks = points.length === 1
+    ? `<circle cx="${toX(0)}" cy="${toY(points[0].value)}" r="7" class="bullionvault-native-point current" />`
+    : `<circle cx="${toX(points.length - 1)}" cy="${toY(lastPoint.value)}" r="6" class="bullionvault-native-point current" />`;
+
+  bullionVaultChart.innerHTML = `
+    <article class="bullionvault-native-chart">
+      <header class="bullionvault-native-header">
+        <div>
+          <span>Andamento Oro · BullionVault</span>
+          <strong>${escapeHtml(formatBullionPrice(lastPoint.value))} EUR/kg</strong>
+        </div>
+        <span class="bullionvault-native-trend ${trendClass}">${escapeHtml(trendLabel)}</span>
+      </header>
+      <svg class="bullionvault-native-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Andamento del prezzo dell'oro BullionVault negli ultimi 30 giorni">
+        <defs>
+          <linearGradient id="bullionVaultAreaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ff8500" stop-opacity="0.34" />
+            <stop offset="100%" stop-color="#ff8500" stop-opacity="0.02" />
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        ${points.length > 1 ? `
+          <polygon points="${padding.left},${height - padding.bottom} ${linePoints} ${width - padding.right},${height - padding.bottom}" class="bullionvault-native-area" />
+          <polyline points="${linePoints}" class="bullionvault-native-line" />
+        ` : ""}
+        ${pointMarks}
+        <text x="${padding.left}" y="${height - 18}" text-anchor="start" class="bullionvault-native-date">${escapeHtml(bullionVaultNativeDateLabel(firstPoint.timestamp))}</text>
+        <text x="${width - padding.right}" y="${height - 18}" text-anchor="end" class="bullionvault-native-date">${escapeHtml(bullionVaultNativeDateLabel(lastPoint.timestamp))}</text>
+        <text x="${padding.left}" y="24" class="bullionvault-native-unit">EUR/kg · ultimi ${points.length} aggiornamenti disponibili</text>
+      </svg>
+      <footer>Fonte dati BullionVault · visualizzazione sicura OroActive compatibile con iPad</footer>
+    </article>
+  `;
+  return true;
+}
+
+async function initBullionVaultChart(options = {}) {
+  if (!bullionVaultChart || (state.bullionChartLoaded && !options.force)) return;
   try {
     bullionVaultChart.setAttribute("aria-busy", "true");
     if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = true;
-    bullionVaultChart.innerHTML = "";
-    const frame = document.createElement("iframe");
-    frame.title = "Grafico indicativo BullionVault";
-    frame.setAttribute("sandbox", "allow-scripts");
-    frame.setAttribute("referrerpolicy", "no-referrer");
-    // Safari/iPad può completare un iframe già in cache immediatamente: il
-    // listener deve essere attivo prima di assegnare la pagina e collegarla.
-    const renderPromise = waitForBullionVaultChartRender(frame);
-    frame.src = `/bullionvault-widget.html?build=${encodeURIComponent(window.__OROACTIVE_BOOT_BUILD_ID__ || "current")}`;
-    bullionVaultChart.append(frame);
-    if (!(await renderPromise)) throw new Error("Grafico BullionVault non renderizzato");
+    let historyRows = (state.metalPredictionHistory?.gold || []).filter((row) => (
+      String(row?.source || "").trim().toLowerCase() === "bullionvault"
+      && String(row?.currency || "").trim().toUpperCase() === "EUR"
+    ));
+    if (!historyRows.length || options.refreshHistory) {
+      try {
+        const historyData = await apiRequest("/quotazioni/metals/history?metals=gold&days=30&currency=EUR&source=bullionvault");
+        historyRows = historyData.history?.gold || historyRows;
+      } catch {
+        // Il prezzo spot già validato resta sufficiente per mostrare una vista
+        // utile anche se lo storico è temporaneamente irraggiungibile.
+      }
+    }
+    if (!renderBullionVaultNativeChart(historyRows, state.bullionVaultPrices?.Oro)) {
+      throw new Error("Dati BullionVault non disponibili per il grafico");
+    }
     state.bullionChartLoaded = true;
     bullionVaultChart.removeAttribute("aria-busy");
     if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = true;
@@ -22032,7 +22116,7 @@ async function refreshQuoteDashboardData() {
     }
   }
   const analysisResult = await loadGoldPredictionPanel({ silent: true });
-  if (!state.bullionChartLoaded) void initBullionVaultChart();
+  await initBullionVaultChart({ force: true, refreshHistory: true });
   if (!analysisResult?.ok) {
     showToast("Aggiornamento incompleto: l’analisi di mercato non è disponibile e i valori decisionali sono stati disabilitati.", "error");
   } else if (!liveResult.ok) {
@@ -24274,6 +24358,7 @@ async function syncGoldHistory() {
   });
   showToast(data.warning || "Storico BullionVault oro e argento aggiornato.", data.warning ? "warning" : "success");
   const analysisResult = await loadGoldPredictionPanel({ silent: true });
+  await initBullionVaultChart({ force: true, refreshHistory: true });
   if (!analysisResult?.ok) showToast("Lo storico è stato sincronizzato, ma l’analisi completa non è disponibile.", "error");
 }
 

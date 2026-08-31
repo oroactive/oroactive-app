@@ -1,4 +1,4 @@
-const BUILD_ID = "20260831-bullionvault-23";
+const BUILD_ID = "20260831-bullionvault-native-24";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;
@@ -106,12 +106,6 @@ async function networkFirstNavigation(request) {
   try {
     return await fetchNoStore(request);
   } catch {
-    if (new URL(request.url).pathname === "/bullionvault-widget.html") {
-      return new Response('<!doctype html><html lang="it"><meta charset="utf-8"><body style="margin:0;padding:24px;background:#111;color:#f5c58f;font:14px Arial">Grafico disponibile soltanto con connessione Internet.</body></html>', {
-        status: 503,
-        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }
-      });
-    }
     const cache = await caches.open(SHELL_CACHE_NAME);
     const shell = await cache.match("/", { ignoreSearch: true });
     return shell || new Response(OFFLINE_FALLBACK, {
