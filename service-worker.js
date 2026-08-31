@@ -1,4 +1,4 @@
-const BUILD_ID = "20260818-security-reliability-22";
+const BUILD_ID = "20260831-bullionvault-23";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;

@@ -229,7 +229,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260818-security-reliability-22";
+const OROACTIVE_CLIENT_BUILD_ID = "20260831-bullionvault-23";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -21976,11 +21976,14 @@ async function initBullionVaultChart() {
     bullionVaultChart.innerHTML = "";
     const frame = document.createElement("iframe");
     frame.title = "Grafico indicativo BullionVault";
-    frame.src = `/bullionvault-widget.html?build=${encodeURIComponent(window.__OROACTIVE_BOOT_BUILD_ID__ || "current")}`;
     frame.setAttribute("sandbox", "allow-scripts");
     frame.setAttribute("referrerpolicy", "no-referrer");
+    // Safari/iPad può completare un iframe già in cache immediatamente: il
+    // listener deve essere attivo prima di assegnare la pagina e collegarla.
+    const renderPromise = waitForBullionVaultChartRender(frame);
+    frame.src = `/bullionvault-widget.html?build=${encodeURIComponent(window.__OROACTIVE_BOOT_BUILD_ID__ || "current")}`;
     bullionVaultChart.append(frame);
-    if (!(await waitForBullionVaultChartRender(frame))) throw new Error("Grafico BullionVault non renderizzato");
+    if (!(await renderPromise)) throw new Error("Grafico BullionVault non renderizzato");
     state.bullionChartLoaded = true;
     bullionVaultChart.removeAttribute("aria-busy");
     if (bullionVaultChartFallback) bullionVaultChartFallback.hidden = true;

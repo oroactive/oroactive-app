@@ -28,6 +28,11 @@ test("il grafico BullionVault è isolato dalla sessione e verifica il rendering"
   assert.match(chartBlock, /setAttribute\("sandbox", "allow-scripts"\)/);
   assert.match(chartBlock, /setAttribute\("referrerpolicy", "no-referrer"\)/);
   assert.match(chartBlock, /waitForBullionVaultChartRender/);
+  assert.match(
+    chartBlock,
+    /const renderPromise = waitForBullionVaultChartRender\(frame\);[\s\S]*bullionVaultChart\.append\(frame\);[\s\S]*await renderPromise/,
+    "l'ascolto del messaggio ready deve iniziare prima di collegare l'iframe"
+  );
   assert.match(chartBlock, /bullionVaultChartFallback\.hidden = false/);
   assert.doesNotMatch(chartBlock, /loadScriptOnce|window\.BullionVaultChart|new BullionVaultChart/);
   assert.match(widgetHtml, /https:\/\/www\.bullionvault\.com\/chart\/bullionvaultchart\.js\?v=1/);
