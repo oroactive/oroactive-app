@@ -229,7 +229,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260831-bullionvault-native-24";
+const OROACTIVE_CLIENT_BUILD_ID = "20260901-aurum-drag-25";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -10766,14 +10766,18 @@ function isAurumResponsiveDock() {
 
 function syncAurumResponsiveDock() {
   if (!aurumMascotRoot) return false;
-  const docked = isAurumResponsiveDock();
-  aurumMascotRoot.classList.toggle("aurum-responsive-docked", docked);
+  const responsive = isAurumResponsiveDock();
+  const hasSavedPosition = Boolean(loadAurumFloatingPosition());
+  const draggingMascot = state.aurumDragState?.element === "mascot";
+  const docked = responsive && !hasSavedPosition && !draggingMascot;
+  aurumMascotRoot.classList.toggle("aurum-responsive-docked", responsive);
   if (docked) {
     aurumMascotRoot.classList.remove("aurum-positioned", "aurum-roaming");
     aurumMascotRoot.style.removeProperty("--aurum-left");
     aurumMascotRoot.style.removeProperty("--aurum-top");
     aurumMascotRoot.style.setProperty("--aurum-x", "0px");
     aurumMascotRoot.style.setProperty("--aurum-y", "0px");
+    state.aurumFloatingPosition = null;
   }
   return docked;
 }
@@ -11094,7 +11098,6 @@ function handleAurumPointerDown(event) {
   const headerHandle = event.target.closest?.(".aurum-chat-header");
   const mascotHandle = event.target.closest?.("#aurumMascotButton");
   if (!headerHandle && !mascotHandle) return;
-  if (mascotHandle && isAurumResponsiveDock()) return;
   if (headerHandle && event.target.closest("button, input, textarea, select")) return;
   if (event.button !== undefined && event.button !== 0) return;
   const element = headerHandle ? aurumChatPanel : aurumMascotRoot;
@@ -11107,6 +11110,7 @@ function handleAurumPointerDown(event) {
     originY: rect.top,
     startX: event.clientX,
     startY: event.clientY,
+    fromResponsiveDock: Boolean(mascotHandle && isAurumResponsiveDock() && !aurumMascotRoot?.classList.contains("aurum-positioned")),
     moved: false
   };
   element.classList.add(headerHandle ? "aurum-panel-dragging" : "aurum-dragging");
@@ -11120,7 +11124,13 @@ function handleAurumPointerMove(event) {
   event.preventDefault();
   const dx = event.clientX - drag.startX;
   const dy = event.clientY - drag.startY;
-  if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+  if (!drag.moved && Math.abs(dx) + Math.abs(dy) <= 4) return;
+  if (!drag.moved) {
+    drag.moved = true;
+    if (drag.element === "mascot" && drag.fromResponsiveDock) {
+      applyAurumPosition({ x: drag.originX, y: drag.originY }, { save: false });
+    }
+  }
   if (drag.element === "panel") {
     applyAurumPanelPosition({ x: drag.originX + dx, y: drag.originY + dy });
   } else {
@@ -11140,7 +11150,7 @@ function handleAurumPointerUp(event) {
     saveAurumFloatingPosition(state.aurumFloatingPosition || defaultAurumPosition());
     window.setTimeout(() => {
       state.aurumSuppressNextClick = false;
-    }, 80);
+    }, 500);
   }
   state.aurumDragState = null;
   scheduleAurumAvoidance();

@@ -1,4 +1,4 @@
-const BUILD_ID = "20260831-bullionvault-native-24";
+const BUILD_ID = "20260901-aurum-drag-25";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;

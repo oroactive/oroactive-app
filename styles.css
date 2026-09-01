@@ -14233,7 +14233,7 @@ input.document-expired {
     padding-right: max(92px, calc(env(safe-area-inset-right) + 92px));
   }
 
-  .aurum-mascot-root.aurum-responsive-docked {
+  .aurum-mascot-root.aurum-responsive-docked:not(.aurum-positioned) {
     left: auto !important;
     top: calc(50dvh - 34px) !important;
     right: max(10px, calc(env(safe-area-inset-right) + 10px)) !important;
@@ -14258,7 +14258,7 @@ input.document-expired {
     padding-right: max(72px, calc(env(safe-area-inset-right) + 72px));
   }
 
-  .aurum-mascot-root.aurum-responsive-docked {
+  .aurum-mascot-root.aurum-responsive-docked:not(.aurum-positioned) {
     top: calc(50dvh - 28px) !important;
     right: max(8px, calc(env(safe-area-inset-right) + 8px)) !important;
   }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 
 const root = new URL("../", import.meta.url);
 const file = (name) => readFile(new URL(name, root), "utf8");
@@ -67,6 +68,105 @@ test("Aurum usa gli offset solo su desktop e ha un dock responsive che riserva s
   assert.match(styles, /\.aurum-mascot-root\.aurum-roaming:not\(\.aurum-panel-open\)[\s\S]*var\(--aurum-x, 0px\)[\s\S]*var\(--aurum-y, 0px\)/);
   assert.match(styles, /@media \(max-width: 1100px\)[\s\S]*\.aurum-mascot-root\.aurum-responsive-docked/);
   assert.match(styles, /@media \(max-width: 1100px\)[\s\S]*\.workspace[\s\S]*padding-right:/);
+});
+
+test("Aurum esce dal dock responsive e segue il trascinamento touch senza aprire la chat", async () => {
+  const [app, styles] = await Promise.all([file("app.js"), file("styles.css")]);
+  const start = app.indexOf("function handleAurumPointerDown");
+  const end = app.indexOf("function shouldShowAurumMascot", start);
+  assert.ok(start >= 0 && end > start, "gestori drag Aurum non trovati");
+  const source = app.slice(start, end);
+  const classes = new Set(["aurum-responsive-docked"]);
+  const savedPositions = [];
+  const state = {
+    aurumDragState: null,
+    aurumFloatingPosition: null,
+    aurumSuppressNextClick: false
+  };
+  const aurumMascotRoot = {
+    classList: {
+      add: (...names) => names.forEach((name) => classes.add(name)),
+      remove: (...names) => names.forEach((name) => classes.delete(name)),
+      contains: (name) => classes.has(name),
+      toggle: (name, force) => force ? classes.add(name) : classes.delete(name)
+    },
+    style: { removeProperty() {}, setProperty() {} },
+    getBoundingClientRect: () => ({ left: 900, top: 400, width: 68, height: 68 }),
+    setPointerCapture: (pointerId) => { aurumMascotRoot.capturedPointer = pointerId; },
+    releasePointerCapture: (pointerId) => { aurumMascotRoot.releasedPointer = pointerId; }
+  };
+  const mascotButton = {};
+  const pointerEvent = (clientX, clientY) => ({
+    pointerId: 7,
+    button: 0,
+    clientX,
+    clientY,
+    target: {
+      closest: (selector) => selector === "#aurumMascotButton" ? mascotButton : null
+    },
+    preventDefault() {}
+  });
+  const context = {
+    state,
+    aurumMascotRoot,
+    aurumChatPanel: null,
+    shouldShowAurumMascot: () => true,
+    isAurumResponsiveDock: () => true,
+    applyAurumPosition: (position) => {
+      state.aurumFloatingPosition = { ...position };
+      classes.add("aurum-positioned");
+    },
+    constrainAurumTipToViewport() {},
+    saveAurumFloatingPosition: (position) => savedPositions.push({ ...position }),
+    defaultAurumPosition: () => ({ x: 0, y: 0 }),
+    scheduleAurumAvoidance() {},
+    window: { setTimeout() {} }
+  };
+  const api = vm.runInNewContext(`${source}; ({ handleAurumPointerDown, handleAurumPointerMove, handleAurumPointerUp })`, context);
+
+  api.handleAurumPointerDown(pointerEvent(930, 430));
+  assert.equal(state.aurumDragState?.element, "mascot");
+  assert.equal(classes.has("aurum-responsive-docked"), true);
+  assert.equal(aurumMascotRoot.capturedPointer, 7);
+
+  api.handleAurumPointerMove(pointerEvent(700, 260));
+  assert.deepEqual(state.aurumFloatingPosition, { x: 670, y: 230 });
+  assert.equal(classes.has("aurum-positioned"), true);
+  assert.match(styles, /\.aurum-mascot-root\.aurum-responsive-docked:not\(\.aurum-positioned\)/);
+
+  api.handleAurumPointerUp(pointerEvent(700, 260));
+  assert.deepEqual(savedPositions, [{ x: 670, y: 230 }]);
+  assert.equal(state.aurumSuppressNextClick, true);
+  assert.equal(state.aurumDragState, null);
+  assert.equal(aurumMascotRoot.releasedPointer, 7);
+
+  state.aurumSuppressNextClick = false;
+  state.aurumFloatingPosition = null;
+  savedPositions.length = 0;
+  classes.clear();
+  classes.add("aurum-responsive-docked");
+  api.handleAurumPointerDown(pointerEvent(930, 430));
+  api.handleAurumPointerUp(pointerEvent(930, 430));
+  assert.deepEqual(savedPositions, []);
+  assert.equal(state.aurumSuppressNextClick, false);
+  assert.equal(classes.has("aurum-positioned"), false);
+
+  const syncStart = app.indexOf("function isAurumResponsiveDock");
+  const syncEnd = app.indexOf("function safeViewportInset", syncStart);
+  const syncSource = app.slice(syncStart, syncEnd);
+  classes.add("aurum-positioned");
+  state.aurumFloatingPosition = { x: 120, y: 160 };
+  const syncWithSavedPosition = vm.runInNewContext(
+    `${syncSource}; syncAurumResponsiveDock()`,
+    {
+      state,
+      aurumMascotRoot,
+      loadAurumFloatingPosition: () => ({ x: 120, y: 160 }),
+      window: { innerWidth: 1024, matchMedia: () => ({ matches: true }) }
+    }
+  );
+  assert.equal(syncWithSavedPosition, false);
+  assert.equal(classes.has("aurum-positioned"), true);
 });
 
 test("la PWA conserva solo shell e immagini statiche per build, mai API o dati", async () => {
