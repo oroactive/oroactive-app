@@ -229,7 +229,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260901-aurum-drag-25";
+const OROACTIVE_CLIENT_BUILD_ID = "20260901-gem-hd-viewer-26";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -5214,6 +5214,7 @@ const storesList = document.getElementById("storesList");
 const antifraudList = document.getElementById("antifraudList");
 const trainingList = document.getElementById("trainingList");
 const gemLabShell = document.getElementById("gemLabShell");
+const gemLabZoomPortal = document.getElementById("gemLabZoomPortal");
 const trainingHero = document.getElementById("trainingHero");
 const trainingEyebrow = document.getElementById("trainingEyebrow");
 const trainingTitle = document.getElementById("trainingTitle");
@@ -6791,6 +6792,7 @@ async function withButtonBusy(button, busyText, task) {
 
 function resetAuthenticatedSessionData() {
   rotateSessionGeneration();
+  teardownGemLabZoom();
   window.currentUser = null;
   window.clearTimeout(state.sessionTimeoutTimer);
   window.clearTimeout(state.clientLookupTimer);
@@ -8960,6 +8962,7 @@ function setScreen(id) {
     showToast("Sezione non disponibile per il tuo ruolo.");
     return;
   }
+  if (id !== "gemLab") teardownGemLabZoom();
   closeMainMenuDropdowns();
   closeMainUserMenu();
   const leavingArchive = document.getElementById("archive")?.classList.contains("active-screen") && id !== "archive";
@@ -9566,6 +9569,7 @@ function renderMainMenuRecoveryError(error, phase = "menu") {
 }
 
 function cleanupUiBeforeMainMenu() {
+  teardownGemLabZoom();
   closeBrandMenu();
   closeMainUserMenu();
   closeNotificationDropdown();
@@ -17229,9 +17233,11 @@ function renderGemLabZoom(material = {}) {
   if (!media) return "";
   return `
     <div class="gem-lab-zoom" role="dialog" aria-modal="true" aria-label="Visualizzazione immagine ingrandita" data-gem-zoom-backdrop>
-      <button class="gem-lab-zoom-close" type="button" data-gem-zoom-close aria-label="Chiudi immagine">×</button>
-      <img ${gemLabHdMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}" decoding="async">
-      <div>
+      <button class="gem-lab-zoom-close" type="button" data-gem-zoom-close aria-label="Chiudi immagine" title="Chiudi immagine">×</button>
+      <div class="gem-lab-zoom-stage" data-gem-zoom-backdrop>
+        <img ${gemLabHdMediaAttributes(media)} alt="${escapeHtml(media.title || material.name)}" decoding="async">
+      </div>
+      <div class="gem-lab-zoom-caption">
         <strong>${escapeHtml(media.title || material.name || "Media gemmologico")}</strong>
         <span>${escapeHtml(media.observation_notes || media.caption || "Osservazione documentata")}</span>
       </div>
@@ -17239,9 +17245,31 @@ function renderGemLabZoom(material = {}) {
   `;
 }
 
+function renderGemLabZoomPortal(material = null) {
+  if (!gemLabZoomPortal) return;
+  const markup = material ? renderGemLabZoom(material) : "";
+  gemLabZoomPortal.innerHTML = markup;
+  document.body.classList.toggle("gem-lab-zoom-open", Boolean(markup));
+  if (!markup) return;
+  const closeButton = gemLabZoomPortal.querySelector("[data-gem-zoom-close]");
+  if (!closeButton) return;
+  try {
+    closeButton.focus({ preventScroll: true });
+  } catch {
+    closeButton.focus();
+  }
+}
+
+function teardownGemLabZoom() {
+  state.gemLabZoomMedia = null;
+  gemLabZoomPortal?.replaceChildren();
+  document.body.classList.remove("gem-lab-zoom-open");
+}
+
 function renderGemLab() {
   if (!gemLabShell) return;
   if (state.gemLabLoading) {
+    teardownGemLabZoom();
     gemLabShell.innerHTML = `
       <div class="gem-lab-loading" role="status">
         <span class="spinner" aria-hidden="true"></span>
@@ -17251,6 +17279,7 @@ function renderGemLab() {
     return;
   }
   if (state.gemLabError) {
+    teardownGemLabZoom();
     gemLabShell.innerHTML = `
       <div class="gem-lab-empty">
         <h2>Laboratorio temporaneamente non disponibile</h2>
@@ -17262,8 +17291,9 @@ function renderGemLab() {
   }
   const material = gemLabCurrentMaterial();
   gemLabShell.innerHTML = material && state.gemLabView === "detail"
-    ? `${renderGemLabDetail(material)}${renderGemLabZoom(material)}`
+    ? renderGemLabDetail(material)
     : renderGemLabCatalog();
+  renderGemLabZoomPortal(material && state.gemLabView === "detail" ? material : null);
 }
 
 function gemLabFormObject(form) {
@@ -17469,7 +17499,7 @@ gemLabShell?.addEventListener("keydown", (event) => {
 
 function closeGemLabZoom() {
   if (state.gemLabZoomMedia === null) return;
-  state.gemLabZoomMedia = null;
+  teardownGemLabZoom();
   renderGemLab();
 }
 

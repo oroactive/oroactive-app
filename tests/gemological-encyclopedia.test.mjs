@@ -568,8 +568,114 @@ test("layout iPad protegge pulsanti, scheda e chiusura immagine", () => {
   const styles = file("styles.css");
   assert.match(styles, /@media \(min-width: 821px\) and \(max-width: 1100px\)/);
   assert.match(styles, /\.gem-lab-detail-hero > \.ghost-button[\s\S]*grid-column: 1 \/ -1/);
-  assert.match(styles, /\.gem-lab-zoom-close[\s\S]*min-width: 48px[\s\S]*touch-action: manipulation/);
+  assert.match(styles, /\.gem-lab-zoom-close[\s\S]*min-width: 56px[\s\S]*touch-action: manipulation/);
   assert.match(styles, /calc\(env\(safe-area-inset-top\) \+ 8px\)/);
+});
+
+test("visualizzatore HD usa il viewport reale e resta sopra Aurum su iPad", () => {
+  const html = file("index.html");
+  const app = file("app.js");
+  const styles = file("styles.css");
+  const printPacketIndex = html.indexOf('id="printPacket"');
+  const portalIndex = html.indexOf('id="gemLabZoomPortal"');
+  const aurumIndex = html.indexOf('id="aurumMascotRoot"');
+
+  assert.ok(printPacketIndex >= 0);
+  assert.ok(portalIndex > printPacketIndex, "Il portale HD deve essere fuori dalla schermata animata");
+  assert.ok(aurumIndex > portalIndex, "Il portale HD deve essere un elemento di primo livello prima di Aurum");
+  assert.match(app, /const gemLabZoomPortal = document\.getElementById\("gemLabZoomPortal"\)/);
+  assert.match(app, /function renderGemLabZoomPortal\(material = null\)/);
+  assert.match(app, /function teardownGemLabZoom\(\)/);
+  assert.match(app, /renderGemLabZoomPortal\(material && state\.gemLabView === "detail" \? material : null\)/);
+  assert.match(app, /function resetAuthenticatedSessionData\(\)[\s\S]*teardownGemLabZoom\(\)/);
+  assert.match(app, /function cleanupUiBeforeMainMenu\(\)[\s\S]*teardownGemLabZoom\(\)/);
+  assert.match(app, /function setScreen\(id\)[\s\S]*if \(id !== "gemLab"\) teardownGemLabZoom\(\)/);
+
+  const zoomRule = styles.match(/\.gem-lab-zoom \{([\s\S]*?)\n\}/)?.[1] || "";
+  const stageRule = styles.match(/\.gem-lab-zoom-stage \{([\s\S]*?)\n\}/)?.[1] || "";
+  const imageRule = styles.match(/\.gem-lab-zoom-stage img \{([\s\S]*?)\n\}/)?.[1] || "";
+  const closeRule = styles.match(/\.gem-lab-zoom-close \{([\s\S]*?)\n\}/)?.[1] || "";
+  const aurumRule = styles.match(/\.aurum-mascot-root \{([\s\S]*?)\n\}/)?.[1] || "";
+  const notificationRule = styles.match(/\.notification-center \{([\s\S]*?)\n\}/)?.[1] || "";
+  const zIndex = (rule) => Number(rule.match(/z-index:\s*(\d+)/)?.[1] || 0);
+
+  assert.match(zoomRule, /z-index:\s*15000/);
+  assert.ok(zIndex(zoomRule) > zIndex(aurumRule));
+  assert.ok(zIndex(zoomRule) > zIndex(notificationRule));
+  assert.match(zoomRule, /width:\s*100dvw/);
+  assert.match(zoomRule, /height:\s*100dvh/);
+  assert.match(zoomRule, /overflow:\s*hidden/);
+  assert.match(stageRule, /min-width:\s*0/);
+  assert.match(stageRule, /min-height:\s*0/);
+  assert.match(stageRule, /place-items:\s*center/);
+  assert.match(stageRule, /position:\s*relative/);
+  assert.match(imageRule, /position:\s*absolute/);
+  assert.match(imageRule, /inset:\s*0/);
+  assert.match(imageRule, /width:\s*100%/);
+  assert.match(imageRule, /height:\s*100%/);
+  assert.match(imageRule, /object-fit:\s*contain/);
+  assert.match(imageRule, /object-position:\s*center/);
+  assert.match(closeRule, /width:\s*56px/);
+  assert.match(closeRule, /height:\s*56px/);
+  assert.match(closeRule, /safe-area-inset-top/);
+  assert.match(closeRule, /safe-area-inset-right/);
+});
+
+test("portale HD sincronizza apertura, focus e chiusura senza lasciare overlay residui", () => {
+  const app = file("app.js");
+  const start = app.indexOf("function renderGemLabZoomPortal");
+  const end = app.indexOf("function renderGemLab()", start);
+  assert.ok(start >= 0 && end > start);
+  const focused = [];
+  const toggles = [];
+  const closeButton = { focus: (options) => focused.push(options || null) };
+  const portal = {
+    innerHTML: "overlay precedente",
+    querySelector: () => closeButton
+  };
+  const documentStub = {
+    body: { classList: { toggle: (...args) => toggles.push(args) } }
+  };
+  const renderPortal = new Function(
+    "gemLabZoomPortal",
+    "document",
+    "renderGemLabZoom",
+    `${app.slice(start, end)}; return renderGemLabZoomPortal;`
+  )(portal, documentStub, (material) => `<div>${material.name}</div>`);
+
+  renderPortal({ name: "Agata" });
+  assert.equal(portal.innerHTML, "<div>Agata</div>");
+  assert.deepEqual(toggles.at(-1), ["gem-lab-zoom-open", true]);
+  assert.deepEqual(focused, [{ preventScroll: true }]);
+
+  renderPortal();
+  assert.equal(portal.innerHTML, "");
+  assert.deepEqual(toggles.at(-1), ["gem-lab-zoom-open", false]);
+});
+
+test("logout e navigazione smontano completamente il visualizzatore HD", () => {
+  const app = file("app.js");
+  const start = app.indexOf("function teardownGemLabZoom");
+  const end = app.indexOf("function renderGemLab()", start);
+  assert.ok(start >= 0 && end > start);
+  const stateStub = { gemLabZoomMedia: "2" };
+  let portalClears = 0;
+  const portal = { replaceChildren: () => { portalClears += 1; } };
+  const removed = [];
+  const documentStub = {
+    body: { classList: { remove: (...classes) => removed.push(...classes) } }
+  };
+  const teardown = new Function(
+    "state",
+    "gemLabZoomPortal",
+    "document",
+    `${app.slice(start, end)}; return teardownGemLabZoom;`
+  )(stateStub, portal, documentStub);
+
+  teardown();
+  assert.equal(stateStub.gemLabZoomMedia, null);
+  assert.equal(portalClears, 1);
+  assert.deepEqual(removed, ["gem-lab-zoom-open"]);
 });
 
 test("protocollo vieta test distruttivi", () => {
@@ -599,7 +705,7 @@ test("migrazione crea tutte le tabelle dell'enciclopedia", () => {
 });
 
 test("build PWA è coerente fra frontend worker e versione", () => {
-  const expected = "20260901-aurum-drag-25";
+  const expected = "20260901-gem-hd-viewer-26";
   assert.match(file("app.js"), new RegExp(expected));
   assert.match(file("service-worker.js"), new RegExp(expected));
   assert.equal(JSON.parse(file("version.json")).assetBuildId, expected);

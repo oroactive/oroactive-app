@@ -13427,49 +13427,92 @@ input.document-expired {
 
 .gem-lab-zoom {
   position: fixed;
-  z-index: 1200;
+  z-index: 15000;
   inset: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 12px;
   place-items: center;
-  padding: max(52px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  padding:
+    max(84px, calc(env(safe-area-inset-top) + 72px))
+    max(20px, calc(env(safe-area-inset-right) + 20px))
+    max(18px, calc(env(safe-area-inset-bottom) + 18px))
+    max(20px, calc(env(safe-area-inset-left) + 20px));
+  overflow: hidden;
   color: #ffffff;
   background: rgba(4, 5, 6, 0.96);
   overscroll-behavior: contain;
+  isolation: isolate;
 }
 
-.gem-lab-zoom img {
-  max-width: min(1200px, 96vw);
-  max-height: 78vh;
+.gem-lab-zoom-stage {
+  position: relative;
+  display: grid;
+  width: 100%;
+  max-width: 1280px;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+}
+
+.gem-lab-zoom-stage img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  object-position: center;
 }
 
-.gem-lab-zoom > div {
+.gem-lab-zoom-caption {
   display: grid;
   gap: 5px;
-  max-width: 900px;
+  width: min(100%, 900px);
+  max-height: min(18dvh, 160px);
+  overflow: auto;
   text-align: center;
+}
+
+body.gem-lab-zoom-open {
+  overflow: hidden;
 }
 
 .gem-lab-zoom-close {
   position: absolute;
-  top: max(14px, env(safe-area-inset-top));
-  right: 16px;
+  top: max(12px, calc(env(safe-area-inset-top) + 12px));
+  right: max(12px, calc(env(safe-area-inset-right) + 12px));
   display: grid;
-  z-index: 1202;
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
-  min-height: 48px;
+  z-index: 15002;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 0;
   place-items: center;
   color: #ffffff;
-  background: #252628;
-  border: 1px solid #6b6c6f;
+  background: rgba(37, 38, 40, 0.98);
+  border: 2px solid #8a8b8e;
   border-radius: 50%;
-  font-size: 28px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.58);
+  font-size: 32px;
+  line-height: 1;
+  cursor: pointer;
   pointer-events: auto !important;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gem-lab-zoom-close:focus-visible {
+  outline: 3px solid #ffb13b;
+  outline-offset: 3px;
 }
 
 @media (min-width: 821px) and (max-width: 1100px) {
@@ -13555,14 +13598,10 @@ input.document-expired {
 
   .gem-lab-zoom {
     padding:
-      max(76px, calc(env(safe-area-inset-top) + 64px))
-      12px
-      max(18px, env(safe-area-inset-bottom));
-  }
-
-  .gem-lab-zoom img {
-    max-width: 100%;
-    max-height: 68vh;
+      max(82px, calc(env(safe-area-inset-top) + 70px))
+      max(12px, calc(env(safe-area-inset-right) + 12px))
+      max(14px, calc(env(safe-area-inset-bottom) + 14px))
+      max(12px, calc(env(safe-area-inset-left) + 12px));
   }
 
   .gem-lab-zoom-close {
