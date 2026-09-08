@@ -1,4 +1,4 @@
-const BUILD_ID = "20260908-apple-trial-28";
+const BUILD_ID = "20260908-logo-layout-29";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;
@@ -14,9 +14,9 @@ const SHELL_CORE_ASSETS = [
   "/oroactive-logo.png"
 ];
 const SHELL_OPTIONAL_ASSETS = [
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/apple-touch-icon-180.png"
+  `/icons/icon-192.png?v=${BUILD_ID}`,
+  `/icons/icon-512.png?v=${BUILD_ID}`,
+  `/icons/apple-touch-icon-180.png?v=${BUILD_ID}`
 ];
 const NEVER_CACHE_PREFIXES = [
   "/api/",

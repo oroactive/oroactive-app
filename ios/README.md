@@ -61,3 +61,19 @@ separati: questo progetto non implica una pubblicazione su App Store.
 
 La presenza del progetto non equivale a installazione o verifica già completata:
 lo stato effettivo di build, firma e prove viene riportato alla consegna.
+
+## Risorse del marchio
+
+Il master `../oroactive-logo.png` è rettangolare e non deve mai essere forzato
+direttamente a un quadrato. Dalla radice del repository eseguire
+`swift scripts/build-brand-icons.swift`: ricostruisce le icone Apple/PWA e la
+risorsa del widget usando una sola scala sui due assi e centrando il marchio.
+Il sorgente originale non viene modificato. I test `brand-icon-layout` misurano
+i pixel prodotti: cerchio, centratura, riempimento e margini di sicurezza.
+
+App e Apple Touch Icon riservano il 14% complessivo ai margini; le icone web
+maskable contengono il marchio nel cerchio centrale sicuro. Il widget applica
+un solo margine esterno, uguale nelle anteprime e nella Home.
+La Home di una PWA già installata può conservare la precedente icona fino a
+quando iOS aggiorna il collegamento: non eliminare automaticamente installazioni
+o dati dell'utente per aggiornare un'icona.

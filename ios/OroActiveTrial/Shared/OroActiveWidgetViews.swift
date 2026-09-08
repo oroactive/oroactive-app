@@ -22,6 +22,12 @@ enum OroActiveWidgetPalette {
         colors: [Color(red: 0.13, green: 0.10, blue: 0.07), Color(red: 0.025, green: 0.025, blue: 0.03)],
         startPoint: .topLeading, endPoint: .bottomTrailing
     )
+
+    static func inset(for style: OroActivePreviewStyle) -> CGFloat { style == .icon ? 8 : 14 }
+
+    @ViewBuilder static func backdrop(for style: OroActivePreviewStyle) -> some View {
+        if style == .icon { Color.black } else { background }
+    }
 }
 
 /// The app and WidgetKit use exactly the same content and destination links.
@@ -39,9 +45,9 @@ struct OroActiveWidgetPreviewView: View {
                 OroActiveWidgetContent(style: style, quote: quote)
             }
         }
-            .padding(14)
+            .padding(OroActiveWidgetPalette.inset(for: style))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(OroActiveWidgetPalette.background)
+            .background { OroActiveWidgetPalette.backdrop(for: style) }
             .clipShape(RoundedRectangle(cornerRadius: 26))
             .overlay {
                 RoundedRectangle(cornerRadius: 26)
@@ -62,7 +68,7 @@ struct OroActiveWidgetContent: View {
                 .resizable()
                 .widgetAccentedRenderingMode(.fullColor)
                 .scaledToFit()
-                .padding(6)
+                .aspectRatio(1, contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityLabel("Apri OroActive")
                 .widgetURL(OroActiveAction.home.url)

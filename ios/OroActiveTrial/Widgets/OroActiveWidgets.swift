@@ -55,8 +55,8 @@ private struct OroActiveWidgetEntryView: View {
 
     var body: some View {
         OroActiveWidgetContent(style: style, quote: entry.quote)
-            .padding(14)
-            .containerBackground(for: .widget) { OroActiveWidgetPalette.background }
+            .padding(OroActiveWidgetPalette.inset(for: style))
+            .containerBackground(for: .widget) { OroActiveWidgetPalette.backdrop(for: style) }
     }
 }
 

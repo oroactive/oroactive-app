@@ -1,5 +1,27 @@
 # Verifica della prova Apple — 8 settembre 2026
 
+## Correzione proporzioni icone — versione Apple 0.1.1 (2)
+
+- Difetto riprodotto nei PNG precedenti: il cerchio Apple Touch Icon risultava
+  138 × 110 pixel e quello dell'app Apple 786 × 628; cinque regressioni fallivano.
+- Nuove risorse derivate dal master invariato con scala uniforme: cinque
+  controlli di circolarità, centratura, riempimento e margini ora superati,
+  insieme al controllo delle icone maskable.
+- Suite completa fresca: 502 test passati, exit 0.
+- Compilazioni incrementali Xcode simulatore e dispositivo: exit 0; firma
+  `codesign --verify --deep --strict` superata.
+- Controllo visivo delle anteprime su simulatore iPhone e iPad: marchio circolare
+  completo, ingrandito e centrato. Controllata anche l'icona nella Home iPad.
+- Aggiornamento installato su entrambi i dispositivi fisici senza disinstallare
+  l'app. Bundle ID, gruppi, autenticazione e azioni widget invariati.
+- Release web preparata: `20260908-logo-layout-29`, riferimenti delle icone
+  versionati in HTML, manifest e precache. La distribuzione App Store/TestFlight
+  non fa parte del deploy web.
+
+Il precedente elenco di controlli rimane uno storico della prima installazione;
+le prove autenticate e le funzioni non esercitate continuano a essere indicate
+separatamente, senza dichiarare una garanzia assoluta su tutta l'app.
+
 ## Confermato
 
 - Suite web completa: 496 test passati, nessun errore, inclusa la regressione
