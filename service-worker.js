@@ -1,4 +1,4 @@
-const BUILD_ID = "20260908-apple-trial-27";
+const BUILD_ID = "20260908-apple-trial-28";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;

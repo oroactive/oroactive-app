@@ -229,7 +229,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260908-apple-trial-27";
+const OROACTIVE_CLIENT_BUILD_ID = "20260908-apple-trial-28";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -5597,6 +5597,10 @@ function isStandalonePwa() {
   return window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
 }
 
+function isOroActiveAppleTrial() {
+  return /(?:^|\s)OroActiveTrial\/[0-9]+(?:\.[0-9]+)*(?=\s|$)/.test(navigator.userAgent || "");
+}
+
 function isAppleTouchDevice() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
@@ -6056,7 +6060,12 @@ async function saveDeviceStorage(key, value) {
 }
 
 function maybeShowInstallHint() {
-  if (!installHint || localStorage.getItem("oroactive-install-hint-dismissed")) return;
+  if (!installHint) return;
+  if (isOroActiveAppleTrial()) {
+    installHint.hidden = true;
+    return;
+  }
+  if (localStorage.getItem("oroactive-install-hint-dismissed")) return;
   if (isStandalonePwa() || !isAppleTouchDevice()) return;
   installHint.hidden = false;
 }
