@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+<defs><linearGradient id="gold" x1="22" x2="98" y1="18" y2="110" gradientUnits="userSpaceOnUse"><stop stop-color="#fff1ad"/><stop offset=".42" stop-color="#ffb13b"/><stop offset="1" stop-color="#be5d0b"/></linearGradient><radialGradient id="eye"><stop stop-color="#fff7d0"/><stop offset=".36" stop-color="#ff8a1f"/><stop offset="1" stop-color="#6d2500"/></radialGradient></defs>
+<path fill="#6d3207" d="M32 47 16 35l10 34 17 24 3-38ZM88 47 104 35 94 69 77 93 74 55Z"/>
+<path fill="url(#gold)" stroke="#fff3b9" stroke-width="2" d="M60 13c17 0 31 12 34 29 11 13 9 37-4 52-8 10-19 15-30 15S38 104 30 94C17 79 15 55 26 42 29 25 43 13 60 13Z"/>
+<path fill="#140d07" stroke="#ffc255" stroke-width="1.4" d="M27 43c9-11 22-14 33-5 11-9 24-6 33 5-2 25-14 46-33 58-19-12-31-33-33-58Z"/>
+<g fill="url(#eye)"><circle cx="45" cy="50" r="13"/><circle cx="75" cy="50" r="13"/></g><g fill="#130a05"><circle cx="45" cy="50" r="5"/><circle cx="75" cy="50" r="5"/></g>
+<path fill="#ff7a00" d="M60 60 53 70h14Z"/><path fill="none" stroke="#fff5d0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M41 82h11l8 8 8-8h11M60 32v-9M36 63h-8M92 63h-8"/>
+</svg>

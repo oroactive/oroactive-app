@@ -27,6 +27,7 @@ import { createOroExpressExtractor } from "./services/competitors/extractors/oro
 import { createOroInEuroExtractor } from "./services/competitors/extractors/oroInEuroExtractor.js";
 import { createProntoGoldExtractor } from "./services/competitors/extractors/prontoGoldExtractor.js";
 import { fetchBullionVaultSpotPrice } from "./services/marketData/bullionVaultProvider.js";
+import { createBullionVaultQuoteCache, createWidgetGoldQuoteHandler } from "./services/marketData/widgetGoldQuote.js";
 import { analyzeMetalPredictionHistory } from "./services/marketData/metalPredictionReadiness.js";
 import {
   GOLD_MASTER_BADGE_NAME,
@@ -632,6 +633,14 @@ const bullionVaultMarkets = {
   Argento: { securityId: "AGXZU", source: "Zurigo" },
   Platino: { securityId: "PTXLN", source: "Londra" }
 };
+const bullionVaultQuoteCache = createBullionVaultQuoteCache({
+  fetchPrice: (metal, market) => fetchBullionVaultSpotPrice({
+    metal,
+    market,
+    currency: "EUR",
+    marketUrl: bullionVaultMarketUrl
+  })
+});
 const defaultStores = [
   { nome: "Busto Arsizio", codice: "BUSTO", citta: "Busto Arsizio", provincia: "VA" },
   { nome: "Cassano Magnago", codice: "CASSANO", citta: "Cassano Magnago", provincia: "VA" },
@@ -1292,6 +1301,7 @@ const publicApiRequests = new Set([
   "GET /api/live",
   "GET /api/health",
   "GET /api/version",
+  "GET /api/widgets/gold",
   "POST /api/auth/login",
   "POST /api/login",
   "POST /api/auth/webauthn/login/options",
@@ -2163,12 +2173,7 @@ function parseBullionVaultPrices(xml) {
 }
 
 async function fetchBullionVaultPrice(metal, market) {
-  return fetchBullionVaultSpotPrice({
-    metal,
-    market,
-    currency: "EUR",
-    marketUrl: bullionVaultMarketUrl
-  });
+  return bullionVaultQuoteCache.getPrice(metal, market);
 }
 
 function normalizePredictionMetal(metal = "gold") {
@@ -25822,6 +25827,12 @@ app.get("/api/version", async (_request, response) => {
     catalogCount: version.catalogCount,
     started_at: runtimeStatus.startedAt
   });
+});
+
+app.get("/api/widgets/gold", createWidgetGoldQuoteHandler(bullionVaultQuoteCache, bullionVaultMarkets.Oro));
+
+app.get("/.well-known/apple-app-site-association", (_request, response) => {
+  response.json({ webcredentials: { apps: ["F9GWSX8N83.it.oroactive.trial"] } });
 });
 
 app.get("/version.json", async (_request, response) => {

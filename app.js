@@ -229,7 +229,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260901-gem-hd-viewer-26";
+const OROACTIVE_CLIENT_BUILD_ID = "20260908-apple-trial-27";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -6791,6 +6791,7 @@ async function withButtonBusy(button, busyText, task) {
 }
 
 function resetAuthenticatedSessionData() {
+  oroActiveNavigationState.authenticatedGeneration = -1;
   rotateSessionGeneration();
   teardownGemLabZoom();
   window.currentUser = null;
@@ -7805,6 +7806,115 @@ function resolveSectionRoute(section = "") {
   return SECTION_ROUTE_ALIASES[key] || { screen: key };
 }
 
+const OROACTIVE_NAVIGATION_ROUTES = Object.freeze({
+  home: "menu",
+  quote: "quotazione",
+  "new-act": "practice",
+  coins: "coinEncyclopedia",
+  gems: "gemLab",
+  aurum: "aurum"
+});
+const oroActiveNavigationState = {
+  pendingAction: "",
+  authenticatedGeneration: -1,
+  startupComplete: false
+};
+
+function normalizeOroActiveNavigationAction(action) {
+  return typeof action === "string" && Object.hasOwn(OROACTIVE_NAVIGATION_ROUTES, action) ? action : "";
+}
+
+function hasActiveNavigationDestination() {
+  return Boolean(
+    state.currentUser
+    && !appShell?.hidden
+    && document.querySelector(".screen.active-screen:not([hidden])")
+  );
+}
+
+function clearConsumedNavigationUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("action")) return;
+    url.searchParams.delete("action");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  } catch {
+    // Navigation still works if the browser prevents history updates.
+  }
+}
+
+function consumePendingOroActiveNavigation() {
+  const action = oroActiveNavigationState.pendingAction;
+  if (!action) return { status: "blocked", reason: "no-pending-action" };
+  if (!state.authToken || !state.currentUser) return { status: "pending", action, reason: "authentication" };
+  if (!oroActiveNavigationState.startupComplete
+    || oroActiveNavigationState.authenticatedGeneration !== state.sessionGeneration) {
+    return { status: "pending", action, reason: "startup" };
+  }
+
+  oroActiveNavigationState.pendingAction = "";
+  clearConsumedNavigationUrl();
+  const destination = OROACTIVE_NAVIGATION_ROUTES[action];
+  const menuItem = MENU_GROUPS.flatMap((group) => group.items).find((item) => item.section === destination);
+  if (menuItem && !isMenuItemVisible(menuItem)) {
+    showToast("Sezione non disponibile per il tuo ruolo.", "warning");
+    return { status: "blocked", action, reason: "permissions" };
+  }
+  try {
+    teardownGemLabZoom();
+    if (action === "home") {
+      openMainMenuCleanly();
+      return { status: mainMenuScreen?.hidden ? "blocked" : "opened", action, destination: "menu" };
+    }
+    if (action === "aurum" && shouldShowAurumMascot()) {
+      openAurumChat();
+      return { status: aurumChatPanel?.hidden === false ? "opened" : "blocked", action, destination: "aurum" };
+    }
+    const screen = action === "aurum" ? "assistant" : destination;
+    // A widget may reopen a running app while a sale deed is being edited.
+    // Opening the form must never reset its fields, photos or signatures.
+    const resumePractice = action === "new-act" && (state.editingPracticeNumber || state.editingDirty || !isPracticeFormEmpty());
+    setScreen(screen);
+    const opened = document.getElementById(screen)?.classList.contains("active-screen") === true;
+    if (opened && resumePractice) {
+      showToast("Hai un atto in compilazione: lo riprendo senza cancellare i dati. Completa o salva questo atto prima di crearne un altro.", "warning");
+    }
+    return { status: opened ? "opened" : "blocked", action, destination: screen, ...(opened && resumePractice ? { resumed: true } : {}) };
+  } catch (error) {
+    reportFrontendFailure("widget navigation", error);
+    showToast("Collegamento non disponibile. Riprova dal menu di OroActive.", "warning");
+    return { status: "blocked", action, reason: "unavailable" };
+  }
+}
+
+function openOroActiveNavigationAction(requestedAction) {
+  const action = normalizeOroActiveNavigationAction(requestedAction);
+  if (!action) return { status: "blocked", reason: "invalid-action" };
+  oroActiveNavigationState.pendingAction = action;
+  return consumePendingOroActiveNavigation();
+}
+
+function installOroActiveNavigationBridge() {
+  if (window.OroActiveNavigation) return;
+  window.OroActiveNavigation = Object.freeze({ openAction: openOroActiveNavigationAction });
+  try {
+    const url = new URL(window.location.href);
+    if (url.protocol !== "https:" || url.pathname !== "/" || url.username || url.password) return;
+    const actions = url.searchParams.getAll("action");
+    if (actions.length === 1) openOroActiveNavigationAction(actions[0]);
+  } catch {
+    // A malformed launch URL must not interfere with normal login.
+  }
+}
+
+function finishOroActiveNavigationBoot(generation) {
+  if (generation !== state.sessionGeneration || !state.authToken || !state.currentUser) {
+    return { status: "blocked", reason: "session-changed" };
+  }
+  oroActiveNavigationState.authenticatedGeneration = state.sessionGeneration;
+  return consumePendingOroActiveNavigation();
+}
+
 function menuButtonMarkup(item = {}, extraClass = "") {
   const attributes = [
     `type="button"`,
@@ -8441,6 +8551,7 @@ function startBootWatchdog() {
     );
 
     if (hasUser && (!mainMenuScreen || mainMenuScreen.hidden)) {
+      if (hasActiveNavigationDestination()) return;
       console.warn("[OroActive Boot] main menu hidden after auth. Forcing recovery.");
       showMainMenuShell();
       renderMainMenuMinimum();
@@ -8450,6 +8561,8 @@ function startBootWatchdog() {
 }
 
 async function bootAuthenticatedApp(reason = "login") {
+  const navigationGeneration = state.sessionGeneration;
+  oroActiveNavigationState.authenticatedGeneration = -1;
   console.info("[OroActive Boot] start", { reason });
   startBootWatchdog();
   try {
@@ -8469,6 +8582,7 @@ async function bootAuthenticatedApp(reason = "login") {
     startNonCriticalModulesSafely();
 
     console.info("[OroActive Boot] completed");
+    finishOroActiveNavigationBoot(navigationGeneration);
   } catch (error) {
     console.error("[OroActive Boot] fatal", error);
     reportFrontendFailure("boot", error);
@@ -9647,8 +9761,11 @@ function forceShowMainMenuAfterLogin(options = {}) {
 }
 
 function schedulePostLoginMenuGuard(phase = "login") {
+  const guardGeneration = state.sessionGeneration;
   window.setTimeout(() => {
+    if (guardGeneration !== state.sessionGeneration) return;
     if (state.currentUser && mainMenuScreen?.hidden) {
+      if (hasActiveNavigationDestination()) return;
       console.warn("[OroActive UI] Main menu hidden after authenticated flow, forcing recovery.", {
         phase,
         userRole: state.currentUser?.ruolo || ""
@@ -27658,7 +27775,11 @@ async function initializeApp() {
     await completeStartupSplash(sessionRestored ? "main" : "login");
   } catch (error) {
     showStartupSplashError(error);
+  } finally {
+    oroActiveNavigationState.startupComplete = true;
+    consumePendingOroActiveNavigation();
   }
 }
 
+installOroActiveNavigationBridge();
 initializeApp();

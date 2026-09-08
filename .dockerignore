@@ -5,6 +5,7 @@ npm-debug.log
 .github
 docs
 tests
+ios
 *.zip
 backups
 OroActive-WebApp-Backend-Coolify*
