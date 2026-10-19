@@ -3740,13 +3740,16 @@ function defaultAmicoOroExtractionRules(source = {}) {
       purity_value: 14 / 24,
       anchor_text: "14K al gr",
       regex_pattern: "14K\\s*al\\s*gr\\s*=\\s*([0-9]+[,.]?[0-9]*)\\s*€"
-    }
+    },
+    {"field_key": "amico_oro_silver_999", "label": "Argento 999 al kg", "metal": "silver", "purity_code": "999", "purity_value": 0.999, "anchor_text": "999 al Kg", "unit": "EUR/kg", "regex_pattern": "999\\s*al\\s*(?:Kg|kg)\\s*=\\s*([0-9]+(?:[,.][0-9]+)?)\\s*€"},
+    {"field_key": "amico_oro_silver_925", "label": "Argento 925 al kg", "metal": "silver", "purity_code": "925", "purity_value": 0.925, "anchor_text": "925 al Kg", "unit": "EUR/kg", "regex_pattern": "925\\s*al\\s*(?:Kg|kg)\\s*=\\s*([0-9]+(?:[,.][0-9]+)?)\\s*€"},
+    {"field_key": "amico_oro_silver_800", "label": "Argento 800 al kg", "metal": "silver", "purity_code": "800", "purity_value": 0.8, "anchor_text": "800 al Kg", "unit": "EUR/kg", "regex_pattern": "800\\s*al\\s*(?:Kg|kg)\\s*=\\s*([0-9]+(?:[,.][0-9]+)?)\\s*€"}
   ].map((rule) => ({
     ...rule,
     competitor_name: source.name || "Amico Oro",
     source_id: source.id || null,
     page_url: pageUrl,
-    unit: "EUR/g",
+    unit: rule.unit || "EUR/g",
     extraction_method: "anchor_regex",
     required: true,
     active: true
@@ -3952,7 +3955,10 @@ function defaultGoldStandardExtractionRules(source = {}) {
       "EUR/g",
       "Acquistiamo\\s+ORO\\s*24\\s*K[\\s\\S]{0,120}?prezzo\\s*MIN[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)",
       "customer_buyback"
-    ]
+    ],
+    ["gold_standard_silver_reference", "Quotazione dell'argento in borsa", "silver", "999", 0.999, "Quotazione dell'argento in borsa", "EUR/kg", "Quotazione\\s+dell[’']argento\\s+in\\s+borsa[\\s\\S]{0,80}?€\\s*([0-9]+(?:[,.][0-9]+)?)\\s*/\\s*kg", "reference_market_silver_price"],
+    ["gold_standard_silver_925_buyback", "Acquistiamo ARGENTO 925 al chilo", "silver", "925", 0.925, "Acquistiamo ARGENTO 925", "EUR/kg", "Acquistiamo\\s+ARGENTO\\s*925\\s*al\\s*chilo[\\s\\S]{0,100}?€\\s*([0-9]+(?:[,.][0-9]+)?)", "customer_buyback"],
+    ["gold_standard_silver_800_buyback", "Acquistiamo ARGENTO 800 al chilo", "silver", "800", 0.8, "Acquistiamo ARGENTO 800", "EUR/kg", "Acquistiamo\\s+ARGENTO\\s*800\\s*al\\s*chilo[\\s\\S]{0,100}?€\\s*([0-9]+(?:[,.][0-9]+)?)", "customer_buyback"]
   ];
   return rows.map(([field_key, label, metal, purity_code, purity_value, anchor_text, unit, regex_pattern, quote_type]) => ({
     field_key,
@@ -4707,6 +4713,8 @@ async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "E
           AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
           AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')
           AND ${hiddenCompetitorSql("competitor_name")}
+          AND (LOWER(competitor_name) NOT IN ('amico oro', 'bordin', 'pronto gold', 'gold standard', 'oro in euro', 'gruppo oro 24k')
+            OR (COALESCE(ai_extracted, false) = false AND raw_payload @> '{"verified_official":true}'::jsonb))
           AND NOT (
             LOWER(competitor_name) = LOWER('Oro D''Oro') AND metal = 'gold' AND purity_code = '20kt'
             AND NOT EXISTS (
@@ -5015,6 +5023,7 @@ async function extractCompetitorQuotes(source = {}) {
       status: trained.status === "success" ? "success" : (trained.quotes?.length ? "partial" : "failed"),
       error: trained.error || (trained.quotes?.length ? "" : "Dato non rilevato. Configura anchor, selettore o regex."),
       extraction_method: "guided_extraction_rules",
+      pages_analyzed: trained.pages_analyzed || [],
       rule_results: (trained.results || []).map(publicExtractionTestResult)
     };
   }
@@ -6557,11 +6566,12 @@ async function runAiCompetitorQuoteExtraction(options = {}) {
     let sourcesSuccess = 0;
     let sourcesFailed = 0;
     for (const source of sources) {
-      const verifiedOnly = ["oro express", "oro d'oro"].includes(String(source.name || "").toLowerCase());
+      const verifiedOnly = ["oro express", "oro d'oro", "amico oro", "bordin", "pronto gold", "gold standard", "oro in euro", "gruppo oro 24k"].includes(String(source.name || "").toLowerCase());
       const extracted = verifiedOnly
         ? await extractCompetitorQuotes(source)
         : await aiCompetitorQuoteExtractor.extractQuotesFromCompetitor(source);
-      pagesAnalyzed += Number(extracted.pages_analyzed || extracted.pages?.length || 0);
+      const analyzedPages = Array.isArray(extracted.pages_analyzed) ? extracted.pages_analyzed.length : Number(extracted.pages_analyzed || extracted.pages?.length || 0);
+      pagesAnalyzed += Number.isFinite(analyzedPages) ? analyzedPages : 0;
       quotesExtracted += Number(extracted.quotes_found || extracted.quotes?.length || 0);
       for (const page of extracted.pages || []) {
         await insertAiExtractionPageLog(run.id, source, page);
@@ -6571,11 +6581,10 @@ async function runAiCompetitorQuoteExtraction(options = {}) {
         ? { saved: verifiedSave.saved, rejected: verifiedSave.errors.map((reason) => ({ reason })) }
         : await saveAiExtractedCompetitorQuotes(extracted.quotes || [], { runId: run.id, user: options.user || {}, spotMap });
       quotesSaved += saved.saved.length;
-      const status = saved.saved.length
-        ? extracted.status === "failed" ? "partial" : extracted.status
-        : extracted.status;
-      if (saved.saved.length) sourcesSuccess += 1;
-      if (!saved.saved.length || status === "failed") sourcesFailed += 1;
+      const status = !saved.saved.length ? "failed"
+        : saved.rejected.length || extracted.status === "failed" ? "partial" : extracted.status || "success";
+      if (status === "success") sourcesSuccess += 1;
+      else sourcesFailed += 1;
       const errorMessage = [
         verifiedOnly ? extracted.error : "",
         ...(extracted.warnings || []),
@@ -6586,14 +6595,14 @@ async function runAiCompetitorQuoteExtraction(options = {}) {
       results.push({
         source,
         status: status || "no_quotes",
-        pages_analyzed: extracted.pages?.length || 0,
+        pages_analyzed: Number.isFinite(analyzedPages) ? analyzedPages : 0,
         quotes_found: extracted.quotes?.length || 0,
         quotes_saved: saved.saved.length,
         rejected: saved.rejected.length,
         error: errorMessage
       });
     }
-    const finalStatus = sourcesFailed && sourcesSuccess ? "partial" : sourcesFailed && !sourcesSuccess ? "failed" : "success";
+    const finalStatus = sourcesFailed ? quotesSaved ? "partial" : "failed" : "success";
     const finished = await finishAiExtractionRun(run.id, {
       status: finalStatus,
       sources_success: sourcesSuccess,
@@ -29928,7 +29937,7 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
     }
     const sources = await listCompetitorSources();
     const logs = await listCompetitorSyncLogs({ limit: 12 }).catch(() => []);
-    const updatedSources = sources.filter((source) => ["success", "updated", "partial"].includes(String(source.last_sync_status || "").toLowerCase())).length;
+    const updatedSources = sources.filter((source) => ["success", "updated"].includes(String(source.last_sync_status || "").toLowerCase())).length;
     const failedSources = sources.filter((source) => String(source.last_sync_status || "").toLowerCase() === "failed").length;
     const validQuotes = await pool.query(
       `SELECT COUNT(*)::int AS count
@@ -29936,7 +29945,9 @@ app.get("/api/quotazioni/competitors/sync-status", async (request, response, nex
        WHERE quote_date >= NOW() - INTERVAL '24 hours'
           AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
           AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')
-          AND ${hiddenCompetitorSql("competitor_name")}`
+          AND ${hiddenCompetitorSql("competitor_name")}
+          AND (LOWER(competitor_name) NOT IN ('amico oro', 'bordin', 'pronto gold', 'gold standard', 'oro in euro', 'gruppo oro 24k')
+            OR (COALESCE(ai_extracted, false) = false AND raw_payload @> '{"verified_official":true}'::jsonb))`
     ).catch(() => ({ rows: [{ count: 0 }] }));
     response.json({
       ok: true,

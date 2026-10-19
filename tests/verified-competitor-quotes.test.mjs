@@ -134,11 +134,11 @@ test("Oro Express text fallback requires an explicit positive EUR/g price", asyn
   assert.equal(r.quotes[0].price_per_gram, 112);
 });
 
-test("global AI refresh routes both dedicated sources through verified extraction and preserves provenance", async () => {
+test("global refresh routes all eight official sources through verified extraction and preserves provenance", async () => {
   const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
   const start = server.indexOf("async function runAiCompetitorQuoteExtraction(");
   const code = server.slice(start, server.indexOf("function nextCompetitorAiRunAt(", start));
-  const sources = [{ id: 1, name: "Oro Express" }, { id: 2, name: "Oro D'Oro" }];
+  const sources = ["Oro Express", "Oro D'Oro", "Amico Oro", "Bordin", "Pronto Gold", "Gold Standard", "Oro in Euro", "Gruppo Oro 24K"].map((name,index)=>({id:index+1,name}));
   const saved = [], statuses = [];
   let aiCalls = 0;
   const ctx = vm.createContext({
@@ -147,7 +147,7 @@ test("global AI refresh routes both dedicated sources through verified extractio
     pool: { query: async () => ({ rows: sources }) }, hiddenCompetitorSql: () => "true", publicCompetitorSource: (s) => s,
     createAiExtractionRun: async () => ({ id: 7 }), latestMetalPriceHistory: async () => null,
     aiCompetitorQuoteExtractor: { extractQuotesFromCompetitor: async () => { aiCalls++; return { quotes: [{ competitor_name: "Oro D'Oro", purity_code: "20kt", price_per_gram: 999 }], status: "success" }; } },
-    extractCompetitorQuotes: async (source) => ({ quotes: [{ source_id: source.id, purity_code: "18kt", price_per_gram: 74, ai_extracted: false, extraction_method: "guided_specific_parser", raw_payload: { source_method: "public_source" } }], status: source.id === 2 ? "partial" : "success", error: source.id === 2 ? "ORO 20kt: nessun prezzo verificabile" : "" }),
+    extractCompetitorQuotes: async (source) => ({ quotes: [{ source_id: source.id, purity_code: "18kt", price_per_gram: 74, ai_extracted: false, extraction_method: "guided_specific_parser", raw_payload: { source_method: "public_source" } }], pages_analyzed: ["https://official.example/"], status: source.id === 2 ? "partial" : "success", error: source.id === 2 ? "ORO 20kt: nessun prezzo verificabile" : "" }),
     saveCompetitorQuotes: async (quotes) => { saved.push(...quotes); return { saved: quotes, errors: [] }; },
     saveAiExtractedCompetitorQuotes: async () => { throw new Error("verified prices must retain their method"); },
     insertAiExtractionPageLog: async () => {}, updateCompetitorSourceSyncStatus: async (...args) => { statuses.push(args); },
@@ -158,7 +158,11 @@ test("global AI refresh routes both dedicated sources through verified extractio
   const result = await ctx.runAiCompetitorQuoteExtraction({ force: true });
   assert.equal(result.ok, true);
   assert.equal(aiCalls, 0);
-  assert.equal(saved.length, 2);
+  assert.equal(saved.length, 8);
+  assert.equal(result.run.pages_analyzed,8);
+  assert.equal(result.run.status,"partial");
+  assert.equal(result.run.sources_success,7);
+  assert.equal(result.run.sources_failed,1);
   assert.ok(saved.every((q) => q.ai_extracted === false && q.raw_payload.source_method === "public_source"));
   assert.match(statuses[1][3], /20kt.*nessun prezzo verificabile/);
 });

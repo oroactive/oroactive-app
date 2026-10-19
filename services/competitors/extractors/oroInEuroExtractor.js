@@ -65,6 +65,7 @@ export function parseItalianEuroPrice(value = "") {
   const raw = String(value || "").replace(/\u00a0/g, " ").replace(/[^\d,.\s]/g, "").trim();
   if (!raw) return 0;
   const compact = raw.replace(/\s+/g, "");
+  if (!/^(?:\d+|\d+[,.]\d+|\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?)$/.test(compact)) return 0;
   if (compact.includes(",") && compact.includes(".")) {
     const commaIndex = compact.lastIndexOf(",");
     const dotIndex = compact.lastIndexOf(".");
@@ -132,7 +133,7 @@ function oroInEuroQuote(definition = {}, price = 0, sourceUrl = ORO_IN_EURO_DEFA
     extraction_method: options.extractionMethod || "auto_oro_in_euro_parser",
     confidence: options.confidence || "high",
     ai_confidence: options.aiConfidence || options.confidence || "high",
-    ai_extracted: Boolean(options.aiExtracted),
+    ai_extracted: false,
     quote_type: definition.quote_type,
     evidence_text: oroInEuroEvidence(definition, price, unit, rawPayload.matched_text),
     url: sourceUrl,
@@ -142,102 +143,93 @@ function oroInEuroQuote(definition = {}, price = 0, sourceUrl = ORO_IN_EURO_DEFA
       oro_in_euro_key: definition.key,
       oro_in_euro_mapping: definition.purity_code,
       oro_in_euro_quote_type: definition.quote_type,
-      fineness_per_mille: definition.fineness_per_mille
+      fineness_per_mille: definition.fineness_per_mille,
+      verified_official: true
     }
   };
 }
 
-function regexesForDefinition(definition = {}) {
-  const price = pricePattern();
-  if (definition.key === "oro_in_euro_gold_18kt") {
-    return [
-      new RegExp(`Oro\\s*750\\s*\\/\\s*1000[\\s\\S]{0,120}?${price}`, "i"),
-      new RegExp(`AU\\.750[\\s\\S]{0,160}?${price}`, "i")
-    ];
-  }
-  if (definition.key === "oro_in_euro_gold_24kt") {
-    return [
-      new RegExp(`Oro\\s*999\\s*\\/\\s*1000[\\s\\S]{0,120}?${price}`, "i"),
-      new RegExp(`AU\\.999[\\s\\S]{0,160}?${price}`, "i")
-    ];
-  }
-  if (definition.key === "oro_in_euro_silver_999") {
-    return [
-      new RegExp(`Argento\\s*999\\s*\\/\\s*1000[\\s\\S]{0,120}?${price}`, "i"),
-      new RegExp(`AG\\.999[\\s\\S]{0,160}?${price}`, "i")
-    ];
-  }
-  return [];
+function officialText(value = "") {
+  return compactText(extractReadableTextFromHtml(decodeHtml(String(value || "").replace(/<!--[\s\S]*?-->/g, " "))));
 }
 
-function addRegexQuote(quotes = [], text = "", definition = {}, sourceUrl = ORO_IN_EURO_DEFAULT_URL, options = {}) {
-  for (const regex of regexesForDefinition(definition)) {
-    const match = text.match(regex);
-    const price = match ? parseItalianEuroPrice(match[1]) : 0;
-    if (!price) continue;
-    const unit = definition.defaultUnit || "EUR/g";
-    quotes.push(oroInEuroQuote(definition, price, sourceUrl, {
-      source_method: "text_regex",
-      matched_text: match[0],
-      unit
-    }, { ...options, unit }));
-    return true;
+function verifiedPrice(body = "", options = {}) {
+  const text = compactText(body);
+  const match = text.match(/^(?:€\s*([+\-−]?[0-9][0-9.,]*)|([+\-−]?[0-9][0-9.,]*)\s*(?:€|EUR\b|euro\b))/i);
+  if (!match) return null;
+  const raw = match[1] || match[2];
+  if (/^[\-−]/.test(raw) || !/^\+?(?:[0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{1,3})?|[0-9]+(?:[.,][0-9]{1,3})?)$/.test(raw)) return null;
+  const value = parseItalianEuroPrice(raw);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const tail = text.slice(match[0].length);
+  if (/^\s*(?:\$|£|USD\b|GBP\b|CHF\b)/i.test(tail)) return null;
+  const unitMatch = tail.match(/^\s*(?:(?:\/|al|per)\s*)?(kg|chilo|chilogramm[oi]|kilo|gramm[oi]|gr\.?|g)\b/i);
+  if (!unitMatch && /^\s*(?:\/|al\b|per\b)/i.test(tail)) return null;
+  const explicitUnit = unitMatch ? unitFromText(unitMatch[1]) : "";
+  const unit = explicitUnit || options.labelUnit || options.defaultUnit || "";
+  if (!unit || (options.requireUnit && !explicitUnit && !options.labelUnit)) return null;
+  if (options.expectedUnit && unit !== options.expectedUnit) return null;
+  if (options.labelUnit && explicitUnit && options.labelUnit !== explicitUnit) return null;
+  return { value, unit, evidenceText: text.slice(0, match[0].length + (unitMatch?.[0].length || 0)) };
+}
+
+function uniqueVerifiedQuotes(quotes = [], invalidKeys = new Set()) {
+  const found = new Map();
+  for (const quote of quotes) {
+    const key = quoteKey(quote);
+    const previous = found.get(key);
+    if (previous && Math.abs(previous.price_per_gram - quote.price_per_gram) > 1e-12) invalidKeys.add(key);
+    else if (!previous) found.set(key, quote);
   }
-  return false;
+  return [...found.entries()].filter(([key]) => !invalidKeys.has(key)).map(([, quote]) => quote);
+}
+
+const ORO_IN_EURO_LABEL = /(?:Oro|Argento)\s*[0-9]{3}\s*\/\s*1000|(?:AU|AG)\.[0-9]{3}/gi;
+
+function definitionForLabel(label = "") {
+  const fineness = label.match(/([0-9]{3})/)?.[1];
+  const metal = /^(?:Argento|AG)/i.test(label) ? "silver" : "gold";
+  return ORO_IN_EURO_DEFINITIONS.find((definition) => definition.metal === metal && String(definition.fineness_per_mille) === fineness);
+}
+
+function parseOroInEuroPage(text = "", options = {}) {
+  const normalized = officialText(text);
+  const labels = [...normalized.matchAll(new RegExp(ORO_IN_EURO_LABEL.source, "gi"))];
+  const quotes = [];
+  const conditions = normalized.match(/Ricevila\s+direttamente[^!\.]{0,400}/i)?.[0] || "";
+  for (let index = 0; index < labels.length; index++) {
+    const label = labels[index];
+    const definition = definitionForLabel(label[0]);
+    if (!definition) continue;
+    const body = normalized.slice(label.index + label[0].length, labels[index + 1]?.index ?? normalized.length).trim().replace(/^[:·]\s*/, "");
+    const parsed = verifiedPrice(body, { requireUnit: true, expectedUnit: "EUR/g" });
+    if (!parsed) continue;
+    quotes.push(oroInEuroQuote(definition, parsed.value, options.sourceUrl || ORO_IN_EURO_DEFAULT_URL, {
+      source_method: "official_label_price", matched_text: `${label[0]} ${parsed.evidenceText}`, unit: parsed.unit, conditions
+    }, { ...options, unit: parsed.unit }));
+  }
+  const invalidKeys = new Set();
+  return { quotes: uniqueVerifiedQuotes(quotes, invalidKeys), invalidKeys };
 }
 
 export function extractPriceNearAnchor(text = "", anchor = "", maxDistance = 240) {
-  const source = String(text || "");
-  const anchorRegex = new RegExp(anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*"), "i");
-  const anchorMatch = source.match(anchorRegex);
-  if (!anchorMatch || anchorMatch.index === undefined) return null;
-  const snippet = source.slice(anchorMatch.index, anchorMatch.index + maxDistance);
-  const priceMatch = snippet.match(currencyPriceRegex());
-  const price = priceMatch ? parseItalianEuroPrice(priceMatch[1] || priceMatch[2] || priceMatch[3]) : 0;
-  if (!price) return null;
-  return {
-    value: price,
-    evidenceText: compactText(snippet.slice(0, priceMatch.index + priceMatch[0].length)).slice(0, 700)
-  };
-}
-
-function addAnchorFallbackQuote(quotes = [], text = "", definition = {}, sourceUrl = ORO_IN_EURO_DEFAULT_URL, options = {}) {
-  if (quotes.some((quote) => quoteKey(quote) === `${definition.metal}:${definition.purity_code}:${definition.quote_type}`)) return false;
-  const found = extractPriceNearAnchor(text, definition.anchor || definition.label, 260);
-  if (!found?.value) return false;
-  const unit = definition.defaultUnit || "EUR/g";
-  quotes.push(oroInEuroQuote(definition, found.value, sourceUrl, {
-    source_method: "anchor_near_price",
-    matched_text: found.evidenceText,
-    unit
-  }, { ...options, unit }));
-  return true;
+  const normalized = officialText(text);
+  const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+  const found = normalized.match(new RegExp(escaped, "i"));
+  if (!found) return null;
+  const remainder = normalized.slice(found.index + found[0].length, found.index + Math.min(maxDistance, 500));
+  const next = remainder.search(new RegExp(ORO_IN_EURO_LABEL.source, "i"));
+  const body = (next < 0 ? remainder : remainder.slice(0, next)).trim();
+  const parsed = verifiedPrice(body, { requireUnit: true, expectedUnit: "EUR/g" });
+  return parsed ? { value: parsed.value, evidenceText: `${found[0]} ${parsed.evidenceText}` } : null;
 }
 
 export function extractOroInEuroQuotesFromText(text = "", options = {}) {
-  const sourceUrl = options.sourceUrl || ORO_IN_EURO_DEFAULT_URL;
-  const normalized = compactText(decodeHtml(text));
-  const quotes = [];
-  for (const definition of ORO_IN_EURO_DEFINITIONS) {
-    const found = addRegexQuote(quotes, normalized, definition, sourceUrl, options);
-    if (!found) addAnchorFallbackQuote(quotes, normalized, definition, sourceUrl, options);
-  }
-  return dedupeOroInEuroQuotes(quotes);
+  return parseOroInEuroPage(text, options).quotes;
 }
 
-function dedupeOroInEuroQuotes(quotes = []) {
-  const map = new Map();
-  for (const quote of quotes) {
-    const existing = map.get(quoteKey(quote));
-    if (!existing) {
-      map.set(quoteKey(quote), quote);
-      continue;
-    }
-    const preferNext = String(quote.raw_payload?.source_method || "").includes("playwright")
-      && !String(existing.raw_payload?.source_method || "").includes("playwright");
-    map.set(quoteKey(quote), preferNext ? quote : existing);
-  }
-  return [...map.values()];
+function dedupeOroInEuroQuotes(quotes = [], invalidKeys = new Set()) {
+  return uniqueVerifiedQuotes(quotes, invalidKeys);
 }
 
 export async function fetchOroInEuroPage(url = ORO_IN_EURO_DEFAULT_URL, options = {}) {
@@ -267,7 +259,7 @@ export async function fetchOroInEuroPage(url = ORO_IN_EURO_DEFAULT_URL, options 
   return {
     url: response.url || url,
     html,
-    text: extractReadableTextFromHtml(html),
+    text: officialText(html),
     method: "safe_external_fetch"
   };
 }
@@ -301,84 +293,7 @@ function requiredMissingDefinitions(quotes = []) {
   return ORO_IN_EURO_DEFINITIONS.filter((definition) => definition.required && !found.has(definition.key));
 }
 
-async function extractOroInEuroQuotesWithAi(pageTexts = [], options = {}) {
-  if (!options.openai) return { quotes: [], warnings: ["AI fallback Oro in Euro non disponibile: OPENAI_API_KEY non configurata sul backend."] };
-  const systemPrompt = "Sei un estrattore dati OroActive per il competitor Oro in Euro. Devi estrarre solo quotazioni chiaramente visibili nel riquadro 'La tua quotazione in tempo reale': Oro 750/1000, Oro 999/1000, Argento 999/1000. Non inventare dati. Restituisci solo JSON valido.";
-  const userPrompt = `Analizza il testo pubblico Oro in Euro. Estrai solo:
-1. Oro 750/1000
-2. Oro 999/1000
-3. Argento 999/1000
-Se un prezzo non e chiaramente presente, non inventarlo.
 
-TESTO:
-${pageTexts.map((page) => `URL: ${page.url}\n${String(page.text || "").replace(/\s+/g, " ").trim()}`).join("\n\n---\n\n").slice(0, Number(options.maxTextChars || 12000))}`;
-  const response = await options.openai.responses.create({
-    model: options.model || "gpt-4.1-mini",
-    input: `${systemPrompt}\n\n${userPrompt}`,
-    text: {
-      format: {
-        type: "json_schema",
-        name: "oro_in_euro_quote_extraction",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            found: { type: "boolean" },
-            quotes: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  metal: { type: "string", enum: ["gold", "silver"] },
-                  purity_code: { type: "string" },
-                  purity_value: { type: "number" },
-                  fineness_per_mille: { type: "number" },
-                  price: { type: "number" },
-                  unit: { type: "string" },
-                  quote_type: { type: "string", enum: ["customer_buyback"] },
-                  evidence_text: { type: "string" },
-                  confidence: { type: "string", enum: ["low", "medium", "high"] },
-                  page_url: { type: "string" }
-                },
-                required: ["metal", "purity_code", "purity_value", "fineness_per_mille", "price", "unit", "quote_type", "evidence_text", "confidence", "page_url"]
-              }
-            },
-            warnings: { type: "array", items: { type: "string" } },
-            notes: { type: "string" }
-          },
-          required: ["found", "quotes", "warnings", "notes"]
-        }
-      }
-    }
-  });
-  const parsed = JSON.parse(response.output_text || "{}");
-  const quotes = (parsed.quotes || []).map((quote) => {
-    const definition = ORO_IN_EURO_DEFINITIONS.find((item) => (
-      item.metal === quote.metal
-      && item.purity_code === quote.purity_code
-      && Number(item.fineness_per_mille) === Number(quote.fineness_per_mille)
-    ));
-    const price = Number(quote.price || 0);
-    if (!definition || !price || !quote.evidence_text) return null;
-    const unit = unitFromText(quote.unit || definition.defaultUnit || "EUR/g", definition.defaultUnit || "EUR/g");
-    return oroInEuroQuote(definition, price, quote.page_url || options.sourceUrl || ORO_IN_EURO_DEFAULT_URL, {
-      source_method: "ai_fallback",
-      matched_text: quote.evidence_text,
-      ai_response: parsed,
-      unit
-    }, {
-      ...options,
-      unit,
-      extractionMethod: "ai_oro_in_euro_fallback",
-      confidence: quote.confidence || "medium",
-      aiConfidence: quote.confidence || "medium",
-      aiExtracted: true
-    });
-  }).filter(Boolean);
-  return { quotes: dedupeOroInEuroQuotes(quotes), warnings: parsed.warnings || [] };
-}
 
 export function createOroInEuroExtractor(options = {}) {
   const config = {
@@ -386,10 +301,6 @@ export function createOroInEuroExtractor(options = {}) {
     timeoutMs: Number(options.timeoutMs || 15000),
     maxBytes: Math.min(Number(options.maxBytes || ORO_IN_EURO_HTML_MAX_BYTES), ORO_IN_EURO_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    useAiFallback: Boolean(options.useAiFallback),
-    openai: options.openai || null,
-    model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000),
     fetchImpl: options.fetchImpl,
     resolver: options.resolver,
     signal: options.signal
@@ -402,33 +313,19 @@ export function createOroInEuroExtractor(options = {}) {
     try {
       const homepage = await fetchOroInEuroPage(runtime.url, runtime);
       pages.push(homepage);
-      const quoteUrls = discoverOroInEuroQuoteUrls(homepage.html, homepage.url || runtime.url);
-      for (const quoteUrl of quoteUrls) {
-        if (pages.some((page) => page.url === quoteUrl)) continue;
-        const page = await fetchOroInEuroPage(quoteUrl, runtime).catch((error) => {
-          warnings.push(`Pagina Oro in Euro non leggibile ${quoteUrl}: ${error.message || "errore fetch"}`);
-          return null;
-        });
-        if (page) pages.push(page);
-        if (pages.length >= 5) break;
-      }
+
     } catch (error) {
       warnings.push(`Homepage Oro in Euro non leggibile: ${error.message || "errore fetch"}`);
     }
 
-    let quotes = dedupeOroInEuroQuotes(pages.flatMap((page) => extractOroInEuroQuotesFromText(`${page.text}\n${page.html || ""}`, {
-      ...runtime,
-      sourceUrl: page.url || runtime.url
-    })));
-
-    if (requiredMissingDefinitions(quotes).length && runtime.useAiFallback) {
-      const ai = await extractOroInEuroQuotesWithAi(pages, {
-        ...runtime,
-        sourceUrl: runtime.url
-      }).catch((error) => ({ quotes: [], warnings: [`AI fallback Oro in Euro non riuscito: ${error.message || "errore AI"}`] }));
-      warnings.push(...(ai.warnings || []));
-      if (ai.quotes?.length) quotes = dedupeOroInEuroQuotes(quotes.concat(ai.quotes));
-    }
+    const quoteDate = runtime.quoteDate || new Date().toISOString();
+    const analyses = pages.map((page) => parseOroInEuroPage(page.text, { ...runtime, quoteDate, sourceUrl: page.url || runtime.url }));
+    const invalidKeys = new Set(analyses.flatMap((page) => [...page.invalidKeys]));
+    const quotes = dedupeOroInEuroQuotes(analyses.flatMap((page) => page.quotes), invalidKeys);
+    const missingFields = requiredMissingDefinitions(quotes).map((definition) => ({
+      field_key: definition.key, metal: definition.metal, purity_code: definition.purity_code, quote_type: definition.quote_type,
+      error: `${definition.label}: nessun prezzo ufficiale univoco in EUR/g verificabile.`
+    }));
 
     for (const definition of requiredMissingDefinitions(quotes)) {
       warnings.push(`Prezzo ${definition.label} Oro in Euro non rilevato automaticamente.`);
@@ -439,9 +336,11 @@ export function createOroInEuroExtractor(options = {}) {
     const status = foundCount === requiredCount ? "success" : foundCount ? "partial" : "failed";
     return {
       source: "oro_in_euro",
+      verified_only: true,
+      missing_fields: missingFields,
       status,
       quotes,
-      error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),
+      error: status === "success" ? "" : warnings.concat(missingFields.map((field) => field.error)).filter(Boolean).join(" | ").slice(0, 1200),
       warnings,
       pages_analyzed: pages.map((page) => page.url)
     };

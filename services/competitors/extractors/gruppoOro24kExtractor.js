@@ -77,6 +77,7 @@ export function parseItalianEuroPrice(value = "") {
   const raw = String(value || "").replace(/\u00a0/g, " ").replace(/[^\d,.\s]/g, "").trim();
   if (!raw) return 0;
   const compact = raw.replace(/\s+/g, "");
+  if (!/^(?:\d+|\d+[,.]\d+|\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?)$/.test(compact)) return 0;
   if (compact.includes(",") && compact.includes(".")) {
     const commaIndex = compact.lastIndexOf(",");
     const dotIndex = compact.lastIndexOf(".");
@@ -126,9 +127,10 @@ function parseProviderTimestamp(text = "") {
   const match = String(text || "").match(/Quotazioni\s+in\s+tempo\s+reale\s+delle\s+([0-9]{2}:[0-9]{2}:[0-9]{2})\s+del\s+([0-9]{2})\/([0-9]{2})\/([0-9]{4})/i);
   if (!match) return { providerTimestamp: null, providerTimestampText: "" };
   const [, time, day, month, year] = match;
-  const date = new Date(`${year}-${month}-${day}T${time}+02:00`);
+  // The source publishes a local clock without a declared timezone or UTC offset.
+  // Keep that evidence verbatim; the retrieval instant is the only certain ISO date.
   return {
-    providerTimestamp: Number.isNaN(date.getTime()) ? null : date.toISOString(),
+    providerTimestamp: null,
     providerTimestampText: `Quotazioni in tempo reale delle ${time} del ${day}/${month}/${year}`
   };
 }
@@ -154,7 +156,7 @@ function gruppoOro24kQuote(definition = {}, price = 0, sourceUrl = GRUPPO_ORO_24
     extraction_method: options.extractionMethod || "auto_gruppo_oro_24k_parser",
     confidence: options.confidence || "high",
     ai_confidence: options.aiConfidence || options.confidence || "high",
-    ai_extracted: Boolean(options.aiExtracted),
+    ai_extracted: false,
     quote_type: definition.quote_type,
     evidence_text: evidence,
     url: sourceUrl,
@@ -164,105 +166,104 @@ function gruppoOro24kQuote(definition = {}, price = 0, sourceUrl = GRUPPO_ORO_24
       gruppo_oro_24k_key: definition.key,
       gruppo_oro_24k_mapping: definition.purity_code,
       gruppo_oro_24k_quote_type: definition.quote_type,
-      fineness_per_mille: definition.fineness_per_mille
+      fineness_per_mille: definition.fineness_per_mille,
+      verified_official: true
     }
   };
 }
 
-function regexesForDefinition(definition = {}) {
-  const price = decimalGramPricePattern();
-  const label = definition.label.replace(/\s+/g, "\\s*");
-  const carati = definition.purity_code.replace("kt", "");
-  if (definition.metal === "gold") {
-    return [
-      new RegExp(`${label}[\\s\\S]{0,140}?Compro\\s+Oro\\s+${carati}\\s+Carati[\\s\\S]{0,80}?${price}`, "i"),
-      new RegExp(`Compro\\s+Oro\\s+${carati}\\s+Carati[\\s\\S]{0,80}?${price}`, "i")
-    ];
+function officialText(value = "") {
+  return compactText(extractReadableTextFromHtml(decodeHtml(String(value || "").replace(/<!--[\s\S]*?-->/g, " "))));
+}
+
+function verifiedPrice(body = "", options = {}) {
+  const text = compactText(body);
+  const match = text.match(/^(?:€\s*([+\-−]?[0-9][0-9.,]*)|([+\-−]?[0-9][0-9.,]*)\s*(?:€|EUR\b|euro\b))/i);
+  if (!match) return null;
+  const raw = match[1] || match[2];
+  if (/^[\-−]/.test(raw) || !/^\+?(?:[0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{1,3})?|[0-9]+(?:[.,][0-9]{1,3})?)$/.test(raw)) return null;
+  const value = parseItalianEuroPrice(raw);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const tail = text.slice(match[0].length);
+  if (/^\s*(?:\$|£|USD\b|GBP\b|CHF\b)/i.test(tail)) return null;
+  const unitMatch = tail.match(/^\s*(?:(?:\/|al|per)\s*)?(kg|chilo|chilogramm[oi]|kilo|gramm[oi]|gr\.?|g)\b/i);
+  if (!unitMatch && /^\s*(?:\/|al\b|per\b)/i.test(tail)) return null;
+  const explicitUnit = unitMatch ? unitFromText(unitMatch[1]) : "";
+  const unit = explicitUnit || options.labelUnit || options.defaultUnit || "";
+  if (!unit || (options.requireUnit && !explicitUnit && !options.labelUnit)) return null;
+  if (options.expectedUnit && unit !== options.expectedUnit) return null;
+  if (options.labelUnit && explicitUnit && options.labelUnit !== explicitUnit) return null;
+  return { value, unit, evidenceText: text.slice(0, match[0].length + (unitMatch?.[0].length || 0)) };
+}
+
+function uniqueVerifiedQuotes(quotes = [], invalidKeys = new Set()) {
+  const found = new Map();
+  for (const quote of quotes) {
+    const key = quoteKey(quote);
+    const previous = found.get(key);
+    if (previous && Math.abs(previous.price_per_gram - quote.price_per_gram) > 1e-12) invalidKeys.add(key);
+    else if (!previous) found.set(key, quote);
   }
-  return [
-    new RegExp(`${label}[\\s\\S]{0,140}?Compro\\s+Argento\\s+${definition.purity_code}[\\s\\S]{0,80}?${price}`, "i"),
-    new RegExp(`Compro\\s+Argento\\s+${definition.purity_code}[\\s\\S]{0,80}?${price}`, "i")
-  ];
+  return [...found.entries()].filter(([key]) => !invalidKeys.has(key)).map(([, quote]) => quote);
+}
+
+const GRUPPO_ORO_24K_LABEL = /(?:Compro\s+)?(?:ORO\s*[0-9]{1,2}\s*Carati|Argento\s*[0-9]{3})|500\s*Lire\s*Argento|Sterlina\s*Oro|Krugerrand\s*Oro|Marengo\s*Oro/gi;
+
+function definitionForLabel(label = "") {
+  const gold = label.match(/ORO\s*([0-9]{1,2})\s*Carati/i);
+  const silver = label.match(/Argento\s*([0-9]{3})/i);
+  if (!gold && !silver) return null;
+  return GRUPPO_ORO_24K_DEFINITIONS.find((definition) => definition.metal === (gold ? "gold" : "silver") && definition.purity_code === (gold ? `${gold[1]}kt` : silver[1]));
+}
+
+function parseGruppoOro24kPage(text = "", options = {}) {
+  const normalized = officialText(text);
+  const timestamp = parseProviderTimestamp(normalized);
+  const labels = [...normalized.matchAll(new RegExp(GRUPPO_ORO_24K_LABEL.source, "gi"))];
+  const quotes = [];
+  const priceCondition = normalized.match(/La\s+quotazione\s+esposta\s+sul\s+sito[^.]{0,350}/i)?.[0] || "";
+  const locationCondition = normalized.match(/Solo\s+nel\s+nostro\s+negozio\s+a\s+Milano\s+trovi\s+le\s+quotazioni\s+indicate\s+qui\s+a\s+fianco[.!]?/i)?.[0] || "";
+  const conditions = [priceCondition, locationCondition].filter(Boolean).join(" · ");
+  const finenessEvidence = normalized.match(/24\s*k(?:t)?\s*\(\s*999\s*\/\s*1000\s*\)/i)?.[0] || "";
+  for (let index = 0; index < labels.length; index++) {
+    const label = labels[index];
+    let definition = definitionForLabel(label[0]);
+    if (!definition) continue;
+    const body = normalized.slice(label.index + label[0].length, labels[index + 1]?.index ?? normalized.length).trim().replace(/^[:·]\s*/, "");
+    const parsed = verifiedPrice(body, { requireUnit: true, expectedUnit: "EUR/g" });
+    if (!parsed) continue;
+    if (definition.purity_code === "24kt" && finenessEvidence) definition = { ...definition, purity_value: 0.999, fineness_per_mille: 999 };
+    quotes.push(gruppoOro24kQuote(definition, parsed.value, options.sourceUrl || GRUPPO_ORO_24K_DEFAULT_URL, {
+      source_method: "official_label_price", matched_text: `${label[0]} ${parsed.evidenceText}`, unit: parsed.unit,
+      provider_timestamp: null, provider_timestamp_text: timestamp.providerTimestampText,
+      conditions, fineness_evidence: definition.purity_code === "24kt" ? finenessEvidence : ""
+    }, { ...options, unit: parsed.unit, providerTimestamp: null }));
+  }
+  const invalidKeys = new Set();
+  return { quotes: uniqueVerifiedQuotes(quotes, invalidKeys), invalidKeys };
 }
 
 export function extractPriceNearAnchor(text = "", anchor = "", maxDistance = 220) {
-  const source = String(text || "");
-  const anchorRegex = new RegExp(anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*"), "i");
-  const anchorMatch = source.match(anchorRegex);
-  if (!anchorMatch || anchorMatch.index === undefined) return null;
-  const snippet = source.slice(anchorMatch.index, anchorMatch.index + maxDistance);
-  const match = snippet.match(new RegExp(decimalGramPricePattern(), "i"));
-  const price = match ? parseItalianEuroPrice(match[1]) : 0;
-  if (!price) return null;
-  return {
-    value: price,
-    unit: unitFromText(match[0] || "EUR/g"),
-    evidenceText: compactText(snippet.slice(0, match.index + match[0].length)).slice(0, 700)
-  };
+  const normalized = officialText(text);
+  const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+  const found = normalized.match(new RegExp(escaped, "i"));
+  if (!found) return null;
+  let remainder = normalized.slice(found.index + found[0].length, found.index + Math.min(maxDistance, 500));
+  const labels = [...remainder.matchAll(new RegExp(GRUPPO_ORO_24K_LABEL.source, "gi"))];
+  // An adjacent image alt may repeat the same field label, but never supplies its price.
+  if (labels[0]?.index === 1 && definitionForLabel(labels[0][0])?.key === definitionForLabel(found[0])?.key) remainder = remainder.slice(1 + labels[0][0].length);
+  const next = remainder.search(new RegExp(GRUPPO_ORO_24K_LABEL.source, "i"));
+  const body = (next < 0 ? remainder : remainder.slice(0, next)).trim();
+  const parsed = verifiedPrice(body, { requireUnit: true, expectedUnit: "EUR/g" });
+  return parsed ? { value: parsed.value, unit: parsed.unit, evidenceText: `${found[0]} ${parsed.evidenceText}` } : null;
 }
 
-function addRegexQuote(quotes = [], text = "", definition = {}, sourceUrl = GRUPPO_ORO_24K_DEFAULT_URL, options = {}) {
-  for (const regex of regexesForDefinition(definition)) {
-    const match = text.match(regex);
-    const price = match ? parseItalianEuroPrice(match[1]) : 0;
-    if (!price) continue;
-    const unit = definition.defaultUnit || "EUR/g";
-    quotes.push(gruppoOro24kQuote(definition, price, sourceUrl, {
-      source_method: "text_regex",
-      matched_text: match[0],
-      unit,
-      provider_timestamp: options.providerTimestamp || null,
-      provider_timestamp_text: options.providerTimestampText || ""
-    }, { ...options, unit }));
-    return true;
-  }
-  return false;
-}
-
-function addAnchorFallbackQuote(quotes = [], text = "", definition = {}, sourceUrl = GRUPPO_ORO_24K_DEFAULT_URL, options = {}) {
-  if (quotes.some((quote) => quoteKey(quote) === `${definition.metal}:${definition.purity_code}:${definition.quote_type}`)) return false;
-  for (const anchor of definition.anchors || [definition.label]) {
-    const found = extractPriceNearAnchor(text, anchor, 260);
-    if (!found?.value) continue;
-    const unit = definition.defaultUnit || "EUR/g";
-    quotes.push(gruppoOro24kQuote(definition, found.value, sourceUrl, {
-      source_method: "anchor_near_price",
-      matched_text: found.evidenceText,
-      unit,
-      provider_timestamp: options.providerTimestamp || null,
-      provider_timestamp_text: options.providerTimestampText || ""
-    }, { ...options, unit }));
-    return true;
-  }
-  return false;
-}
-
-function dedupeGruppoOro24kQuotes(quotes = []) {
-  const map = new Map();
-  for (const quote of quotes) {
-    const key = quoteKey(quote);
-    const existing = map.get(key);
-    if (!existing) {
-      map.set(key, quote);
-      continue;
-    }
-    const preferNext = String(quote.raw_payload?.source_method || "").includes("playwright")
-      && !String(existing.raw_payload?.source_method || "").includes("playwright");
-    map.set(key, preferNext ? quote : existing);
-  }
-  return [...map.values()];
+function dedupeGruppoOro24kQuotes(quotes = [], invalidKeys = new Set()) {
+  return uniqueVerifiedQuotes(quotes, invalidKeys);
 }
 
 export function extractGruppoOro24kQuotesFromText(text = "", options = {}) {
-  const sourceUrl = options.sourceUrl || GRUPPO_ORO_24K_DEFAULT_URL;
-  const normalized = compactText(decodeHtml(text));
-  const timestamp = parseProviderTimestamp(normalized);
-  const quotes = [];
-  for (const definition of GRUPPO_ORO_24K_DEFINITIONS) {
-    const found = addRegexQuote(quotes, normalized, definition, sourceUrl, { ...options, ...timestamp });
-    if (!found) addAnchorFallbackQuote(quotes, normalized, definition, sourceUrl, { ...options, ...timestamp });
-  }
-  return dedupeGruppoOro24kQuotes(quotes);
+  return parseGruppoOro24kPage(text, options).quotes;
 }
 
 export async function fetchGruppoOro24kPage(url = GRUPPO_ORO_24K_DEFAULT_URL, options = {}) {
@@ -292,7 +293,7 @@ export async function fetchGruppoOro24kPage(url = GRUPPO_ORO_24K_DEFAULT_URL, op
   return {
     url: response.url || url,
     html,
-    text: extractReadableTextFromHtml(html),
+    text: officialText(html),
     method: "safe_external_fetch"
   };
 }
@@ -302,78 +303,7 @@ function requiredMissingDefinitions(quotes = []) {
   return GRUPPO_ORO_24K_DEFINITIONS.filter((definition) => definition.required && !found.has(definition.key));
 }
 
-async function extractGruppoOro24kQuotesWithAi(pageTexts = [], options = {}) {
-  if (!options.openai) return { quotes: [], warnings: ["AI fallback Gruppo Oro 24K non disponibile: OPENAI_API_KEY non configurata sul backend."] };
-  const systemPrompt = "Sei un estrattore dati OroActive per Gruppo Oro 24K. Devi estrarre SOLO le quattro quotazioni pubbliche di acquisto cliente dal riquadro 'Quotazioni in tempo reale': ORO 24 Carati, ORO 18 Carati, Argento 999, Argento 800. Non estrarre monete, sterline, krugerrand, prezzi vendita o valori di borsa. Non inventare dati. Restituisci solo JSON valido.";
-  const userPrompt = `Analizza il testo pubblico Gruppo Oro 24K. Estrai solo:
-1. ORO 24 Carati
-2. ORO 18 Carati
-3. Argento 999
-4. Argento 800
-Se un prezzo non e chiaramente presente, non inventarlo.
 
-TESTO:
-${pageTexts.map((page) => `URL: ${page.url}\n${String(page.text || "").replace(/\s+/g, " ").trim()}`).join("\n\n---\n\n").slice(0, Number(options.maxTextChars || 12000))}`;
-  const response = await options.openai.responses.create({
-    model: options.model || "gpt-4.1-mini",
-    input: `${systemPrompt}\n\n${userPrompt}`,
-    text: {
-      format: {
-        type: "json_schema",
-        name: "gruppo_oro_24k_quote_extraction",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            found: { type: "boolean" },
-            quotes: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  metal: { type: "string", enum: ["gold", "silver"] },
-                  purity_code: { type: "string", enum: ["24kt", "18kt", "999", "800"] },
-                  price: { type: "number" },
-                  unit: { type: "string" },
-                  evidence_text: { type: "string" },
-                  confidence: { type: "string", enum: ["low", "medium", "high"] },
-                  page_url: { type: "string" }
-                },
-                required: ["metal", "purity_code", "price", "unit", "evidence_text", "confidence", "page_url"]
-              }
-            },
-            warnings: { type: "array", items: { type: "string" } },
-            notes: { type: "string" }
-          },
-          required: ["found", "quotes", "warnings", "notes"]
-        }
-      }
-    }
-  });
-  const parsed = JSON.parse(response.output_text || "{}");
-  const quotes = (parsed.quotes || []).map((quote) => {
-    const definition = GRUPPO_ORO_24K_DEFINITIONS.find((item) => item.metal === quote.metal && item.purity_code === quote.purity_code);
-    const price = Number(quote.price || 0);
-    if (!definition || !price || !quote.evidence_text) return null;
-    const unit = unitFromText(quote.unit || definition.defaultUnit || "EUR/g", definition.defaultUnit || "EUR/g");
-    return gruppoOro24kQuote(definition, price, quote.page_url || options.sourceUrl || GRUPPO_ORO_24K_DEFAULT_URL, {
-      source_method: "ai_fallback",
-      matched_text: quote.evidence_text,
-      ai_response: parsed,
-      unit
-    }, {
-      ...options,
-      unit,
-      extractionMethod: "ai_gruppo_oro_24k_fallback",
-      confidence: quote.confidence || "medium",
-      aiConfidence: quote.confidence || "medium",
-      aiExtracted: true
-    });
-  }).filter(Boolean);
-  return { quotes: dedupeGruppoOro24kQuotes(quotes), warnings: parsed.warnings || [] };
-}
 
 export function createGruppoOro24kExtractor(options = {}) {
   const config = {
@@ -381,10 +311,6 @@ export function createGruppoOro24kExtractor(options = {}) {
     timeoutMs: Number(options.timeoutMs || 15000),
     maxBytes: Math.min(Number(options.maxBytes || GRUPPO_ORO_24K_HTML_MAX_BYTES), GRUPPO_ORO_24K_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    useAiFallback: Boolean(options.useAiFallback),
-    openai: options.openai || null,
-    model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000),
     fetchImpl: options.fetchImpl,
     resolver: options.resolver,
     signal: options.signal
@@ -400,19 +326,14 @@ export function createGruppoOro24kExtractor(options = {}) {
       warnings.push(`Homepage Gruppo Oro 24K non leggibile: ${error.message || "errore fetch"}`);
     }
 
-    let quotes = dedupeGruppoOro24kQuotes(pages.flatMap((page) => extractGruppoOro24kQuotesFromText(`${page.text}\n${page.html || ""}`, {
-      ...runtime,
-      sourceUrl: page.url || runtime.url
-    })));
-
-    if (requiredMissingDefinitions(quotes).length && runtime.useAiFallback) {
-      const ai = await extractGruppoOro24kQuotesWithAi(pages, {
-        ...runtime,
-        sourceUrl: runtime.url
-      }).catch((error) => ({ quotes: [], warnings: [`AI fallback Gruppo Oro 24K non riuscito: ${error.message || "errore AI"}`] }));
-      warnings.push(...(ai.warnings || []));
-      if (ai.quotes?.length) quotes = dedupeGruppoOro24kQuotes(quotes.concat(ai.quotes));
-    }
+    const quoteDate = runtime.quoteDate || new Date().toISOString();
+    const analyses = pages.map((page) => parseGruppoOro24kPage(page.text, { ...runtime, quoteDate, sourceUrl: page.url || runtime.url }));
+    const invalidKeys = new Set(analyses.flatMap((page) => [...page.invalidKeys]));
+    const quotes = dedupeGruppoOro24kQuotes(analyses.flatMap((page) => page.quotes), invalidKeys);
+    const missingFields = requiredMissingDefinitions(quotes).map((definition) => ({
+      field_key: definition.key, metal: definition.metal, purity_code: definition.purity_code, quote_type: definition.quote_type,
+      error: `${definition.label}: nessun prezzo ufficiale univoco in EUR/g verificabile.`
+    }));
 
     for (const definition of requiredMissingDefinitions(quotes)) {
       warnings.push(`Prezzo ${definition.label} Gruppo Oro 24K non rilevato automaticamente.`);
@@ -423,9 +344,11 @@ export function createGruppoOro24kExtractor(options = {}) {
     const status = foundCount === requiredCount ? "success" : foundCount ? "partial" : "failed";
     return {
       source: "gruppo_oro_24k",
+      verified_only: true,
+      missing_fields: missingFields,
       status,
       quotes,
-      error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),
+      error: status === "success" ? "" : warnings.concat(missingFields.map((field) => field.error)).filter(Boolean).join(" | ").slice(0, 1200),
       warnings,
       pages_analyzed: pages.map((page) => page.url)
     };
