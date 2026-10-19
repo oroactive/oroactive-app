@@ -1,7 +1,7 @@
 import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
 import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
-const ORO_DORO_DEFAULT_URL = "https://www.comproorodoro.it";
+const ORO_DORO_DEFAULT_URL = "https://comproorodoro.it";
 const ORO_DORO_ALLOWED_HOSTS = ["comproorodoro.it"];
 const ORO_DORO_HTML_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -105,85 +105,37 @@ function oroDOroQuote(definition = {}, price = 0, sourceUrl = ORO_DORO_DEFAULT_U
   };
 }
 
-function quoteKey(quote = {}) {
-  return `${quote.metal}:${quote.purity_code}`;
-}
-
-function priceUnitPattern() {
-  return "(?:€\\s*)?([0-9][0-9.,]*)\\s*(?:€\\s*)?(?:/\\s*)?(g|gr|grammo|grammi)\\b";
-}
-
-function regexesForDefinition(definition = {}) {
-  const unitPattern = priceUnitPattern();
-  if (definition.metal === "gold" && definition.purity_code === "24kt") {
-    return [
-      new RegExp(`\\bORO\\b\\s*${unitPattern}[\\s\\S]{0,40}?\\b24\\s*(?:kt|k)\\b`, "i"),
-      new RegExp(`\\bORO\\s*24\\s*(?:kt|k)\\b[\\s\\S]{0,110}?${unitPattern}`, "i")
-    ];
-  }
-  if (definition.metal === "gold") {
-    return [
-      new RegExp(`\\bORO\\s*${definition.token}\\s*(?:kt|k)\\b[\\s\\S]{0,110}?${unitPattern}`, "i"),
-      new RegExp(`\\bORO\\b[\\s\\S]{0,80}?${unitPattern}[\\s\\S]{0,45}?\\b${definition.token}\\s*(?:kt|k)\\b`, "i")
-    ];
-  }
-  if (definition.metal === "silver" && definition.purity_code === "999") {
-    return [
-      new RegExp(`\\bARGENTO\\b\\s*${unitPattern}[\\s\\S]{0,40}?\\b999\\b`, "i"),
-      new RegExp(`\\bARGENTO\\s*999\\b[\\s\\S]{0,110}?${unitPattern}`, "i")
-    ];
-  }
-  return [
-    new RegExp(`\\bARGENTO\\s*${definition.token}\\b[\\s\\S]{0,110}?${unitPattern}`, "i"),
-    new RegExp(`\\b${definition.token}\\s*ARGENTO\\b[\\s\\S]{0,110}?${unitPattern}`, "i")
-  ];
-}
-
-function addRegexQuote(quotes = [], text = "", definitionKey = "", sourceUrl = ORO_DORO_DEFAULT_URL, options = {}) {
-  const definition = oroDOroDefinition(definitionKey);
-  for (const regex of regexesForDefinition(definition)) {
-    const match = text.match(regex);
-    const price = match ? parseItalianEuroPrice(match[1]) : 0;
-    if (!price) continue;
-    const unit = unitFromText(match[2] || "EUR/g");
-    quotes.push(oroDOroQuote(definition, price, sourceUrl, {
-      source_method: "text_regex",
-      matched_text: match[0],
-      unit
-    }, { ...options, unit }));
-    return true;
-  }
-  return false;
-}
-
 export function extractOroDOroQuotesFromText(text = "", options = {}) {
   const sourceUrl = options.sourceUrl || ORO_DORO_DEFAULT_URL;
   const normalized = compactText(decodeHtml(text));
-  const quotes = [];
-  for (const definition of ORO_DORO_DEFINITIONS) {
-    addRegexQuote(quotes, normalized, definition.key, sourceUrl, options);
+  // A price belongs only to its own labelled segment, never the next carat.
+  const labels = [...normalized.matchAll(/\b(?:ORO\s*(\d{1,2})\s*(?:kt|k)|ARGENTO\s*(\d{3}))\b/gi)];
+  const quotes = new Map();
+  const conflicts = new Set();
+  for (const label of labels) {
+    const definition = ORO_DORO_DEFINITIONS.find((item) => item.metal === (label[1] ? "gold" : "silver") && item.token === (label[1] || label[2]));
+    if (!definition) continue;
+    let segment = normalized.slice(label.index + label[0].length, label.index + label[0].length + 110);
+    const boundary = segment.search(/\b(?:ORO|ARGENTO)\b|\b\d{1,2}\s*(?:kt|k)\b|\b\d{3}\s*‰/i);
+    if (boundary >= 0) segment = segment.slice(0, boundary);
+    const match = segment.match(/^[\s·:]*([0-9]+(?:[,.][0-9]{1,2})?)\s*(?:€|EUR)\s*\/\s*(?:gr|g|grammo|grammi)\b/i);
+    const price = match ? parseItalianEuroPrice(match[1]) : 0;
+    if (!Number.isFinite(price) || price <= 0) continue;
+    const key = definition.key;
+    if (quotes.has(key) && quotes.get(key).price_per_gram !== price) conflicts.add(key);
+    quotes.set(key, oroDOroQuote(definition, price, sourceUrl, {
+      source_method: "text_regex",
+      matched_text: label[0] + segment.slice(0, match.index + match[0].length),
+      unit: "EUR/g"
+    }, options));
   }
-  return dedupeOroDOroQuotes(quotes);
-}
-
-function dedupeOroDOroQuotes(quotes = []) {
-  const map = new Map();
-  for (const quote of quotes) {
-    const key = quoteKey(quote);
-    const existing = map.get(key);
-    if (!existing) {
-      map.set(key, quote);
-      continue;
-    }
-    const preferNext = String(quote.raw_payload?.source_method || "").includes("playwright")
-      && !String(existing.raw_payload?.source_method || "").includes("playwright");
-    map.set(key, preferNext ? quote : existing);
-  }
-  return [...map.values()];
+  return [...quotes].filter(([key]) => !conflicts.has(key)).map(([, quote]) => quote);
 }
 
 export async function fetchOroDOroPage(url = ORO_DORO_DEFAULT_URL, options = {}) {
-  const response = await safeExternalFetch(url, {
+  const canonicalUrl = new URL(url);
+  if (canonicalUrl.hostname === "www.comproorodoro.it") canonicalUrl.hostname = "comproorodoro.it";
+  const response = await safeExternalFetch(canonicalUrl, {
     allowedHosts: ORO_DORO_ALLOWED_HOSTS,
     timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
     maxBytes: Math.min(Number(options.maxBytes || ORO_DORO_HTML_MAX_BYTES), ORO_DORO_HTML_MAX_BYTES),
@@ -200,7 +152,7 @@ export async function fetchOroDOroPage(url = ORO_DORO_DEFAULT_URL, options = {})
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const html = await response.text();
   return {
-    url: response.url || url,
+    url: response.url || canonicalUrl.toString(),
     html,
     text: extractReadableTextFromHtml(html),
     method: "safe_external_fetch"
@@ -210,91 +162,6 @@ export async function fetchOroDOroPage(url = ORO_DORO_DEFAULT_URL, options = {})
 function missingOroDOroDefinitions(quotes = []) {
   const found = new Set(quotes.map((quote) => quote.raw_payload?.oro_doro_key).filter(Boolean));
   return ORO_DORO_DEFINITIONS.filter((definition) => !found.has(definition.key));
-}
-
-async function extractOroDOroQuotesWithAi(pageTexts = [], options = {}) {
-  if (!options.openai) return { quotes: [], warnings: ["AI fallback Oro D'Oro non disponibile: OPENAI_API_KEY non configurata sul backend."] };
-  const systemPrompt = "Sei un estrattore dati OroActive per il competitor Oro D'Oro. Devi estrarre solo le quotazioni cliente oro/argento pubbliche per ORO 24kt, 22kt, 21kt, 20kt, 18kt, 14kt, 9kt e ARGENTO 999, 925, 800. Non inventare dati. Restituisci solo JSON valido.";
-  const userPrompt = `Analizza il testo pubblico Oro D'Oro. Estrai solo questi campi se chiaramente presenti:
-- oro_doro_gold_24kt
-- oro_doro_gold_22kt
-- oro_doro_gold_21kt
-- oro_doro_gold_20kt
-- oro_doro_gold_18kt
-- oro_doro_gold_14kt
-- oro_doro_gold_9kt
-- oro_doro_silver_999
-- oro_doro_silver_925
-- oro_doro_silver_800
-
-I prezzi sono quotazioni di acquisto al cliente in EUR/g. Non inventare dati mancanti.
-
-TESTO:
-${pageTexts.map((page) => `URL: ${page.url}\n${compactText(page.text)}`).join("\n\n---\n\n").slice(0, Number(options.maxTextChars || 12000))}`;
-  const response = await options.openai.responses.create({
-    model: options.model || "gpt-4.1-mini",
-    input: `${systemPrompt}\n\n${userPrompt}`,
-    text: {
-      format: {
-        type: "json_schema",
-        name: "oro_doro_quote_extraction",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            found: { type: "boolean" },
-            quotes: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  field_key: { type: "string" },
-                  metal: { type: "string", enum: ["gold", "silver"] },
-                  purity_code: { type: "string" },
-                  purity_value: { type: "number" },
-                  price: { type: "number" },
-                  unit: { type: "string" },
-                  evidence_text: { type: "string" },
-                  confidence: { type: "string", enum: ["low", "medium", "high"] },
-                  page_url: { type: "string" }
-                },
-                required: ["field_key", "metal", "purity_code", "purity_value", "price", "unit", "evidence_text", "confidence", "page_url"]
-              }
-            },
-            warnings: { type: "array", items: { type: "string" } },
-            notes: { type: "string" }
-          },
-          required: ["found", "quotes", "warnings", "notes"]
-        }
-      }
-    }
-  });
-  const parsed = JSON.parse(response.output_text || "{}");
-  const quotes = (parsed.quotes || []).map((quote) => {
-    const definition = ORO_DORO_DEFINITIONS.find((item) => (
-      item.key === quote.field_key
-      || (item.metal === quote.metal && item.purity_code === quote.purity_code)
-    ));
-    const price = Number(quote.price || 0);
-    if (!definition || !price || !quote.evidence_text) return null;
-    const unit = unitFromText(quote.unit || "EUR/g");
-    return oroDOroQuote(definition, price, quote.page_url || options.sourceUrl || ORO_DORO_DEFAULT_URL, {
-      source_method: "ai_fallback",
-      matched_text: quote.evidence_text,
-      ai_response: parsed,
-      unit
-    }, {
-      ...options,
-      unit,
-      extractionMethod: "ai_oro_doro_fallback",
-      confidence: quote.confidence || "medium",
-      aiConfidence: quote.confidence || "medium",
-      aiExtracted: true
-    });
-  }).filter(Boolean);
-  return { quotes: dedupeOroDOroQuotes(quotes), warnings: parsed.warnings || [] };
 }
 
 export function createOroDOroExtractor(options = {}) {
@@ -323,29 +190,27 @@ export function createOroDOroExtractor(options = {}) {
       warnings.push(`Homepage Oro D'Oro non leggibile: ${error.message || "errore fetch"}`);
     }
 
-    let quotes = dedupeOroDOroQuotes(pages.flatMap((page) => extractOroDOroQuotesFromText(page.text, {
+    const quotes = pages.flatMap((page) => extractOroDOroQuotesFromText(page.text, {
       ...runtime,
       sourceUrl: page.url || runtime.url
-    })));
+    }));
 
-    if (missingOroDOroDefinitions(quotes).length && runtime.useAiFallback && pages.length) {
-      const ai = await extractOroDOroQuotesWithAi(pages, {
-        ...runtime,
-        sourceUrl: runtime.url
-      }).catch((error) => ({ quotes: [], warnings: [`AI fallback Oro D'Oro non riuscito: ${error.message || "errore AI"}`] }));
-      warnings.push(...(ai.warnings || []));
-      if (ai.quotes?.length) quotes = dedupeOroDOroQuotes(quotes.concat(ai.quotes));
-    }
-
-    for (const definition of missingOroDOroDefinitions(quotes)) {
-      warnings.push(`Prezzo ${definition.label} Oro D'Oro non rilevato automaticamente.`);
-    }
+    // AI fallback Oro D'Oro is deliberately excluded: only source-backed prices.
+    const missingFields = missingOroDOroDefinitions(quotes).map((definition) => ({
+      field_key: definition.key,
+      metal: definition.metal,
+      purity_code: definition.purity_code,
+      error: `${definition.label}: nessun prezzo verificabile in EUR/g nella pagina ufficiale Oro D'Oro. Nessuna stima utilizzata.`
+    }));
+    warnings.push(...missingFields.map((field) => field.error));
 
     const requiredCount = ORO_DORO_DEFINITIONS.length;
     const foundCount = requiredCount - missingOroDOroDefinitions(quotes).length;
     const status = foundCount === requiredCount ? "success" : foundCount ? "partial" : "failed";
     return {
       source: "oro_doro",
+      verified_only: true,
+      missing_fields: missingFields,
       status,
       quotes,
       error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),

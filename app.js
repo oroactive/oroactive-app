@@ -230,7 +230,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261019-reliability-30";
+const OROACTIVE_CLIENT_BUILD_ID = "20261019-reliability-31";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -22852,12 +22852,17 @@ function oroDOroSummaryHtml() {
     .filter(Boolean);
   if (!source.id && !quotes.length) return "";
   const quoteRows = quotes.length
-    ? quotes.map((quote) => `
-        <div>
-          <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
-          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
-        </div>
-      `).join("")
+    ? quoteConfigs.map((item) => {
+        const quote = latestOroDOroQuote(item.metal, item.code);
+        const rule = (state.competitorExtractionRules || []).find((candidate) => String(candidate.source_id) === String(source.id) && candidate.metal === item.metal && candidate.purity_code === item.code);
+        const missingOnLastCheck = rule?.last_test_status === "not_found"
+          && (!quote || new Date(rule.last_test_at || 0) >= new Date(quote.quote_date || quote.created_at || 0));
+        const label = item.metal === "gold" ? `ORO ${item.code}` : `ARGENTO ${item.code}`;
+        if (!quote || missingOnLastCheck) {
+          return `<div><span>${escapeHtml(label)}</span><strong>Prezzo non disponibile dalla fonte</strong>${quote ? `<small>Ultimo dato storico: ${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))} · ${escapeHtml(formatDateTime(quote.quote_date || quote.created_at))}</small>` : ""}</div>`;
+        }
+        return `<div><span>${escapeHtml(competitorPurityDisplay(quote))}</span><strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong></div>`;
+      }).join("")
     : `<p>Nessuna quotazione Oro D'Oro rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
   return `
     <article class="oro-doro-card">
@@ -22868,7 +22873,7 @@ function oroDOroSummaryHtml() {
         </div>
         <strong>${escapeHtml(competitorSourceStatusLabel(source))}</strong>
       </header>
-      <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">www.comproorodoro.it</a>` : "https://www.comproorodoro.it"} · Metodo: parser automatico · Ogni 60 minuti</p>
+      <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">comproorodoro.it</a>` : "https://comproorodoro.it"} · Metodo: parser automatico · Ogni 60 minuti</p>
       <div class="oro-doro-grid">${quoteRows}</div>
       <p>Ultimo aggiornamento: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
       ${isFounder() ? `<button class="ghost-button" type="button" data-force-oro-doro-sync>Forza aggiornamento Oro D'Oro</button>` : ""}
