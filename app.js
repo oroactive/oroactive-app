@@ -230,7 +230,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261019-reliability-31";
+const OROACTIVE_CLIENT_BUILD_ID = "20261019-reliability-32";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -22738,8 +22738,11 @@ function latestOroExpressQuote(metal = "", purityCode = "") {
 }
 
 function latestOroDOroQuote(metal = "", purityCode = "") {
+  const source = (state.competitorSources || []).find((item) => String(item.name || "").toLowerCase() === "oro d'oro") || {};
+  const published20kt = (source.quote_fields || []).some((field) => field.metal === "gold" && field.purity_code === "20kt" && field.status === "found");
   return (state.competitorQuotes || [])
     .filter((quote) => quote.competitor_name === "Oro D'Oro" || String(quote.competitor_name || "").toLowerCase() === "oro d'oro")
+    .filter((quote) => quote.metal !== "gold" || quote.purity_code !== "20kt" || published20kt)
     .filter(isCompetitorBuybackQuote)
     .filter((quote) => !metal || quote.metal === metal)
     .filter((quote) => !purityCode || quote.purity_code === purityCode)
@@ -22835,6 +22838,7 @@ function oroExpressSummaryHtml() {
 
 function oroDOroSummaryHtml() {
   const source = (state.competitorSources || []).find((item) => String(item.name || "").toLowerCase() === "oro d'oro") || {};
+  const published20kt = (source.quote_fields || []).some((field) => field.metal === "gold" && field.purity_code === "20kt" && field.status === "found");
   const quoteConfigs = [
     { metal: "gold", code: "24kt" },
     { metal: "gold", code: "22kt" },
@@ -22846,7 +22850,7 @@ function oroDOroSummaryHtml() {
     { metal: "silver", code: "999" },
     { metal: "silver", code: "925" },
     { metal: "silver", code: "800" }
-  ];
+  ].filter((item) => item.code !== "20kt" || published20kt);
   const quotes = quoteConfigs
     .map((item) => latestOroDOroQuote(item.metal, item.code))
     .filter(Boolean);
@@ -22855,8 +22859,9 @@ function oroDOroSummaryHtml() {
     ? quoteConfigs.map((item) => {
         const quote = latestOroDOroQuote(item.metal, item.code);
         const rule = (state.competitorExtractionRules || []).find((candidate) => String(candidate.source_id) === String(source.id) && candidate.metal === item.metal && candidate.purity_code === item.code);
-        const missingOnLastCheck = rule?.last_test_status === "not_found"
-          && (!quote || new Date(rule.last_test_at || 0) >= new Date(quote.quote_date || quote.created_at || 0));
+        const field = (source.quote_fields || []).find((candidate) => candidate.metal === item.metal && candidate.purity_code === item.code);
+        const missingOnLastCheck = (field?.status || rule?.last_test_status) === "not_found"
+          && (!quote || new Date(field?.checked_at || rule?.last_test_at || 0) >= new Date(quote.quote_date || quote.created_at || 0));
         const label = item.metal === "gold" ? `ORO ${item.code}` : `ARGENTO ${item.code}`;
         if (!quote || missingOnLastCheck) {
           return `<div><span>${escapeHtml(label)}</span><strong>Prezzo non disponibile dalla fonte</strong>${quote ? `<small>Ultimo dato storico: ${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))} · ${escapeHtml(formatDateTime(quote.quote_date || quote.created_at))}</small>` : ""}</div>`;
@@ -22875,6 +22880,7 @@ function oroDOroSummaryHtml() {
       </header>
       <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">comproorodoro.it</a>` : "https://comproorodoro.it"} · Metodo: parser automatico · Ogni 60 minuti</p>
       <div class="oro-doro-grid">${quoteRows}</div>
+      ${!published20kt ? "<p>20 kt escluso finché non viene pubblicato un prezzo ufficiale verificabile. Storico conservato.</p>" : ""}
       <p>Ultimo aggiornamento: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
       ${isFounder() ? `<button class="ghost-button" type="button" data-force-oro-doro-sync>Forza aggiornamento Oro D'Oro</button>` : ""}
     </article>
@@ -23496,6 +23502,7 @@ function buildGeneralPriceExplanationContext() {
       })),
     oro_doro_quotes: buybackCompetitorQuotes
       .filter((quote) => quote.competitor_name === "Oro D'Oro" || String(quote.competitor_name || "").toLowerCase() === "oro d'oro")
+      .filter((quote) => quote.metal !== "gold" || quote.purity_code !== "20kt" || latestOroDOroQuote("gold", "20kt"))
       .sort((first, second) => new Date(second.quote_date || second.created_at || 0) - new Date(first.quote_date || first.created_at || 0))
       .slice(0, 10)
       .map((quote) => ({
@@ -24279,6 +24286,7 @@ function extractionTestResultsForSource(sourceId) {
 function extractionStatusLabel(status = "") {
   const normalized = String(status || "").toLowerCase();
   if (["found", "success"].includes(normalized)) return "Rilevato";
+  if (normalized === "excluded") return "Escluso fino alla pubblicazione";
   if (["partial", "da_verificare"].includes(normalized)) return "Da verificare";
   if (["not_found", "failed"].includes(normalized)) return "Non rilevato";
   if (normalized === "not_configured") return "Da configurare";

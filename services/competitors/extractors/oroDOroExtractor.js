@@ -105,19 +105,22 @@ function oroDOroQuote(definition = {}, price = 0, sourceUrl = ORO_DORO_DEFAULT_U
   };
 }
 
-export function extractOroDOroQuotesFromText(text = "", options = {}) {
+function parseOroDOroQuotePage(text = "", options = {}) {
   const sourceUrl = options.sourceUrl || ORO_DORO_DEFAULT_URL;
   const normalized = compactText(decodeHtml(text));
   // A price belongs only to its own labelled segment, never the next carat.
   const labels = [...normalized.matchAll(/\b(?:ORO\s*(\d{1,2})\s*(?:kt|k)|ARGENTO\s*(\d{3}))\b/gi)];
   const quotes = new Map();
   const conflicts = new Set();
+  const publishedKeys = new Set();
   for (const label of labels) {
     const definition = ORO_DORO_DEFINITIONS.find((item) => item.metal === (label[1] ? "gold" : "silver") && item.token === (label[1] || label[2]));
     if (!definition) continue;
     let segment = normalized.slice(label.index + label[0].length, label.index + label[0].length + 110);
     const boundary = segment.search(/\b(?:ORO|ARGENTO)\b|\b\d{1,2}\s*(?:kt|k)\b|\b\d{3}\s*‰/i);
     if (boundary >= 0) segment = segment.slice(0, boundary);
+    const candidate = segment.match(/^[\s·:]*(?:€\s*)?([+\-−]?[0-9][0-9.,]*)/);
+    if (candidate && /[1-9]/.test(candidate[1])) publishedKeys.add(definition.key);
     const match = segment.match(/^[\s·:]*([0-9]+(?:[,.][0-9]{1,2})?)\s*(?:€|EUR)\s*\/\s*(?:gr|g|grammo|grammi)\b/i);
     const price = match ? parseItalianEuroPrice(match[1]) : 0;
     if (!Number.isFinite(price) || price <= 0) continue;
@@ -129,7 +132,14 @@ export function extractOroDOroQuotesFromText(text = "", options = {}) {
       unit: "EUR/g"
     }, options));
   }
-  return [...quotes].filter(([key]) => !conflicts.has(key)).map(([, quote]) => quote);
+  return {
+    quotes: [...quotes].filter(([key]) => !conflicts.has(key)).map(([, quote]) => quote),
+    publishedKeys
+  };
+}
+
+export function extractOroDOroQuotesFromText(text = "", options = {}) {
+  return parseOroDOroQuotePage(text, options).quotes;
 }
 
 export async function fetchOroDOroPage(url = ORO_DORO_DEFAULT_URL, options = {}) {
@@ -190,13 +200,25 @@ export function createOroDOroExtractor(options = {}) {
       warnings.push(`Homepage Oro D'Oro non leggibile: ${error.message || "errore fetch"}`);
     }
 
-    const quotes = pages.flatMap((page) => extractOroDOroQuotesFromText(page.text, {
+    const parsedPages = pages.map((page) => parseOroDOroQuotePage(page.text, {
       ...runtime,
       sourceUrl: page.url || runtime.url
     }));
+    const quotes = parsedPages.flatMap((page) => page.quotes);
+    const publishedKeys = new Set(parsedPages.flatMap((page) => [...page.publishedKeys]));
+    const missing = missingOroDOroDefinitions(quotes);
+    const excludedFields = missing.filter((definition) => (
+      definition.purity_code === "20kt" && quotes.length > 0 && !publishedKeys.has(definition.key)
+    )).map((definition) => ({
+      field_key: definition.key,
+      metal: definition.metal,
+      purity_code: definition.purity_code,
+      reason: "20 kt escluso finché non viene pubblicato un prezzo ufficiale verificabile. Storico conservato."
+    }));
+    const excludedKeys = new Set(excludedFields.map((field) => field.field_key));
 
     // AI fallback Oro D'Oro is deliberately excluded: only source-backed prices.
-    const missingFields = missingOroDOroDefinitions(quotes).map((definition) => ({
+    const missingFields = missing.filter((definition) => !excludedKeys.has(definition.key)).map((definition) => ({
       field_key: definition.key,
       metal: definition.metal,
       purity_code: definition.purity_code,
@@ -204,13 +226,14 @@ export function createOroDOroExtractor(options = {}) {
     }));
     warnings.push(...missingFields.map((field) => field.error));
 
-    const requiredCount = ORO_DORO_DEFINITIONS.length;
-    const foundCount = requiredCount - missingOroDOroDefinitions(quotes).length;
+    const requiredCount = ORO_DORO_DEFINITIONS.length - excludedFields.length;
+    const foundCount = quotes.length;
     const status = foundCount === requiredCount ? "success" : foundCount ? "partial" : "failed";
     return {
       source: "oro_doro",
       verified_only: true,
       missing_fields: missingFields,
+      excluded_fields: excludedFields,
       status,
       quotes,
       error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),

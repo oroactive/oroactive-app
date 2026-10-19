@@ -408,6 +408,10 @@ export function createCompetitorExtractionTrainer(options = {}) {
     }
     if (options.verifiedSourceResult) {
       const extraction = options.verifiedSourceResult;
+      const excluded = (extraction.excluded_fields || []).find((field) => field.metal === rule.metal && field.purity_code === rule.purity_code);
+      if (excluded) {
+        return { rule, status: "excluded", value: null, unit: "EUR/g", evidence_text: excluded.reason, method: sourceSpecificMethod(source), confidence: "high", error: "" };
+      }
       const missing = (extraction.missing_fields || []).find((field) => field.metal === rule.metal && field.purity_code === rule.purity_code);
       return {
         rule,
@@ -530,7 +534,7 @@ export function createCompetitorExtractionTrainer(options = {}) {
     }
     const quotes = results.map((result) => result.quote).filter(Boolean);
     return {
-      status: results.every((result) => result.status === "found") ? "success" : quotes.length ? "partial" : "failed",
+      status: quotes.length && results.every((result) => ["found", "excluded"].includes(result.status)) ? "success" : quotes.length ? "partial" : "failed",
       results,
       quotes,
       error: results.map((result) => result.error).filter(Boolean).join(" | ").slice(0, 1200)
