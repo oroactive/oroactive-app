@@ -56,15 +56,16 @@ test("Oro Express preserves the sign of the published variation", async () => {
   assert.equal(result.quotes.find((q) => q.purity_code === "24kt").price_per_gram, 100.9);
 });
 
-test("Oro D'Oro reads the canonical host and reports the missing 20kt without AI or estimates", async () => {
+test("Oro D'Oro excludes unpublished 20kt and succeeds for the nine verified quotes", async () => {
   const urls = [];
   const result = await createOroDOroExtractor({ url: "https://www.comproorodoro.it", resolver, useAiFallback: true, openai: poisonAi, fetchImpl: async (url) => { urls.push(String(url)); return response(`<p>${ticker}</p>`); } }).extractOroDOroQuotes();
   assert.deepEqual(urls, ["https://comproorodoro.it/"]);
-  assert.equal(result.status, "partial");
+  assert.equal(result.status, "success");
   assert.equal(result.quotes.length, 9);
   assert.equal(result.verified_only, true);
-  assert.deepEqual(result.missing_fields.map((f) => f.purity_code), ["20kt"]);
-  assert.match(result.error, /20kt.*nessun prezzo verificabile/i);
+  assert.deepEqual(result.missing_fields, []);
+  assert.deepEqual(result.excluded_fields.map((f) => f.purity_code), ["20kt"]);
+  assert.equal(result.error, "");
   assert.equal(result.quotes.some((q) => q.purity_code === "20kt"), false);
   assert.ok(result.quotes.every((q) => !q.ai_extracted && q.source_url === "https://comproorodoro.it/"));
 });
@@ -89,10 +90,11 @@ test("guided extraction preserves verified-only missing fields even when AI is r
   const rules = ["21kt", "20kt", "18kt"].map((code) => ({ field_key: `oro_doro_gold_${code}`, label: `ORO ${code}`, metal: "gold", purity_code: code, page_url: source.website_url, required: true, active: true }));
   for (const forceAi of [false, true]) {
     const result = await trainer.testCompetitorExtraction(source, rules, { forceAi });
-    assert.equal(result.status, "partial");
+    assert.equal(result.status, "success");
     assert.deepEqual(result.quotes.map((q) => q.purity_code), ["21kt", "18kt"]);
-    assert.equal(result.results[1].status, "not_found");
-    assert.match(result.results[1].error, /20kt.*nessun prezzo verificabile/i);
+    assert.equal(result.results[1].status, "excluded");
+    assert.equal(result.results[1].error, "");
+    assert.match(result.results[1].evidence_text, /escluso/i);
   }
   assert.equal(otherCalls, 0);
 });
@@ -103,20 +105,23 @@ test("Oro Express never treats an HTML error page as a quote", async () => {
   assert.equal(result.quotes.length, 0);
 });
 
-test("Oro D'Oro summary shows unavailable 20kt explicitly and keeps an old value historical", async () => {
+test("Oro D'Oro summary excludes 20kt from current prices without mutating its history", async () => {
   const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
   const start = app.indexOf("function oroDOroSummaryHtml()");
   const code = app.slice(start, app.indexOf("function amicoOroSummaryHtml()", start));
   const oldQuote = { metal: "gold", purity_code: "20kt", price_per_gram: 82, currency: "EUR", quote_date: "2026-10-18T10:00:00Z" };
   const ctx = vm.createContext({
-    state: { competitorSources: [{ id: 3, name: "Oro D'Oro", last_sync_at: "2026-10-19T12:00:00Z" }], competitorExtractionRules: [{ source_id: 3, metal: "gold", purity_code: "20kt", last_test_status: "not_found", last_test_at: "2026-10-19T12:00:00Z" }] },
+    state: { competitorSources: [{ id: 3, name: "Oro D'Oro", last_sync_at: "2026-10-19T12:00:00Z", quote_fields: [{ metal: "gold", purity_code: "20kt", status: "excluded" }] }], competitorExtractionRules: [{ source_id: 3, metal: "gold", purity_code: "20kt", last_test_status: "not_found", last_test_at: "2026-10-19T12:00:00Z" }] },
     latestOroDOroQuote: (metal, code) => code === "20kt" ? oldQuote : code === "18kt" ? { ...oldQuote, purity_code: "18kt", price_per_gram: 74 } : null,
     escapeHtml: String, formatGoldPerGram: (value) => `${value} EUR/g`, formatDateTime: String,
     competitorPurityDisplay: (q) => q.purity_code, competitorSourceStatusLabel: () => "Parziale", isFounder: () => true,
   });
   vm.runInContext(code, ctx);
   const html = ctx.oroDOroSummaryHtml();
-  assert.match(html, /ORO 20kt<\/span><strong>Prezzo non disponibile dalla fonte<\/strong><small>Ultimo dato storico: 82 EUR\/g/);
+  assert.doesNotMatch(html, /82 EUR\/g|ORO 20kt<\/span>/);
+  assert.match(html, /20 kt escluso.*Storico conservato/);
+  ctx.state.competitorSources[0].quote_fields[0].status = "found";
+  assert.match(ctx.oroDOroSummaryHtml(), /82 EUR\/g/);
   assert.equal(oldQuote.price_per_gram, 82);
 });
 
@@ -156,4 +161,50 @@ test("global AI refresh routes both dedicated sources through verified extractio
   assert.equal(saved.length, 2);
   assert.ok(saved.every((q) => q.ai_extracted === false && q.raw_payload.source_method === "public_source"));
   assert.match(statuses[1][3], /20kt.*nessun prezzo verificabile/);
+});
+
+test("Oro D'Oro stays partial for a missing required quote or a published 20kt that cannot be verified", async () => {
+  for (const text of [ticker.replace('ORO 18KT · 74,36 €/g ', ''), ticker + ' ORO 20kt 82,00 €/g ORO 20kt 83,00 €/g', ticker + ' ORO 20kt 82000 €/kg']) {
+    const r = await createOroDOroExtractor({ resolver, fetchImpl: async () => response(`<p>${text}</p>`) }).extractOroDOroQuotes();
+    assert.equal(r.status, 'partial', text);
+    assert.ok(r.missing_fields.length > 0);
+  }
+});
+
+test("Oro D'Oro automatically includes 20kt only when a verified official price appears", async () => {
+  let published = false;
+  const extractor = createOroDOroExtractor({ resolver, fetchImpl: async () => response(`<p>${ticker}${published ? ' ORO 20kt 82,00 €/g' : ''}</p>`) });
+  const before = await extractor.extractOroDOroQuotes();
+  assert.equal(before.status, 'success');
+  assert.equal(before.excluded_fields.length, 1);
+  published = true;
+  const after = await extractor.extractOroDOroQuotes();
+  assert.equal(after.status, 'success');
+  assert.equal(after.quotes.length, 10);
+  assert.equal(after.excluded_fields.length, 0);
+  assert.equal(after.quotes.find(q => q.purity_code === '20kt').price_per_gram, 82);
+  published = false;
+  const withdrawn = await extractor.extractOroDOroQuotes();
+  assert.equal(withdrawn.status, 'success');
+  assert.equal(withdrawn.quotes.length, 9);
+  assert.equal(after.quotes.find(q => q.purity_code === '20kt').price_per_gram, 82);
+});
+
+
+test("current Oro D'Oro lookup requires public verification of 20kt for every app role", async () => {
+  const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
+  const start = app.indexOf("function latestOroDOroQuote(");
+  const code = app.slice(start, app.indexOf("function latestAmicoOroQuote(", start));
+  const quotes = [{ competitor_name: "Oro D'Oro", metal: "gold", purity_code: "20kt", price_per_gram: 82 }, { competitor_name: "Oro D'Oro", metal: "gold", purity_code: "18kt", price_per_gram: 74 }];
+  const state = { competitorQuotes: quotes, competitorSources: [{name: "Oro D'Oro", quote_fields: [{metal: "gold", purity_code: "20kt", status: "excluded"}]}] };
+  const ctx = vm.createContext({state, isCompetitorBuybackQuote: () => true});
+  vm.runInContext(code, ctx);
+  assert.equal(ctx.latestOroDOroQuote("gold", "20kt"), null);
+  assert.equal(ctx.latestOroDOroQuote("gold", "18kt").price_per_gram, 74);
+  state.competitorSources[0].quote_fields[0].status = "found";
+  assert.equal(ctx.latestOroDOroQuote("gold", "20kt").price_per_gram, 82);
+  state.competitorSources[0].quote_fields[0].status = "excluded";
+  assert.equal(ctx.latestOroDOroQuote("gold", "20kt"), null);
+  assert.equal(state.competitorQuotes.length, 2);
+  assert.equal(quotes[0].price_per_gram, 82);
 });

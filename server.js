@@ -3461,6 +3461,7 @@ function publicCompetitorSource(row = {}) {
     notes: row.notes || "",
     selectors: row.selectors || {},
     extraction_config: row.extraction_config || row.extractionConfig || row.selectors || {},
+    quote_fields: Array.isArray(row.quote_fields) ? row.quote_fields : [],
     last_sync_at: row.last_sync_at || null,
     next_sync_at: row.next_sync_at || null,
     last_sync_status: row.last_sync_status || "not_synced",
@@ -4426,7 +4427,12 @@ async function testCompetitorExtractionForSource(sourceId, user = {}, req = null
 }
 
 async function listCompetitorSources() {
-  const result = await pool.query(`SELECT * FROM competitor_quote_sources WHERE ${hiddenCompetitorSql("name")} ORDER BY active DESC, name ASC`);
+  const result = await pool.query(`SELECT s.*, COALESCE((
+    SELECT jsonb_agg(jsonb_build_object('metal', r.metal, 'purity_code', r.purity_code, 'status', r.last_test_status, 'checked_at', r.last_test_at))
+      FROM competitor_extraction_rules r
+     WHERE r.source_id = s.id AND r.active = true
+  ), '[]'::jsonb) AS quote_fields
+  FROM competitor_quote_sources s WHERE ${hiddenCompetitorSql("s.name")} ORDER BY s.active DESC, s.name ASC`);
   return result.rows.map(publicCompetitorSource);
 }
 
@@ -4701,6 +4707,16 @@ async function competitorQuoteStats({ metals = ["gold", "silver"], currency = "E
           AND COALESCE(quote_type, 'customer_buyback') = 'customer_buyback'
           AND LOWER(COALESCE(ai_confidence, confidence, 'medium')) IN ('medium', 'high', 'media', 'alta')
           AND ${hiddenCompetitorSql("competitor_name")}
+          AND NOT (
+            LOWER(competitor_name) = LOWER('Oro D''Oro') AND metal = 'gold' AND purity_code = '20kt'
+            AND NOT EXISTS (
+              SELECT 1 FROM competitor_extraction_rules r
+               JOIN competitor_quote_sources s ON s.id = r.source_id
+              WHERE LOWER(s.name) = LOWER(competitor_buyback_quotes.competitor_name)
+                AND r.active = true AND r.metal = 'gold' AND r.purity_code = '20kt'
+                AND r.last_test_status = 'found'
+            )
+          )
      ),
      ranked AS (
        SELECT *,
