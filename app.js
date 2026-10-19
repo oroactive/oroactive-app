@@ -101,6 +101,7 @@ const state = {
   academyOperationalCapabilities: [],
   academySimulationScenarios: [],
   academyExamHistory: [],
+  academyManualExamHistory: [],
   academyFounderDashboard: null,
   academyGemMaterials: [],
   academyGemTools: [],
@@ -229,7 +230,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20260908-logo-layout-29";
+const OROACTIVE_CLIENT_BUILD_ID = "20261019-reliability-30";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -237,21 +238,21 @@ const SIGNATURE_LABELS = ["Firma vendita", "Firma dichiarazioni", "Firma privacy
 const REQUIRED_SIGNATURES = SIGNATURE_LABELS.length;
 const OROACTIVE_WEBSITE_URL = "https://www.oroactive.it";
 const PRIVACY_POLICY_FALLBACK = {
-  version: "v1.1",
-  updated_at: "2026-07-30",
+  version: "v1.2",
+  updated_at: "2026-10-19",
   title: "Privacy Policy e Informativa sul trattamento dei dati personali — OroActive",
   subtitle: "Informativa ai sensi del Regolamento UE 2016/679 (GDPR) e della normativa applicabile in materia di protezione dei dati personali.",
   note: "Questa informativa descrive come OroActive tratta i dati personali all'interno dell'app gestionale e nei processi collegati agli atti di vendita, alla gestione clienti, alla formazione, alla sicurezza operativa e alle funzionalità AI.",
   controller: {
-    company_name: "[INSERIRE RAGIONE SOCIALE]",
-    legal_address: "[INSERIRE INDIRIZZO]",
-    privacy_email: "[INSERIRE EMAIL PRIVACY]",
-    pec: "[INSERIRE PEC]",
-    vat: "[INSERIRE DATI]",
-    status: "Da completare"
+    company_name: "OroActive Cassano Magnago Srl",
+    legal_address: "viale Generale Armando Diaz, 9, Busto Arsizio",
+    privacy_email: "privacy@oroactive.it",
+    pec: "oroactive.cassanomsrl@pec.it",
+    vat: "04168610121",
+    status: "Dati del titolare aggiornati"
   },
   sections: [
-    { id: "utenti-app", tab: "Informativa utenti app", title: "1. Titolare del trattamento", badge: "Da completare", paragraphs: ["Il Titolare del trattamento è [INSERIRE RAGIONE SOCIALE], con sede legale in [INSERIRE INDIRIZZO]. Email privacy: [INSERIRE EMAIL PRIVACY]. PEC: [INSERIRE PEC]. P.IVA / C.F.: [INSERIRE DATI].", "I dati sopra indicati devono essere completati dal Founder o dal consulente privacy prima dell'utilizzo definitivo."] },
+    { id: "utenti-app", tab: "Informativa utenti app", title: "1. Titolare del trattamento", badge: "Dati del titolare", paragraphs: ["Il Titolare del trattamento è OroActive Cassano Magnago Srl, con sede legale in viale Generale Armando Diaz, 9, Busto Arsizio. Email privacy: privacy@oroactive.it. PEC: oroactive.cassanomsrl@pec.it. P.IVA: 04168610121.", "Il Titolare può essere contattato ai recapiti sopra indicati per le richieste relative ai dati personali."] },
     { id: "clienti-atti", tab: "Informativa clienti / atti di vendita", title: "2. Quali dati trattiamo", paragraphs: ["L'app OroActive può trattare dati degli utenti dell'app, dati dei clienti collegati agli atti di vendita, dati tecnici e dati relativi alle funzionalità AI e Aurum."], groups: [
       { title: "Dati degli utenti dell'app", items: ["nome e cognome", "username/email", "ruolo operativo", "negozio assegnato", "telefono se inserito", "stato online/offline", "attività svolte nell'app", "log accessi", "autorizzazioni, notifiche e audit trail", "risultati formazione Academy", "badge e certificazioni interne"] },
       { title: "Dati dei clienti negli atti di vendita", items: ["nome e cognome", "codice fiscale", "data e luogo di nascita", "indirizzo di residenza", "telefono/email se richiesti", "dati documento di identità", "immagini documento/tessera sanitaria se acquisite", "firme", "dati relativi agli oggetti preziosi ceduti", "foto preziosi", "dati pagamento", "IBAN o contabili se necessari", "numero pratica / atto di vendita", "storico operazioni collegate al cliente"] },
@@ -265,7 +266,7 @@ const PRIVACY_POLICY_FALLBACK = {
     { id: "comunicazione", tab: "Sicurezza", title: "7. A chi possono essere comunicati i dati", items: ["personale autorizzato OroActive", "Founder, responsabili e supervisori secondo permessi", "fornitori tecnici dell'app", "hosting provider", "fornitori backup/storage", "consulenti fiscali/legali/amministrativi", "autorità competenti quando previsto dalla legge", "servizi di pagamento o strumenti collegati se necessari", "fornitori AI solo nei limiti tecnici e con minimizzazione dei dati"], closing: "Non vengono comunicati dati personali a soggetti non autorizzati." },
     { id: "ai-aurum", tab: "AI, Aurum e automazioni", title: "8. Funzionalità AI e Aurum", paragraphs: ["OroActive può includere funzionalità di assistenza AI tramite Aurum, assistente operativo interno. Aurum può aiutare l'utente a comprendere sezioni, compilare correttamente le pratiche, consultare procedure e ricevere suggerimenti operativi o di coaching.", "Aurum è un sistema IA e non un coach umano certificato, uno psicologo, uno psicoterapeuta o un medico. Il coaching digitale sostiene riflessione e autonomia, ma non formula diagnosi, non prescrive trattamenti e non sostituisce professionisti qualificati."], items: ["Aurum non sostituisce il giudizio umano", "Aurum non deve trattare dati cliente non necessari", "categorie particolari di dati, salute, documenti, firme, IBAN, codici fiscali e credenziali non sono ammessi nella memoria personale", "ogni memoria viene salvata cifrata soltanto se l'utente conferma esplicitamente quella specifica informazione", "l'uso della memoria nella chat e la condivisione con un fornitore IA esterno sono scelte separate; la condivisione esterna è disattivata per impostazione predefinita", "l'utente può visualizzare, modificare, esportare, eliminare singolarmente o cancellare tutte le proprie memorie", "il Founder può consultare soltanto conteggi e categorie tecniche, non il contenuto delle memorie", "la cronologia recente viene minimizzata e filtrata per assicurare continuità; se sono rilevati dati personali non viene inviata al fornitore IA esterno", "richieste di crisi o di diagnosi e terapia non vengono memorizzate né inviate al fornitore IA esterno"] },
     { id: "sicurezza", tab: "Sicurezza", title: "9. Misure di sicurezza", paragraphs: ["OroActive adotta misure tecniche e organizzative per proteggere i dati personali."], items: ["accesso con credenziali", "ruoli e permessi", "tracciamento attività tramite Audit Trail", "backup", "controllo qualità", "autorizzazioni superiori per pratiche rischiose", "protezione file e documenti", "limitazione accessi in base al ruolo", "registrazione eventi critici", "controlli su operazioni anomale"], closing: "La sicurezza viene migliorata progressivamente in base all'evoluzione dell'app e delle esigenze operative." },
-    { id: "diritti", tab: "Diritti privacy", title: "10. Diritti privacy", paragraphs: ["L'interessato può esercitare, nei limiti previsti dalla normativa, i diritti di accesso, rettifica, cancellazione, limitazione del trattamento, opposizione, portabilità ove applicabile, revoca del consenso ove il trattamento sia basato sul consenso e reclamo all'Autorità Garante per la protezione dei dati personali.", "Per esercitare i diritti: Email [INSERIRE EMAIL PRIVACY] - PEC [INSERIRE PEC]."] },
+    { id: "diritti", tab: "Diritti privacy", title: "10. Diritti privacy", paragraphs: ["L'interessato può esercitare, nei limiti previsti dalla normativa, i diritti di accesso, rettifica, cancellazione, limitazione del trattamento, opposizione, portabilità ove applicabile, revoca del consenso ove il trattamento sia basato sul consenso e reclamo all'Autorità Garante per la protezione dei dati personali.", "Per esercitare i diritti: Email privacy@oroactive.it - PEC oroactive.cassanomsrl@pec.it."] },
     { id: "cookie-pwa", tab: "Cookie / PWA / log tecnici", title: "11. Cookie, PWA e dati tecnici", paragraphs: ["L'app OroActive può utilizzare strumenti tecnici necessari al funzionamento, come cookie tecnici, localStorage, sessionStorage, service worker/PWA e log tecnici."], items: ["mantenere la sessione", "migliorare la navigazione", "salvare preferenze utente", "abilitare funzionalità PWA", "gestire aggiornamenti applicativi", "garantire sicurezza e continuità operativa"], closing: "Se in futuro verranno utilizzati strumenti di analytics, marketing o profilazione, dovrà essere predisposta informativa e consenso specifico ove richiesto." },
     { id: "versione", tab: "Versione documento", title: "12. Aggiornamenti della Privacy Policy", paragraphs: ["La presente informativa può essere aggiornata nel tempo. In caso di modifiche rilevanti, l'app potrà mostrare una richiesta di presa visione agli utenti al successivo accesso."] }
   ]
@@ -6799,6 +6800,17 @@ async function withButtonBusy(button, busyText, task) {
   }
 }
 
+function resetAuthenticatedFormFields(root) {
+  root?.querySelectorAll("input, textarea").forEach((field) => {
+    if (field.type === "checkbox" || field.type === "radio") field.checked = field.defaultChecked;
+    else field.value = field.defaultValue || "";
+  });
+  root?.querySelectorAll("select").forEach((select) => {
+    const defaultIndex = Array.from(select.options).findIndex((option) => option.defaultSelected);
+    select.selectedIndex = defaultIndex < 0 ? 0 : defaultIndex;
+  });
+}
+
 function resetAuthenticatedSessionData() {
   oroActiveNavigationState.authenticatedGeneration = -1;
   rotateSessionGeneration();
@@ -6842,6 +6854,8 @@ function resetAuthenticatedSessionData() {
   state.guidedQualityCheck = null;
   state.amlCashCheck = null;
   state.buybackSimulationContext = null;
+  state.buybackScenario = "standard";
+  state.buybackSimulationRequest = 0;
   state.activeTrainingSession = null;
   state.activeTrainingData = null;
   state.academyLearningPath = null;
@@ -6856,13 +6870,7 @@ function resetAuthenticatedSessionData() {
   demoActs.splice(0, demoActs.length);
   window.__OROACTIVE_DIRTY_STATE__ = false;
 
-  appShell?.querySelectorAll("input, textarea").forEach((field) => {
-    if (field.type === "checkbox" || field.type === "radio") field.checked = false;
-    else field.value = "";
-  });
-  appShell?.querySelectorAll("select").forEach((select) => {
-    select.selectedIndex = 0;
-  });
+  resetAuthenticatedFormFields(appShell);
   document.querySelectorAll("canvas[data-signature]").forEach((canvas) => {
     canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
   });
@@ -9537,7 +9545,7 @@ function renderNavigationError(screenId) {
 function openAppScreen(screenId, options = {}) {
   console.info("[OroActive Navigation] openAppScreen", { screenId, options });
 
-  const route = resolveSectionRoute(screenId);
+  const route = resolveSectionRoute(options.requestedSection || screenId);
   const targetScreenId = route.screen;
   const targetScreen = document.getElementById(targetScreenId);
 
@@ -9820,11 +9828,11 @@ async function enterSectionFromMainMenu(section) {
   setAurumSection(section);
   updateAurumMascotVisibility();
   if (route.screen === "practice") {
-    setScreen(route.screen);
+    setScreen(section);
     await clearPracticeForFreshStart({ deferPracticeNumber: true });
     return;
   }
-  setScreen(route.screen);
+  setScreen(section);
 }
 
 async function clearPracticeForFreshStart(options = {}) {
@@ -11235,6 +11243,7 @@ function handleAurumPointerDown(event) {
   const rect = element.getBoundingClientRect();
   state.aurumDragState = {
     pointerId: event.pointerId,
+    captureTarget: headerHandle ? element : mascotHandle,
     element: headerHandle ? "panel" : "mascot",
     originX: rect.left,
     originY: rect.top,
@@ -11244,7 +11253,7 @@ function handleAurumPointerDown(event) {
     moved: false
   };
   element.classList.add(headerHandle ? "aurum-panel-dragging" : "aurum-dragging");
-  element.setPointerCapture?.(event.pointerId);
+  state.aurumDragState.captureTarget.setPointerCapture?.(event.pointerId);
   event.preventDefault();
 }
 
@@ -11274,7 +11283,9 @@ function handleAurumPointerUp(event) {
   if (!drag || drag.pointerId !== event.pointerId) return;
   const element = drag.element === "panel" ? aurumChatPanel : aurumMascotRoot;
   element?.classList.remove(drag.element === "panel" ? "aurum-panel-dragging" : "aurum-dragging");
-  element?.releasePointerCapture?.(event.pointerId);
+  if (drag.captureTarget?.hasPointerCapture?.(event.pointerId)) {
+    drag.captureTarget.releasePointerCapture(event.pointerId);
+  }
   if (drag.element === "mascot" && drag.moved) {
     state.aurumSuppressNextClick = true;
     saveAurumFloatingPosition(state.aurumFloatingPosition || defaultAurumPosition());
@@ -12716,8 +12727,8 @@ function renderDashboard() {
     metricCard("Richieste rischiose", approvals.risky_pending || 0),
     metricCard("Pratiche sospese", suspended.total || 0),
     metricCard("Sospese oggi", suspended.today || 0),
-    metricCard("Health Score rete", `${Number(storeHealth.average_score || 0)}/100`),
-    metricCard("Negozi critici", (storeHealth.stores || []).filter((store) => store.status === "critico").length),
+    metricCard("Health Score rete", storeHealth.available === false ? "Non disponibile" : `${Number(storeHealth.average_score || 0)}/100`),
+    metricCard("Negozi critici", storeHealth.available === false ? "Non disponibile" : (storeHealth.stores || []).filter((store) => store.status === "critico").length),
     metricCard("Login oggi", audit.logins_today || 0),
     metricCard("Azioni critiche oggi", Number(audit.acts_deleted_today || 0) + Number(audit.shield_alerts_today || 0)),
     metricCard("Oro mensile", `${Number(kpi.grammi_mensili?.Oro || 0).toFixed(2)} gr`),
@@ -12752,10 +12763,12 @@ function renderDashboard() {
       ${(suspended.latest || []).slice(0, 5).map((item) => `<div class="dashboard-rank-row"><span>${escapeHtml(item.practiceNumber || item.numero_atto || "Atto")}</span><strong>${escapeHtml(String(item.risk_score || 0))}/100</strong><em>${escapeHtml((item.motivi || [])[0] || "Motivo da verificare")}</em></div>`).join("") || '<div class="empty-state">Nessuna pratica sospesa.</div>'}
     </section>
     <section class="dashboard-panel"><h3>Salute Negozi</h3>
+      ${storeHealth.available === false ? '<div class="empty-state" role="alert">Salute Negozio non disponibile. Apri la sezione per riprovare.</div>' : `
       <div class="dashboard-rank-row"><span>Score medio rete</span><strong>${escapeHtml(String(storeHealth.average_score || 0))}/100</strong><em>Ultimi 7 giorni</em></div>
       <div class="dashboard-rank-row"><span>Miglior negozio</span><strong>${escapeHtml(storeHealth.best_store?.store_name || "Nessun dato")}</strong><em>${escapeHtml(String(storeHealth.best_store?.score || 0))}/100 · ${escapeHtml(storeHealth.best_store?.status || "")}</em></div>
       <div class="dashboard-rank-row"><span>Negozio più critico</span><strong>${escapeHtml(storeHealth.critical_store?.store_name || "Nessun dato")}</strong><em>${escapeHtml(String(storeHealth.critical_store?.score || 0))}/100 · ${escapeHtml(storeHealth.critical_store?.status || "")}</em></div>
       <div class="dashboard-rank-row"><span>Alert salute</span><strong>${escapeHtml(String(storeHealth.alert_count || 0))}</strong><em>Pratiche, rischio, qualità, backup</em></div>
+      `}
       <button class="ghost-button small-button" type="button" data-open-store-health>Apri Salute Negozio</button>
     </section>
     <section class="dashboard-panel"><h3>Oggi nell'app</h3>
@@ -12913,10 +12926,17 @@ async function loadStoreHealth() {
   if (storeHealthList) storeHealthList.innerHTML = '<div class="empty-state">Calcolo Salute Negozio...</div>';
   const params = storeHealthPeriodParams();
   const query = queryString(params);
-  const data = await apiRequest(`/store-health${query ? `?${query}` : ""}`, { timeoutMs: 45000 });
-  state.storeHealth = data.stores || [];
-  state.storeHealthDateRange = data.date_range || null;
-  renderStoreHealth();
+  try {
+    const data = await apiRequest(`/store-health${query ? `?${query}` : ""}`, { timeoutMs: 45000 });
+    state.storeHealth = data.stores || [];
+    state.storeHealthDateRange = data.date_range || null;
+    renderStoreHealth();
+  } catch (error) {
+    state.storeHealth = [];
+    state.storeHealthDateRange = null;
+    if (storeHealthList) storeHealthList.innerHTML = '<div class="empty-state" role="alert">Salute Negozio non disponibile. Riprova tra poco o usa Ricalcola.</div>';
+    throw error;
+  }
 }
 
 async function recalculateStoreHealth() {
@@ -15538,19 +15558,26 @@ function renderCompetencyMatrix() {
 }
 
 function renderAcademyExams() {
-  const attempts = state.academyExamHistory || [];
+  const manual = (state.academyManualExamHistory || []).map((exam) => ({
+    ...exam, submitted_at: exam.evaluated_at || exam.created_at,
+    passed: exam.esito === "superato", status: exam.esito === "non_superato" ? "Non superato" : exam.esito,
+    manual: true
+  }));
+  const attempts = [...(state.academyExamHistory || []), ...manual]
+    .sort((a, b) => new Date(b.submitted_at || b.started_at || 0) - new Date(a.submitted_at || a.started_at || 0));
   trainingList.innerHTML = `
     <section class="academy-qualification-shell">
       <article class="academy-qualification-hero">
-        <span class="course-pill">Esami teorici</span>
-        <h3>Storico tentativi</h3>
-        <p>Gli esami vengono corretti lato backend. Le risposte corrette non sono inviate al dispositivo prima della consegna.</p>
+        <span class="course-pill">Esami Academy</span>
+        <h3>Storico esami e valutazioni</h3>
+        <p>Test teorici corretti dal sistema e ultime 200 valutazioni registrate dai responsabili. I corsi avanzati seguono le prove previste dal PDF ufficiale.</p>
       </article>
       <div class="academy-path-grid">
         ${attempts.length ? attempts.map((attempt) => `
           <article class="academy-qualification-card">
             <h4>${escapeHtml(attempt.course_title || "Esame Academy")}</h4>
             <p>${escapeHtml(formatDateTime(attempt.submitted_at || attempt.started_at || ""))}</p>
+            ${attempt.manual ? `<p>Valutazione ${escapeHtml(attempt.exam_type || "presenza")} · ${escapeHtml([attempt.nome, attempt.cognome].filter(Boolean).join(" ") || attempt.username || "Operatore")}</p><p>${escapeHtml(attempt.note || "")}</p>` : ""}
             <div class="academy-course-meta">
               ${renderQualificationStatus(attempt.passed ? "passed" : attempt.status, attempt.passed ? "Superato" : attempt.status || "In corso")}
               ${attempt.score !== null && attempt.score !== undefined ? `<span>Punteggio ${escapeHtml(String(attempt.score))}%</span>` : ""}
@@ -16166,7 +16193,7 @@ function renderCourseCard(course) {
       : "Completa prima i corsi propedeutici.");
   const finalExamQuestions = courseFinalExamQuestions(course);
   const hasFinalExam = finalExamQuestions.length > 0;
-  const showExamUnavailable = !isLocked && isAdvancedPath && !hasFinalExam;
+  const hasManualExam = !isLocked && isAdvancedPath && !hasFinalExam;
   const examPassed = courseExamPassed(course);
   const retryMessage = courseExamRetryMessage(course);
   const canOpenSlides = Boolean(pdfUrl) && !isLocked;
@@ -16188,8 +16215,8 @@ function renderCourseCard(course) {
         : retryMessage
           ? `<span class="academy-test-status">Test finale non superato · ${escapeHtml(retryMessage)}</span>`
           : `<span class="academy-test-status">Test finale richiesto per ottenere badge e certificazione</span>`
-      : showExamUnavailable
-        ? `<span class="academy-test-status">Esame da configurare</span>`
+      : hasManualExam
+        ? `<span class="academy-test-status">${examPassed ? "Esame superato" : "Esame con valutazione del responsabile"}</span>`
         : "";
   const firstMissingPrerequisite = Array.isArray(course.missing_prerequisites) ? course.missing_prerequisites[0] : null;
   const prerequisiteButton = isLocked && firstMissingPrerequisite?.code
@@ -16223,8 +16250,8 @@ function renderCourseCard(course) {
       <div class="course-progress-panel">
         ${isLocked ? `<span class="academy-course-lock">${escapeHtml(lockReason)}</span>${prerequisiteButton}` : ""}
         ${!isLocked && hasFinalExam && !examPassed ? `<button class="primary-button" type="button" data-course-exam="${escapeHtml(String(course.id))}" ${course.final_exam_retry_blocked ? "disabled" : ""}>${course.final_exam_retry_blocked ? "Test disponibile tra 48 ore" : "Sostieni test finale"}</button>` : ""}
-        ${showExamUnavailable ? '<button class="primary-button" type="button" disabled>Esame non disponibile</button>' : ""}
-        ${hasFinalExam && examPassed ? `<button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(course.certificate_id || ""))}" ${course.certificate_id ? "" : "disabled"}>Scarica certificato</button>` : ""}
+        ${hasManualExam ? `<button class="primary-button" type="button" data-course-manual-exam="${escapeHtml(String(course.id))}">Esame con responsabile</button>` : ""}
+        ${(hasFinalExam || hasManualExam) && examPassed ? `<button class="primary-button" type="button" data-download-certificate="${escapeHtml(String(course.certificate_id || ""))}" ${course.certificate_id ? "" : "disabled"}>Scarica certificato</button>` : ""}
       </div>
     </article>
   `;
@@ -16340,7 +16367,8 @@ async function loadTraining() {
     capabilitiesResult,
     simulationsResult,
     examHistoryResult,
-    founderDashboardResult
+    founderDashboardResult,
+    manualExamsResult
   ] = await Promise.allSettled([
     apiRequest("/corsi"),
     apiRequest("/training/scenarios", { retries: 1 }),
@@ -16353,8 +16381,10 @@ async function loadTraining() {
     apiRequest("/academy/my-operational-capabilities", { retries: 1 }),
     apiRequest("/academy/simulations", { retries: 1 }),
     apiRequest("/academy/exam-attempts/history", { retries: 1 }),
-    apiRequest("/academy/founder/qualification-dashboard", { retries: 1 })
+    apiRequest("/academy/founder/qualification-dashboard", { retries: 1 }),
+    apiRequest("/academy/exams", { retries: 1 })
   ]);
+  if (manualExamsResult.status === "fulfilled") state.academyManualExamHistory = manualExamsResult.value.exams || [];
   const courseDataLoaded = rawCourseDataResult.status === "fulfilled";
   const rawCourseData = courseDataLoaded ? rawCourseDataResult.value : currentTrainingDataSnapshot();
   if (!courseDataLoaded) {
@@ -19012,15 +19042,51 @@ async function updateCourseProgress(courseId) {
   showToast("Avanzamento corso aggiornato.");
 }
 
-async function markCourseExamPassed(courseId) {
-  if (!canEvaluateCoursesUi()) return;
-  const examType = window.confirm("Esame svolto in live? Premi OK per live, Annulla per presenza.") ? "live" : "presenza";
+async function showCourseManualExamModal(courseId) {
+  const course = state.trainingCourses.find((item) => String(item.id) === String(courseId));
+  if (!course || course.course_locked || course.prerequisites_satisfied === false) return;
+  const canEvaluate = canEvaluateCoursesUi();
+  const users = canEvaluate ? await apiRequest("/utenti") : [];
+  document.querySelector(".academy-preview-backdrop")?.remove();
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="academy-preview-backdrop" role="dialog" aria-modal="true" aria-label="Esame con responsabile">
+      <article class="academy-preview-modal academy-exam-modal">
+        <header><div><span class="course-pill">Valutazione del responsabile</span>
+          <h3>${escapeHtml(course.title || "Corso Academy")}</h3></div>
+          <button type="button" class="academy-preview-close" data-close-course-preview aria-label="Chiudi esame">×</button>
+        </header>
+        <p>L’esame comprende le verifiche teoriche e pratiche, i criteri e le soglie indicati nel PDF ufficiale. Il responsabile registra l’esito solo dopo aver svolto la valutazione.</p>
+        <button type="button" data-manual-exam-slides="${escapeHtml(String(course.id))}">Consulta PDF e criteri d’esame</button>
+        ${canEvaluate ? `
+          <form class="academy-exam-form" data-course-manual-exam-form="${escapeHtml(String(course.id))}">
+            <label>Operatore valutato<select name="user_id" required>
+              <option value="">Seleziona l’operatore</option>
+              ${users.filter((user) => String(user.id) !== String(state.currentUser?.id)).map((user) => `<option value="${escapeHtml(String(user.id))}">${escapeHtml([user.nome, user.cognome].filter(Boolean).join(" ") || user.username || "Utente")}</option>`).join("")}
+            </select></label>
+            <label>Modalità<select name="exam_type" required><option value="presenza">In presenza</option><option value="live">Live con valutatore</option></select></label>
+            <label>Esito<select name="esito" required><option value="">Seleziona l’esito</option><option value="superato">Superato</option><option value="non_superato">Non superato</option></select></label>
+            <label>Verbale della valutazione<textarea name="note" required minlength="10" maxlength="4000" placeholder="Prove svolte, punteggi, criteri verificati ed eventuali criticità"></textarea></label>
+            <label><input type="checkbox" name="practical_completed" required> Confermo di aver valutato personalmente le prove previste dal PDF e verificato i requisiti per l’esito selezionato.</label>
+            <button type="submit" class="primary-button">Registra valutazione</button>
+          </form>` : '<p>Concorda l’esame con il responsabile: sarà il valutatore autorizzato a registrare il tuo esito. Puoi consultare qui il materiale e i criteri.</p>'}
+      </article>
+    </div>`);
+}
+
+async function submitCourseManualExam(form) {
+  if (!canEvaluateCoursesUi() || !form.reportValidity()) return;
+  const values = new FormData(form);
   await apiRequest("/corsi/esami", {
     method: "POST",
-    body: JSON.stringify({ course_id: courseId, user_id: state.currentUser?.id, exam_type: examType, esito: "superato" })
+    body: JSON.stringify({
+      course_id: form.dataset.courseManualExamForm,
+      user_id: values.get("user_id"), exam_type: values.get("exam_type"), esito: values.get("esito"),
+      note: String(values.get("note") || "").trim(), practical_completed: values.get("practical_completed") === "on"
+    })
   });
+  document.querySelector(".academy-preview-backdrop")?.remove();
   await loadTraining();
-  showToast("Esame superato, certificazione e badge assegnati.");
+  showToast("Valutazione registrata. Esito e certificazione aggiornati secondo il risultato.", "success");
 }
 
 function academyExamHashSeed(seed = "") {
@@ -19057,7 +19123,7 @@ function showCourseExamModal(courseId) {
   if (!course) return;
   const questions = courseFinalExamQuestions(course);
   if (!questions.length) {
-    void markCourseExamPassed(courseId);
+    void showCourseManualExamModal(courseId);
     return;
   }
   const retryMessage = courseExamRetryMessage(course);
@@ -24428,6 +24494,8 @@ function setGoldPredictionAvailability(available, error = null) {
 }
 
 async function loadGoldPredictionPanel(options = {}) {
+  state.buybackSimulationRequest = (state.buybackSimulationRequest || 0) + 1;
+  state.buybackSimulationContext = null;
   if (!goldPredictionStatus) return { ok: false, error: new Error("Pannello analisi non disponibile") };
   if (!options.silent) goldPredictionStatus.textContent = "Caricamento Analisi di mercato...";
   try {
@@ -24599,7 +24667,7 @@ async function saveGoldPredictionSettings(event) {
   await loadGoldPredictionPanel({ silent: true });
 }
 
-function renderBuybackSimulation(event) {
+async function renderBuybackSimulation(event) {
   event?.preventDefault();
   if (!buybackSimulatorForm || !buybackSimulatorOutput) return;
   if (!state.goldPredictionAvailable) {
@@ -24611,8 +24679,26 @@ function renderBuybackSimulation(event) {
   const purityCode = String(formData.get("purity_code") || "18kt");
   const grams = Math.max(0, Number(formData.get("grams") || 0));
   const scenario = String(formData.get("scenario") || state.buybackScenario || "standard");
-  const row = findBuybackRow(metal, purityCode, "today", scenario) || findBuybackRow(metal, purityCode, "today", state.buybackScenario);
-  if (!row || !grams) {
+  const generation = state.sessionGeneration;
+  const request = state.buybackSimulationRequest = (state.buybackSimulationRequest || 0) + 1;
+  state.buybackSimulationContext = null;
+  let row = findBuybackRow(metal, purityCode, "today", scenario);
+  if (!row && Number.isFinite(grams) && grams > 0 && ["prudente", "standard", "aggressivo"].includes(scenario)) {
+    buybackSimulatorOutput.textContent = "Calcolo dello scenario selezionato...";
+    try {
+      const currency = state.goldPredictionStatus?.settings?.currency || "EUR";
+      const data = await apiRequest(`/quotazioni/buyback-preview?metals=${encodeURIComponent(metal)}&currency=${encodeURIComponent(currency)}&horizons=today&scenario=${encodeURIComponent(scenario)}`);
+      if (generation !== state.sessionGeneration || request !== state.buybackSimulationRequest || !state.goldPredictionAvailable) return null;
+      const calculations = (data.calculations || []).filter((item) => item.scenario === scenario && item.metal === metal);
+      state.buybackCalculations = state.buybackCalculations.filter((item) => !(item.scenario === scenario && item.metal === metal && (item.horizon || item.prediction_horizon) === "today")).concat(calculations);
+      row = findBuybackRow(metal, purityCode, "today", scenario);
+    } catch {
+      if (generation !== state.sessionGeneration || request !== state.buybackSimulationRequest) return null;
+      buybackSimulatorOutput.textContent = "Calcolo non disponibile per lo scenario selezionato. Aggiorna i prezzi e riprova.";
+      return null;
+    }
+  }
+  if (!row || !Number.isFinite(grams) || grams <= 0) {
     state.buybackSimulationContext = null;
     buybackSimulatorOutput.textContent = "Calcolo non disponibile. Aggiorna i prezzi e inserisci un peso valido.";
     return null;
@@ -25110,8 +25196,8 @@ function askAurumGoldPrediction() {
   void explainPriceWithAurum(buildGeneralPriceExplanationContext());
 }
 
-function explainBuybackSimulation() {
-  const context = renderBuybackSimulation();
+async function explainBuybackSimulation() {
+  const context = await renderBuybackSimulation();
   if (!context) {
     showToast("Prima esegui una simulazione prezzo valida.", "warning");
     return;
@@ -26357,6 +26443,7 @@ trainingList?.addEventListener("click", async (event) => {
   const cancelOperator = event.target.closest("[data-cancel-operator-training]");
   const openTrainingResult = event.target.closest("[data-open-training-result]");
   const exam = event.target.closest("[data-course-exam]");
+  const manualExam = event.target.closest("[data-course-manual-exam]");
   const viewSlides = event.target.closest("[data-view-course-slides]");
   const downloadSlides = event.target.closest("[data-download-course-slides]");
   const certificate = event.target.closest("[data-download-certificate]");
@@ -26376,9 +26463,10 @@ trainingList?.addEventListener("click", async (event) => {
       return;
     }
     if (openTrainingResult) return await openOperatorTrainingResult(openTrainingResult.dataset.openTrainingResult);
+    if (manualExam) return await withButtonBusy(manualExam, "Apro...", () => showCourseManualExamModal(manualExam.dataset.courseManualExam));
     if (exam) {
       const course = state.trainingCourses.find((item) => String(item.id) === String(exam.dataset.courseExam));
-      return courseFinalExamQuestions(course).length ? showCourseExamModal(exam.dataset.courseExam) : await markCourseExamPassed(exam.dataset.courseExam);
+      return courseFinalExamQuestions(course).length ? showCourseExamModal(exam.dataset.courseExam) : await showCourseManualExamModal(exam.dataset.courseExam);
     }
     if (viewSlides) return await withButtonBusy(viewSlides, "Apro...", () => downloadCourseSlides(viewSlides.dataset.viewCourseSlides, { download: false }));
     if (downloadSlides) return await withButtonBusy(downloadSlides, "Scarico...", () => downloadCourseSlides(downloadSlides.dataset.downloadCourseSlides, { download: true }));
@@ -26425,10 +26513,21 @@ trainingList?.addEventListener("click", async (event) => {
     showToast(error.message || "Operazione corso non riuscita.");
   }
 });
+document.addEventListener("submit", (event) => {
+  const form = event.target.closest("[data-course-manual-exam-form]");
+  if (!form) return;
+  event.preventDefault();
+  void withButtonBusy(form.querySelector('[type="submit"]'), "Registro...", () => submitCourseManualExam(form));
+});
 document.addEventListener("click", (event) => {
   const closePreview = event.target.closest("[data-close-course-preview]");
   const backdrop = event.target.classList?.contains("academy-preview-backdrop") ? event.target : null;
   const submitCourseExam = event.target.closest("[data-submit-course-final-exam]");
+  const manualSlides = event.target.closest("[data-manual-exam-slides]");
+  if (manualSlides) {
+    void withButtonBusy(manualSlides, "Apro...", () => downloadCourseSlides(manualSlides.dataset.manualExamSlides, { download: false }));
+    return;
+  }
   if (closePreview || backdrop) {
     document.querySelector(".academy-preview-backdrop")?.remove();
     return;

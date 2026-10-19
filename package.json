@@ -16,10 +16,10 @@
   "dependencies": {
     "@simplewebauthn/server": "13.3.2",
     "bcrypt": "^6.0.0",
-    "compression": "^1.8.1",
+    "compression": "1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "4.22.2",
+    "express": "4.22.3",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.8.0",
     "openai": "^6.10.0",
@@ -28,6 +28,12 @@
     "pg": "^8.13.1"
   },
   "overrides": {
-    "body-parser": "1.20.6"
+    "body-parser": "1.20.6",
+    "qs": "6.16.1",
+    "proxy-addr": "2.0.8",
+    "@xmldom/xmldom": "0.8.15",
+    "mammoth": {
+      "argparse": "2.0.1"
+    }
   }
 }

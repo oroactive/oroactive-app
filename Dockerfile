@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:24-alpine3.23
 
 ARG GIT_COMMIT=unknown
 ARG BUILD_TIME=unknown
@@ -8,7 +8,7 @@ ARG SOURCE_BRANCH=unknown
 
 WORKDIR /app
 
-RUN apk add --no-cache postgresql16-client git
+RUN apk add --no-cache postgresql18-client git
 
 COPY package*.json ./
 RUN npm ci --omit=dev

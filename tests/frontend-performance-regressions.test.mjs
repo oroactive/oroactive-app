@@ -95,7 +95,11 @@ test("Aurum esce dal dock responsive e segue il trascinamento touch senza aprire
     setPointerCapture: (pointerId) => { aurumMascotRoot.capturedPointer = pointerId; },
     releasePointerCapture: (pointerId) => { aurumMascotRoot.releasedPointer = pointerId; }
   };
-  const mascotButton = {};
+  const mascotButton = {
+    setPointerCapture: (pointerId) => { mascotButton.capturedPointer = pointerId; },
+    hasPointerCapture: (pointerId) => mascotButton.capturedPointer === pointerId,
+    releasePointerCapture: (pointerId) => { mascotButton.releasedPointer = pointerId; }
+  };
   const pointerEvent = (clientX, clientY) => ({
     pointerId: 7,
     button: 0,
@@ -127,7 +131,8 @@ test("Aurum esce dal dock responsive e segue il trascinamento touch senza aprire
   api.handleAurumPointerDown(pointerEvent(930, 430));
   assert.equal(state.aurumDragState?.element, "mascot");
   assert.equal(classes.has("aurum-responsive-docked"), true);
-  assert.equal(aurumMascotRoot.capturedPointer, 7);
+  assert.equal(mascotButton.capturedPointer, 7);
+  assert.equal(aurumMascotRoot.capturedPointer, undefined);
 
   api.handleAurumPointerMove(pointerEvent(700, 260));
   assert.deepEqual(state.aurumFloatingPosition, { x: 670, y: 230 });
@@ -138,7 +143,7 @@ test("Aurum esce dal dock responsive e segue il trascinamento touch senza aprire
   assert.deepEqual(savedPositions, [{ x: 670, y: 230 }]);
   assert.equal(state.aurumSuppressNextClick, true);
   assert.equal(state.aurumDragState, null);
-  assert.equal(aurumMascotRoot.releasedPointer, 7);
+  assert.equal(mascotButton.releasedPointer, 7);
 
   state.aurumSuppressNextClick = false;
   state.aurumFloatingPosition = null;
