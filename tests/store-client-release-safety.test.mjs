@@ -298,7 +298,7 @@ test("createApprovalRequest allinea i 12 bind SQL senza duplicare l'utente", asy
 
   assert.ok(insertCall);
   assert.equal(insertCall.values.length, 12);
-  assert.deepEqual(insertCall.values, [
+  assert.deepEqual(insertCall.values.map((value, index) => index === 7 ? JSON.parse(value) : value), [
     77,
     15,
     "commesso",

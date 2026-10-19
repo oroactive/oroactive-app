@@ -14168,8 +14168,8 @@ async function generateFounderDailyReport(date = new Date(), generatedBy = null,
         reportDate,
         generatedBy?.id || generatedBy || null,
         sanitizeForPostgres(reportPayload.summary),
-        sanitizeForPostgres(reportPayload.stores_data),
-        sanitizeForPostgres(reportPayload.operators_data),
+        JSON.stringify(sanitizeForPostgres(reportPayload.stores_data)),
+        JSON.stringify(sanitizeForPostgres(reportPayload.operators_data)),
         sanitizeForPostgres(reportPayload.risks_data),
         sanitizeForPostgres(reportPayload.quality_data),
         sanitizeForPostgres(reportPayload.suspended_data),
@@ -15134,8 +15134,8 @@ async function persistAurumShieldForAct(saleDeedRow, user = {}) {
       shield.score,
       shield.risk_level,
       shield.summary,
-      sanitizeForPostgres(shield.factors || []),
-      sanitizeForPostgres(shield.recommendations || [])
+      JSON.stringify(sanitizeForPostgres(shield.factors || [])),
+      JSON.stringify(sanitizeForPostgres(shield.recommendations || []))
     ]
   );
   await pool.query(
@@ -15146,7 +15146,7 @@ async function persistAurumShieldForAct(saleDeedRow, user = {}) {
          aurum_shield_factors = $5::jsonb,
          aurum_shield_updated_at = NOW()
      WHERE id = $1::bigint`,
-    [saleDeedRow.id, shield.score, shield.risk_level, shield.summary, sanitizeForPostgres(shield.factors || [])]
+    [saleDeedRow.id, shield.score, shield.risk_level, shield.summary, JSON.stringify(sanitizeForPostgres(shield.factors || []))]
   );
   await syncAurumShieldAlert({ saleDeedRow, shield, user });
   void writeAuditLog({
@@ -15483,10 +15483,10 @@ async function saveQualityCheckResult(input = {}, user = {}) {
       user?.id || null,
       quality.quality_status,
       quality.score,
-      sanitizeForPostgres(quality.checks || []),
-      sanitizeForPostgres(quality.blocking_errors || []),
-      sanitizeForPostgres(quality.warnings || []),
-      sanitizeForPostgres(quality.required_actions || []),
+      JSON.stringify(sanitizeForPostgres(quality.checks || [])),
+      JSON.stringify(sanitizeForPostgres(quality.blocking_errors || [])),
+      JSON.stringify(sanitizeForPostgres(quality.warnings || [])),
+      JSON.stringify(sanitizeForPostgres(quality.required_actions || [])),
       input.feedback || ""
     ]
   );
@@ -15570,7 +15570,7 @@ async function writeSuspendedPracticeLog({ saleDeedId, user = {}, action, reason
         user?.id || null,
         action,
         reason || suspendedPracticeSummary(reasons),
-        sanitizeForPostgres(reasons || []),
+        JSON.stringify(sanitizeForPostgres(reasons || [])),
         sanitizeForPostgres(metadata || {})
       ]
     );
@@ -15898,7 +15898,7 @@ async function suspendPractice(id, input = {}, user = {}, req = null) {
       [
         row.id,
         suspension.reason,
-        sanitizeForPostgres(suspension.reasons),
+        JSON.stringify(sanitizeForPostgres(suspension.reasons)),
         user?.id || null,
         sanitizeForPostgres({
           suspendedReason: suspension.reason,
@@ -16869,7 +16869,7 @@ async function createApprovalRequest(input = {}, user = {}, req = null) {
           existing.rows[0].id,
           riskScore,
           riskLevel,
-          sanitizeForPostgres(reasons),
+          JSON.stringify(sanitizeForPostgres(reasons)),
           sanitizeForPostgres(quality),
           sanitizeForPostgres(shield),
           input.requester_note || input.requesterNote || ""
@@ -16903,7 +16903,7 @@ async function createApprovalRequest(input = {}, user = {}, req = null) {
         row.negozio_id || store?.id || null,
         riskScore,
         riskLevel,
-        sanitizeForPostgres(reasons),
+        JSON.stringify(sanitizeForPostgres(reasons)),
         sanitizeForPostgres(quality),
         sanitizeForPostgres(shield),
         input.requester_note || input.requesterNote || "",
@@ -17113,7 +17113,7 @@ async function reviewApprovalRequest(id, input = {}, user = {}, req = null, targ
           : targetStatus === "rejected"
             ? "Autorizzazione rifiutata: pratica da correggere."
             : "",
-        sanitizeForPostgres(row.reasons || []),
+        JSON.stringify(sanitizeForPostgres(row.reasons || [])),
         user.id || null
       ]
     );
@@ -19777,9 +19777,9 @@ async function seedAcademyQualificationSystem() {
           scenario.title,
           scenario.description,
           scenario.difficulty,
-          sanitizeForPostgres(scenario.targetRoles),
+          JSON.stringify(sanitizeForPostgres(scenario.targetRoles)),
           sanitizeForPostgres({ demo_only: true, no_real_customer_data: true, watermark: "SIMULAZIONE — DATI NON REALI" }),
-          sanitizeForPostgres(scenario.expectedControls),
+          JSON.stringify(sanitizeForPostgres(scenario.expectedControls)),
           scenario.expectedDecision,
           "Richiedere verifica superiore se emergono criticità.",
           sanitizeForPostgres(scenario.scoringConfig)
@@ -20173,7 +20173,7 @@ async function submitAcademySimulationAttempt(attemptId, input = {}, user = {}) 
       attemptId,
       user.id,
       decision,
-      sanitizeForPostgres(controls),
+      JSON.stringify(sanitizeForPostgres(controls)),
       sanitizeForPostgres(input.documentation || {}),
       sanitizeForPostgres(input.economic_calculation || {}),
       String(input.escalation || ""),
@@ -21508,7 +21508,7 @@ async function upsertGoldMasterQuizzes(course = {}, modules = []) {
         [
           course.id,
           question.question,
-          sanitizeForPostgres(question.options || []),
+          JSON.stringify(sanitizeForPostgres(question.options || [])),
           question.correct_answer,
           sort
         ]
@@ -23858,7 +23858,7 @@ async function saveOperatorTrainingProgress(id, input = {}, user = {}) {
          metadata = $3::jsonb
      WHERE id = $1::uuid
      RETURNING *`,
-    [row.id, sanitizeForPostgres(input.completed_steps || input.completedSteps || []), sanitizeForPostgres(metadata)]
+    [row.id, JSON.stringify(sanitizeForPostgres(input.completed_steps || input.completedSteps || [])), sanitizeForPostgres(metadata)]
   );
   return publicTrainingSession(result.rows[0]);
 }
@@ -23894,8 +23894,8 @@ async function completeOperatorTrainingSession(id, input = {}, user = {}, req = 
       evaluation.passed,
       durationSeconds,
       sanitizeForPostgres(evaluation.feedback),
-      sanitizeForPostgres(evaluation.mistakes),
-      sanitizeForPostgres(evaluation.completed_steps),
+      JSON.stringify(sanitizeForPostgres(evaluation.mistakes)),
+      JSON.stringify(sanitizeForPostgres(evaluation.completed_steps)),
       sanitizeForPostgres({ evaluation: evaluation.sanitized_demo_data, academy_practical_training: true })
     ]
   );
@@ -24477,7 +24477,7 @@ async function saveAct(input, user, req = null) {
       completedAt,
       archivedAt,
       nullIfEmpty(suspension.reason),
-      sanitizeForPostgres(suspension.reasons),
+      JSON.stringify(sanitizeForPostgres(suspension.reasons)),
       suspendedAt,
       suspendedBy,
       null,
@@ -24689,7 +24689,7 @@ async function updateAct(identifier, input, user, req = null) {
     normalizedStatus,
     user?.id || null,
     nullIfEmpty(suspension.reason),
-    sanitizeForPostgres(suspension.reasons)
+    JSON.stringify(sanitizeForPostgres(suspension.reasons))
   ];
   const { result, finalRow } = await withDatabaseTransaction(async (db) => {
     const lockedExisting = await findExisting(existing.id, db, { forUpdate: true });
