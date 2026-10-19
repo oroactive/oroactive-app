@@ -241,6 +241,14 @@ function quoteFromResult(rule = {}, result = {}, source = {}) {
 
 function sourceSpecificQuoteForRule(rule = {}, sourceQuotes = [], strictKeys = false) {
   const expectedKey = String(rule.field_key || "").replace(/^amico_oro_/, "");
+  // The installed Oro Express rules predate the widget's field names.
+  // Keep this mapping explicit so reference/sale or unknown fields cannot match by purity.
+  const oroExpressKey = {
+    gold_24kt: "gold_pure",
+    gold_18kt: "gold_used",
+    silver_999: "silver_pure",
+    silver_used_generic: "silver_used"
+  }[rule.field_key];
   const byFieldKey = sourceQuotes.find((quote) => (
     rule.field_key
     && [
@@ -254,6 +262,7 @@ function sourceSpecificQuoteForRule(rule = {}, sourceQuotes = [], strictKeys = f
       quote.raw_payload?.gruppo_oro_24k_key,
       quote.raw_payload?.pronto_gold_key
     ].filter(Boolean).some((key) => (String(key) === String(rule.field_key) || (String(rule.field_key || "").startsWith("amico_oro_") && String(key) === expectedKey)))
+    || (oroExpressKey && quote.raw_payload?.oro_express_key === oroExpressKey)
   ));
   if (byFieldKey) return byFieldKey;
   if (strictKeys && rule.field_key) return null;

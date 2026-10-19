@@ -51,6 +51,29 @@ test("Oro Express rejects missing, negative, non-finite or malformed widget inpu
   }
 });
 
+test("Oro Express guided and global refresh retain the four configured field keys", async () => {
+  const extractor = createOroExpressExtractor({ resolver, fetchImpl: async (url) => {
+    const u = new URL(url);
+    if (!u.searchParams.has("tipo")) return response("<p>Quotazioni ufficiali</p>");
+    return response(JSON.stringify(u.searchParams.get("tipo").startsWith("oro")
+      ? { valore_oro: 120, variazione: "0" }
+      : { valore_argento: 2, variazione: "0" }));
+  } });
+  const source = { id: 2, name: "Oro Express", website_url: "https://www.oro-express.it" };
+  const fields = [["gold_24kt", "gold", "24kt", 119.88], ["gold_18kt", "gold", "18kt", 90], ["silver_999", "silver", "999", 2], ["silver_used_generic", "silver", "used_generic", 1.6]];
+  const rules = fields.map(([field_key, metal, purity_code]) => ({ field_key, metal, purity_code, page_url: source.website_url, active: true, required: true }));
+  const trainer = createCompetitorExtractionTrainer({ oroExpressExtractor: extractor, openai: poisonAi, resolver, fetchImpl: async () => { throw new Error("must use only the verified widget result"); } });
+  for (const forceAi of [false, true]) {
+    const result = await trainer.testCompetitorExtraction(source, rules, { forceAi });
+    assert.equal(result.status, "success");
+    assert.deepEqual(result.results.map((r) => [r.rule.field_key, r.status, r.value]), fields.map(([key, , , price]) => [key, "found", price]));
+    assert.ok(result.quotes.every((q) => q.ai_extracted === false && q.raw_payload.source_method === "public_widget_json"));
+  }
+  const unknown = await trainer.testCompetitorExtraction(source, [{ ...rules[0], field_key: "unknown_gold_field" }]);
+  assert.equal(unknown.quotes.length, 0);
+  assert.equal(unknown.results[0].status, "not_found");
+});
+
 test("Oro Express preserves the sign of the published variation", async () => {
   const result = await createOroExpressExtractor({ resolver, fetchImpl: async (url) => new URL(url).searchParams.has("tipo") ? response(JSON.stringify({ valore_oro: 100, variazione: "-1" }), "application/json") : response("") }).extractOroExpressQuotes();
   assert.equal(result.quotes.find((q) => q.purity_code === "24kt").price_per_gram, 100.9);
