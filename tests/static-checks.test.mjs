@@ -172,7 +172,7 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(sw, /cache: "no-store"/);
   assert.match(sw, /\/document/i);
   assert.match(sw, /\/pdf\//);
-  assert.match(sw, /const BUILD_ID = "20260908-logo-layout-29"/);
+  assert.match(sw, /const BUILD_ID = "20261019-reliability-30"/);
   assert.match(sw, /const SHELL_CACHE_NAME = `oroactive-shell-\$\{BUILD_ID\}`/);
   assert.match(sw, /const IMAGE_CACHE_NAME = `oroactive-images-\$\{BUILD_ID\}`/);
   assert.match(sw, /self\.skipWaiting\(\)/);
@@ -211,8 +211,8 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(app, /data-app-update-now/);
   assert.match(app, /label: "Verifica aggiornamento app"/);
   assert.match(app, /visibilitychange/);
-  assert.match(index, /meta name="oroactive-build-id" content="20260908-logo-layout-29"/);
-  assert.match(index, /pwa-boot\.js\?v=20260908-logo-layout-29/);
+  assert.match(index, /meta name="oroactive-build-id" content="20261019-reliability-30"/);
+  assert.match(index, /pwa-boot\.js\?v=20261019-reliability-30/);
   assert.match(pwaBoot, /async function verifyBootBuild/);
   assert.match(pwaBoot, /async function resetStalePwa/);
   assert.match(pwaBoot, /fetch\("\/version\.json", \{/);
@@ -220,11 +220,11 @@ test("PWA non cachea API e dati sensibili", async () => {
   assert.match(pwaBoot, /registration\.unregister/);
   assert.match(pwaBoot, /window\.caches\.delete/);
   assert.match(pwaBoot, /serverBuildId !== htmlBuildId/);
-  assert.match(index, /app\.js\?v=20260908-logo-layout-29/);
-  assert.match(index, /shared\/aurum-policy\.js\?v=20260908-logo-layout-29/);
-  assert.match(index, /styles\.css\?v=20260908-logo-layout-29/);
+  assert.match(index, /app\.js\?v=20261019-reliability-30/);
+  assert.match(index, /shared\/aurum-policy\.js\?v=20261019-reliability-30/);
+  assert.match(index, /styles\.css\?v=20261019-reliability-30/);
   assert.match(version, /"ok": true/);
-  assert.match(version, /"assetBuildId": "20260908-logo-layout-29"/);
+  assert.match(version, /"assetBuildId": "20261019-reliability-30"/);
   assert.match(version, /"catalogCount": 197/);
   assert.match(version, /"aurumSalesTopics": 12/);
   assert.match(version, /"aurumSalesMode": "ethical-consultative"/);
@@ -283,7 +283,7 @@ test("splash screen iniziale premium animata e senza ghost screen", async () => 
   assert.match(app, /reportFrontendFailure\("session profile restore", error\)/);
   assert.match(app, /await clearStoredAuthToken\(\)/);
   assert.match(app, /showStartupSplashError/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("sezione OroActive Academy e certificazioni interne presenti", async () => {
@@ -380,7 +380,7 @@ test("sezione OroActive Academy e certificazioni interne presenti", async () => 
   assert.match(schema, /CREATE TABLE IF NOT EXISTS course_badges/);
 });
 
-test("Oro Master e facoltà generata vengono rimossi dal catalogo Academy", async () => {
+test("Oro Master resta nascosto nel catalogo senza cancellare dati al riavvio", async () => {
   const [server, schema, generator, app, index, styles, migration] = await Promise.all([
     file("server.js"),
     file("schema.sql"),
@@ -399,10 +399,9 @@ test("Oro Master e facoltà generata vengono rimossi dal catalogo Academy", asyn
   assert.match(migration, /DELETE FROM courses/);
   assert.match(migration, /ORO-MASTER-001/);
   assert.match(migration, /OroActive Academy/);
-  assert.match(server, /removeGoldMasterCourseAndFaculty/);
-  assert.match(server, /Pulizia Oro Master non completata/);
-  assert.match(server, /DELETE FROM courses WHERE id = ANY/);
-  assert.match(server, /UPDATE courses SET faculty_id = NULL/);
+  const startup = server.match(/async function initDatabase\(\) \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(startup);
+  assert.doesNotMatch(startup, /removeGoldMasterCourseAndFaculty|DELETE FROM courses|DELETE FROM academy_faculties/);
   assert.doesNotMatch(server, /await ensureGoldMasterCourseInCatalog\(\)/);
   assert.doesNotMatch(server, /safeEnsureGoldMasterCourseForCatalog\(\{ forceVisible: true \}\)/);
   assert.doesNotMatch(server, /gold_master_status/);
@@ -530,7 +529,8 @@ test("corsi base PDF OroActive Academy sono consultabili e test finale assegna b
   assert.match(app, /prerequisites_satisfied/);
   assert.match(app, /Percorso Avanzato Compro Oro/);
   assert.match(app, /Vai al corso propedeutico/);
-  assert.match(app, /Esame non disponibile/);
+  assert.match(app, /Esame con responsabile/);
+  assert.doesNotMatch(app, /Esame da configurare|Esame non disponibile/);
   assert.match(app, /Test disponibile tra 48 ore/);
   assert.match(app, /Test finale richiesto per ottenere badge e certificazione/);
   assert.match(app, /Rispondi correttamente ad almeno/);
@@ -2228,8 +2228,8 @@ test("CRM e Backup hanno gestione modifica eliminazione e dettagli", async () =>
   assert.match(schema, /idx_backups_status/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS backups/);
   assert.match(migration, /idx_backup_logs_backup_id/);
-  assert.match(nixpacks, /postgresql_16/);
-  assert.match(dockerfile, /postgresql16-client/);
+  assert.match(nixpacks, /postgresql_18/);
+  assert.match(dockerfile, /postgresql18-client/);
 });
 
 test("quotazioni utenti copia cliente e refresh app aggiornati", async () => {
@@ -3492,7 +3492,7 @@ test("workflow autorizzazioni blocca pratiche rischiose e traccia Audit Trail", 
   assert.match(app, /In attesa autorizzazione/);
   assert.match(styles, /\.approvals-table/);
   assert.match(styles, /\.approval-status\.approval-approved/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("notifiche interne hanno schema API UI e polling leggero", async () => {
@@ -3551,7 +3551,7 @@ test("notifiche interne hanno schema API UI e polling leggero", async () => {
   assert.match(styles, /\.notification-dropdown/);
   assert.match(styles, /\.notification-dropdown\.is-viewport-anchored/);
   assert.match(styles, /\.notifications-table/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", async () => {
@@ -3603,7 +3603,7 @@ test("pratiche sospese hanno schema API UI e non contaminano elenco giacenza", a
   assert.match(app, /\.filter\(\(act\) => isCompletedWorkflowStatus\(act\.status\)\)/);
   assert.match(styles, /\.suspended-practices-table/);
   assert.match(styles, /\.status-suspended/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("nuovo atto si apre senza attendere la numerazione remota", async () => {
@@ -3615,7 +3615,7 @@ test("nuovo atto si apre senza attendere la numerazione remota", async () => {
   const metaEnd = app.indexOf("async function updatePracticeNumber", metaStart);
   const metaBlock = app.slice(metaStart, metaEnd);
 
-  assert.match(enterBlock, /route\.screen === "practice"[\s\S]*setScreen\(route\.screen\);[\s\S]*clearPracticeForFreshStart\(\{ deferPracticeNumber: true \}\)/);
+  assert.match(enterBlock, /route\.screen === "practice"[\s\S]*setScreen\(section\);[\s\S]*clearPracticeForFreshStart\(\{ deferPracticeNumber: true \}\)/);
   assert.match(metaBlock, /deferPracticeNumber/);
   assert.match(metaBlock, /In assegnazione/);
   assert.match(app, /if \(!fieldValue\("#practiceNumber"\)\) await updatePracticeNumber\(\)/);
@@ -3692,9 +3692,9 @@ test("qualita generale protegge click doppi messaggi tecnici e caricamenti sezio
   assert.match(errorBlock, /const safeCode = publicErrorCode\(error\);[\s\S]*if \(safeCode\) payload\.code = safeCode/);
   assert.doesNotMatch(errorBlock, /payload\.code\s*=\s*error\.code/);
   assert.doesNotMatch(server, /UPDATE PAYLOAD|ATTO ID/);
-  assert.match(index, /app\.js\?v=20260908-logo-layout-29/);
-  assert.match(index, /styles\.css\?v=20260908-logo-layout-29/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(index, /app\.js\?v=20261019-reliability-30/);
+  assert.match(index, /styles\.css\?v=20261019-reliability-30/);
+  assert.match(worker, /20261019-reliability-30/);
   const sectionIds = new Set([...index.matchAll(/<section[^>]+id="([^"]+)"/g)].map((match) => match[1]));
   const menuTargets = [...new Set([...index.matchAll(/data-section="([^"]+)"/g)].map((match) => match[1]))];
   assert.deepEqual(menuTargets.filter((target) => !sectionIds.has(target)), []);
@@ -3740,8 +3740,8 @@ test("design system OroActive centralizza tema componenti e stati UI", async () 
   assert.match(styles, /\.archive-header \.muted,[\s\S]*\.archive-header p:not\(\.eyebrow\)[\s\S]*rgba\(255, 255, 255, 0\.82\)/);
   assert.match(styles, /\.archive-header label,[\s\S]*\.founder-report-actions label,[\s\S]*\.store-health-filters label[\s\S]*rgba\(255, 255, 255, 0\.9\)/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*\.archive-header,[\s\S]*padding: 20px[\s\S]*font-size: 28px/);
-  assert.match(index, /styles\.css\?v=20260908-logo-layout-29/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(index, /styles\.css\?v=20261019-reliability-30/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("menu principale usa macroaree centralizzate e permessi ruolo", async () => {
@@ -3800,7 +3800,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(app, /inventory: \{ screen: "fusion", fusionView: "stock" \}/);
   assert.match(app, /quotes: \{ screen: "quotazione" \}/);
   assert.match(app, /academy: \{ screen: "training" \}/);
-  assert.match(app, /async function enterSectionFromMainMenu\(section\)[\s\S]*const route = resolveSectionRoute\(section\)[\s\S]*setScreen\(route\.screen\)/);
+  assert.match(app, /async function enterSectionFromMainMenu\(section\)[\s\S]*const route = resolveSectionRoute\(section\)[\s\S]*setScreen\(section\)/);
   assert.match(app, /async function safeStartModule\(name, fn\)/);
   assert.match(app, /function startBootWatchdog\(\)/);
   assert.match(app, /await bootAuthenticatedApp\("login"\)/);
@@ -3897,7 +3897,7 @@ test("menu principale usa macroaree centralizzate e permessi ruolo", async () =>
   assert.match(styles, /\.main-menu-quick-actions/);
   assert.match(styles, /\.main-menu-search/);
   assert.match(styles, /\.main-menu-empty/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("Founder Daily Report ha backend UI PDF audit e conteggi sicuri", async () => {
@@ -4001,7 +4001,7 @@ test("Store Health Score ha schema API UI dashboard e report Founder", async () 
   assert.match(styles, /\.store-health-card/);
   assert.match(styles, /\.store-health-score/);
   assert.match(styles, /\.store-health-detail/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("Customer Trust Pack genera PDF protetto solo per atti completati", async () => {
@@ -4052,9 +4052,9 @@ test("Customer Trust Pack genera PDF protetto solo per atti completati", async (
   assert.match(app, /Customer Trust Pack può essere generato solo per pratiche completate o archiviate/);
   assert.match(styles, /\.trust-pack-panel/);
   assert.match(styles, /\.crm-trust-pack-list/);
-  assert.match(index, /app\.js\?v=20260908-logo-layout-29/);
-  assert.match(index, /styles\.css\?v=20260908-logo-layout-29/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(index, /app\.js\?v=20261019-reliability-30/);
+  assert.match(index, /styles\.css\?v=20261019-reliability-30/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("Centro Privacy OroActive espone policy, presa visione e riferimenti cliente", async () => {
@@ -4076,7 +4076,7 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(migration, /privacy_policy_versions/);
   assert.match(migration, /privacy_policy_acceptances/);
 
-  assert.match(server, /const privacyPolicyVersion = "v1\.1"/);
+  assert.match(server, /const privacyPolicyVersion = "v1\.2"/);
   assert.match(server, /async function bootstrapPrivacyPolicy/);
   assert.match(server, /function writePrivacyPolicyPdf/);
   assert.match(server, /app\.get\("\/api\/privacy-policy\/current"/);
@@ -4111,9 +4111,9 @@ test("Centro Privacy OroActive espone policy, presa visione e riferimenti client
   assert.match(styles, /\.privacy-center-layout/);
   assert.match(styles, /\.privacy-accordion/);
   assert.match(styles, /\.customer-privacy-box/);
-  assert.match(index, /app\.js\?v=20260908-logo-layout-29/);
-  assert.match(index, /styles\.css\?v=20260908-logo-layout-29/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(index, /app\.js\?v=20261019-reliability-30/);
+  assert.match(index, /styles\.css\?v=20261019-reliability-30/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("Training Operatore simula atti demo senza effetti operativi reali", async () => {
@@ -4191,7 +4191,7 @@ test("Training Operatore simula atti demo senza effetti operativi reali", async 
   assert.match(styles, /\.training-mode-badge/);
   assert.match(styles, /\.operator-training-live/);
   assert.match(styles, /\.operator-training-result\.passed/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
 });
 
 test("app ripulita da dipendenze e bridge Capacitor", async () => {
@@ -4308,7 +4308,7 @@ test("Aurum Blocks arcade formativo è integrato in Formazione senza dati operat
   assert.match(styles, /@keyframes aurumLineGoldClear/);
   assert.match(styles, /prefers-reduced-motion: reduce/);
   assert.match(styles, /\.metal-oro24/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
   assert.doesNotMatch(`${index}\n${app}\n${styles}`, /Tetris/i);
   const leaderboardBlock = server.slice(server.indexOf("async function listAurumBlocksLeaderboard"), server.indexOf("async function listAurumBlocksBadges"));
   assert.doesNotMatch(leaderboardBlock, /s\.user_id\s*=/);
@@ -4352,7 +4352,7 @@ test("Gaming OroActive contiene solo Aurum Blocks", async () => {
   assert.match(migration, /'aurum_blocks', 'Aurum Blocks'/);
   assert.match(styles, /\.gaming-game-card/);
   assert.match(styles, /\.gaming-overview-grid/);
-  assert.match(worker, /20260908-logo-layout-29/);
+  assert.match(worker, /20261019-reliability-30/);
   assert.doesNotMatch(
     `${index}\n${app}\n${server}\n${schema}\n${migration}\n${styles}`,
     /La corsa all['’]oro|corsa all['’]oro|gold-run|goldRun|GOLD_RUN|gaming_gold_run_scores|gaming\/gold-run|Runner OroActive|Christian Runner|Founder Runner|Michele il Re|Mirko il Dio|Falsario Supremo|Super Mario|Nintendo/i
@@ -4418,7 +4418,7 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(dockerfile, /ARG GIT_COMMIT/);
   assert.match(dockerfile, /ARG SOURCE_COMMIT/);
   assert.match(dockerfile, /ARG SOURCE_BRANCH/);
-  assert.match(dockerfile, /postgresql16-client git/);
+  assert.match(dockerfile, /postgresql18-client git/);
   assert.match(dockerfile, /OROACTIVE_GIT_COMMIT/);
   assert.match(dockerfile, /OROACTIVE_BUILD_TIME/);
   assert.match(dockerfile, /OROACTIVE_BUILD_NUMBER/);
@@ -4484,7 +4484,7 @@ test("deploy Coolify e aggiornamento PWA espongono versione e cache sicura", asy
   assert.match(index, /data-user-check-update/);
   assert.match(index, /id="appUpdateBanner"/);
   assert.match(index, /Aggiorna ora/);
-  assert.match(index, /pwa-boot\.js\?v=20260908-logo-layout-29/);
+  assert.match(index, /pwa-boot\.js\?v=20261019-reliability-30/);
   assert.match(pwaBoot, /window\.__OROACTIVE_BOOT_BUILD_ID__/);
   assert.match(pwaBoot, /resetStalePwa/);
   assert.doesNotMatch(index, /data-founder-footer-build|app-footer-build/);

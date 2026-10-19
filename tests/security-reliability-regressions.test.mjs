@@ -88,7 +88,10 @@ test("logout e cambio password revocano i token precedenti", () => {
   const resetBlock = app.slice(resetStart, resetEnd);
   assert.match(resetBlock, /rotateSessionGeneration\(\)/);
   assert.match(resetBlock, /captureFiles\.forEach\(revokeCaptureUrl\)/);
-  assert.match(resetBlock, /appShell\?\.querySelectorAll\("input, textarea"\)/);
+  assert.match(resetBlock, /resetAuthenticatedFormFields\(appShell\)/);
+  const formReset = app.slice(app.indexOf("function resetAuthenticatedFormFields"), resetStart);
+  assert.match(formReset, /root\?\.querySelectorAll\("input, textarea"\)/);
+  assert.match(formReset, /field\.value = field\.defaultValue \|\| ""/);
   assert.match(resetBlock, /demoActs\.splice\(0, demoActs\.length\)/);
   assert.match(app, /async function expireSessionForInactivity[\s\S]*archiveCurrentPractice\("Bozza"[\s\S]*\/auth\/logout/);
   assert.match(server, /code: "USER_INACTIVE"/);

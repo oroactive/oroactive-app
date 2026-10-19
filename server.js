@@ -233,7 +233,7 @@ async function readGitCommitFromDisk() {
       return line ? line.split(" ")[0] : "";
     }
   } catch {
-    return "";
+    return readGitValue(["rev-parse", "HEAD"]);
   }
 }
 
@@ -546,8 +546,8 @@ const trustPackDirectory = process.env.CUSTOMER_TRUST_PACK_DIR || path.join(priv
 const requirePersistentUploadStorage = isProduction && String(process.env.REQUIRE_PERSISTENT_UPLOAD_STORAGE || "true").toLowerCase() !== "false";
 const requirePersistentBackupStorage = isProduction && String(process.env.REQUIRE_PERSISTENT_BACKUP_STORAGE || "true").toLowerCase() !== "false";
 const oroactiveSiteUrl = process.env.OROACTIVE_SITE_URL || "https://www.oroactive.it";
-const privacyPolicyVersion = "v1.1";
-const privacyPolicyUpdatedAt = "2026-07-30";
+const privacyPolicyVersion = "v1.2";
+const privacyPolicyUpdatedAt = "2026-10-19";
 const pgDumpPath = process.env.PG_DUMP_PATH || "pg_dump";
 const pgRestorePath = process.env.PG_RESTORE_PATH || "pg_restore";
 const backupIntervalMs = 24 * 60 * 60 * 1000;
@@ -654,22 +654,22 @@ const defaultPrivacyPolicyContent = {
   subtitle: "Informativa ai sensi del Regolamento UE 2016/679 (GDPR) e della normativa applicabile in materia di protezione dei dati personali.",
   note: "Questa informativa descrive come OroActive tratta i dati personali all'interno dell'app gestionale e nei processi collegati agli atti di vendita, alla gestione clienti, alla formazione, alla sicurezza operativa e alle funzionalità AI.",
   controller: {
-    company_name: "[INSERIRE RAGIONE SOCIALE]",
-    legal_address: "[INSERIRE INDIRIZZO]",
-    privacy_email: "[INSERIRE EMAIL PRIVACY]",
-    pec: "[INSERIRE PEC]",
-    vat: "[INSERIRE DATI]",
-    status: "Da completare"
+    company_name: "OroActive Cassano Magnago Srl",
+    legal_address: "viale Generale Armando Diaz, 9, Busto Arsizio",
+    privacy_email: "privacy@oroactive.it",
+    pec: "oroactive.cassanomsrl@pec.it",
+    vat: "04168610121",
+    status: "Dati del titolare aggiornati"
   },
   sections: [
     {
       id: "utenti-app",
       tab: "Informativa utenti app",
       title: "1. Titolare del trattamento",
-      badge: "Da completare",
+      badge: "Dati del titolare",
       paragraphs: [
-        "Il Titolare del trattamento è [INSERIRE RAGIONE SOCIALE], con sede legale in [INSERIRE INDIRIZZO]. Email privacy: [INSERIRE EMAIL PRIVACY]. PEC: [INSERIRE PEC]. P.IVA / C.F.: [INSERIRE DATI].",
-        "I dati sopra indicati devono essere completati dal Founder o dal consulente privacy prima dell'utilizzo definitivo."
+        "Il Titolare del trattamento è OroActive Cassano Magnago Srl, con sede legale in viale Generale Armando Diaz, 9, Busto Arsizio. Email privacy: privacy@oroactive.it. PEC: oroactive.cassanomsrl@pec.it. P.IVA: 04168610121.",
+        "Il Titolare può essere contattato ai recapiti sopra indicati per le richieste relative ai dati personali."
       ]
     },
     {
@@ -740,7 +740,7 @@ const defaultPrivacyPolicyContent = {
       id: "diritti",
       tab: "Diritti privacy",
       title: "10. Diritti privacy",
-      paragraphs: ["L'interessato può esercitare, nei limiti previsti dalla normativa, i diritti di accesso, rettifica, cancellazione, limitazione del trattamento, opposizione, portabilità ove applicabile, revoca del consenso ove il trattamento sia basato sul consenso e reclamo all'Autorità Garante per la protezione dei dati personali.", "Per esercitare i diritti: Email [INSERIRE EMAIL PRIVACY] - PEC [INSERIRE PEC]."]
+      paragraphs: ["L'interessato può esercitare, nei limiti previsti dalla normativa, i diritti di accesso, rettifica, cancellazione, limitazione del trattamento, opposizione, portabilità ove applicabile, revoca del consenso ove il trattamento sia basato sul consenso e reclamo all'Autorità Garante per la protezione dei dati personali.", "Per esercitare i diritti: Email privacy@oroactive.it - PEC oroactive.cassanomsrl@pec.it."]
     },
     {
       id: "cookie-pwa",
@@ -6342,7 +6342,7 @@ async function finishAiExtractionRun(runId, updates = {}) {
             metadata = COALESCE(metadata, '{}'::jsonb) || $8::jsonb
       WHERE id = $9::bigint
       RETURNING *`,
-    [
+    sanitizeForPostgres([
       updates.status || "failed",
       Number(updates.sources_success || 0),
       Number(updates.sources_failed || 0),
@@ -6352,7 +6352,7 @@ async function finishAiExtractionRun(runId, updates = {}) {
       String(updates.error_message || "").slice(0, 1200),
       sanitizeForPostgres(updates.metadata || {}),
       runId
-    ]
+    ])
   );
   return result.rows[0] || null;
 }
@@ -6365,7 +6365,7 @@ async function insertAiExtractionPageLog(runId, source = {}, page = {}) {
       $1::bigint,$2::bigint,$3::text,$4::text,$5::text,$6::int,$7::text,$8::jsonb,NOW()
     )
     RETURNING *`,
-    [
+    sanitizeForPostgres([
       runId || null,
       source.id || null,
       source.name || "",
@@ -6374,7 +6374,7 @@ async function insertAiExtractionPageLog(runId, source = {}, page = {}) {
       Number(page.quotes_found || 0),
       String(page.error_message || "").slice(0, 1200),
       sanitizeForPostgres(page.ai_response || {})
-    ]
+    ])
   );
   return publicAiExtractionPageLog(result.rows[0]);
 }
@@ -6584,7 +6584,6 @@ async function runAiCompetitorQuoteExtraction(options = {}) {
     const summary = await calculateCompetitorMarketSummary({ currency: goldPriceBaseCurrency }).catch(() => null);
     competitorAiExtractionState.lastStatus = finalStatus;
     competitorAiExtractionState.lastSummary = summary;
-    competitorAiExtractionState.nextRunAt = new Date(Date.now() + competitorAiExtractionIntervalMinutes * 60 * 1000).toISOString();
     void writeAuditLog({
       req: options.req,
       user: options.user,
@@ -6613,8 +6612,18 @@ async function runAiCompetitorQuoteExtraction(options = {}) {
     }
     throw error;
   } finally {
+    competitorAiExtractionState.nextRunAt = nextCompetitorAiRunAt();
     competitorAiExtractionState.running = false;
   }
+}
+
+function nextCompetitorAiRunAt(now = Date.now()) {
+  if (!competitorAiExtractionState.timer || !competitorAiExtractionState.autoEnabled) return null;
+  const interval = competitorAiExtractionIntervalMinutes * 60 * 1000;
+  let scheduled = Date.parse(competitorAiExtractionState.nextRunAt);
+  if (!Number.isFinite(scheduled)) scheduled = now + interval;
+  if (scheduled <= now) scheduled += (Math.floor((now - scheduled) / interval) + 1) * interval;
+  return new Date(scheduled).toISOString();
 }
 
 function competitorAiExtractionPublicStatus() {
@@ -7050,9 +7059,10 @@ function nullIfEmpty(value) {
 function sanitizeForPostgres(value) {
   if (value === undefined) return null;
   if (value === null) return null;
+  if (typeof value === "string") return value.replace(/\0/g, "").toWellFormed();
   if (Array.isArray(value)) return value.map((item) => sanitizeForPostgres(item));
   if (value && typeof value === "object" && !(value instanceof Date)) {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizeForPostgres(item)]));
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [sanitizeForPostgres(key), sanitizeForPostgres(item)]));
   }
   return value;
 }
@@ -10571,17 +10581,30 @@ function publicPrivacyAcceptance(row = {}) {
 }
 
 async function bootstrapPrivacyPolicy() {
-  await pool.query(
-    `INSERT INTO privacy_policy_versions (version, title, content, is_active, created_at)
-     VALUES ($1::text, $2::text, $3::jsonb, TRUE, NOW())
-     ON CONFLICT (version) DO UPDATE
-     SET title = EXCLUDED.title,
-         content = EXCLUDED.content`,
-    [privacyPolicyVersion, defaultPrivacyPolicyContent.title, sanitizeForPostgres(defaultPrivacyPolicyContent)]
-  );
-  const active = await pool.query("SELECT id FROM privacy_policy_versions WHERE is_active = TRUE LIMIT 1");
-  if (!active.rowCount) {
-    await pool.query("UPDATE privacy_policy_versions SET is_active = TRUE WHERE version = $1::text", [privacyPolicyVersion]);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('oroactive-privacy-policy-bootstrap'))");
+    const active = await client.query("SELECT version FROM privacy_policy_versions WHERE is_active = TRUE FOR UPDATE");
+    // Published versions and their acceptances are immutable. Keep custom active policies.
+    await client.query(
+      `INSERT INTO privacy_policy_versions (version, title, content, is_active, created_at)
+       VALUES ($1::text, $2::text, $3::jsonb, FALSE, NOW())
+       ON CONFLICT (version) DO NOTHING`,
+      [privacyPolicyVersion, defaultPrivacyPolicyContent.title, sanitizeForPostgres(defaultPrivacyPolicyContent)]
+    );
+    if (active.rows.every((row) => ["v1.0", "v1.1", privacyPolicyVersion].includes(row.version))) {
+      await client.query(
+        "UPDATE privacy_policy_versions SET is_active = (version = $1::text) WHERE version IN ('v1.0', 'v1.1', $1::text)",
+        [privacyPolicyVersion]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -10778,11 +10801,7 @@ async function initDatabase() {
   await bootstrapPrivacyPolicy();
   await seedDefaultCompetitorSources();
   await seedDefaultCompetitorExtractionRules();
-  try {
-    await removeGoldMasterCourseAndFaculty();
-  } catch (error) {
-    console.warn("Pulizia Oro Master non completata:", error.message);
-  }
+  // Existing Academy courses are retained across application restarts.
 }
 
 function backupTimestamp(date = new Date()) {
@@ -10924,12 +10943,37 @@ async function addBackupLog(backupId, level, message, metadata = {}) {
   ).catch((error) => console.error("BACKUP LOG ERROR", error.message || error));
 }
 
+function postgresToolMajorVersion(output = "") {
+  const match = String(output).match(/\(PostgreSQL\)\s+(\d+)(?:\.\d+)?/);
+  return match ? Number(match[1]) : 0;
+}
+
+async function assertPostgresBackupTools(env) {
+  const [server, dump, restore] = await Promise.all([
+    pool.query("SHOW server_version_num"),
+    execFileAsync(pgDumpPath, ["--version"], { env, timeout: 10000, maxBuffer: 4096 }),
+    execFileAsync(pgRestorePath, ["--version"], { env, timeout: 10000, maxBuffer: 4096 })
+  ]);
+  const serverMajor = Math.floor(Number(server.rows[0]?.server_version_num) / 10000);
+  const dumpMajor = postgresToolMajorVersion(dump.stdout);
+  const restoreMajor = postgresToolMajorVersion(restore.stdout);
+  if (!serverMajor || !dumpMajor || !restoreMajor || dumpMajor < serverMajor || restoreMajor < dumpMajor) {
+    const error = new Error(`Strumenti backup incompatibili: PostgreSQL ${serverMajor || "?"}, pg_dump ${dumpMajor || "?"}, pg_restore ${restoreMajor || "?"}. Installare client PostgreSQL compatibili prima di creare il backup.`);
+    error.code = "BACKUP_TOOL_VERSION_MISMATCH";
+    error.status = 503;
+    throw error;
+  }
+  return { server_major: serverMajor, pg_dump_major: dumpMajor, pg_restore_major: restoreMajor };
+}
+
 async function createPostgresBackup(outputPath, backupId = null) {
   if (!process.env.DATABASE_URL) {
     throw new Error("Backup fallito: configurazione database non disponibile.");
   }
   const env = postgresToolEnv();
   try {
+    const versions = await assertPostgresBackupTools(env);
+    if (backupId) await addBackupLog(backupId, "info", "Compatibilità strumenti PostgreSQL verificata", versions);
     await execFileAsync(pgDumpPath, ["-Fc", "-f", outputPath, "--no-owner", "--no-privileges"], {
       env,
       timeout: 20 * 60 * 1000,
@@ -11093,7 +11137,7 @@ async function recoverInterruptedBackupRows(db) {
              )
        WHERE id = $1::uuid
          AND status = 'running'`,
-      [row.id, sanitizeForPostgres(candidates)]
+      [row.id, JSON.stringify(sanitizeForPostgres(candidates))]
     );
     let cleanupComplete = true;
     for (const candidate of candidates) {
@@ -12909,7 +12953,7 @@ async function dashboardKpis(user = {}) {
   });
   const storeHealth = await storeHealthNetworkSummary(user).catch((error) => {
     console.error("STORE HEALTH SUMMARY ERROR", error);
-    return { average_score: 0, best_store: null, critical_store: null, alert_count: 0, stores: [] };
+    return { available: false, average_score: null, best_store: null, critical_store: null, alert_count: null, stores: [] };
   });
   return {
     kpi: {
@@ -13061,13 +13105,14 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
     error.status = 404;
     throw error;
   }
+  const queryHealth = async (sql, values = []) => (await pool.query(sql, values)).rows;
   const range = storeHealthDateRange(dateRange);
   const values = [];
   const storeCondition = storeHealthStoreCondition("a", values, store);
   values.push(range.date_from, range.date_to);
   const fromIndex = values.length - 1;
   const toIndex = values.length;
-  const completedRows = await reportQuery(
+  const completedRows = await queryHealth(
     `SELECT a.*, u.username AS operator_username, u.nome AS operator_nome, u.cognome AS operator_cognome
      FROM ${actsTable} a
      LEFT JOIN utenti u ON u.id = a.operatore_id
@@ -13097,7 +13142,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
   }, {});
 
   const [suspendedRows, deletedRows, qualityRows, riskRows, shieldAlertRows, approvalRows, fusionRows, operatorRows, auditRows, backupRows, academyRows] = await Promise.all([
-    reportQuery(
+    queryHealth(
       `SELECT COUNT(*)::int AS suspended_open,
               COUNT(*) FILTER (WHERE a.suspended_at < NOW() - INTERVAL '48 hours')::int AS suspended_over_48h,
               COUNT(*) FILTER (WHERE COALESCE(a.status, '') ILIKE 'pending_approval' OR COALESCE(a.status, '') ILIKE 'in_attesa_autorizzazione')::int AS pending_authorization
@@ -13106,7 +13151,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
          AND ${storeHealthStoreCondition("a", [], store).replace(/\$1/g, "$1").replace(/\$2/g, "$2")}`,
       [store.id, store.nome]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT COUNT(*)::int AS deleted_acts
        FROM ${actsTable} a
        WHERE a.deleted_at >= $3::date
@@ -13114,7 +13159,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
          AND ${storeHealthStoreCondition("a", [], store).replace(/\$1/g, "$1").replace(/\$2/g, "$2")}`,
       [store.id, store.nome, range.date_from, range.date_to]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT
          COUNT(*) FILTER (WHERE LOWER(COALESCE(qc.status, '')) IN ('non_completabile','failed','error'))::int AS failed_checks,
          COUNT(*) FILTER (WHERE LOWER(COALESCE(qc.status, '')) IN ('attenzione','warning'))::int AS warning_checks,
@@ -13126,7 +13171,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
          AND ${storeHealthStoreCondition("a", [], store).replace(/\$1/g, "$1").replace(/\$2/g, "$2")}`,
       [store.id, store.nome, range.date_from, range.date_to]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT
          COALESCE(ROUND(AVG(s.score), 1), 0) AS average_score,
          COUNT(*) FILTER (WHERE LOWER(s.risk_level) IN ('alto','high'))::int AS high_alerts,
@@ -13138,7 +13183,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
          AND ${storeHealthStoreCondition("a", [], store).replace(/\$1/g, "$1").replace(/\$2/g, "$2")}`,
       [store.id, store.nome, range.date_from, range.date_to]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT COUNT(*)::int AS open_alerts,
               COUNT(*) FILTER (WHERE severity IN ('danger','critical') OR severity ILIKE 'alto' OR severity ILIKE 'critico')::int AS severe_alerts
        FROM aurum_shield_alerts asa
@@ -13148,7 +13193,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
          AND COALESCE(asa.status, 'open') <> 'resolved'`,
       [store.id, range.date_from, range.date_to]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT
          COUNT(*) FILTER (WHERE ar.created_at >= $2::date AND ar.created_at < ($3::date + INTERVAL '1 day'))::int AS requested,
          COUNT(*) FILTER (WHERE ar.status = 'rejected' AND ar.reviewed_at >= $2::date AND ar.reviewed_at < ($3::date + INTERVAL '1 day'))::int AS rejected,
@@ -13157,7 +13202,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
        WHERE ar.store_id = $1::bigint`,
       [store.id, range.date_from, range.date_to]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT COUNT(*)::int AS lots_total,
               COUNT(*) FILTER (WHERE COALESCE(stato, '') ILIKE 'conclus%' OR COALESCE(stato, '') ILIKE 'completed')::int AS lots_completed,
               COUNT(*) FILTER (WHERE NOT (COALESCE(stato, '') ILIKE 'conclus%' OR COALESCE(stato, '') ILIKE 'completed'))::int AS lots_open,
@@ -13168,14 +13213,14 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
          AND (negozio_id = $1::bigint OR (negozio_id IS NULL AND negozio = $2::text))`,
       [store.id, store.nome, range.date_from, range.date_to]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT COUNT(*)::int AS active_operators
        FROM utenti
        WHERE COALESCE(attivo, TRUE) = TRUE
          AND (negozio_id = $1::bigint OR (negozio_id IS NULL AND negozio = $2::text))`,
       [store.id, store.nome]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT action, COUNT(*)::int AS total
        FROM audit_logs
        WHERE created_at >= $3::date
@@ -13184,7 +13229,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
        GROUP BY action`,
       [store.id, store.nome, range.date_from, range.date_to]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT *
        FROM backups
        WHERE (store_id IS NULL OR store_id = $1::bigint)
@@ -13192,7 +13237,7 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
        LIMIT 5`,
       [store.id]
     ),
-    reportQuery(
+    queryHealth(
       `SELECT
          COALESCE(ROUND(AVG(COALESCE(p.percentuale, 0)), 1), 0) AS average_progress,
          COUNT(DISTINCT u.id) FILTER (WHERE COALESCE(p.percentuale, 0) < 60)::int AS operators_below_60,
@@ -13338,10 +13383,10 @@ async function calculateStoreHealthScore(storeId, dateRange = {}, options = {}) 
       status.status,
       range.date_from,
       range.date_to,
-      sanitizeForPostgres(factors),
-      sanitizeForPostgres(penalties),
-      sanitizeForPostgres(bonuses),
-      sanitizeForPostgres(recommendations)
+      JSON.stringify(sanitizeForPostgres(factors)),
+      JSON.stringify(sanitizeForPostgres(penalties)),
+      JSON.stringify(sanitizeForPostgres(bonuses)),
+      JSON.stringify(sanitizeForPostgres(recommendations))
     ]
   );
   return publicStoreHealthScore(saved.rows[0], store);
@@ -13432,7 +13477,7 @@ async function storeHealthHistory(storeId, user = {}, limit = 30) {
 
 async function storeHealthNetworkSummary(user = {}) {
   if (!canViewStoreHealth(user)) return { average_score: 0, best_store: null, critical_store: null, alert_count: 0, stores: [] };
-  const stores = await listStoreHealthScores({ period: "last_7" }, user).catch(() => []);
+  const stores = await listStoreHealthScores({ period: "last_7" }, user);
   if (!stores.length) return { average_score: 0, best_store: null, critical_store: null, alert_count: 0, stores: [] };
   const average = stores.reduce((sum, row) => sum + Number(row.score || 0), 0) / stores.length;
   const critical = [...stores].sort((a, b) => a.score - b.score)[0] || null;
@@ -18718,24 +18763,24 @@ function academyGemMaterialValue(material = {}, column = "", founderId = null) {
 }
 
 async function seedAcademyGemologicalLab() {
+  return withDatabaseTransaction(seedAcademyGemologicalLabInTransaction);
+}
+
+async function seedAcademyGemologicalLabInTransaction(db) {
+  await db.query("SELECT pg_advisory_xact_lock(hashtext('academy-gem-catalog-seed'))");
   const invalidMaterials = academyGemSeedValidation().filter((entry) => !entry.valid);
   if (invalidMaterials.length) {
     throw new Error(`Materiali gemmologici incompleti: ${invalidMaterials.map((entry) => entry.slug).join(", ")}`);
   }
   for (const tool of ACADEMY_GEM_TOOLS) {
-    await pool.query(
+    await db.query(
       `INSERT INTO academy_gem_tools (name, description, usage, limitations, available)
        VALUES ($1::text, $2::text, $3::text, $4::text, TRUE)
-       ON CONFLICT (name)
-       DO UPDATE SET description = EXCLUDED.description,
-                     usage = EXCLUDED.usage,
-                     limitations = EXCLUDED.limitations,
-                     available = TRUE,
-                     updated_at = NOW()`,
+       ON CONFLICT (name) DO NOTHING`,
       [tool.name, tool.description, tool.usage, tool.limitations]
     );
   }
-  const founderId = (await pool.query(
+  const founderId = (await db.query(
     "SELECT id FROM utenti WHERE LOWER(ruolo) = 'founder' ORDER BY id ASC LIMIT 1"
   )).rows[0]?.id || null;
   const mediaManifest = JSON.parse(await fs.readFile(
@@ -18743,35 +18788,25 @@ async function seedAcademyGemologicalLab() {
     "utf8"
   ));
   const mediaBySlug = new Map((mediaManifest.materials || []).map((entry) => [entry.slug, entry.media || []]));
-  const toolsByName = new Map((await pool.query("SELECT id, name FROM academy_gem_tools")).rows.map((tool) => [tool.name, tool.id]));
+  const toolsByName = new Map((await db.query("SELECT id, name FROM academy_gem_tools")).rows.map((tool) => [tool.name, tool.id]));
   const placeholders = ACADEMY_GEM_MATERIAL_COLUMNS.map((_, index) => `$${index + 1}`).join(", ");
-  const updateColumns = ACADEMY_GEM_MATERIAL_COLUMNS
-    .filter((column) => !["slug", "created_by"].includes(column))
-    .map((column) => `${column} = EXCLUDED.${column}`)
-    .join(", ");
   for (const material of ACADEMY_GEM_MATERIALS) {
     const values = ACADEMY_GEM_MATERIAL_COLUMNS.map((column) => academyGemMaterialValue(material, column, founderId));
-    const materialRow = (await pool.query(
+    const materialRow = (await db.query(
       `INSERT INTO academy_gem_materials (${ACADEMY_GEM_MATERIAL_COLUMNS.join(", ")})
        VALUES (${placeholders})
-       ON CONFLICT (slug)
-       DO UPDATE SET ${updateColumns},
-                     updated_at = NOW()
+       ON CONFLICT (slug) DO NOTHING
        RETURNING id`,
       values
     )).rows[0];
+    // Existing records and their reviewed content belong to the user.
+    if (!materialRow) continue;
     const materialId = materialRow.id;
-
-    await pool.query(
-      `DELETE FROM academy_gem_media
-       WHERE material_id = $1::bigint AND source IN ('Wikimedia Commons', 'OroActive AI Studio')`,
-      [materialId]
-    );
     const platePath = path.join(__dirname, "assets", "academy", "gems", "plates", `${material.slug}-four-view.jpg`);
     let mediaSortOrder = 0;
     try {
       await fs.access(platePath);
-      await pool.query(
+      await db.query(
         `INSERT INTO academy_gem_media
           (material_id, type, title, caption, observation_notes, url, source, author, license,
            rights_status, original_width, original_height, view_count, sort_order, active, created_by)
@@ -18793,7 +18828,7 @@ async function seedAcademyGemologicalLab() {
       // Per gli altri materiali vengono usate fotografie Commons con licenza documentata.
     }
     for (const media of mediaBySlug.get(material.slug) || []) {
-      await pool.query(
+      await db.query(
         `INSERT INTO academy_gem_media
           (material_id, type, title, caption, observation_notes, url, large_url, source, author, license,
            rights_status, original_width, original_height, view_count, sort_order, active, created_by)
@@ -18816,9 +18851,8 @@ async function seedAcademyGemologicalLab() {
       );
     }
 
-    await pool.query("DELETE FROM academy_gem_sources WHERE material_id = $1::bigint", [materialId]);
     for (const source of material.sources || []) {
-      await pool.query(
+      await db.query(
         `INSERT INTO academy_gem_sources
           (material_id, title, organization, url, accessed_on, note, reviewer_id)
          VALUES ($1::bigint, $2::text, $3::text, $4::text, $5::date, $6::text, $7::bigint)`,
@@ -18826,11 +18860,10 @@ async function seedAcademyGemologicalLab() {
       );
     }
 
-    await pool.query("DELETE FROM academy_gem_material_tools WHERE material_id = $1::bigint", [materialId]);
     for (const [index, tool] of (material.recommended_tools || []).entries()) {
       const toolId = toolsByName.get(tool.name);
       if (!toolId) continue;
-      await pool.query(
+      await db.query(
         `INSERT INTO academy_gem_material_tools
           (material_id, tool_id, priority, purpose, preparation, procedure, expected_observation,
            interpretation, limitations, risk, do_not_use_when, next_step, sort_order)
@@ -18847,17 +18880,15 @@ async function seedAcademyGemologicalLab() {
       );
     }
 
-    await pool.query("DELETE FROM academy_gem_inclusions WHERE material_id = $1::bigint", [materialId]);
     const inclusion = material.inclusions?.typical?.[0] || "Caratteri interni da osservare e correlare con più proprietà.";
-    await pool.query(
+    await db.query(
       `INSERT INTO academy_gem_inclusions
         (material_id, name, description, meaning, occurs_in, diagnostic_limit, inclusion_type)
        VALUES ($1::bigint, 'Caratteri diagnostici tipici', $2::text, $3::text, $4::jsonb, $5::text, 'typical')`,
       [materialId, inclusion, "Indicazione utile nel confronto gemmologico.", JSON.stringify([material.name]), material.inclusions?.diagnostic_limit]
     );
 
-    await pool.query("DELETE FROM academy_gem_analysis_protocols WHERE material_id = $1::bigint", [materialId]);
-    await pool.query(
+    await db.query(
       `INSERT INTO academy_gem_analysis_protocols
         (material_id, title, version, steps, result_options, safety_notes, active, created_by, reviewed_by, reviewed_at)
        VALUES ($1::bigint, $2::text, '1.0', $3::jsonb, $4::jsonb, $5::jsonb, TRUE, $6::bigint, $6::bigint, NOW())`,
@@ -18867,8 +18898,7 @@ async function seedAcademyGemologicalLab() {
       ]
     );
 
-    await pool.query("DELETE FROM academy_gem_comparisons WHERE material_id = $1::bigint", [materialId]);
-    await pool.query(
+    await db.query(
       `INSERT INTO academy_gem_comparisons
         (material_id, compared_name, comparison_data, discriminating_element, verification_limit, sort_order)
        VALUES ($1::bigint, $2::text, $3::jsonb, $4::text, $5::text, 0)`,
@@ -19460,9 +19490,16 @@ async function isCourseCompletedForUser(userId, courseIdentifier) {
        WHERE course_id = $1::bigint
          AND user_id = $2::bigint
          AND esito = 'superato'
+       UNION ALL
+       SELECT id, evaluated_at AS completed_at
+       FROM academy_exam_results
+       WHERE course_id = $1::bigint
+         AND user_id = $2::bigint
+         AND esito = 'superato'
+         AND $3::boolean
        ORDER BY completed_at DESC NULLS LAST, id DESC
        LIMIT 1`,
-      [course.id, userId]
+      [course.id, userId, Boolean(oroactiveBaseCourseDefinitionFor(course)?.isAdvancedPathCourse)]
     ),
     pool.query(
       `SELECT *
@@ -20231,6 +20268,46 @@ async function assertAcademyCoursePrerequisites(course = {}, user = {}) {
   throw error;
 }
 
+async function seedBundledCourseQuizzes(courseId, definition) {
+  return withDatabaseTransaction(async (db) => {
+    await db.query("SELECT pg_advisory_xact_lock(hashtext('academy-bundled-quiz'), $1::integer)", [courseId]);
+    for (const [index, question] of (definition.quiz || []).entries()) {
+      await db.query(
+        `INSERT INTO course_quizzes (course_id, question, options, correct_answer, sort_order, active)
+         SELECT $1::bigint, $2::text, $3::jsonb, $4::text, $5::integer, TRUE
+         WHERE NOT EXISTS (
+           SELECT 1 FROM course_quizzes WHERE course_id = $1::bigint AND sort_order = $5::integer
+         )`,
+        [courseId, question.question, JSON.stringify(sanitizeForPostgres(question.options)), question.correct_answer, 1000 + index]
+      );
+    }
+  });
+}
+
+async function seedBundledCourseMaterials(courseId, lessonId, definition, slidesRoute, metadata) {
+  return withDatabaseTransaction(async (db) => {
+    await db.query("SELECT pg_advisory_xact_lock(hashtext('academy-bundled-materials'), $1::integer)", [courseId]);
+    await db.query(
+      `INSERT INTO course_materials
+        (course_id, title, material_type, file_url, allow_download, sort_order, metadata)
+       SELECT $1::bigint, $2::text, 'pdf', $3::text, TRUE, 1000, $4::jsonb
+       WHERE NOT EXISTS (
+         SELECT 1 FROM course_materials WHERE course_id = $1::bigint AND sort_order = 1000
+       )`,
+      [courseId, `Slide PDF ufficiali - ${definition.title}`, slidesRoute, metadata]
+    );
+    await db.query(
+      `INSERT INTO academy_materials
+        (academy_lesson_id, course_id, title, material_type, file_url, mime_type, allow_download, sort_order, metadata)
+       SELECT $1::bigint, $2::bigint, $3::text, 'pdf', $4::text, 'application/pdf', TRUE, 1000, $5::jsonb
+       WHERE NOT EXISTS (
+         SELECT 1 FROM academy_materials WHERE course_id = $2::bigint AND sort_order = 1000
+       )`,
+      [lessonId, courseId, `Slide PDF ufficiali - ${definition.title}`, slidesRoute, metadata]
+    );
+  });
+}
+
 async function ensureOroActiveBaseAcademyCourses() {
   for (const courseDefinition of OROACTIVE_BASE_ACADEMY_COURSES) {
     try {
@@ -20261,7 +20338,8 @@ async function ensureOroActiveBaseAcademyCourses() {
       finalExamPassScore: OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE,
       finalExamRequiredCorrect: quizCount ? OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT : 0,
       finalExamQuestionCount: quizCount,
-      examConfigured: quizCount > 0,
+      examConfigured: quizCount > 0 || Boolean(courseDefinition.isAdvancedPathCourse),
+      finalExamMode: courseDefinition.isAdvancedPathCourse ? "responsible" : "online",
       assetAvailable: assetExists,
       updatedAt: new Date().toISOString()
     });
@@ -20491,51 +20569,10 @@ async function ensureOroActiveBaseAcademyCourses() {
       isAdvancedPathCourse: Boolean(courseDefinition.isAdvancedPathCourse),
       pdfAssetFile: courseDefinition.assetFile
     });
-    await pool.query(
-      `DELETE FROM course_materials
-       WHERE course_id = $1::bigint
-         AND sort_order BETWEEN 1000 AND 1099`,
-      [course.id]
-    );
-    await pool.query(
-      `INSERT INTO course_materials
-        (course_id, title, material_type, file_url, allow_download, sort_order, metadata)
-       VALUES ($1::bigint,$2::text,'pdf',$3::text,TRUE,1000,$4::jsonb)`,
-      [course.id, `Slide PDF ufficiali - ${courseDefinition.title}`, slidesRoute, materialMetadata]
-    );
-    await pool.query(
-      `DELETE FROM academy_materials
-       WHERE course_id = $1::bigint
-         AND sort_order BETWEEN 1000 AND 1099`,
-      [course.id]
-    );
-    await pool.query(
-      `INSERT INTO academy_materials
-        (academy_lesson_id, course_id, title, material_type, file_url, mime_type, allow_download, sort_order, metadata)
-       VALUES ($1::bigint,$2::bigint,$3::text,'pdf',$4::text,'application/pdf',TRUE,1000,$5::jsonb)`,
-      [lessonRow.id, course.id, `Slide PDF ufficiali - ${courseDefinition.title}`, slidesRoute, materialMetadata]
-    );
+    await seedBundledCourseMaterials(course.id, lessonRow.id, courseDefinition, slidesRoute, materialMetadata);
 
-    await pool.query(
-      `DELETE FROM course_quizzes
-       WHERE course_id = $1::bigint
-         AND sort_order BETWEEN 1000 AND 1099`,
-      [course.id]
-    );
-    for (const [index, question] of (courseDefinition.quiz || []).entries()) {
-      await pool.query(
-        `INSERT INTO course_quizzes
-          (course_id, question, options, correct_answer, sort_order, active)
-         VALUES ($1::bigint,$2::text,$3::jsonb,$4::text,$5::integer,TRUE)`,
-        [
-          course.id,
-          question.question,
-          sanitizeForPostgres(question.options),
-          question.correct_answer,
-          1000 + index
-        ]
-      );
-    }
+    await seedBundledCourseQuizzes(course.id, courseDefinition);
+
     } catch (error) {
       console.warn(`Corso base OroActive non inizializzato (${courseDefinition.code}):`, error.message);
     }
@@ -20704,7 +20741,8 @@ async function listCourses(user = {}) {
       course_slug: metadata.slug || baseCourseDefinition?.slug || "",
       advanced_path_course: Boolean(metadata.isAdvancedPathCourse || baseCourseDefinition?.isAdvancedPathCourse),
       founder_access: role === "founder" && Boolean(metadata.isAdvancedPathCourse || baseCourseDefinition?.isAdvancedPathCourse),
-      final_exam_configured: finalExamQuestions.length > 0,
+      final_exam_configured: finalExamQuestions.length > 0 || Boolean(baseCourseDefinition?.isAdvancedPathCourse),
+      final_exam_mode: baseCourseDefinition?.isAdvancedPathCourse ? "responsible" : "online",
       final_exam: {
         pass_score: Number(metadata.finalExamPassScore || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_PASS_SCORE : 80)),
         required_correct: Number(metadata.finalExamRequiredCorrect || (baseCourseDefinition ? OROACTIVE_BASE_FINAL_EXAM_REQUIRED_CORRECT : 0)),
@@ -22857,6 +22895,12 @@ async function evaluateCourseFinalQuiz(input = {}, user = {}) {
     error.status = 404;
     throw error;
   }
+  if (oroactiveBaseCourseDefinitionFor(course)?.isAdvancedPathCourse) {
+    const error = new Error("Questo corso richiede l’esame valutato dal responsabile dalla scheda corso.");
+    error.code = "RESPONSIBLE_EXAM_REQUIRED";
+    error.status = 409;
+    throw error;
+  }
   await assertAcademyCoursePrerequisites(course, user);
   let questions = (await pool.query(
     `SELECT id, course_id, question, options, correct_answer, sort_order
@@ -23020,6 +23064,21 @@ async function getAcademyCourseSlidesAccess(courseId, user = {}) {
   };
 }
 
+function validateAdvancedCourseExam(course, input, actorId, targetUserId) {
+  if (!oroactiveBaseCourseDefinitionFor(course)?.isAdvancedPathCourse) return false;
+  if (String(actorId) === String(targetUserId)) {
+    const error = new Error("L’esame avanzato richiede un valutatore diverso dall’operatore esaminato.");
+    error.status = 403;
+    throw error;
+  }
+  if (input.practical_completed !== true || String(input.note || "").trim().length < 10) {
+    const error = new Error("Conferma le prove previste dal PDF e inserisci il verbale della valutazione.");
+    error.status = 400;
+    throw error;
+  }
+  return true;
+}
+
 async function evaluateCourseExam(input = {}, user = {}) {
   if (Array.isArray(input.answers)) {
     return evaluateCourseFinalQuiz(input, user);
@@ -23037,6 +23096,15 @@ async function evaluateCourseExam(input = {}, user = {}) {
       const error = new Error("Non autorizzato");
       error.status = 403;
       throw error;
+    }
+    const course = (await db.query("SELECT * FROM courses WHERE id = $1::bigint FOR SHARE", [courseId])).rows[0];
+    if (!course || course.active === false) {
+      const error = new Error("Corso non disponibile.");
+      error.status = 404;
+      throw error;
+    }
+    if (validateAdvancedCourseExam(course, input, user.id, targetUserId)) {
+      await assertAcademyCoursePrerequisites(course, lockedUsers.target);
     }
     const exam = await db.query(
       `INSERT INTO course_exam_sessions (course_id, user_id, exam_type, esito, evaluated_by, evaluated_at, note)
@@ -23083,7 +23151,8 @@ async function listAcademyExams(query = {}, user = {}) {
      JOIN courses c ON c.id = e.course_id
      LEFT JOIN utenti u ON u.id = e.user_id
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-     ORDER BY e.created_at DESC`,
+     ORDER BY e.created_at DESC, e.id DESC
+     LIMIT 200`,
     values
   );
   return result.rows;
