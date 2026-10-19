@@ -6541,13 +6541,19 @@ async function runAiCompetitorQuoteExtraction(options = {}) {
     let sourcesSuccess = 0;
     let sourcesFailed = 0;
     for (const source of sources) {
-      const extracted = await aiCompetitorQuoteExtractor.extractQuotesFromCompetitor(source);
+      const verifiedOnly = ["oro express", "oro d'oro"].includes(String(source.name || "").toLowerCase());
+      const extracted = verifiedOnly
+        ? await extractCompetitorQuotes(source)
+        : await aiCompetitorQuoteExtractor.extractQuotesFromCompetitor(source);
       pagesAnalyzed += Number(extracted.pages_analyzed || extracted.pages?.length || 0);
       quotesExtracted += Number(extracted.quotes_found || extracted.quotes?.length || 0);
       for (const page of extracted.pages || []) {
         await insertAiExtractionPageLog(run.id, source, page);
       }
-      const saved = await saveAiExtractedCompetitorQuotes(extracted.quotes || [], { runId: run.id, user: options.user || {}, spotMap });
+      const verifiedSave = verifiedOnly ? await saveCompetitorQuotes(extracted.quotes || [], options.user || {}) : null;
+      const saved = verifiedSave
+        ? { saved: verifiedSave.saved, rejected: verifiedSave.errors.map((reason) => ({ reason })) }
+        : await saveAiExtractedCompetitorQuotes(extracted.quotes || [], { runId: run.id, user: options.user || {}, spotMap });
       quotesSaved += saved.saved.length;
       const status = saved.saved.length
         ? extracted.status === "failed" ? "partial" : extracted.status
@@ -6555,6 +6561,7 @@ async function runAiCompetitorQuoteExtraction(options = {}) {
       if (saved.saved.length) sourcesSuccess += 1;
       if (!saved.saved.length || status === "failed") sourcesFailed += 1;
       const errorMessage = [
+        verifiedOnly ? extracted.error : "",
         ...(extracted.warnings || []),
         ...(extracted.pages || []).map((page) => page.error_message).filter(Boolean),
         ...saved.rejected.map((item) => item.reason || item.reasons?.join(", ") || "").filter(Boolean)
