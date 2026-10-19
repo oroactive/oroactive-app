@@ -19,6 +19,37 @@ function context(source, names, values) {
 }
 const element = () => ({ hidden: true, style: {}, classList: { add() {}, remove() {}, toggle() {} }, removeAttribute() {} });
 
+test("capability requirement seed serializes concurrent startups and keeps existing policies", async () => {
+  const queries = [];
+  let transactions = 0;
+  const db = { query: async (sql, values) => {
+    queries.push({ sql, values });
+    if (sql.includes("FROM academy_operational_capabilities")) return { rows: [{ id: 11 }] };
+    if (sql.includes("FROM academy_competencies")) return { rows: values[0] === "KNOWN" ? [{ id: 22 }] : [] };
+    return { rows: [], rowCount: 0 };
+  } };
+  const ctx = context(server, ["seedAcademyCapabilityRequirements"], {
+    ACADEMY_CAPABILITY_REQUIREMENT_DEFINITIONS: { SALE: { competencies: ["KNOWN", "MISSING"], practicalRequired: true, managerApprovalRequired: false } },
+    withDatabaseTransaction: async (work) => { transactions += 1; return work(db); },
+  });
+  await ctx.seedAcademyCapabilityRequirements();
+  assert.equal(transactions, 1);
+  assert.match(queries[0].sql, /pg_advisory_xact_lock/);
+  const inserts = queries.filter(({ sql }) => sql.includes("INSERT INTO academy_capability_requirements"));
+  assert.equal(inserts.length, 1);
+  assert.deepEqual(Array.from(inserts[0].values), [11, 22, true, false]);
+  assert.equal(queries.some(({ sql }) => /UPDATE|DELETE|TRUNCATE/.test(sql)), false);
+});
+
+test("capability requirement seed propagates a storage failure to its transaction", async () => {
+  const failure = new Error("storage unavailable");
+  const ctx = context(server, ["seedAcademyCapabilityRequirements"], {
+    ACADEMY_CAPABILITY_REQUIREMENT_DEFINITIONS: {},
+    withDatabaseTransaction: (work) => work({ query: async () => { throw failure; } }),
+  });
+  await assert.rejects(ctx.seedAcademyCapabilityRequirements(), (error) => error === failure);
+});
+
 test("Fusioni preserves melting view through the main menu and screen opening", async () => {
   const screen = element();
   const ctx = context(app, ["resolveSectionRoute", "enterSectionFromMainMenu", "openAppScreen"], {
