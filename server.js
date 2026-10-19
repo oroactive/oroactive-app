@@ -19567,6 +19567,32 @@ function academyQualificationSettings() {
   };
 }
 
+async function seedAcademyCapabilityRequirements() {
+  return withDatabaseTransaction(async (db) => {
+    await db.query("SELECT pg_advisory_xact_lock(hashtext('academy-capability-requirements-seed'))");
+    for (const [capabilityCode, requirement] of Object.entries(ACADEMY_CAPABILITY_REQUIREMENT_DEFINITIONS)) {
+      const capability = (await db.query("SELECT id FROM academy_operational_capabilities WHERE code = $1::text LIMIT 1", [capabilityCode])).rows[0];
+      if (!capability?.id) continue;
+      for (const competencyCode of requirement.competencies || []) {
+        const competency = (await db.query("SELECT id FROM academy_competencies WHERE code = $1::text LIMIT 1", [competencyCode])).rows[0];
+        if (!competency?.id) continue;
+        await db.query(
+          `INSERT INTO academy_capability_requirements
+            (capability_id, competency_id, required_role, certification_required, practical_required, manager_approval_required, active)
+           SELECT $1::bigint,$2::bigint,NULL,TRUE,$3::boolean,$4::boolean,TRUE
+           WHERE NOT EXISTS (
+             SELECT 1 FROM academy_capability_requirements
+             WHERE capability_id = $1::bigint
+               AND competency_id = $2::bigint
+               AND required_role IS NULL
+           )`,
+          [capability.id, competency.id, Boolean(requirement.practicalRequired), Boolean(requirement.managerApprovalRequired)]
+        );
+      }
+    }
+  });
+}
+
 async function seedAcademyQualificationSystem() {
   if (!ACADEMY_QUALIFICATION_SYSTEM_ENABLED) {
     return { skipped: true, reason: "disabled" };
@@ -19711,21 +19737,7 @@ async function seedAcademyQualificationSystem() {
       report.capabilities += 1;
     }
 
-    for (const [capabilityCode, requirement] of Object.entries(ACADEMY_CAPABILITY_REQUIREMENT_DEFINITIONS)) {
-      const capability = (await pool.query("SELECT id FROM academy_operational_capabilities WHERE code = $1::text LIMIT 1", [capabilityCode])).rows[0];
-      if (!capability?.id) continue;
-      for (const competencyCode of requirement.competencies || []) {
-        const competency = (await pool.query("SELECT id FROM academy_competencies WHERE code = $1::text LIMIT 1", [competencyCode])).rows[0];
-        if (!competency?.id) continue;
-        await pool.query(
-          `INSERT INTO academy_capability_requirements
-            (capability_id, competency_id, required_role, certification_required, practical_required, manager_approval_required, active)
-           VALUES ($1::bigint,$2::bigint,NULL,TRUE,$3::boolean,$4::boolean,TRUE)
-           ON CONFLICT DO NOTHING`,
-          [capability.id, competency.id, Boolean(requirement.practicalRequired), Boolean(requirement.managerApprovalRequired)]
-        );
-      }
-    }
+    await seedAcademyCapabilityRequirements();
 
     for (const assessmentDefinition of ACADEMY_PRACTICAL_ASSESSMENT_DEFINITIONS) {
       const course = await oroactiveCourseByLogicalCode(assessmentDefinition.courseCode);
