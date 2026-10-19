@@ -348,7 +348,7 @@ const oroExpressSilverUsedMapping = String(process.env.ORO_EXPRESS_SILVER_USED_M
 const oroDOroAutoSyncEnabled = String(process.env.ORO_DORO_AUTO_SYNC_ENABLED || "true").toLowerCase() !== "false";
 const oroDOroAutoSyncOnStartup = String(process.env.ORO_DORO_AUTO_SYNC_ON_STARTUP || "true").toLowerCase() !== "false";
 const oroDOroSyncIntervalMinutes = Math.max(60, Number(process.env.ORO_DORO_SYNC_INTERVAL_MINUTES || 60));
-const oroDOroUrl = process.env.ORO_DORO_URL || "https://www.comproorodoro.it";
+const oroDOroUrl = process.env.ORO_DORO_URL || "https://comproorodoro.it";
 const oroDOroUsePlaywright = false;
 const oroDOroUseAiFallback = String(process.env.ORO_DORO_USE_AI_FALLBACK || "true").toLowerCase() !== "false";
 const oroDOroTimeoutMs = Math.min(Math.max(Number(process.env.ORO_DORO_TIMEOUT_MS || competitorAutoSyncTimeoutMs || 15000), 3000), 60000);

@@ -305,16 +305,16 @@ export function createCompetitorExtractionTrainer(options = {}) {
         source_id: source.id,
         sourceId: source.id,
         url: rules[0]?.page_url || source.website_url
-      }).catch(() => ({ quotes: [] }));
-      return result.quotes || [];
+      }).catch((error) => ({ quotes: [], verified_only: true, status: "failed", error: error.message }));
+      return { ...result, verified_only: true };
     }
     if (config.oroDOroExtractor && sourceName === "oro d'oro") {
       const result = await config.oroDOroExtractor.extractOroDOroQuotes({
         source_id: source.id,
         sourceId: source.id,
         url: rules[0]?.page_url || source.website_url
-      }).catch(() => ({ quotes: [] }));
-      return result.quotes || [];
+      }).catch((error) => ({ quotes: [], verified_only: true, status: "failed", error: error.message }));
+      return { ...result, verified_only: true };
     }
     if (config.amicoOroExtractor && sourceName === "amico oro") {
       const result = await config.amicoOroExtractor.extractAmicoOroQuotes({
@@ -392,7 +392,7 @@ export function createCompetitorExtractionTrainer(options = {}) {
   }
 
   async function extractRule(rule = {}, source = {}, pageCache = new Map(), sourceQuotes = [], options = {}) {
-    const specific = options.forceAi ? null : sourceSpecificQuoteForRule(rule, sourceQuotes);
+    const specific = options.forceAi && !options.verifiedSourceResult ? null : sourceSpecificQuoteForRule(rule, sourceQuotes);
     if (specific) {
       const method = sourceSpecificMethod(source);
       return {
@@ -404,6 +404,20 @@ export function createCompetitorExtractionTrainer(options = {}) {
         method,
         confidence: specific.ai_confidence || specific.confidence || "high",
         quote: { ...specific, extraction_method: method }
+      };
+    }
+    if (options.verifiedSourceResult) {
+      const extraction = options.verifiedSourceResult;
+      const missing = (extraction.missing_fields || []).find((field) => field.metal === rule.metal && field.purity_code === rule.purity_code);
+      return {
+        rule,
+        status: extraction.status === "failed" ? "error" : "not_found",
+        value: null,
+        unit: "EUR/g",
+        evidence_text: "",
+        method: sourceSpecificMethod(source),
+        confidence: "low",
+        error: missing?.error || extraction.error || `${rule.label || rule.field_key}: nessun prezzo verificabile nella fonte ufficiale. Nessuna stima utilizzata.`
       };
     }
     const pageUrl = rule.page_url || source.website_url || "";
@@ -496,10 +510,14 @@ export function createCompetitorExtractionTrainer(options = {}) {
       return { status: "not_configured", results: [], quotes: [], error: "Nessuna regola di estrazione configurata per questo competitor." };
     }
     const pageCache = new Map();
-    const sourceQuotes = options.forceAi ? [] : await sourceSpecificQuotes(source, activeRules);
+    const dedicatedOnly = (String(source.name || "").toLowerCase() === "oro express" && config.oroExpressExtractor)
+      || (String(source.name || "").toLowerCase() === "oro d'oro" && config.oroDOroExtractor);
+    const extraction = options.forceAi && !dedicatedOnly ? [] : await sourceSpecificQuotes(source, activeRules);
+    const sourceQuotes = Array.isArray(extraction) ? extraction : extraction.quotes || [];
+    const ruleOptions = extraction.verified_only ? { ...options, verifiedSourceResult: extraction } : options;
     const results = [];
     for (const rule of activeRules) {
-      results.push(await extractRule(rule, source, pageCache, sourceQuotes, options).catch((error) => ({
+      results.push(await extractRule(rule, source, pageCache, sourceQuotes, ruleOptions).catch((error) => ({
         rule,
         status: "error",
         value: null,

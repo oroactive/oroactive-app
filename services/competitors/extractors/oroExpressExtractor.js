@@ -152,12 +152,16 @@ async function fetchOroExpressJson(url = ORO_EXPRESS_DEFAULT_URL, definition = {
     timeoutMs: Math.min(Number(options.timeoutMs || 15000), 15000),
     maxBytes: Math.min(Number(options.jsonMaxBytes || ORO_EXPRESS_JSON_MAX_BYTES), ORO_EXPRESS_JSON_MAX_BYTES),
     maxRedirects: 2,
-    allowedContentTypes: ["application/json", "text/plain"],
+    // Joomla's raw JSON endpoint is served with a text/html content type.
+    // JSON.parse below still rejects an HTML error or challenge page.
+    allowedContentTypes: ["application/json", "text/plain", "text/html"],
     signal: options.signal,
     fetchImpl: options.fetchImpl,
     resolver: options.resolver,
     headers: {
       Accept: "application/json,text/plain;q=0.9,*/*;q=0.5",
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: new URL("/", url).toString(),
       "User-Agent": options.userAgent || "OroActiveBot/1.0"
     }
   });
@@ -167,8 +171,13 @@ async function fetchOroExpressJson(url = ORO_EXPRESS_DEFAULT_URL, definition = {
 }
 
 function priceFromOroExpressWidgetJson(definition = {}, json = {}) {
-  const rawValue = Number(json[definition.valueField] || 0);
-  const variation = parseItalianEuroPrice(Array.isArray(json.variazione) ? json.variazione[0] : json.variazione);
+  const number = (value) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+    return typeof value === "string" && /^[+-]?\d+(?:\.\d+)?$/.test(value.trim()) ? Number(value) : NaN;
+  };
+  const rawValue = number(json?.[definition.valueField]);
+  const variation = number(Array.isArray(json?.variazione) && json.variazione.length === 1 ? json.variazione[0] : json?.variazione);
+  if (!(rawValue > 0) || !Number.isFinite(variation)) return 0;
   const price = Number(((rawValue * definition.coefficient) - variation).toFixed(2));
   return Number.isFinite(price) && price > 0 ? price : 0;
 }
@@ -178,10 +187,10 @@ export function extractOroExpressQuotesFromText(text = "", options = {}) {
   const normalized = compactText(text);
   const silverUsedMapping = String(options.silverUsedMapping || "generic").toLowerCase();
   const patterns = {
-    gold_pure: /Acquistiamo\s+il\s+tuo\s+oro\s+puro\s+a\s+partire\s+da\s+([0-9][0-9.,]*)/i,
-    gold_used: /Acquistiamo\s+il\s+tuo\s+oro\s+usato\s+a\s+partire\s+da\s+([0-9][0-9.,]*)/i,
-    silver_pure: /Acquistiamo\s+il\s+tuo\s+argento\s+puro\s+a\s+partire\s+da\s+([0-9][0-9.,]*)/i,
-    silver_used: /Acquistiamo\s+il\s+tuo\s+argento\s+usato\s+a\s+partire\s+da\s+([0-9][0-9.,]*)/i
+    gold_pure: /Acquistiamo\s+il\s+tuo\s+oro\s+puro\s+a\s+partire\s+da\s+([0-9][0-9.,]*)\s*(?:€|EUR)\s*\/\s*(?:gr|g)\b/i,
+    gold_used: /Acquistiamo\s+il\s+tuo\s+oro\s+usato\s+a\s+partire\s+da\s+([0-9][0-9.,]*)\s*(?:€|EUR)\s*\/\s*(?:gr|g)\b/i,
+    silver_pure: /Acquistiamo\s+il\s+tuo\s+argento\s+puro\s+a\s+partire\s+da\s+([0-9][0-9.,]*)\s*(?:€|EUR)\s*\/\s*(?:gr|g)\b/i,
+    silver_used: /Acquistiamo\s+il\s+tuo\s+argento\s+usato\s+a\s+partire\s+da\s+([0-9][0-9.,]*)\s*(?:€|EUR)\s*\/\s*(?:gr|g)\b/i
   };
   return ORO_EXPRESS_QUOTE_DEFINITIONS
     .map((baseDefinition) => {
@@ -210,6 +219,9 @@ async function extractOroExpressQuotesFromWidgetApi(url = ORO_EXPRESS_DEFAULT_UR
       quotes.push(oroExpressQuote(definition, price, url, {
         source_method: "public_widget_json",
         endpoint: result.endpoint,
+        widget_script_url: new URL("/modules/mod_quotazioni/js/script.js", url).toString(),
+        coefficient: baseDefinition.coefficient,
+        unit: "EUR/g",
         response: result.json
       }, options));
     } catch (error) {
@@ -217,69 +229,6 @@ async function extractOroExpressQuotesFromWidgetApi(url = ORO_EXPRESS_DEFAULT_UR
     }
   }
   return { quotes, errors };
-}
-
-async function extractOroExpressQuotesWithAi(pageText = "", options = {}) {
-  if (!options.openai) return { quotes: [], warnings: ["AI fallback non disponibile: OPENAI_API_KEY non configurata sul backend."] };
-  const systemPrompt = "Sei un estrattore dati OroActive per il competitor Oro Express. Devi individuare esclusivamente quattro quotazioni cliente nel testo pubblico: oro puro, oro usato, argento puro, argento usato. Non inventare prezzi. Se un prezzo non e chiaro, restituisci null per quel campo. Restituisci solo JSON valido.";
-  const userPrompt = `Estrai solo questi prezzi dal testo pubblico Oro Express:
-- oro_puro_eur_g
-- oro_usato_eur_g
-- argento_puro_eur_g
-- argento_usato_eur_g
-
-I prezzi sono quotazioni di acquisto al cliente, non prezzi spot. Non inventare dati mancanti.
-
-TESTO:
-${String(pageText || "").replace(/\s+/g, " ").trim().slice(0, Number(options.maxTextChars || 12000))}`;
-  const response = await options.openai.responses.create({
-    model: options.model || "gpt-4.1-mini",
-    input: `${systemPrompt}\n\n${userPrompt}`,
-    text: {
-      format: {
-        type: "json_schema",
-        name: "oro_express_quote_extraction",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            oro_puro_eur_g: { type: ["number", "null"] },
-            oro_usato_eur_g: { type: ["number", "null"] },
-            argento_puro_eur_g: { type: ["number", "null"] },
-            argento_usato_eur_g: { type: ["number", "null"] },
-            warnings: { type: "array", items: { type: "string" } }
-          },
-          required: ["oro_puro_eur_g", "oro_usato_eur_g", "argento_puro_eur_g", "argento_usato_eur_g", "warnings"]
-        }
-      }
-    }
-  });
-  const parsed = JSON.parse(response.output_text || "{}");
-  const values = {
-    gold_pure: parsed.oro_puro_eur_g,
-    gold_used: parsed.oro_usato_eur_g,
-    silver_pure: parsed.argento_puro_eur_g,
-    silver_used: parsed.argento_usato_eur_g
-  };
-  const silverUsedMapping = String(options.silverUsedMapping || "generic").toLowerCase();
-  const quotes = ORO_EXPRESS_QUOTE_DEFINITIONS
-    .map((baseDefinition) => {
-      const definition = normalizeOroExpressSilverUsed(baseDefinition, silverUsedMapping);
-      const price = Number(values[baseDefinition.key] || 0);
-      return price > 0 ? oroExpressQuote(definition, price, options.sourceUrl || ORO_EXPRESS_DEFAULT_URL, {
-        source_method: "ai_fallback",
-        ai_response: parsed
-      }, {
-        ...options,
-        extractionMethod: "ai_oro_express_fallback",
-        confidence: "medium",
-        aiConfidence: "medium",
-        aiExtracted: true
-      }) : null;
-    })
-    .filter(Boolean);
-  return { quotes, warnings: parsed.warnings || [] };
 }
 
 export function createOroExpressExtractor(options = {}) {
@@ -315,16 +264,10 @@ export function createOroExpressExtractor(options = {}) {
 
     const widget = await extractOroExpressQuotesFromWidgetApi(runtime.url, runtime);
     warnings.push(...widget.errors);
-    let quotes = widget.quotes.length ? widget.quotes : textQuotes;
-
-    if (quotes.length < ORO_EXPRESS_QUOTE_DEFINITIONS.length && page?.text) {
-      const ai = await extractOroExpressQuotesWithAi(page.text, {
-        ...runtime,
-        sourceUrl: page.url || runtime.url
-      }).catch((error) => ({ quotes: [], warnings: [`AI fallback Oro Express non riuscito: ${error.message || "errore AI"}`] }));
-      warnings.push(...(ai.warnings || []));
-      if (ai.quotes?.length > quotes.length) quotes = ai.quotes;
-    }
+    const quotes = ORO_EXPRESS_QUOTE_DEFINITIONS.map((definition) => (
+      widget.quotes.find((quote) => quote.raw_payload?.oro_express_key === definition.key)
+      || textQuotes.find((quote) => quote.raw_payload?.oro_express_key === definition.key)
+    )).filter(Boolean);
 
     const foundKeys = new Set(quotes.map((quote) => quote.raw_payload?.oro_express_key));
     for (const definition of ORO_EXPRESS_QUOTE_DEFINITIONS) {
@@ -338,9 +281,10 @@ export function createOroExpressExtractor(options = {}) {
         : "failed";
     return {
       source: "oro_express",
+      verified_only: true,
       status,
       quotes,
-      error: warnings.filter(Boolean).join(" | ").slice(0, 1200),
+      error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),
       warnings
     };
   }
