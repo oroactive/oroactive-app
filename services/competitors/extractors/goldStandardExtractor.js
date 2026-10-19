@@ -2,6 +2,7 @@ import { extractReadableTextFromHtml } from "../aiCompetitorQuoteExtractor.js";
 import { safeExternalFetch } from "../../security/safeExternalFetch.js";
 
 const GOLD_STANDARD_DEFAULT_URL = "https://www.goldstandard.gold";
+const GOLD_STANDARD_GOLD_UNIT_URL = "https://www.goldstandard.gold/da-gioiello-a-denaro-il-processo-di-valutazione-delloro/";
 const GOLD_STANDARD_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const GOLD_STANDARD_ALLOWED_HOSTS = ["goldstandard.gold"];
 const GOLD_STANDARD_HTML_MAX_BYTES = 2 * 1024 * 1024;
@@ -49,7 +50,7 @@ const GOLD_STANDARD_DEFINITIONS = [
     purity_code: "999",
     purity_value: 0.999,
     quote_type: "reference_market_silver_price",
-    required: false,
+    required: true,
     anchor: "Quotazione dell'argento in borsa",
     defaultUnit: "EUR/kg"
   },
@@ -60,7 +61,7 @@ const GOLD_STANDARD_DEFINITIONS = [
     purity_code: "925",
     purity_value: 0.925,
     quote_type: "customer_buyback",
-    required: false,
+    required: true,
     anchor: "Acquistiamo ARGENTO 925",
     price_kind: "min_price",
     defaultUnit: "EUR/kg"
@@ -72,7 +73,7 @@ const GOLD_STANDARD_DEFINITIONS = [
     purity_code: "800",
     purity_value: 0.8,
     quote_type: "customer_buyback",
-    required: false,
+    required: true,
     anchor: "Acquistiamo ARGENTO 800",
     price_kind: "min_price",
     defaultUnit: "EUR/kg"
@@ -98,6 +99,7 @@ export function parseItalianEuroPrice(value = "") {
   const raw = String(value || "").replace(/\u00a0/g, " ").replace(/[^\d,.\s]/g, "").trim();
   if (!raw) return 0;
   const compact = raw.replace(/\s+/g, "");
+  if (!/^(?:\d+|\d+[,.]\d+|\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?)$/.test(compact)) return 0;
   if (compact.includes(",") && compact.includes(".")) {
     const commaIndex = compact.lastIndexOf(",");
     const dotIndex = compact.lastIndexOf(".");
@@ -165,7 +167,7 @@ function goldStandardQuote(definition = {}, price = 0, sourceUrl = GOLD_STANDARD
     extraction_method: options.extractionMethod || "auto_gold_standard_parser",
     confidence: options.confidence || "high",
     ai_confidence: options.aiConfidence || options.confidence || "high",
-    ai_extracted: Boolean(options.aiExtracted),
+    ai_extracted: false,
     quote_type: definition.quote_type,
     evidence_text: goldStandardEvidence(definition, price, unit, rawPayload.matched_text),
     url: sourceUrl,
@@ -175,120 +177,143 @@ function goldStandardQuote(definition = {}, price = 0, sourceUrl = GOLD_STANDARD
       gold_standard_key: definition.key,
       gold_standard_mapping: definition.purity_code,
       gold_standard_quote_type: definition.quote_type,
-      price_kind: definition.price_kind || rawPayload.price_kind || null
+      price_kind: definition.price_kind || rawPayload.price_kind || null,
+      verified_official: true
     }
   };
 }
 
-function regexesForDefinition(definition = {}) {
-  const price = pricePattern();
-  if (definition.key === "gold_standard_gold_24kt_reference") {
-    return [
-      new RegExp(`Quotazione\\s+dell[’']\\s*oro\\s+in\\s+borsa[\\s\\S]{0,140}?${price}`, "i"),
-      new RegExp(`Quotazione[\\s\\S]{0,40}?oro\\s+in\\s+borsa[\\s\\S]{0,140}?${price}`, "i")
-    ];
-  }
-  if (definition.key === "gold_standard_gold_18kt_buyback") {
-    return [
-      new RegExp(`Acquistiamo\\s+ORO\\s*18\\s*K(?:T)?[\\s\\S]{0,140}?(?:prezzo\\s*(?:MIN|minimo)|al\\s+prezzo\\s*(?:MIN|minimo))[\\s\\S]{0,90}?${price}`, "i"),
-      new RegExp(`Acquistiamo\\s+ORO\\s*18\\s*K(?:T)?[\\s\\S]{0,220}?${price}`, "i")
-    ];
-  }
-  if (definition.key === "gold_standard_gold_24kt_buyback") {
-    return [
-      new RegExp(`Acquistiamo\\s+ORO\\s*24\\s*K(?:T)?[\\s\\S]{0,140}?(?:prezzo\\s*(?:MIN|minimo)|al\\s+prezzo\\s*(?:MIN|minimo))[\\s\\S]{0,90}?${price}`, "i"),
-      new RegExp(`Acquistiamo\\s+ORO\\s*24\\s*K(?:T)?[\\s\\S]{0,220}?${price}`, "i")
-    ];
-  }
-  if (definition.key === "gold_standard_silver_reference") {
-    return [
-      new RegExp(`Quotazione\\s+dell[’']\\s*argento\\s+in\\s+borsa[\\s\\S]{0,140}?${price}`, "i"),
-      new RegExp(`Quotazione[\\s\\S]{0,40}?argento\\s+in\\s+borsa[\\s\\S]{0,140}?${price}`, "i")
-    ];
-  }
-  if (definition.key === "gold_standard_silver_925_buyback") {
-    return [
-      new RegExp(`Acquistiamo\\s+ARGENTO\\s*925[\\s\\S]{0,120}?(?:al\\s+chilo|kg|kilo|chilogrammo)[\\s\\S]{0,80}?${price}`, "i"),
-      new RegExp(`Acquistiamo\\s+ARGENTO\\s*925[\\s\\S]{0,220}?${price}`, "i")
-    ];
-  }
-  if (definition.key === "gold_standard_silver_800_buyback") {
-    return [
-      new RegExp(`Acquistiamo\\s+ARGENTO\\s*800[\\s\\S]{0,120}?(?:al\\s+chilo|kg|kilo|chilogrammo)[\\s\\S]{0,80}?${price}`, "i"),
-      new RegExp(`Acquistiamo\\s+ARGENTO\\s*800[\\s\\S]{0,220}?${price}`, "i")
-    ];
-  }
-  return [];
+function officialText(value = "") {
+  return compactText(extractReadableTextFromHtml(decodeHtml(String(value || "").replace(/<!--[\s\S]*?-->/g, " "))));
 }
 
-function addRegexQuote(quotes = [], text = "", definition = {}, sourceUrl = GOLD_STANDARD_DEFAULT_URL, options = {}) {
-  for (const regex of regexesForDefinition(definition)) {
-    const match = text.match(regex);
-    const price = match ? parseItalianEuroPrice(match[1]) : 0;
-    if (!price) continue;
-    const unit = definition.defaultUnit || "EUR/g";
-    quotes.push(goldStandardQuote(definition, price, sourceUrl, {
-      source_method: "text_regex",
-      matched_text: match[0],
-      unit
-    }, { ...options, unit }));
-    return true;
+function verifiedPrice(body = "", options = {}) {
+  const text = compactText(body);
+  const match = text.match(/^(?:€\s*([+\-−]?[0-9][0-9.,]*)|([+\-−]?[0-9][0-9.,]*)\s*(?:€|EUR\b|euro\b))/i);
+  if (!match) return null;
+  const raw = match[1] || match[2];
+  if (/^[\-−]/.test(raw) || !/^\+?(?:[0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{1,3})?|[0-9]+(?:[.,][0-9]{1,3})?)$/.test(raw)) return null;
+  const value = parseItalianEuroPrice(raw);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const tail = text.slice(match[0].length);
+  if (/^\s*(?:\$|£|USD\b|GBP\b|CHF\b)/i.test(tail)) return null;
+  const unitMatch = tail.match(/^\s*(?:(?:\/|al|per)\s*)?(kg|chilo|chilogramm[oi]|kilo|gramm[oi]|gr\.?|g)\b/i);
+  if (!unitMatch && /^\s*(?:\/|al\b|per\b)/i.test(tail)) return null;
+  const explicitUnit = unitMatch ? unitFromText(unitMatch[1]) : "";
+  const unit = explicitUnit || options.labelUnit || options.defaultUnit || "";
+  if (!unit || (options.requireUnit && !explicitUnit && !options.labelUnit)) return null;
+  if (options.expectedUnit && unit !== options.expectedUnit) return null;
+  if (options.labelUnit && explicitUnit && options.labelUnit !== explicitUnit) return null;
+  return { value, unit, explicitUnit, evidenceText: text.slice(0, match[0].length + (unitMatch?.[0].length || 0)) };
+}
+
+function verifiedGoldUnitEvidence(evidence = null) {
+  if (evidence?.unit !== "EUR/g" || !evidence.source_url || !evidence.text) return null;
+  try {
+    const url = new URL(evidence.source_url);
+    if (url.protocol !== "https:" || !/^(?:www\.)?goldstandard\.gold$/i.test(url.hostname)
+      || !/^\/da-gioiello-a-denaro-il-processo-di-valutazione-delloro\/?$/.test(url.pathname)) return null;
+    const text = officialText(evidence.text);
+    if (!/quotazione\s+dell[’']oro\b[\s\S]{0,400}?\beuro\s+per\s+grammo\b/i.test(text)) return null;
+    return { unit: "EUR/g", source_url: url.toString(), text };
+  } catch {
+    return null;
   }
-  return false;
+}
+
+function goldUnitEvidenceFromPage(page = {}) {
+  const text = page.text?.match(/L[’']altro\s+elemento\s+essenziale\s+[èe]\s+la\s+quotazione\s+dell[’']oro\b[\s\S]{0,400}?\beuro\s+per\s+grammo\b[.!?]?/i)?.[0];
+  return text ? verifiedGoldUnitEvidence({ unit: "EUR/g", source_url: page.url, text }) : null;
+}
+
+function uniqueVerifiedQuotes(quotes = [], invalidKeys = new Set()) {
+  const found = new Map();
+  for (const quote of quotes) {
+    const key = quoteKey(quote);
+    const previous = found.get(key);
+    if (previous && Math.abs(previous.price_per_gram - quote.price_per_gram) > 1e-12) invalidKeys.add(key);
+    else if (!previous) found.set(key, quote);
+  }
+  return [...found.entries()].filter(([key]) => !invalidKeys.has(key)).map(([, quote]) => quote);
+}
+
+const GOLD_STANDARD_LABEL = /Quotazione\s+dell[’']\s*(?:oro|argento)\s+in\s+borsa|Acquistiamo\s+(?:ORO\s*[0-9]{1,2}\s*K(?:T)?|ARGENTO\s*[0-9]{3})/gi;
+
+function definitionForLabel(label = "") {
+  const normalized = compactText(label).toLowerCase();
+  if (/quotazione/.test(normalized)) return GOLD_STANDARD_DEFINITIONS.find((definition) => definition.key === (/argento/.test(normalized) ? "gold_standard_silver_reference" : "gold_standard_gold_24kt_reference"));
+  const gold = normalized.match(/oro\s*([0-9]{1,2})\s*k/);
+  const silver = normalized.match(/argento\s*([0-9]{3})/);
+  return GOLD_STANDARD_DEFINITIONS.find((definition) => definition.quote_type === "customer_buyback" && definition.metal === (gold ? "gold" : "silver") && definition.purity_code === (gold ? `${gold[1]}kt` : silver?.[1]));
+}
+
+function parseGoldStandardPage(text = "", options = {}) {
+  const normalized = officialText(text);
+  const labels = [...normalized.matchAll(new RegExp(GOLD_STANDARD_LABEL.source, "gi"))];
+  const quotes = [];
+  const goldUnitEvidence = verifiedGoldUnitEvidence(options.goldUnitEvidence);
+  let needsGoldUnitEvidence = false;
+  const conditions = normalized.match(/La\s+quotazione\s+indica\s+[^.]{0,700}/i)?.[0] || "";
+  for (let index = 0; index < labels.length; index++) {
+    const label = labels[index];
+    const definition = definitionForLabel(label[0]);
+    if (!definition) continue;
+    let body = normalized.slice(label.index + label[0].length, labels[index + 1]?.index ?? normalized.length).trim();
+    let labelUnit = "";
+    if (definition.metal === "gold" && definition.quote_type === "customer_buyback") {
+      const minimum = body.match(/^(?:al\s+)?prezzo\s*(?:MIN(?:IMO)?)\b\s*[:·]?\s*/i);
+      if (!minimum) continue;
+      body = body.slice(minimum[0].length);
+    }
+    if (definition.metal === "silver" && definition.quote_type === "customer_buyback") {
+      const kilogram = body.match(/^al\s+(?:chilo|chilogrammo|kg)\b\s*[:·]?\s*/i);
+      if (!kilogram) continue;
+      labelUnit = "EUR/kg";
+      body = body.slice(kilogram[0].length);
+    }
+    const parsed = verifiedPrice(body.replace(/^[:·]\s*/, ""), {
+      labelUnit: labelUnit || (definition.metal === "gold" ? goldUnitEvidence?.unit : ""),
+      expectedUnit: definition.metal === "gold" ? "EUR/g" : "",
+      requireUnit: true
+    });
+    if (!parsed) {
+      if (definition.metal === "gold" && !goldUnitEvidence
+        && /^(?:€\s*\+?[0-9][0-9.,]*|\+?[0-9][0-9.,]*\s*(?:€|EUR|euro))\s*$/i.test(body)) needsGoldUnitEvidence = true;
+      continue;
+    }
+    const unitEvidence = definition.metal === "gold" && !parsed.explicitUnit
+      ? goldUnitEvidence
+      : { unit: parsed.unit, source_url: options.sourceUrl || GOLD_STANDARD_DEFAULT_URL, text: labelUnit ? `${label[0]} al chilo` : `${label[0]} ${parsed.evidenceText}` };
+    quotes.push(goldStandardQuote(definition, parsed.value, options.sourceUrl || GOLD_STANDARD_DEFAULT_URL, {
+      source_method: "official_label_price", matched_text: `${label[0]} ${body}`, unit: parsed.unit,
+      conditions, unit_evidence: unitEvidence
+    }, { ...options, unit: parsed.unit }));
+  }
+  const invalidKeys = new Set();
+  return { quotes: uniqueVerifiedQuotes(quotes, invalidKeys), invalidKeys, needsGoldUnitEvidence };
 }
 
 export function extractPriceNearAnchor(text = "", anchor = "", maxDistance = 240) {
-  const source = String(text || "");
-  const anchorRegex = new RegExp(anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*").replace(/'/g, "[’']"), "i");
-  const anchorMatch = source.match(anchorRegex);
-  if (!anchorMatch || anchorMatch.index === undefined) return null;
-  const snippet = source.slice(anchorMatch.index, anchorMatch.index + maxDistance);
-  const priceMatch = snippet.match(currencyPriceRegex());
-  const price = priceMatch ? parseItalianEuroPrice(priceMatch[1] || priceMatch[2]) : 0;
-  if (!price) return null;
-  return {
-    value: price,
-    evidenceText: compactText(snippet.slice(0, priceMatch.index + priceMatch[0].length)).slice(0, 700)
-  };
-}
-
-function addAnchorFallbackQuote(quotes = [], text = "", definition = {}, sourceUrl = GOLD_STANDARD_DEFAULT_URL, options = {}) {
-  if (quotes.some((quote) => quoteKey(quote) === `${definition.metal}:${definition.purity_code}:${definition.quote_type}`)) return false;
-  const found = extractPriceNearAnchor(text, definition.anchor || definition.label, 260);
-  if (!found?.value) return false;
-  const unit = definition.defaultUnit || "EUR/g";
-  quotes.push(goldStandardQuote(definition, found.value, sourceUrl, {
-    source_method: "anchor_near_price",
-    matched_text: found.evidenceText,
-    unit
-  }, { ...options, unit }));
-  return true;
+  const normalized = officialText(text);
+  const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*").replace(/'/g, "[’']");
+  const found = normalized.match(new RegExp(escaped, "i"));
+  if (!found) return null;
+  const remainder = normalized.slice(found.index + found[0].length, found.index + Math.min(maxDistance, 500));
+  const next = remainder.search(new RegExp(GOLD_STANDARD_LABEL.source, "i"));
+  let body = next < 0 ? remainder : remainder.slice(0, next);
+  const labelUnit = /al\s+chilo/i.test(body) ? "EUR/kg" : "";
+  body = body.replace(/^\s*(?:(?:al\s+)?prezzo\s*MIN(?:IMO)?|al\s+chilo)\s*[:·]?\s*/i, "");
+  const definition = definitionForLabel(found[0]);
+  const parsed = verifiedPrice(body, { labelUnit, requireUnit: true, expectedUnit: definition?.metal === "gold" ? "EUR/g" : "" });
+  return parsed ? { value: parsed.value, evidenceText: `${found[0]} ${parsed.evidenceText}` } : null;
 }
 
 export function extractGoldStandardQuotesFromText(text = "", options = {}) {
-  const sourceUrl = options.sourceUrl || GOLD_STANDARD_DEFAULT_URL;
-  const normalized = compactText(decodeHtml(text));
-  const quotes = [];
-  for (const definition of GOLD_STANDARD_DEFINITIONS) {
-    const found = addRegexQuote(quotes, normalized, definition, sourceUrl, options);
-    if (!found) addAnchorFallbackQuote(quotes, normalized, definition, sourceUrl, options);
-  }
-  return dedupeGoldStandardQuotes(quotes);
+  return parseGoldStandardPage(text, options).quotes;
 }
 
-function dedupeGoldStandardQuotes(quotes = []) {
-  const map = new Map();
-  for (const quote of quotes) {
-    const existing = map.get(quoteKey(quote));
-    if (!existing) {
-      map.set(quoteKey(quote), quote);
-      continue;
-    }
-    const preferNext = String(quote.raw_payload?.source_method || "").includes("playwright")
-      && !String(existing.raw_payload?.source_method || "").includes("playwright");
-    map.set(quoteKey(quote), preferNext ? quote : existing);
-  }
-  return [...map.values()];
+function dedupeGoldStandardQuotes(quotes = [], invalidKeys = new Set()) {
+  return uniqueVerifiedQuotes(quotes, invalidKeys);
 }
 
 export async function fetchGoldStandardPage(url = GOLD_STANDARD_DEFAULT_URL, options = {}) {
@@ -318,7 +343,7 @@ export async function fetchGoldStandardPage(url = GOLD_STANDARD_DEFAULT_URL, opt
   return {
     url: response.url || url,
     html,
-    text: extractReadableTextFromHtml(html),
+    text: officialText(html),
     method: "safe_external_fetch"
   };
 }
@@ -352,85 +377,7 @@ function requiredMissingDefinitions(quotes = []) {
   return GOLD_STANDARD_DEFINITIONS.filter((definition) => definition.required && !found.has(definition.key));
 }
 
-async function extractGoldStandardQuotesWithAi(pageTexts = [], options = {}) {
-  if (!options.openai) return { quotes: [], warnings: ["AI fallback Gold Standard non disponibile: OPENAI_API_KEY non configurata sul backend."] };
-  const systemPrompt = "Sei un estrattore dati OroActive per il competitor Gold Standard. Devi estrarre solo quotazioni chiaramente visibili nel riquadro prezzi: quotazione dell'oro in borsa, Acquistiamo ORO 18K prezzo MIN, Acquistiamo ORO 24K al prezzo MIN. Non inventare dati. Restituisci solo JSON valido.";
-  const userPrompt = `Analizza il testo pubblico Gold Standard. Estrai solo:
-1. Quotazione dell'oro in borsa
-2. Acquistiamo ORO 18K prezzo MIN
-3. Acquistiamo ORO 24K al prezzo MIN
-Eventuali quotazioni argento solo se esplicite.
 
-TESTO:
-${pageTexts.map((page) => `URL: ${page.url}\n${String(page.text || "").replace(/\s+/g, " ").trim()}`).join("\n\n---\n\n").slice(0, Number(options.maxTextChars || 12000))}`;
-  const response = await options.openai.responses.create({
-    model: options.model || "gpt-4.1-mini",
-    input: `${systemPrompt}\n\n${userPrompt}`,
-    text: {
-      format: {
-        type: "json_schema",
-        name: "gold_standard_quote_extraction",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            found: { type: "boolean" },
-            quotes: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  metal: { type: "string", enum: ["gold", "silver"] },
-                  purity_code: { type: "string" },
-                  purity_value: { type: "number" },
-                  price: { type: "number" },
-                  unit: { type: "string" },
-                  quote_type: { type: "string", enum: ["customer_buyback", "reference_market_gold_price", "reference_market_silver_price"] },
-                  price_kind: { type: ["string", "null"] },
-                  evidence_text: { type: "string" },
-                  confidence: { type: "string", enum: ["low", "medium", "high"] },
-                  page_url: { type: "string" }
-                },
-                required: ["metal", "purity_code", "purity_value", "price", "unit", "quote_type", "price_kind", "evidence_text", "confidence", "page_url"]
-              }
-            },
-            warnings: { type: "array", items: { type: "string" } },
-            notes: { type: "string" }
-          },
-          required: ["found", "quotes", "warnings", "notes"]
-        }
-      }
-    }
-  });
-  const parsed = JSON.parse(response.output_text || "{}");
-  const quotes = (parsed.quotes || []).map((quote) => {
-    const definition = GOLD_STANDARD_DEFINITIONS.find((item) => (
-      item.metal === quote.metal
-      && item.purity_code === quote.purity_code
-      && item.quote_type === quote.quote_type
-    ));
-    const price = Number(quote.price || 0);
-    if (!definition || !price || !quote.evidence_text) return null;
-    const unit = unitFromText(quote.unit || definition.defaultUnit || "EUR/g", definition.defaultUnit || "EUR/g");
-    return goldStandardQuote(definition, price, quote.page_url || options.sourceUrl || GOLD_STANDARD_DEFAULT_URL, {
-      source_method: "ai_fallback",
-      matched_text: quote.evidence_text,
-      ai_response: parsed,
-      unit,
-      price_kind: quote.price_kind || definition.price_kind || null
-    }, {
-      ...options,
-      unit,
-      extractionMethod: "ai_gold_standard_fallback",
-      confidence: quote.confidence || "medium",
-      aiConfidence: quote.confidence || "medium",
-      aiExtracted: true
-    });
-  }).filter(Boolean);
-  return { quotes: dedupeGoldStandardQuotes(quotes), warnings: parsed.warnings || [] };
-}
 
 export function createGoldStandardExtractor(options = {}) {
   const config = {
@@ -438,10 +385,6 @@ export function createGoldStandardExtractor(options = {}) {
     timeoutMs: Number(options.timeoutMs || 15000),
     maxBytes: Math.min(Number(options.maxBytes || GOLD_STANDARD_HTML_MAX_BYTES), GOLD_STANDARD_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    useAiFallback: Boolean(options.useAiFallback),
-    openai: options.openai || null,
-    model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000),
     fetchImpl: options.fetchImpl,
     resolver: options.resolver,
     signal: options.signal
@@ -454,33 +397,33 @@ export function createGoldStandardExtractor(options = {}) {
     try {
       const homepage = await fetchGoldStandardPage(runtime.url, runtime);
       pages.push(homepage);
-      const quoteUrls = discoverGoldStandardQuoteUrls(homepage.html, homepage.url || runtime.url);
-      for (const quoteUrl of quoteUrls) {
-        if (pages.some((page) => page.url === quoteUrl)) continue;
-        const page = await fetchGoldStandardPage(quoteUrl, runtime).catch((error) => {
-          warnings.push(`Pagina Gold Standard non leggibile ${quoteUrl}: ${error.message || "errore fetch"}`);
-          return null;
-        });
-        if (page) pages.push(page);
-        if (pages.length >= 5) break;
-      }
+
     } catch (error) {
       warnings.push(`Homepage Gold Standard non leggibile: ${error.message || "errore fetch"}`);
     }
 
-    let quotes = dedupeGoldStandardQuotes(pages.flatMap((page) => extractGoldStandardQuotesFromText(`${page.text}\n${page.html || ""}`, {
-      ...runtime,
-      sourceUrl: page.url || runtime.url
-    })));
-
-    if (requiredMissingDefinitions(quotes).length && runtime.useAiFallback) {
-      const ai = await extractGoldStandardQuotesWithAi(pages, {
-        ...runtime,
-        sourceUrl: runtime.url
-      }).catch((error) => ({ quotes: [], warnings: [`AI fallback Gold Standard non riuscito: ${error.message || "errore AI"}`] }));
-      warnings.push(...(ai.warnings || []));
-      if (ai.quotes?.length) quotes = dedupeGoldStandardQuotes(quotes.concat(ai.quotes));
+    const quoteDate = runtime.quoteDate || new Date().toISOString();
+    const preliminary = pages.map((page) => parseGoldStandardPage(page.text, { ...runtime, goldUnitEvidence: null, quoteDate, sourceUrl: page.url || runtime.url }));
+    let goldUnitEvidence = null;
+    let unitEvidencePage = null;
+    if (preliminary.some((page) => page.needsGoldUnitEvidence)) {
+      unitEvidencePage = pages.find((page) => page.url === GOLD_STANDARD_GOLD_UNIT_URL)
+        || await fetchGoldStandardPage(GOLD_STANDARD_GOLD_UNIT_URL, runtime).catch((error) => {
+          warnings.push(`Unità ufficiale Gold Standard non leggibile: ${error.message || "errore fetch"}`);
+          return null;
+        });
+      goldUnitEvidence = goldUnitEvidenceFromPage(unitEvidencePage || {});
+      if (!goldUnitEvidence) warnings.push("Unità dell'oro non verificabile nella dichiarazione ufficiale Gold Standard. Nessuna unità dedotta dai prezzi.");
     }
+    const analyses = pages.map((page) => parseGoldStandardPage(page.text, { ...runtime, goldUnitEvidence, quoteDate, sourceUrl: page.url || runtime.url }));
+    const invalidKeys = new Set(analyses.flatMap((page) => [...page.invalidKeys]));
+    const quotes = dedupeGoldStandardQuotes(analyses.flatMap((page) => page.quotes), invalidKeys);
+    const missingFields = requiredMissingDefinitions(quotes).map((definition) => ({
+      field_key: definition.key, metal: definition.metal, purity_code: definition.purity_code, quote_type: definition.quote_type,
+      error: definition.key === "gold_standard_silver_reference"
+        ? "Quotazione argento in borsa: prezzo o unità ufficiale non verificabile. Nessuna unità dedotta dal valore numerico."
+        : `${definition.label}: nessun prezzo ufficiale univoco verificabile.`
+    }));
 
     for (const definition of requiredMissingDefinitions(quotes)) {
       warnings.push(`Prezzo ${definition.label} Gold Standard non rilevato automaticamente.`);
@@ -491,11 +434,13 @@ export function createGoldStandardExtractor(options = {}) {
     const status = foundCount === requiredCount ? "success" : foundCount ? "partial" : "failed";
     return {
       source: "gold_standard",
+      verified_only: true,
+      missing_fields: missingFields,
       status,
       quotes,
-      error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),
+      error: status === "success" ? "" : warnings.concat(missingFields.map((field) => field.error)).filter(Boolean).join(" | ").slice(0, 1200),
       warnings,
-      pages_analyzed: pages.map((page) => page.url)
+      pages_analyzed: [...new Set(pages.map((page) => page.url).concat(unitEvidencePage?.url || []))]
     };
   }
 

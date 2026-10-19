@@ -154,6 +154,10 @@ function compactText(value = "") {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function officialText(value = "") {
+  return compactText(extractReadableTextFromHtml(decodeHtml(String(value || "").replace(/<!--[\s\S]*?-->/g, " "))));
+}
+
 function decodeHtml(value = "") {
   return String(value || "")
     .replace(/&nbsp;/gi, " ")
@@ -174,6 +178,7 @@ export function parseItalianEuroPrice(value = "") {
   const raw = String(value || "").replace(/\u00a0/g, " ").replace(/[^\d,.\s]/g, "").trim();
   if (!raw) return 0;
   const compact = raw.replace(/\s+/g, "");
+  if (!/^(?:\d+|\d+[,.]\d+|\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?)$/.test(compact)) return 0;
   if (compact.includes(",") && compact.includes(".")) {
     const commaIndex = compact.lastIndexOf(",");
     const dotIndex = compact.lastIndexOf(".");
@@ -210,71 +215,42 @@ function quoteKey(quote = {}) {
   return `${quote.metal}:${quote.purity_code}:${quote.quote_type}:${quote.raw_payload?.pronto_gold_key || ""}`;
 }
 
-function pricePattern() {
-  return "([0-9][0-9.,]*)\\s*(?:€|eur|euro)?\\s*(?:\\/\\s*)?(?:Grammo|grammo|grammi|g|gr)?";
-}
-
-function findAnchorSnippet(text = "", anchor = "", maxDistance = 460) {
-  const source = String(text || "");
-  const anchorRegex = new RegExp(escapeRegex(anchor), "i");
-  const anchorMatch = source.match(anchorRegex);
-  if (!anchorMatch || anchorMatch.index === undefined) return "";
-  return source.slice(anchorMatch.index, anchorMatch.index + maxDistance);
-}
-
 export function parseProntoGoldProviderTimestamp(text = "") {
-  const normalized = compactText(decodeHtml(text));
+  const normalized = officialText(text);
   const match = normalized.match(/Aggiornamento:\s*([a-zàèéìòù]+)?\s*(\d{2})-(\d{2})-(\d{2,4})\s+(\d{2}):(\d{2}):(\d{2})/i);
   if (!match) return { text: "", iso: null };
   const [, day = "", dd, mm, yy, hh, min, ss] = match;
-  const year = yy.length === 2 ? 2000 + Number(yy) : Number(yy);
-  const date = new Date(Date.UTC(year, Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss)));
   return {
     text: compactText(`${day} ${dd}-${mm}-${yy} ${hh}:${min}:${ss}`),
-    iso: Number.isNaN(date.getTime()) ? null : date.toISOString()
+    iso: null
   };
 }
 
-function parseLabelPrice(snippet = "", label = "") {
-  const regex = new RegExp(`${escapeRegex(label)}\\s*${pricePattern()}`, "i");
-  const match = snippet.match(regex);
-  if (!match) return null;
-  const price = parseItalianEuroPrice(match[1]);
-  if (!price) return null;
-  return {
-    value: price,
-    evidenceText: compactText(snippet.slice(0, match.index + match[0].length)).slice(0, 700),
-    unit: unitFromText(match[0], "EUR/g")
-  };
-}
+const PRONTO_GOLD_PRICE = "([0-9][0-9.,]*)\\s*(?:Euro|EUR|€)\\s*\\/\\s*(?:Grammo|grammi|gr|g)\\b";
 
-function parseFirstPrice(snippet = "") {
-  const regex = new RegExp(pricePattern(), "i");
-  const match = snippet.match(regex);
-  if (!match) return null;
-  const price = parseItalianEuroPrice(match[1]);
-  if (!price) return null;
-  return {
-    value: price,
-    evidenceText: compactText(snippet.slice(0, match.index + match[0].length)).slice(0, 700),
-    unit: unitFromText(match[0], "EUR/g")
-  };
-}
-
-function parseRangePrice(snippet = "") {
-  const regex = new RegExp(`\\bda\\s*${pricePattern()}[\\s\\S]{0,120}?\\ba\\s*${pricePattern()}`, "i");
-  const match = snippet.match(regex);
-  if (!match) return null;
-  const min = parseItalianEuroPrice(match[1]);
-  const max = parseItalianEuroPrice(match[2]);
-  if (!min || !max) return null;
-  return {
-    value: Math.max(min, max),
-    min,
-    max,
-    evidenceText: compactText(snippet.slice(0, match.index + match[0].length)).slice(0, 700),
-    unit: unitFromText(match[0], "EUR/g")
-  };
+function publishedPricesForDefinition(segment = "", definition = {}) {
+  const prices = [];
+  if (definition.price_kind === "range") {
+    const match = segment.match(new RegExp(`^\\s*da\\s*${PRONTO_GOLD_PRICE}\\s+a\\s*${PRONTO_GOLD_PRICE}`, "i"));
+    const min = match ? parseItalianEuroPrice(match[1]) : 0;
+    const max = match ? parseItalianEuroPrice(match[2]) : 0;
+    if (Number.isFinite(min) && Number.isFinite(max) && min > 0 && max >= min) prices.push({ value: max, min, max, evidenceText: match[0] });
+  } else if (definition.priceLabel) {
+    const labels = [...segment.matchAll(/\b(?:Acquisto|Vendita)\b/gi)];
+    for (let index = 0; index < labels.length; index += 1) {
+      const label = labels[index];
+      if (label[0].toLowerCase() !== definition.priceLabel.toLowerCase()) continue;
+      const field = segment.slice(label.index + label[0].length, labels[index + 1]?.index ?? segment.length);
+      const match = field.match(new RegExp(`^\\s*${PRONTO_GOLD_PRICE}`, "i"));
+      const value = match ? parseItalianEuroPrice(match[1]) : 0;
+      if (Number.isFinite(value) && value > 0) prices.push({ value, evidenceText: `${label[0]}${match[0]}` });
+    }
+  } else {
+    const match = segment.match(new RegExp(`^\\s*sulle\\s+Borse\\s+internazionali\\s*${PRONTO_GOLD_PRICE}`, "i"));
+    const value = match ? parseItalianEuroPrice(match[1]) : 0;
+    if (Number.isFinite(value) && value > 0) prices.push({ value, evidenceText: match[0] });
+  }
+  return prices;
 }
 
 function prontoGoldEvidence(definition = {}, price = 0, unit = "EUR/g", matchedText = "") {
@@ -285,7 +261,7 @@ function prontoGoldEvidence(definition = {}, price = 0, unit = "EUR/g", matchedT
 function prontoGoldQuote(definition = {}, price = 0, sourceUrl = PRONTO_GOLD_QUOTE_URL, rawPayload = {}, options = {}) {
   const unit = unitFromText(options.unit || rawPayload.unit || definition.defaultUnit || "EUR/g", definition.defaultUnit || "EUR/g");
   const priceGram = pricePerGram(price, unit);
-  const quoteDate = options.quoteDate || rawPayload.provider_timestamp || new Date().toISOString();
+  const quoteDate = options.quoteDate || new Date().toISOString();
   return {
     source_id: options.source_id || options.sourceId || null,
     competitor_name: "Pronto Gold",
@@ -299,13 +275,14 @@ function prontoGoldQuote(definition = {}, price = 0, sourceUrl = PRONTO_GOLD_QUO
     extraction_method: options.extractionMethod || "auto_pronto_gold_parser",
     confidence: options.confidence || "high",
     ai_confidence: options.aiConfidence || options.confidence || "high",
-    ai_extracted: Boolean(options.aiExtracted),
+    ai_extracted: false,
     quote_type: definition.quote_type,
     evidence_text: prontoGoldEvidence(definition, price, unit, rawPayload.matched_text),
     url: sourceUrl,
     source_url: sourceUrl,
     raw_payload: {
       ...rawPayload,
+      verified_official: true,
       pronto_gold_key: definition.key,
       pronto_gold_mapping: definition.purity_code,
       pronto_gold_quote_type: definition.quote_type,
@@ -319,59 +296,46 @@ function prontoGoldQuote(definition = {}, price = 0, sourceUrl = PRONTO_GOLD_QUO
   };
 }
 
-function quoteForDefinition(text = "", definition = {}, sourceUrl = PRONTO_GOLD_QUOTE_URL, options = {}) {
-  const snippet = findAnchorSnippet(text, definition.anchor || definition.label, definition.key.includes("18kt") ? 520 : 420);
-  if (!snippet) return null;
-  let parsed = null;
-  if (definition.price_kind === "range") parsed = parseRangePrice(snippet);
-  else if (definition.priceLabel) parsed = parseLabelPrice(snippet, definition.priceLabel);
-  else parsed = parseFirstPrice(snippet);
-  if (!parsed?.value) return null;
-  const provider = options.providerTimestamp || {};
-  return prontoGoldQuote(definition, parsed.value, sourceUrl, {
-    source_method: "text_regex",
-    matched_text: parsed.evidenceText,
-    unit: parsed.unit || definition.defaultUnit || "EUR/g",
-    provider_timestamp_text: provider.text || "",
-    provider_timestamp: provider.iso || null,
-    range_min_per_gram: parsed.min || null,
-    range_max_per_gram: parsed.max || null,
-    price_kind: definition.price_kind || null
-  }, {
-    ...options,
-    quoteDate: provider.iso || options.quoteDate || new Date().toISOString(),
-    unit: parsed.unit || definition.defaultUnit || "EUR/g"
-  });
-}
-
 export function extractProntoGoldQuotesFromText(text = "", options = {}) {
   const sourceUrl = options.sourceUrl || PRONTO_GOLD_QUOTE_URL;
-  const normalized = compactText(decodeHtml(text));
+  const normalized = officialText(text);
   const providerTimestamp = parseProntoGoldProviderTimestamp(normalized);
+  const labels = [...normalized.matchAll(/\b(?:Valore\s+dell[’'](?:ORO|ARGENTO)\b|ORO\s+PURO\s*\d+\s*(?:kt|k)\b|Compro\s+ORO\s+usato\s*\d+\s*(?:kt|k)\b|ARGENTO\s+PURO\b|Compro\s+ARGENTO\s+usato\s*\d+\b)/gi)];
   const quotes = [];
-  for (const definition of PRONTO_GOLD_DEFINITIONS) {
-    const quote = quoteForDefinition(normalized, definition, sourceUrl, {
-      ...options,
-      providerTimestamp
-    });
-    if (quote) quotes.push(quote);
+  for (let index = 0; index < labels.length; index += 1) {
+    const label = labels[index];
+    const segment = normalized.slice(label.index + label[0].length, labels[index + 1]?.index ?? normalized.length);
+    const definitions = PRONTO_GOLD_DEFINITIONS.filter((definition) => new RegExp(`^${escapeRegex(definition.anchor)}$`, "i").test(label[0]));
+    for (const definition of definitions) {
+      for (const parsed of publishedPricesForDefinition(segment, definition)) {
+        quotes.push(prontoGoldQuote(definition, parsed.value, sourceUrl, {
+          source_method: "text_regex",
+          matched_text: `${label[0]} ${parsed.evidenceText}`,
+          unit: "EUR/g",
+          provider_timestamp_text: providerTimestamp.text,
+          provider_timestamp: providerTimestamp.iso,
+          range_min_per_gram: parsed.min ?? null,
+          range_max_per_gram: parsed.max ?? null,
+          price_kind: definition.price_kind
+        }, { ...options, unit: "EUR/g" }));
+      }
+    }
   }
   return dedupeProntoGoldQuotes(quotes);
 }
 
 function dedupeProntoGoldQuotes(quotes = []) {
   const map = new Map();
+  const conflicts = new Set();
   for (const quote of quotes) {
-    const existing = map.get(quoteKey(quote));
-    if (!existing) {
-      map.set(quoteKey(quote), quote);
-      continue;
-    }
-    const preferNext = String(quote.raw_payload?.source_method || "").includes("playwright")
-      && !String(existing.raw_payload?.source_method || "").includes("playwright");
-    map.set(quoteKey(quote), preferNext ? quote : existing);
+    const key = quoteKey(quote);
+    const previous = map.get(key);
+    if (previous && (previous.price_per_gram !== quote.price_per_gram
+      || previous.raw_payload.range_min_per_gram !== quote.raw_payload.range_min_per_gram
+      || previous.raw_payload.range_max_per_gram !== quote.raw_payload.range_max_per_gram)) conflicts.add(key);
+    else map.set(key, quote);
   }
-  return [...map.values()];
+  return [...map.entries()].filter(([key]) => !conflicts.has(key)).map(([, quote]) => quote);
 }
 
 export async function fetchProntoGoldPage(url = PRONTO_GOLD_DEFAULT_URL, options = {}) {
@@ -401,7 +365,7 @@ export async function fetchProntoGoldPage(url = PRONTO_GOLD_DEFAULT_URL, options
   return {
     url: response.url || url,
     html,
-    text: extractReadableTextFromHtml(html),
+    text: officialText(html),
     method: "safe_external_fetch"
   };
 }
@@ -435,103 +399,6 @@ function requiredMissingDefinitions(quotes = []) {
   return PRONTO_GOLD_DEFINITIONS.filter((definition) => definition.required && !found.has(definition.key));
 }
 
-async function extractProntoGoldQuotesWithAi(pageTexts = [], options = {}) {
-  if (!options.openai) return { quotes: [], warnings: ["AI fallback Pronto Gold non disponibile: OPENAI_API_KEY non configurata sul backend."] };
-  const systemPrompt = "Sei un estrattore dati OroActive per il competitor Pronto Gold. Devi estrarre SOLO dal riquadro pubblico quotazioni oro/argento, distinguendo reference borsa, prezzi di acquisto cliente e prezzi di vendita. Non usare prezzi monete. Non inventare dati. Restituisci solo JSON valido.";
-  const userPrompt = `Analizza il testo pubblico Pronto Gold e cerca solo questi dati:
-1. Valore dell'ORO sulle Borse internazionali, quote_type reference_market_gold_price
-2. ORO PURO 24k Acquisto, quote_type customer_buyback
-3. ORO PURO 24k Vendita, quote_type sell_price
-4. Compro ORO usato 18k da X a Y, quote_type customer_buyback, usare price=max e includere range_min/range_max
-5. Compro ORO usato 14k Acquisto, quote_type customer_buyback
-6. Compro ORO usato 9k Acquisto, quote_type customer_buyback
-7. Valore dell'ARGENTO sulle Borse internazionali, quote_type reference_market_silver_price
-8. ARGENTO PURO Acquisto, quote_type customer_buyback
-9. ARGENTO PURO Vendita, quote_type sell_price
-10. Compro ARGENTO usato 925 Acquisto, quote_type customer_buyback
-11. Compro ARGENTO usato 800 Acquisto, quote_type customer_buyback
-Ignora completamente la colonna monete. Se un prezzo non e chiaramente presente, non inventarlo.
-
-TESTO:
-${pageTexts.map((page) => `URL: ${page.url}\n${String(page.text || "").replace(/\s+/g, " ").trim()}`).join("\n\n---\n\n").slice(0, Number(options.maxTextChars || 12000))}`;
-  const response = await options.openai.responses.create({
-    model: options.model || "gpt-4.1-mini",
-    input: `${systemPrompt}\n\n${userPrompt}`,
-    text: {
-      format: {
-        type: "json_schema",
-        name: "pronto_gold_quote_extraction",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            found: { type: "boolean" },
-            provider_timestamp_text: { type: "string" },
-            quotes: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  key: { type: "string" },
-                  metal: { type: "string", enum: ["gold", "silver"] },
-                  purity_code: { type: "string" },
-                  purity_value: { type: "number" },
-                  price: { type: "number" },
-                  unit: { type: "string" },
-                  quote_type: { type: "string", enum: ["customer_buyback", "reference_market_gold_price", "reference_market_silver_price", "sell_price"] },
-                  price_kind: { type: "string" },
-                  range_min: { type: ["number", "null"] },
-                  range_max: { type: ["number", "null"] },
-                  evidence_text: { type: "string" },
-                  confidence: { type: "string", enum: ["low", "medium", "high"] },
-                  page_url: { type: "string" }
-                },
-                required: ["key", "metal", "purity_code", "purity_value", "price", "unit", "quote_type", "price_kind", "range_min", "range_max", "evidence_text", "confidence", "page_url"]
-              }
-            },
-            warnings: { type: "array", items: { type: "string" } },
-            notes: { type: "string" }
-          },
-          required: ["found", "provider_timestamp_text", "quotes", "warnings", "notes"]
-        }
-      }
-    }
-  });
-  const parsed = JSON.parse(response.output_text || "{}");
-  const providerTimestamp = parseProntoGoldProviderTimestamp(parsed.provider_timestamp_text || "");
-  const quotes = (parsed.quotes || []).map((quote) => {
-    const definition = PRONTO_GOLD_DEFINITIONS.find((item) => (
-      item.key === quote.key
-      || (item.metal === quote.metal && item.purity_code === quote.purity_code && item.quote_type === quote.quote_type && item.price_kind === quote.price_kind)
-    ));
-    const price = Number(quote.price || 0);
-    if (!definition || !price || !quote.evidence_text) return null;
-    const unit = unitFromText(quote.unit || definition.defaultUnit || "EUR/g", definition.defaultUnit || "EUR/g");
-    return prontoGoldQuote(definition, price, quote.page_url || options.sourceUrl || PRONTO_GOLD_QUOTE_URL, {
-      source_method: "ai_fallback",
-      matched_text: quote.evidence_text,
-      ai_response: parsed,
-      unit,
-      provider_timestamp_text: providerTimestamp.text || parsed.provider_timestamp_text || "",
-      provider_timestamp: providerTimestamp.iso || null,
-      range_min_per_gram: quote.range_min || null,
-      range_max_per_gram: quote.range_max || null,
-      price_kind: quote.price_kind || definition.price_kind || null
-    }, {
-      ...options,
-      unit,
-      quoteDate: providerTimestamp.iso || options.quoteDate || new Date().toISOString(),
-      extractionMethod: "ai_pronto_gold_fallback",
-      confidence: quote.confidence || "medium",
-      aiConfidence: quote.confidence || "medium",
-      aiExtracted: true
-    });
-  }).filter(Boolean);
-  return { quotes: dedupeProntoGoldQuotes(quotes), warnings: parsed.warnings || [] };
-}
-
 export function createProntoGoldExtractor(options = {}) {
   const config = {
     url: options.url || PRONTO_GOLD_DEFAULT_URL,
@@ -539,10 +406,6 @@ export function createProntoGoldExtractor(options = {}) {
     timeoutMs: Number(options.timeoutMs || 15000),
     maxBytes: Math.min(Number(options.maxBytes || PRONTO_GOLD_HTML_MAX_BYTES), PRONTO_GOLD_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    useAiFallback: Boolean(options.useAiFallback),
-    openai: options.openai || null,
-    model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000),
     fetchImpl: options.fetchImpl,
     resolver: options.resolver,
     signal: options.signal
@@ -553,50 +416,28 @@ export function createProntoGoldExtractor(options = {}) {
     const warnings = [];
     const pages = [];
     try {
-      const homepage = await fetchProntoGoldPage(runtime.url, runtime);
-      pages.push(homepage);
-      const quoteUrls = discoverProntoGoldQuoteUrls(homepage.html, homepage.url || runtime.url, runtime.quoteUrl);
-      for (const quoteUrl of quoteUrls) {
-        if (pages.some((page) => page.url === quoteUrl)) continue;
-        const page = await fetchProntoGoldPage(quoteUrl, runtime).catch((error) => {
-          warnings.push(`Pagina Pronto Gold non leggibile ${quoteUrl}: ${error.message || "errore fetch"}`);
-          return null;
-        });
-        if (page) pages.push(page);
-        if (pages.length >= 8) break;
-      }
+      const page = await fetchProntoGoldPage(runtime.quoteUrl || runtime.url, runtime);
+      pages.push(page);
     } catch (error) {
-      warnings.push(`Homepage Pronto Gold non leggibile: ${error.message || "errore fetch"}`);
-      const quotePage = await fetchProntoGoldPage(runtime.quoteUrl, runtime).catch((quoteError) => {
-        warnings.push(`Pagina quotazioni Pronto Gold non leggibile: ${quoteError.message || "errore fetch"}`);
-        return null;
-      });
-      if (quotePage) pages.push(quotePage);
+      warnings.push(`Pagina quotazioni Pronto Gold non leggibile: ${error.message || "errore fetch"}`);
     }
-
-    let quotes = dedupeProntoGoldQuotes(pages.flatMap((page) => extractProntoGoldQuotesFromText(`${page.text}\n${page.html || ""}`, {
+    const quotes = dedupeProntoGoldQuotes(pages.flatMap((page) => extractProntoGoldQuotesFromText(page.text, {
       ...runtime,
       sourceUrl: page.url || runtime.quoteUrl
     })));
-
-    if (requiredMissingDefinitions(quotes).length && runtime.useAiFallback) {
-      const ai = await extractProntoGoldQuotesWithAi(pages, {
-        ...runtime,
-        sourceUrl: runtime.quoteUrl
-      }).catch((error) => ({ quotes: [], warnings: [`AI fallback Pronto Gold non riuscito: ${error.message || "errore AI"}`] }));
-      warnings.push(...(ai.warnings || []));
-      if (ai.quotes?.length) quotes = dedupeProntoGoldQuotes(quotes.concat(ai.quotes));
-    }
-
-    for (const definition of requiredMissingDefinitions(quotes)) {
-      warnings.push(`Prezzo ${definition.label} Pronto Gold non rilevato automaticamente.`);
-    }
-
-    const requiredCount = PRONTO_GOLD_DEFINITIONS.filter((definition) => definition.required).length;
-    const foundCount = requiredCount - requiredMissingDefinitions(quotes).length;
-    const status = foundCount === requiredCount ? "success" : foundCount ? "partial" : "failed";
+    const missingFields = requiredMissingDefinitions(quotes).map((definition) => ({
+      field_key: definition.key,
+      metal: definition.metal,
+      purity_code: definition.purity_code,
+      quote_type: definition.quote_type,
+      error: `${definition.label}: nessun prezzo verificabile nella fonte ufficiale. Nessuna stima utilizzata.`
+    }));
+    warnings.push(...missingFields.map((field) => field.error));
+    const status = missingFields.length === 0 ? "success" : quotes.length ? "partial" : "failed";
     return {
       source: "pronto_gold",
+      verified_only: true,
+      missing_fields: missingFields,
       status,
       quotes,
       error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),

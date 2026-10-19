@@ -21,10 +21,15 @@ function compactText(value = "") {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function officialText(value = "") {
+  return compactText(extractReadableTextFromHtml(String(value || "").replace(/<!--[\s\S]*?-->/g, " ")));
+}
+
 export function parseItalianEuroPrice(value = "") {
   const raw = String(value || "").replace(/\u00a0/g, " ").replace(/[^\d,.\s]/g, "").trim();
   if (!raw) return 0;
   const compact = raw.replace(/\s+/g, "");
+  if (!/^(?:\d+|\d+[,.]\d+|\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?)$/.test(compact)) return 0;
   if (compact.includes(",") && compact.includes(".")) {
     const commaIndex = compact.lastIndexOf(",");
     const dotIndex = compact.lastIndexOf(".");
@@ -82,13 +87,14 @@ function amicoOroQuote(definition = {}, price = 0, sourceUrl = AMICO_ORO_DEFAULT
     extraction_method: options.extractionMethod || "auto_amico_oro_parser",
     confidence: options.confidence || "high",
     ai_confidence: options.aiConfidence || options.confidence || "high",
-    ai_extracted: Boolean(options.aiExtracted),
+    ai_extracted: false,
     quote_type: "customer_buyback",
     evidence_text: amicoOroEvidence(definition, price, unit, rawPayload.matched_text),
     url: sourceUrl,
     source_url: sourceUrl,
     raw_payload: {
       ...rawPayload,
+      verified_official: true,
       amico_oro_key: definition.key,
       amico_oro_mapping: definition.purity_code
     }
@@ -115,125 +121,44 @@ export async function fetchAmicoOroPage(url = AMICO_ORO_DEFAULT_URL, options = {
   return {
     url: response.url || url,
     html,
-    text: extractReadableTextFromHtml(html),
+    text: officialText(html),
     method: "safe_external_fetch"
   };
 }
 
-function goldRegexForKarat(karat = "") {
-  return new RegExp(`\\b${karat}\\s*(?:k|kt|carati|carato)\\b\\s*al\\s*(?:gr|g|grammo|grammi)\\s*[=:]?\\s*(?:€\\s*)?([0-9][0-9.,]*)\\s*(?:€|eur|euro)`, "i");
-}
-
-function silverRegexForTitle(title = "") {
-  return new RegExp(`\\b${title}\\b\\s*al\\s*(kg|chilogrammo|chilo|kilo|gr|g|grammo|grammi)\\s*[=:]?\\s*(?:€\\s*)?([0-9][0-9.,]*)\\s*(?:€|eur|euro)?`, "i");
-}
-
 export function extractAmicoOroQuotesFromText(text = "", options = {}) {
   const sourceUrl = options.sourceUrl || AMICO_ORO_DEFAULT_URL;
-  const normalized = compactText(text);
-  const quotes = [];
-  for (const definition of AMICO_ORO_GOLD_DEFINITIONS) {
-    const match = normalized.match(goldRegexForKarat(definition.karat));
+  const normalized = officialText(text);
+  const definitions = [...AMICO_ORO_GOLD_DEFINITIONS, ...AMICO_ORO_SILVER_DEFINITIONS];
+  const labels = [...normalized.matchAll(/\b(?:(\d{1,2})\s*(?:kt|k|carati|carato)\s+al\s+(chilogrammo|grammi|grammo|chilo|kilo|kg|gr|g)|(\d{3})\s+al\s+(chilogrammo|grammi|grammo|chilo|kilo|kg|gr|g))\b/gi)];
+  const minimum = normalized.match(/minimo\s+(\d+)\s*grammi?\s+di\s+oro\s+e\s+(\d+(?:[.,]\d+)?)\s*kg\s+di\s+argento/i);
+  const conditionText = normalized.match(/Data\s+l['’]alta\s+volatilit[àa][\s\S]*?minimo\s+\d+\s*grammi?\s+di\s+oro\s+e\s+\d+(?:[.,]\d+)?\s*kg\s+di\s+argento/i)?.[0] || minimum?.[0] || "";
+  const quotes = new Map();
+  const conflicts = new Set();
+  for (let index = 0; index < labels.length; index += 1) {
+    const label = labels[index];
+    const metal = label[1] ? "gold" : "silver";
+    const code = label[1] ? `${label[1]}kt` : label[3];
+    const definition = definitions.find((item) => item.metal === metal && item.purity_code === code);
+    if (!definition || (metal === "silver" && !/\bargento\b/i.test(normalized.slice(0, label.index)))) continue;
+    const unit = unitFromText(label[2] || label[4]);
+    if ((metal === "gold" && unit !== "EUR/g") || (metal === "silver" && unit !== "EUR/kg")) continue;
+    const segment = normalized.slice(label.index + label[0].length, labels[index + 1]?.index ?? normalized.length);
+    const match = segment.match(/^\s*[=:]?\s*([0-9][0-9.,]*)\s*(?:€|EUR|euro)(?=\s|$)/i);
     const price = match ? parseItalianEuroPrice(match[1]) : 0;
-    if (!price) continue;
-    quotes.push(amicoOroQuote(definition, price, sourceUrl, {
+    if (!Number.isFinite(price) || price <= 0) continue;
+    const quote = amicoOroQuote(definition, price, sourceUrl, {
       source_method: "text_regex",
-      matched_text: match[0],
-      unit: "EUR/g"
-    }, options));
-  }
-
-  const argentoIndex = normalized.toLowerCase().indexOf("argento");
-  const silverText = argentoIndex >= 0 ? normalized.slice(argentoIndex, argentoIndex + 1200) : "";
-  if (silverText) {
-    for (const definition of AMICO_ORO_SILVER_DEFINITIONS) {
-      const match = silverText.match(silverRegexForTitle(definition.title));
-      const unit = match ? unitFromText(match[1]) : "EUR/kg";
-      const price = match ? parseItalianEuroPrice(match[2]) : 0;
-      if (!price) continue;
-      quotes.push(amicoOroQuote(definition, price, sourceUrl, {
-        source_method: "text_regex",
-        matched_text: match[0],
-        unit
-      }, { ...options, unit }));
-    }
-  }
-  return quotes;
-}
-
-async function extractAmicoOroQuotesWithAi(pageText = "", options = {}) {
-  if (!options.openai) return { quotes: [], warnings: ["AI fallback non disponibile: OPENAI_API_KEY non configurata sul backend."] };
-  const systemPrompt = "Sei un estrattore dati OroActive per il competitor Amico Oro. Devi individuare esclusivamente quotazioni cliente nel testo pubblico: 24K al gr, 18K al gr, 14K al gr e solo eventuale argento chiaramente indicato. Non inventare prezzi. Se un prezzo non e chiaro, non restituirlo. Restituisci solo JSON valido.";
-  const userPrompt = `Analizza il testo pubblico Amico Oro. Estrai solo quotazioni nel formato tipo:
-- 24K al gr = prezzo €
-- 18K al gr = prezzo €
-- 14K al gr = prezzo €
-- eventuale argento 999/925/800 solo se chiaramente indicato
-
-I prezzi sono quotazioni di acquisto al cliente, non prezzi spot. Non inventare dati mancanti.
-
-TESTO:
-${String(pageText || "").replace(/\s+/g, " ").trim().slice(0, Number(options.maxTextChars || 12000))}`;
-  const response = await options.openai.responses.create({
-    model: options.model || "gpt-4.1-mini",
-    input: `${systemPrompt}\n\n${userPrompt}`,
-    text: {
-      format: {
-        type: "json_schema",
-        name: "amico_oro_quote_extraction",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            found: { type: "boolean" },
-            quotes: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  metal: { type: "string", enum: ["gold", "silver"] },
-                  purity_code: { type: "string" },
-                  purity_value: { type: ["number", "null"] },
-                  price: { type: "number" },
-                  unit: { type: "string" },
-                  evidence_text: { type: "string" },
-                  confidence: { type: "string", enum: ["low", "medium", "high"] }
-                },
-                required: ["metal", "purity_code", "purity_value", "price", "unit", "evidence_text", "confidence"]
-              }
-            },
-            warnings: { type: "array", items: { type: "string" } },
-            notes: { type: "string" }
-          },
-          required: ["found", "quotes", "warnings", "notes"]
-        }
-      }
-    }
-  });
-  const parsed = JSON.parse(response.output_text || "{}");
-  const allowedDefinitions = [...AMICO_ORO_GOLD_DEFINITIONS, ...AMICO_ORO_SILVER_DEFINITIONS];
-  const quotes = (parsed.quotes || []).map((quote) => {
-    const definition = allowedDefinitions.find((item) => item.metal === quote.metal && item.purity_code === quote.purity_code);
-    const price = Number(quote.price || 0);
-    if (!definition || !price || !quote.evidence_text) return null;
-    const unit = unitFromText(quote.unit || "EUR/g");
-    return amicoOroQuote(definition, price, options.sourceUrl || AMICO_ORO_DEFAULT_URL, {
-      source_method: "ai_fallback",
-      matched_text: quote.evidence_text,
-      ai_response: parsed,
-      unit
-    }, {
-      ...options,
+      matched_text: `${label[0]}${match[0]}`,
       unit,
-      extractionMethod: "ai_amico_oro_fallback",
-      confidence: quote.confidence || "medium",
-      aiConfidence: quote.confidence || "medium",
-      aiExtracted: true
-    });
-  }).filter(Boolean);
-  return { quotes, warnings: parsed.warnings || [] };
+      condition: conditionText,
+      condition_text: conditionText,
+      min_quantity_grams: minimum ? (metal === "gold" ? Number(minimum[1]) : Number(minimum[2].replace(",", ".")) * 1000) : null
+    }, { ...options, unit });
+    if (quotes.has(definition.key) && quotes.get(definition.key).price_per_gram !== quote.price_per_gram) conflicts.add(definition.key);
+    else quotes.set(definition.key, quote);
+  }
+  return [...quotes.entries()].filter(([key]) => !conflicts.has(key)).map(([, quote]) => quote);
 }
 
 export function createAmicoOroExtractor(options = {}) {
@@ -242,10 +167,6 @@ export function createAmicoOroExtractor(options = {}) {
     timeoutMs: Number(options.timeoutMs || 15000),
     maxBytes: Math.min(Number(options.maxBytes || AMICO_ORO_HTML_MAX_BYTES), AMICO_ORO_HTML_MAX_BYTES),
     userAgent: options.userAgent || "OroActiveBot/1.0",
-    useAiVisionFallback: Boolean(options.useAiVisionFallback),
-    openai: options.openai || null,
-    model: options.model || "gpt-4.1-mini",
-    maxTextChars: Number(options.maxTextChars || 12000),
     fetchImpl: options.fetchImpl,
     resolver: options.resolver,
     signal: options.signal
@@ -261,41 +182,29 @@ export function createAmicoOroExtractor(options = {}) {
       warnings.push(`Homepage Amico Oro non leggibile: ${error.message || "errore fetch"}`);
     }
 
-    let quotes = page?.text ? extractAmicoOroQuotesFromText(page.text, {
+    const quotes = page?.text ? extractAmicoOroQuotesFromText(page.text, {
       ...runtime,
       sourceUrl: page.url || runtime.url
     }) : [];
 
-    if (quotes.filter((quote) => quote.metal === "gold").length < AMICO_ORO_GOLD_DEFINITIONS.length && page?.text) {
-      const ai = await extractAmicoOroQuotesWithAi(page.text, {
-        ...runtime,
-        sourceUrl: page.url || runtime.url
-      }).catch((error) => ({ quotes: [], warnings: [`AI fallback Amico Oro non riuscito: ${error.message || "errore AI"}`] }));
-      warnings.push(...(ai.warnings || []));
-      if (ai.quotes?.length > quotes.length) quotes = ai.quotes;
-    }
-
-    if (quotes.filter((quote) => quote.metal === "gold").length < AMICO_ORO_GOLD_DEFINITIONS.length && runtime.useAiVisionFallback && !runtime.openai) {
-      warnings.push("AI vision fallback non disponibile.");
-    }
-
+    const definitions = [...AMICO_ORO_GOLD_DEFINITIONS, ...AMICO_ORO_SILVER_DEFINITIONS];
     const foundKeys = new Set(quotes.map((quote) => quote.raw_payload?.amico_oro_key));
-    for (const definition of AMICO_ORO_GOLD_DEFINITIONS) {
-      if (!foundKeys.has(definition.key)) warnings.push(`Prezzo ${definition.label} Amico Oro non rilevato automaticamente.`);
-    }
-    if (!quotes.some((quote) => quote.metal === "silver")) warnings.push("Dato argento Amico Oro non rilevato automaticamente.");
-
-    const goldCount = quotes.filter((quote) => quote.metal === "gold").length;
-    const status = goldCount === AMICO_ORO_GOLD_DEFINITIONS.length
-      ? "success"
-      : goldCount
-        ? "partial"
-        : "failed";
+    const missingFields = definitions.filter((definition) => !foundKeys.has(definition.key)).map((definition) => ({
+      field_key: definition.key,
+      metal: definition.metal,
+      purity_code: definition.purity_code,
+      quote_type: "customer_buyback",
+      error: `${definition.label}: nessun prezzo verificabile nella fonte ufficiale. Nessuna stima utilizzata.`
+    }));
+    warnings.push(...missingFields.map((field) => field.error));
+    const status = missingFields.length === 0 ? "success" : quotes.length ? "partial" : "failed";
     return {
       source: "amico_oro",
+      verified_only: true,
+      missing_fields: missingFields,
       status,
       quotes,
-      error: warnings.filter(Boolean).join(" | ").slice(0, 1200),
+      error: status === "success" ? "" : warnings.filter(Boolean).join(" | ").slice(0, 1200),
       warnings
     };
   }

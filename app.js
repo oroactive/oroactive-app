@@ -230,7 +230,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261019-reliability-32";
+const OROACTIVE_CLIENT_BUILD_ID = "20261019-reliability-33";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -10921,7 +10921,7 @@ function syncAurumResponsiveDock() {
 }
 
 function safeViewportInset(name = "right") {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(`env(safe-area-inset-${name})`);
+  const value = getComputedStyle(document.documentElement).getPropertyValue(`--oa-safe-area-${name}`);
   const parsed = parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -11172,11 +11172,8 @@ function dispatchAurumAvoidanceUpdate() {
 function constrainAurumPanelToViewport() {
   if (!aurumChatPanel || aurumChatPanel.hidden) return;
   const rect = aurumChatPanel.getBoundingClientRect();
-  const minX = AURUM_SAFE_MARGIN;
-  const minY = AURUM_SAFE_MARGIN;
-  const maxX = Math.max(minX, window.innerWidth - rect.width - AURUM_SAFE_MARGIN);
-  const maxY = Math.max(minY, window.innerHeight - rect.height - AURUM_SAFE_MARGIN);
-  if (rect.left < minX || rect.top < minY || rect.right > window.innerWidth - AURUM_SAFE_MARGIN || rect.bottom > window.innerHeight - AURUM_SAFE_MARGIN) {
+  const { minX, minY, maxX, maxY } = aurumViewportBounds(aurumChatPanel);
+  if (rect.left < minX || rect.top < minY || rect.right > maxX + rect.width || rect.bottom > maxY + rect.height) {
     aurumChatPanel.classList.add("aurum-panel-positioned");
     aurumChatPanel.style.left = `${Math.min(Math.max(rect.left, minX), maxX)}px`;
     aurumChatPanel.style.top = `${Math.min(Math.max(rect.top, minY), maxY)}px`;
@@ -11221,9 +11218,9 @@ function scheduleAurumViewportClamp() {
 
 function applyAurumPanelPosition(position) {
   if (!aurumChatPanel) return;
-  const rect = aurumChatPanel.getBoundingClientRect();
-  const x = Math.min(Math.max(position.x, AURUM_SAFE_MARGIN), Math.max(AURUM_SAFE_MARGIN, window.innerWidth - rect.width - AURUM_SAFE_MARGIN));
-  const y = Math.min(Math.max(position.y, AURUM_SAFE_MARGIN), Math.max(AURUM_SAFE_MARGIN, window.innerHeight - rect.height - AURUM_SAFE_MARGIN));
+  const { minX, minY, maxX, maxY } = aurumViewportBounds(aurumChatPanel);
+  const x = Math.min(Math.max(position.x, minX), maxX);
+  const y = Math.min(Math.max(position.y, minY), maxY);
   aurumChatPanel.classList.add("aurum-panel-positioned");
   aurumChatPanel.style.left = `${x}px`;
   aurumChatPanel.style.top = `${y}px`;
@@ -22371,6 +22368,17 @@ function formatGoldPerGram(value, currency = "EUR") {
   }).format(amount)}/g`;
 }
 
+function formatCompetitorPrice(value, currency = "EUR", unit = "g") {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return "Non disponibile";
+  return `${new Intl.NumberFormat("it-IT", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 5
+  }).format(amount)}/${unit}`;
+}
+
 function goldPredictionHorizonLabel(horizon = "") {
   return {
     today: "oggi",
@@ -22526,9 +22534,9 @@ function competitorQuoteMatrixValue(quote = null) {
   const min = Number(quote.raw_payload?.range_min_per_gram || 0);
   const max = Number(quote.raw_payload?.range_max_per_gram || 0);
   if (isRange && min && max) {
-    return `da ${formatGoldPerGram(min, currency)} a ${formatGoldPerGram(max, currency)}`;
+    return `da ${formatCompetitorPrice(min, currency)} a ${formatCompetitorPrice(max, currency)}`;
   }
-  return formatGoldPerGram(quote.price_per_gram, currency);
+  return formatCompetitorPrice(quote.price_per_gram, currency);
 }
 
 function competitorSourceStatusLabel(source = {}) {
@@ -22594,17 +22602,12 @@ function competitorAiExtractionSummaryHtml() {
   const sourcesFailed = Number(latest.sources_failed || 0);
   const pagesAnalyzed = Number(latest.pages_analyzed || 0);
   const quotesSaved = Number(latest.quotes_saved || 0);
-  const validQuotes = Number(ai.quotes_24h || state.competitorAiQuotes?.length || 0);
   const lastError = status.last_error || latest.error_message || "";
   return `
     <article class="competitor-auto-sync-card competitor-ai-sync-card">
       <div>
-        <span>Analisi AI competitor</span>
+        <span>Verifica fonti competitor</span>
         <strong>${hasStatus ? status.enabled ? "Attiva" : "Disattiva" : "Stato riservato"}</strong>
-      </div>
-      <div>
-        <span>AI backend</span>
-        <strong>${hasStatus ? status.openai_configured ? "Configurata" : "Non configurata" : "Riservata"}</strong>
       </div>
       <div>
         <span>Ultima analisi</span>
@@ -22615,16 +22618,16 @@ function competitorAiExtractionSummaryHtml() {
         <strong>${status.next_run_at ? escapeHtml(formatDateTime(status.next_run_at)) : "Non pianificata"}</strong>
       </div>
       <div>
-        <span>Fonti ok/fallite</span>
-        <strong>${sourcesSuccess}/${sourcesTotal} · ${sourcesFailed} KO</strong>
+        <span>Fonti complete / da verificare</span>
+        <strong>${sourcesSuccess}/${sourcesTotal} · ${sourcesFailed} da verificare</strong>
       </div>
       <div>
         <span>Pagine / quote</span>
-        <strong>${pagesAnalyzed} pagine · ${quotesSaved || validQuotes} quote</strong>
+        <strong>${pagesAnalyzed} pagine · ${quotesSaved} quote</strong>
       </div>
-      ${status.running ? `<p>Analisi AI competitor in corso. I nuovi dati compariranno appena il backend completa il run.</p>` : ""}
+      ${status.running ? `<p>Verifica delle fonti ufficiali in corso. I nuovi prezzi compariranno al termine del controllo.</p>` : ""}
       ${lastError ? `<p>${escapeHtml(lastError)}</p>` : ""}
-      ${isFounder() ? `<button class="ghost-button" type="button" data-run-ai-competitor-extract="all">Riesegui analisi AI</button>` : ""}
+      ${isFounder() ? `<button class="ghost-button" type="button" data-run-ai-competitor-extract="all">Verifica tutte le fonti</button>` : ""}
     </article>
   `;
 }
@@ -22657,7 +22660,9 @@ function isUnsupportedCompetitorBuybackQuote(quote = {}) {
 
 function isCompetitorBuybackQuote(quote = {}) {
   return String(quote.quote_type || "customer_buyback").toLowerCase() === "customer_buyback"
-    && !isUnsupportedCompetitorBuybackQuote(quote);
+    && !isUnsupportedCompetitorBuybackQuote(quote)
+    && (!["amico oro", "bordin", "pronto gold", "gold standard", "oro in euro", "gruppo oro 24k"].includes(String(quote.competitor_name || "").toLowerCase())
+      || (quote.raw_payload?.verified_official === true && quote.ai_extracted !== true));
 }
 
 function competitorSourceTypeLabel(type = "") {
@@ -22893,11 +22898,12 @@ function amicoOroSummaryHtml() {
     .map((code) => latestAmicoOroQuote(["999", "925", "800"].includes(code) ? "silver" : "gold", code))
     .filter(Boolean);
   if (!source.id && !quotes.length) return "";
+  const conditionTexts = [...new Set(quotes.map((quote) => quote.raw_payload?.condition || quote.raw_payload?.conditions).filter(Boolean))];
   const quoteRows = quotes.length
     ? quotes.map((quote) => `
         <div>
           <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
-          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
+          <strong>${escapeHtml(quote.metal === "silver" ? `${formatCompetitorPrice(quote.price_per_kg, quote.currency || "EUR", "kg")} · ${formatCompetitorPrice(quote.price_per_gram, quote.currency || "EUR")}` : formatCompetitorPrice(quote.price_per_gram, quote.currency || "EUR"))}</strong>
         </div>
       `).join("")
     : `<p>Nessuna quotazione Amico Oro rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
@@ -22912,6 +22918,7 @@ function amicoOroSummaryHtml() {
       </header>
       <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">www.amico-oro.it</a>` : "https://www.amico-oro.it"} · Metodo: parser automatico · Ogni 60 minuti</p>
       <div class="amico-oro-grid">${quoteRows}</div>
+      ${conditionTexts.length ? `<p class="gold-prediction-disclaimer">${escapeHtml(conditionTexts.join(" · "))}</p>` : ""}
       <p>Ultimo aggiornamento: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
       ${isFounder() ? `<button class="ghost-button" type="button" data-force-amico-oro-sync>Forza aggiornamento Amico Oro</button>` : ""}
     </article>
@@ -22933,17 +22940,15 @@ function prontoGoldSummaryHtml() {
     .map((item) => latestProntoGoldQuote(item.metal, item.code, item.type))
     .filter(Boolean);
   if (!quotes.length) return "";
-  const providerTimestamp = quotes.map((quote) => quote.raw_payload?.provider_timestamp || quote.raw_payload?.provider_timestamp_text).filter(Boolean)[0] || "";
-  const providerTimestampLabel = providerTimestamp
-    ? Number.isNaN(new Date(providerTimestamp).getTime()) ? providerTimestamp : formatDateTime(providerTimestamp)
-    : "non rilevato";
+  const providerTimestamp = quotes.map((quote) => quote.raw_payload?.provider_timestamp_text || quote.raw_payload?.provider_timestamp).filter(Boolean)[0] || "";
+  const providerTimestampLabel = providerTimestamp || "non rilevato";
   const quoteRows = quotes.map((quote) => {
         const isRange = quote.raw_payload?.price_kind === "range";
         const min = Number(quote.raw_payload?.range_min_per_gram || 0);
         const max = Number(quote.raw_payload?.range_max_per_gram || 0);
         const priceLabel = isRange && min && max
-          ? `da ${formatGoldPerGram(min, quote.currency || "EUR")} a ${formatGoldPerGram(max, quote.currency || "EUR")}`
-          : formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR");
+          ? `da ${formatCompetitorPrice(min, quote.currency || "EUR")} a ${formatCompetitorPrice(max, quote.currency || "EUR")}`
+          : formatCompetitorPrice(quote.price_per_gram, quote.currency || "EUR");
         return `
           <div>
             <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
@@ -22988,14 +22993,14 @@ function bordinSummaryHtml() {
   if (!source.id && !quotes.length) return "";
   const conditionTexts = [...new Set(quotes.map((quote) => quote.raw_payload?.condition_text).filter(Boolean))];
   const providerTimestamp = quotes
-    .map((quote) => quote.raw_payload?.provider_timestamp || quote.quote_date)
+    .map((quote) => quote.raw_payload?.provider_timestamp_text || quote.raw_payload?.provider_timestamp)
     .filter(Boolean)
-    .sort((first, second) => new Date(second) - new Date(first))[0] || "";
+    [0] || "";
   const quoteRows = quotes.length
     ? quotes.map((quote) => `
         <div>
           <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
-          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
+          <strong>${escapeHtml(formatCompetitorPrice(quote.price_per_gram, quote.currency || "EUR"))}</strong>
         </div>
       `).join("")
     : `<p>Nessuna quotazione Bordin rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
@@ -23012,7 +23017,7 @@ function bordinSummaryHtml() {
       <div class="bordin-grid">${quoteRows}</div>
       <p>
         Ultimo sync app: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}
-        ${providerTimestamp ? ` · Ultimo aggiornamento sito: ${escapeHtml(formatDateTime(providerTimestamp))}` : ""}
+        ${providerTimestamp ? ` · Ultimo aggiornamento sito: ${escapeHtml(providerTimestamp)}` : ""}
         ${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}
       </p>
       ${conditionTexts.length ? `<p class="gold-prediction-disclaimer">${escapeHtml(conditionTexts.join(" · "))}</p>` : `<p class="gold-prediction-disclaimer">Condizioni quantità non rilevate automaticamente.</p>`}
@@ -23036,8 +23041,8 @@ function goldStandardSummaryHtml() {
   const quoteRows = quotes.length
     ? quotes.map((quote) => {
         const priceLabel = quote.metal === "silver"
-          ? `${formatMetalPerKg(quote.price_per_kg, quote.currency || "EUR")} · ${formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR")}`
-          : formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR");
+          ? `${formatCompetitorPrice(quote.price_per_kg, quote.currency || "EUR", "kg")} · ${formatCompetitorPrice(quote.price_per_gram, quote.currency || "EUR")}`
+          : formatCompetitorPrice(quote.price_per_gram, quote.currency || "EUR");
         return `
           <div>
             <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
@@ -23079,7 +23084,7 @@ function oroInEuroSummaryHtml() {
     ? quotes.map((quote) => `
         <div>
           <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
-          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
+          <strong>${escapeHtml(formatCompetitorPrice(quote.price_per_gram, quote.currency || "EUR"))}</strong>
         </div>
       `).join("")
     : `<p>Nessuna quotazione Oro in Euro rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
@@ -23114,14 +23119,15 @@ function gruppoOro24kSummaryHtml() {
     .filter(Boolean);
   if (!source.id && !quotes.length) return "";
   const providerTimestamp = quotes
-    .map((quote) => quote.raw_payload?.provider_timestamp || quote.quote_date)
+    .map((quote) => quote.raw_payload?.provider_timestamp_text || quote.raw_payload?.provider_timestamp)
     .filter(Boolean)
-    .sort((first, second) => new Date(second) - new Date(first))[0] || "";
+    [0] || "";
+  const conditionTexts = [...new Set(quotes.map((quote) => quote.raw_payload?.condition || quote.raw_payload?.conditions).filter(Boolean))];
   const quoteRows = quotes.length
     ? quotes.map((quote) => `
         <div>
           <span>${escapeHtml(competitorPurityDisplay(quote))}</span>
-          <strong>${escapeHtml(formatGoldPerGram(quote.price_per_gram, quote.currency || "EUR"))}</strong>
+          <strong>${escapeHtml(formatCompetitorPrice(quote.price_per_gram, quote.currency || "EUR"))}</strong>
         </div>
       `).join("")
     : `<p>Nessuna quotazione Gruppo Oro 24K rilevata automaticamente. Uso ultimo dato valido se disponibile.</p>`;
@@ -23136,9 +23142,10 @@ function gruppoOro24kSummaryHtml() {
       </header>
       <p>Sito: ${source.website_url ? `<a href="${escapeHtml(source.website_url)}" target="_blank" rel="noopener">www.comprooromilano.org</a>` : "https://www.comprooromilano.org"} · Metodo: parser automatico · Ogni 60 minuti</p>
       <div class="gruppo-oro-24k-grid">${quoteRows}</div>
+      ${conditionTexts.length ? `<p class="gold-prediction-disclaimer">${escapeHtml(conditionTexts.join(" · "))}</p>` : ""}
       <p>
         Ultimo sync app: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}
-        ${providerTimestamp ? ` · Ultimo aggiornamento sito: ${escapeHtml(formatDateTime(providerTimestamp))}` : ""}
+        ${providerTimestamp ? ` · Ultimo aggiornamento sito: ${escapeHtml(providerTimestamp)}` : ""}
         ${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}
       </p>
       <p class="gold-prediction-disclaimer">Vengono usati solo ORO 24 carati, ORO 18 carati, Argento 999 e Argento 800 dal riquadro pubblico. Monete, sterline, krugerrand e valori borsa restano esclusi.</p>
@@ -23988,7 +23995,8 @@ function buybackTableHtml(title, metal) {
     : `<tr><td colspan="${rows.length + 1}">Nessuna quotazione competitor disponibile.</td></tr>`;
   return `
     <div class="gold-prediction-table-heading">${escapeHtml(title)}</div>
-    <div class="gold-prediction-table-wrap">
+    <p class="mobile-table-hint">Scorri la tabella in orizzontale per vedere tutti i titoli.</p>
+    <div class="gold-prediction-table-wrap" role="region" aria-label="Confronto competitor ${escapeHtml(title)}" tabindex="0">
       <table class="gold-prediction-table">
         <thead>
           <tr>
@@ -24120,7 +24128,10 @@ function defaultExtractionRulesForSource(source = {}) {
     return [
       ["amico_oro_gold_24kt", "24K al gr", "gold", "24kt", "1", "24K al gr", "24K\\s*al\\s*gr\\s*=\\s*([0-9]+[,.]?[0-9]*)\\s*€"],
       ["amico_oro_gold_18kt", "18K al gr", "gold", "18kt", "0.75", "18K al gr", "18K\\s*al\\s*gr\\s*=\\s*([0-9]+[,.]?[0-9]*)\\s*€"],
-      ["amico_oro_gold_14kt", "14K al gr", "gold", "14kt", String(14 / 24), "14K al gr", "14K\\s*al\\s*gr\\s*=\\s*([0-9]+[,.]?[0-9]*)\\s*€"]
+      ["amico_oro_gold_14kt", "14K al gr", "gold", "14kt", String(14 / 24), "14K al gr", "14K\\s*al\\s*gr\\s*=\\s*([0-9]+[,.]?[0-9]*)\\s*€"],
+      ["amico_oro_silver_999", "Argento 999 al kg", "silver", "999", "0.999", "999 al Kg", "999\\s*al\\s*(?:Kg|kg)\\s*=\\s*([0-9]+(?:[,.][0-9]+)?)\\s*€"],
+      ["amico_oro_silver_925", "Argento 925 al kg", "silver", "925", "0.925", "925 al Kg", "925\\s*al\\s*(?:Kg|kg)\\s*=\\s*([0-9]+(?:[,.][0-9]+)?)\\s*€"],
+      ["amico_oro_silver_800", "Argento 800 al kg", "silver", "800", "0.8", "800 al Kg", "800\\s*al\\s*(?:Kg|kg)\\s*=\\s*([0-9]+(?:[,.][0-9]+)?)\\s*€"]
     ].map(([field_key, label, metal, purity_code, purity_value, anchor_text, regex_pattern]) => ({
       source_id: source.id,
       competitor_name: source.name || "Amico Oro",
@@ -24130,7 +24141,7 @@ function defaultExtractionRulesForSource(source = {}) {
       metal,
       purity_code,
       purity_value,
-      unit: "EUR/g",
+      unit: metal === "silver" ? "EUR/kg" : "EUR/g",
       anchor_text,
       regex_pattern,
       extraction_method: "anchor_regex",
@@ -24199,7 +24210,10 @@ function defaultExtractionRulesForSource(source = {}) {
     return [
       ["gold_standard_gold_24kt_reference", "Quotazione dell'oro in borsa", "gold", "24kt", "1", "Quotazione dell'oro in borsa", "Quotazione\\s+dell[’']oro\\s+in\\s+borsa[\\s\\S]{0,120}?€\\s*([0-9]+[,.]?[0-9]*)"],
       ["gold_standard_gold_18kt_buyback", "Acquistiamo ORO 18K prezzo MIN", "gold", "18kt", "0.75", "Acquistiamo ORO 18K", "Acquistiamo\\s+ORO\\s*18\\s*K[\\s\\S]{0,120}?prezzo\\s*MIN[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)"],
-      ["gold_standard_gold_24kt_buyback", "Acquistiamo ORO 24K al prezzo MIN", "gold", "24kt", "1", "Acquistiamo ORO 24K", "Acquistiamo\\s+ORO\\s*24\\s*K[\\s\\S]{0,120}?prezzo\\s*MIN[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)"]
+      ["gold_standard_gold_24kt_buyback", "Acquistiamo ORO 24K al prezzo MIN", "gold", "24kt", "1", "Acquistiamo ORO 24K", "Acquistiamo\\s+ORO\\s*24\\s*K[\\s\\S]{0,120}?prezzo\\s*MIN[\\s\\S]{0,80}?€\\s*([0-9]+[,.]?[0-9]*)"],
+      ["gold_standard_silver_reference", "Quotazione dell'argento in borsa", "silver", "999", "0.999", "Quotazione dell'argento in borsa", "Quotazione\\s+dell[’']argento\\s+in\\s+borsa[\\s\\S]{0,80}?€\\s*([0-9]+(?:[,.][0-9]+)?)\\s*/\\s*kg"],
+      ["gold_standard_silver_925_buyback", "Acquistiamo ARGENTO 925 al chilo", "silver", "925", "0.925", "Acquistiamo ARGENTO 925", "Acquistiamo\\s+ARGENTO\\s*925\\s*al\\s*chilo[\\s\\S]{0,100}?€\\s*([0-9]+(?:[,.][0-9]+)?)"],
+      ["gold_standard_silver_800_buyback", "Acquistiamo ARGENTO 800 al chilo", "silver", "800", "0.8", "Acquistiamo ARGENTO 800", "Acquistiamo\\s+ARGENTO\\s*800\\s*al\\s*chilo[\\s\\S]{0,100}?€\\s*([0-9]+(?:[,.][0-9]+)?)"]
     ].map(([field_key, label, metal, purity_code, purity_value, anchor_text, regex_pattern]) => ({
       source_id: source.id,
       competitor_name: source.name || "Gold Standard",
@@ -24209,7 +24223,7 @@ function defaultExtractionRulesForSource(source = {}) {
       metal,
       purity_code,
       purity_value,
-      unit: "EUR/g",
+      unit: metal === "silver" ? "EUR/kg" : "EUR/g",
       anchor_text,
       regex_pattern,
       extraction_method: "anchor_regex",
@@ -24333,7 +24347,7 @@ function renderCompetitorExtractionTrainer() {
           </div>
           <div class="competitor-extraction-actions">
             <button class="small-button" type="button" data-test-extraction-source="${escapeHtml(source.id)}">Testa estrazione</button>
-            <button class="small-button" type="button" data-ai-assisted-extraction="${escapeHtml(source.id)}">Esegui analisi AI assistita</button>
+            <button class="small-button" type="button" data-ai-assisted-extraction="${escapeHtml(source.id)}">Verifica fonte ufficiale</button>
             <button class="primary-button small-button" type="button" data-save-extraction-rules="${escapeHtml(source.id)}">Salva regole</button>
           </div>
         </div>
@@ -24892,8 +24906,8 @@ async function forceAmicoOroSync() {
   const saved = Number(data.result?.quotes_saved || 0);
   const status = data.result?.status || data.state?.last_status || "success";
   showToast(
-    status === "failed" ? "Amico Oro non leggibile automaticamente. Ultimo dato valido mantenuto." : `Amico Oro aggiornato. Quotazioni salvate: ${saved}.`,
-    status === "failed" ? "warning" : "success"
+    status === "failed" ? "Amico Oro non leggibile automaticamente. Storico conservato." : status === "partial" ? `Amico Oro verificato parzialmente. Quotazioni salvate: ${saved}.` : `Amico Oro aggiornato. Quotazioni salvate: ${saved}.`,
+    status === "failed" || status === "partial" ? "warning" : "success"
   );
   await loadGoldPredictionPanel({ silent: true });
 }
@@ -25006,7 +25020,7 @@ async function forceGruppoOro24kSync() {
 async function runAiCompetitorExtraction(sourceId = "all") {
   if (!isFounder()) return;
   const payload = sourceId && sourceId !== "all" ? { source_id: sourceId } : {};
-  showToast(sourceId === "all" ? "Analisi AI competitor in esecuzione..." : "Analisi AI della fonte competitor in esecuzione...", "success");
+  showToast(sourceId === "all" ? "Verifica fonti ufficiali in esecuzione..." : "Verifica della fonte ufficiale in esecuzione...", "success");
   const data = await apiRequest("/quotazioni/competitors/ai-extract/run", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -25016,7 +25030,7 @@ async function runAiCompetitorExtraction(sourceId = "all") {
   const pages = Number(data.pages_analyzed || data.run?.pages_analyzed || data.result?.pages_analyzed || 0);
   const failed = Number(data.sources_failed || data.run?.sources_failed || data.result?.sources_failed || 0);
   showToast(
-    failed ? `Analisi AI completata con ${failed} fonte/i da verificare. Quote salvate: ${saved}.` : `Analisi AI completata. Pagine: ${pages}. Quote salvate: ${saved}.`,
+    failed ? `Verifica completata con ${failed} fonte/i da verificare. Quote salvate: ${saved}.` : `Verifica completata. Pagine: ${pages}. Quote salvate: ${saved}.`,
     failed ? "warning" : "success"
   );
   await loadGoldPredictionPanel({ silent: true });
