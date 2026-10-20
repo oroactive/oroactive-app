@@ -230,7 +230,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261020-reliability-35";
+const OROACTIVE_CLIENT_BUILD_ID = "20261020-reliability-36";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -10955,19 +10955,22 @@ function saveAurumFloatingPosition(position) {
 function aurumViewportBounds(element = aurumMascotRoot) {
   const rect = element?.getBoundingClientRect?.();
   const width = Math.max(rect?.width || element?.offsetWidth || 96, 64);
-  const height = Math.max(rect?.height || element?.offsetHeight || 96, 64);
+  const height = Math.max(rect?.height || element?.offsetHeight || 96, element?.id === "aurumChatPanel" ? 0 : 64);
   const viewport = window.visualViewport;
   const viewportWidth = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : window.innerWidth;
   const viewportHeight = Number.isFinite(viewport?.height) && viewport.height > 0 ? viewport.height : window.innerHeight;
   const left = Number.isFinite(viewport?.offsetLeft) ? Math.max(0, viewport.offsetLeft) : 0;
   const top = Number.isFinite(viewport?.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
   const minX = left + AURUM_SAFE_MARGIN + safeViewportInset("left");
-  const minY = top + AURUM_SAFE_MARGIN + safeViewportInset("top");
+  const tinyPanel = element?.id === "aurumChatPanel" && viewportHeight < 100;
+  const topMargin = tinyPanel ? Math.max(4, safeViewportInset("top")) : AURUM_SAFE_MARGIN + safeViewportInset("top");
+  const bottomMargin = tinyPanel ? Math.max(4, safeViewportInset("bottom")) : AURUM_SAFE_MARGIN + safeViewportInset("bottom");
+  const minY = top + topMargin;
   return {
     minX,
     minY,
     maxX: Math.max(minX, left + viewportWidth - width - AURUM_SAFE_MARGIN - safeViewportInset("right")),
-    maxY: Math.max(minY, top + viewportHeight - height - AURUM_SAFE_MARGIN - safeViewportInset("bottom")),
+    maxY: Math.max(minY, top + viewportHeight - height - bottomMargin),
     width,
     height
   };
@@ -17458,9 +17461,12 @@ function renderGemLab() {
     return;
   }
   const material = gemLabCurrentMaterial();
+  const tabsScrollLeft = gemLabShell.querySelector(".gem-lab-tabs")?.scrollLeft || 0;
   gemLabShell.innerHTML = material && state.gemLabView === "detail"
     ? renderGemLabDetail(material)
     : renderGemLabCatalog();
+  const tabs = gemLabShell.querySelector(".gem-lab-tabs");
+  if (tabs) tabs.scrollLeft = tabsScrollLeft;
   renderGemLabZoomPortal(material && state.gemLabView === "detail" ? material : null);
 }
 
@@ -27232,6 +27238,24 @@ brandDropdown?.addEventListener("click", (event) => {
   void openBrandMenuItem(button);
 });
 
+function revealFocusedOverlayField() {
+  const field = document.activeElement;
+  if (!field?.matches?.("input, textarea, select")) return;
+  const panel = field.closest(".academy-preview-modal, .preview-dialog, #aurumChatPanel");
+  if (!panel || !panel.clientHeight) return;
+  const bounds = panel.getBoundingClientRect();
+  const rect = field.getBoundingClientRect();
+  const header = panel.querySelector(":scope > header, :scope > .preview-topbar, :scope > .aurum-chat-header");
+  const headerHeight = header && getComputedStyle(header).position === "sticky" ? header.getBoundingClientRect().height : 0;
+  const top = bounds.top + headerHeight + 6;
+  const bottom = bounds.bottom - 6;
+  if (rect.height > bottom - top || rect.top < top) {
+    panel.scrollTop += rect.top - top;
+  } else if (rect.bottom > bottom) {
+    panel.scrollTop += rect.bottom - bottom;
+  }
+}
+
 function syncFloatingViewport() {
   const viewport = window.visualViewport;
   const width = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : window.innerWidth;
@@ -27245,10 +27269,12 @@ function syncFloatingViewport() {
   style.setProperty("--oa-visible-top", `${top}px`);
   style.setProperty("--oa-visible-bottom-gap", `${Math.max(0, window.innerHeight - top - height)}px`);
   document.documentElement.classList.toggle("has-short-viewport", height < 320);
+  document.documentElement.classList.toggle("has-tiny-viewport", height < 100);
   if (notificationDropdown && !notificationDropdown.hidden) positionNotificationDropdown();
   restoreAurumFloatingPosition();
   scheduleAurumViewportClamp();
   scheduleAurumAvoidance();
+  window.requestAnimationFrame?.(() => revealFocusedOverlayField());
 }
 
 window.addEventListener("resize", syncFloatingViewport);
@@ -27260,6 +27286,7 @@ document.addEventListener("scroll", scheduleAurumAvoidance, { passive: true, cap
 window.addEventListener(AURUM_AVOID_EVENT, scheduleAurumAvoidance);
 
 document.addEventListener("focusin", (event) => {
+  window.requestAnimationFrame?.(() => revealFocusedOverlayField());
   if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR) || event.target.closest?.(AURUM_AVOID_SELECTORS.join(","))) {
     dispatchAurumAvoidanceUpdate();
   }
