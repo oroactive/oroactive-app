@@ -230,7 +230,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261019-reliability-34";
+const OROACTIVE_CLIENT_BUILD_ID = "20261020-reliability-35";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -5810,14 +5810,14 @@ function showAppUpdateBanner(serverVersion = {}) {
   if (!banner) {
     banner = document.createElement("aside");
     banner.id = "oroactiveUpdateBanner";
+    banner.className = "app-update-banner";
     banner.setAttribute("role", "status");
-    banner.style.cssText = "position:fixed;left:16px;right:16px;bottom:16px;z-index:9999;display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid rgba(255,138,24,.55);border-radius:12px;background:rgba(18,18,18,.96);color:#fff;box-shadow:0 18px 45px rgba(0,0,0,.45);";
     banner.innerHTML = `
       <span data-update-copy></span>
-      <span style="display:flex;gap:8px;align-items:center;">
+      <div>
         <button class="ghost-button" type="button" data-app-update-later>Dopo</button>
         <button class="primary-button" type="button" data-app-update-now>Aggiorna ora</button>
-      </span>
+      </div>
     `;
     banner.querySelector("[data-app-update-later]")?.addEventListener("click", () => {
       state.appUpdateBannerDismissed = true;
@@ -8206,21 +8206,29 @@ function syncNotificationPlacement() {
 
 function positionNotificationDropdown() {
   if (!notificationDropdown || notificationDropdown.hidden || !notificationBell) return;
-  const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-  const viewportHeight = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-  const margin = 12;
-  const preferredWidth = viewportWidth <= 520 ? viewportWidth - (margin * 2) : 390;
-  const width = Math.max(280, Math.min(preferredWidth, viewportWidth - (margin * 2)));
+  const viewport = window.visualViewport;
+  const viewportWidth = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+  const viewportHeight = Number.isFinite(viewport?.height) && viewport.height > 0 ? viewport.height : Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+  const viewportLeft = Number.isFinite(viewport?.offsetLeft) ? Math.max(0, viewport.offsetLeft) : 0;
+  const viewportTop = Number.isFinite(viewport?.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
+  const minLeft = viewportLeft + 12 + safeViewportInset("left");
+  const minTop = viewportTop + 12 + safeViewportInset("top");
+  const right = viewportLeft + viewportWidth - 12 - safeViewportInset("right");
+  const bottom = viewportTop + viewportHeight - 12 - safeViewportInset("bottom");
+  const availableWidth = Math.max(0, right - minLeft);
+  const availableHeight = Math.max(0, bottom - minTop);
+  const preferredWidth = viewportWidth <= 520 ? availableWidth : 390;
+  const width = Math.min(preferredWidth, availableWidth);
   const bellRect = notificationBell.getBoundingClientRect();
   const top = Math.min(
-    Math.max(margin, bellRect.bottom + 10),
-    Math.max(margin, viewportHeight - 240)
+    Math.max(minTop, bellRect.bottom + 10),
+    Math.max(minTop, bottom - Math.min(240, availableHeight))
   );
   const left = Math.min(
-    Math.max(margin, bellRect.right - width),
-    Math.max(margin, viewportWidth - width - margin)
+    Math.max(minLeft, bellRect.right - width),
+    Math.max(minLeft, right - width)
   );
-  const maxHeight = Math.max(220, viewportHeight - top - margin);
+  const maxHeight = Math.max(0, bottom - top);
   notificationDropdown.classList.add("is-viewport-anchored");
   notificationDropdown.style.setProperty("--notification-dropdown-width", `${width}px`);
   notificationDropdown.style.setProperty("--notification-dropdown-left", `${left}px`);
@@ -10948,11 +10956,18 @@ function aurumViewportBounds(element = aurumMascotRoot) {
   const rect = element?.getBoundingClientRect?.();
   const width = Math.max(rect?.width || element?.offsetWidth || 96, 64);
   const height = Math.max(rect?.height || element?.offsetHeight || 96, 64);
+  const viewport = window.visualViewport;
+  const viewportWidth = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : window.innerWidth;
+  const viewportHeight = Number.isFinite(viewport?.height) && viewport.height > 0 ? viewport.height : window.innerHeight;
+  const left = Number.isFinite(viewport?.offsetLeft) ? Math.max(0, viewport.offsetLeft) : 0;
+  const top = Number.isFinite(viewport?.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
+  const minX = left + AURUM_SAFE_MARGIN + safeViewportInset("left");
+  const minY = top + AURUM_SAFE_MARGIN + safeViewportInset("top");
   return {
-    minX: AURUM_SAFE_MARGIN + safeViewportInset("left"),
-    minY: AURUM_SAFE_MARGIN + safeViewportInset("top"),
-    maxX: Math.max(AURUM_SAFE_MARGIN, window.innerWidth - width - AURUM_SAFE_MARGIN - safeViewportInset("right")),
-    maxY: Math.max(AURUM_SAFE_MARGIN, window.innerHeight - height - AURUM_SAFE_MARGIN - safeViewportInset("bottom")),
+    minX,
+    minY,
+    maxX: Math.max(minX, left + viewportWidth - width - AURUM_SAFE_MARGIN - safeViewportInset("right")),
+    maxY: Math.max(minY, top + viewportHeight - height - AURUM_SAFE_MARGIN - safeViewportInset("bottom")),
     width,
     height
   };
@@ -27217,12 +27232,29 @@ brandDropdown?.addEventListener("click", (event) => {
   void openBrandMenuItem(button);
 });
 
-window.addEventListener("resize", () => {
+function syncFloatingViewport() {
+  const viewport = window.visualViewport;
+  const width = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : window.innerWidth;
+  const height = Number.isFinite(viewport?.height) && viewport.height > 0 ? viewport.height : window.innerHeight;
+  const left = Number.isFinite(viewport?.offsetLeft) ? Math.max(0, viewport.offsetLeft) : 0;
+  const top = Number.isFinite(viewport?.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
+  const style = document.documentElement.style;
+  style.setProperty("--oa-visible-width", `${width}px`);
+  style.setProperty("--oa-visible-height", `${height}px`);
+  style.setProperty("--oa-visible-left", `${left}px`);
+  style.setProperty("--oa-visible-top", `${top}px`);
+  style.setProperty("--oa-visible-bottom-gap", `${Math.max(0, window.innerHeight - top - height)}px`);
+  document.documentElement.classList.toggle("has-short-viewport", height < 320);
   if (notificationDropdown && !notificationDropdown.hidden) positionNotificationDropdown();
   restoreAurumFloatingPosition();
   scheduleAurumViewportClamp();
   scheduleAurumAvoidance();
-});
+}
+
+window.addEventListener("resize", syncFloatingViewport);
+window.visualViewport?.addEventListener("resize", syncFloatingViewport, { passive: true });
+window.visualViewport?.addEventListener("scroll", syncFloatingViewport, { passive: true });
+syncFloatingViewport();
 window.addEventListener("scroll", scheduleAurumAvoidance, { passive: true });
 document.addEventListener("scroll", scheduleAurumAvoidance, { passive: true, capture: true });
 window.addEventListener(AURUM_AVOID_EVENT, scheduleAurumAvoidance);
