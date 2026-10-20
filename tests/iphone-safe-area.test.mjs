@@ -50,6 +50,35 @@ test('floating UI dimensions follow keyboard opening and closing without changin
  assert.equal(properties['--oa-visible-height'],'844px');assert.equal(properties['--oa-visible-bottom-gap'],'0px');assert.equal(clamps,3);
  assert.deepEqual(shortViewport,[false,true,false]);
 });
+
+test('rotation reveals the focused overlay field inside the resized panel',()=>{
+ let scrollTop=0;
+ const panel={clientHeight:72,querySelector:()=>null,getBoundingClientRect:()=>({top:12,bottom:84}),get scrollTop(){return scrollTop;},set scrollTop(value){scrollTop=value;}};
+ const field={matches:()=>true,closest:()=>panel,getBoundingClientRect:()=>({top:168-scrollTop,bottom:212-scrollTop,height:44})};
+ const ctx=vm.createContext({document:{activeElement:field}});
+ vm.runInContext(fn('revealFocusedOverlayField','syncFloatingViewport'),ctx);
+ ctx.revealFocusedOverlayField();
+ assert.ok(field.getBoundingClientRect().top>=18);
+ assert.ok(field.getBoundingClientRect().bottom<=78);
+ const stable=scrollTop;ctx.revealFocusedOverlayField();assert.equal(scrollTop,stable);
+});
+
+test('restoring portrait keeps the focused field below a sticky overlay header',()=>{
+ let scrollTop=180;
+ const header={getBoundingClientRect:()=>({height:80})};
+ const panel={clientHeight:400,querySelector:()=>header,getBoundingClientRect:()=>({top:12,bottom:412}),get scrollTop(){return scrollTop;},set scrollTop(value){scrollTop=value;}};
+ const field={matches:()=>true,closest:()=>panel,getBoundingClientRect:()=>({top:200-scrollTop,bottom:270-scrollTop,height:70})};
+ const ctx=vm.createContext({document:{activeElement:field},getComputedStyle:()=>({position:'sticky'})});
+ vm.runInContext(fn('revealFocusedOverlayField','syncFloatingViewport'),ctx);ctx.revealFocusedOverlayField();
+ assert.ok(field.getBoundingClientRect().top>=98);assert.ok(field.getBoundingClientRect().bottom<=406);
+});
+
+test('viewport changes do not scroll ordinary form fields or change input values',()=>{
+ const field={value:'unchanged',matches:()=>true,closest:()=>null,getBoundingClientRect:()=>{throw Error('ordinary form must remain untouched');}};
+ const ctx=vm.createContext({document:{activeElement:field}});
+ vm.runInContext(fn('revealFocusedOverlayField','syncFloatingViewport'),ctx);ctx.revealFocusedOverlayField();
+ assert.equal(field.value,'unchanged');
+});
 test('competitor source prices retain their published per-kilogram and per-gram decimals',()=>{
  const name=app.includes('function formatCompetitorPrice(')?'formatCompetitorPrice':'formatCompetitorPerGram';
  const ctx=vm.createContext({});vm.runInContext(fn(name,'goldPredictionHorizonLabel'),ctx);
@@ -78,4 +107,32 @@ test('notifications respect landscape notch and keyboard height instead of a min
  assert.ok(p['--notification-dropdown-left']+p['--notification-dropdown-width']<=873);
  assert.ok(p['--notification-dropdown-top']>=12);
  assert.ok(p['--notification-dropdown-top']+p['--notification-dropdown-max-height']<=87);
+});
+
+test('GemLab keeps the scrolled tab rail when selecting a section or opening an image',()=>{
+ let rail={scrollLeft:560};
+ const shell={querySelector:()=>rail,set innerHTML(value){rail={scrollLeft:0};}};
+ const material={id:900801};
+ const ctx=vm.createContext({gemLabShell:shell,state:{gemLabView:'detail'},gemLabCurrentMaterial:()=>material,renderGemLabDetail:()=>'<detail>',renderGemLabCatalog:()=>'<catalog>',renderGemLabZoomPortal:()=>{},teardownGemLabZoom:()=>{}});
+ vm.runInContext(fn('renderGemLab','gemLabFormObject'),ctx);
+ ctx.renderGemLab();assert.equal(rail.scrollLeft,560);
+ rail=null;ctx.state.gemLabView='catalog';ctx.renderGemLab();assert.equal(rail.scrollLeft,0);
+});
+
+test('a 69px landscape keyboard viewport fits the Aurum panel without a fictitious 64px height',()=>{
+ const panel={id:'aurumChatPanel',getBoundingClientRect:()=>({width:643,height:61})};
+ const ctx=vm.createContext({AURUM_SAFE_MARGIN:12,window:{innerWidth:667,innerHeight:375,visualViewport:{width:667,height:69,offsetLeft:0,offsetTop:0}},safeViewportInset:()=>0});
+ vm.runInContext(fn('aurumViewportBounds','clampAurumPosition'),ctx);
+ const bounds=ctx.aurumViewportBounds(panel);
+ assert.equal(bounds.height,61);assert.equal(bounds.minY,4);assert.equal(bounds.maxY,4);
+ assert.ok(bounds.minY+bounds.height<=69-4);
+});
+
+test('tiny Aurum viewport still preserves a landscape home-indicator safe area',()=>{
+ const panel={id:'aurumChatPanel',getBoundingClientRect:()=>({width:549,height:44})};
+ const ctx=vm.createContext({AURUM_SAFE_MARGIN:12,window:{innerWidth:667,innerHeight:375,visualViewport:{width:667,height:69,offsetLeft:0,offsetTop:25}},safeViewportInset:side=>({left:47,right:47,bottom:21}[side]||0)});
+ vm.runInContext(fn('aurumViewportBounds','clampAurumPosition'),ctx);
+ const bounds=ctx.aurumViewportBounds(panel);
+ assert.equal(bounds.minY,29);assert.equal(bounds.maxY,29);
+ assert.ok(bounds.maxY+bounds.height<=25+69-21);
 });
