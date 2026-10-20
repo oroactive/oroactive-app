@@ -165,6 +165,22 @@ test("Gold Standard factory fetches the official unit declaration before verifyi
   assert.deepEqual(result.missing_fields.map((field) => field.field_key), ["gold_standard_silver_reference"]);
 });
 
+test("Gold Standard recognizes the HTML-encoded unit declaration served by its official article", async () => {
+  // The live article served on 2026-10-20 encodes è as &egrave;.
+  for (const encodedE of ["&egrave;", "&#232;", "&#xE8;"]) {
+    const article = goldUnitText.replace("L’altro", "L&#8217;altro").replace(" è ", ` ${encodedE} `);
+    const result = await createGoldStandardExtractor({ resolver, fetchImpl: async (url) =>
+      response(String(url) === goldUnitUrl ? `<p>${article}</p>` : goldStandardBare)
+    }).extractGoldStandardQuotes();
+    assert.equal(result.quotes.filter((quote) => quote.metal === "gold").length, 3, encodedE);
+    assert.equal(result.quotes.length, 5, encodedE);
+    for (const quote of result.quotes.filter((quote) => quote.metal === "gold")) {
+      assert.deepEqual(quote.raw_payload.unit_evidence, goldUnitEvidence, encodedE);
+    }
+    assert.deepEqual(result.missing_fields.map((field) => field.field_key), ["gold_standard_silver_reference"], encodedE);
+  }
+});
+
 test("Gold Standard withholds bare gold if the official unit declaration is missing or unreachable", async () => {
   for (const unavailable of [false, true]) {
     const result = await createGoldStandardExtractor({ resolver, fetchImpl: async (url) => {
