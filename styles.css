@@ -3,6 +3,15 @@
   --oa-safe-area-right: env(safe-area-inset-right, 0px);
   --oa-safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --oa-safe-area-left: env(safe-area-inset-left, 0px);
+  --oa-visible-width: 100vw;
+  --oa-visible-height: 100dvh;
+  --oa-visible-left: 0px;
+  --oa-visible-top: 0px;
+  --oa-visible-bottom-gap: 0px;
+  --oa-overlay-top: max(12px, env(safe-area-inset-top, 0px));
+  --oa-overlay-right: max(12px, env(safe-area-inset-right, 0px));
+  --oa-overlay-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  --oa-overlay-left: max(12px, env(safe-area-inset-left, 0px));
   /* OroActive Design System: tokens centrali per tema, componenti e stati. */
   --oa-black: #050505;
   --oa-graphite: #0b0b0d;
@@ -5371,6 +5380,10 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.academy-preview-modal header {
+  top: 0;
+}
+
 .academy-preview-modal footer {
   bottom: 0;
   align-items: center;
@@ -10040,7 +10053,8 @@ button.quality-review-badge {
   padding: 0 12px;
 }
 
-.app-update-banner button[data-app-update-dismiss] {
+.app-update-banner button[data-app-update-dismiss],
+.app-update-banner button[data-app-update-later] {
   background: transparent;
   color: #fff8eb;
 }
@@ -11845,7 +11859,7 @@ input.document-expired {
   }
 
   .preview-modal {
-    padding: 12px;
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
 
   .preview-body .print-copy {
@@ -14469,5 +14483,111 @@ body.gem-lab-zoom-open {
   .main-menu-quick-button .main-menu-item-copy {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+}
+
+/* Safari iOS: finestre e controlli fissi rimangono nell'area visibile, anche con tastiera. */
+.preview-modal,
+.academy-preview-backdrop {
+  top: var(--oa-visible-top);
+  bottom: auto;
+  height: var(--oa-visible-height);
+  padding: var(--oa-overlay-top) var(--oa-overlay-right) var(--oa-overlay-bottom) var(--oa-overlay-left);
+}
+
+.preview-dialog,
+.academy-preview-modal {
+  max-height: calc(var(--oa-visible-height) - var(--oa-overlay-top) - var(--oa-overlay-bottom));
+}
+
+.preview-dialog {
+  max-width: min(980px, 100%);
+}
+
+.academy-preview-modal {
+  max-width: 100%;
+  max-height: min(820px, calc(var(--oa-visible-height) - var(--oa-overlay-top) - var(--oa-overlay-bottom)));
+}
+
+.app-update-banner {
+  left: calc(var(--oa-visible-left) + var(--oa-overlay-left));
+  right: calc(100vw - var(--oa-visible-left) - var(--oa-visible-width) + var(--oa-overlay-right));
+  bottom: calc(var(--oa-visible-bottom-gap) + max(72px, calc(env(safe-area-inset-bottom) + 16px)));
+  width: auto;
+  max-width: 620px;
+  max-height: calc(var(--oa-visible-height) - var(--oa-overlay-top) - max(72px, calc(env(safe-area-inset-bottom) + 16px)));
+  overflow: auto;
+  margin-inline: auto;
+  transform: none;
+}
+
+.tutorial-card {
+  max-height: calc(var(--oa-visible-height) - var(--oa-overlay-top) - var(--oa-overlay-bottom));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.aurum-chat-panel {
+  bottom: calc(var(--oa-visible-bottom-gap) + 16px + env(safe-area-inset-bottom));
+  max-height: min(720px, calc(var(--oa-visible-height) - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.aurum-chat-panel > .aurum-chat-log {
+  min-height: 0;
+}
+
+.has-short-viewport .aurum-chat-header,
+.has-short-viewport .academy-preview-modal header,
+.has-short-viewport .preview-topbar {
+  position: static;
+}
+
+.has-short-viewport .preview-dialog {
+  display: block;
+  overflow-y: auto;
+}
+
+.has-short-viewport .preview-body {
+  overflow: visible;
+}
+
+.session-username {
+  top: max(18px, calc(env(safe-area-inset-top) + 12px));
+  right: calc(78px + env(safe-area-inset-right));
+}
+
+.notification-center:not(.is-main-menu-docked) {
+  top: max(18px, calc(env(safe-area-inset-top) + 12px));
+  right: calc(22px + env(safe-area-inset-right));
+}
+
+@media (max-width: 920px) {
+  .session-username {
+    right: calc(66px + env(safe-area-inset-right));
+    max-width: calc(100vw - 132px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+
+  .notification-center:not(.is-main-menu-docked) {
+    right: calc(12px + env(safe-area-inset-right));
+  }
+
+  .tutorial-card {
+    left: calc(var(--oa-visible-left) + var(--oa-overlay-left));
+    right: auto;
+    bottom: calc(var(--oa-visible-bottom-gap) + var(--oa-overlay-bottom));
+    width: calc(var(--oa-visible-width) - var(--oa-overlay-left) - var(--oa-overlay-right));
+  }
+}
+
+@media (max-width: 600px), (max-width: 1100px) and (max-height: 500px) {
+  .aurum-chat-panel {
+    left: calc(var(--oa-visible-left) + 12px + env(safe-area-inset-left));
+    right: auto;
+    bottom: calc(var(--oa-visible-bottom-gap) + 12px + env(safe-area-inset-bottom));
+    width: calc(var(--oa-visible-width) - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
+    max-width: calc(var(--oa-visible-width) - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
+    max-height: calc(var(--oa-visible-height) - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 }
