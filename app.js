@@ -230,7 +230,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261020-reliability-37";
+const OROACTIVE_CLIENT_BUILD_ID = "20261020-reliability-39";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -27265,7 +27265,28 @@ function revealFocusedOverlayField() {
   }
 }
 
-function syncFloatingViewport() {
+function revealFocusedPageField() {
+  const viewport = window.visualViewport;
+  if (!viewport || !Number.isFinite(viewport.height) || viewport.height <= 0) return;
+  if (window.innerHeight - viewport.height < 100) return;
+  if (Number.isFinite(viewport.scale) && Math.abs(viewport.scale - 1) > 0.02) return;
+  const field = document.activeElement;
+  if (!field?.matches?.('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), textarea, select')) return;
+  if (field.disabled || field.readOnly || field.closest(".academy-preview-modal, .preview-dialog, #aurumChatPanel")) return;
+  const rect = field.getBoundingClientRect();
+  const viewportTop = Number.isFinite(viewport.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
+  const top = viewportTop + 12;
+  const bottom = viewportTop + viewport.height - 12;
+  let delta = 0;
+  if (rect.height > bottom - top || rect.top < top) {
+    delta = rect.top - top;
+  } else if (rect.bottom > bottom) {
+    delta = rect.bottom - bottom;
+  }
+  if (Math.abs(delta) >= 1) window.scrollBy({ top: delta, left: 0, behavior: "instant" });
+}
+
+function syncFloatingViewport(event) {
   const viewport = window.visualViewport;
   const width = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : window.innerWidth;
   const height = Number.isFinite(viewport?.height) && viewport.height > 0 ? viewport.height : window.innerHeight;
@@ -27283,7 +27304,10 @@ function syncFloatingViewport() {
   restoreAurumFloatingPosition();
   scheduleAurumViewportClamp();
   scheduleAurumAvoidance();
-  window.requestAnimationFrame?.(() => revealFocusedOverlayField());
+  window.requestAnimationFrame?.(() => {
+    revealFocusedOverlayField();
+    if (event?.type !== "scroll") revealFocusedPageField();
+  });
 }
 
 window.addEventListener("resize", syncFloatingViewport);
@@ -27295,7 +27319,10 @@ document.addEventListener("scroll", scheduleAurumAvoidance, { passive: true, cap
 window.addEventListener(AURUM_AVOID_EVENT, scheduleAurumAvoidance);
 
 document.addEventListener("focusin", (event) => {
-  window.requestAnimationFrame?.(() => revealFocusedOverlayField());
+  window.requestAnimationFrame?.(() => {
+    revealFocusedOverlayField();
+    revealFocusedPageField();
+  });
   if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR) || event.target.closest?.(AURUM_AVOID_SELECTORS.join(","))) {
     dispatchAurumAvoidanceUpdate();
   }

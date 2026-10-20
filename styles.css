@@ -14621,6 +14621,12 @@ body.gem-lab-zoom-open {
 }
 
 @media (max-width: 600px), (max-width: 1100px) and (max-height: 500px) {
+  /* Keep session controls with the page instead of covering rows while scrolling. */
+  body.app-active .session-username,
+  body.app-active .notification-center:not(.is-main-menu-docked) {
+    position: absolute;
+  }
+
   .aurum-chat-panel {
     left: calc(var(--oa-visible-left) + 12px + env(safe-area-inset-left));
     right: auto;

@@ -79,6 +79,69 @@ test('viewport changes do not scroll ordinary form fields or change input values
  vm.runInContext(fn('revealFocusedOverlayField','syncFloatingViewport'),ctx);ctx.revealFocusedOverlayField();
  assert.equal(field.value,'unchanged');
 });
+
+function pageKeyboardContext({height=136,offsetTop=0,scale=1,top=199,fieldHeight=50,panel=null}={}) {
+ let position=top;const scrolls=[];
+ const field={value:'test value preserved',readOnly:false,disabled:false,matches:()=>true,closest:()=>panel,
+  getBoundingClientRect:()=>({top:position,bottom:position+fieldHeight,height:fieldHeight})};
+ const viewport={width:956,height,offsetTop,offsetLeft:0,scale};
+ const ctx=vm.createContext({document:{activeElement:field},window:{innerWidth:956,innerHeight:440,visualViewport:viewport,
+  scrollBy:options=>{scrolls.push(options);position-=options.top;}}});
+ vm.runInContext(fn('revealFocusedPageField','syncFloatingViewport'),ctx);
+ return {ctx,field,viewport,scrolls};
+}
+
+test('physical iPhone landscape keyboard leaves the entire focused page input visible',()=>{
+ const {ctx,field,scrolls}=pageKeyboardContext();
+ ctx.revealFocusedPageField();
+ const rect=field.getBoundingClientRect();
+ assert.ok(rect.top>=0);assert.ok(rect.bottom<=136);
+ assert.equal(field.value,'test value preserved');assert.equal(scrolls.length,1);
+ ctx.revealFocusedPageField();assert.equal(scrolls.length,1,'a visible field must remain stable');
+});
+
+test('keyboard panning reveals a page input above the visible viewport without changing its value',()=>{
+ const {ctx,field,scrolls}=pageKeyboardContext({offsetTop:60,top:10});
+ ctx.revealFocusedPageField();
+ assert.ok(field.getBoundingClientRect().top>=60);assert.ok(field.getBoundingClientRect().bottom<=196);
+ assert.ok(scrolls[0].top<0);assert.equal(field.value,'test value preserved');
+});
+
+test('ordinary viewport changes with no keyboard preserve the page scroll position',()=>{
+ const {ctx,field,scrolls}=pageKeyboardContext({height:440});
+ field.getBoundingClientRect=()=>{throw Error('no keyboard: do not reposition a form');};
+ ctx.revealFocusedPageField();assert.equal(scrolls.length,0);
+});
+
+test('pinch zoom does not trigger keyboard scroll correction',()=>{
+ const {ctx,field,scrolls}=pageKeyboardContext({scale:2});
+ field.getBoundingClientRect=()=>{throw Error('respect user zoom');};
+ ctx.revealFocusedPageField();assert.equal(scrolls.length,0);
+});
+
+test('focused dialog inputs continue to use their own panel scroll instead of moving the page',()=>{
+ const {ctx,field,scrolls}=pageKeyboardContext({panel:{clientHeight:100}});
+ field.getBoundingClientRect=()=>{throw Error('overlay must not move the document');};
+ ctx.revealFocusedPageField();assert.equal(scrolls.length,0);
+});
+
+test('keyboard correction leaves an already visible page field stationary',()=>{
+ const {ctx,field,scrolls}=pageKeyboardContext({top:25});
+ ctx.revealFocusedPageField();assert.equal(field.getBoundingClientRect().top,25);assert.equal(scrolls.length,0);
+});
+
+test('manual viewport scrolling does not pull a focused page field back into view',()=>{
+ let pageCorrections=0,overlayCorrections=0;
+ const ctx=vm.createContext({window:{innerWidth:956,innerHeight:440,visualViewport:{width:956,height:136,offsetTop:0,offsetLeft:0},requestAnimationFrame:callback=>callback()},
+  document:{documentElement:{style:{setProperty(){}},classList:{toggle(){}}}},notificationDropdown:null,
+  restoreAurumFloatingPosition(){},scheduleAurumViewportClamp(){},scheduleAurumAvoidance(){},
+  revealFocusedOverlayField:()=>overlayCorrections++,revealFocusedPageField:()=>pageCorrections++});
+ const start=app.indexOf('function syncFloatingViewport(');
+ vm.runInContext(app.slice(start,app.indexOf('\nwindow.addEventListener("resize", syncFloatingViewport);',start)),ctx);
+ ctx.syncFloatingViewport({type:'scroll'});assert.equal(pageCorrections,0);
+ ctx.syncFloatingViewport({type:'resize'});assert.equal(pageCorrections,1);assert.equal(overlayCorrections,2);
+});
+
 test('competitor source prices retain their published per-kilogram and per-gram decimals',()=>{
  const name=app.includes('function formatCompetitorPrice(')?'formatCompetitorPrice':'formatCompetitorPerGram';
  const ctx=vm.createContext({});vm.runInContext(fn(name,'goldPredictionHorizonLabel'),ctx);
