@@ -230,7 +230,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261020-reliability-36";
+const OROACTIVE_CLIENT_BUILD_ID = "20261020-reliability-37";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -6452,13 +6452,14 @@ async function loadSavedActs(options = {}) {
     store = "",
     field = "",
     q = "",
+    includeDrafts = false,
     includeSuspended = false,
     limit = ACT_LIST_LIMIT,
     offset = 0,
     silent = false
   } = options;
   const endpoint = q ? "/atti/search" : "/atti";
-  const params = queryString({ store, field, q, includeSuspended: includeSuspended ? "true" : "", limit, offset });
+  const params = queryString({ store, field, q, includeDrafts: includeDrafts ? "true" : "", includeSuspended: includeSuspended ? "true" : "", limit, offset });
   const cacheKey = `${endpoint}?${params}`;
   const cached = state.actsCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.time < ACT_CACHE_TTL) {
@@ -19917,7 +19918,7 @@ function computeStatsRows(user) {
   const operatorKey = userOperatorKey(user);
   const today = localDateKey();
   const currentMonth = monthKey();
-  const userActs = demoActs.filter((act) => actOperatorKey(act) === operatorKey);
+  const userActs = demoActs.filter((act) => actOperatorKey(act) === operatorKey && isCompletedWorkflowStatus(act.status));
   const stores = [...new Set(userActs.map((act) => act.store || user.negozio).filter(Boolean))];
 
   return stores.map((store) => {
@@ -20534,6 +20535,7 @@ async function loadArchiveScreenData(options = {}) {
   await loadSavedActs({
     force: options.force || false,
     store: selectedArchiveStore(),
+    includeDrafts: true,
     includeSuspended: archiveShowsSuspended(),
     limit: ACT_LIST_LIMIT,
     silent: options.silent || false
@@ -20559,7 +20561,8 @@ function archiveVisibleActs() {
     const keywordMatches = !keyword || archiveSearchValue(act, field).includes(keyword);
     const status = workflowStatusCode(act.status);
     const suspendedStatus = ["suspended", "pending_approval"].includes(status);
-    const operativeStatus = isCompletedWorkflowStatus(status) || (archiveShowsSuspended() && suspendedStatus);
+    const recoverableStatus = ["draft", "archived_incomplete"].includes(status);
+    const operativeStatus = recoverableStatus || isCompletedWorkflowStatus(status) || (archiveShowsSuspended() && suspendedStatus);
     return storeMatches && keywordMatches && operativeStatus;
   });
 }
@@ -21917,6 +21920,7 @@ async function runActSearch() {
     store: selectedArchiveStore(),
     field: document.getElementById("searchField")?.value || "name",
     q: keyword,
+    includeDrafts: true,
     includeSuspended: archiveShowsSuspended(),
     limit: ACT_LIST_LIMIT
   });
@@ -26233,6 +26237,11 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   } catch (error) {
+    if (error.code === "ACT_NUMBER_CONFLICT") {
+      await updatePracticeNumber();
+      showToast("Numero atto già utilizzato. Numerazione aggiornata: verifica i dati e salva nuovamente.", "warning");
+      return false;
+    }
     if (error.approval_required) {
       await requestApprovalForCurrentPractice({
         action: isCompletion ? "complete" : "archive",

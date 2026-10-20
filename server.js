@@ -7160,33 +7160,6 @@ function visibleRealActStatusSql(alias = "") {
     AND NOT (${prefix}suspended_at IS NOT NULL AND ${prefix}resumed_at IS NULL)`;
 }
 
-function reservedActNumberStatusSql(alias = "") {
-  const prefix = alias ? `${alias}.` : "";
-  return `${prefix}deleted_at IS NULL
-    AND COALESCE(${prefix}status, '') NOT ILIKE 'draft'
-    AND COALESCE(${prefix}status, '') NOT ILIKE 'Bozza'
-    AND COALESCE(${prefix}status, '') NOT ILIKE 'deleted'
-    AND COALESCE(${prefix}status, '') NOT ILIKE 'Deleted'
-    AND COALESCE(${prefix}status, '') NOT ILIKE 'abandoned'
-    AND COALESCE(${prefix}status, '') NOT ILIKE 'Abandoned'
-    AND (
-      ${realCompletedStatusSql(alias)}
-      OR COALESCE(${prefix}status, '') ILIKE 'archived_incomplete'
-      OR ((COALESCE(${prefix}status, '') ILIKE 'archived'
-          OR COALESCE(${prefix}status, '') ILIKE 'Archiviato'
-          OR COALESCE(${prefix}status, '') ILIKE 'Archiviata')
-        AND ${prefix}completed_at IS NULL)
-      OR COALESCE(${prefix}status, '') ILIKE 'pending_approval'
-      OR COALESCE(${prefix}status, '') ILIKE 'in_attesa_autorizzazione'
-      OR COALESCE(${prefix}status, '') ILIKE 'approval_approved'
-      OR COALESCE(${prefix}status, '') ILIKE 'autorizzazione_approvata'
-      OR COALESCE(${prefix}status, '') ILIKE 'approval_rejected'
-      OR COALESCE(${prefix}status, '') ILIKE 'autorizzazione_rifiutata'
-      OR COALESCE(${prefix}status, '') ILIKE 'suspended'
-      OR COALESCE(${prefix}status, '') ILIKE 'sospesa'
-    )`;
-}
-
 function normalizeFiscalCode(value = "") {
   return String(value || "").trim().toUpperCase();
 }
@@ -12460,17 +12433,20 @@ async function listActs(query = {}, user = null) {
 }
 
 async function nextActNumber(storeCode, year) {
+  // Anche bozze e record rimossi conservano un'identità univoca: non riusare
+  // numeri già salvati e non generare serie enormi per eventuali numeri legacy.
   const result = await pool.query(
     `WITH used_numbers AS (
        SELECT DISTINCT COALESCE(numero_atto_negozio, act_number)::integer AS number
        FROM ${actsTable}
        WHERE COALESCE(codice_negozio, store_code) = $1::text
          AND act_year = $2::integer
-         AND ${reservedActNumberStatusSql()}
          AND COALESCE(numero_atto_negozio, act_number) IS NOT NULL
      ),
      candidates AS (
-       SELECT generate_series(1, COALESCE((SELECT MAX(number) FROM used_numbers), 0) + 1) AS number
+       SELECT 1 AS number
+       UNION
+       SELECT number + 1 FROM used_numbers WHERE number BETWEEN 1 AND 2147483646
      )
      SELECT MIN(c.number)::integer AS next_number
      FROM candidates c
@@ -24411,6 +24387,32 @@ function stockSummaryFromActs(acts = []) {
   ));
 }
 
+function isSameActCreateRequest(input, existing, user) {
+  const incoming = input.legalSignature || input.payload?.legalSignature;
+  const saved = existing.payload?.legalSignature;
+  return Boolean(incoming?.timestamp && incoming.documentHashSha256
+    && incoming.timestamp === saved?.timestamp
+    && incoming.documentHashSha256 === saved?.documentHashSha256
+    && String(existing.operatore_id || "") === String(user?.id || "")
+    && user?.id);
+}
+
+function actNumberConflictError() {
+  const error = new Error("Numero atto già utilizzato. Aggiorna la numerazione oppure riapri la pratica esistente per modificarla.");
+  error.status = 409;
+  error.code = "ACT_NUMBER_CONFLICT";
+  return error;
+}
+
+async function lockActPracticeNumbers(db, ...numbers) {
+  // Le bozze non sono coperte dall'indice univoco delle pratiche attive.
+  // Il lock transazionale protegge anche creazioni e rinumerazioni simultanee,
+  // senza modificare eventuali duplicazioni storiche già presenti.
+  for (const number of [...new Set(numbers.filter(Boolean).map(String))].sort()) {
+    await db.query("SELECT pg_advisory_xact_lock(hashtext($1::text))", [`act-number:${number}`]);
+  }
+}
+
 async function saveAct(input, user, req = null) {
   const protectedInput = await enforceActStore(input, user);
   const existing = protectedInput.id
@@ -24423,7 +24425,11 @@ async function saveAct(input, user, req = null) {
     error.status = 403;
     throw error;
   }
-  if (existing) return updateAct(existing.id, protectedInput, user, req);
+  if (existing) {
+    if (protectedInput.id) return updateAct(existing.id, protectedInput, user, req);
+    if (isSameActCreateRequest(protectedInput, existing, user)) return rowToAct(existing);
+    throw actNumberConflictError();
+  }
   const act = await enrichActStore(normalizeAct(protectedInput, existing), user);
   const nowIso = new Date().toISOString();
   const statusCode = normalizeWorkflowStatus(act.status);
@@ -24471,7 +24477,15 @@ async function saveAct(input, user, req = null) {
   const archivedAt = ["archived_incomplete", "archived_completed"].includes(statusCode) ? nowIso : null;
   const suspendedAt = statusCode === "suspended" ? nowIso : null;
   const suspendedBy = statusCode === "suspended" ? user?.id || null : null;
-  const { result, finalRow } = await withDatabaseTransaction(async (db) => {
+  const { result, finalRow, retryRow } = await withDatabaseTransaction(async (db) => {
+    await lockActPracticeNumbers(db, act.practiceNumber);
+    const concurrentExisting = act.practiceNumber ? await findExisting(act.practiceNumber, db) : null;
+    if (concurrentExisting) {
+      if (canAccessAct(concurrentExisting, user) && isSameActCreateRequest(protectedInput, concurrentExisting, user)) {
+        return { retryRow: concurrentExisting };
+      }
+      throw actNumberConflictError();
+    }
     await lockCashTransactionIdentity(db, act, existing);
     const amlCheck = await enforceCashAntiMoneyLaundering(act, user, existing, {
       allowApproved: Boolean(approvalCheck.approved),
@@ -24547,6 +24561,7 @@ async function saveAct(input, user, req = null) {
     }
     return { result, finalRow: transactionFinalRow };
   });
+  if (retryRow) return rowToAct(retryRow);
   void logUserActivity({
     userId: user?.id,
     actorId: user?.id,
@@ -24741,6 +24756,14 @@ async function updateAct(identifier, input, user, req = null) {
     if (!canAccessAct(lockedExisting, user) || !canEditAct(lockedExisting, user)) throw completedActEditError();
     if (String(lockedExisting.row_version || "") !== String(existing.row_version || "")) {
       throw concurrentActEditError();
+    }
+    await lockActPracticeNumbers(db, lockedExisting.practice_number, act.practiceNumber);
+    if (act.practiceNumber && act.practiceNumber !== lockedExisting.practice_number) {
+      const conflict = await db.query(
+        `SELECT 1 FROM ${actsTable} WHERE practice_number = $1::text AND id <> $2::bigint LIMIT 1`,
+        [act.practiceNumber, lockedExisting.id]
+      );
+      if (conflict.rowCount) throw actNumberConflictError();
     }
     if (String(lockedExisting.negozio_id || "") !== String(act.negozioId || "")) {
       const pendingApproval = await db.query(
@@ -31907,12 +31930,14 @@ function publicErrorMessage(error, request) {
 }
 
 const publicErrorCodes = new Set([
+  "ACT_NUMBER_CONFLICT",
   "TRUST_PACK_STALE",
   "TRUST_PACK_ACT_VERSION_CONFLICT",
   "TRUST_PACK_CODE_CONFLICT"
 ]);
 
 function publicErrorCode(error) {
+  if (error?.code === "23505" && /atti_vendita.*practice_number/i.test(String(error.constraint || ""))) return "ACT_NUMBER_CONFLICT";
   const code = String(error?.code || "");
   return publicErrorCodes.has(code) ? code : "";
 }
@@ -31925,13 +31950,14 @@ app.use((error, request, response, _next) => {
   if (safeCode) payload.code = safeCode;
   const activeStoreConflict = error.code === "23503"
     && /oroactive_active_store_required/i.test(String(error.constraint || ""));
+  const actNumberConflict = safeCode === "ACT_NUMBER_CONFLICT";
   if (error.approval_required) {
     payload.approval_required = true;
     payload.reasons = error.reasons || [];
     payload.quality_check = error.quality_check || null;
     payload.aurum_shield = error.aurum_shield || null;
   }
-  response.status(error.status || (activeStoreConflict ? 409 : 500)).json(payload);
+  response.status(error.status || (activeStoreConflict || actNumberConflict ? 409 : 500)).json(payload);
 });
 
 const httpServer = app.listen(port, () => {
