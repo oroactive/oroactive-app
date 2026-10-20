@@ -89,6 +89,7 @@ function decodeHtml(value = "") {
     .replace(/&nbsp;/gi, " ")
     .replace(/&euro;/gi, "€")
     .replace(/&amp;/gi, "&")
+    .replace(/&egrave;|&#0*232;|&#x0*e8;/gi, "è")
     .replace(/&#038;/gi, "&")
     .replace(/&#39;/gi, "'")
     .replace(/&rsquo;|&#8217;|&#x2019;/gi, "’")
