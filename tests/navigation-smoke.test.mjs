@@ -96,6 +96,42 @@ function makeDomContext(app) {
   };
 }
 
+for (const previousScreen of ["main-menu-active", "app-active"]) {
+  test(`session expiry exposes login after ${previousScreen}`, async () => {
+    const app = await file("app.js");
+    const context = makeDomContext(app);
+    context.__bodyClasses.delete("main-menu-active");
+    context.__bodyClasses.add(previousScreen);
+    context.loginScreen = makeElement("loginScreen");
+    context.loginScreen.hidden = true;
+    context.mainMenuScreen.style.display = "block";
+    context.mainMenuScreen.style.visibility = "visible";
+    context.appShell.style.display = "grid";
+    context.appShell.style.visibility = "visible";
+    context.state = { currentUser: { id: 1 }, actsCache: new Map() };
+    context.demoActs = [];
+    context.mainUserMenuButton = null;
+    context.loggedUserName = null;
+    context.sessionUsername = null;
+    context.notificationCenter = null;
+    context.window = { clearTimeout() {}, clearInterval() {} };
+    for (const name of ["resetAuthenticatedSessionData", "clearStoredAuthToken", "resetAurumSessionState",
+      "stopNotificationPolling", "closeNotificationDropdown", "renderNotificationBadge",
+      "closeMainMenuDropdowns", "closeMainUserMenu", "updateAurumMascotVisibility"]) context[name] = () => {};
+
+    vm.runInNewContext(`${extractFunction(app, "showLogin")}; showLogin();`, context);
+
+    assert.equal(context.loginScreen.hidden, false);
+    assert.equal(context.mainMenuScreen.hidden, true);
+    assert.equal(context.mainMenuScreen.style.display, "none", "Menu must not cover the login fields after its inline display was set");
+    assert.equal(context.appShell.hidden, true);
+    assert.equal(context.__bodyClasses.has("main-menu-active"), false);
+    assert.equal(context.__bodyClasses.has("app-active"), false, "Authenticated shell CSS must not override its hidden state");
+    assert.equal(context.__bodyClasses.has("authenticated"), false);
+    assert.equal(context.state.currentUser, null);
+  });
+}
+
 test("navigation manager apre Operatività → Nuovo atto di vendita su #practice", async () => {
   const app = await file("app.js");
   const openAppScreenSource = extractFunction(app, "openAppScreen");
