@@ -735,6 +735,10 @@ body.splash-active {
   -webkit-overflow-scrolling: touch;
 }
 
+.main-menu-screen:has(.main-user-dropdown:not([hidden])) {
+  z-index: 8100;
+}
+
 .splash-screen .dark-footer,
 .main-menu-screen .dark-footer {
   position: absolute;
@@ -1205,6 +1209,10 @@ body.main-menu-active .splash-screen {
   position: relative;
   z-index: 32;
   min-width: 0;
+}
+
+.main-user-menu:has(.main-user-dropdown:not([hidden])) {
+  z-index: 1101;
 }
 
 .main-user-button {
