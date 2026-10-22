@@ -5,6 +5,7 @@ import PNG from "png-js";
 
 const root = new URL("../", import.meta.url);
 const icons = [
+  ["oroactive-logo.png", 1024, 0.98],
   ["icons/apple-touch-icon-180.png", 180, 0.86],
   ["icons/icon-192.png", 192, 0.78],
   ["icons/icon-512.png", 512, 0.78],

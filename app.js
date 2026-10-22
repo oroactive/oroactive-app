@@ -231,7 +231,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-53";
+const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-54";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -21641,7 +21641,7 @@ function fusionDdtHtml(store, date, acts) {
   return `
     <section class="print-copy ddt-copy">
       <div class="ddt-header">
-        <img src="oroactive-logo.png" alt="OroActive">
+        <img src="oroactive-logo.png?v=${OROACTIVE_CLIENT_BUILD_ID}" alt="OroActive">
         <div>
           <h1>Documento di Trasporto - Fusione</h1>
           <p>OroActive Compro Oro</p>
@@ -26008,7 +26008,7 @@ function buildPrintCopy(title, weightLabel, scope, includeWeight = false) {
   const customerOnly = scope === "customer";
   const customerLogo = customerOnly ? `
       <div class="customer-copy-logo">
-        <img src="oroactive-logo.png" alt="OroActive">
+        <img src="oroactive-logo.png?v=${OROACTIVE_CLIENT_BUILD_ID}" alt="OroActive">
       </div>
   ` : "";
 
