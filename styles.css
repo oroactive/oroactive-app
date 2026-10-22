@@ -1498,6 +1498,11 @@ body.main-menu-active .splash-screen {
   padding: 7px 10px;
 }
 
+#mainMenuClock {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .main-menu-hero-orbit {
   width: 150px;
   height: 150px;

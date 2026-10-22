@@ -6,7 +6,7 @@ import ImageIO
 import UniformTypeIdentifiers
 
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
-let sourceURL = root.appendingPathComponent("oroactive-logo.png")
+let sourceURL = root.appendingPathComponent("assets/oroactive-logo-source.jpg")
 guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
       let master = CGImageSourceCreateImageAtIndex(source, 0, nil),
       let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
@@ -41,6 +41,7 @@ let markSide = CGFloat(max(markWidth, markHeight))
 // Home icons need safe margins for Apple's rounded mask. The web manifest also
 // declares maskable icons, whose mark must fit in the central 80% safe circle.
 let outputs: [(String, Int, CGFloat)] = [
+    ("oroactive-logo.png", 1024, 0.98),
     ("icons/apple-touch-icon-180.png", 180, 0.86),
     ("icons/icon-192.png", 192, 0.78),
     ("icons/icon-512.png", 512, 0.78),

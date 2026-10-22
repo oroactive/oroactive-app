@@ -1,4 +1,4 @@
-const BUILD_ID = "20261022-reliability-53";
+const BUILD_ID = "20261022-reliability-54";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;
@@ -11,7 +11,7 @@ const SHELL_CORE_ASSETS = [
   `/frontend-config.js?v=${BUILD_ID}`,
   `/shared/aurum-policy.js?v=${BUILD_ID}`,
   `/app.js?v=${BUILD_ID}`,
-  "/oroactive-logo.png"
+  `/oroactive-logo.png?v=${BUILD_ID}`
 ];
 const SHELL_OPTIONAL_ASSETS = [
   `/icons/icon-192.png?v=${BUILD_ID}`,
