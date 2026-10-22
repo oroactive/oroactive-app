@@ -327,7 +327,7 @@ test("Negozi usa eliminazione logica, conferma e layout dedicato", async () => {
   assert.match(server, /action: "store_deleted"/);
   assert.match(server, /deleted_at IS NULL/);
   assert.match(server, /oroactive_active_store_required/);
-  assert.match(server, /activeStoreConflict \? 409 : 500/);
+  assert.match(server, /activeStoreConflict \|\| actNumberConflict \? 409 : 500/);
 
   assert.match(app, /data-delete-store/);
   assert.match(app, /async function deleteStore/);

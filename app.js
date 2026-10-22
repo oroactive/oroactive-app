@@ -209,6 +209,7 @@ const state = {
   sessionAbortController: null,
   expiringSession: false,
   sessionTimeoutTimer: null,
+  sessionLastActivityAt: 0,
   clientVersion: null,
   serverVersion: null,
   appUpdateAvailable: false,
@@ -230,7 +231,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261020-reliability-36";
+const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-52";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -6093,16 +6094,52 @@ function startMainMenuClock() {
   state.clockTimer = window.setInterval(updateMainMenuClock, 1000);
 }
 
-function resetSessionTimeout() {
-  if (!state.authToken) return;
+function sessionActivityStorageKey() {
+  const parts = String(state.authToken || "").split(".");
+  // Only the public JWT payload identifies the session; never copy its signature.
+  return parts.length === 3 && parts[1] ? `oroactive-session-activity:${parts[1]}` : "";
+}
+
+function lastSessionActivityAt() {
+  let lastActivity = Number(state.sessionLastActivityAt) || 0;
+  try {
+    const key = sessionActivityStorageKey();
+    const sharedActivity = key ? Number(localStorage.getItem(key)) : 0;
+    if (Number.isFinite(sharedActivity) && sharedActivity > lastActivity && sharedActivity <= Date.now()) {
+      lastActivity = sharedActivity;
+    }
+  } catch {
+    // Restricted storage keeps the existing per-tab inactivity protection.
+  }
+  return lastActivity;
+}
+
+function scheduleSessionTimeout(delay) {
   window.clearTimeout(state.sessionTimeoutTimer);
   state.sessionTimeoutTimer = window.setTimeout(() => {
     void expireSessionForInactivity();
-  }, 30 * 60 * 1000);
+  }, delay);
+}
+
+function resetSessionTimeout() {
+  if (!state.authToken) return;
+  state.sessionLastActivityAt = Date.now();
+  try {
+    const key = sessionActivityStorageKey();
+    if (key) localStorage.setItem(key, String(state.sessionLastActivityAt));
+  } catch {
+    // Activity remains tracked in memory when shared storage is unavailable.
+  }
+  scheduleSessionTimeout(30 * 60 * 1000);
 }
 
 async function expireSessionForInactivity() {
-  if (state.expiringSession) return;
+  if (state.expiringSession || !state.authToken) return;
+  const remaining = 30 * 60 * 1000 - (Date.now() - lastSessionActivityAt());
+  if (remaining > 0) {
+    scheduleSessionTimeout(remaining);
+    return;
+  }
   state.expiringSession = true;
   try {
     const practiceStarted = document.getElementById("practice")?.classList.contains("active-screen") && !isPracticeFormEmpty();
@@ -6452,13 +6489,14 @@ async function loadSavedActs(options = {}) {
     store = "",
     field = "",
     q = "",
+    includeDrafts = false,
     includeSuspended = false,
     limit = ACT_LIST_LIMIT,
     offset = 0,
     silent = false
   } = options;
   const endpoint = q ? "/atti/search" : "/atti";
-  const params = queryString({ store, field, q, includeSuspended: includeSuspended ? "true" : "", limit, offset });
+  const params = queryString({ store, field, q, includeDrafts: includeDrafts ? "true" : "", includeSuspended: includeSuspended ? "true" : "", limit, offset });
   const cacheKey = `${endpoint}?${params}`;
   const cached = state.actsCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.time < ACT_CACHE_TTL) {
@@ -6817,6 +6855,7 @@ function resetAuthenticatedSessionData() {
   teardownGemLabZoom();
   window.currentUser = null;
   window.clearTimeout(state.sessionTimeoutTimer);
+  state.sessionLastActivityAt = 0;
   window.clearTimeout(state.clientLookupTimer);
   window.clearTimeout(state.crmSearchTimer);
   window.clearTimeout(state.amlCashCheckTimer);
@@ -6927,7 +6966,10 @@ function showLogin(options = {}) {
     splashScreen.hidden = false;
   }
   mainMenuScreen.hidden = true;
-  document.body.classList.remove("main-menu-active");
+  mainMenuScreen.style.display = "none";
+  mainMenuScreen.style.visibility = "hidden";
+  mainMenuScreen.style.opacity = "0";
+  document.body.classList.remove("main-menu-active", "app-active", "authenticated");
   closeMainMenuDropdowns();
   closeMainUserMenu();
   closeNotificationDropdown();
@@ -9459,9 +9501,44 @@ function toggleMainMenuDropdown(id) {
   }
 }
 
+function positionMainUserDropdown() {
+  if (!mainUserDropdown || mainUserDropdown.hidden || !mainUserMenuButton) return;
+  const viewport = window.visualViewport;
+  const width = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : window.innerWidth;
+  const height = Number.isFinite(viewport?.height) && viewport.height > 0 ? viewport.height : window.innerHeight;
+  const viewportLeft = Number.isFinite(viewport?.offsetLeft) ? Math.max(0, viewport.offsetLeft) : 0;
+  const viewportTop = Number.isFinite(viewport?.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
+  const minLeft = viewportLeft + 12 + safeViewportInset("left");
+  const minTop = viewportTop + 12 + safeViewportInset("top");
+  const right = viewportLeft + width - 12 - safeViewportInset("right");
+  const bottom = viewportTop + height - 12 - safeViewportInset("bottom");
+  const availableWidth = Math.max(0, right - minLeft);
+  const availableHeight = Math.max(0, bottom - minTop);
+  const menuWidth = Math.min(280, availableWidth);
+  const button = mainUserMenuButton.getBoundingClientRect();
+  const left = Math.min(Math.max(minLeft, button.right - menuWidth), Math.max(minLeft, right - menuWidth));
+  // Keep room for the scrollable menu even when its trigger is near the bottom.
+  const top = Math.min(Math.max(minTop, button.bottom + 8), Math.max(minTop, bottom - Math.min(240, availableHeight)));
+  mainUserDropdown.classList.add("is-viewport-anchored");
+  mainUserDropdown.style.setProperty("--main-user-dropdown-width", `${menuWidth}px`);
+  mainUserDropdown.style.setProperty("--main-user-dropdown-left", `${left}px`);
+  mainUserDropdown.style.setProperty("--main-user-dropdown-top", `${top}px`);
+  mainUserDropdown.style.setProperty("--main-user-dropdown-max-height", `${Math.max(0, bottom - top)}px`);
+}
+
+function syncMainUserMenuPosition(event) {
+  if (!mainUserDropdown || mainUserDropdown.hidden) return;
+  if (event?.type === "scroll" && event.target instanceof Node && mainUserDropdown.contains(event.target)) return;
+  positionMainUserDropdown();
+}
+
 function closeMainUserMenu() {
   if (!mainUserDropdown || !mainUserMenuButton) return;
   mainUserDropdown.hidden = true;
+  mainUserDropdown.classList.remove("is-viewport-anchored");
+  ["width", "left", "top", "max-height"].forEach((property) => {
+    mainUserDropdown.style.removeProperty(`--main-user-dropdown-${property}`);
+  });
   mainUserMenuButton.setAttribute("aria-expanded", "false");
 }
 
@@ -9470,6 +9547,8 @@ function toggleMainUserMenu() {
   const willOpen = mainUserDropdown.hidden;
   mainUserDropdown.hidden = !willOpen;
   mainUserMenuButton.setAttribute("aria-expanded", String(willOpen));
+  if (willOpen) positionMainUserDropdown();
+  else closeMainUserMenu();
 }
 
 function closeBrandMenu() {
@@ -10963,8 +11042,9 @@ function aurumViewportBounds(element = aurumMascotRoot) {
   const top = Number.isFinite(viewport?.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
   const minX = left + AURUM_SAFE_MARGIN + safeViewportInset("left");
   const tinyPanel = element?.id === "aurumChatPanel" && viewportHeight < 100;
-  const topMargin = tinyPanel ? Math.max(4, safeViewportInset("top")) : AURUM_SAFE_MARGIN + safeViewportInset("top");
-  const bottomMargin = tinyPanel ? Math.max(4, safeViewportInset("bottom")) : AURUM_SAFE_MARGIN + safeViewportInset("bottom");
+  const microPanel = tinyPanel && viewportHeight < 40;
+  const topMargin = microPanel ? 0 : tinyPanel ? Math.max(4, safeViewportInset("top")) : AURUM_SAFE_MARGIN + safeViewportInset("top");
+  const bottomMargin = microPanel ? 0 : tinyPanel ? Math.max(4, safeViewportInset("bottom")) : AURUM_SAFE_MARGIN + safeViewportInset("bottom");
   const minY = top + topMargin;
   return {
     minX,
@@ -19917,7 +19997,7 @@ function computeStatsRows(user) {
   const operatorKey = userOperatorKey(user);
   const today = localDateKey();
   const currentMonth = monthKey();
-  const userActs = demoActs.filter((act) => actOperatorKey(act) === operatorKey);
+  const userActs = demoActs.filter((act) => actOperatorKey(act) === operatorKey && isCompletedWorkflowStatus(act.status));
   const stores = [...new Set(userActs.map((act) => act.store || user.negozio).filter(Boolean))];
 
   return stores.map((store) => {
@@ -20534,6 +20614,7 @@ async function loadArchiveScreenData(options = {}) {
   await loadSavedActs({
     force: options.force || false,
     store: selectedArchiveStore(),
+    includeDrafts: true,
     includeSuspended: archiveShowsSuspended(),
     limit: ACT_LIST_LIMIT,
     silent: options.silent || false
@@ -20559,7 +20640,8 @@ function archiveVisibleActs() {
     const keywordMatches = !keyword || archiveSearchValue(act, field).includes(keyword);
     const status = workflowStatusCode(act.status);
     const suspendedStatus = ["suspended", "pending_approval"].includes(status);
-    const operativeStatus = isCompletedWorkflowStatus(status) || (archiveShowsSuspended() && suspendedStatus);
+    const recoverableStatus = ["draft", "archived_incomplete"].includes(status);
+    const operativeStatus = recoverableStatus || isCompletedWorkflowStatus(status) || (archiveShowsSuspended() && suspendedStatus);
     return storeMatches && keywordMatches && operativeStatus;
   });
 }
@@ -21917,6 +21999,7 @@ async function runActSearch() {
     store: selectedArchiveStore(),
     field: document.getElementById("searchField")?.value || "name",
     q: keyword,
+    includeDrafts: true,
     includeSuspended: archiveShowsSuspended(),
     limit: ACT_LIST_LIMIT
   });
@@ -26233,6 +26316,11 @@ async function archiveCurrentPractice(status = "Archiviata", options = {}) {
   try {
     await saveActRecord(archivedAct, wasEditing ? "PUT" : "POST");
   } catch (error) {
+    if (error.code === "ACT_NUMBER_CONFLICT") {
+      await updatePracticeNumber();
+      showToast("Numero atto già utilizzato. Numerazione aggiornata: verifica i dati e salva nuovamente.", "warning");
+      return false;
+    }
     if (error.approval_required) {
       await requestApprovalForCurrentPractice({
         action: isCompletion ? "complete" : "archive",
@@ -27151,6 +27239,11 @@ mainUserMenuButton?.addEventListener("click", (event) => {
   toggleMainUserMenu();
 });
 
+window.addEventListener("resize", syncMainUserMenuPosition);
+window.visualViewport?.addEventListener("resize", syncMainUserMenuPosition, { passive: true });
+window.visualViewport?.addEventListener("scroll", syncMainUserMenuPosition, { passive: true });
+document.addEventListener("scroll", syncMainUserMenuPosition, { capture: true, passive: true });
+
 document.querySelectorAll("[data-login-privacy]").forEach((button) => {
   button.addEventListener("click", () => openPrivacyNoticePreview({ login: true }));
 });
@@ -27238,25 +27331,142 @@ brandDropdown?.addEventListener("click", (event) => {
   void openBrandMenuItem(button);
 });
 
+function createKeyboardDismissControl() {
+  const button = document.createElement("button");
+  button.id = "keyboardDismissButton";
+  button.type = "button";
+  button.textContent = "Fine";
+  button.className = "keyboard-dismiss-button";
+  button.setAttribute("aria-label", "Chiudi tastiera");
+  button.setAttribute("data-aurum-avoid", "true");
+  button.hidden = true;
+  let field = null;
+  let host = null;
+  let originalPosition = "";
+  let positionedHost = false;
+  function hide() {
+    button.hidden = true;
+    button.remove();
+    field?.classList.remove("has-keyboard-dismiss");
+    if (positionedHost) {
+      if (originalPosition) host.style.position = originalPosition;
+      else host.style.removeProperty("position");
+    }
+    field = null;
+    host = null;
+    positionedHost = false;
+  }
+  function sync() {
+    const active = document.activeElement;
+    const viewport = window.visualViewport;
+    const loginHeight = Number(active?.closest?.("#loginScreen")?.clientHeight) || 0;
+    if (!viewport || window.innerWidth > 1100 || Math.max(window.innerHeight, loginHeight) - viewport.height < 100
+      || !Number.isFinite(viewport.height) || viewport.height <= 0
+      || (Number.isFinite(viewport.scale) && Math.abs(viewport.scale - 1) > 0.02)
+      || !active?.matches?.('textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"])')
+      || active.disabled || active.readOnly) {
+      hide();
+      return;
+    }
+    if (active !== field) {
+      hide();
+      field = active;
+      // Keep the command outside labels so it does not change the input's name.
+      host = field.parentElement;
+      while (host?.matches("label")) host = host.parentElement;
+      if (!host) { hide(); return; }
+      originalPosition = host.style.position;
+      positionedHost = getComputedStyle(host).position === "static";
+      if (positionedHost) host.style.position = "relative";
+      field.classList.add("has-keyboard-dismiss");
+      host.appendChild(button);
+    }
+    const rect = field.getBoundingClientRect();
+    const bounds = host.getBoundingClientRect();
+    const height = Math.min(44, rect.height, viewport.height);
+    button.style.left = `${rect.right - bounds.left + host.scrollLeft - host.clientLeft - 54}px`;
+    button.style.top = `${rect.top - bounds.top + host.scrollTop - host.clientTop + Math.max(0, (rect.height - height) / 2)}px`;
+    button.style.height = `${height}px`;
+    button.hidden = false;
+  }
+  button.addEventListener("pointerdown", (event) => event.preventDefault());
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    // Blurring removes this button; outside-click handlers must not mistake the
+    // detached target for a click outside the search results or current panel.
+    event.stopPropagation();
+    if (document.activeElement === field) field.blur();
+    hide();
+  });
+  return { sync, hide };
+}
+
+const keyboardDismissControl = createKeyboardDismissControl();
+
 function revealFocusedOverlayField() {
   const field = document.activeElement;
   if (!field?.matches?.("input, textarea, select")) return;
   const panel = field.closest(".academy-preview-modal, .preview-dialog, #aurumChatPanel");
   if (!panel || !panel.clientHeight) return;
   const bounds = panel.getBoundingClientRect();
-  const rect = field.getBoundingClientRect();
   const header = panel.querySelector(":scope > header, :scope > .preview-topbar, :scope > .aurum-chat-header");
   const headerHeight = header && getComputedStyle(header).position === "sticky" ? header.getBoundingClientRect().height : 0;
-  const top = bounds.top + headerHeight + 6;
-  const bottom = bounds.bottom - 6;
-  if (rect.height > bottom - top || rect.top < top) {
-    panel.scrollTop += rect.top - top;
-  } else if (rect.bottom > bottom) {
-    panel.scrollTop += rect.bottom - bottom;
+  const containers = [];
+  for (let parent = field.parentElement; parent && parent !== panel; parent = parent.parentElement) {
+    if (parent.scrollHeight > parent.clientHeight && /^(auto|scroll)$/.test(getComputedStyle(parent).overflowY)) containers.push(parent);
+  }
+  containers.push(panel);
+  for (const container of containers) {
+    const rect = field.getBoundingClientRect();
+    const content = container === panel ? bounds : container.getBoundingClientRect();
+    const visibleTop = Math.max(bounds.top + headerHeight, content.top);
+    const visibleBottom = Math.min(bounds.bottom, content.bottom);
+    const margin = Math.min(6, Math.max(0, (visibleBottom - visibleTop - rect.height) / 2));
+    const top = visibleTop + margin;
+    const bottom = visibleBottom - margin;
+    if (rect.height > bottom - top || rect.top < top) {
+      container.scrollTop += rect.top - top;
+    } else if (rect.bottom > bottom) {
+      container.scrollTop += rect.bottom - bottom;
+    }
   }
 }
 
-function syncFloatingViewport() {
+function revealFocusedPageField() {
+  const viewport = window.visualViewport;
+  if (!viewport || !Number.isFinite(viewport.height) || viewport.height <= 0) return;
+  const field = document.activeElement;
+  const loginPanel = field?.closest?.("#loginScreen");
+  // Safari can shrink innerHeight again while panning a fixed login panel.
+  // Its unchanged client height still identifies the open software keyboard.
+  if (Math.max(window.innerHeight, Number(loginPanel?.clientHeight) || 0) - viewport.height < 100) return;
+  if (Number.isFinite(viewport.scale) && Math.abs(viewport.scale - 1) > 0.02) return;
+  if (!field?.matches?.('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), textarea, select')) return;
+  if (field.disabled || field.readOnly || field.closest(".academy-preview-modal, .preview-dialog, #aurumChatPanel")) return;
+  const rect = field.getBoundingClientRect();
+  // WebKit reports ordinary client rects in visual viewport coordinates.
+  // Adding its keyboard pan again leaves the field behind Safari's accessory bar.
+  const visualClientRects = window.CSS?.supports?.("-webkit-backdrop-filter", "none");
+  const viewportTop = !visualClientRects && Number.isFinite(viewport.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
+  const margin = Math.min(12, Math.max(0, (viewport.height - rect.height) / 2));
+  const top = viewportTop + margin;
+  const bottom = viewportTop + viewport.height - margin;
+  let delta = 0;
+  if (rect.height > bottom - top || rect.top < top) {
+    delta = rect.top - top;
+  } else if (rect.bottom > bottom) {
+    delta = rect.bottom - bottom;
+  }
+  if (Math.abs(delta) >= 1) {
+    if (loginPanel && loginPanel.scrollHeight > loginPanel.clientHeight) {
+      loginPanel.scrollTop += delta;
+    } else {
+      window.scrollBy({ top: delta, left: 0, behavior: "instant" });
+    }
+  }
+}
+
+function syncFloatingViewport(event) {
   const viewport = window.visualViewport;
   const width = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : window.innerWidth;
   const height = Number.isFinite(viewport?.height) && viewport.height > 0 ? viewport.height : window.innerHeight;
@@ -27270,11 +27480,19 @@ function syncFloatingViewport() {
   style.setProperty("--oa-visible-bottom-gap", `${Math.max(0, window.innerHeight - top - height)}px`);
   document.documentElement.classList.toggle("has-short-viewport", height < 320);
   document.documentElement.classList.toggle("has-tiny-viewport", height < 100);
+  document.documentElement.classList.toggle("has-micro-viewport", height < 40);
   if (notificationDropdown && !notificationDropdown.hidden) positionNotificationDropdown();
   restoreAurumFloatingPosition();
   scheduleAurumViewportClamp();
   scheduleAurumAvoidance();
-  window.requestAnimationFrame?.(() => revealFocusedOverlayField());
+  window.requestAnimationFrame?.(() => {
+    revealFocusedOverlayField();
+    const field = document.activeElement;
+    const settlingLoginFocus = Number(field?.dataset?.keyboardRevealUntil) > Date.now()
+      && Boolean(field?.closest?.("#loginScreen"));
+    if (event?.type !== "scroll" || settlingLoginFocus) revealFocusedPageField();
+    keyboardDismissControl.sync();
+  });
 }
 
 window.addEventListener("resize", syncFloatingViewport);
@@ -27283,22 +27501,46 @@ window.visualViewport?.addEventListener("scroll", syncFloatingViewport, { passiv
 syncFloatingViewport();
 window.addEventListener("scroll", scheduleAurumAvoidance, { passive: true });
 document.addEventListener("scroll", scheduleAurumAvoidance, { passive: true, capture: true });
+document.addEventListener("scroll", () => keyboardDismissControl.sync(), { passive: true, capture: true });
 window.addEventListener(AURUM_AVOID_EVENT, scheduleAurumAvoidance);
 
 document.addEventListener("focusin", (event) => {
-  window.requestAnimationFrame?.(() => revealFocusedOverlayField());
+  if (event.target.closest?.("#loginScreen") && event.target.matches?.("input")) {
+    event.target.dataset.keyboardRevealUntil = String(Date.now() + 3000);
+  }
+  window.requestAnimationFrame?.(() => {
+    revealFocusedOverlayField();
+    revealFocusedPageField();
+    keyboardDismissControl.sync();
+  });
   if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR) || event.target.closest?.(AURUM_AVOID_SELECTORS.join(","))) {
     dispatchAurumAvoidanceUpdate();
   }
 });
 
 document.addEventListener("focusout", (event) => {
+  if (event.target.dataset) delete event.target.dataset.keyboardRevealUntil;
+  keyboardDismissControl.hide();
   if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR) || event.target.closest?.(AURUM_AVOID_SELECTORS.join(","))) {
     window.setTimeout(dispatchAurumAvoidanceUpdate, 80);
   }
 });
 
+["pointerdown", "wheel"].forEach((eventName) => {
+  document.addEventListener(eventName, () => {
+    const field = document.activeElement;
+    if (field?.dataset) delete field.dataset.keyboardRevealUntil;
+  }, { capture: true, passive: true });
+});
+
 document.addEventListener("input", (event) => {
+  if (event.target.closest?.("#loginScreen") && event.target.matches?.("input")) {
+    event.target.dataset.keyboardRevealUntil = String(Date.now() + 3000);
+    window.requestAnimationFrame?.(() => {
+      revealFocusedPageField();
+      keyboardDismissControl.sync();
+    });
+  }
   if (event.target.matches?.(AURUM_ACTIVE_FIELD_SELECTOR)) dispatchAurumAvoidanceUpdate();
 });
 
