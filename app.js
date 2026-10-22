@@ -231,7 +231,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-51";
+const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-52";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -9501,9 +9501,44 @@ function toggleMainMenuDropdown(id) {
   }
 }
 
+function positionMainUserDropdown() {
+  if (!mainUserDropdown || mainUserDropdown.hidden || !mainUserMenuButton) return;
+  const viewport = window.visualViewport;
+  const width = Number.isFinite(viewport?.width) && viewport.width > 0 ? viewport.width : window.innerWidth;
+  const height = Number.isFinite(viewport?.height) && viewport.height > 0 ? viewport.height : window.innerHeight;
+  const viewportLeft = Number.isFinite(viewport?.offsetLeft) ? Math.max(0, viewport.offsetLeft) : 0;
+  const viewportTop = Number.isFinite(viewport?.offsetTop) ? Math.max(0, viewport.offsetTop) : 0;
+  const minLeft = viewportLeft + 12 + safeViewportInset("left");
+  const minTop = viewportTop + 12 + safeViewportInset("top");
+  const right = viewportLeft + width - 12 - safeViewportInset("right");
+  const bottom = viewportTop + height - 12 - safeViewportInset("bottom");
+  const availableWidth = Math.max(0, right - minLeft);
+  const availableHeight = Math.max(0, bottom - minTop);
+  const menuWidth = Math.min(280, availableWidth);
+  const button = mainUserMenuButton.getBoundingClientRect();
+  const left = Math.min(Math.max(minLeft, button.right - menuWidth), Math.max(minLeft, right - menuWidth));
+  // Keep room for the scrollable menu even when its trigger is near the bottom.
+  const top = Math.min(Math.max(minTop, button.bottom + 8), Math.max(minTop, bottom - Math.min(240, availableHeight)));
+  mainUserDropdown.classList.add("is-viewport-anchored");
+  mainUserDropdown.style.setProperty("--main-user-dropdown-width", `${menuWidth}px`);
+  mainUserDropdown.style.setProperty("--main-user-dropdown-left", `${left}px`);
+  mainUserDropdown.style.setProperty("--main-user-dropdown-top", `${top}px`);
+  mainUserDropdown.style.setProperty("--main-user-dropdown-max-height", `${Math.max(0, bottom - top)}px`);
+}
+
+function syncMainUserMenuPosition(event) {
+  if (!mainUserDropdown || mainUserDropdown.hidden) return;
+  if (event?.type === "scroll" && event.target instanceof Node && mainUserDropdown.contains(event.target)) return;
+  positionMainUserDropdown();
+}
+
 function closeMainUserMenu() {
   if (!mainUserDropdown || !mainUserMenuButton) return;
   mainUserDropdown.hidden = true;
+  mainUserDropdown.classList.remove("is-viewport-anchored");
+  ["width", "left", "top", "max-height"].forEach((property) => {
+    mainUserDropdown.style.removeProperty(`--main-user-dropdown-${property}`);
+  });
   mainUserMenuButton.setAttribute("aria-expanded", "false");
 }
 
@@ -9512,6 +9547,8 @@ function toggleMainUserMenu() {
   const willOpen = mainUserDropdown.hidden;
   mainUserDropdown.hidden = !willOpen;
   mainUserMenuButton.setAttribute("aria-expanded", String(willOpen));
+  if (willOpen) positionMainUserDropdown();
+  else closeMainUserMenu();
 }
 
 function closeBrandMenu() {
@@ -27201,6 +27238,11 @@ mainUserMenuButton?.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleMainUserMenu();
 });
+
+window.addEventListener("resize", syncMainUserMenuPosition);
+window.visualViewport?.addEventListener("resize", syncMainUserMenuPosition, { passive: true });
+window.visualViewport?.addEventListener("scroll", syncMainUserMenuPosition, { passive: true });
+document.addEventListener("scroll", syncMainUserMenuPosition, { capture: true, passive: true });
 
 document.querySelectorAll("[data-login-privacy]").forEach((button) => {
   button.addEventListener("click", () => openPrivacyNoticePreview({ login: true }));

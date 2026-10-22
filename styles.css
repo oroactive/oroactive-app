@@ -1208,7 +1208,8 @@ body.main-menu-active .splash-screen {
 }
 
 .main-user-button {
-  width: 100%;
+  width: auto;
+  height: 44px;
   min-width: 74px;
   max-width: 170px;
   overflow: hidden;
@@ -1249,12 +1250,24 @@ body.main-menu-active .splash-screen {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
-  width: 190px;
+  width: min(280px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px;
   border: 1px solid rgba(255, 115, 28, 0.35);
   border-radius: 12px;
   background: #111;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+}
+
+.main-user-dropdown.is-viewport-anchored {
+  position: fixed;
+  top: var(--main-user-dropdown-top, 12px);
+  left: var(--main-user-dropdown-left, 12px);
+  right: auto;
+  width: var(--main-user-dropdown-width, min(280px, calc(100vw - 24px)));
+  max-height: var(--main-user-dropdown-max-height, calc(100dvh - 24px));
 }
 
 .main-user-dropdown button {
@@ -12010,10 +12023,6 @@ input.document-expired {
     min-width: 44px;
   }
 
-  .main-user-dropdown {
-    width: 100%;
-  }
-
   .main-menu-search-wrap {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -12122,12 +12131,11 @@ input.document-expired {
     top: auto;
     right: auto;
     left: auto;
-    display: flex;
-    justify-content: flex-end;
+    display: block;
   }
 
   .main-user-button {
-    max-width: min(100%, 280px);
+    max-width: min(170px, 40vw);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
