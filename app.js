@@ -231,7 +231,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-54";
+const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-59";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -27488,14 +27488,22 @@ function syncFloatingViewport(event) {
   window.requestAnimationFrame?.(() => {
     revealFocusedOverlayField();
     const field = document.activeElement;
-    const settlingLoginFocus = Number(field?.dataset?.keyboardRevealUntil) > Date.now()
-      && Boolean(field?.closest?.("#loginScreen"));
-    if (event?.type !== "scroll" || settlingLoginFocus) revealFocusedPageField();
+    const settlingPageFocus = Number(field?.dataset?.keyboardRevealUntil) > Date.now()
+      && (Boolean(field?.closest?.("#loginScreen")) || field?.id === "assistantQuestion");
+    if (event?.type !== "scroll" || settlingPageFocus) revealFocusedPageField();
     keyboardDismissControl.sync();
   });
 }
 
 window.addEventListener("resize", syncFloatingViewport);
+window.addEventListener("orientationchange", () => {
+  const field = document.activeElement;
+  if (field?.id !== "assistantQuestion") return;
+  // Safari may finish its keyboard pan after the resized textarea has settled.
+  // Pointer or wheel input cancels this bounded correction below.
+  field.dataset.keyboardRevealUntil = String(Date.now() + 3000);
+  syncFloatingViewport();
+});
 window.visualViewport?.addEventListener("resize", syncFloatingViewport, { passive: true });
 window.visualViewport?.addEventListener("scroll", syncFloatingViewport, { passive: true });
 syncFloatingViewport();
@@ -27505,7 +27513,8 @@ document.addEventListener("scroll", () => keyboardDismissControl.sync(), { passi
 window.addEventListener(AURUM_AVOID_EVENT, scheduleAurumAvoidance);
 
 document.addEventListener("focusin", (event) => {
-  if (event.target.closest?.("#loginScreen") && event.target.matches?.("input")) {
+  if ((event.target.closest?.("#loginScreen") && event.target.matches?.("input"))
+    || event.target.id === "assistantQuestion") {
     event.target.dataset.keyboardRevealUntil = String(Date.now() + 3000);
   }
   window.requestAnimationFrame?.(() => {

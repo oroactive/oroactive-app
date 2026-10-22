@@ -3,7 +3,7 @@
   z-index: 10;
   width: 48px;
   min-width: 48px;
-  min-height: 0;
+  min-height: 0 !important;
   margin: 0;
   padding: 0;
   border: 0;
@@ -5641,7 +5641,7 @@ body.aurum-blocks-playing .aurum-mascot-root:not(.aurum-panel-open) .aurum-masco
   width: 100%;
 }
 
-.crm-edit-grid label:last-child {
+.crm-edit-grid label:last-of-type {
   grid-column: 1 / -1;
 }
 
@@ -14617,9 +14617,29 @@ body.gem-lab-zoom-open {
   overflow: visible;
 }
 
+.has-short-viewport .preview-dialog textarea {
+  --oa-preview-field-room: max(24px, calc(var(--oa-visible-height) - var(--oa-overlay-top) - var(--oa-overlay-bottom) - 14px));
+  min-height: min(44px, var(--oa-preview-field-room));
+  max-height: var(--oa-preview-field-room);
+}
+
 .has-short-viewport .aurum-chat-form textarea {
   height: 44px;
   min-height: 44px;
+}
+
+.has-short-viewport .assistant-form textarea {
+  --oa-assistant-field-room: max(0px, calc(var(--oa-visible-height) - 2px));
+  min-height: min(44px, var(--oa-assistant-field-room));
+  max-height: var(--oa-assistant-field-room);
+}
+
+.has-tiny-viewport .assistant-form textarea {
+  height: min(44px, var(--oa-assistant-field-room));
+  min-height: min(44px, var(--oa-assistant-field-room));
+  padding-block: 0;
+  border-block-width: 0;
+  line-height: 16px;
 }
 
 .has-tiny-viewport {
@@ -14633,6 +14653,21 @@ body.gem-lab-zoom-open {
   height: min(44px, var(--oa-overlay-field-room));
   min-height: min(44px, var(--oa-overlay-field-room));
   padding-block: 4px;
+}
+
+.has-tiny-viewport .preview-dialog {
+  border: 0;
+  border-radius: 0;
+}
+
+.has-tiny-viewport .preview-dialog textarea {
+  /* Reserve room for Safari's fractional scroll alignment. */
+  --oa-preview-field-room: max(0px, calc(var(--oa-visible-height) - var(--oa-overlay-top) - var(--oa-overlay-bottom) - 2px));
+  height: min(44px, var(--oa-preview-field-room));
+  min-height: min(44px, var(--oa-preview-field-room));
+  padding-block: 0;
+  border-block-width: 0;
+  line-height: 16px;
 }
 
 
