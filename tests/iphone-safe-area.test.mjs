@@ -420,3 +420,29 @@ test('Safari keyboard Fine stays available when login panning shrinks innerHeigh
  assert.equal(row.button.style.height,'44px');assert.equal(row.field.value,'Entered text');
  row.viewport.height=323;row.ctx.window.innerHeight=323;row.control.sync();assert.equal(row.button.hidden,true,'Fine must still disappear when the keyboard closes');
 });
+
+test('Safari assistant finishes a delayed rotation pan while manual scrolling stays free',()=>{
+ const {ctx,field,scrolls}=pageKeyboardContext({webkit:true,height:18.65625,top:-812,fieldHeight:16.65625});
+ field.id='assistantQuestion';field.dataset={keyboardRevealUntil:String(Date.now()+3000)};
+ Object.assign(ctx,{notificationDropdown:null,restoreAurumFloatingPosition(){},scheduleAurumViewportClamp(){},scheduleAurumAvoidance(){},keyboardDismissControl:{sync(){}},revealFocusedOverlayField(){}});
+ ctx.window.requestAnimationFrame=callback=>callback();ctx.document.documentElement={style:{setProperty(){}},classList:{toggle(){}}};
+ const start=app.indexOf('function syncFloatingViewport(');
+ vm.runInContext(app.slice(start,app.indexOf('\nwindow.addEventListener("resize", syncFloatingViewport);',start)),ctx);
+ ctx.syncFloatingViewport({type:'scroll'});
+ assert.ok(field.getBoundingClientRect().top>=0,'a late native rotation pan must return the assistant question below browser chrome');
+ assert.ok(field.getBoundingClientRect().bottom<=18.65625,'the compact question must fit above the keyboard');
+ assert.equal(field.value,'test value preserved');assert.equal(scrolls.length,1);
+ ctx.syncFloatingViewport({type:'scroll'});assert.equal(scrolls.length,1,'a settled assistant must remain still');
+ delete field.dataset.keyboardRevealUntil;
+ ctx.syncFloatingViewport({type:'scroll'});assert.equal(scrolls.length,1,'manual scroll cancellation must remain effective');
+});
+
+test('native rotation renews only the assistant keyboard settling window',()=>{
+ let handler,corrections=0;
+ const field={id:'assistantQuestion',dataset:{},value:'QA question preserved'};
+ const ctx=vm.createContext({document:{activeElement:field},Date:{now:()=>10000},window:{addEventListener:(type,callback)=>{assert.equal(type,'orientationchange');handler=callback;}},syncFloatingViewport:()=>corrections++});
+ const start=app.indexOf('window.addEventListener("orientationchange", () => {');
+ vm.runInContext(app.slice(start,app.indexOf('\nwindow.visualViewport?.addEventListener("resize"',start)),ctx);
+ handler();assert.equal(field.dataset.keyboardRevealUntil,'13000');assert.equal(corrections,1);assert.equal(field.value,'QA question preserved');
+ field.id='crmEditNotes';delete field.dataset.keyboardRevealUntil;handler();assert.deepEqual(field.dataset,{});assert.equal(corrections,1,'rotation must preserve other screens behavior');
+});
