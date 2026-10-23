@@ -8461,6 +8461,7 @@ input.document-expired {
 }
 
 .capture-card {
+  min-width: 0;
   min-height: 178px;
   border: 1px dashed #ffad7a;
   border-radius: 8px;
@@ -8499,7 +8500,9 @@ input.document-expired {
 }
 
 .capture-actions button {
-  min-height: 34px;
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: #fff;
