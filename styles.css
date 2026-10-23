@@ -9174,6 +9174,22 @@ input.document-expired {
   color: var(--ink);
 }
 
+/* Keep wide archive rows inside their own scroll area on tablet layouts. */
+#archive .archive-groups,
+#archive .archive-month,
+#archive .archive-day {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#archive .archive-day-inner {
+  min-width: 0;
+}
+
+#archive .acts-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .archive-table,
 .settings-list {
   background: var(--panel);
@@ -14336,7 +14352,8 @@ body.gem-lab-zoom-open {
 }
 
 /* Dock Aurum: sui tablet e telefoni una corsia dedicata evita sovrapposizioni con le CTA. */
-@media (min-width: 601px) and (max-width: 1100px) {
+@media (min-width: 601px) and (max-width: 1100px),
+       (min-width: 1101px) and (hover: none) and (pointer: coarse) {
   .main-menu-control-shell,
   .workspace {
     box-sizing: border-box;
@@ -14364,7 +14381,8 @@ body.gem-lab-zoom-open {
 
 .mobile-table-hint { display: none; }
 
-@media (min-width: 769px) and (max-width: 1100px) and (max-height: 500px) {
+@media (min-width: 769px) and (max-width: 1100px) and (max-height: 500px),
+       (min-width: 921px) and (max-width: 1100px) {
   .archive-header {
     flex-wrap: wrap;
     align-items: flex-start;
@@ -14372,6 +14390,11 @@ body.gem-lab-zoom-open {
 
   .archive-header > div:first-child {
     flex: 1 0 260px;
+    max-width: 100%;
+  }
+
+  .archive-header > :not(div:first-child) {
+    min-width: 0;
     max-width: 100%;
   }
 }
@@ -14602,6 +14625,18 @@ body.gem-lab-zoom-open {
   min-height: 0;
 }
 
+@media (min-width: 1101px) and (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  /* Safari can keep reporting the full viewport while the iPad keyboard is open. */
+  .aurum-chat-panel > .aurum-chat-header {
+    order: -2;
+  }
+
+  .aurum-chat-panel > .aurum-chat-form {
+    order: -1;
+    margin-top: 12px;
+  }
+}
+
 .has-short-viewport .aurum-chat-header,
 .has-short-viewport .academy-preview-modal header,
 .has-short-viewport .preview-topbar {
@@ -14713,6 +14748,14 @@ body.gem-lab-zoom-open {
     width: calc(var(--oa-visible-width) - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
     max-width: calc(var(--oa-visible-width) - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
     max-height: calc(var(--oa-visible-height) - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 601px) and (hover: none) and (pointer: coarse) {
+  /* Let tablet session controls scroll with the page, clear of row actions. */
+  body.app-active .session-username,
+  body.app-active .notification-center:not(.is-main-menu-docked) {
+    position: absolute;
   }
 }
 

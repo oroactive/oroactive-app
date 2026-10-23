@@ -1,4 +1,4 @@
-const BUILD_ID = "20261022-reliability-59";
+const BUILD_ID = "20261022-reliability-64";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;
