@@ -231,7 +231,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-59";
+const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-64";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -10986,7 +10986,7 @@ function saveAurumSettings(settings = {}) {
 }
 
 function isAurumResponsiveDock() {
-  return window.matchMedia?.("(max-width: 1100px)")?.matches ?? window.innerWidth <= 1100;
+  return window.matchMedia?.("(max-width: 1100px), (hover: none) and (pointer: coarse)")?.matches ?? window.innerWidth <= 1100;
 }
 
 function syncAurumResponsiveDock() {
@@ -27408,6 +27408,12 @@ function revealFocusedOverlayField() {
   if (!field?.matches?.("input, textarea, select")) return;
   const panel = field.closest(".academy-preview-modal, .preview-dialog, #aurumChatPanel");
   if (!panel || !panel.clientHeight) return;
+  if (panel.id === "aurumChatPanel" && window.matchMedia?.("(min-width: 1101px) and (orientation: landscape) and (hover: none) and (pointer: coarse)")?.matches) {
+    // Keep the composer near the top even when Safari has not shrunk its viewport.
+    // Reposition on focus/viewport changes; explicit panel dragging still works.
+    const { left } = panel.getBoundingClientRect();
+    applyAurumPanelPosition({ x: left, y: aurumViewportBounds(panel).minY });
+  }
   const bounds = panel.getBoundingClientRect();
   const header = panel.querySelector(":scope > header, :scope > .preview-topbar, :scope > .aurum-chat-header");
   const headerHeight = header && getComputedStyle(header).position === "sticky" ? header.getBoundingClientRect().height : 0;
