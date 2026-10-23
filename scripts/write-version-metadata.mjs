@@ -40,12 +40,12 @@ const commit = firstUseful([
   gitCommit
 ]) || "unknown";
 const shortCommit = useful(commit) ? commit.slice(0, 12) : "unknown";
-const buildNumber = firstUseful([
+const { assetBuildId, catalogCount } = readClientRelease();
+const buildNumber = /^oroactive_gestionale_\d+_\d{8}$/.test(assetBuildId) ? assetBuildId : firstUseful([
   process.env.BUILD_NUMBER,
   process.env.GITHUB_RUN_NUMBER,
   gitBuildNumber
 ], { rejectLocal: true }) || (shortCommit !== "unknown" ? `git-${shortCommit}` : "local");
-const { assetBuildId, catalogCount } = readClientRelease();
 const metadata = {
   ok: true,
   app: "OroActive",
