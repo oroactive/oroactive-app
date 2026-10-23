@@ -6,6 +6,7 @@ const state = {
   annualProgressive: 184,
   uploadedCaptures: new Set(),
   captureFiles: new Map(),
+  captureGeneration: 0,
   lastSearchResults: [],
   editingPracticeNumber: null,
   authToken: "",
@@ -231,7 +232,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "oroactive_gestionale_67_20261023";
+const OROACTIVE_CLIENT_BUILD_ID = "oroactive_gestionale_68_20261023";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -21216,6 +21217,7 @@ function storeCodeFromAct(act) {
 }
 
 function restoreCaptureStateFromAct(act) {
+  state.captureGeneration = (state.captureGeneration || 0) + 1;
   const restoredCaptures = new Set(Array.isArray(act.captures) ? act.captures : []);
   state.captureFiles.clear();
 
@@ -21406,6 +21408,7 @@ async function loadActForEdit(practiceNumber) {
 }
 
 async function resetCurrentPractice(options = {}) {
+  state.captureGeneration = (state.captureGeneration || 0) + 1;
   const preservedStoreCode = options.preserveStoreCode ? fieldValue("#storeCode") : "";
 
   previewModal.hidden = true;
@@ -25720,12 +25723,13 @@ async function handleCaptureFileChange(event) {
   const file = input.files?.[0];
   if (!card || !key || !file) return;
   const generation = state.sessionGeneration;
+  const captureGeneration = state.captureGeneration || 0;
   const token = Symbol();
   card.captureUploadToken = token;
   try {
     const dataUrl = await fileToDataUrl(file);
     if (!dataUrl) throw new Error("Empty attachment");
-    if (generation !== state.sessionGeneration || card.dataset.captureKey !== key || card.captureUploadToken !== token) return;
+    if (generation !== state.sessionGeneration || captureGeneration !== (state.captureGeneration || 0) || card.isConnected === false || card.dataset.captureKey !== key || card.captureUploadToken !== token) return;
     setCaptureFile(key, {
       name: file.name || "Foto allegata",
       type: dataUrl.startsWith("data:image/jpeg") ? "image/jpeg" : file.type || "",
@@ -25740,7 +25744,7 @@ async function handleCaptureFileChange(event) {
     scheduleAurumShieldEvaluation();
     if (state.captureGroup && !previewModal.hidden) openCaptureGroupModal(state.captureGroup);
   } catch {
-    if (generation === state.sessionGeneration && card.captureUploadToken === token) {
+    if (generation === state.sessionGeneration && captureGeneration === (state.captureGeneration || 0) && card.isConnected !== false && card.captureUploadToken === token) {
       showToast("Impossibile caricare il file. Gli allegati presenti restano invariati.");
     }
   } finally {
@@ -25837,8 +25841,9 @@ function removeCaptureGroup(group) {
     revokeCaptureUrl(previous);
     state.captureFiles.delete(slot.key);
     state.uploadedCaptures.delete(slot.key);
-    const input = document.querySelector(`.capture-card[data-capture-key="${cssEscape(slot.key)}"] input`);
-    if (input) input.value = "";
+    const card = document.querySelector(`.capture-card[data-capture-key="${cssEscape(slot.key)}"]`);
+    if (card) card.captureUploadToken = null;
+    card?.querySelectorAll("input").forEach((input) => { input.value = ""; });
   });
   state.attachments = state.uploadedCaptures.size;
   updateDocumentCaptureCards();
@@ -28183,14 +28188,14 @@ document.addEventListener("click", async (event) => {
 
   const previous = state.captureFiles.get(key);
   markPracticeDirty();
+  card.captureUploadToken = null;
   revokeCaptureUrl(previous);
   state.captureFiles.delete(key);
   state.uploadedCaptures.delete(key);
   state.attachments = state.uploadedCaptures.size;
   card.classList.remove("loaded");
   card.querySelector("em").textContent = key.startsWith("pagamento-") ? "Scatta una foto o carica dal dispositivo" : "Scatta una foto o carica dal dispositivo";
-  const input = card.querySelector("input");
-  if (input) input.value = "";
+  card.querySelectorAll("input").forEach((input) => { input.value = ""; });
   updateDocumentCaptureCards();
   renderPaymentCaptureCard();
   renderPreciousCaptureCards();
