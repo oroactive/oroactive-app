@@ -269,7 +269,7 @@ async function getBuildMetadata() {
     fileMetadata.buildTime,
     fileMetadata.builtAt
   ]) || runtimeStatus.startedAt;
-  const buildNumber = firstUsefulBuildValue([
+  let buildNumber = firstUsefulBuildValue([
     process.env.OROACTIVE_BUILD_NUMBER,
     process.env.BUILD_NUMBER,
     process.env.GITHUB_RUN_NUMBER,
@@ -288,6 +288,7 @@ async function getBuildMetadata() {
     process.env.OROACTIVE_ASSET_BUILD_ID,
     fileMetadata.assetBuildId
   ]);
+  if (/^oroactive_gestionale_\d+_\d{8}$/.test(assetBuildId)) buildNumber = assetBuildId;
   const catalogCount = validCatalogCount(
     firstUsefulBuildValue([
       process.env.OROACTIVE_CATALOG_COUNT,
