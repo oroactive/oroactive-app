@@ -109,6 +109,26 @@ test("a photo finishing after the session changes cannot alter the next session"
   assert.equal(h.effects.revoked.length, 0);
 });
 
+test("switching to another deed discards a photo still loading for the previous deed", async () => {
+  let complete; const h = harness(() => new Promise(resolve => { complete = resolve; }));
+  vm.runInContext(sourceFunction("restoreCaptureStateFromAct"), h.ctx);
+  const pending = h.ctx.handleCaptureFileChange({ target: h.input });
+  h.ctx.restoreCaptureStateFromAct({ captures: [], captureAttachments: [] });
+  complete("data:image/jpeg;base64,cHJldmlvdXM="); await pending;
+  assert.equal(h.state.captureFiles.size, 0);
+  assert.equal(h.state.uploadedCaptures.size, 0);
+  assert.equal(h.effects.dirty, 0);
+});
+
+test("a picker card removed while decoding cannot reintroduce its attachment", async () => {
+  let complete; const h = harness(() => new Promise(resolve => { complete = resolve; }));
+  const pending = h.ctx.handleCaptureFileChange({ target: h.input });
+  h.card.isConnected = false;
+  complete("data:image/jpeg;base64,bmV3"); await pending;
+  assert.equal(h.state.captureFiles.get(h.key), h.old);
+  assert.equal(h.effects.dirty, 0);
+});
+
 test("the most recently selected photo wins if two source conversions finish out of order", async () => {
   const complete = []; const h = harness(() => new Promise(resolve => complete.push(resolve)));
   const first = h.ctx.handleCaptureFileChange({ target: h.input });
