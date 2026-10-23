@@ -231,7 +231,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "oroactive_gestionale_66_20261023";
+const OROACTIVE_CLIENT_BUILD_ID = "oroactive_gestionale_67_20261023";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -22189,13 +22189,13 @@ function renderPaymentCaptureCard() {
         <strong>Contabile pagamento</strong>
         <em>Carica immagine o PDF della contabile ${escapeHtml(method)}.</em>
       </div>
-      <label class="capture-card ${loaded ? "loaded" : ""}" data-capture-key="${key}">
-        <input type="file" accept="image/*,.pdf" capture="environment">
+      <div class="capture-card ${loaded ? "loaded" : ""}" data-capture-key="${key}">
+        ${captureInputsMarkup("image/*,.pdf")}
         <span>Pagamento</span>
         <strong>Contabile ${method}</strong>
-        <em>${loaded ? "Allegato acquisito" : "Tocca per fotografare o allegare"}</em>
-        ${captureActionsMarkup()}
-      </label>
+        <em>${loaded ? "Allegato acquisito" : "Scatta una foto o carica dal dispositivo"}</em>
+        ${captureActionsMarkup(true)}
+      </div>
     </div>
   `;
   ensureCaptureActions();
@@ -22226,7 +22226,7 @@ function updateDocumentCaptureCards() {
     card.querySelector("strong").textContent = `${side === "fronte" ? "Fronte" : "Retro"} ${label}`;
     const loaded = state.uploadedCaptures.has(key);
     card.classList.toggle("loaded", loaded);
-    card.querySelector("em").textContent = loaded ? "Foto acquisita" : "Tocca per fotografare";
+    card.querySelector("em").textContent = loaded ? "Foto acquisita" : "Scatta una foto o carica dal dispositivo";
   });
   ensureCaptureActions();
 }
@@ -25685,13 +25685,67 @@ function captureClassForMetal(metal) {
   }[metal] || "gold";
 }
 
-function captureActionsMarkup() {
+function captureInputsMarkup(accept = "image/*") {
+  return `
+    <input type="file" accept="image/*" capture="environment" data-capture-source="camera">
+    <input type="file" accept="${escapeHtml(accept)}" data-capture-source="library">
+  `;
+}
+
+function captureActionsMarkup(acceptPdf = false) {
   return `
     <div class="capture-actions">
+      <button type="button" data-open-capture="camera">Fotocamera</button>
+      <button type="button" data-open-capture="library">${acceptPdf ? "Carica foto o PDF" : "Carica foto"}</button>
       <button type="button" data-view-capture>Visualizza foto</button>
       <button type="button" data-delete-capture>Elimina foto</button>
     </div>
   `;
+}
+
+function openCapturePicker(card, source) {
+  if (!card || !["camera", "library"].includes(source)) return false;
+  const input = card.querySelector(`input[data-capture-source="${source}"]`);
+  if (!input || input.disabled) return false;
+  input.value = "";
+  input.click();
+  return true;
+}
+
+async function handleCaptureFileChange(event) {
+  const input = event.target;
+  if (!input.matches(".capture-card input")) return;
+  const card = input.closest(".capture-card");
+  const key = card?.dataset.captureKey;
+  const file = input.files?.[0];
+  if (!card || !key || !file) return;
+  const generation = state.sessionGeneration;
+  const token = Symbol();
+  card.captureUploadToken = token;
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    if (!dataUrl) throw new Error("Empty attachment");
+    if (generation !== state.sessionGeneration || card.dataset.captureKey !== key || card.captureUploadToken !== token) return;
+    setCaptureFile(key, {
+      name: file.name || "Foto allegata",
+      type: dataUrl.startsWith("data:image/jpeg") ? "image/jpeg" : file.type || "",
+      url: dataUrl,
+      dataUrl
+    });
+    markPracticeDirty();
+    card.classList.add("loaded");
+    card.querySelector("em").textContent = "Allegato acquisito";
+    updateAttachmentState();
+    updateChecklistState();
+    scheduleAurumShieldEvaluation();
+    if (state.captureGroup && !previewModal.hidden) openCaptureGroupModal(state.captureGroup);
+  } catch {
+    if (generation === state.sessionGeneration && card.captureUploadToken === token) {
+      showToast("Impossibile caricare il file. Gli allegati presenti restano invariati.");
+    }
+  } finally {
+    input.value = "";
+  }
 }
 
 function captureGroupConfig(group = "") {
@@ -25748,7 +25802,10 @@ function captureGroupSlotMarkup(slot) {
     <article class="capture-group-slot ${loaded ? "loaded" : ""}">
       <span>${escapeHtml(slot.label)}</span>
       <div>${preview}</div>
-      <button class="ghost-button" type="button" data-trigger-capture-key="${escapeHtml(slot.key)}">${loaded ? escapeHtml(slot.action) : "Carica / scatta"}</button>
+      <div class="capture-actions">
+        <button type="button" data-trigger-capture-key="${escapeHtml(slot.key)}" data-trigger-capture-source="camera">Fotocamera</button>
+        <button type="button" data-trigger-capture-key="${escapeHtml(slot.key)}" data-trigger-capture-source="library">${slot.key.startsWith("pagamento-") ? "Carica foto o PDF" : "Carica foto"}</button>
+      </div>
     </article>
   `;
 }
@@ -25899,13 +25956,13 @@ function renderPreciousCaptureCards() {
         const key = `preziosi-${metal.toLowerCase()}-${photo.side}`;
         const loaded = state.uploadedCaptures.has(key);
         return `
-          <label class="capture-card ${captureClassForMetal(metal)} ${loaded ? "loaded" : ""}" data-capture-key="${key}">
-            <input type="file" accept="image/*" capture="environment">
+          <div class="capture-card ${captureClassForMetal(metal)} ${loaded ? "loaded" : ""}" data-capture-key="${key}">
+            ${captureInputsMarkup()}
             <span>${escapeHtml(photo.label)}</span>
             <strong>${escapeHtml(photo.label)} ${escapeHtml(metal.toLowerCase())}</strong>
-            <em>${loaded ? "Foto acquisita" : "Tocca per fotografare"}</em>
+            <em>${loaded ? "Foto acquisita" : "Scatta una foto o carica dal dispositivo"}</em>
             ${captureActionsMarkup()}
-          </label>
+          </div>
         `;
       }).join("")}
     </div>
@@ -27889,8 +27946,8 @@ previewBody?.addEventListener("click", async (event) => {
   }
   const triggerCapture = event.target.closest("[data-trigger-capture-key]");
   if (triggerCapture) {
-    const input = document.querySelector(`.capture-card[data-capture-key="${cssEscape(triggerCapture.dataset.triggerCaptureKey)}"] input`);
-    input?.click();
+    const card = document.querySelector(`.capture-card[data-capture-key="${cssEscape(triggerCapture.dataset.triggerCaptureKey)}"]`);
+    openCapturePicker(card, triggerCapture.dataset.triggerCaptureSource);
     return;
   }
   const reloadCaptureGroup = event.target.closest("[data-reload-capture-group]");
@@ -28084,45 +28141,15 @@ window.addEventListener("online", () => {
   window.addEventListener(eventName, resetSessionTimeout, { passive: true });
 });
 
-document.addEventListener("change", async (event) => {
-  if (!event.target.matches(".capture-card input")) return;
-  const card = event.target.closest(".capture-card");
-  const key = card?.dataset.captureKey;
-  if (!card || !key) return;
-  const file = event.target.files?.[0];
-  if (file) {
-    const captureGeneration = state.sessionGeneration;
-    markPracticeDirty();
-    const previous = state.captureFiles.get(key);
-    revokeCaptureUrl(previous);
-    let dataUrl = "";
-    try {
-      dataUrl = await fileToDataUrl(file);
-    } catch {
-      showToast("Foto caricata, ma anteprima PDF non disponibile.");
-    }
-    if (captureGeneration !== state.sessionGeneration) {
-      event.target.value = "";
-      return;
-    }
-    state.captureFiles.set(key, {
-      name: file.name || "Foto allegata",
-      type: file.type || "",
-      url: dataUrl,
-      dataUrl
-    });
-  }
-  state.uploadedCaptures.add(key);
-  state.attachments = state.uploadedCaptures.size;
-  card.classList.add("loaded");
-  card.querySelector("em").textContent = "Foto acquisita";
-  updateAttachmentState();
-  updateChecklistState();
-  scheduleAurumShieldEvaluation();
-  if (state.captureGroup && !previewModal.hidden) openCaptureGroupModal(state.captureGroup);
-});
+document.addEventListener("change", handleCaptureFileChange);
 
 document.addEventListener("click", async (event) => {
+  const captureSource = event.target.closest("[data-open-capture]");
+  if (captureSource) {
+    event.preventDefault();
+    openCapturePicker(captureSource.closest(".capture-card"), captureSource.dataset.openCapture);
+    return;
+  }
   const captureGroup = event.target.closest("[data-capture-group]");
   if (captureGroup && !event.target.closest(".capture-card") && !event.target.closest(".capture-actions")) {
     openCaptureGroupModal(captureGroup.dataset.captureGroup);
@@ -28161,7 +28188,7 @@ document.addEventListener("click", async (event) => {
   state.uploadedCaptures.delete(key);
   state.attachments = state.uploadedCaptures.size;
   card.classList.remove("loaded");
-  card.querySelector("em").textContent = key.startsWith("pagamento-") ? "Tocca per fotografare o allegare" : "Tocca per fotografare";
+  card.querySelector("em").textContent = key.startsWith("pagamento-") ? "Scatta una foto o carica dal dispositivo" : "Scatta una foto o carica dal dispositivo";
   const input = card.querySelector("input");
   if (input) input.value = "";
   updateDocumentCaptureCards();
