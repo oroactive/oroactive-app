@@ -77,10 +77,11 @@ test("Gold Standard keeps market references separate from customer MIN prices an
 test("Gold Standard does not infer the market silver unit from its numerical magnitude", async () => {
   const result = await createGoldStandardExtractor({ resolver, fetchImpl: async () => response(goldStandard) }).extractGoldStandardQuotes();
   assert.equal(byField(result.quotes, "gold_standard_silver_reference"), undefined);
-  assert.equal(result.status, "partial");
+  assert.equal(result.status, "success");
   assert.equal(result.quotes.length, 5);
-  assert.deepEqual(result.missing_fields.map((field) => field.field_key), ["gold_standard_silver_reference"]);
-  assert.match(result.missing_fields[0].error, /unità|unita|kg/i);
+  assert.deepEqual(result.missing_fields, []);
+  assert.deepEqual(result.excluded_fields.map((field) => field.field_key), ["gold_standard_silver_reference"]);
+  assert.match(result.excluded_fields[0].reason, /unità|unita|kg/i);
 });
 
 test("Gold Standard verifies all six fields only when silver market units are explicitly published", async () => {
@@ -159,10 +160,11 @@ test("Gold Standard factory fetches the official unit declaration before verifyi
   assert.ok(calls.includes(goldUnitUrl));
   assert.equal(result.quotes.filter((quote) => quote.metal === "gold").length, 3);
   assert.equal(result.quotes.length, 5);
-  assert.equal(result.status, "partial");
+  assert.equal(result.status, "success");
   for (const quote of result.quotes.filter((quote) => quote.metal === "gold")) assert.deepEqual(quote.raw_payload.unit_evidence, goldUnitEvidence);
   assert.ok(result.pages_analyzed.includes(goldUnitUrl));
-  assert.deepEqual(result.missing_fields.map((field) => field.field_key), ["gold_standard_silver_reference"]);
+  assert.deepEqual(result.missing_fields, []);
+  assert.deepEqual(result.excluded_fields.map((field) => field.field_key), ["gold_standard_silver_reference"]);
 });
 
 test("Gold Standard recognizes the HTML-encoded unit declaration served by its official article", async () => {
@@ -177,7 +179,8 @@ test("Gold Standard recognizes the HTML-encoded unit declaration served by its o
     for (const quote of result.quotes.filter((quote) => quote.metal === "gold")) {
       assert.deepEqual(quote.raw_payload.unit_evidence, goldUnitEvidence, encodedE);
     }
-    assert.deepEqual(result.missing_fields.map((field) => field.field_key), ["gold_standard_silver_reference"], encodedE);
+    assert.deepEqual(result.missing_fields, [], encodedE);
+    assert.deepEqual(result.excluded_fields.map((field) => field.field_key), ["gold_standard_silver_reference"], encodedE);
   }
 });
 
@@ -193,7 +196,7 @@ test("Gold Standard withholds bare gold if the official unit declaration is miss
     assert.equal(result.status, "partial");
     assert.equal(result.quotes.some((quote) => quote.metal === "gold"), false);
     assert.deepEqual(result.quotes.map((quote) => quote.purity_code), ["925", "800"]);
-    assert.equal(result.missing_fields.length, 4);
+    assert.deepEqual(result.missing_fields.map((field) => field.field_key), ["gold_standard_gold_18kt_buyback", "gold_standard_gold_24kt_buyback"]);
   }
 });
 

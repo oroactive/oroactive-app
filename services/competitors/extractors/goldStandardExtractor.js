@@ -15,7 +15,7 @@ const GOLD_STANDARD_DEFINITIONS = [
     purity_code: "24kt",
     purity_value: 1,
     quote_type: "reference_market_gold_price",
-    required: true,
+    required: false,
     anchor: "Quotazione dell'oro in borsa",
     defaultUnit: "EUR/g"
   },
@@ -50,7 +50,7 @@ const GOLD_STANDARD_DEFINITIONS = [
     purity_code: "999",
     purity_value: 0.999,
     quote_type: "reference_market_silver_price",
-    required: true,
+    required: false,
     anchor: "Quotazione dell'argento in borsa",
     defaultUnit: "EUR/kg"
   },
@@ -419,28 +419,37 @@ export function createGoldStandardExtractor(options = {}) {
     const analyses = pages.map((page) => parseGoldStandardPage(page.text, { ...runtime, goldUnitEvidence, quoteDate, sourceUrl: page.url || runtime.url }));
     const invalidKeys = new Set(analyses.flatMap((page) => [...page.invalidKeys]));
     const quotes = dedupeGoldStandardQuotes(analyses.flatMap((page) => page.quotes), invalidKeys);
-    const missingFields = requiredMissingDefinitions(quotes).map((definition) => ({
+    const foundKeys = new Set(quotes.map((quote) => quote.raw_payload?.gold_standard_key));
+    const excludedFields = GOLD_STANDARD_DEFINITIONS.filter((definition) => (
+      !definition.required && !foundKeys.has(definition.key)
+    )).map((definition) => ({
       field_key: definition.key, metal: definition.metal, purity_code: definition.purity_code, quote_type: definition.quote_type,
-      error: definition.key === "gold_standard_silver_reference"
-        ? "Quotazione argento in borsa: prezzo o unità ufficiale non verificabile. Nessuna unità dedotta dal valore numerico."
-        : `${definition.label}: nessun prezzo ufficiale univoco verificabile.`
+      reason: definition.key === "gold_standard_silver_reference"
+        ? "Argento in borsa escluso finché prezzo e unità non sono ufficialmente verificabili. Storico conservato."
+        : "Oro in borsa escluso dal controllo dei prezzi di acquisto: riferimento ufficiale non verificabile. Storico conservato."
+    }));
+    const missingDefinitions = requiredMissingDefinitions(quotes);
+    const missingFields = missingDefinitions.map((definition) => ({
+      field_key: definition.key, metal: definition.metal, purity_code: definition.purity_code, quote_type: definition.quote_type,
+      error: `${definition.label}: nessun prezzo ufficiale univoco verificabile.`
     }));
 
-    for (const definition of requiredMissingDefinitions(quotes)) {
+    for (const definition of missingDefinitions) {
       warnings.push(`Prezzo ${definition.label} Gold Standard non rilevato automaticamente.`);
     }
 
     const requiredCount = GOLD_STANDARD_DEFINITIONS.filter((definition) => definition.required).length;
-    const foundCount = requiredCount - requiredMissingDefinitions(quotes).length;
+    const foundCount = requiredCount - missingDefinitions.length;
     const status = foundCount === requiredCount ? "success" : foundCount ? "partial" : "failed";
     return {
       source: "gold_standard",
       verified_only: true,
       missing_fields: missingFields,
+      excluded_fields: excludedFields,
       status,
       quotes,
       error: status === "success" ? "" : warnings.concat(missingFields.map((field) => field.error)).filter(Boolean).join(" | ").slice(0, 1200),
-      warnings,
+      warnings: status === "success" ? [] : warnings,
       pages_analyzed: [...new Set(pages.map((page) => page.url).concat(unitEvidencePage?.url || []))]
     };
   }

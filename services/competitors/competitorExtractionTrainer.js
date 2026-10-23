@@ -419,7 +419,10 @@ export function createCompetitorExtractionTrainer(options = {}) {
     }
     if (options.verifiedSourceResult) {
       const extraction = options.verifiedSourceResult;
-      const excluded = (extraction.excluded_fields || []).find((field) => field.metal === rule.metal && field.purity_code === rule.purity_code);
+      const excluded = (extraction.excluded_fields || []).find((field) => field.field_key
+        ? field.field_key === rule.field_key
+        : field.metal === rule.metal && field.purity_code === rule.purity_code
+          && (!field.quote_type || field.quote_type === rule.quote_type));
       if (excluded) {
         return { rule, status: "excluded", value: null, unit: "EUR/g", evidence_text: excluded.reason, method: sourceSpecificMethod(source), confidence: "high", error: "" };
       }

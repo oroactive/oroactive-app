@@ -231,7 +231,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "20261022-reliability-64";
+const OROACTIVE_CLIENT_BUILD_ID = "20261023-reliability-65";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -23168,6 +23168,7 @@ function goldStandardSummaryHtml() {
       <div class="gold-standard-grid">${quoteRows}</div>
       <p>Ultimo sync app: ${source.last_sync_at ? escapeHtml(formatDateTime(source.last_sync_at)) : "non ancora eseguito"}${source.last_sync_error ? ` · ${escapeHtml(source.last_sync_error)}` : ""}</p>
       <p class="gold-prediction-disclaimer">Gold Standard indica prezzi MIN di acquisto cliente: trattarli come benchmark operativo e verificare condizioni in negozio. Le quotazioni borsa non vengono mostrate.</p>
+      <p class="gold-prediction-disclaimer">Lo stato della fonte riguarda i prezzi di acquisto cliente. L'argento in borsa resta escluso quando l'unità non è ufficialmente verificabile. Storico conservato.</p>
       ${isFounder() ? `<button class="ghost-button" type="button" data-force-gold-standard-sync>Forza aggiornamento Gold Standard</button>` : ""}
     </article>
   `;
