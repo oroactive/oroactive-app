@@ -232,7 +232,7 @@ const state = {
 window.__OROACTIVE_DIRTY_STATE__ = false;
 window.__OROACTIVE_VERSION__ = null;
 
-const OROACTIVE_CLIENT_BUILD_ID = "oroactive_gestionale_68_20261023";
+const OROACTIVE_CLIENT_BUILD_ID = "oroactive_gestionale_69_20261024";
 const EXPECTED_GOLD_COIN_CATALOG_COUNT = 197;
 const COIN_CATALOG_PAGE_SIZE = 24;
 
@@ -7585,7 +7585,10 @@ function refreshCaptureCardStates() {
     const loaded = state.uploadedCaptures.has(key) || state.captureFiles.has(key);
     card.classList.toggle("loaded", loaded);
     const note = card.querySelector("em");
-    if (note && loaded) note.textContent = "Foto acquisita";
+    if (note) {
+      const message = loaded ? "Foto acquisita" : "Scatta una foto o carica dal dispositivo";
+      if (note.textContent !== message) note.textContent = message;
+    }
   });
 }
 
@@ -21374,6 +21377,7 @@ async function loadActForEdit(practiceNumber) {
   updateDocumentCaptureCards();
   renderPaymentCaptureCard();
   renderPreciousCaptureCards();
+  refreshCaptureCardStates();
   updateAttachmentState();
   updateDocumentExpiryWarning();
 
@@ -21486,6 +21490,7 @@ async function resetCurrentPractice(options = {}) {
   updateDocumentCaptureCards();
   renderPaymentCaptureCard();
   updateIbanVisibility();
+  refreshCaptureCardStates();
   updateAttachmentState();
   updateChecklistState();
   syncDirtyState();

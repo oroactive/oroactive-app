@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 
 const writer = new URL("../scripts/write-version-metadata.mjs", import.meta.url);
 const server = fs.readFileSync(new URL("../server.js", import.meta.url), "utf8");
-const release = "oroactive_gestionale_68_20261023";
+const release = "oroactive_gestionale_69_20261024";
 
 for (const [asset, expected] of [[release, release], ["20261023-reliability-65", "919"]]) {
   test(`metadata writer keeps the application release identity: ${asset}`, () => {
