@@ -1,4 +1,4 @@
-// Build resources from the unchanged brand master; never stretch the portrait canvas.
+// Build resources from the approved relief master; never stretch the source canvas.
 // Run from the repository root: swift scripts/build-brand-icons.swift
 import Foundation
 import CoreGraphics
@@ -6,11 +6,11 @@ import ImageIO
 import UniformTypeIdentifiers
 
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
-let sourceURL = root.appendingPathComponent("assets/oroactive-logo-source.jpg")
+let sourceURL = root.appendingPathComponent("assets/oroactive-logo-rilievo-20261026.png")
 guard let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
       let master = CGImageSourceCreateImageAtIndex(source, 0, nil),
       let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
-    fatalError("Unable to load the original OroActive logo")
+    fatalError("Unable to load the approved OroActive relief logo")
 }
 let bitmapInfo = CGImageAlphaInfo.noneSkipLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
 guard let scan = CGContext(data: nil, width: master.width, height: master.height,

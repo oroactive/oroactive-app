@@ -1,4 +1,4 @@
-const BUILD_ID = "oroactive_gestionale_69_20261024";
+const BUILD_ID = "oroactive_gestionale_70_20261026";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;
