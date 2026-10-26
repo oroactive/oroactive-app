@@ -1,4 +1,4 @@
-const BUILD_ID = "oroactive_gestionale_70_20261026";
+const BUILD_ID = "oroactive_gestionale_71_20261026";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;
@@ -8,6 +8,7 @@ const SHELL_CORE_ASSETS = [
   "/",
   `/pwa-boot.js?v=${BUILD_ID}`,
   `/styles.css?v=${BUILD_ID}`,
+  `/buttons-relief.css?v=${BUILD_ID}`,
   `/frontend-config.js?v=${BUILD_ID}`,
   `/shared/aurum-policy.js?v=${BUILD_ID}`,
   `/app.js?v=${BUILD_ID}`,

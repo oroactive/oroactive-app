@@ -31775,6 +31775,7 @@ app.get("/reset-cache", async (_request, response) => {
 
 const publicRootStaticFiles = new Set([
   "app.js",
+  "buttons-relief.css",
   "frontend-config.js",
   "index.html",
   "manifest.json",
