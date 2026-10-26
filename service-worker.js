@@ -1,4 +1,4 @@
-const BUILD_ID = "oroactive_gestionale_71_20261026";
+const BUILD_ID = "oroactive_gestionale_72_20261026";
 const SHELL_CACHE_NAME = `oroactive-shell-${BUILD_ID}`;
 const IMAGE_CACHE_NAME = `oroactive-images-${BUILD_ID}`;
 const IMAGE_CACHE_MAX_ENTRIES = 96;
@@ -15,9 +15,9 @@ const SHELL_CORE_ASSETS = [
   `/oroactive-logo.png?v=${BUILD_ID}`
 ];
 const SHELL_OPTIONAL_ASSETS = [
-  `/icons/icon-192.png?v=${BUILD_ID}`,
-  `/icons/icon-512.png?v=${BUILD_ID}`,
-  `/icons/apple-touch-icon-180.png?v=${BUILD_ID}`
+  `/icons/oroactive-relief-192-20261026.png?v=${BUILD_ID}`,
+  `/icons/oroactive-relief-512-20261026.png?v=${BUILD_ID}`,
+  `/icons/oroactive-relief-apple-touch-180-20261026.png?v=${BUILD_ID}`
 ];
 const NEVER_CACHE_PREFIXES = [
   "/api/",

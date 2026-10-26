@@ -43,8 +43,11 @@ let markSide = CGFloat(max(markWidth, markHeight))
 let outputs: [(String, Int, CGFloat)] = [
     ("oroactive-logo.png", 1024, 0.98),
     ("icons/apple-touch-icon-180.png", 180, 0.86),
+    ("icons/oroactive-relief-apple-touch-180-20261026.png", 180, 0.86),
     ("icons/icon-192.png", 192, 0.78),
+    ("icons/oroactive-relief-192-20261026.png", 192, 0.78),
     ("icons/icon-512.png", 512, 0.78),
+    ("icons/oroactive-relief-512-20261026.png", 512, 0.78),
     ("ios/OroActiveTrial/Assets.xcassets/AppIcon.appiconset/icon.png", 1024, 0.86),
     ("ios/OroActiveTrial/Assets.xcassets/OroActiveLogo.imageset/logo.png", 1024, 0.98)
 ]
